@@ -1,1 +1,1 @@
-## 欢迎您，这是 linchun.com.cn 的主页
+## 欢迎您，这里是 linchun.com.cn
