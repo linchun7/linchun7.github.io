@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<search> 
+  
+  
+    
+    <entry>
+      <title>TEST</title>
+      <link href="/2022/05/01/TEST/"/>
+      <url>/2022/05/01/TEST/</url>
+      
+        <content type="html"><![CDATA[]]></content>
+      
+      
+      
+    </entry>
+    
+    
+    
+    <entry>
+      <title>hello world</title>
+      <link href="/2022/05/01/hello-world/"/>
+      <url>/2022/05/01/hello-world/</url>
+      
+        <content type="html"><![CDATA[]]></content>
+      
+      
+      <categories>
+          
+          <category> 其他 </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> hello world </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+  
+  
+</search>
