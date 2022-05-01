@@ -4,13 +4,25 @@
   
     
     <entry>
-      <title>TEST</title>
-      <link href="/2022/05/01/TEST/"/>
-      <url>/2022/05/01/TEST/</url>
+      <title>第二篇文章</title>
+      <link href="/2022/05/01/%E7%AC%AC%E4%BA%8C%E7%AF%87%E6%96%87%E7%AB%A0/"/>
+      <url>/2022/05/01/%E7%AC%AC%E4%BA%8C%E7%AF%87%E6%96%87%E7%AB%A0/</url>
       
-        <content type="html"><![CDATA[]]></content>
+        <content type="html"><![CDATA[<p><strong>这是第二篇文章</strong><br>也是一个测试<br>目前看，网站简洁<br>但实现方式不够优雅<br>还需要进一步调试</p>]]></content>
       
       
+      <categories>
+          
+          <category> 随笔 </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> 测试 </tag>
+            
+        </tags>
       
     </entry>
     
@@ -21,7 +33,7 @@
       <link href="/2022/05/01/hello-world/"/>
       <url>/2022/05/01/hello-world/</url>
       
-        <content type="html"><![CDATA[]]></content>
+        <content type="html"><![CDATA[<p><strong>Hello, World!</strong></p>]]></content>
       
       
       <categories>
@@ -33,7 +45,7 @@
       
         <tags>
             
-            <tag> hello world </tag>
+            <tag> 测试 </tag>
             
         </tags>
       
