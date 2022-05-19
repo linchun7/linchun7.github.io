@@ -4,6 +4,33 @@
   
     
     <entry>
+      <title>如何在 Mac 上的 Safari、Opera、Chrome、Firefox 和 Edge 浏览器中强制硬刷新</title>
+      <link href="/posts/b49680bc.html"/>
+      <url>/posts/b49680bc.html</url>
+      
+        <content type="html"><![CDATA[<p>在 macOS 系统调试网页，发现各浏览器的强制刷新快捷键是有区别的，总结如下：</p><p>1、Safari、Opera</p><p><strong><u>Command (⌘) + Option (⌥) + R</u></strong></p><p><img src="/../pictures/hard_refresh_1.png" alt="img"></p><p>2、Google Chrome、Mozilla Firefox、Microsoft Edge</p><p><strong><u>Command (⌘) + Shift(⇧) + R</u></strong></p><p><img src="/../pictures/hard_refresh_2.png" alt="img"></p>]]></content>
+      
+      
+      <categories>
+          
+          <category> 技术 </category>
+          
+          <category> 经验技巧 </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> 浏览器 </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
       <title>test</title>
       <link href="/posts/d87f7e0c.html"/>
       <url>/posts/d87f7e0c.html</url>
