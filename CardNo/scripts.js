@@ -20,27 +20,27 @@ function handleInput() {
 
     // 限制已输入有效位数不大于30位
     if (validCount > 30) {
-        output.textContent = '有效位数不大于30位。';
+        output.textContent = '有效位数超过 30 位，无法生成卡号。';
         cardCount.textContent = `生成的卡号数量：0`;
         return;
     }
 
     // 更新信息
     info.textContent = `已输入有效位数：${validCount}`;
-
-    // 生成和显示银行卡号
-    if (validCount < 15 || wildcardCount > 4) {
-        let message = '有效位数少于15位，无法生成卡号。';
-        if (wildcardCount > 4) {
-            message += ' 可变内容超过4位，无法生成卡号。';
-        }
-        output.textContent = message;
-        cardCount.textContent = `生成的卡号数量：0`;
-    } else {
-        let cardNumbers = generateCardNumbers(rawInput.replace(/\s+/g, ''));
-        output.textContent = formatCardNumbers(cardNumbers).join('\n');
-        cardCount.textContent = `生成的卡号数量：${cardNumbers.length}`;
-    }
+	
+	
+	// 生成和显示银行卡号
+	if (validCount < 15) {
+		output.textContent = '有效位数少于15位，无法生成卡号。';
+		cardCount.textContent = `生成的卡号数量：0`;
+	} else if (wildcardCount > 4) {
+		output.textContent = '可变内容超过4位，无法生成卡号。';
+		cardCount.textContent = `生成的卡号数量：0`;
+	} else {
+		let cardNumbers = generateCardNumbers(rawInput.replace(/\s+/g, ''));
+		output.textContent = formatCardNumbers(cardNumbers).join('\n');
+		cardCount.textContent = `生成的卡号数量：${cardNumbers.length}`;
+	}
 }
 
 function generateCardNumbers(template) {
