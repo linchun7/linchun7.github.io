@@ -17,12 +17,14 @@ body {
 
 input {
     flex: 1;
-    padding: 10px;
+    padding: 12px; /* 调整输入框内文字的字体大小和上下间距 */
+    font-size: 16px; /* 调整输入框内文字的字体大小 */
     margin-right: 10px;
 }
 
 button {
-    padding: 10px;
+    padding: 12px 20px; /* 增大按钮的内边距，使确定两字加大 */
+    font-size: 16px; /* 增大按钮上的文字字体大小 */
 }
 
 #output {
@@ -33,4 +35,25 @@ button {
 
 #submit.clicked {
     background-color: #f0f0f0;
+}
+
+/* 移动端适配，根据屏幕宽度调整字体大小 */
+@media screen and (max-width: 600px) {
+    h1 {
+        font-size: 24px;
+    }
+
+    p {
+        font-size: 14px;
+    }
+
+    input {
+        font-size: 14px;
+        padding: 10px;
+    }
+
+    button {
+        padding: 10px 16px;
+        font-size: 14px;
+    }
 }
