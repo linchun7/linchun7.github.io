@@ -1,5 +1,7 @@
 body {
     font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
 }
 
 #main {
@@ -8,10 +10,19 @@ body {
     padding: 20px;
 }
 
-input, button {
-    width: 100%;
+.input-wrapper {
+    display: flex;
+    align-items: center;
+}
+
+input {
+    flex: 1;
     padding: 10px;
-    margin-top: 10px;
+    margin-right: 10px;
+}
+
+button {
+    padding: 10px;
 }
 
 #output {
@@ -22,10 +33,4 @@ input, button {
 
 #submit.clicked {
     background-color: #f0f0f0;
-}
-
-.info {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
 }
