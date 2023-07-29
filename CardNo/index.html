@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="styles.css">
+    <title>银行卡号生成器</title>
+</head>
+<body>
+    <div id="main">
+        <h1>银行卡号生成器</h1>
+        <p>根据输入的数字（包含最多 4 位任意位置的 x 或 * 号，如 6222 **** 8888 8888），生成满足 Luhn 算法的银行卡号，用于卡号定制提前算号。</p>
+        <div class="info">
+            <input type="text" id="input" placeholder="输入银行卡号，如 6222 **** 8888 8888" autofocus>
+            <button id="submit">确定</button>
+            <p id="info">已输入卡号：0</p>
+            <p id="cardCount">生成卡号：0</p>
+        </div>
+        <div id="output"></div>
+    </div>
+    <script src="scripts.js"></script>
+</body>
+</html>
