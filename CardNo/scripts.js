@@ -82,3 +82,10 @@ function formatCardNumbers(cardNumbers) {
     // 每4位加一个空格显示
     return cardNumbers.map(cardNumber => cardNumber.replace(/\s/g, '').replace(/(.{4})/g, '$1 '));
 }
+var _hmt = _hmt || [];
+(function() {
+  var hm = document.createElement("script");
+  hm.src = "https://hm.baidu.com/hm.js?db1887936545a6bc1ba1afebdd10e617";
+  var s = document.getElementsByTagName("script")[0]; 
+  s.parentNode.insertBefore(hm, s);
+})();
