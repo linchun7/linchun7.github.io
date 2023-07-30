@@ -8,7 +8,7 @@
       <link href="/posts/50c5b27d.html"/>
       <url>/posts/50c5b27d.html</url>
       
-        <content type="html"><![CDATA[<h1 id="银行卡号生成器"><a href="#银行卡号生成器" class="headerlink" title="银行卡号生成器"></a><a href="https://www.linchun.com.cn/CardNo/">银行卡号生成器</a></h1>]]></content>
+        <content type="html"><![CDATA[<h1 id="银行卡号生成器"><a href="#银行卡号生成器" class="headerlink" title="银行卡号生成器"></a><a href="https://www.linchun.com.cn/CardNo/">银行卡号生成器</a></h1><p>直接点击以上链接即可使用，纯前端实现。</p><p>该功能主要用于银行卡号定制时的算号，可提前找出满足 Luhn 算法的银行卡号（注意，满足 Luhn 算法不等于可以直接使用，因已使用、注销、冻结、银行保留等原因，该卡号不一定能够开出）。</p>]]></content>
       
       
       <categories>
