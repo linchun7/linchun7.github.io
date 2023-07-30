@@ -8,7 +8,7 @@
       <link href="/posts/50c5b27d.html"/>
       <url>/posts/50c5b27d.html</url>
       
-        <content type="html"><![CDATA[<p>直接点击链接： <strong><a href="/tools/CardNo/">银行卡号生成器</a></strong> 即可使用。</p><p>该功能主要用于银行卡号定制时的算号，可提前找出满足 Luhn 算法的银行卡号（注意，满足 Luhn 算法不等于可以直接使用，因已使用、注销、冻结、银行保留等原因，该卡号不一定能够开出）。</p>]]></content>
+        <content type="html"><![CDATA[<p>直接点击链接： <strong><a href="/tools/card_number/">银行卡号生成器</a></strong> 即可使用。</p><p>该功能主要用于银行卡号定制时的算号，可提前找出满足 Luhn 算法的银行卡号（注意，满足 Luhn 算法不等于可以直接使用，因已使用、注销、冻结、银行保留等原因，该卡号不一定能够开出）。</p>]]></content>
       
       
       <categories>
@@ -20,11 +20,11 @@
       
         <tags>
             
+            <tag> Luhn算法 </tag>
+            
             <tag> 银行卡号 </tag>
             
             <tag> 算号 </tag>
-            
-            <tag> Luhn算法 </tag>
             
         </tags>
       
