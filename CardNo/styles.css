@@ -2,32 +2,33 @@ body {
     font-family: Arial, sans-serif;
     margin: 0;
     padding: 0;
+    display: flex; /* 将body设置为Flex容器 */
+    flex-direction: column; /* 垂直排列子项 */
+    min-height: 100vh; /* 确保body至少占满一屏的高度 */
 }
 
 #main {
+    flex-grow: 1; /* 让main元素占据剩余的垂直空间 */
     max-width: 600px;
     margin: 0 auto;
     padding: 20px;
 }
+
 #footer {
     text-align: center;
-    align-self: flex-start;
-    flex-basis: auto;
-    flex-grow: 1;
-    flex-shrink: 1;
     margin-right: 20px;
     text-overflow: ellipsis;
     overflow: hidden;
 }
+
 #footer a {
     color: inherit;
-    text-decoration: none;
+    text-decoration: underline;
 }
 
 #footer a:hover {
     color: underline; /* 鼠标悬停时的颜色，你可以根据需要进行调整 */
 }
-
 
 .input-wrapper {
     display: flex;
