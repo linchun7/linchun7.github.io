@@ -1,3 +1,5 @@
+/* styles.css */
+
 body {
     font-family: Arial, sans-serif;
     margin: 0;
@@ -19,6 +21,7 @@ body {
     margin-right: 20px;
     text-overflow: ellipsis;
     overflow: hidden;
+    margin-top: 10px; /* 将footer上移10像素 */
 }
 
 #footer a {
