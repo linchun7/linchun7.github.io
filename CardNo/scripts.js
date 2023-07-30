@@ -1,3 +1,5 @@
+// scripts.js
+
 // 获取 HTML 元素
 const input = document.getElementById('input');
 const submit = document.getElementById('submit');
@@ -13,10 +15,10 @@ input.focus();
 
 function handleInput() {
     // 获取并处理输入
-    let rawInput = input.value.replace(/[^0-9xX*\s]/g, '');
-    input.value = rawInput; // 清除非法字符
-    let validCount = (rawInput.match(/[0-9xX*]/g) || []).length;
-    let wildcardCount = (rawInput.match(/[xX*]/g) || []).length;
+    let filteredInput = filterInput(input.value);
+    input.value = filteredInput;
+    let validCount = countValidDigits(filteredInput);
+    let wildcardCount = countWildcards(filteredInput);
 
     // 限制已输入有效位数不大于30位
     if (validCount > 30) {
@@ -27,20 +29,31 @@ function handleInput() {
 
     // 更新信息
     info.textContent = `已输入有效位数：${validCount}`;
-	
-	
-	// 生成和显示银行卡号
-	if (validCount < 15) {
-		output.textContent = '有效位数少于15位，无法生成卡号。';
-		cardCount.textContent = `生成的卡号数量：0`;
-	} else if (wildcardCount > 4) {
-		output.textContent = '可变内容超过4位，无法生成卡号。';
-		cardCount.textContent = `生成的卡号数量：0`;
-	} else {
-		let cardNumbers = generateCardNumbers(rawInput.replace(/\s+/g, ''));
-		output.textContent = formatCardNumbers(cardNumbers).join('\n');
-		cardCount.textContent = `生成的卡号数量：${cardNumbers.length}`;
-	}
+
+    // 生成和显示银行卡号
+    if (validCount < 15) {
+        output.textContent = '有效位数少于15位，无法生成卡号。';
+        cardCount.textContent = `生成的卡号数量：0`;
+    } else if (wildcardCount > 4) {
+        output.textContent = '可变内容超过4位，无法生成卡号。';
+        cardCount.textContent = `生成的卡号数量：0`;
+    } else {
+        let cardNumbers = generateCardNumbers(filteredInput.replace(/\s+/g, ''));
+        output.textContent = formatCardNumbers(cardNumbers).join('\n');
+        cardCount.textContent = `生成的卡号数量：${cardNumbers.length}`;
+    }
+}
+
+function filterInput(input) {
+    return input.replace(/[^0-9xX*\s]/g, '');
+}
+
+function countValidDigits(input) {
+    return (input.match(/[0-9xX*]/g) || []).length;
+}
+
+function countWildcards(input) {
+    return (input.match(/[xX*]/g) || []).length;
 }
 
 function generateCardNumbers(template) {
@@ -78,10 +91,18 @@ function luhnCheck(cardNumber) {
     return sum % 10 === 0;
 }
 
-function formatCardNumbers(cardNumbers) {
-    // 每4位加一个空格显示
-    return cardNumbers.map(cardNumber => cardNumber.replace(/\s/g, '').replace(/(.{4})/g, '$1 '));
+function formatCardNumber(cardNumber) {
+    return cardNumber.replace(/\s/g, '').replace(/(.{4})/g, '$1 ');
 }
+
+function formatCardNumbers(cardNumbers) {
+    return cardNumbers.map(formatCardNumber);
+}
+
+// ...
+
+
+
 var _hmt = _hmt || [];
 (function() {
   var hm = document.createElement("script");

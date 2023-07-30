@@ -9,7 +9,7 @@ body {
     min-height: 100vh; /* 确保body至少占满一屏的高度 */
 }
 
-#main {
+main {
     flex-grow: 1; /* 让main元素占据剩余的垂直空间 */
     max-width: 600px;
     margin: 0 auto;
@@ -21,7 +21,6 @@ body {
     margin-right: 20px;
     text-overflow: ellipsis;
     overflow: hidden;
-    margin-top: 10px; /* 将footer上移10像素 */
 }
 
 #footer a {
