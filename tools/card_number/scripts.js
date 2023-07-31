@@ -97,7 +97,6 @@ function formatCardNumbers(cardNumbers) {
     return cardNumbers.map(formatCardNumber);
 }
 
-// 百度统计代码
 var _hmt = _hmt || [];
 (function() {
   var hm = document.createElement("script");
