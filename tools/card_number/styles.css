@@ -94,3 +94,8 @@ button {
         font-size: 14px;
     }
 }
+/* 取消链接的下划线样式 */
+.no-link-style {
+    color: inherit;
+    text-decoration: none;
+}
