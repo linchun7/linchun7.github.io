@@ -20,7 +20,7 @@ function handleInput() {
 
     // 限制已输入有效位数不大于30位
     if (validCount > 30) {
-		output.innerHTML = '<span class="red-text">注意：有效位数超过 30 位，请输入 30 位以内的卡号。</span>';
+		output.innerHTML = '<span class="red-text">有效位数超过 30 位，请输入 30 位以内的卡号。</span>';
         cardCount.textContent = `生成的卡号数量：0`;
         return;
     }
@@ -30,10 +30,10 @@ function handleInput() {
 
     // 生成和显示银行卡号
     if (validCount < 15) {
-		output.innerHTML = '<span class="red-text">注意：有效位数不足 15 位，请输入 15 位以上的卡号。</span>';
+		output.innerHTML = '<span class="red-text">有效位数不足 15 位，请输入 15 位以上的卡号。</span>';
         cardCount.textContent = `生成的卡号数量：0`;
     } else if (wildcardCount > 4) {
-		output.innerHTML = '<span class="red-text">注意：可变内容超过 4 位，请删除多余的 x 或 * 号。</span>';
+		output.innerHTML = '<span class="red-text">可变符号超过 4 位，请删除多余的 x 或 * 号。</span>';
         cardCount.textContent = `生成的卡号数量：0`;
     } else {
         let cardNumbers = generateCardNumbers(filteredInput.replace(/\s+/g, ''));
