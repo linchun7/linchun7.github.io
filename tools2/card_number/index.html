@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+	<meta name="format-detection" content="telephone=no">
+    <link rel="stylesheet" href="styles.css">
+	<link rel="shortcut icon" href="/images/favicon.ico">
+	<link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
+	<link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+    <title>银行卡号生成器</title>
+</head>
+<body>
+    <main>
+		<h1><a href="https://www.linchun.com.cn/posts/50c5b27d.html">银行卡号生成器</a></h1>
+        <p>根据输入的数字（包含最多 4 位任意位置的 x 或 * 号，如 6222 **** 8888 8888），生成满足 Luhn 算法的银行卡号，用于卡号定制提前算号。</p>
+        <div class="input-wrapper">
+            <input type="number" id="input" placeholder="输入卡号，如 6222 **** 8888 8888" autofocus>
+			<input type="text" inputmode="numeric" name="quantity" id="quantityInput">
+            <button id="submit">确定</button>
+        </div>
+        <p id="info">已输入有效位数：0</p>
+        <p id="cardCount">生成的卡号数量：0</p>
+        <div id="output"></div>
+    </main>
+    <div id="footer">
+        <span>© 2023 <a href="https://www.linchun.com.cn">林春写字的地方</a></span>
+    </div>
+    <script src="scripts.js"></script>
+</body>
+</html>
