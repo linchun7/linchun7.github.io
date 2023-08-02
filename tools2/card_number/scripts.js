@@ -43,7 +43,7 @@ function handleInput() {
 }
 
 function filterInput(input) {
-    return input.replace(/[^0-9xX*\s]/g, '');
+    return input.replace(/[^0-9xX*\s]+/g, '');
 }
 
 function countValidDigits(input) {
