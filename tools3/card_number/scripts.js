@@ -18,7 +18,7 @@ async function generateCombinations(str, batchSize, combination = '') {
       results.push(combination);
       if (results.length % batchSize === 0) {
         displayResults();
-        await sleep(200); // 设置适当的延迟，这里是 200 毫秒
+        await sleep(0); // 设置适当的延迟，这里是 200 毫秒
       }
     }
   } else {
@@ -58,11 +58,8 @@ function handleInput() {
   let inputField = document.getElementById('inputField');
   let inputStr = inputField.value;
 
-  // 过滤非字母、数字、星号的字符
-  inputStr = inputStr.replace(/[^a-zA-Z0-9*\s]/g, '');
-
-  // 多个空格替换为一个空格
-  inputStr = inputStr.replace(/\s+/g, ' ');
+  // 过滤非字母、数字、星号的字符，并将多个空格替换为一个空格
+  inputStr = inputStr.replace(/[^a-zA-Z0-9*\s]/g, '').replace(/\s+/g, ' ');
 
   // 更新输入框内容
   inputField.value = inputStr;
@@ -80,7 +77,7 @@ async function startGeneration() {
   let processedInput = inputStr.replace(/[^a-zA-Z0-9*]/g, ''); //
   results = [];
   letterMap = {};
-  let batchSize = 50000; // 设置每批显示的条数
+  let batchSize = 10000; // 设置每批显示的条数
   await generateCombinations(processedInput, batchSize);
   displayResults();
 }
