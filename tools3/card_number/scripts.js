@@ -102,3 +102,4 @@ function luhnCheck(str) {
 }
 
 //最新
+//最新2
