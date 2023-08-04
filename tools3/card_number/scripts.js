@@ -100,5 +100,3 @@ function luhnCheck(str) {
   }
   return sum % 10 === 0;
 }
-
-//测试版本。新增。
