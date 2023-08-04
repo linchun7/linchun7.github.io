@@ -100,3 +100,5 @@ function luhnCheck(str) {
   }
   return sum % 10 === 0;
 }
+
+//最新
