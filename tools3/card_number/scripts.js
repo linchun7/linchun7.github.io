@@ -1,4 +1,6 @@
+// 存储生成的银行卡号组合
 let results = [];
+// 存储字母映射
 let letterMap = {};
 
 /**
@@ -6,39 +8,66 @@ let letterMap = {};
  * @param {string} str - 输入的银行卡号模板
  * @param {string} combination - 当前组合的中间结果
  */
-async function generateCombinations(str, combination = '') {
+function generateCombinations(str, combination = '') {
   if (str.length === 0) {
-    if (combination.length > 0 && luhnCheck(combination)) { // 仅当combination不为空且Luhn验证通过时加入结果
+    // 当组合非空且通过 Luhn 验证时，添加到结果列表
+    if (combination.length > 0 && luhnCheck(combination)) {
       results.push(combination);
     }
   } else {
     let char = str[0];
 
     if (char >= '0' && char <= '9') {
-      await generateCombinations(str.substring(1), combination + char);
+      generateCombinations(str.substring(1), combination + char);
     } else if (char.match(/[a-zA-Z]/)) {
       let firstLetter = char.toLowerCase();
       if (letterMap[firstLetter] === undefined) {
-        for (let i = 0; i < 10; i++) {
-          letterMap[firstLetter] = i;
-          await generateCombinations(str.substring(1), combination + i);
-        }
-        letterMap[firstLetter] = undefined;
+        // 生成对应字母的所有数字组合
+      for (let i = 0; i < 10; i++) {
+        letterMap[firstLetter] = i;
+        generateCombinations(str.substring(1), combination + i);
+      }
+      letterMap[firstLetter] = undefined;
       } else {
-        await generateCombinations(str.substring(1), combination + letterMap[firstLetter]);
+        generateCombinations(str.substring(1), combination + letterMap[firstLetter]);
       }
     } else if (char === '*') {
+      // 对于星号，生成所有可能的数字组合
       for (let i = 0; i < 10; i++) {
-        await generateCombinations(str.substring(1), combination + i);
+        generateCombinations(str.substring(1), combination + i);
       }
     }
   }
 }
 
+/**
+ * 开始生成银行卡号组合
+ */
+function startGeneration() {
+  let inputStr = document.getElementById('inputField').value;
+  let processedInput = inputStr.replace(/[^a-zA-Z0-9*]/g, '');
+  results = [];
+  letterMap = {};
+
+  if (processedInput.length > 0) {
+    generateCombinations(processedInput);
+  }
+
+  displayResults();
+}
+
+/**
+ * 显示生成结果
+ */
+function displayResults() {
+  document.getElementById('result').textContent = results.join('\n');
+  document.getElementById('count').textContent = `生成的卡号数量：${results.length}`;
+}
+
 // 处理用户输入
-document.getElementById('inputField').addEventListener('input', async function() {
+document.getElementById('inputField').addEventListener('input', function() {
   handleInput();
-  await startGeneration();
+  startGeneration();
 });
 
 /**
@@ -56,49 +85,27 @@ function handleInput() {
 
   // 统计有效位数（不包括空格）
   let validCount = inputStr.replace(/[^a-zA-Z0-9*]/g, '').length;
-  document.getElementById('validCount').innerText = `已输入有效位数：${validCount}`;
-}
-
-/**
- * 开始生成银行卡号组合
- */
-async function startGeneration() {
-  let inputStr = document.getElementById('inputField').value;
-  let processedInput = inputStr.replace(/[^a-zA-Z0-9*]/g, '');
-  results = [];
-  letterMap = {};
-
-  if (processedInput.length > 0) { // 仅当有有效输入时才开始生成组合
-    await generateCombinations(processedInput);
-  }
-
-  displayResults();
-}
-
-/**
- * 显示生成结果
- */
-function displayResults() {
-  document.getElementById('result').innerText = results.join('\n');
-  document.getElementById('count').innerText = `生成的卡号数量：${results.length}`;
+  document.getElementById('validCount').textContent = `已输入有效位数：${validCount}`;
 }
 
 /**
  * Luhn 算法验证
  * @param {string} str - 输入的银行卡号
- * @returns {boolean} - 验证结果，true表示通过
+ * @returns {boolean} - 验证结果，true 表示通过
  */
 function luhnCheck(str) {
   let len = str.length;
   let parity = len % 2;
   let sum = 0;
   for (let i = len - 1; i >= 0; i--) {
-    let d = parseInt(str.charAt(i));
-    if (i % 2 === parity) d *= 2;
-    if (d > 9) d -= 9;
-    sum += d;
+    let digit = parseInt(str[i], 10);
+    if ((i + parity) % 2 === 0) {
+      digit *= 2;
+      if (digit > 9) {
+        digit -= 9;
+      }
+    }
+    sum += digit;
   }
   return sum % 10 === 0;
 }
-
-//最新
