@@ -1,98 +1,89 @@
-// 存储生成的银行卡号组合
 let results = [];
-// 存储字母映射
 let letterMap = {};
+let currentPage = 0;
+const resultsPerPage = 100; // 每页显示的结果数量
+const batchSize = resultsPerPage * 10; // 每批生成的数量
 
-/**
- * 生成银行卡号的组合
- * @param {string} str - 输入的银行卡号模板
- * @param {string} combination - 当前组合的中间结果
- */
-function generateCombinations(str, combination = '') {
+function generateCombinationsBatch(str, batchSize, currentBatch = 0, combination = '') {
+  if (results.length >= batchSize) {
+    return;
+  }
+
   if (str.length === 0) {
-    // 当组合非空且通过 Luhn 验证时，添加到结果列表
     if (combination.length > 0 && luhnCheck(combination)) {
       results.push(combination);
+      currentBatch++;
     }
   } else {
     let char = str[0];
 
     if (char >= '0' && char <= '9') {
-      generateCombinations(str.substring(1), combination + char);
+      generateCombinationsBatch(str.substring(1), batchSize, currentBatch, combination + char);
     } else if (char.match(/[a-zA-Z]/)) {
       let firstLetter = char.toLowerCase();
       if (letterMap[firstLetter] === undefined) {
-        // 生成对应字母的所有数字组合
-      for (let i = 0; i < 10; i++) {
-        letterMap[firstLetter] = i;
-        generateCombinations(str.substring(1), combination + i);
-      }
-      letterMap[firstLetter] = undefined;
+        for (let i = 0; i < 10; i++) {
+          if (results.length >= batchSize) {
+            return;
+          }
+          letterMap[firstLetter] = i;
+          generateCombinationsBatch(str.substring(1), batchSize, currentBatch, combination + i);
+          currentBatch++;
+        }
+        letterMap[firstLetter] = undefined;
       } else {
-        generateCombinations(str.substring(1), combination + letterMap[firstLetter]);
+        generateCombinationsBatch(str.substring(1), batchSize, currentBatch, combination + letterMap[firstLetter]);
+        currentBatch++;
       }
     } else if (char === '*') {
-      // 对于星号，生成所有可能的数字组合
       for (let i = 0; i < 10; i++) {
-        generateCombinations(str.substring(1), combination + i);
+        if (results.length >= batchSize) {
+          return;
+        }
+        generateCombinationsBatch(str.substring(1), batchSize, currentBatch, combination + i);
+        currentBatch++;
       }
     }
   }
 }
 
-/**
- * 开始生成银行卡号组合
- */
-function startGeneration() {
+function startGenerationBatch() {
   let inputStr = document.getElementById('inputField').value;
   let processedInput = inputStr.replace(/[^a-zA-Z0-9*]/g, '');
   results = [];
   letterMap = {};
 
   if (processedInput.length > 0) {
-    generateCombinations(processedInput);
+    generateCombinationsBatch(processedInput, batchSize);
   }
 
+  currentPage = 0; // 重置当前页
   displayResults();
 }
 
-/**
- * 显示生成结果
- */
 function displayResults() {
-  document.getElementById('result').textContent = results.join('\n');
+  const startIndex = currentPage * resultsPerPage;
+  const endIndex = Math.min((currentPage + 1) * resultsPerPage, results.length);
+  const pageResults = results.slice(startIndex, endIndex);
+  
+  document.getElementById('result').textContent = pageResults.join('\n');
   document.getElementById('count').textContent = `生成的卡号数量：${results.length}`;
+  updatePageContent();
+  updatePageButtons();
 }
 
-// 处理用户输入
-document.getElementById('inputField').addEventListener('input', function() {
-  handleInput();
-  startGeneration();
-});
-
-/**
- * 处理用户输入，过滤非法字符并更新统计信息
- */
 function handleInput() {
   let inputField = document.getElementById('inputField');
   let inputStr = inputField.value;
 
-  // 过滤非字母、数字、星号的字符，并将多个空格替换为一个空格
   inputStr = inputStr.replace(/[^a-zA-Z0-9*\s]/g, '').replace(/\s+/g, ' ');
 
-  // 更新输入框内容
   inputField.value = inputStr;
 
-  // 统计有效位数（不包括空格）
   let validCount = inputStr.replace(/[^a-zA-Z0-9*]/g, '').length;
   document.getElementById('validCount').textContent = `已输入有效位数：${validCount}`;
 }
 
-/**
- * Luhn 算法验证
- * @param {string} str - 输入的银行卡号
- * @returns {boolean} - 验证结果，true 表示通过
- */
 function luhnCheck(str) {
   let len = str.length;
   let parity = len % 2;
@@ -109,3 +100,42 @@ function luhnCheck(str) {
   }
   return sum % 10 === 0;
 }
+
+function updatePageButtons() {
+  const prevPageButton = document.getElementById('prevPage');
+  const nextPageButton = document.getElementById('nextPage');
+
+  prevPageButton.disabled = currentPage === 0;
+  nextPageButton.disabled = (currentPage + 1) * resultsPerPage >= results.length;
+}
+
+function updatePageContent() {
+  const startIndex = currentPage * resultsPerPage;
+  const endIndex = Math.min((currentPage + 1) * resultsPerPage, results.length);
+  const pageResults = results.slice(startIndex, endIndex);
+  
+  document.getElementById('result').textContent = pageResults.join('\n');
+}
+
+document.getElementById('inputField').addEventListener('input', function() {
+  handleInput();
+  startGenerationBatch();
+});
+
+document.getElementById('prevPage').addEventListener('click', function() {
+  if (currentPage > 0) {
+    currentPage--;
+    displayResults();
+  }
+});
+
+document.getElementById('nextPage').addEventListener('click', function() {
+  const nextPageStart = (currentPage + 1) * resultsPerPage;
+  if (nextPageStart < results.length) {
+    currentPage++;
+    displayResults();
+  }
+});
+
+startGenerationBatch(); // 生成初始批次
+updatePageButtons();
