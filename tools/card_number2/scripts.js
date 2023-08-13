@@ -1,133 +1,108 @@
-// 存储生成的银行卡号组合
-let results = [];
-// 存储字母映射
-let letterMap = {};
-// 最大生成结果数量
-let maxResults = 100000; // 你可以根据需要设置最大数量
+// 获取 HTML 元素
+const input = document.getElementById('input');
+const submit = document.getElementById('submit');
+const info = document.getElementById('info');
+const cardCount = document.getElementById('cardCount');
+const output = document.getElementById('output');
 
-/**
- * 生成银行卡号的组合
- * @param {string} str - 输入的银行卡号模板
- * @param {string} combination - 当前组合的中间结果
- */
-function generateCombinations(str, combination = '') {
-  if (results.length >= maxResults) {
-    return; // 停止生成
-  }
+// 处理输入内容，当输入框内容改变时调用
+input.addEventListener('input', handleInput);
 
-  if (str.length === 0) {
-    // 当组合非空且通过 Luhn 验证时，添加到结果列表
-    if (combination.length > 0 && luhnCheck(combination)) {
-      results.push(combination);
-    }
-  } else {
-    let char = str[0];
+// 自动聚焦输入框
+input.focus();
 
-    if (char >= '0' && char <= '9') {
-      generateCombinations(str.substring(1), combination + char);
-    } else if (char.match(/[a-zA-Z]/)) {
-      let firstLetter = char.toLowerCase();
-      if (letterMap[firstLetter] === undefined) {
-        // 生成对应字母的所有数字组合
-        for (let i = 0; i < 10; i++) {
-          letterMap[firstLetter] = i;
-          generateCombinations(str.substring(1), combination + i);
-        }
-        letterMap[firstLetter] = undefined;
-      } else {
-        generateCombinations(str.substring(1), combination + letterMap[firstLetter]);
-      }
-    } else if (char === '*') {
-      // 对于星号，生成所有可能的数字组合
-      for (let i = 0; i < 10; i++) {
-        generateCombinations(str.substring(1), combination + i);
-      }
-    }
-  }
-}
-
-/**
- * 开始生成银行卡号组合
- */
-function startGeneration() {
-  let inputStr = document.getElementById('inputField').value;
-  let processedInput = inputStr.replace(/[^a-zA-Z0-9*]/g, '');
-  results = [];
-  letterMap = {};
-
-  if (processedInput.length > 0) {
-    generateCombinations(processedInput);
-  }
-
-  displayResults();
-}
-
-/**
- * 显示生成结果
- */
-function displayResults() {
-  let formattedResults = results.map(result => {
-    // 插入空格，每隔4位数字
-    let formattedResult = result.replace(/\d{4}(?=\d)/g, '$& ');
-
-    return formattedResult;
-  });
-
-  let countMessage = results.length >= maxResults
-    ? `生成的卡号数量：生成结果过多，仅显示前 ${maxResults} 条。`
-    : `生成的卡号数量：${results.length}`;
-  
-  document.getElementById('result').textContent = formattedResults.join('\n');
-  document.getElementById('count').textContent = countMessage;
-}
-
-// 处理用户输入
-document.getElementById('inputField').addEventListener('input', function() {
-  handleInput();
-  startGeneration();
-});
-
-// 添加点击事件处理
-document.getElementById('generateButton').addEventListener('click', function() {
-  startGeneration();
-});
-
-/**
- * 处理用户输入，过滤非法字符并更新统计信息
- */
 function handleInput() {
-  let inputField = document.getElementById('inputField');
-  let inputStr = inputField.value;
+    // 获取并处理输入
+    let filteredInput = filterInput(input.value);
+    input.value = filteredInput;
+    let validCount = countValidDigits(filteredInput);
+    let wildcardCount = countWildcards(filteredInput);
 
-  // 过滤非字母、数字、星号的字符，并将多个空格替换为一个空格
-  inputStr = inputStr.replace(/[^a-zA-Z0-9*\s]/g, '').replace(/\s+/g, ' ');
-
-  // 更新输入框内容
-  inputField.value = inputStr;
-
-  // 统计有效位数（不包括空格）
-  let validCount = inputStr.replace(/[^a-zA-Z0-9*]/g, '').length;
-  document.getElementById('validCount').textContent = `已输入有效位数：${validCount}`;
-}
-
-/**
- * Luhn 算法验证
- * @param {string} str - 输入的银行卡号
- * @returns {boolean} - 验证结果，true 表示通过
- */
-function luhnCheck(str) {
-  let len = str.length;
-  let parity = len % 2;
-  let sum = 0;
-  for (let i = len - 1; i >= 0; i--) {
-    let digit = parseInt(str[i], 10);
-    if ((i + parity) % 2 === 0) {
-      digit *= 2;
-      if (digit > 9) {
-        digit -= 9;
-      }
+    // 限制已输入有效位数不大于30位
+    if (validCount > 30) {
+		output.innerHTML = '<span class="red-text">有效位数超过 30 位，请输入 30 位以内的卡号。</span>';
+        cardCount.textContent = `生成的卡号数量：0`;
+        return;
     }
-    sum += digit;
-  }
-  return sum % 10 === 0;
+
+    // 更新信息
+    info.textContent = `已输入有效位数：${validCount}`;
+
+    // 生成和显示银行卡号
+    if (validCount < 15) {
+		output.innerHTML = '<span class="red-text">有效位数不足 15 位，请输入 15 位以上的卡号。</span>';
+        cardCount.textContent = `生成的卡号数量：0`;
+    } else if (wildcardCount > 4) {
+		output.innerHTML = '<span class="red-text">输入的 x 或 * 号超过 4 位，请删除多余的符号。</span>';
+        cardCount.textContent = `生成的卡号数量：0`;
+    } else {
+        let cardNumbers = generateCardNumbers(filteredInput.replace(/\s+/g, ''));
+        output.textContent = formatCardNumbers(cardNumbers).join('\n');
+        cardCount.textContent = `生成的卡号数量：${cardNumbers.length}`;
+    }
 }
+
+function filterInput(input) {
+	return input.replace(/[^0-9xX*\s]/g, '').replace(/\s+/g, ' ');
+
+}
+
+function countValidDigits(input) {
+    return (input.match(/[0-9xX*]/g) || []).length;
+}
+
+function countWildcards(input) {
+    return (input.match(/[xX*]/g) || []).length;
+}
+
+function generateCardNumbers(template) {
+    // 生成满足 Luhn 算法的银行卡号
+    let cardNumbers = [];
+    let wildcardCount = (template.match(/[xX*]/g) || []).length;
+
+    for (let i = 0; i < Math.pow(10, wildcardCount); i++) {
+        let cardNumber = template;
+        let replacements = String(i).padStart(wildcardCount, '0').split('');
+        replacements.forEach(replacement => {
+            cardNumber = cardNumber.replace(/[xX*]/, replacement);
+        });
+        if (luhnCheck(cardNumber)) {
+            cardNumbers.push(cardNumber);
+        }
+    }
+
+    return cardNumbers;
+}
+
+function luhnCheck(cardNumber) {
+    // 进行 Luhn 校验
+    let sum = 0;
+    for (let i = 0; i < cardNumber.length; i++) {
+        let digit = parseInt(cardNumber[cardNumber.length - 1 - i]);
+        if (i % 2 === 1) {
+            digit *= 2;
+            if (digit > 9) {
+                digit -= 9;
+            }
+        }
+        sum += digit;
+    }
+    return sum % 10 === 0;
+}
+
+function formatCardNumber(cardNumber) {
+    return cardNumber.replace(/\s/g, '').replace(/(.{4})/g, '$1 ');
+}
+
+function formatCardNumbers(cardNumbers) {
+    return cardNumbers.map(formatCardNumber);
+}
+
+// 百度统计代码
+var _hmt = _hmt || [];
+(function() {
+  var hm = document.createElement("script");
+  hm.src = "https://hm.baidu.com/hm.js?db1887936545a6bc1ba1afebdd10e617";
+  var s = document.getElementsByTagName("script")[0]; 
+  s.parentNode.insertBefore(hm, s);
+})();

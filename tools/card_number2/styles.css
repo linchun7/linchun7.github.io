@@ -57,7 +57,7 @@ button {
     font-size: 16px; /* 增大按钮上的文字字体大小 */
 }
 
-#result {
+#output {
     margin-top: 20px;
     word-wrap: break-word;
     white-space: pre-line;
