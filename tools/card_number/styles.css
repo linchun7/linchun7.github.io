@@ -97,5 +97,10 @@ button {
 
 #validCount,
 #count {
-  line-height: 0.5; /* 调整行距的值，可以根据需要进行调整 */
+  line-height: 0.6; /* 调整行距的值，可以根据需要进行调整 */
+}
+
+
+#result {
+  line-height: 1.5; 
 }
