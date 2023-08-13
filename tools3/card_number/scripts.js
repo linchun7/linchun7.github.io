@@ -2,6 +2,8 @@
 let results = [];
 // 存储字母映射
 let letterMap = {};
+// 最大生成结果数量
+let maxResults = 10000; // 你可以根据需要设置最大数量
 
 /**
  * 生成银行卡号的组合
@@ -9,6 +11,10 @@ let letterMap = {};
  * @param {string} combination - 当前组合的中间结果
  */
 function generateCombinations(str, combination = '') {
+  if (results.length >= maxResults) {
+    return; // 停止生成
+  }
+
   if (str.length === 0) {
     // 当组合非空且通过 Luhn 验证时，添加到结果列表
     if (combination.length > 0 && luhnCheck(combination)) {
@@ -23,11 +29,11 @@ function generateCombinations(str, combination = '') {
       let firstLetter = char.toLowerCase();
       if (letterMap[firstLetter] === undefined) {
         // 生成对应字母的所有数字组合
-      for (let i = 0; i < 10; i++) {
-        letterMap[firstLetter] = i;
-        generateCombinations(str.substring(1), combination + i);
-      }
-      letterMap[firstLetter] = undefined;
+        for (let i = 0; i < 10; i++) {
+          letterMap[firstLetter] = i;
+          generateCombinations(str.substring(1), combination + i);
+        }
+        letterMap[firstLetter] = undefined;
       } else {
         generateCombinations(str.substring(1), combination + letterMap[firstLetter]);
       }
@@ -60,8 +66,19 @@ function startGeneration() {
  * 显示生成结果
  */
 function displayResults() {
-  document.getElementById('result').textContent = results.join('\n');
-  document.getElementById('count').textContent = `生成的卡号数量：${results.length}`;
+  let formattedResults = results.map(result => {
+    // 插入空格，每隔4位数字
+    let formattedResult = result.replace(/\d{4}(?=\d)/g, '$& ');
+
+    return formattedResult;
+  });
+
+  let countMessage = results.length >= maxResults
+    ? `生成的卡号数量达到 ${maxResults}，停止生成`
+    : `生成的卡号数量：${results.length}`;
+  
+  document.getElementById('result').textContent = formattedResults.join('\n');
+  document.getElementById('count').textContent = countMessage;
 }
 
 // 处理用户输入
