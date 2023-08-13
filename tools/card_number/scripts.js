@@ -74,7 +74,7 @@ function displayResults() {
   });
 
   let countMessage = results.length >= maxResults
-    ? `生成的卡号数量：生成结果过多，仅显示前 ${maxResults} 条。`
+    ? `生成的卡号数量：生成的结果过多，仅显示前 ${maxResults} 条。`
     : `生成的卡号数量：${results.length}`;
   
   document.getElementById('result').textContent = formattedResults.join('\n');
