@@ -90,6 +90,7 @@ document.getElementById('inputField').addEventListener('input', function() {
 // 添加点击事件处理
 document.getElementById('generateButton').addEventListener('click', function() {
   clearInput(); // 调用清空输入框函数
+  document.getElementById('inputField').focus(); // 设置输入框焦点
   startGeneration(); // 重新开始生成银行卡号组合
 });
 
