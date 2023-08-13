@@ -3,7 +3,7 @@ let results = [];
 // 存储字母映射
 let letterMap = {};
 // 最大生成结果数量
-let maxResults = 50000; // 你可以根据需要设置最大数量
+let maxResults = 20000; // 你可以根据需要设置最大数量
 
 /**
  * 生成银行卡号的组合
@@ -74,7 +74,7 @@ function displayResults() {
   });
 
   let countMessage = results.length >= maxResults
-    ? `生成的卡号结果过多，仅显示前 ${maxResults} 条。`
+    ? `生成的卡号结果过多，仅显示前 ${maxResults} 条`
     : `生成的卡号数量：${results.length}`;
   
   document.getElementById('result').textContent = formattedResults.join('\n');
@@ -89,8 +89,17 @@ document.getElementById('inputField').addEventListener('input', function() {
 
 // 添加点击事件处理
 document.getElementById('generateButton').addEventListener('click', function() {
-  startGeneration();
+  clearInput(); // 调用清空输入框函数
+  startGeneration(); // 重新开始生成银行卡号组合
 });
+
+/**
+ * 清空输入框内容
+ */
+function clearInput() {
+  document.getElementById('inputField').value = ''; // 清空输入框内容
+  handleInput(); // 更新统计信息
+}
 
 /**
  * 处理用户输入，过滤非法字符并更新统计信息
