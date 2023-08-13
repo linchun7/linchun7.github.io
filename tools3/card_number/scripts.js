@@ -3,7 +3,7 @@ let results = [];
 // 存储字母映射
 let letterMap = {};
 // 最大生成结果数量
-let maxResults = 10000; // 你可以根据需要设置最大数量
+let maxResults = 100000; // 你可以根据需要设置最大数量
 
 /**
  * 生成银行卡号的组合
@@ -74,7 +74,7 @@ function displayResults() {
   });
 
   let countMessage = results.length >= maxResults
-    ? `生成的卡号数量：为了显示体验，仅显示前 ${maxResults} 条结果。`
+    ? `生成的卡号数量：生成结果过多，仅显示前 ${maxResults} 条。`
     : `生成的卡号数量：${results.length}`;
   
   document.getElementById('result').textContent = formattedResults.join('\n');
