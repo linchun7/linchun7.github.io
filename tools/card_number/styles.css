@@ -94,3 +94,8 @@ button {
         font-size: 14px;
     }
 }
+
+#validCount,
+#count {
+  line-height: 0.5; /* 调整行距的值，可以根据需要进行调整 */
+}
