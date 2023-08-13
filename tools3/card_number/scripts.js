@@ -87,6 +87,11 @@ document.getElementById('inputField').addEventListener('input', function() {
   startGeneration();
 });
 
+// 添加点击事件处理
+document.getElementById('generateButton').addEventListener('click', function() {
+  startGeneration();
+});
+
 /**
  * 处理用户输入，过滤非法字符并更新统计信息
  */
