@@ -84,15 +84,22 @@ p a:active {
 
 input {
     flex: 1;
-    padding: 12px; /* 调整输入框内文字的字体大小和上下间距 */
+    padding: 10px; /* 调整输入框内文字的字体大小和上下间距 */
     font-size: 16px; /* 调整输入框内文字的字体大小 */
     margin-right: 10px;
+    border: 1px solid #ccc; /* 设置默认边框颜色为浅灰色 */
+	border-radius: 6px; /* 添加圆角 */
+    transition: border-color 0.3s; /* 添加过渡效果，使颜色变化平滑 */
+}
+
+input:hover {
+    border-color: rgba(8, 66, 160, 0.8);
 }
 
 input:focus {
     border-color: rgba(8, 66, 160, 1); /* 设置获取焦点时的边框颜色 */
     outline: none; /* 移除默认的焦点样式 */
-    box-shadow: 0 0 6px rgba(8, 66, 160, 0.6); /* 添加一些微小的阴影效果，增强焦点可见性 */
+    box-shadow: 0 0 2px rgba(8, 66, 160, 0.8); /* 添加一些微小的阴影效果，增强焦点可见性 */
 }
 
 
