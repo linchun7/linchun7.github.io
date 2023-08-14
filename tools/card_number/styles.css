@@ -39,6 +39,7 @@ h1 a:hover {
 }
 
 #footer a:hover {
+	color: blue;
     color: underline; /* 鼠标悬停时的颜色，你可以根据需要进行调整 */
 }
 
