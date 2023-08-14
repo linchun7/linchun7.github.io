@@ -29,7 +29,7 @@ h1 a:hover {
 	margin: 0 auto;
     text-overflow: ellipsis;
     overflow: hidden;
-	margin-top: 10px;
+	margin-top: 5px;
 	margin-bottom:5px;
 }
 
@@ -83,6 +83,7 @@ button:active {
 
 
 #result {
+	font-family: 'Courier New', Courier, monospace;
     margin-top: 20px;
     word-wrap: break-word;
     white-space: pre-line;
@@ -117,6 +118,9 @@ button:active {
     button {
         padding: 10px 16px;
         font-size: 14px;
+    }
+	#footer {
+        font-size: 12px;
     }
 }
 
