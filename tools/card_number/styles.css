@@ -14,6 +14,13 @@ main {
     padding: 20px;
 }
 
+h1 {
+	font-size: 26px;
+    margin-top: 5px; 
+	margin-bottom: 5px;
+}
+
+
 h1 a {
     text-decoration: none;
     color: inherit;
