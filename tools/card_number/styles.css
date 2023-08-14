@@ -102,7 +102,7 @@ button:active {
 /* 移动端适配，根据屏幕宽度调整字体大小 */
 @media screen and (max-width: 600px) {
     h1 {
-        font-size: 24px;
+        font-size: 20px;
     }
 	h1 a:active {
         transform: scale(1.1); /* 移动端点击时的标题放大效果 */
