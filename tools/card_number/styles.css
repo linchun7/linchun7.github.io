@@ -31,6 +31,7 @@ h1 a:hover {
     overflow: hidden;
 	margin-top: 5px;
 	margin-bottom:5px;
+	white-space: nowrap; /* 防止文本换行 */
 }
 
 #footer a {
