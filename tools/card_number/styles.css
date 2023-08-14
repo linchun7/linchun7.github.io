@@ -87,6 +87,8 @@ button:active {
     margin-top: 20px;
     word-wrap: break-word;
     white-space: pre-line;
+	line-height: 1.4; 
+
 }
 
 .red-text {
@@ -130,6 +132,3 @@ button:active {
 }
 
 
-#result {
-  line-height: 1.4; 
-}
