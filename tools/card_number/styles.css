@@ -31,6 +31,24 @@ h1 a:hover {
     text-decoration: underline; /* 鼠标悬停时显示下划线 */
 }
 
+p a {
+    color: rgba(8, 66, 160, 1); /* 设置为你想要的颜色值 */
+}
+p a:visited {
+    color: rgba(8, 66, 160, 1); /* 已访问颜色 */
+}
+
+p a:hover {
+    color: blue;/* 悬停颜色 */
+}
+
+p a:active {
+	position: relative; /* 添加相对定位，用于微小的文字偏移 */
+    top: 1px; /* 使文字稍微下移，强调点击效果 */
+}
+
+
+
 #footer {
     text-align: center;
 	margin: 0 auto;
@@ -46,9 +64,17 @@ h1 a:hover {
     text-decoration: underline;
 }
 
+#footer a:visited {
+    color: inherit;
+}
+
 #footer a:hover {
-	color: blue;
-    color: underline; /* 鼠标悬停时的颜色，你可以根据需要进行调整 */
+	color: rgba(8, 66, 160, 1);
+}
+
+#footer a:active {
+	position: relative; 
+    top: 1px;
 }
 
 .input-wrapper {
@@ -98,13 +124,8 @@ button:active {
 	line-height: 1.4; 
 }
 
-.red-text {
-    color: red;
-}
 
-#submit.clicked {
-    background-color: #f0f0f0;
-}
+
 
 /* 移动端适配，根据屏幕宽度调整字体大小 */
 @media screen and (max-width: 600px) {
@@ -137,5 +158,4 @@ button:active {
 #count {
   line-height: 0.6; /* 调整行距的值，可以根据需要进行调整 */
 }
-
 
