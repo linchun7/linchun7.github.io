@@ -89,6 +89,12 @@ input {
     margin-right: 10px;
 }
 
+input:focus {
+    border-color: rgba(8, 66, 160, 1); /* 设置获取焦点时的边框颜色 */
+    outline: none; /* 移除默认的焦点样式 */
+    box-shadow: 0 0 2px rgba(8, 66, 160, 0.5); /* 添加一些微小的阴影效果，增强焦点可见性 */
+}
+
 
 button {
   padding: 12px 20px;
