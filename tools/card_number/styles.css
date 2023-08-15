@@ -26,10 +26,12 @@ main p {
 
 main a {
     color: rgba(8, 66, 160, 1);
+    text-decoration: underline;
 }
 
 main a:visited {
     color: rgba(8, 66, 160, 1);
+    text-decoration: underline;
 }
 
 main a:hover {
