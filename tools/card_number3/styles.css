@@ -95,7 +95,12 @@ button:active {
     word-wrap: break-word;
     white-space: pre-line;
 	letter-spacing: 1px;
-    line-height: 1.6;
+    line-height: 1.8;
+}
+
+u {
+    text-decoration: none;
+    border-bottom: 1px solid #ccc;
 }
 
 @media screen and (max-width: 600px) {
