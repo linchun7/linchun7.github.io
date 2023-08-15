@@ -20,28 +20,23 @@ h1 {
     margin-bottom: 5px;
 }
 
-h1 a {
-    text-decoration: none;
-    color: inherit;
+main p {
+    margin: 12px auto;
 }
 
-h1 a:hover {
-    text-decoration: underline;
-}
-
-p a {
+main a {
     color: rgba(8, 66, 160, 1);
 }
 
-p a:visited {
+main a:visited {
     color: rgba(8, 66, 160, 1);
 }
 
-p a:hover {
+main a:hover {
     color: blue;
 }
 
-p a:active {
+main a:active {
     position: relative;
     top: 1px;
 }
@@ -94,7 +89,7 @@ button:active {
 
 #result {
     font-family: 'Courier New', Courier, monospace;
-    margin-top: 20px;
+    margin-top: 18px;
     word-wrap: break-word;
     white-space: pre-line;
     line-height: 1.4;
@@ -103,10 +98,6 @@ button:active {
 @media screen and (max-width: 600px) {
     h1 {
         font-size: 20px;
-    }
-
-    h1 a:active {
-        transform: scale(1.1);
     }
 
     p {
@@ -130,7 +121,7 @@ button:active {
 
 #validCount,
 #count {
-    line-height: 0.6;
+    line-height: 0.9;
 }
 
 footer {
