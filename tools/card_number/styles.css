@@ -90,7 +90,7 @@ button:active {
 }
 
 #result {
-    font-family: 'Courier New', Courier, monospace;
+    font-family: Menlo, Consolas, monospace;
     margin-top: 18px;
     word-wrap: break-word;
     white-space: pre-line;
