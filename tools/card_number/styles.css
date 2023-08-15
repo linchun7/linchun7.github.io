@@ -138,22 +138,28 @@ footer {
     margin: 0px auto;
     text-overflow: ellipsis;
     overflow: hidden;
-    margin-top: 2px;
-    margin-bottom: 2px;
+    margin-top: 0px;
+    margin-bottom: 0px;
     white-space: nowrap;
+}
+
+footer p {
+    margin: 10px 0;
 }
 
 footer a {
     color: inherit;
-    text-decoration: underline;
+	text-decoration: none; 
 }
 
 footer a:visited {
     color: inherit;
+	text-decoration: none; 
 }
 
 footer a:hover {
     color: rgba(8, 66, 160, 1);
+    text-decoration: underline;
 }
 
 footer a:active {
