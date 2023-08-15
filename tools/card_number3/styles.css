@@ -99,8 +99,13 @@ button:active {
 }
 
 u {
-    text-decoration: none;
-    border-bottom: 1px solid #ccc;
+	    white-space: pre;
+
+}
+
+.digit-space {
+    display: inline-block;
+    width: 10px; /* 设置间隔宽度 */
 }
 
 @media screen and (max-width: 600px) {
