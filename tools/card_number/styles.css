@@ -121,9 +121,10 @@ button:active {
     }
 
     .generator button {
-        padding: 10px 40px;
+        padding: 10px 16px;
         font-size: 14px;
-		line-height: 1; 
+		line-height: 1;
+		height: auto;
     }
 	
 	#validCount,
