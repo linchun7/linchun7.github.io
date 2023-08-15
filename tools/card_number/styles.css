@@ -94,6 +94,7 @@ button:active {
     margin-top: 18px;
     word-wrap: break-word;
     white-space: pre-line;
+	letter-spacing: 1px;
     line-height: 1.4;
 }
 
