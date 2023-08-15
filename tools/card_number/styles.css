@@ -52,7 +52,7 @@ input {
     flex: 1;
     padding: 10px;
     font-size: 16px;
-    margin-right: 10px;
+    margin-right: 6px;
     border: 1px solid #ccc;
     border-radius: 6px;
     transition: border-color 0.3s;
@@ -121,8 +121,9 @@ button:active {
     }
 
     .generator button {
-        padding: 10px 16px;
-        font-size: 12px;
+        padding: 8px 8px;
+        font-size: 14px;
+		white-space: nowrap;
     }
 	
 	#validCount,
