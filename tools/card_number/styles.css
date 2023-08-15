@@ -124,6 +124,15 @@ button:active {
 	#result {
         font-size: 14px;
 	}
+	
+	#validCount {
+        font-size: 14px;
+	}
+	
+	#count {
+        font-size: 14px;
+	}
+	
 }
 
 #validCount,
