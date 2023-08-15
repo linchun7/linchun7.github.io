@@ -99,20 +99,21 @@ button:active {
 }
 
 @media screen and (max-width: 600px) {
-    h1 {
+	
+	.generator {
+    	font-size: 14px;
+	}
+
+    .generator h1 {
         font-size: 20px;
     }
 
-    p {
-        font-size: 14px;
-    }
-
-    input {
+    .generator input {
         font-size: 14px;
         padding: 10px;
     }
 
-    button {
+    .generator button {
         padding: 10px 16px;
         font-size: 14px;
     }
@@ -120,12 +121,6 @@ button:active {
     footer {
         font-size: 14px;
     }
-	
-	#result,
-	#validCount,
-	#count {
-    	font-size: 14px;
-	}
 
 	
 }
