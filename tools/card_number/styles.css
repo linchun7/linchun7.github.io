@@ -110,6 +110,10 @@ button:active {
     .generator h1 {
         font-size: 24px;
     }
+	
+    .generator p {
+        font-size: 14px;
+    }
 
     .generator input {
         font-size: 16px;
@@ -117,7 +121,7 @@ button:active {
     }
 
     .generator button {
-        padding: 10px 16px;
+        padding: 8px 12px;
         font-size: 16px;
     }
 
