@@ -121,17 +121,12 @@ button:active {
         font-size: 14px;
     }
 	
-	#result {
-        font-size: 14px;
-	}
-	
-	#validCount {
-        font-size: 14px;
-	}
-	
+	#result,
+	#validCount,
 	#count {
-        font-size: 14px;
+    	font-size: 14px;
 	}
+
 	
 }
 
