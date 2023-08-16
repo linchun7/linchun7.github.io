@@ -81,10 +81,10 @@ function displayResults() {
   } else {
     countMessage = `${results.length}`;
   }
-  
-  document.getElementById('result').textContent = formattedResults.join('\n');
-  document.getElementById('count').textContent = countMessage;
+	
   document.getElementById('countText').textContent = countText;
+  document.getElementById('count').textContent = countMessage;
+  document.getElementById('result').textContent = formattedResults.join('\n');
 }
 
 // 处理用户输入
