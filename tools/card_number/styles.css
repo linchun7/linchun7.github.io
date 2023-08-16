@@ -89,9 +89,18 @@ button:active {
     top: 1px;
 }
 
+.result-info {
+	 margin: 10px 0; 
+}
+
+.result-info p {
+	 margin: 10px 0; 
+	 line-height: 1;
+}
+
 #result {
     font-family: Menlo, Consolas, monospace;
-    margin-top: 18px;
+    margin-top: 14px;
     word-wrap: break-word;
     white-space: pre-line;
 	letter-spacing: 0.5px;
@@ -126,10 +135,11 @@ button:active {
 		white-space: nowrap;
     }
 	
-	.result-info {
-        font-size: 14px;
+	.result-info p {
+	  	margin: 6px 0; 
+	  	line-height: 1;
 	}
-	
+
 	#result {
         font-size: 14px;
 	}
@@ -141,7 +151,6 @@ button:active {
 
 #validCount,
 #count {
-    line-height: 0.9;
 }
 
 footer {
