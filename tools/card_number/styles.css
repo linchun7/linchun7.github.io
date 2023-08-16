@@ -116,7 +116,7 @@ button:active {
     }
 
     .generator input {
-        font-size: 16px;
+        font-size: 14px;
         padding: 10px;
     }
 
@@ -126,7 +126,7 @@ button:active {
 		white-space: nowrap;
     }
 	#result {
-        font-size: 15px;
+        font-size: 14px;
 	}
 	
 	#validCount,
