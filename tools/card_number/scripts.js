@@ -69,16 +69,22 @@ function displayResults() {
   let formattedResults = results.map(result => {
     // 插入空格，每隔4位数字
     let formattedResult = result.replace(/\d{4}(?=\d)/g, '$& ');
-
     return formattedResult;
   });
 
-  let countMessage = results.length >= maxResults
-    ? `生成的卡号过多，仅显示前 ${maxResults} 条`
-    : `生成的卡号数量：${results.length}`;
+  let countMessage;
+  let countText = "生成的卡号数量：";
+
+  if (results.length >= maxResults) {
+    countText = ''; // 清空
+    countMessage = `生成的卡号过多，仅显示前 ${maxResults} 条`;
+  } else {
+    countMessage = `${results.length}`;
+  }
   
   document.getElementById('result').textContent = formattedResults.join('\n');
   document.getElementById('count').textContent = countMessage;
+  document.getElementById('countText').textContent = countText;
 }
 
 // 处理用户输入
@@ -117,7 +123,7 @@ function handleInput() {
 
   // 统计有效位数（不包括空格）
   let validCount = inputStr.replace(/[^a-zA-Z0-9*]/g, '').length;
-  document.getElementById('validCount').textContent = `已输入有效位数：${validCount}`;
+  document.getElementById('validCount').textContent = `${validCount}`;
 }
 
 /**
