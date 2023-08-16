@@ -100,11 +100,11 @@ button:active {
 
 @media screen and (max-width: 600px) {
 	main {
-    	font-size: 16px;
+    	font-size: 14px;
 	}
 	
 	.generator {
-    	font-size: 16px;
+    	font-size: 14px;
 	}
 
     .generator h1 {
@@ -131,7 +131,7 @@ button:active {
 	
 	#validCount,
 	#count {
-        font-size: 16px;
+        font-size: 14px;
 	}
 
     footer {
