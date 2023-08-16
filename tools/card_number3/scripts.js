@@ -67,12 +67,10 @@ function startGeneration() {
  */
 function displayResults() {
   let formattedResults = results.map(result => {
-    // 插入空格，每隔4位数字
-    let formattedResult = result.replace(/\d{4}(?=\d)/g, '$& ');
-	let formattedResult = result.replace(/\d{4}(?=\d)/g, '$&<span class="digit-space"></span>');
+    // 插入像素，每隔4位数字
+  let formattedResult = result.replace(/\d{4}(?=\d)/g, '$&<span class="digit-space"></span>');
 
-
-    return `<u>${formattedResult}</u>`;
+    return formattedResult;
   });
 
   let countMessage = results.length >= maxResults
