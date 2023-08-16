@@ -98,6 +98,9 @@ button:active {
     line-height: 1.8;
 }
 
+.result-line {
+}
+
 span.digit-space {
     display: inline-block;
     width: 6px; /* 设置间隔宽度 */
