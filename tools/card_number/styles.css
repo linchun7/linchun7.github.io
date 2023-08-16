@@ -125,12 +125,12 @@ button:active {
         font-size: 14px;
 		white-space: nowrap;
     }
-	#result {
+	
+	.input-wrapper {
         font-size: 14px;
 	}
 	
-	#validCount,
-	#count {
+	#result {
         font-size: 14px;
 	}
 
