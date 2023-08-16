@@ -20,25 +20,25 @@ h1 {
     margin-bottom: 5px;
 }
 
-main p {
+#prompt-info {
     margin: 12px auto;
 }
 
-main a {
+#prompt-info a {
     color: rgba(8, 66, 160, 1);
     text-decoration: underline;
 }
 
-main a:visited {
+#prompt-info a:visited {
     color: rgba(8, 66, 160, 1);
     text-decoration: underline;
 }
 
-main a:hover {
+#prompt-info a:hover {
     color: blue;
 }
 
-main a:active {
+#prompt-info a:active {
     position: relative;
     top: 1px;
 }
@@ -93,7 +93,7 @@ button:active {
 	 margin: 10px 0; 
 }
 
-.result-info p {
+.result-p {
 	 margin: 10px 0; 
 	 line-height: 1;
 }
@@ -109,41 +109,41 @@ button:active {
 
 @media screen and (max-width: 600px) {
 	main {
-    	font-size: 16px;
+    	font-size: 15px;
 	}
 	
 	.generator {
-    	font-size: 16px;
+    	font-size: 15px;
 	}
 
     .generator h1 {
         font-size: 22px;
     }
 	
-    .generator p {
+    #prompt-info {
 		margin: 8px auto;
         font-size: 14px;
     }
 
     .generator input {
-        font-size: 16px;
+        font-size: 15px;
         padding: 10px;
     }
 
     .generator button {
         padding: 8px 8px;
-        font-size: 16px;
+        font-size: 15px;
 		white-space: nowrap;
     }
 	
-	.result-info p {
+	.result-p {
 	  	margin: 6px 0; 
 	  	line-height: 1.1;
-		font-size: 16px;
+		font-size: 15px;
 	}
 
 	#result {
-        font-size: 16px;
+        font-size: 15px;
 	    margin-top: 10px;
 	}
 
@@ -156,7 +156,6 @@ button:active {
 #count {
 	 border-bottom: 1px solid #000; 
   	 display: inline-block;
-	 color: red; 
 }
 
 footer {
