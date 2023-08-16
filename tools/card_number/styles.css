@@ -100,23 +100,23 @@ button:active {
 
 @media screen and (max-width: 600px) {
 	main {
-    	font-size: 16px;
+    	font-size: 14px;
 	}
 	
 	.generator {
-    	font-size: 16px;
+    	font-size: 14px;
 	}
 
     .generator h1 {
-        font-size: 22px;
+        font-size: 20px;
     }
 	
     .generator p {
-        font-size: 16px;
+        font-size: 14px;
     }
 
     .generator input {
-        font-size: 16px;
+        font-size: 14px;
         padding: 10px;
     }
 
@@ -126,12 +126,12 @@ button:active {
 		white-space: nowrap;
     }
 	#result {
-        font-size: 16px;
+        font-size: 14px;
 	}
 	
 	#validCount,
 	#count {
-        font-size: 16px;
+        font-size: 14px;
 	}
 
     footer {
