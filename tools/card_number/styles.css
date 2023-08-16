@@ -109,11 +109,11 @@ button:active {
 
 @media screen and (max-width: 600px) {
 	main {
-    	font-size: 15px;
+    	font-size: 16px;
 	}
 	
 	.generator {
-    	font-size: 15px;
+    	font-size: 16px;
 	}
 
     .generator h1 {
@@ -122,28 +122,27 @@ button:active {
 	
     #prompt-info {
 		margin: 8px auto;
-        font-size: 14px;
+        font-size: 15px;
     }
 
     .generator input {
-        font-size: 15px;
+        font-size: 16px;
         padding: 10px;
     }
 
     .generator button {
         padding: 8px 8px;
-        font-size: 15px;
+        font-size: 16px;
 		white-space: nowrap;
     }
 	
 	.result-p {
 	  	margin: 6px 0; 
-	  	line-height: 1.1;
-		font-size: 15px;
+		font-size: 16px;
 	}
 
 	#result {
-        font-size: 15px;
+        font-size: 16px;
 	    margin-top: 10px;
 	}
 
