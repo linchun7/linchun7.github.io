@@ -121,6 +121,7 @@ button:active {
     }
 	
     .generator p {
+		margin: 8px auto;
         font-size: 14px;
     }
 
@@ -137,11 +138,12 @@ button:active {
 	
 	.result-info p {
 	  	margin: 6px 0; 
-	  	line-height: 1;
+	  	line-height: 1.1;
 	}
 
 	#result {
         font-size: 14px;
+	    margin-top: 10px;
 	}
 
     footer {
