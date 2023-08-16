@@ -14,14 +14,14 @@
     <main>
         <section class="generator">
             <h1>银行卡号生成器</h1>
-            <p>根据输入的数字、字母及 * 号（同一字母表示相同数字，* 号表示任意数字），生成满足 Luhn 算法的银行卡号，用于卡号定制提前算号。<a href="https://www.linchun.com.cn/posts/50c5b27d.html">查看使用说明</a></p>
+            <p id="prompt-info">根据输入的数字、字母及 * 号（同一字母表示相同数字，* 号表示任意数字），生成满足 Luhn 算法的银行卡号，用于卡号定制提前算号。<a href="https://www.linchun.com.cn/posts/50c5b27d.html">查看使用说明</a></p>
             <div class="input-wrapper">
                 <input type="text" id="inputField" placeholder="请输入卡号，如 6214 8800 0*aa bbbb" autofocus>
                 <button id="generateButton">清空</button>
             </div>
 			<div class="result-info">
-				<p><span id="validText">已输入有效位数：</span><span id="validCount">0</span></p>
-				<p><span id="countText">生成的卡号数量：</span><span id="count">0</span></p>
+				<p class="result-p"><span id="validText">已输入有效位数：</span><span id="validCount">0</span></p>
+				<p class="result-p"><span id="countText">生成的卡号数量：</span><span id="count">0</span></p>
 			</div>
             <div id="result"></div>
         </section>
