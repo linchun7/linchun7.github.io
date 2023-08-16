@@ -70,14 +70,14 @@ function displayResults() {
     // 插入像素，每隔4位数字
   let formattedResult = result.replace(/\d{4}(?=\d)/g, '$&<span class="digit-space"></span>');
 
-    return formattedResult;
+    return `<div class="result-line">${formattedResult}</div>`;
   });
 
   let countMessage = results.length >= maxResults
     ? `生成的卡号过多，仅显示前 ${maxResults} 条`
     : `生成的卡号数量：${results.length}`;
   
-  document.getElementById('result').innerHTML = formattedResults.join('<br>');
+  document.getElementById('result').innerHTML = formattedResults.join('');
   document.getElementById('count').textContent = countMessage;
 }
 
