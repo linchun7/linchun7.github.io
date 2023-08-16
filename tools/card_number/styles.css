@@ -153,6 +153,8 @@ button:active {
 
 #validCount,
 #count {
+	 border-bottom: 1px solid #000; 
+  	 display: inline-block;
 }
 
 footer {
