@@ -5,6 +5,8 @@ body {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+	margin-right: calc(100% - 100vw);
+    overflow-x: hidden;
 }
 
 main {
@@ -163,6 +165,7 @@ footer {
     text-overflow: ellipsis;
     overflow: hidden;
     white-space: nowrap;
+	max-width: 600px;
 }
 
 footer p {
