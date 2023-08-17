@@ -5,8 +5,7 @@ body {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
-	margin-right: calc(100% - 100vw);
-    overflow-x: hidden;
+	margin-right: calc(100% - 100vw);/* 部分浏览器滚动条问题 */
 }
 
 main {
