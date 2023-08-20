@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>在线转换</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="stylesheet" href="/tools/css/bootstrap.min.css">
+	
+    <meta name="format-detection" content="telephone=no">
+    <link rel="shortcut icon" href="/images/favicon.ico">
+    <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
+    <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+	
+    <style>
+        body {
+        }
+
+        .container {
+            margin-top: 20px;
+        }
+
+        .result-container {
+            margin-top: 20px;
+        }
+
+        .form-label {
+        }
+
+	   .result-text {
+		font-size: 30px;
+		min-height: 2em; /* 设置最小高度为一个行高，以确保至少有一行高度 */
+		display: flex;
+		align-items: center; /* 垂直居中对齐内容 */
+		}
+
+
+        .copy-button {
+            margin-top: 10px;
+        }
+    </style>
+    <script src="nzh.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="mb-3">
+                    <label for="inputmoney" class="form-label fs-4">请输入金额：</label>
+                    <div class="input-group">
+                        <input id="inputmoney" type="text" class="form-control" onkeyup="show(this.value)" value="">
+                        <button class="btn btn-danger" type="button" onclick="clearAndFocus()">清空</button>
+                    </div>
+                </div>
+
+                <div class="result-container">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="form-label fs-4">数字大写：</label>
+                        <button class="btn btn-success copy-button" onclick="copyResult(1)">复制</button>
+                    </div>
+                    <div id="result1" class="form-control result-text" readonly></div>
+                </div>
+
+                <div class="result-container">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="form-label fs-4">人民币金额大写：</label>
+                        <button class="btn btn-success copy-button" onclick="copyResult(2)">复制</button>
+                    </div>
+                    <div id="result2" class="form-control result-text" readonly></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.onload = function() {
+            show($('inputmoney').value);
+            var inputElement = document.getElementById("inputmoney");
+            inputElement.focus();
+        };
+
+        function clearAndFocus() {
+            var inputElement = document.getElementById("inputmoney");
+            inputElement.value = "";
+            inputElement.focus();
+            show("");
+        }
+
+        $ = function() {
+            return document.getElementById.apply(document, arguments);
+        }
+
+        function show(money) {
+            money = money.replace(/\s+/g, "").replace(/[,，]/g, "");
+            $('result1').textContent = Nzh.cn.encodeS(money);
+            $('result2').textContent = Nzh.cn.toMoney(money);
+        }
+
+        function copyResult(resultNum) {
+            var resultElement = document.getElementById("result" + resultNum);
+            var range = document.createRange();
+            range.selectNode(resultElement);
+            window.getSelection().removeAllRanges();
+            window.getSelection().addRange(range);
+            document.execCommand("copy");
+            alert("已复制到剪贴板：" + resultElement.textContent);
+            window.getSelection().removeAllRanges();
+        }
+    </script>
+</body>
+</html>
