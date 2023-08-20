@@ -170,22 +170,29 @@
         }
 
         function copyResult1() {
-            const result1Element = document.getElementById("result1");
-            const result1Value = result1Element.textContent;
+			const result1Element = document.getElementById("result1");
+			const result1Value = result1Element.textContent.trim();
 
-            const textArea = document.createElement("textarea");
-            textArea.value = result1Value;
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand("copy");
-            document.body.removeChild(textArea);
+			const alertTextElement = document.getElementById("alertTxet");
 
-            const alertTextElement = document.getElementById("alertTxet");
-            alertTextElement.textContent = "已复制";
-            setTimeout(function() {
-                alertTextElement.textContent = "";
-            }, 3000); // 3秒后恢复提示文本
-        }
+			if (result1Value === "") {
+				alertTextElement.textContent = "无金额";
+			} else {
+				const textArea = document.createElement("textarea");
+				textArea.value = result1Value;
+				document.body.appendChild(textArea);
+				textArea.select();
+				document.execCommand("copy");
+				document.body.removeChild(textArea);
+
+				alertTextElement.textContent = "已复制";
+			}
+
+			setTimeout(function() {
+				alertTextElement.textContent = "";
+			}, 3000);
+		}
+
 		
 		var _hmt = _hmt || [];
 			(function() {
