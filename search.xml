@@ -4,11 +4,38 @@
   
     
     <entry>
+      <title>数字转人民币大写金额</title>
+      <link href="/posts/f6f9d33e.html"/>
+      <url>/posts/f6f9d33e.html</url>
+      
+        <content type="html"><![CDATA[<p>直接点击链接： <strong><a href="/tools/rmb/">数字转人民币大写金额</a></strong> 即可使用。</p><p>互联网上此类工具多如牛毛，但总有些地方不符合自己的使用习惯。</p><p>使用 <a href="https://github.com/cnwhy/nzh">https://github.com/cnwhy/nzh</a> 开源项目，简单做了一个页面，满足平时的的一些使用要求。</p>]]></content>
+      
+      
+      <categories>
+          
+          <category> 工具 </category>
+          
+      </categories>
+      
+      
+        <tags>
+            
+            <tag> 人民币大写 </tag>
+            
+            <tag> 金额转换 </tag>
+            
+        </tags>
+      
+    </entry>
+    
+    
+    
+    <entry>
       <title>银行卡号生成器</title>
       <link href="/posts/50c5b27d.html"/>
       <url>/posts/50c5b27d.html</url>
       
-        <content type="html"><![CDATA[<p>直接点击链接： <strong><a href="/tools/card_number/">银行卡号生成器</a></strong> 即可使用。</p><p>该功能主要用于银行卡号定制时的算号，可提前找出满足 Luhn 算法的银行卡号（注意，满足 Luhn 算法不等于可以直接使用，因已使用、注销、冻结、银行保留等原因，该卡号不一定能够开出）。</p><ul><li><strong>如何使用？</strong></li></ul><p>输入数字、英文字母、* 号的任意组合，即可生成符合 Luhn 算法的卡号。如输入 “6221 *aaa bbbb cccc”，会生成包括且不限于以下的卡号：</p><blockquote><p>6221 0000 0000 0000 </p><p>6221 0000 0000 8888 </p><p>6221 0000 1111 4444 </p><p>6221 0111 2222 4444 </p><p>……</p></blockquote><ul><li><strong>输入字母和 * 号的区别？</strong></li></ul><p>字母：生成的任意一条卡号中，相同字母对应的数字<strong>必</strong>相同（如 aaa 只对应 000、111 等，不会对应 001）；不同字母对应的数字，<strong>可能</strong>相同，<strong>也可能</strong>不同（如 aaa bbbb cccc，可能对应 000 0000 0000，也可能对应 000 1111 4444 等）；</p><p> * 号：生成的任意一条卡号中，多个 * 号对应的数字<strong>可能</strong>相同，<strong>也可能</strong>不同（如 **，可能对应 00，也可能对应 01 等）；</p>]]></content>
+        <content type="html"><![CDATA[<p>直接点击链接： <strong><a href="/tools/card_number/">银行卡号生成器</a></strong> 即可使用。</p><p>该功能主要用于银行卡号定制时的算号，可提前找出满足 Luhn 算法的银行卡号（注意，满足 Luhn 算法不等于可以直接使用，因已使用、注销、冻结、银行保留等原因，该卡号不一定能够开出）。</p><ul><li><strong>如何使用？</strong></li></ul><p>输入数字、英文字母、* 号的任意组合，即可生成符合 Luhn 算法的卡号。如输入”6221 *aaa bbbb cccc”，会生成包括且不限于以下的卡号：</p><blockquote><p>6221 0000 0000 0000 </p><p>6221 0000 0000 8888 </p><p>6221 0000 1111 4444 </p><p>6221 0111 2222 4444 </p><p>……</p></blockquote><ul><li><strong>字母和 * 号的区别？</strong></li></ul><p>字母：生成的任意一条卡号中，相同字母对应的数字<strong>必</strong>相同（如 aaa 只对应 000、111 等，不会对应 001）；不同字母对应的数字，<strong>可能</strong>相同，<strong>也可能</strong>不同（如 aaa bbbb cccc，可能对应 000 0000 0000，也可能对应 000 1111 4444 等）；</p><p> * 号：生成的任意一条卡号中，多个 * 号对应的数字<strong>可能</strong>相同，<strong>也可能</strong>不同（如 **，可能对应 00，也可能对应 01 等）；</p>]]></content>
       
       
       <categories>

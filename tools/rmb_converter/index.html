@@ -33,6 +33,26 @@
             font-size: 28px;
             margin-bottom: 20px;
         }
+		
+		#prompt-a {
+			color: rgba(8, 66, 160, 1);
+			text-decoration: underline;
+		}
+
+		#prompt-a:visited {
+			color: rgba(8, 66, 160, 1);
+			text-decoration: underline;
+		}
+
+		#prompt-a:hover {
+			color: blue;
+		}
+
+		#prompt-a:active {
+			position: relative;
+			top: 1px;
+		}
+
 
         .result-container {
             margin-top: 30px;
@@ -101,6 +121,7 @@
             <div class="col-md-8">
                 <div class="mb-3">
                     <label class="form-label fs-4">输入数字：</label>
+					<a id="prompt-a" href="https://www.linchun.com.cn/posts/50c5b27d.html">查看说明</a>
                     <div class="input-group">
                         <input id="inputmoney" type="text" class="form-control" onkeyup="show(this.value)">
                         <button class="btn btn-danger" type="button" onclick="clearAndFocus()">清空</button>
