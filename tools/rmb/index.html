@@ -40,8 +40,12 @@
         }
 
         .form-label {
-			margin: 0;
+			margin: 0px;
         }
+		.container .form-label {
+			font-size: 20px; /* 按需调整字体大小 */
+		}
+
 
 	   .result-text {
 		font-size: 30px;
@@ -88,7 +92,6 @@
 		}
 
     </style>
-    <script src="nzh.js"></script>
 </head>
 
 <body>
@@ -99,15 +102,15 @@
         <div class="row justify-content-center">
             <div class="col-md-8">
                 <div class="mb-3">
-                    <label for="inputmoney" class="form-label fs-4">输入数字：</label>
+                    <label class="form-label fs-4">输入数字：</label>
                     <div class="input-group">
-                        <input id="inputmoney" type="text" class="form-control" onkeyup="show(this.value)" value="">
+                        <input id="inputmoney" type="text" class="form-control" onkeyup="show(this.value)">
                         <button class="btn btn-danger" type="button" onclick="clearAndFocus()">清空</button>
                     </div>
                 </div>
 
                 <div class="result-container">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
                         <label class="form-label fs-4">人民币大写金额：</label>
 						<label id="alertTxet" class="form-label fs-4" style="background:#CDCDCD"></label>
 
@@ -141,7 +144,9 @@
         }
 
         function show(money) {
-            money = money.replace(/\s+/g, "").replace(/[,，]/g, "");
+			money = money.replace(/[^0-9eE+\-.]/g, "");
+			$('inputmoney').value = money;
+
             $('result1').textContent = Nzh.cn.toMoney(money);
         }
 
