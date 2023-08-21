@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>工具导航</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            padding: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: #333333;
+        }
+
+        #searchInput {
+            margin-bottom: 10px;
+            padding: 6px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            width: 100%;
+            transition: border-color 0.3s;
+        }
+
+        #searchInput:focus,
+        #searchInput:hover {
+            border-color: #007bff;
+        }
+
+        #toolList {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        #toolList li {
+            padding: 5px 0;
+            transition: background-color 0.3s;
+            display:block;
+        }
+
+        #toolList li:hover {
+            background-color: #f5f5f5;
+        }
+
+        .tool-link {
+            color: #007bff;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        .tool-link:hover {
+            color: #0056b3;
+        }
+
+        .highlight {
+            background-color: yellow;
+        }
+
+        #noResults {
+            color: #999999;
+            text-align: center;
+            display: none;
+            padding: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>工具导航</h1>
+        <input id="searchInput" type="text" class="form-control" placeholder="搜索工具...">
+        <ul id="toolList">     
+            <!-- ... 这里可以添加更多类型和工具链接 -->
+        </ul>
+        <p id="noResults">当前没有符合条件的工具。</p>
+    </div>
+    <script>
+        // JavaScript 代码
+        const toolList = [
+            { name: "银行卡号生成器", link: "https://tool1.com" },
+            { name: "金额大小写转换", link: "https://tool2.com" },
+            { name: "工具3", link: "https://tool3.com" },
+            { name: "工具4", link: "https://tool4.com" },
+            // ... 可以添加更多工具项
+        ];
+
+        const ul = document.getElementById("toolList");
+        const searchInput = document.getElementById("searchInput");
+        const noResults = document.getElementById("noResults");
+
+        function displayToolList(tools, keyword) {
+            ul.innerHTML = "";
+            tools.forEach(tool => {
+                const li = document.createElement("li");
+                const link = document.createElement("a");
+                link.className = "tool-link";
+                link.href = tool.link;
+                link.innerHTML = highlightSearchKeyword(tool.name, keyword); // 高亮搜索词
+                li.appendChild(link);
+                ul.appendChild(li);
+            });
+        }
+
+        function highlightSearchKeyword(text, keyword) {
+            const regex = new RegExp(keyword, "gi");
+            return text.replace(regex, match => `<span class="highlight">${match}</span>`);
+        }
+
+        displayToolList(toolList, "");
+
+        searchInput.addEventListener("input", function() {
+            const keyword = this.value.toLowerCase().trim();
+            if (keyword === "") {
+                displayToolList(toolList, "");
+                noResults.style.display = "none";
+            } else {
+                const filteredTools = toolList.filter(tool => tool.name.toLowerCase().includes(keyword));
+                displayToolList(filteredTools, keyword);
+
+                if (filteredTools.length === 0) {
+                    noResults.style.display = "block";
+                } else {
+                    noResults.style.display = "none";
+                }
+            }
+        });
+    </script>
+</body>
+</html>
