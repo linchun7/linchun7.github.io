@@ -1,0 +1,177 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+	<meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, maximum-scale=1, user-scalable=no">
+    <link rel="stylesheet" href="../css/bootstrap.min.css">
+    <script src="dist/browser/pangu.min.js"></script>
+    <meta name="format-detection" content="telephone=no">
+    <link rel="shortcut icon" href="/images/favicon.ico">
+    <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
+    <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+    <title>中英文加空格工具</title>
+
+	
+	
+ <style>
+        body {
+            font-family: "Helvetica Neue", Helvetica, Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            margin-right: calc(100% - 100vw);
+            overflow-x: hidden;
+        }
+
+        .container {
+            margin-top: 20px;
+            flex-grow: 1;
+            padding: 15px;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+
+ 
+
+        .copy-button,.add-button{
+            margin-left: 20px;
+			margin
+        }
+	 
+		 #info {
+			 resize: none; 
+			 height: 25em;
+			 margin: 2px;
+
+	 	}
+	 
+        footer {
+            text-align: center;
+            margin: 0 auto;
+            text-overflow: ellipsis;
+            overflow: hidden;
+            white-space: nowrap;
+            max-width: 600px;
+            margin-top: 30px;
+        }
+
+        footer p {
+            margin: 6px 0;
+        }
+
+        footer a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        footer a:visited {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            color: rgba(8, 66, 160, 1);
+            text-decoration: underline;
+        }
+
+        footer a:active {
+            position: relative;
+            top: 1px;
+        }
+</style>
+   
+</head>
+
+<body>
+
+	 <div class="container">
+        <h1>中英文加空格工具</h1>
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="d-flex justify-content-end">
+                    <button class="btn btn-danger" type="button" onclick="clearAndFocus()">清空</button>
+					 <button class="btn btn-info add-button" type="button" onclick="addInfo()">加空格</button>
+                    <button class="btn btn-success copy-button" onclick="copyInfo()">复制</button>
+                </div>
+                    <div>
+						<textarea type="text" id="info" class="form-control" oninput="handleTextareaInput(this)"></textarea>
+
+						 <label id="countText" class="form-label fs-4">已输入字符：0</label>
+                        <label id="alertText" class="form-label fs-4"></label>
+                    </div>
+            </div>
+        </div>
+    </div>
+
+
+    <footer>
+        <p>&copy; 2023 <a href="https://www.linchun.com.cn">林春写字的地方</a></p>
+    </footer>
+
+    <script>
+			function addInfo() {
+				const infoTextArea = document.getElementById("info");
+				const content = infoTextArea.value.replace(/\s+/g, ' ').trim();
+				const spacedContent = pangu.spacing(content);
+				infoTextArea.value = spacedContent;
+    			handleTextareaInput(infoTextArea);
+			}
+		
+			window.onload = function() {
+				const infoTextArea = document.getElementById("info");
+				infoTextArea.focus();
+			};
+
+			function clearAndFocus() {
+				const inputElement = document.getElementById("info");
+				inputElement.value = "";
+				inputElement.focus();
+				
+    			handleTextareaInput(inputElement);
+			}
+
+    		function copyInfo() {
+				var infoTextArea = document.getElementById("info");
+				var alertText = document.getElementById("alertText");
+
+				if (infoTextArea.value.trim() === "") {
+					alertText.textContent = "无内容";
+				} else {
+					infoTextArea.select();
+					document.execCommand("copy");
+					alertText.textContent = "已复制";
+				}
+
+				setTimeout(function() {
+					alertText.textContent = "";
+				}, 3000);
+			}
+			function handleTextareaInput(textarea) {
+				const content = textarea.value;
+				const characterCount = content.length;
+				const countText = document.getElementById("countText");
+				countText.textContent = `已输入字符：${characterCount}`;
+			}
+		
+			var _hmt = _hmt || [];
+			(function() {
+			  var hm = document.createElement("script");
+			  hm.src = "https://hm.baidu.com/hm.js?db1887936545a6bc1ba1afebdd10e617";
+			  var s = document.getElementsByTagName("script")[0]; 
+			  s.parentNode.insertBefore(hm, s);
+			})();
+	
+	</script>
+</body>
+</html>
+
+
+
+   
