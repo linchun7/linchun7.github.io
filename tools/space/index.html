@@ -29,7 +29,7 @@
         .container {
             margin-top: 20px;
             flex-grow: 1;
-            padding: 15px;
+            padding: 10px;
         }
 
         h1 {
@@ -48,10 +48,14 @@
 		 #info {
 			 resize: none; 
 			 height: 25em;
-			 margin: 0px;
+			 margin: 0px 0px 10px 0px;
 			 padding: 10px;
 
 	 	}
+		 .bg-light {
+		background-color: #f0f0f0; 
+		}
+
 	 
         footer {
             text-align: center;
@@ -60,11 +64,10 @@
             overflow: hidden;
             white-space: nowrap;
             max-width: 600px;
-            margin-top: 30px;
         }
 
         footer p {
-            margin: 6px 0;
+            margin: 5px 0;
         }
 
         footer a {
@@ -105,7 +108,7 @@
 						<textarea type="text" id="info" class="form-control" oninput="handleTextareaInput(this)"></textarea>
 
 						 <label id="countText" class="form-label fs-4">已输入字符：0</label>
-                        <label id="alertText" class="form-label fs-4"></label>
+						<label id="alertText" class="form-label fs-4 bg-light"></label>
                     </div>
             </div>
         </div>
