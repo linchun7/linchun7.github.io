@@ -40,7 +40,7 @@
 
  
 
-        .copy-button,.add-button{
+        .clear-button, .copy-button, .add-button{
             margin-left: 20px;
 			margin
         }
@@ -96,9 +96,9 @@
         <div class="row justify-content-center">
             <div class="col-md-8">
                 <div class="d-flex justify-content-end">
-                    <button class="btn btn-danger" type="button" onclick="clearAndFocus()">清空</button>
-					 <button class="btn btn-info add-button" type="button" onclick="addInfo()">加空格</button>
-                    <button class="btn btn-success copy-button" onclick="copyInfo()">复制</button>
+					<button class="btn btn-success add-button" type="button" onclick="addInfo()">加空格</button>
+                    <button class="btn btn-danger clear-button" type="button" onclick="clearAndFocus()">清空</button>
+                    <button class="btn btn-warning copy-button" onclick="copyInfo()">复制</button>
                 </div>
                     <div>
 						<textarea type="text" id="info" class="form-control" oninput="handleTextareaInput(this)"></textarea>
