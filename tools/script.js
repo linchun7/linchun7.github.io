@@ -21,18 +21,33 @@ function highlightSearchKeyword(text, keyword) {
     return text.replace(regex, match => `<span class="highlight">${match}</span>`);
 }
 
-const toolElements = Array.from(ul.getElementsByTagName("a")); // 获取所有工具链接
-const toolList = toolElements.map(toolElement => ({ name: toolElement.textContent, link: toolElement.href }));
+function filterToolsByKeyword(keyword) {
+    return toolList.filter(tool => tool.name.toLowerCase().includes(keyword));
+}
+
+let toolList = [];
+let currentKeyword = "";
+
+// 获取所有工具链接
+const toolElements = Array.from(ul.getElementsByTagName("a"));
+toolList = toolElements.map(toolElement => ({ name: toolElement.textContent, link: toolElement.href }));
 
 displayToolList(toolList, "");
 
 searchInput.addEventListener("input", function() {
     const keyword = this.value.toLowerCase().trim();
+    
+    if (keyword === currentKeyword) {
+        return; // 如果搜索词没有变化，则跳过处理
+    }
+    
+    currentKeyword = keyword;
+    
     if (keyword === "") {
         displayToolList(toolList, "");
         noResults.style.display = "none";
     } else {
-        const filteredTools = toolList.filter(tool => tool.name.toLowerCase().includes(keyword));
+        const filteredTools = filterToolsByKeyword(keyword);
         displayToolList(filteredTools, keyword);
 
         if (filteredTools.length === 0) {
