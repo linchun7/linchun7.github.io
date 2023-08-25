@@ -223,7 +223,7 @@
 			var inputText = inputElement.value;
 
 			// 使用 pinyinPro 进行汉字转拼音
-			var pinyinResult1 = pinyin(inputText,{pattern: 'pinyin', v: true, toneType: 'none', nonZh: 'removed', separator: ''  }); // 不带声调，
+			var pinyinResult1 = pinyin(inputText,{pattern: 'pinyin', v: true, toneType: 'none', nonZh: 'removed'}); // 不带声调，
 			var pinyinResult2 = pinyin(inputText,{pattern: 'pinyin', v: true, toneType: 'symbol', nonZh: 'removed'}); // 带声调
 			var pinyinResult3 = pinyin(inputText,{pattern: 'pinyin', v: true, toneType: 'num', nonZh: 'removed' }); // 带数字声调
 			var pinyinResult4 = pinyin(inputText, { pattern: 'first', toneType: 'none', nonZh: 'removed', separator: '' }); // 首字母，无声调，移除非汉字，无连接
