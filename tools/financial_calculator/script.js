@@ -1,26 +1,34 @@
-// 获取所有选项卡和内容区域的元素
-const tabs = document.querySelectorAll('.tab');
-const content = document.getElementById('content');
+document.addEventListener('DOMContentLoaded', function() {
+    const tabs = document.querySelectorAll('.nav-link');
+    const contents = document.querySelectorAll('.tab-pane');
 
-// 默认显示第一个功能内容
-tabs[0].classList.add('active');
-document.getElementById('content1').style.display = 'block';
-
-// 为每个选项卡添加点击事件监听器
-tabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-        // 移除所有选项卡的“active”类，添加到当前点击的选项卡
-        tabs.forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-
-        // 获取选项卡对应的内容区域的ID，并根据ID显示对应的内容
-        const tabId = tab.id.replace('tab', 'content');
-        document.querySelectorAll('.function-content').forEach(content => {
-            content.style.display = 'none';
+    function showContent(targetId) {
+        contents.forEach(content => {
+            content.classList.remove('show', 'active');
         });
-        document.getElementById(tabId).style.display = 'block';
+        document.getElementById(targetId).classList.add('show', 'active');
+    }
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const targetId = tab.getAttribute('data-bs-target').replace('#', '');
+
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            
+            showContent(targetId);
+        });
     });
+
+    tabs[0].classList.add('active');
+    showContent(tabs[0].getAttribute('data-bs-target').replace('#', ''));
 });
+
+
+
+
+// ... （其余部分保持不变）
+
 
 // 获取第一个功能的计算按钮和结果显示区域的元素
 const calculateButton1 = document.getElementById('calculate1');
@@ -170,3 +178,51 @@ document.getElementById("calculate4").addEventListener("click", function() {
                                 <div style="margin-bottom: 10px;">利息：${totalInterest.toFixed(2)}</div>
                                 ${detailsTable}`;
 });
+
+// 清空1的点击事件监听器
+document.getElementById('empty1').addEventListener('click', () => {
+    // 清空输入字段的值
+    document.getElementById('principal1').value = '';
+    document.getElementById('days1').value = '';
+    document.getElementById('interest1').value = '';
+
+    // 清空结果显示区域
+    resultDiv1.innerHTML = '';
+});
+
+// 清空2的点击事件监听器
+document.getElementById('empty2').addEventListener('click', () => {
+    // 清空输入字段的值
+    document.getElementById('principal2').value = '';
+    document.getElementById('days2').value = '';
+    document.getElementById('annualRate2').value = '';
+
+    // 清空结果显示区域
+    resultDiv2.innerHTML = '';
+});
+
+// 清空3的点击事件监听器
+document.getElementById('empty3').addEventListener('click', () => {
+    // 清空输入字段的值
+    document.getElementById('startDate').value = '';
+    document.getElementById('startNetValue').value = '';
+    document.getElementById('endDate').value = '';
+	    document.getElementById('endNetValue').value = '';
+
+
+    // 清空结果显示区域
+    resultDiv3.innerHTML = '';
+});
+
+// 清空4的点击事件监听器
+document.getElementById('empty4').addEventListener('click', () => {
+    // 清空输入字段的值
+    document.getElementById('principal3').value = '';
+    document.getElementById('depositPeriod').value = '';
+    document.getElementById('annualRate3').value = '';
+
+    // 清空结果显示区域
+	const resultElement = document.getElementById("result4");
+    resultElement.innerHTML = '';
+});
+
