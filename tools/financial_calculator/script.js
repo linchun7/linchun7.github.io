@@ -151,11 +151,11 @@ document.getElementById("calculate4").addEventListener("click", function() {
                                 <table style="width: auto; border-collapse: collapse; margin-top: 10px;">
                                     <thead>
                                         <tr>
-                                            <th style="min-width: 100px;">期数（${compoundingFrequency}）</th>
-                                            <th style="min-width: 100px;">本金</th>
-                                            <th style="min-width: 100px;">利息</th>
+                                            <th style="min-width: 100px;">期  数</th>
+                                            <th style="min-width: 100px;">本  金</th>
+                                            <th style="min-width: 100px;">利  息</th>
                                             <th style="min-width: 100px;">利息总计</th>
-                                            <th style="min-width: 150px;">本金利息总计</th>
+                                            <th style="min-width: 150px;">本息总计</th>
                                         </tr>
                                     </thead>
                                     <tbody>`;
