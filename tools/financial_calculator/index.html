@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>工具名称</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>工具名称</h1>
+    </header>
+    <div class="container">
+        <div class="tabs">
+            <div class="tab active" id="tab1">算年化收益率</div>
+            <div class="tab" id="tab2">算利息收益</div>
+            <div class="tab" id="tab3">净值收益率</div>
+            <div class="tab" id="tab4">算复利收益</div>
+        </div>
+        <div class="content" id="content">
+            <!-- 算年化收益率内容 -->
+            <div id="content1" class="function-content">
+                <h2>算年化收益率</h2>
+                <div>
+                    <label for="principal1">本金：</label>
+                    <input type="number" id="principal1">元
+                </div>
+                <div>
+                    <label for="days1">天数：</label>
+                    <input type="number" id="days1">天
+                </div>
+                <div>
+                    <label for="interest1">收益：</label>
+                    <input type="number" id="interest1">元
+                </div>
+                <div>
+                    <label for="rateType1">年化收益率类型：</label>
+                    <select id="rateType1">
+                        <option value="365">365天</option>
+                        <option value="360">360天</option>
+                    </select>
+                </div>
+                <button id="calculate1">计算</button>
+                <div id="result1"></div>
+            </div>
+
+            <!-- 算利息收益内容 -->
+            <div id="content2" class="function-content">
+                <h2>算利息收益</h2>
+                <div>
+                    <label for="principal2">本金：</label>
+                    <input type="number" id="principal2">元
+                </div>
+                <div>
+                    <label for="days2">天数：</label>
+                    <input type="number" id="days2">天
+                </div>
+                <div>
+                    <label for="annualRate2">年化收益率：</label>
+                    <input type="number" id="annualRate2">%
+                </div>
+                <div>
+                    <label for="rateType2">年化收益率类型：</label>
+                    <select id="rateType2">
+                        <option value="365">365天</option>
+                        <option value="360">360天</option>
+                    </select>
+                </div>
+                <button id="calculate2">计算</button>
+                <div id="result2"></div>
+            </div>
+
+            <!-- 净值收益率内容 -->
+            <!-- ...之前的代码... -->
+
+		<!-- 净值收益率内容 -->
+		<div id="content3" class="function-content">
+			<h2>净值收益率</h2>
+			<div>
+				<label for="startDate">起始日期：</label>
+				<input type="date" id="startDate">
+			</div>
+			<div>
+				<label for="startNetValue">起始净值：</label>
+				<input type="number" id="startNetValue" step="0.01">
+			</div>
+			<div>
+				<label for="endDate">终止日期：</label>
+				<input type="date" id="endDate">
+			</div>
+			<div>
+				<label for="endNetValue">终止净值：</label>
+				<input type="number" id="endNetValue" step="0.01">
+			</div>
+			<div>
+				<label for="rateType3">年化收益率类型：</label>
+				<select id="rateType3">
+					<option value="365">365天</option>
+					<option value="360">360天</option>
+				</select>
+			</div>
+			<button id="calculate3">计算</button>
+			<div id="result3"></div>
+		</div>
+
+
+
+         <!-- 算复利收益内容 -->
+		<div id="content4" class="function-content">
+			<h2>算复利收益</h2>
+			<div>
+				<label for="principal3">本金：</label>
+				<input type="number" id="principal3">元
+			</div>
+			<div>
+				<label for="compoundingFrequency">复利方式：</label>
+				<select id="compoundingFrequency">
+					<option value="annually">按年复利</option>
+					<option value="semi-annually">按半年复利</option>
+					<option value="quarterly">按季复利</option>
+					<option value="monthly">按月复利</option>
+					<option value="weekly">按周复利</option>
+					<option value="daily">按日复利</option>
+				</select>
+			</div>
+			<div>
+				<label for="depositPeriod">存期：</label>
+				<input type="number" id="depositPeriod"><span id="frequency">年</span>
+			</div>
+			<div>
+				<label for="annualRate3">年化收益率：</label>
+				<input type="number" id="annualRate3">
+			</div>
+			<div>
+				<label for="rateType4">年化收益率类型：</label>
+				<select id="rateType4">
+					<option value="360">360天</option>
+					<option value="365">365天</option>
+				</select>
+			</div>
+			<button id="calculate4">计算</button>
+			<div id="result4"></div>
+		</div>
+
+
+
+			
+        </div>
+    </div>
+
+
+	
+
+    <script>
+        window.onload = function() {
+            const compoundingFrequencyElement = document.getElementById("compoundingFrequency");
+            const depositPeriodElement = document.getElementById("depositPeriod");
+            const frequencyElement = document.getElementById("frequency");
+
+            function updateControls() {
+                const newCompoundingFrequency = compoundingFrequencyElement.value;
+
+                // 更新存期单位
+                switch (newCompoundingFrequency) {
+                    case "annually":
+                        frequencyElement.textContent = "年";
+                        break;
+                    case "semi-annually":
+                        frequencyElement.textContent = "半年";
+                        break;
+                    case "quarterly":
+                        frequencyElement.textContent = "季";
+                        break;
+                    case "monthly":
+                        frequencyElement.textContent = "月";
+                        break;
+                    case "weekly":
+                        frequencyElement.textContent = "周";
+                        break;
+                    case "daily":
+                        frequencyElement.textContent = "日";
+                        break;
+                    default:
+                        frequencyElement.textContent = "年";
+                        break;
+                }
+            }
+
+            // 设置默认值和监听事件
+            updateControls();
+
+            // 当"复利方式"选择变更时
+            compoundingFrequencyElement.addEventListener("change", updateControls);
+        };
+    </script>
+	
+	
+
+
+
+	
+
+
+	
+	
+    <script src="script.js"></script>
+</body>
+</html>
