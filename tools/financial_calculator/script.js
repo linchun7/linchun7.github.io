@@ -161,19 +161,28 @@ document.getElementById("calculate4").addEventListener("click", function() {
                                     <tbody>`;
 
         // 计算并构建每期的明细
-        for (let period = 1; period <= depositPeriod; period++) {
-            const interest = totalPrincipal * i;
-            totalInterest += interest;
-            totalPrincipal += interest;
+// 计算并构建每期的明细
+for (let period = 1; period <= depositPeriod; period++) {
+    const interest = totalPrincipal * i;
+    totalInterest += interest;
 
-            detailsTable += `<tr>
-                                <td>${period}</td>
-                                <td>${principal.toFixed(2)}</td>
-                                <td>${interest.toFixed(2)}</td>
-                                <td>${totalInterest.toFixed(2)}</td>
-                                <td>${totalPrincipal.toFixed(2)}</td>
-                            </tr>`;
-        }
+    // 本期本金总计为初始本金 + 累计的总利息
+    const totalAmount = principal + totalInterest;
+
+    detailsTable += `<tr>
+                        <td>${period}</td>
+                        <td>${totalPrincipal.toFixed(2)}</td>
+                        <td>${interest.toFixed(2)}</td>
+                        <td>${totalInterest.toFixed(2)}</td>
+                        <td>${totalAmount.toFixed(2)}</td>
+                    </tr>`;
+
+    // 更新总本金为本金总计，以便下一期使用
+    totalPrincipal = totalAmount;
+}
+
+
+
 
         // 关闭明细表格
         detailsTable += `</tbody></table></div>`;
