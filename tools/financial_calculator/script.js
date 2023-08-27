@@ -127,17 +127,19 @@ document.getElementById("calculate4").addEventListener("click", function() {
     let totalInterest = 0;
 
     // 构建明细表格的表头
-    let detailsTable = `<table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
-                        <thead>
-                            <tr>
-                                <th style="width: 20%;">期数（${compoundingFrequency}）</th>
-                                <th style="width: 20%;">本金</th>
-                                <th style="width: 20%;">利息</th>
-                                <th style="width: 20%;">利息总计</th>
-                                <th style="width: 20%;">本金利息总计</th>
-                            </tr>
-                        </thead>
-                        <tbody>`;
+    // 构建明细表格
+    let detailsTable = `<div style="overflow-x: auto;">
+                            <table style="width: auto; border-collapse: collapse; margin-top: 10px;">
+                                <thead>
+                                    <tr>
+                                        <th style="min-width: 100px;">期数（${compoundingFrequency}）</th>
+                                        <th style="min-width: 100px;">本金</th>
+                                        <th style="min-width: 100px;">利息</th>
+                                        <th style="min-width: 100px;">利息总计</th>
+                                        <th style="min-width: 150px;">本金利息总计</th>
+                                    </tr>
+                                </thead>
+                                <tbody>`;
 
     // 计算并构建每期的明细
     for (let period = 1; period <= depositPeriod; period++) {
@@ -155,15 +157,16 @@ document.getElementById("calculate4").addEventListener("click", function() {
     }
 
     // 关闭明细表格
-    detailsTable += `</tbody></table>`;
+    detailsTable += `</tbody></table></div>`;
 
     // 计算本息总额和利息
     const futureValue = totalPrincipal;
     const totalInterestAmount = totalInterest;
 
     // 显示结果和明细
+   // 显示结果和明细
     const resultElement = document.getElementById("result4");
     resultElement.innerHTML = `<div style="margin-bottom: 10px;">本息总额：${futureValue.toFixed(2)}</div>
-                                <div style="margin-bottom: 10px;">利息：${totalInterestAmount.toFixed(2)}</div>
+                                <div style="margin-bottom: 10px;">利息：${totalInterest.toFixed(2)}</div>
                                 ${detailsTable}`;
 });
