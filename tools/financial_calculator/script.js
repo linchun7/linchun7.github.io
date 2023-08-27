@@ -1,3 +1,4 @@
+
 document.addEventListener('DOMContentLoaded', function() {
     const tabs = document.querySelectorAll('.nav-link');
     const contents = document.querySelectorAll('.tab-pane');
@@ -26,10 +27,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 
-
-// ... （其余部分保持不变）
-
-
 // 获取第一个功能的计算按钮和结果显示区域的元素
 const calculateButton1 = document.getElementById('calculate1');
 const resultDiv1 = document.getElementById('result1');
@@ -42,12 +39,18 @@ calculateButton1.addEventListener('click', () => {
     const interest1 = parseFloat(document.getElementById('interest1').value);
     const rateType1 = parseInt(document.getElementById('rateType1').value);
 
-    // 计算年化收益率，收益/本金/投资天数*365(360)*100%
-    const annualizedReturn = (interest1 / principal1 / days1) * rateType1 * 100;
+    // 检查输入值是否为空
+    if (isNaN(principal1) || isNaN(days1) || isNaN(interest1)) {
+        resultDiv1.innerHTML = '请输入有效的值';
+    } else {
+        // 计算年化收益率，收益/本金/投资天数*365(360)*100%
+        const annualizedReturn = (interest1 / principal1 / days1) * rateType1 * 100;
 
-    // 在页面上显示计算结果
-    resultDiv1.innerHTML = `年化收益率：${annualizedReturn.toFixed(2)}%`;
+        // 在页面上显示计算结果
+        resultDiv1.innerHTML = `年化收益率：${annualizedReturn.toFixed(2)}%`;
+    }
 });
+
 
 
 
@@ -63,13 +66,17 @@ calculateButton2.addEventListener('click', () => {
     const annualRate2 = parseFloat(document.getElementById('annualRate2').value);
     const rateType2 = parseInt(document.getElementById('rateType2').value);
 
-    // 计算利息收益，收益 = （本金 × 年化收益率） × （天数 / 365（360））
-    const interestEarnings = (principal2 * annualRate2 / 100) * (days2 / rateType2);
+    // 检查输入值是否为空
+    if (isNaN(principal2) || isNaN(days2) || isNaN(annualRate2)) {
+        resultDiv2.innerHTML = '请输入有效的值';
+    } else {
+        // 计算利息收益，收益 = （本金 × 年化收益率） × （天数 / 365（360））
+        const interestEarnings = (principal2 * annualRate2 / 100) * (days2 / rateType2);
 
-    // 在页面上显示计算结果
-    resultDiv2.innerHTML = `利息收益：${interestEarnings.toFixed(2)}`;
+        // 在页面上显示计算结果
+        resultDiv2.innerHTML = `利息收益：${interestEarnings.toFixed(2)}`;
+    }
 });
-
 
 // 获取第三个功能的计算按钮和结果显示区域的元素
 const calculateButton3 = document.getElementById('calculate3');
@@ -84,26 +91,25 @@ calculateButton3.addEventListener('click', () => {
     const endNetValue = parseFloat(document.getElementById('endNetValue').value);
     const rateType3 = parseInt(document.getElementById('rateType3').value);
 
-    // 计算天数和净值变化
-    const days = (endDate - startDate) / (1000 * 60 * 60 * 24);
-    const netValueChange = endNetValue - startNetValue;
+    // 检查输入值是否为空
+    if (isNaN(startNetValue) || isNaN(endNetValue) || isNaN(rateType3) || startDate === 'Invalid Date' || endDate === 'Invalid Date') {
+        resultDiv3.innerHTML = '请输入有效的值';
+    } else {
+        // 计算天数和净值变化
+        const days = (endDate - startDate) / (1000 * 60 * 60 * 24);
+        const netValueChange = endNetValue - startNetValue;
 
-    // 计算净值收益率，年化收益率 =（结束净值 - 初始净值）/ 初始净值 / 已成立天数 ×365(360)
-    const netValueReturn = (netValueChange / startNetValue) / days * rateType3 * 100;
+        // 计算净值收益率，年化收益率 =（结束净值 - 初始净值）/ 初始净值 / 已成立天数 ×365(360)
+        const netValueReturn = (netValueChange / startNetValue) / days * rateType3 * 100;
 
-    // 在页面上显示计算结果
-    resultDiv3.innerHTML = `年化收益率：${netValueReturn.toFixed(2)}%`;
+        // 在页面上显示计算结果
+        resultDiv3.innerHTML = `年化收益率：${netValueReturn.toFixed(2)}%`;
+    }
 });
 
 
 
-
-
-
 // 获取第四个功能的计算按钮和结果显示区域的元素
-
-
-// 在计算按钮点击事件处理程序中
 document.getElementById("calculate4").addEventListener("click", function() {
     // 获取用户输入的值
     const principal = parseFloat(document.getElementById("principal3").value);  // 获取本金
@@ -112,72 +118,80 @@ document.getElementById("calculate4").addEventListener("click", function() {
     const annualRate = parseFloat(document.getElementById("annualRate3").value);  // 获取年化收益率
     const rateType = parseInt(document.getElementById("rateType4").value);  // 获取年化收益率类型
 
-    // 将年化收益率转换为对应复利方式的利率
-    let rate;
-    if (compoundingFrequency === "daily") {
-        rate = annualRate / rateType;  // 日利率
-    } else if (compoundingFrequency === "weekly") {
-        rate = annualRate / rateType * 7; //日利率*7=周利率
-    } else if (compoundingFrequency === "monthly") {
-        rate = annualRate / 12;  // 月
-    } else if (compoundingFrequency === "quarterly") {
-        rate = annualRate / 4;  // 季
-    } else if (compoundingFrequency === "semi-annually") {
-        rate = annualRate / 2;  // 半年
-    } else if (compoundingFrequency === "annually") {
-        rate = annualRate;  // 年
+    // 检测输入值是否为空
+    if (isNaN(principal) || isNaN(depositPeriod) || isNaN(annualRate) || isNaN(rateType)) {
+        const resultElement = document.getElementById("result4");
+        resultElement.innerHTML = '请填写所有必要信息';
+    } else {
+        // 将年化收益率转换为对应复利方式的利率
+        let rate;
+        if (compoundingFrequency === "daily") {
+            rate = annualRate / rateType;  // 日利率
+        } else if (compoundingFrequency === "weekly") {
+            rate = annualRate / rateType * 7; //日利率*7=周利率
+        } else if (compoundingFrequency === "monthly") {
+            rate = annualRate / 12;  // 月
+        } else if (compoundingFrequency === "quarterly") {
+            rate = annualRate / 4;  // 季
+        } else if (compoundingFrequency === "semi-annually") {
+            rate = annualRate / 2;  // 半年
+        } else if (compoundingFrequency === "annually") {
+            rate = annualRate;  // 年
+        }
+
+        // 计算复利收益和明细
+        const n = depositPeriod;  // 计息期数
+        const i = rate / 100;  // 将利率转为小数
+        let totalPrincipal = principal;
+        let totalInterest = 0;
+
+        // 构建明细表格的表头
+        // 构建明细表格
+        let detailsTable = `<div style="overflow-x: auto;">
+                                <table style="width: auto; border-collapse: collapse; margin-top: 10px;">
+                                    <thead>
+                                        <tr>
+                                            <th style="min-width: 100px;">期数（${compoundingFrequency}）</th>
+                                            <th style="min-width: 100px;">本金</th>
+                                            <th style="min-width: 100px;">利息</th>
+                                            <th style="min-width: 100px;">利息总计</th>
+                                            <th style="min-width: 150px;">本金利息总计</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>`;
+
+        // 计算并构建每期的明细
+        for (let period = 1; period <= depositPeriod; period++) {
+            const interest = totalPrincipal * i;
+            totalInterest += interest;
+            totalPrincipal += interest;
+
+            detailsTable += `<tr>
+                                <td>${period}</td>
+                                <td>${principal.toFixed(2)}</td>
+                                <td>${interest.toFixed(2)}</td>
+                                <td>${totalInterest.toFixed(2)}</td>
+                                <td>${totalPrincipal.toFixed(2)}</td>
+                            </tr>`;
+        }
+
+        // 关闭明细表格
+        detailsTable += `</tbody></table></div>`;
+
+        // 计算本息总额和利息
+        const futureValue = totalPrincipal;
+        const totalInterestAmount = totalInterest;
+
+        // 显示结果和明细
+        const resultElement = document.getElementById("result4");
+        resultElement.innerHTML = `<div style="margin-bottom: 10px;">本息总额：${futureValue.toFixed(2)}</div>
+                                    <div style="margin-bottom: 10px;">利息：${totalInterest.toFixed(2)}</div>
+                                    ${detailsTable}`;
     }
-
-    // 计算复利收益和明细
-    const n = depositPeriod;  // 计息期数
-    const i = rate / 100;  // 将利率转为小数
-    let totalPrincipal = principal;
-    let totalInterest = 0;
-
-    // 构建明细表格的表头
-    // 构建明细表格
-    let detailsTable = `<div style="overflow-x: auto;">
-                            <table style="width: auto; border-collapse: collapse; margin-top: 10px;">
-                                <thead>
-                                    <tr>
-                                        <th style="min-width: 100px;">期数（${compoundingFrequency}）</th>
-                                        <th style="min-width: 100px;">本金</th>
-                                        <th style="min-width: 100px;">利息</th>
-                                        <th style="min-width: 100px;">利息总计</th>
-                                        <th style="min-width: 150px;">本金利息总计</th>
-                                    </tr>
-                                </thead>
-                                <tbody>`;
-
-    // 计算并构建每期的明细
-    for (let period = 1; period <= depositPeriod; period++) {
-        const interest = totalPrincipal * i;
-        totalInterest += interest;
-        totalPrincipal += interest;
-
-        detailsTable += `<tr>
-                            <td>${period}</td>
-                            <td>${principal.toFixed(2)}</td>
-                            <td>${interest.toFixed(2)}</td>
-                            <td>${totalInterest.toFixed(2)}</td>
-                            <td>${totalPrincipal.toFixed(2)}</td>
-                        </tr>`;
-    }
-
-    // 关闭明细表格
-    detailsTable += `</tbody></table></div>`;
-
-    // 计算本息总额和利息
-    const futureValue = totalPrincipal;
-    const totalInterestAmount = totalInterest;
-
-    // 显示结果和明细
-   // 显示结果和明细
-    const resultElement = document.getElementById("result4");
-    resultElement.innerHTML = `<div style="margin-bottom: 10px;">本息总额：${futureValue.toFixed(2)}</div>
-                                <div style="margin-bottom: 10px;">利息：${totalInterest.toFixed(2)}</div>
-                                ${detailsTable}`;
 });
+
+
+
 
 // 清空1的点击事件监听器
 document.getElementById('empty1').addEventListener('click', () => {
