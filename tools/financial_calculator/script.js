@@ -94,7 +94,8 @@ calculateButton3.addEventListener('click', () => {
 
 // 获取第四个功能的计算按钮和结果显示区域的元素
 
-// 计算复利收益
+
+// 在计算按钮点击事件处理程序中
 document.getElementById("calculate4").addEventListener("click", function() {
     // 获取用户输入的值
     const principal = parseFloat(document.getElementById("principal3").value);  // 获取本金
@@ -102,9 +103,6 @@ document.getElementById("calculate4").addEventListener("click", function() {
     const depositPeriod = parseFloat(document.getElementById("depositPeriod").value);  // 获取存期
     const annualRate = parseFloat(document.getElementById("annualRate3").value);  // 获取年化收益率
     const rateType = parseInt(document.getElementById("rateType4").value);  // 获取年化收益率类型
-	
-
-
 
     // 将年化收益率转换为对应复利方式的利率
     let rate;
@@ -121,16 +119,51 @@ document.getElementById("calculate4").addEventListener("click", function() {
     } else if (compoundingFrequency === "annually") {
         rate = annualRate;  // 年
     }
-	
 
-    // 计算复利收益
+    // 计算复利收益和明细
     const n = depositPeriod;  // 计息期数
     const i = rate / 100;  // 将利率转为小数
-    const futureValue = principal * Math.pow(1 + i, n);  // 利用复利计算公式计算未来值
-    const totalInterest = futureValue - principal;  // 计算利息
+    let totalPrincipal = principal;
+    let totalInterest = 0;
 
-    // 显示结果
+    // 构建明细表格的表头
+    let detailsTable = `<table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                        <thead>
+                            <tr>
+                                <th style="width: 20%;">期数（${compoundingFrequency}）</th>
+                                <th style="width: 20%;">本金</th>
+                                <th style="width: 20%;">利息</th>
+                                <th style="width: 20%;">利息总计</th>
+                                <th style="width: 20%;">本金利息总计</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+
+    // 计算并构建每期的明细
+    for (let period = 1; period <= depositPeriod; period++) {
+        const interest = totalPrincipal * i;
+        totalInterest += interest;
+        totalPrincipal += interest;
+
+        detailsTable += `<tr>
+                            <td>${period}</td>
+                            <td>${principal.toFixed(2)}</td>
+                            <td>${interest.toFixed(2)}</td>
+                            <td>${totalInterest.toFixed(2)}</td>
+                            <td>${totalPrincipal.toFixed(2)}</td>
+                        </tr>`;
+    }
+
+    // 关闭明细表格
+    detailsTable += `</tbody></table>`;
+
+    // 计算本息总额和利息
+    const futureValue = totalPrincipal;
+    const totalInterestAmount = totalInterest;
+
+    // 显示结果和明细
     const resultElement = document.getElementById("result4");
-    resultElement.innerHTML = `本息总额：${futureValue.toFixed(2)}<br>利息：${totalInterest.toFixed(2)}`;
+    resultElement.innerHTML = `<div style="margin-bottom: 10px;">本息总额：${futureValue.toFixed(2)}</div>
+                                <div style="margin-bottom: 10px;">利息：${totalInterestAmount.toFixed(2)}</div>
+                                ${detailsTable}`;
 });
-
