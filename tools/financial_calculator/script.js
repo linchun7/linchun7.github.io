@@ -1,4 +1,3 @@
-
 document.addEventListener('DOMContentLoaded', function() {
     const tabs = document.querySelectorAll('.nav-link');
     const contents = document.querySelectorAll('.tab-pane');
@@ -16,7 +15,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             tabs.forEach(t => t.classList.remove('active'));
             tab.classList.add('active');
-            
+
             showContent(targetId);
         });
     });
@@ -92,24 +91,24 @@ calculateButton3.addEventListener('click', () => {
     const rateType3 = parseInt(document.getElementById('rateType3').value);
 
     // 检查输入值是否为空
-    if (isNaN(startNetValue) || isNaN(endNetValue) || isNaN(rateType3) || isNaN(startDate) || isNaN(endDate) ) {
+    if (isNaN(startNetValue) || isNaN(endNetValue) || isNaN(rateType3) || isNaN(startDate) || isNaN(endDate)) {
         resultDiv3.innerHTML = '请输入有效的值';
     } else {
         // 计算天数和净值变化
         const days = (endDate - startDate) / (1000 * 60 * 60 * 24);
         const netValueChange = endNetValue - startNetValue;
-		
-		if (days === 0) {
+
+        if (days === 0) {
             resultDiv3.innerHTML = '终止日期应大于起始日期';
         } else {
 
-        // 计算净值收益率，年化收益率 =（结束净值 - 初始净值）/ 初始净值 / 已成立天数 ×365(360)
-        const netValueReturn = (netValueChange / startNetValue) / days * rateType3 * 100;
+            // 计算净值收益率，年化收益率 =（结束净值 - 初始净值）/ 初始净值 / 已成立天数 ×365(360)
+            const netValueReturn = (netValueChange / startNetValue) / days * rateType3 * 100;
 
-        // 在页面上显示计算结果
-        resultDiv3.innerHTML = `年化收益率：<span style='color: red'>${netValueReturn.toFixed(2)}%</span>`;
-    	}
-	}
+            // 在页面上显示计算结果
+            resultDiv3.innerHTML = `年化收益率：<span style='color: red'>${netValueReturn.toFixed(2)}%</span>`;
+        }
+    }
 });
 
 
@@ -117,11 +116,11 @@ calculateButton3.addEventListener('click', () => {
 // 获取第四个功能的计算按钮和结果显示区域的元素
 document.getElementById("calculate4").addEventListener("click", function() {
     // 获取用户输入的值
-    const principal = parseFloat(document.getElementById("principal3").value);  // 获取本金
-    const compoundingFrequency = document.getElementById("compoundingFrequency").value;  // 获取复利方式
-    const depositPeriod = parseFloat(document.getElementById("depositPeriod").value);  // 获取存期
-    const annualRate = parseFloat(document.getElementById("annualRate3").value);  // 获取年化收益率
-    const rateType = parseInt(document.getElementById("rateType4").value);  // 获取年化收益率类型
+    const principal = parseFloat(document.getElementById("principal3").value); // 获取本金
+    const compoundingFrequency = document.getElementById("compoundingFrequency").value; // 获取复利方式
+    const depositPeriod = parseFloat(document.getElementById("depositPeriod").value); // 获取存期
+    const annualRate = parseFloat(document.getElementById("annualRate3").value); // 获取年化收益率
+    const rateType = parseInt(document.getElementById("rateType4").value); // 获取年化收益率类型
 
     // 检测输入值是否为空
     if (isNaN(principal) || isNaN(depositPeriod) || isNaN(annualRate) || isNaN(rateType)) {
@@ -131,22 +130,22 @@ document.getElementById("calculate4").addEventListener("click", function() {
         // 将年化收益率转换为对应复利方式的利率
         let rate;
         if (compoundingFrequency === "daily") {
-            rate = annualRate / rateType;  // 日利率
+            rate = annualRate / rateType; // 日利率
         } else if (compoundingFrequency === "weekly") {
             rate = annualRate / rateType * 7; //日利率*7=周利率
         } else if (compoundingFrequency === "monthly") {
-            rate = annualRate / 12;  // 月
+            rate = annualRate / 12; // 月
         } else if (compoundingFrequency === "quarterly") {
-            rate = annualRate / 4;  // 季
+            rate = annualRate / 4; // 季
         } else if (compoundingFrequency === "semi-annually") {
-            rate = annualRate / 2;  // 半年
+            rate = annualRate / 2; // 半年
         } else if (compoundingFrequency === "annually") {
-            rate = annualRate;  // 年
+            rate = annualRate; // 年
         }
 
         // 计算复利收益和明细
-        const n = depositPeriod;  // 计息期数
-        const i = rate / 100;  // 将利率转为小数
+        const n = depositPeriod; // 计息期数
+        const i = rate / 100; // 将利率转为小数
         let totalPrincipal = principal;
         let totalInterest = 0;
 
@@ -166,15 +165,15 @@ document.getElementById("calculate4").addEventListener("click", function() {
                                     <tbody>`;
 
         // 计算并构建每期的明细
-// 计算并构建每期的明细
-for (let period = 1; period <= depositPeriod; period++) {
-    const interest = totalPrincipal * i;
-    totalInterest += interest;
+        // 计算并构建每期的明细
+        for (let period = 1; period <= depositPeriod; period++) {
+            const interest = totalPrincipal * i;
+            totalInterest += interest;
 
-    // 本期本金总计为初始本金 + 累计的总利息
-    const totalAmount = principal + totalInterest;
+            // 本期本金总计为初始本金 + 累计的总利息
+            const totalAmount = principal + totalInterest;
 
-    detailsTable += `<tr>
+            detailsTable += `<tr>
                         <td>${period}</td>
                         <td>${totalPrincipal.toFixed(2)}</td>
                         <td>${interest.toFixed(2)}</td>
@@ -182,9 +181,9 @@ for (let period = 1; period <= depositPeriod; period++) {
                         <td>${totalAmount.toFixed(2)}</td>
                     </tr>`;
 
-    // 更新总本金为本金总计，以便下一期使用
-    totalPrincipal = totalAmount;
-}
+            // 更新总本金为本金总计，以便下一期使用
+            totalPrincipal = totalAmount;
+        }
 
         // 关闭明细表格
         detailsTable += `</tbody></table></div>`;
@@ -195,11 +194,11 @@ for (let period = 1; period <= depositPeriod; period++) {
 
         // 显示结果和明细
         const result4 = document.getElementById("result4");
-		const resultElement = document.getElementById("result4-table");
+        const resultElement = document.getElementById("result4-table");
         result4.innerHTML = `<div>本息总计：<span style='color: red'>${futureValue.toFixed(2)}</span></div>
                                     <div>利息总计：<span style='color: red'>${totalInterest.toFixed(2)}</span></div>`;
-		 resultElement.innerHTML = `${detailsTable}`;
-		
+        resultElement.innerHTML = `${detailsTable}`;
+
     }
 });
 
@@ -234,7 +233,7 @@ document.getElementById('empty3').addEventListener('click', () => {
     document.getElementById('startDate').value = '';
     document.getElementById('startNetValue').value = '';
     document.getElementById('endDate').value = '';
-	    document.getElementById('endNetValue').value = '';
+    document.getElementById('endNetValue').value = '';
 
 
     // 清空结果显示区域
@@ -249,9 +248,8 @@ document.getElementById('empty4').addEventListener('click', () => {
     document.getElementById('annualRate3').value = '';
 
     // 清空结果显示区域
-	const result4 = document.getElementById("result4");
-	const resultElement = document.getElementById("result4-table");
-	result4.innerHTML = '';
+    const result4 = document.getElementById("result4");
+    const resultElement = document.getElementById("result4-table");
+    result4.innerHTML = '';
     resultElement.innerHTML = '';
 });
-
