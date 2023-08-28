@@ -92,19 +92,24 @@ calculateButton3.addEventListener('click', () => {
     const rateType3 = parseInt(document.getElementById('rateType3').value);
 
     // 检查输入值是否为空
-    if (isNaN(startNetValue) || isNaN(endNetValue) || isNaN(rateType3) || startDate === 'Invalid Date' || endDate === 'Invalid Date') {
+    if (isNaN(startNetValue) || isNaN(endNetValue) || isNaN(rateType3) || isNaN(startDate) || isNaN(endDate) ) {
         resultDiv3.innerHTML = '请输入有效的值';
     } else {
         // 计算天数和净值变化
         const days = (endDate - startDate) / (1000 * 60 * 60 * 24);
         const netValueChange = endNetValue - startNetValue;
+		
+		if (days === 0) {
+            resultDiv3.innerHTML = '终止日期应大于起始日期';
+        } else {
 
         // 计算净值收益率，年化收益率 =（结束净值 - 初始净值）/ 初始净值 / 已成立天数 ×365(360)
         const netValueReturn = (netValueChange / startNetValue) / days * rateType3 * 100;
 
         // 在页面上显示计算结果
         resultDiv3.innerHTML = `年化收益率：${netValueReturn.toFixed(2)}%`;
-    }
+    	}
+	}
 });
 
 
