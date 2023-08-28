@@ -249,7 +249,9 @@ document.getElementById('empty4').addEventListener('click', () => {
     document.getElementById('annualRate3').value = '';
 
     // 清空结果显示区域
-	const resultElement = document.getElementById("result4");
+	const result4 = document.getElementById("result4");
+	const resultElement = document.getElementById("result4-table");
+	result4.innerHTML = '';
     resultElement.innerHTML = '';
 });
 
