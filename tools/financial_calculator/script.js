@@ -196,8 +196,8 @@ for (let period = 1; period <= depositPeriod; period++) {
         // 显示结果和明细
         const result4 = document.getElementById("result4");
 		const resultElement = document.getElementById("result4-table");
-        result4.innerHTML = `<div>本息总额：${futureValue.toFixed(2)}</div>
-                                    <div>利息：${totalInterest.toFixed(2)}</div>`;
+        result4.innerHTML = `<div>本息总计：${futureValue.toFixed(2)}</div>
+                                    <div>利息总计：${totalInterest.toFixed(2)}</div>`;
 		 resultElement.innerHTML = `${detailsTable}`;
 		
     }
