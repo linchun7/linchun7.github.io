@@ -38,12 +38,7 @@ h2{
 	
 }
 
-/* 将表格体内的单元格内容居中
-table tbody td,
-table thead th {
-    text-align: center;
-} */
-
+/* 表格内字体、左右间距*/
 table tbody td,
 table thead th {
 	font-family: Menlo, Consolas, monospace;
