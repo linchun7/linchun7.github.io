@@ -38,10 +38,17 @@ h2{
 	
 }
 
-/* 将表格体内的单元格内容居中 */
+/* 将表格体内的单元格内容居中
 table tbody td,
 table thead th {
     text-align: center;
+} */
+
+table tbody td,
+table thead th {
+	font-family: Menlo, Consolas, monospace;
+    padding-left: 10px; 
+    padding-right: 10px; 
 }
 
 
