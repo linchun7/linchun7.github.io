@@ -125,8 +125,8 @@ document.getElementById("calculate4").addEventListener("click", function() {
 
     // 检测输入值是否为空
     if (isNaN(principal) || isNaN(depositPeriod) || isNaN(annualRate) || isNaN(rateType)) {
-        const resultElement = document.getElementById("result4");
-        resultElement.innerHTML = '请输入有效的值';
+        const resultDiv4 = document.getElementById("result4");
+        resultDiv4.innerHTML = '请输入有效的值';
     } else {
         // 将年化收益率转换为对应复利方式的利率
         let rate;
