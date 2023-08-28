@@ -33,6 +33,11 @@ h2{
 	    visibility: hidden;
 }
 
+.select-style{
+	text-align: center;
+	
+}
+
 /* 为活动选项卡导航链接添加加粗样式 */
 .nav-tabs .nav-link.active {
 	font-size: 1.25em; 
