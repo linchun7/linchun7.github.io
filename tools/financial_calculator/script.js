@@ -181,9 +181,6 @@ for (let period = 1; period <= depositPeriod; period++) {
     totalPrincipal = totalAmount;
 }
 
-
-
-
         // 关闭明细表格
         detailsTable += `</tbody></table></div>`;
 
