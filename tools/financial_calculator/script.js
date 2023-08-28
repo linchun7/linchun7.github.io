@@ -47,7 +47,7 @@ calculateButton1.addEventListener('click', () => {
         const annualizedReturn = (interest1 / principal1 / days1) * rateType1 * 100;
 
         // 在页面上显示计算结果
-        resultDiv1.innerHTML = `年化收益率：${annualizedReturn.toFixed(2)}%`;
+        resultDiv1.innerHTML = `年化收益率：<span style='color: red'>${annualizedReturn.toFixed(2)}%</span>`;
     }
 });
 
@@ -74,7 +74,7 @@ calculateButton2.addEventListener('click', () => {
         const interestEarnings = (principal2 * annualRate2 / 100) * (days2 / rateType2);
 
         // 在页面上显示计算结果
-        resultDiv2.innerHTML = `利息收益：${interestEarnings.toFixed(2)}`;
+        resultDiv2.innerHTML = `利息收益：<span style='color: red'>${interestEarnings.toFixed(2)}</span>`;
     }
 });
 
@@ -107,7 +107,7 @@ calculateButton3.addEventListener('click', () => {
         const netValueReturn = (netValueChange / startNetValue) / days * rateType3 * 100;
 
         // 在页面上显示计算结果
-        resultDiv3.innerHTML = `年化收益率：${netValueReturn.toFixed(2)}%`;
+        resultDiv3.innerHTML = `年化收益率：<span style='color: red'>${netValueReturn.toFixed(2)}%</span>`;
     	}
 	}
 });
@@ -196,8 +196,8 @@ for (let period = 1; period <= depositPeriod; period++) {
         // 显示结果和明细
         const result4 = document.getElementById("result4");
 		const resultElement = document.getElementById("result4-table");
-        result4.innerHTML = `<div>本息总计：${futureValue.toFixed(2)}</div>
-                                    <div>利息总计：${totalInterest.toFixed(2)}</div>`;
+        result4.innerHTML = `<div>本息总计：<span style='color: red'>${futureValue.toFixed(2)}</span></div>
+                                    <div>利息总计：<span style='color: red'>${totalInterest.toFixed(2)}</span></div>`;
 		 resultElement.innerHTML = `${detailsTable}`;
 		
     }
