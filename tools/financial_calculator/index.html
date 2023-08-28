@@ -29,148 +29,191 @@
             <a class="nav-link" id="tab4" data-bs-toggle="tab" data-bs-target="#content4" role="tab" aria-controls="content4" aria-selected="false">复利收益</a>
         </li>
     </ul>
-    <div class="tab-content" id="contents">
-        <!-- 算年化收益率内容 -->
-        <div id="content1" class="function-content tab-pane fade show active">
-         <!-- <h2>计算年化收益率</h2>-->
-
-			<div class="mb-3">
-				<label for="principal1" class="form-label inline-elements">本金：</label>
-				<input type="number" class="form-control inline-block-elements" id="principal1">
-				<span class="inline-elements">元</span>
-			</div>
-                <div class="mb-3">
-                    <label for="days1" class="form-label inline-elements" >天数：</label>
-                    <input type="number" class="form-control inline-block-elements" id="days1">
-									<span class="inline-elements">天</span>
-
-                </div>
-                <div class="mb-3">
-                    <label for="interest1" class="form-label inline-elements">收益：</label>
-                    <input type="number" class="form-control inline-block-elements" id="interest1">
-									<span class="inline-elements">元</span>
-
-                </div>
-                <div class="mb-3">
-                    <label for="rateType1" class="form-label inline-elements">年化收益率类型：</label>
-                    <select class="form-select inline-block-elements" id="rateType1">
-						<option value="360">360天</option>
-                        <option value="365">365天</option>
-                    </select>
-                </div>
-			     <button id="empty1" class="btn btn-primary">清空</button>
+<div class="tab-content" id="contents">
+    <!-- 算年化收益率内容 -->
+    <div id="content1" class="function-content tab-pane fade show active">
+        <div class="mb-3 row align-items-center">
+            <label for="principal1" class="form-label col-auto mb-0">本金：</label>
+            <div class="col">
+                <input type="number" class="form-control" id="principal1">
+            </div>
+            <span class="col-auto">元</span>
+        </div>
+        <div class="mb-3 row align-items-center">
+            <label for="days1" class="form-label col-auto mb-0">天数：</label>
+            <div class="col">
+                <input type="number" class="form-control" id="days1">
+            </div>
+            <span class="col-auto">天</span>
+        </div>
+        <div class="mb-3 row align-items-center">
+            <label for="interest1" class="form-label col-auto mb-0">收益：</label>
+            <div class="col">
+                <input type="number" class="form-control" id="interest1">
+            </div>
+            <span class="col-auto">元</span>
+        </div>
+        <div class="mb-3 row align-items-center">
+            <label for="rateType1" class="form-label col-auto mb-0">年化收益率类型：</label>
+            <div class="col">
+                <select class="form-select" id="rateType1">
+                    <option value="360">360天</option>
+                    <option value="365">365天</option>
+                </select>
+            </div>
+        </div>
+        <div class="mb-3 row">
+            <div class="col">
+                <button id="empty1" class="btn btn-primary">清空</button>
                 <button id="calculate1" class="btn btn-primary">计算</button>
-                <div id="result1" class="mt-3"></div>
-		</div>
-
-        <!-- 算利息收益内容 -->
-        <div id="content2" class="function-content tab-pane fade">
-			<!-- <h2>计算利息收益</h2>-->
-                <div class="mb-3">
-                    <label for="principal2" class="form-label inline-elements">本金：</label>
-                    <input type="number" class="form-control inline-block-elements" id="principal2">
-														<span class="inline-elements">元</span>
-
-                </div>
-                <div class="mb-3">
-                    <label for="days2" class="form-label inline-elements">天数：</label>
-                    <input type="number" class="form-control inline-block-elements" id="days2">
-														<span class="inline-elements">天</span>
-
-                </div>
-                <div class="mb-3">
-                    <label for="annualRate2" class="form-label inline-elements">年化收益率：</label>
-                    <input type="number" class="form-control inline-block-elements" id="annualRate2">
-														<span class="inline-elements">%</span>
-
-                </div>
-                <div class="mb-3">
-                    <label for="rateType2" class="form-label inline-elements">年化收益率类型：</label>
-                    <select class="form-select inline-block-elements" id="rateType2">
-					 <option value="360">360天</option>
-                        <option value="365">365天</option>
-                    </select>
-                </div>
-						     <button id="empty2" class="btn btn-primary">清空</button>
-
-                <button id="calculate2" class="btn btn-primary">计算</button>
-                <div id="result2" class="mt-3"></div>        </div>
-
-        <!-- 净值收益率内容 -->
-        <div id="content3" class="function-content tab-pane fade">
-			<!-- <h2>计算净值收益率</h2>-->
-                <div class="mb-3">
-                    <label for="startDate" class="form-label inline-elements">起始日期：</label>
-                    <input type="date" class="form-control inline-block-elements" id="startDate">
-                </div>
-                <div class="mb-3">
-                    <label for="startNetValue" class="form-label inline-elements">起始净值：</label>
-                    <input type="number" class="form-control inline-block-elements" id="startNetValue" step="0.01">
-                </div>
-                <div class="mb-3">
-                    <label for="endDate" class="form-label inline-elements">终止日期：</label>
-                    <input type="date" class="form-control inline-block-elements" id="endDate">
-                </div>
-                <div class="mb-3">
-                    <label for="endNetValue" class="form-label inline-elements">终止净值：</label>
-                    <input type="number" class="form-control inline-block-elements" id="endNetValue" step="0.01">
-                </div>
-                <div class="mb-3">
-                    <label for="rateType3" class="form-label inline-elements">年化收益率类型：</label>
-                    <select class="form-select inline-block-elements" id="rateType3">
-						 <option value="360">360天</option>
-                        <option value="365">365天</option>
-                    </select>
-                </div>
-						     <button id="empty3" class="btn btn-primary">清空</button>
-
-                <button id="calculate3" class="btn btn-primary">计算</button>
-                <div id="result3" class="mt-3"></div>        </div>
-
-        <!-- 算复利收益内容 -->
-        <div id="content4" class="function-content tab-pane fade">
-               <!-- <h2>计算复利收益</h2>-->
-                <div class="mb-3">
-                    <label for="principal3" class="form-label inline-elements">本金：</label>
-                    <input type="number" class="form-control inline-block-elements" id="principal3">
-					<span class="inline-elements">元</span>
-
-                </div>
-                <div class="mb-3">
-                    <label for="compoundingFrequency" class="form-label inline-elements">复利方式：</label>
-                    <select class="form-select inline-block-elements" id="compoundingFrequency">
-                        <option value="annually">按年复利</option>
-                        <option value="semi-annually">按半年复利</option>
-                        <option value="quarterly">按季复利</option>
-                        <option value="monthly">按月复利</option>
-                        <option value="weekly">按周复利</option>
-                        <option value="daily">按日复利</option>
-                    </select>
-                </div>
-                <div class="mb-3">
-                    <label for="depositPeriod" class="form-label inline-elements">存期：</label>
-                    <input type="number" class="form-control inline-block-elements" id="depositPeriod">
-					<span class="inline-elements" id="frequency">年</span>
-                </div>
-                <div class="mb-3">
-                    <label for="annualRate3" class="form-label inline-elements">年化收益率：</label>
-                    <input type="number" class="form-control inline-block-elements" id="annualRate3">
-										<span class="inline-elements">%</span>
-
-                </div>
-                <div class="mb-3">
-                    <label for="rateType4" class="form-label inline-elements">年化收益率类型：</label>
-                    <select class="form-select inline-block-elements" id="rateType4">
-                        <option value="360">360天</option>
-                        <option value="365">365天</option>
-                    </select>
-                </div>
-						     <button id="empty4" class="btn btn-primary">清空</button>
-
-                <button id="calculate4" class="btn btn-primary">计算</button>
-                <div id="result4" class="mt-3"></div>        </div>
+            </div>
+        </div>
+        <div class="mt-3" id="result1"></div>
     </div>
+
+    <!-- 算利息收益内容 -->
+    <div id="content2" class="function-content tab-pane fade">
+        <div class="mb-3 row align-items-center">
+            <label for="principal2" class="form-label col-auto mb-0">本金：</label>
+            <div class="col">
+                <input type="number" class="form-control" id="principal2">
+            </div>
+            <span class="col-auto">元</span>
+        </div>
+        <div class="mb-3 row align-items-center">
+            <label for="days2" class="form-label col-auto mb-0">天数：</label>
+            <div class="col">
+                <input type="number" class="form-control" id="days2">
+            </div>
+            <span class="col-auto">天</span>
+        </div>
+        <div class="mb-3 row align-items-center">
+            <label for="annualRate2" class="form-label col-auto mb-0">年化收益率：</label>
+            <div class="col">
+                <input type="number" class="form-control" id="annualRate2">
+            </div>
+            <span class="col-auto">%</span>
+        </div>
+        <div class="mb-3 row align-items-center">
+            <label for="rateType2" class="form-label col-auto mb-0">年化收益率类型：</label>
+            <div class="col">
+                <select class="form-select" id="rateType2">
+                    <option value="360">360天</option>
+                    <option value="365">365天</option>
+                </select>
+            </div>
+        </div>
+        <div class="mb-3 row">
+            <div class="col">
+                <button id="empty2" class="btn btn-primary">清空</button>
+                <button id="calculate2" class="btn btn-primary">计算</button>
+            </div>
+        </div>
+        <div class="mt-3" id="result2"></div>
+    </div>
+
+
+<!-- 净值收益率内容 -->
+<div id="content3" class="function-content tab-pane fade">
+    <div class="mb-3 row align-items-center">
+        <label for="startDate" class="form-label col-auto mb-0">起始日期：</label>
+        <div class="col">
+            <input type="date" class="form-control" id="startDate">
+        </div>
+    </div>
+    <div class="mb-3 row align-items-center">
+        <label for="startNetValue" class="form-label col-auto mb-0">起始净值：</label>
+        <div class="col">
+            <input type="number" class="form-control" id="startNetValue" step="0.01">
+        </div>
+    </div>
+    <div class="mb-3 row align-items-center">
+        <label for="endDate" class="form-label col-auto mb-0">终止日期：</label>
+        <div class="col">
+            <input type="date" class="form-control" id="endDate">
+        </div>
+    </div>
+    <div class="mb-3 row align-items-center">
+        <label for="endNetValue" class="form-label col-auto mb-0">终止净值：</label>
+        <div class="col">
+            <input type="number" class="form-control" id="endNetValue" step="0.01">
+        </div>
+    </div>
+    <div class="mb-3 row align-items-center">
+        <label for="rateType3" class="form-label col-auto mb-0">年化收益率类型：</label>
+        <div class="col">
+            <select class="form-select" id="rateType3">
+                <option value="360">360天</option>
+                <option value="365">365天</option>
+            </select>
+        </div>
+    </div>
+    <div class="mb-3 row">
+        <div class="col">
+            <button id="empty3" class="btn btn-primary">清空</button>
+            <button id="calculate3" class="btn btn-primary">计算</button>
+        </div>
+    </div>
+    <div class="mt-3" id="result3"></div>
 </div>
+
+  <!-- 算复利收益内容 -->
+<div id="content4" class="function-content tab-pane fade">
+    <div class="mb-3 row align-items-center">
+        <label for="principal3" class="form-label col-auto mb-0">本金：</label>
+        <div class="col">
+            <input type="number" class="form-control" id="principal3">
+        </div>
+        <span class="col-auto">元</span>
+    </div>
+    <div class="mb-3 row align-items-center">
+        <label for="compoundingFrequency" class="form-label col-auto mb-0">复利方式：</label>
+        <div class="col">
+            <select class="form-select" id="compoundingFrequency">
+                <option value="annually">按年复利</option>
+                <option value="semi-annually">按半年复利</option>
+                <option value="quarterly">按季复利</option>
+                <option value="monthly">按月复利</option>
+                <option value="weekly">按周复利</option>
+                <option value="daily">按日复利</option>
+            </select>
+        </div>
+    </div>
+    <div class="mb-3 row align-items-center">
+        <label for="depositPeriod" class="form-label col-auto mb-0">存期：</label>
+        <div class="col">
+            <input type="number" class="form-control" id="depositPeriod">
+        </div>
+        <span class="col-auto" id="frequency">年</span>
+    </div>
+    <div class="mb-3 row align-items-center">
+        <label for="annualRate3" class="form-label col-auto mb-0">年化收益率：</label>
+        <div class="col">
+            <input type="number" class="form-control" id="annualRate3">
+        </div>
+        <span class="col-auto">%</span>
+    </div>
+    <div class="mb-3 row align-items-center">
+        <label for="rateType4" class="form-label col-auto mb-0">年化收益率类型：</label>
+        <div class="col">
+            <select class="form-select" id="rateType4">
+                <option value="360">360天</option>
+                <option value="365">365天</option>
+            </select>
+        </div>
+    </div>
+    <div class="mb-3 row">
+        <div class="col">
+            <button id="empty4" class="btn btn-primary">清空</button>
+            <button id="calculate4" class="btn btn-primary">计算</button>
+        </div>
+    </div>
+    <div class="mt-3" id="result4"></div>
+</div>
+
+	
+</div>
+	</div>
 
 	
 	
