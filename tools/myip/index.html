@@ -2,42 +2,42 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>My IP</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, maximum-scale=1, user-scalable=no">
     <link rel="stylesheet" href="../css/bootstrap.min.css">
-    <script src="dist/nzh.min.js"></script>
     <meta name="format-detection" content="telephone=no">
+	<meta http-equiv="x-dns-prefetch-control" content="on">
     <link rel="shortcut icon" href="/images/favicon.ico">
     <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
     <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
-	
-    <meta charset="utf-8">
-    <meta http-equiv="x-dns-prefetch-control" content="on">
-    <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,minimal-ui">
+    <!-- <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,minimal-ui">--> 
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="preconnect" href="https://ip.mcr.moe" crossorigin>
     <link rel="preconnect" href="https://ipapi.co" crossorigin>
     <link rel="preconnect" href="https://myip.ipip.net" crossorigin>
-    <link rel="preconnect" href="https://pv.sohu.com" crossorigin>
     <link rel="preconnect" href="https://api.ip.sb" crossorigin>
     <link rel="preconnect" href="https://api.ipify.org" crossorigin>
+	<link rel="preconnect" href="https://ipapi.co" crossorigin>
+	<link rel="preconnect" href="https://ipinfo.io" crossorigin>
+	<link rel="preconnect" href="https://r.inews.qq.com" crossorigin>
+	<link rel="preconnect" href="https://qifu-api.baidubce.com" crossorigin>
     <link rel="dns-prefetch" href="//cdn.jsdelivr.net">
     <link rel="dns-prefetch" href="//ip.mcr.moe">
     <link rel="dns-prefetch" href="//ipapi.co">
     <link rel="dns-prefetch" href="//myip.ipip.net">
-    <link rel="dns-prefetch" href="//pv.sohu.com">
     <link rel="dns-prefetch" href="//api.ip.sb">
     <link rel="dns-prefetch" href="//api.ipify.org">
-    <link rel="shortcut icon" type="image/ico" href="https://cdn.jsdelivr.net/npm/skx@0.0.1">
+	<link rel="dns-prefetch" href="//ipapi.co">
+	<link rel="dns-prefetch" href="//ipinfo.io">
+	<link rel="dns-prefetch" href="//r.inews.qq.com">
+	<link rel="dns-prefetch" href="//qifu-api.baidubce.com">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.7.2/css/bulma.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/suka.css@0.2.1">
     <script src="app.js"></script>
-    <title>IP 地址查询</title>
+    <title>当前 IP 地址查询</title>
     <style>
         .box { padding: .75rem 1.25rem !important; }
         .ip-body { min-height: 48px; }
         .http-body { min-height: 24px;}
-        .github-corner:hover .octo-arm { animation: octocat-wave 560ms ease-in-out }
         @keyframes octocat-wave {
             0%, 100% { transform: rotate(0) }
             20%, 60% { transform: rotate(-25deg) }
@@ -88,7 +88,7 @@
 <body>
     <div class="container">
         <section class="section">
-            <h1 class="sk-text-center title">IP 地址查询</h1>
+            <h1 class="sk-text-center title">当前 IP 地址查询</h1>
             <div class="columns">
                 <div class="column">
                     <div class="box">
@@ -106,24 +106,26 @@
                 <div class="column">
                     <div class="box">
                         <h2 class="sk-text-center sk-text-bold subtitle sk-mb-1">从国内查询</h2>
-                        <p class="sk-text-center sk-text-small">数据来自 IPIP.net</p>
+                        <p class="sk-text-center sk-text-small">数据来自 QQ</p>
                         <hr class="sk-my-2">
                         <div class="ip-body">
                             <div class="sk-text-center">
-                                <div id="ip-ipipnet"></div>
+                                <p id="ip-QQ"></p>
+                                <p id="ip-QQ-geo" class="sk-text-small"></p>
                             </div>
                         </div>
                     </div>
                 </div>
+				
                 <div class="column">
                     <div class="box">
                         <h2 class="sk-text-center sk-text-bold subtitle sk-mb-1">从国内查询</h2>
-                        <p class="sk-text-center sk-text-small">数据来自 搜狐 + Moe IP</p>
+                        <p class="sk-text-center sk-text-small">数据来自 baidubce</p>
                         <hr class="sk-my-2">
                         <div class="ip-body">
                             <div class="sk-text-center">
-                                <p id="ip-sohu"></p>
-                                <p id="ip-sohu-geo" class="sk-text-small"></p>
+                                <p id="ip-baidubce"></p>
+                                <p id="ip-baidubce-geo" class="sk-text-small"></p>
                             </div>
                         </div>
                     </div>
@@ -133,7 +135,7 @@
                 <div class="column">
                     <div class="box">
                         <h2 class="sk-text-center sk-text-bold subtitle sk-mb-1">从国外查询</h2>
-                        <p class="sk-text-center sk-text-small">数据来自 IP.SB</p>
+                        <p class="sk-text-center sk-text-small">数据来自 ip.sb</p>
                         <hr class="sk-my-2">
                         <div class="ip-body">
                             <div class="sk-text-center">
@@ -159,12 +161,12 @@
                 <div class="column">
                     <div class="box">
                         <h2 class="sk-text-center sk-text-bold subtitle sk-mb-1">从国外查询</h2>
-                        <p class="sk-text-center sk-text-small">数据来自 ipapi</p>
+                        <p class="sk-text-center sk-text-small">数据来自 ipinfo.io</p>
                         <hr class="sk-my-2">
                         <div class="ip-body">
                             <div class="sk-text-center">
-                                <p id="ip-ipapi"></p>
-                                <p id="ip-ipapi-geo" class="sk-text-small"></p>
+                                <p id="ip-ipinfo"></p>
+                                <p id="ip-ipinfo-geo" class="sk-text-small"></p>
                             </div>
                         </div>
                     </div>
@@ -174,7 +176,7 @@
             <div class="columns is-mobile is-multiline">
                 <div class="column is-half-mobile">
                     <div class="box">
-                        <h2 class="sk-text-center sk-text-bold subtitle sk-mb-1">百度搜索</h2>
+                        <h2 class="sk-text-center sk-text-bold subtitle sk-mb-1">某度搜索</h2>
                         <p class="sk-text-center sk-text-small">国内网站</p>
                         <hr class="sk-my-2">
                         <div class="http-body">
@@ -186,7 +188,7 @@
                 </div>
                 <div class="column is-half-mobile">
                     <div class="box">
-                        <h2 class="sk-text-center sk-text-bold subtitle sk-mb-1">网易云音乐</h2>
+                        <h2 class="sk-text-center sk-text-bold subtitle sk-mb-1">某易音乐</h2>
                         <p class="sk-text-center sk-text-small">国内网站</p>
                         <hr class="sk-my-2">
                         <div class="http-body">
@@ -199,7 +201,7 @@
                 <div class="column is-half-mobile">
                     <div class="box">
                         <h2 class="sk-text-center sk-text-bold subtitle sk-mb-1">GitHub</h2>
-                        <p class="sk-text-center sk-text-small">国外网站</p>
+                        <p class="sk-text-center sk-text-small">国际网站</p>
                         <hr class="sk-my-2">
                         <div class="http-body">
                             <div class="sk-text-center">
@@ -211,7 +213,7 @@
                 <div class="column is-half-mobile">
                     <div class="box">
                         <h2 class="sk-text-center sk-text-bold subtitle sk-mb-1">YouTube</h2>
-                        <p class="sk-text-center sk-text-small">海外网站</p>
+                        <p class="sk-text-center sk-text-small">国际网站</p>
                         <hr class="sk-my-2">
                         <div class="http-body">
                             <div class="sk-text-center">
@@ -225,30 +227,25 @@
     </div>
     <script>
         HTTP.runcheck();
-
         IP.getWebrtcIP()
-        IP.getIpipnetIP();
-        IP.getSohuIP();
-
+        IP.getIpipnetIP();		
+		IP.getQQIP();
+        IP.getbaidubceIP();
         IP.getIpsbIP();
         IP.getIpifyIP();
-        IP.getIpapiIP();
+        IP.getIpapiIP();		
+		IP.getipinfoIP();
 		
-				var _hmt = _hmt || [];
+		var _hmt = _hmt || [];
 			(function() {
 			  var hm = document.createElement("script");
 			  hm.src = "https://hm.baidu.com/hm.js?db1887936545a6bc1ba1afebdd10e617";
 			  var s = document.getElementsByTagName("script")[0]; 
 			  s.parentNode.insertBefore(hm, s);
 			})();
-	
     </script>
-	
-	
 		<footer>
         <p>&copy; 2023 <a href="https://www.linchun.com.cn">林春写字的地方</a></p>
     </footer>
-	
 </body>
-
 </html>
