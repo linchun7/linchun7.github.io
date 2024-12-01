@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="description" content="装修贷款实际利率计算器 - 帮您计算装修贷款的真实成本">    
+    <link rel="shortcut icon" href="/images/favicon.ico">
+    <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
+    <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+    <link rel="stylesheet" href="styles.css">
+    <title>装修贷款实际利率计算器</title>
+
+    <!-- 百度统计代码 -->
+    <script>
+        var _hmt = _hmt || [];
+        (function() {
+            var hm = document.createElement("script");
+            hm.src = "https://hm.baidu.com/hm.js?db1887936545a6bc1ba1afebdd10e617";
+            var s = document.getElementsByTagName("script")[0]; 
+            s.parentNode.insertBefore(hm, s);
+        })();
+    </script>
+</head>
+<body>
+    <!-- 主计算器容器 -->
+    <div class="calculator">
+        <h2>装修贷款实际年化利率计算器</h2>
+        
+        <!-- 贷款金额输入区域 -->
+        <div class="form-group">
+            <div class="label-wrapper">
+                <label for="loanAmount">贷款金额（元）：</label>
+                <div class="error-message" id="loanAmountError"></div>
+                <div class="warning-message" id="loanAmountWarning"></div>
+            </div>
+            <div class="input-wrapper">
+                <div class="input-row">
+                    <input type="number" id="loanAmount" placeholder="请输入贷款金额" min="0" step="10000" required>
+                    <div class="quick-amounts">
+                        <span class="quick-amount" data-value="50000">5 万</span>
+                        <span class="quick-amount" data-value="100000">10 万</span>
+                        <span class="quick-amount" data-value="200000">20 万</span>
+                        <span class="quick-amount" data-value="300000">30 万</span>
+                        <span class="quick-amount" data-value="500000">50 万</span>
+                        <span class="quick-amount" data-value="1000000">100 万</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-divider"></div>
+
+        <!-- 贷款期限输入区域 -->
+        <div class="form-group">
+            <div class="label-wrapper">
+                <label for="loanTerm">贷款期限（月）：</label>
+                <div class="error-message" id="loanTermError"></div>
+            </div>
+            <div class="input-wrapper">
+                <div class="input-row">
+                    <input type="number" id="loanTerm" placeholder="请输入贷款期限" min="1" max="1200" step="1" required>
+                    <div class="quick-terms">
+                        <span class="quick-term" data-value="12">12 期（1 年）</span>
+                        <span class="quick-term" data-value="24">24 期（2 年）</span>
+                        <span class="quick-term" data-value="36">36 期（3 年）</span>
+                        <span class="quick-term" data-value="48">48 期（4 年）</span>
+                        <span class="quick-term" data-value="60">60 期（5 年）</span>
+                        <span class="quick-term" data-value="96">96 期（8 年）</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-divider"></div>
+
+        <!-- 月手续费率输入区域 -->
+        <div class="form-group">
+            <div class="label-wrapper">
+                <label for="serviceFee">月手续费率（%）：</label>
+                <div class="error-message" id="serviceFeeError"></div>
+                <div class="warning-message" id="serviceFeeWarning"></div>
+            </div>
+            <div class="input-wrapper">
+                <div class="input-row">
+                    <input type="number" id="serviceFee" placeholder="请输入月手续费率" min="0" step="0.01" required>
+                    <div class="quick-fees">
+                        <span class="quick-fee" data-value="0.15">0.15%</span>
+                        <span class="quick-fee" data-value="0.18">0.18%</span>
+                        <span class="quick-fee" data-value="0.2">0.2%</span>
+                        <span class="quick-fee" data-value="0.22">0.22%</span>
+                        <span class="quick-fee" data-value="0.25">0.25%</span>
+                        <span class="quick-fee" data-value="0.3">0.3%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 计算按钮和结果展示区域 -->
+        <button id="calculateBtn">计算实际年化利率</button>
+        <div class="result" id="result"></div>
+        <div class="payment-details" id="paymentDetails"></div>
+    </div>
+
+    <!-- 添加页脚 -->
+    <footer>
+        <p>&copy; 2023 <a href="https://www.linchun.com.cn">林春写字的地方</a></p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html> 
