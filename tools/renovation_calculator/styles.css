@@ -446,8 +446,9 @@ tr:hover td:first-child {
     }
     
     h2 {
-        font-size: var(--font-size-lg);
-        margin-top: var(--space-xl);
+        font-size: 1.5rem; /* 24px */
+        margin-top: var(--space-lg);
+        margin-bottom: var(--space-md);
     }
     
     .summary-card > div:last-child {
