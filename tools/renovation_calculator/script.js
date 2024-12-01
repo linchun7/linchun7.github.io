@@ -337,11 +337,16 @@ function generateSchedule(inputs) {
         if (month === inputs.loanTerm) {
             earlyRepaymentAPR = apr;
         } else {
-            const cashFlows = [-inputs.loanAmount];
-            for (let i = 0; i < month; i++) {
-                cashFlows.push(principal + monthlyFee);
+            // 构造提前还款的现金流
+            const cashFlows = [-inputs.loanAmount];  // 第0期是借款金额的负值
+            
+            // 添加正常还款期的现金流
+            for (let i = 0; i < month - 1; i++) {
+                cashFlows.push(monthlyPrincipal + monthlyFee);
             }
-            cashFlows.push(remainingPrincipal);
+            
+            // 最后一期合并当期还款和提前还款金额
+            cashFlows.push(monthlyPrincipal + monthlyFee + remainingPrincipal);
             
             const monthlyIRR = IRR(cashFlows, apr);
             earlyRepaymentAPR = monthlyIRR ? numberUtils.toFixed2(monthlyIRR * 12 * 100) : 0;
