@@ -1,7 +1,7 @@
 // 错误信息配置
 const errorMessages = {
     loanAmount: '贷款金额必须大于 0，请重新输入',
-    loanTerm: '贷款期限必须是 0-600 之间的整数，请重新输入',
+    loanTerm: '贷款期限必须是 1-600 之间的整数，请重新输入',
     serviceFee: '月手续费率必须大于 0，请重新输入',
     irrDiverge: '计算结果异常，请检查输入的数据是否合理'
 };
