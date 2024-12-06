@@ -177,7 +177,7 @@ button:active {
 /* 标题 */
 h2 {
     text-align: center;
-    margin-top: var(--space-xxl);
+    margin-top: var(--space-lg);
     margin-bottom: var(--space-lg);
     font-size: var(--font-size-xl);
     color: var(--color-text);
