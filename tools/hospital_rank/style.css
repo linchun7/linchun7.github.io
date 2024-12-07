@@ -154,7 +154,7 @@ th {
     cursor: pointer;
     user-select: none;
     position: relative;
-    padding-right: 35px;
+    padding-right: 28px;
     white-space: nowrap;
     transition: background-color 0.3s;
 }
@@ -388,6 +388,28 @@ td:nth-child(8):hover {
         margin-bottom: 15px;
         font-size: 1.5em;
     }
+
+    th {
+        padding: 10px 25px 10px 8px;
+        font-size: 13px;
+    }
+
+    th:nth-child(1) { min-width: 60px; }
+    th:nth-child(2) { min-width: 70px; }
+    th:nth-child(4),
+    th:nth-child(5),
+    th:nth-child(6) { min-width: 90px; }
+    th:nth-child(7) { min-width: 80px; }
+    th:nth-child(8) { min-width: 80px; }
+
+    .sort-icon {
+        right: 8px;
+        font-size: 12px;
+    }
+
+    td {
+        padding: 10px 8px;
+    }
 }
 
 /* 添加加载过渡效果 */
@@ -458,7 +480,7 @@ td:nth-child(8):hover {
 
 .data-source {
     text-align: center;
-    margin-top: 2px;
+    margin-top: 15px;
     margin-bottom: 10px;
     color: #666;
     font-size: 14px;
@@ -575,5 +597,11 @@ td:nth-child(3) {
 
     th, td {
         padding: 6px 8px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .data-source {
+        margin-top: 20px;
     }
 }
