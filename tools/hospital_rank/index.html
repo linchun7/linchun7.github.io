@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="description" content="复旦版医院排名查询">
+    
+    <link rel="shortcut icon" href="/images/favicon.ico">
+    <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
+    <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+    <title>复旦版医院排名查询</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script>
+    // 百度统计代码
+    var _hmt = _hmt || [];
+    (function() {
+    var hm = document.createElement("script");
+    hm.src = "https://hm.baidu.com/hm.js?db1887936545a6bc1ba1afebdd10e617";
+    var s = document.getElementsByTagName("script")[0]; 
+    s.parentNode.insertBefore(hm, s);
+    })();
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>复旦版医院排名查询</h1>
+        
+        <div class="search-box">
+            <input type="text" id="hospitalSearch" placeholder="搜索医院名称">
+            <select id="yearSelect">
+                <option value="">请选择年份</option>
+            </select>
+            <select id="provinceSelect">
+                <option value="">全部省份</option>
+            </select>
+            <select id="citySelect">
+                <option value="">全部城市</option>
+            </select>
+        </div>
+
+        <div class="charts-container" style="display: none;">
+            <div class="chart-box">
+                <div id="rankingTrend" class="chart"></div>
+            </div>
+        </div>
+
+        <div class="result-container">
+            <table id="hospitalTable">
+                <thead>
+                    <tr>
+                        <th data-sort="年份">年份 <span class="sort-icon">↕</span></th>
+                        <th data-sort="排名">排名 <span class="sort-icon">↕</span></th>
+                        <th data-sort="医院名称">医院名称 <span class="sort-icon">↕</span></th>
+                        <th data-sort="专科声誉">专科声誉 <span class="sort-icon">↕</span></th>
+                        <th data-sort="科研学术">科研学术 <span class="sort-icon">↕</span></th>
+                        <th data-sort="综合得分">综合得分 <span class="sort-icon">↕</span></th>
+                        <th data-sort="省份">省份 <span class="sort-icon">↕</span> <span class="count-badge"></span></th>
+                        <th data-sort="城市">城市 <span class="sort-icon">↕</span> <span class="count-badge"></span></th>
+                    </tr>
+                </thead>
+                <tbody id="hospitalList">
+                </tbody>
+            </table>
+        </div>
+        <div class="data-source">
+            数据来源：<a href="https://rank.cn-healthcare.com/fudan/national-general" target="_blank">中国医院及专科声誉排行榜 复旦大学医院管理研究所</a>
+        </div>
+        <footer>
+            <p>&copy; 2023 <a href="https://www.linchun.com.cn">林春写字的地方</a></p>
+        </footer>
+    </div>
+    <script src="data.js"></script>
+    <script src="script.js"></script>
+</body>
+</html> 
