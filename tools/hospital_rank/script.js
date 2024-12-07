@@ -1,3 +1,8 @@
+// 在文件开头添加一个全局变量来存储医院名称映射
+let hospitalAliasMap = new Map();
+// 添加新的映射用于年份特定的曾用名
+let yearlyAliasMap = new Map();
+
 // 直接使用 data.js 中定义的 hospitalData
 function initYearSelect() {
     const yearSelect = document.getElementById('yearSelect');
@@ -135,8 +140,43 @@ function displayHospitals() {
 
     // 按关键词筛选
     if (searchKeyword) {
+        // 将搜索关键词按空格分割成数组，并去除空字符串
+        const keywords = searchKeyword.split(/\s+/).filter(k => k);
+        
+        // 先找出所有匹配的医院名称
+        const matchedHospitals = new Set();
+        
+        hospitalData.forEach(item => {
+            // 检查是否所有关键词都匹配
+            const matchesAllKeywords = keywords.every(keyword => {
+                // 检查当前名称
+                if (item.医院名称.toLowerCase().includes(keyword)) {
+                    return true;
+                }
+                // 检查基本曾用名称
+                const baseAliases = hospitalAliasMap.get(item.医院名称) || [];
+                if (baseAliases.some(alias => alias.toLowerCase().includes(keyword))) {
+                    return true;
+                }
+                // 检查年份特定的曾用名称
+                const yearMap = yearlyAliasMap.get(item.年份);
+                if (yearMap) {
+                    const yearlyAliases = yearMap.get(item.医院名称) || [];
+                    if (yearlyAliases.some(alias => alias.toLowerCase().includes(keyword))) {
+                        return true;
+                    }
+                }
+                return false;
+            });
+
+            if (matchesAllKeywords) {
+                matchedHospitals.add(item.医院名称);
+            }
+        });
+
+        // 过滤数据，显示所有匹配医院的所有年份记录
         filteredData = filteredData.filter(item => 
-            item.医院名称.toLowerCase().includes(searchKeyword)
+            matchedHospitals.has(item.医院名称)
         );
     }
 
@@ -216,7 +256,7 @@ function displayHospitals() {
                 }
 
                 // 数字类型字段
-                if (['专科声誉', '科研学��', '综合得分', '年份'].includes(sortConfig.column)) {
+                if (['专科声誉', '科研学术', '综合得分', '年份'].includes(sortConfig.column)) {
                     // 处理空值
                     if (aValue === '') {
                         return isAsc ? -1 : 1;  // 升序时空值排最前，降序时排最后
@@ -270,17 +310,26 @@ function displayHospitals() {
         const fragment = document.createDocumentFragment();
         filteredData.forEach(hospital => {
             const row = document.createElement('tr');
+            // 获取基本曾用名
+            const baseAliases = hospitalAliasMap.get(hospital.医院名称) || [];
+            // 获取年份特定的曾用名
+            const yearMap = yearlyAliasMap.get(hospital.年份);
+            const yearlyAliases = yearMap ? yearMap.get(hospital.医院名称) || [] : [];
+            
+            // 如果有年份特定的曾用名，使用它，否则使用基本曾用名
+            const aliases = yearlyAliases.length > 0 ? yearlyAliases : baseAliases;
+            const aliasesText = aliases.length > 0 ? `\n曾用名称：${aliases.join('、')}` : '';
+            
             row.innerHTML = `
                 <td>${hospital.年份}</td>
                 <td>${hospital.排名}</td>
-                <td>${hospital.医院名称}</td>
+                <td title="${hospital.医院名称}${aliasesText}">${hospital.医院名称}</td>
                 <td>${formatNumber(hospital.专科声誉)}</td>
                 <td>${formatNumber(hospital.科研学术)}</td>
                 <td>${formatNumber(hospital.综合得分)}</td>
                 <td>${hospital.省份}</td>
                 <td>${hospital.城市}</td>
             `;
-            row.cells[2].title = hospital.医院名称;  // 添加完整医院名称作为提示
             fragment.appendChild(row);
         });
         hospitalList.appendChild(fragment);
@@ -413,6 +462,9 @@ function drawRankingTrend(hospitalName) {
 
 // 主函数
 function init() {
+    // 初始化医院别名映射
+    initHospitalAliasMap();
+    
     // 添加错误处理
     try {
         initYearSelect();
@@ -553,4 +605,29 @@ function hideLocationStats() {
     if (tooltip) {
         tooltip.style.opacity = '0';
     }
+}
+
+// 添加初始化医院别名映射的函数
+function initHospitalAliasMap() {
+    // 保持原有的初始化逻辑
+    hospitalData.forEach(hospital => {
+        if (hospital.曾用名称) {
+            const aliases = hospital.曾用名称.split('、').filter(name => name.trim());
+            hospitalAliasMap.set(hospital.医院名称, aliases);
+        }
+    });
+
+    // 添加年份特定的曾用名初始化
+    hospitalData.forEach(hospital => {
+        const year = hospital.年份;
+        if (!yearlyAliasMap.has(year)) {
+            yearlyAliasMap.set(year, new Map());
+        }
+        const yearMap = yearlyAliasMap.get(year);
+        
+        if (hospital.曾用名称) {
+            const aliases = hospital.曾用名称.split('、').filter(name => name.trim());
+            yearMap.set(hospital.医院名称, aliases);
+        }
+    });
 } 
