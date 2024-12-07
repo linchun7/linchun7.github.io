@@ -233,7 +233,7 @@ td:nth-child(3):hover::after {
     padding: 4px 8px;
     border-radius: 4px;
     font-size: 12px;
-    white-space: nowrap;
+    white-space: pre-line;
     z-index: 1000;
 }
 
