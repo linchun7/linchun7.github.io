@@ -2,8 +2,8 @@
 body {
     font-family: "Microsoft YaHei", sans-serif;
     margin: 0;
-    padding: 20px;
-    background-color: #f0f2f5;
+    padding: 5px 5px 0 5px;
+    background-color: #ffffff;
 }
 
 .container {
@@ -12,7 +12,8 @@ body {
     background-color: white;
     padding: 15px 30px 30px;
     border-radius: 12px;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+    box-shadow: 0 1px 8px rgba(0,0,0,0.1);
+    margin-bottom: 5px;
     transition: all 0.3s ease;
 }
 
@@ -402,33 +403,56 @@ td:nth-child(8):hover {
 /* 暗色模式支持 */
 @media (prefers-color-scheme: dark) {
     body {
-        background-color: #1f1f1f;
+        background-color: #121212;
         color: #e0e0e0;
     }
 
     .container,
     .chart-box,
     .result-container {
-        background-color: #2d2d2d;
+        background-color: #242424;
     }
 
     select,
     input {
-        background-color: #3d3d3d;
-        color: #e0e0e0;
-        border-color: #4d4d4d;
+        background-color: #333333;
+        color: #ffffff;
+        border-color: #404040;
+    }
+
+    input::placeholder {
+        color: #999999;
+    }
+
+    input:focus {
+        background-color: #404040;
+        border-color: #505050;
+    }
+
+    select {
+        background-color: #333333;
+    }
+
+    select option {
+        background-color: #333333;
+        color: #ffffff;
     }
 
     th {
-        background-color: #3d3d3d;
+        background-color: #2a2a2a;
     }
 
     td {
-        border-bottom-color: #3d3d3d;
+        border-bottom-color: #333333;
     }
 
     tr:hover {
-        background-color: #3a3a3a;
+        background-color: #2f2f2f;
+    }
+
+    /* 暗色模式下的链接颜色 */
+    .data-source a {
+        color: #40a9ff;
     }
 }
 
@@ -500,7 +524,7 @@ footer a:active {
 /* 医院名称列宽度限制 */
 th:nth-child(3),
 td:nth-child(3) {
-    max-width: 200px;
+    max-width: 400px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -510,7 +534,8 @@ td:nth-child(3) {
 @media screen and (max-width: 768px) {
     th:nth-child(3),
     td:nth-child(3) {
-        max-width: 140px;
+        min-width: 250px;
+        max-width: 250px;
     }
 }
 
@@ -536,4 +561,19 @@ td:nth-child(3) {
     font-size: 15px;
     background: #fff3f3;
     border-radius: 8px;
+}
+
+/* 在最小屏幕下的特殊处理 */
+@media screen and (max-width: 320px) {
+    body {
+        padding: 0;
+    }
+
+    .container {
+        padding: 5px;
+    }
+
+    th, td {
+        padding: 6px 8px;
+    }
 }
