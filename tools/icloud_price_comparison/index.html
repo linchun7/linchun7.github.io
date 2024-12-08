@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta name="format-detection" content="telephone=no">
+    <!-- SEO优化 -->
+    <meta name="description" content="比较全球各地区 iCloud+ 存储订阅价格，支持实时汇率换算成人民币">
+    <meta name="keywords" content="iCloud+,苹果云存储,全球价格,汇率换算,价格比较">
+    <!-- Open Graph标签 -->
+    <meta property="og:title" content="iCloud+ 全球价格比较">
+    <meta property="og:description" content="比较全球各地区 iCloud+ 存储订阅价格，支持实时汇率换算成人民币">
+    <meta property="og:type" content="website">
+    <title>iCloud+ 全球价格比较</title>
+    <!-- 资源预加载 -->
+    <link rel="preload" href="style.css" as="style">
+    <link rel="preload" href="data.js" as="script">
+    <link rel="preload" href="exchangeRates.js" as="script">
+    <link rel="preload" href="script.js" as="script">
+    <!-- 样式和图标 -->
+    <link rel="stylesheet" href="style.css">
+    <link rel="shortcut icon" href="/images/favicon.ico">
+    <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
+    <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+    <!-- 百度统计代码 -->
+    <script>
+        var _hmt = _hmt || [];
+        (function() {
+            var hm = document.createElement("script");
+            hm.src = "https://hm.baidu.com/hm.js?db1887936545a6bc1ba1afebdd10e617";
+            var s = document.getElementsByTagName("script")[0]; 
+            s.parentNode.insertBefore(hm, s);
+        })();
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>iCloud+ 全球价格比较</h1>
+        <div class="description">
+            本工具可帮助您比较全球各地区 iCloud+ 订阅价格。人民币价格基于实时汇率计算，点击表头可进行排序。
+        </div>
+        <table id="price-table">
+            <thead>
+                <tr>
+                    <th>国家/地区</th>
+                    <th>货币</th>
+                    <th>50GB</th>
+                    <th>200GB</th>
+                    <th>2TB</th>
+                    <th>6TB</th>
+                    <th>12TB</th>
+                </tr>
+            </thead>
+            <tbody id="price-tbody">
+            </tbody>
+        </table>
+        <footer class="footer">
+            <p class="note">注意：汇率仅供参考，实际支付金额可能因支付渠道等因素有所不同</p>
+            <div class="info-group">
+                <div class="data-source">价格数据来源：<a href="https://support.apple.com/zh-cn/108047" target="_blank">iCloud+ 订阅方案和定价- 官方Apple 支持(中国)</a></div>
+                <div class="data-source">实时汇率数据来源：<a href="https://www.exchangerate-api.com/" target="_blank">ExchangeRate-API</a></div>
+                <div class="data-source">固定汇率数据来源：<a href="https://www.xe.com/" target="_blank">XE.com</a></div>
+                <div class="update-info"></div>
+            </div>
+        </footer>
+    </div>
+    <footer class="copyright">
+        <p>&copy; 2023 <a href="https://www.linchun.com.cn">林春写字的地方</a></p>
+    </footer>
+    <script src="data.js"></script>
+    <script src="exchangeRates.js"></script>
+    <script src="script.js"></script>
+</body>
+</html> 

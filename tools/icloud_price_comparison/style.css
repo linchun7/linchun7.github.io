@@ -1,0 +1,326 @@
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    margin: 0;
+    padding: 10px;
+    background-color: #f5f5f7;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    background-color: white;
+    padding: 15px;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+h1 {
+    text-align: center;
+    color: #1d1d1f;
+    margin: 10px 0 20px;
+}
+
+.controls {
+    margin-bottom: 20px;
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+select {
+    padding: 8px 12px;
+    border: 1px solid #d2d2d7;
+    border-radius: 6px;
+    font-size: 14px;
+    background-color: white;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+th, td {
+    padding: 12px 16px;
+    text-align: center;
+    border-bottom: 1px solid #d2d2d7;
+}
+
+th {
+    background-color: #f5f5f7;
+    font-weight: 600;
+    position: relative;
+    cursor: pointer;
+    user-select: none;
+    padding-right: 24px;
+    text-align: center;
+}
+
+th::after {
+    content: '';
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0;
+    height: 0;
+    margin-left: 8px;
+}
+
+th.sort-asc::after {
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-bottom: 5px solid #666;
+}
+
+th.sort-desc::after {
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid #666;
+}
+
+th:hover {
+    background-color: #eaeaea;
+}
+
+tr:hover {
+    background-color: #f8f8fa;
+    transition: background-color 0.2s ease;
+}
+
+.price-cell {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.original-price {
+    color: #666;
+    font-size: 0.85em;
+}
+
+.cny-price {
+    font-weight: 600;
+    font-size: 1.1em;
+    color: #333;
+}
+
+td {
+    padding: 12px 16px;
+    text-align: center;
+    vertical-align: top;
+}
+
+/* 表头居中对齐 */
+th {
+    text-align: center;
+    padding-right: 24px;
+}
+
+/* 国家/地区和货币列完全居中 */
+td:nth-child(1), 
+td:nth-child(2) {
+    text-align: center;
+    vertical-align: middle;
+    height: 100%;
+    display: table-cell;
+}
+
+/* 移除之前的右对齐样式 */
+td:nth-child(n+3) {
+    text-align: left;
+}
+
+.update-time {
+    text-align: right;
+    color: #666;
+    font-size: 0.9em;
+    margin-bottom: 10px;
+}
+
+/* 添加汇率信息样式 */
+.rate-info {
+    color: #999;
+    font-size: 0.75em;
+    margin-top: 2px;
+}
+
+/* 更新时间和数据来源样式 */
+.update-info,
+.data-source {
+    text-align: right;
+    color: #666;
+    font-size: 0.9em;
+}
+
+.data-source {
+    margin-bottom: 4px;
+}
+
+.update-info {
+    margin-bottom: 20px;
+}
+
+.data-source a {
+    color: #0066CC;
+    text-decoration: none;
+}
+
+.data-source a:hover {
+    text-decoration: underline;
+}
+
+/* 国家/地区和货币列居中对齐 */
+td:nth-child(1), 
+td:nth-child(2) {
+    text-align: center;
+}
+
+/* 添加说明文字样式 */
+.description {
+    color: #666;
+    margin-bottom: 15px;
+    line-height: 1.5;
+    text-align: center;
+}
+
+/* 页脚样式 */
+.footer {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+    color: #666;
+    font-size: 0.9em;
+}
+
+/* 所有页脚信息居右 */
+.footer .note,
+.footer .info-group,
+.footer .data-source,
+.footer .update-info {
+    text-align: right;
+    margin-bottom: 4px;
+}
+
+/* 移除之前的冲突样式 */
+.update-info,
+.data-source {
+    text-align: right;
+}
+
+/* 移除这个冲突的规则 */
+/* .footer .data-source,
+.footer .update-info {
+    text-align: center;
+} */
+
+/* 优化链接样式 */
+a {
+    color: #0066CC;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+a:hover {
+    color: #004499;
+    text-decoration: underline;
+}
+
+/* 添加响应式支持 */
+@media (max-width: 1240px) {
+    .container {
+        max-width: 100%;
+        margin: 10px;
+        border-radius: 8px;
+    }
+}
+
+@media (max-width: 768px) {
+    body {
+        padding: 5px;
+    }
+    
+    .container {
+        margin: 0;
+        padding: 10px;
+        border-radius: 6px;
+    }
+    
+    h1 {
+        margin: 5px 0 15px;
+    }
+    
+    th, td {
+        padding: 8px;
+        font-size: 0.9em;
+    }
+    
+    .description {
+        font-size: 0.9em;
+    }
+}
+
+/* 优化表格滚动 */
+@media (max-width: 1024px) {
+    .table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+
+/* 加载动画 */
+.loading {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+}
+
+.loading::after {
+    content: '加载中...';
+    animation: dots 1.5s infinite;
+}
+
+@keyframes dots {
+    0%, 20% { content: '加载中.'; }
+    40% { content: '加载中..'; }
+    60% { content: '加载中...'; }
+    80%, 100% { content: '加载中....'; }
+}
+
+/* 版权信息样式 */
+.copyright {
+    text-align: center;
+    margin: 20px auto;
+    padding: 10px 0;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+    max-width: 600px;
+    font-size: 14px;
+}
+
+.copyright p {
+    margin: 6px 0;
+}
+
+.copyright a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.copyright a:visited {
+    color: inherit;
+    text-decoration: none;
+}
+
+.copyright a:hover {
+    color: #0842a0;
+    text-decoration: underline;
+}
+
+.copyright a:active {
+    position: relative;
+    top: 1px;
+} 
