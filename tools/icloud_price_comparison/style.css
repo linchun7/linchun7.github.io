@@ -44,6 +44,7 @@ table {
 th, td {
     padding: 12px 16px;
     text-align: center;
+    vertical-align: middle;
     border-bottom: 1px solid #d2d2d7;
 }
 
@@ -93,7 +94,9 @@ tr:hover {
     display: inline-flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 2px;
+    width: 100%;
 }
 
 .original-price {
@@ -130,7 +133,7 @@ td:nth-child(2) {
 
 /* 移除之前的右对齐样式 */
 td:nth-child(n+3) {
-    text-align: left;
+    text-align: center;
 }
 
 .update-time {
@@ -142,9 +145,8 @@ td:nth-child(n+3) {
 
 /* 添加汇率信息样式 */
 .rate-info {
-    color: #999;
+    color: #666;
     font-size: 0.75em;
-    margin-top: 2px;
 }
 
 /* 更新时间和数据来源样式 */
@@ -253,8 +255,9 @@ a:hover {
     }
     
     th, td {
-        padding: 8px;
-        font-size: 0.9em;
+        padding: 8px 6px;
+        text-align: center;
+        vertical-align: middle;
     }
     
     .description {
@@ -323,4 +326,83 @@ a:hover {
 .copyright a:active {
     position: relative;
     top: 1px;
+}
+
+/* 添加表格容器样式 */
+.table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-bottom: 15px;
+    position: relative;
+}
+
+/* 移动端优化 */
+@media (max-width: 768px) {
+    /* 调整表格单元格内容 */
+    .price-cell {
+        min-width: 80px; /* 设置最小宽度 */
+    }
+    
+    .price-cell .original-price {
+        font-size: 0.75em;
+    }
+    
+    .price-cell .cny-price {
+        font-size: 0.95em;
+    }
+    
+    .price-cell .rate-info {
+        font-size: 0.65em;
+    }
+    
+    /* 调整表格内边距 */
+    th, td {
+        padding: 8px 6px;
+    }
+    
+    /* 固定第一列 */
+    th:first-child,
+    td:first-child {
+        position: sticky;
+        left: 0;
+        background: white;
+        z-index: 1;
+        border-right: 1px solid #d2d2d7;
+    }
+    
+    /* 当处于固定列的单元格被hover时的背景色 */
+    tr:hover td:first-child {
+        background-color: #f8f8fa;
+    }
+}
+
+/* 修改货币单元格样式 */
+.currency-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    width: 100%;
+}
+
+.currency-name {
+    font-size: 0.9em;
+}
+
+.rate-info {
+    color: #666;
+    font-size: 0.75em;
+}
+
+/* 修改移动端样式 */
+@media (max-width: 768px) {
+    .currency-cell {
+        min-width: 60px;
+    }
+    
+    .currency-cell .rate-info {
+        font-size: 0.65em;
+    }
 } 

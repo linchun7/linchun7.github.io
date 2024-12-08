@@ -107,7 +107,7 @@ function updateTable() {
 
         row.innerHTML = `
             <td>${item['国家/地区']}</td>
-            <td>${item['货币']}</td>
+            <td>${formatCurrencyCell(item.Currency)}</td>
             <td>${prices[0]}</td>
             <td>${prices[1]}</td>
             <td>${prices[2]}</td>
@@ -147,6 +147,17 @@ function initSortHeaders() {
     });
 }
 
+function formatCurrencyCell(currency) {
+    const rate = exchangeRates[currency];
+    const rateInfo = currency === 'CNY' ? '' : 
+        `<div class="rate-info">${isLiveRate ? '实时汇率' : '固定汇率'}：${rate?.toFixed(4)}</div>`;
+    
+    return `<div class="currency-cell">
+        <div class="currency-name">${currency}</div>
+        ${rateInfo}
+    </div>`;
+}
+
 function formatPriceCell(price, currency) {
     let formattedPrice;
     if (['JPY', 'KRW', 'VND', 'IDR', 'CLP', 'COP', 'HUF', 'ISK'].includes(currency)) {
@@ -164,14 +175,9 @@ function formatPriceCell(price, currency) {
         maximumFractionDigits: 2
     });
 
-    // 添加汇率信息
-    const rateInfo = currency === 'CNY' ? '' : 
-        `<div class="rate-info">${isLiveRate ? '实时' : '固定'}汇率：${exchangeRates[currency]?.toFixed(4)}</div>`;
-    
     return `<div class="price-cell">
         <div class="cny-price">￥${formattedCNY}</div>
         <div class="original-price">${formattedPrice} ${currency}</div>
-        ${rateInfo}
     </div>`;
 }
 
