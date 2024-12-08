@@ -251,7 +251,7 @@ a:hover {
     }
     
     h1 {
-        margin: 5px 0 15px;
+        margin: 5px 0 8px;
     }
     
     th, td {
@@ -262,6 +262,15 @@ a:hover {
     
     .description {
         font-size: 0.9em;
+        margin-bottom: 2px;
+    }
+    
+    table {
+        margin-top: 2px;
+    }
+    
+    .table-wrapper {
+        margin-top: 0;
     }
 }
 
