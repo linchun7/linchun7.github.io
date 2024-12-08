@@ -10,21 +10,28 @@ body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Hiragino Sans G
 /* 5. 添加移动端优化 */
 @media screen and (max-width: 600px) {
     #searchInput {
-        width: calc(100% - 24px);  /* 考虑padding */
+        width: calc(100% - 24px);
         box-sizing: border-box;
+        margin-bottom: 5px;
     }
     
-    /* 优化移动端点击效果 */
+    /* 减少移动端列表项间距 */
+    #toolList li {
+        padding: 0;
+    }
+    
     .tool-link {
-        padding: 8px 0;  /* 增加可点击区域 */
+        padding: 4px 0;
     }
     
-    /* 禁用悬停效果 */
-    @media (hover: none) {
-        .tool-link:hover {
-            color: inherit;
-            text-decoration: none;
-        }
+    /* 减少标题下方间距 */
+    h1 {
+        margin: 0 0 5px 0;
+    }
+    
+    /* 减少容器内边距 */
+    .container {
+        margin: 5px;
     }
 }
 
