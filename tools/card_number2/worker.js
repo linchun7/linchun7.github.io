@@ -1,7 +1,7 @@
 // 存储字母映射
 let letterMap = {};
 // 每批发送的结果数量
-const BATCH_SEND_SIZE = 100;
+const BATCH_SEND_SIZE = 1000;
 
 /**
  * Luhn 算法验证
@@ -75,7 +75,7 @@ function processGeneration(iterator) {
     function processBatch() {
         let startTime = Date.now();
         
-        while (Date.now() - startTime < 50) {
+        while (Date.now() - startTime < 100) {
             let next = iterator.next();
             
             if (next.done) {
@@ -93,11 +93,6 @@ function processGeneration(iterator) {
                     batch = [];
                 }
             }
-        }
-        
-        if (batch.length > 0) {
-            sendBatchResults(batch, false);
-            batch = [];
         }
         
         setTimeout(() => processBatch(), 0);
