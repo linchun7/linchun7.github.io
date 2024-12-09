@@ -8,17 +8,12 @@ let allResults = [];
 worker.addEventListener('message', function(e) {
     if (e.data.type === 'result') {
         allResults = allResults.concat(e.data.results);
-        
-        // 直接显示当前接收到的数量
         document.getElementById('count').textContent = allResults.length;
         
-        // 只要有结果就显示
-        displayResults(allResults);
-        
         if (e.data.isComplete) {
-            // 计算完成时清除"计算中..."
-            document.getElementById('result').textContent = '';
-            allResults = []; // 清空缓存
+            // 计算完成时显示结果（无论有无结果）
+            displayResults(allResults);
+            allResults = [];
         }
     }
 });
@@ -87,7 +82,13 @@ function displayResults(results) {
     
     document.getElementById('countText').textContent = countText;
     document.getElementById('count').textContent = countMessage;
-    document.getElementById('result').innerHTML = formattedResults.join('\n');
+    
+    // 如果没有结果，显示"无满足条件的卡号"
+    if (results.length === 0) {
+        document.getElementById('result').textContent = '无满足条件的卡号';
+    } else {
+        document.getElementById('result').innerHTML = formattedResults.join('\n');
+    }
 }
 
 // 处理用户输入
