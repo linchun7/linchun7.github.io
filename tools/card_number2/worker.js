@@ -3,7 +3,7 @@ let results = [];
 // 存储字母映射
 let letterMap = {};
 // 最大生成结果数量
-const maxResults = 50000;
+const maxResults = Number.MAX_SAFE_INTEGER;
 
 /**
  * Luhn 算法验证
