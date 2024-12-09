@@ -42,15 +42,8 @@ function displayResults(results) {
         return result.replace(/\d{4}(?=\d)/g, '$& ');
     });
 
-    let countMessage;
+    let countMessage = `${results.length}`;
     let countText = "生成的卡号数量：";
-
-    if (results.length >= 50000) {
-        countText = '';
-        countMessage = `生成的卡号过多，仅显示前 50000 条`;
-    } else {
-        countMessage = `${results.length}`;
-    }
     
     document.getElementById('countText').textContent = countText;
     document.getElementById('count').textContent = countMessage;
