@@ -2,8 +2,6 @@
 let letterMap = {};
 // 每批发送的结果数量
 const BATCH_SEND_SIZE = 1000;
-// 添加计数器
-let totalCount = 0;
 
 /**
  * Luhn 算法验证
@@ -31,7 +29,6 @@ function luhnCheck(str) {
 function* generateCombinationsIterator(str, combination = '') {
     if (str.length === 0) {
         if (combination.length > 0 && luhnCheck(combination)) {
-            totalCount++;
             yield combination;
         }
     } else {
@@ -65,8 +62,7 @@ function sendBatchResults(batch, isComplete = false) {
     self.postMessage({
         type: 'result',
         results: batch,
-        isComplete: isComplete,
-        total: totalCount
+        isComplete: isComplete
     });
 }
 
@@ -113,7 +109,6 @@ function processGeneration(iterator) {
 self.addEventListener('message', function(e) {
     if (e.data.type === 'generate') {
         try {
-            totalCount = 0;
             letterMap = {};
             
             const iterator = generateCombinationsIterator(e.data.input);

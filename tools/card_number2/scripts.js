@@ -3,23 +3,21 @@ let worker = new Worker('worker.js');
 
 // 添加结果缓存
 let allResults = [];
-let totalResults = 0;
 
 // 监听 worker 消息
 worker.addEventListener('message', function(e) {
     if (e.data.type === 'result') {
-        if (e.data.total) {
-            totalResults = e.data.total;
-        }
-        
         allResults = allResults.concat(e.data.results);
+        
+        // 直接显示当前接收到的数量
+        document.getElementById('count').textContent = allResults.length;
         
         if (e.data.isComplete) {
             displayResults(allResults);
             allResults = []; // 清空缓存
         } else {
-            // 显示进度
-            document.getElementById('result').textContent = `已接收 ${allResults.length}/${totalResults} 条结果...`;
+            // 显示当前批次的结果
+            displayResults(allResults);
         }
     }
 });
