@@ -39,7 +39,32 @@ function startGeneration() {
  */
 function displayResults(results) {
     let formattedResults = results.map(result => {
-        return result.replace(/\d{4}(?=\d)/g, '$& ');
+        // 先将结果分组为4位一组
+        let formatted = result.replace(/\d{4}(?=\d)/g, '$& ');
+        // 获取原始输入
+        let inputStr = document.getElementById('inputField').value.replace(/\s/g, '');
+        
+        // 将结果转换为数组以便处理
+        let chars = formatted.split('');
+        let inputChars = inputStr.split('');
+        let pos = 0; // 用于跟踪实际位置（不包括空格）
+        
+        // 遍历结果的每个字符
+        for(let i = 0; i < chars.length; i++) {
+            if(chars[i] !== ' ') { // 跳过空格
+                if(pos < inputChars.length) {
+                    if(/[a-zA-Z]/.test(inputChars[pos])) {
+                        // 对字母对应位置添加字母高亮
+                        chars[i] = `<span class="highlight-letter">${chars[i]}</span>`;
+                    } else if(inputChars[pos] === '*') {
+                        // 对星号对应位置添加星号高亮
+                        chars[i] = `<span class="highlight-star">${chars[i]}</span>`;
+                    }
+                }
+                pos++;
+            }
+        }
+        return chars.join('');
     });
 
     let countMessage = `${results.length}`;
@@ -47,7 +72,7 @@ function displayResults(results) {
     
     document.getElementById('countText').textContent = countText;
     document.getElementById('count').textContent = countMessage;
-    document.getElementById('result').textContent = formattedResults.join('\n');
+    document.getElementById('result').innerHTML = formattedResults.join('\n');
 }
 
 // 处理用户输入
