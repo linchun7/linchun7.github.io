@@ -3,28 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-	<meta name="format-detection" content="telephone=no">
+    <meta name="format-detection" content="telephone=no">
     <link rel="stylesheet" href="styles.css">
-	<link rel="shortcut icon" href="/images/favicon.ico">
-	<link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
-	<link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+    <link rel="shortcut icon" href="/images/favicon.ico">
+    <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
+    <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
     <title>银行卡号生成器</title>
 </head>
 <body>
     <main>
-		<h1><a href="https://www.linchun.com.cn/posts/50c5b27d.html">银行卡号生成器</a></h1>
-        <p>根据输入的数字（包含最多 4 位任意位置的 x 或 * 号，如 6222 **** 8888 8888），生成满足 Luhn 算法的银行卡号，用于卡号定制提前算号。</p>
-        <div class="input-wrapper">
-            <input type="text" id="input" placeholder="输入银行卡号，如 6222 **** 8888 8888" autofocus>
-            <button id="submit">确定</button>
-        </div>
-        <p id="info">已输入有效位数：0</p>
-        <p id="cardCount">生成的卡号数量：0</p>
-        <div id="output"></div>
+        <section class="generator">
+            <h1>银行卡号生成器</h1>
+            <p id="prompt-info">根据输入的数字、字母及 * 号（同一字母表示相同数字，* 号表示任意数字），生成满足 Luhn 算法的银行卡号，用于卡号定制提前算号。<a href="https://www.linchun.com.cn/posts/50c5b27d.html">查看使用说明</a></p>
+            <div class="input-wrapper">
+                <input type="text" id="inputField" placeholder="请输入卡号，如 6214 8800 0*aa bbbb" autofocus>
+                <button id="generateButton">清空</button>
+            </div>
+			<div class="result-info">
+				<p class="result-p"><span id="validText">已输入有效位数：</span><span id="validCount">0</span></p>
+				<p class="result-p"><span id="countText">生成的卡号数量：</span><span id="count">0</span></p>
+			</div>
+            <div id="result"></div>
+        </section>
     </main>
-    <div id="footer">
-        <span>© 2023 <a href="https://www.linchun.com.cn">林春写字的地方</a></span>
-    </div>
+    <footer>
+        <p>&copy; 2023 <a href="https://www.linchun.com.cn">林春写字的地方</a></p>
+    </footer>
     <script src="scripts.js"></script>
 </body>
 </html>
