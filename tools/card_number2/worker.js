@@ -61,17 +61,27 @@ function generateCombinations(str, combination = '') {
     }
 }
 
-// 监听主线程消息
+// 添加分批发送函数
+function sendBatchResults(results, batchSize = 1000) {
+    for (let i = 0; i < results.length; i += batchSize) {
+        let batch = results.slice(i, i + batchSize);
+        self.postMessage({
+            type: 'result',
+            results: batch,
+            isComplete: i + batchSize >= results.length,
+            total: results.length
+        });
+    }
+}
+
+// 修改消息处理
 self.addEventListener('message', function(e) {
     if (e.data.type === 'generate') {
         results = [];
         letterMap = {};
         generateCombinations(e.data.input);
         
-        // 返回结果给主线程
-        self.postMessage({
-            type: 'result',
-            results: results
-        });
+        // 分批发送结果
+        sendBatchResults(results);
     }
 }); 
