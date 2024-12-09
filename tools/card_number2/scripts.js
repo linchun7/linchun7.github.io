@@ -12,17 +12,13 @@ worker.addEventListener('message', function(e) {
         // 直接显示当前接收到的数量
         document.getElementById('count').textContent = allResults.length;
         
+        // 只要有结果就显示
+        displayResults(allResults);
+        
         if (e.data.isComplete) {
-            // 计算完成时，不管有没有结果都清除"计算中..."
+            // 计算完成时清除"计算中..."
             document.getElementById('result').textContent = '';
-            displayResults(allResults);
             allResults = []; // 清空缓存
-        } else {
-            // 有结果时清除"计算中..."并显示结果
-            if (e.data.results.length > 0) {
-                document.getElementById('result').textContent = '';
-                displayResults(allResults);
-            }
         }
     }
 });
