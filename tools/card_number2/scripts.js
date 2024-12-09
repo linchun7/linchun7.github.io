@@ -13,11 +13,16 @@ worker.addEventListener('message', function(e) {
         document.getElementById('count').textContent = allResults.length;
         
         if (e.data.isComplete) {
+            // 计算完成时，不管有没有结果都清除"计算中..."
+            document.getElementById('result').textContent = '';
             displayResults(allResults);
             allResults = []; // 清空缓存
         } else {
-            // 显示当前批次的结果
-            displayResults(allResults);
+            // 有结果时清除"计算中..."并显示结果
+            if (e.data.results.length > 0) {
+                document.getElementById('result').textContent = '';
+                displayResults(allResults);
+            }
         }
     }
 });
