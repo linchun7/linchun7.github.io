@@ -1,9 +1,9 @@
-// 存储生成的银行卡号组合
-let results = [];
 // 存储字母映射
 let letterMap = {};
-// 最大生成结果数量
-const maxResults = Number.MAX_SAFE_INTEGER;
+// 每批发送的结果数量
+const BATCH_SEND_SIZE = 1000;
+// 添加计数器
+let totalCount = 0;
 
 /**
  * Luhn 算法验证
@@ -26,62 +26,103 @@ function luhnCheck(str) {
 }
 
 /**
- * 生成银行卡号的组合
+ * 分批生成组合
  */
-function generateCombinations(str, combination = '') {
-    if (results.length >= maxResults) {
-        return;
-    }
-
+function* generateCombinationsIterator(str, combination = '') {
     if (str.length === 0) {
         if (combination.length > 0 && luhnCheck(combination)) {
-            results.push(combination);
+            totalCount++;
+            yield combination;
         }
     } else {
         let char = str[0];
 
         if (char >= '0' && char <= '9') {
-            generateCombinations(str.substring(1), combination + char);
+            yield* generateCombinationsIterator(str.substring(1), combination + char);
         } else if (char.match(/[a-zA-Z]/)) {
             let firstLetter = char.toLowerCase();
             if (letterMap[firstLetter] === undefined) {
                 for (let i = 0; i < 10; i++) {
                     letterMap[firstLetter] = i;
-                    generateCombinations(str.substring(1), combination + i);
+                    yield* generateCombinationsIterator(str.substring(1), combination + i);
                 }
                 letterMap[firstLetter] = undefined;
             } else {
-                generateCombinations(str.substring(1), combination + letterMap[firstLetter]);
+                yield* generateCombinationsIterator(str.substring(1), combination + letterMap[firstLetter]);
             }
         } else if (char === '*') {
             for (let i = 0; i < 10; i++) {
-                generateCombinations(str.substring(1), combination + i);
+                yield* generateCombinationsIterator(str.substring(1), combination + i);
             }
         }
     }
 }
 
-// 添加分批发送函数
-function sendBatchResults(results, batchSize = 1000) {
-    for (let i = 0; i < results.length; i += batchSize) {
-        let batch = results.slice(i, i + batchSize);
-        self.postMessage({
-            type: 'result',
-            results: batch,
-            isComplete: i + batchSize >= results.length,
-            total: results.length
-        });
-    }
+/**
+ * 分批发送结果
+ */
+function sendBatchResults(batch, isComplete = false) {
+    self.postMessage({
+        type: 'result',
+        results: batch,
+        isComplete: isComplete,
+        total: totalCount
+    });
 }
 
-// 修改消息处理
+/**
+ * 处理生成过程
+ */
+function processGeneration(iterator) {
+    let batch = [];
+    let lastSendTime = Date.now();
+    
+    function processBatch() {
+        let startTime = Date.now();
+        
+        while (Date.now() - startTime < 100) { // 最多执行100ms
+            let next = iterator.next();
+            
+            if (next.done) {
+                if (batch.length > 0) {
+                    sendBatchResults(batch, true);
+                }
+                return;
+            }
+            
+            if (next.value) {
+                batch.push(next.value);
+                
+                // 如果批次满了或者距离上次发送超过500ms，就发送数据
+                if (batch.length >= BATCH_SEND_SIZE || 
+                    (batch.length > 0 && Date.now() - lastSendTime > 500)) {
+                    sendBatchResults(batch, false);
+                    batch = [];
+                    lastSendTime = Date.now();
+                }
+            }
+        }
+        
+        setTimeout(() => processBatch(), 0);
+    }
+    
+    processBatch();
+}
+
+// 监听主线程消息
 self.addEventListener('message', function(e) {
     if (e.data.type === 'generate') {
-        results = [];
-        letterMap = {};
-        generateCombinations(e.data.input);
-        
-        // 分批发送结果
-        sendBatchResults(results);
+        try {
+            totalCount = 0;
+            letterMap = {};
+            
+            const iterator = generateCombinationsIterator(e.data.input);
+            processGeneration(iterator);
+        } catch (error) {
+            self.postMessage({
+                type: 'error',
+                message: error.message
+            });
+        }
     }
 }); 
