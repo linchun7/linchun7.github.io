@@ -1,7 +1,7 @@
 // 存储字母映射
 let letterMap = {};
 // 每批发送的结果数量
-const BATCH_SEND_SIZE = 1000;
+const BATCH_SEND_SIZE = 100;
 
 /**
  * Luhn 算法验证
@@ -71,12 +71,11 @@ function sendBatchResults(batch, isComplete = false) {
  */
 function processGeneration(iterator) {
     let batch = [];
-    let lastSendTime = Date.now();
     
     function processBatch() {
         let startTime = Date.now();
         
-        while (Date.now() - startTime < 100) { // 最多执行100ms
+        while (Date.now() - startTime < 50) {
             let next = iterator.next();
             
             if (next.done) {
@@ -89,14 +88,16 @@ function processGeneration(iterator) {
             if (next.value) {
                 batch.push(next.value);
                 
-                // 如果批次满了或者距离上次发送超过500ms，就发送数据
-                if (batch.length >= BATCH_SEND_SIZE || 
-                    (batch.length > 0 && Date.now() - lastSendTime > 500)) {
+                if (batch.length >= BATCH_SEND_SIZE) {
                     sendBatchResults(batch, false);
                     batch = [];
-                    lastSendTime = Date.now();
                 }
             }
+        }
+        
+        if (batch.length > 0) {
+            sendBatchResults(batch, false);
+            batch = [];
         }
         
         setTimeout(() => processBatch(), 0);
