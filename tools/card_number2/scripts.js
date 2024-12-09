@@ -1,10 +1,26 @@
 // 创建 Worker 实例
 let worker = new Worker('worker.js');
 
+// 添加结果缓存
+let allResults = [];
+let totalResults = 0;
+
 // 监听 worker 消息
 worker.addEventListener('message', function(e) {
     if (e.data.type === 'result') {
-        displayResults(e.data.results);
+        if (e.data.total) {
+            totalResults = e.data.total;
+        }
+        
+        allResults = allResults.concat(e.data.results);
+        
+        if (e.data.isComplete) {
+            displayResults(allResults);
+            allResults = []; // 清空缓存
+        } else {
+            // 显示进度
+            document.getElementById('result').textContent = `已接收 ${allResults.length}/${totalResults} 条结果...`;
+        }
     }
 });
 
