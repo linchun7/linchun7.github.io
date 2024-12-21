@@ -5,7 +5,7 @@
     <title>汉字转拼音工具</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, maximum-scale=1, user-scalable=no">
     <link rel="stylesheet" href="../css/bootstrap.min.css">
-    <script src="dist/pinyin-pro.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pinyin-pro"></script>
     <meta name="format-detection" content="telephone=no">
     <link rel="shortcut icon" href="/images/favicon.ico">
     <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
@@ -209,76 +209,65 @@
             return document.getElementById.apply(document, arguments);
         }
 
-		function show() {
-			var { pinyin } = pinyinPro;
-			var inputElement = document.getElementById('inputInfo');
-			var outputElement1 = document.getElementById('result1');
-			var outputElement2 = document.getElementById('result2');
-			var outputElement3 = document.getElementById('result3');
-			var outputElement4 = document.getElementById('result4');
-			var outputElement5 = document.getElementById('result5');
+        function show() {
+            var { pinyin } = pinyinPro;
+            var inputElement = document.getElementById('inputInfo');
+            var outputElement1 = document.getElementById('result1');
+            var outputElement2 = document.getElementById('result2');
+            var outputElement3 = document.getElementById('result3');
+            var outputElement4 = document.getElementById('result4');
+            var outputElement5 = document.getElementById('result5');
 
-			
-			var inputText = inputElement.value;
+            
+            var inputText = inputElement.value;
 
-			// 使用 pinyinPro 进行汉字转拼音
-			var pinyinResult1 = pinyin(inputText,{pattern: 'pinyin', v: true, toneType: 'none', nonZh: 'removed'}); // 不带声调，
-			var pinyinResult2 = pinyin(inputText,{pattern: 'pinyin', v: true, toneType: 'symbol', nonZh: 'removed'}); // 带声调
-			var pinyinResult3 = pinyin(inputText,{pattern: 'pinyin', v: true, toneType: 'num', nonZh: 'removed' }); // 带数字声调
-			var pinyinResult4 = pinyin(inputText, { pattern: 'first', toneType: 'none', nonZh: 'removed', separator: '' }); // 首字母，无声调，移除非汉字，无连接
-			var pinyinResult5 = pinyin(inputText, { multiple: true }); // 多音字
+            // 使用 pinyinPro 进行汉字转拼音
+            var pinyinResult1 = pinyin(inputText,{pattern: 'pinyin', v: true, toneType: 'none', nonZh: 'removed'}); // 不带声调，
+            var pinyinResult2 = pinyin(inputText,{pattern: 'pinyin', v: true, toneType: 'symbol', nonZh: 'removed'}); // 带声调
+            var pinyinResult3 = pinyin(inputText,{pattern: 'pinyin', v: true, toneType: 'num', nonZh: 'removed' }); // 带数字声调
+            var pinyinResult4 = pinyin(inputText, { pattern: 'first', toneType: 'none', nonZh: 'removed', separator: '' }); // 首字母，无声调，移除非汉字，无连接
+            var pinyinResult5 = pinyin(inputText, { multiple: true }); // 多音字
 
+            // 显示拼音结果
+            outputElement1.textContent = pinyinResult1;
+            outputElement2.textContent = pinyinResult2;
+            outputElement3.textContent = pinyinResult3;
+            outputElement4.textContent = pinyinResult4;
+            outputElement5.textContent = pinyinResult5;
+        }
+        
+        function copyResult(resultNumber) {
+            const resultElement = document.getElementById(`result${resultNumber}`);
+            const resultValue = resultElement.textContent.trim();
 
-			// 显示拼音结果
-			outputElement1.textContent = pinyinResult1;
-			outputElement2.textContent = pinyinResult2;
-			outputElement3.textContent = pinyinResult3;
-			outputElement4.textContent = pinyinResult4;
-			outputElement5.textContent = pinyinResult5;
+            const alertTextElement = document.getElementById(`alertText${resultNumber}`);
 
-		}
+            if (resultValue === "") {
+                alertTextElement.textContent = "无内容";
+            } else {
+                const textArea = document.createElement("textarea");
+                textArea.value = resultValue;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand("copy");
+                document.body.removeChild(textArea);
 
+                alertTextElement.textContent = "已复制";
+            }
 
-			
-       
-		
-		
-		function copyResult(resultNumber) {
-			const resultElement = document.getElementById(`result${resultNumber}`);
-			const resultValue = resultElement.textContent.trim();
+            setTimeout(function() {
+                alertTextElement.textContent = "";
+            }, 3000);
+        }
+    </script>
 
-			const alertTextElement = document.getElementById(`alertText${resultNumber}`);
-	
-
-			if (resultValue === "") {
-				alertTextElement.textContent = "无内容";
-			} else {
-				const textArea = document.createElement("textarea");
-				textArea.value = resultValue;
-				document.body.appendChild(textArea);
-				textArea.select();
-				document.execCommand("copy");
-				document.body.removeChild(textArea);
-
-				alertTextElement.textContent = "已复制";
-			}
-
-			setTimeout(function() {
-				alertTextElement.textContent = "";
-			}, 3000);
-		}
-
-
-		
-		// Google tag (gtag.js)
-		<script async src="https://www.googletagmanager.com/gtag/js?id=G-K2S9L4CHNP"></script>
-		<script>
-		  window.dataLayer = window.dataLayer || [];
-		  function gtag(){dataLayer.push(arguments);}
-		  gtag('js', new Date());
-
-		  gtag('config', 'G-K2S9L4CHNP');
-		</script>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-K2S9L4CHNP"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-K2S9L4CHNP');
     </script>
 </body>
 </html>
