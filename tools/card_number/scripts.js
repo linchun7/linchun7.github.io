@@ -147,13 +147,3 @@ function luhnCheck(str) {
   }
   return sum % 10 === 0;
 }
-
-
-// 百度统计代码
-var _hmt = _hmt || [];
-(function() {
-  var hm = document.createElement("script");
-  hm.src = "https://hm.baidu.com/hm.js?db1887936545a6bc1ba1afebdd10e617";
-  var s = document.getElementsByTagName("script")[0]; 
-  s.parentNode.insertBefore(hm, s);
-})();
