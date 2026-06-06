@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>银行卡号生成器 | 终极版</title>
+    <style>
+        :root {
+            --primary: #2563EB; --primary-hover: #1D4ED8;
+            --bg: #F8FAFC; --card-bg: #FFFFFF;
+            --text-main: #0F172A; --text-muted: #64748B;
+            --border: #E2E8F0;
+            --color-star: #F59E0B; /* 星号：橙色 */
+            /* 预设多套字母颜色组 */
+            --color-c1: #3B82F6; /* 蓝 */ --color-c2: #10B981; /* 绿 */
+            --color-c3: #8B5CF6; /* 紫 */ --color-c4: #EC4899; /* 粉 */
+            --color-c5: #06B6D4; /* 青 */
+        }
+
+        body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background-color: var(--bg); color: var(--text-main); margin: 0; padding: 20px 15px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        main { width: 100%; max-width: 700px; background: var(--card-bg); padding: 30px; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); box-sizing: border-box; }
+        h1 { text-align: center; font-size: 24px; margin: 0 0 8px 0; }
+        .subtitle { text-align: center; color: var(--text-muted); font-size: 14px; margin-bottom: 20px; }
+
+        .input-group { display: flex; gap: 10px; margin-bottom: 20px; }
+        input[type="text"] { flex: 1; padding: 14px 18px; font-size: 18px; border: 2px solid var(--border); border-radius: 10px; outline: none; transition: 0.2s; font-family: Menlo, Consolas, monospace; letter-spacing: 1px; }
+        input[type="text"]:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(37,99,235,0.1); }
+
+        .btn { padding: 0 20px; font-size: 15px; font-weight: 600; border: none; border-radius: 10px; cursor: pointer; transition: 0.2s; white-space: nowrap; height: 50px; }
+        .btn-primary { background: var(--primary); color: #fff; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-danger { background: #EF4444; color: #fff; }
+        .btn-danger:hover { background: #DC2626; }
+        .btn-outline { background: transparent; border: 2px solid var(--border); color: var(--text-main); }
+        .btn-outline:hover { background: var(--bg); }
+
+        .dashboard { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; background: var(--bg); padding: 16px 20px; border-radius: 10px; margin-bottom: 15px; font-size: 14px; gap: 10px; }
+        .stat-num { font-size: 18px; font-weight: bold; color: var(--primary); }
+
+        /* 动态图例区 */
+        #dynamic-legend { display: flex; gap: 12px; font-size: 13px; margin-bottom: 12px; flex-wrap: wrap; color: var(--text-muted); min-height: 20px; }
+        .legend-item { display: inline-flex; align-items: center; }
+        .legend-item::before { content: ''; display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+
+        /* 终端显示区 */
+        .terminal-wrap { position: relative; }
+        #result-container { background: #1E293B; color: #F8FAFC; padding: 20px; border-radius: 10px; font-family: Menlo, Consolas, monospace; font-size: 15px; line-height: 1.8; min-height: 250px; white-space: pre-wrap; }
+        .hl-star { color: var(--color-star); font-weight: bold; }
+        .hl-c1 { color: var(--color-c1); font-weight: bold; }
+        .hl-c2 { color: var(--color-c2); font-weight: bold; }
+        .hl-c3 { color: var(--color-c3); font-weight: bold; }
+        .hl-c4 { color: var(--color-c4); font-weight: bold; }
+        .hl-c5 { color: var(--color-c5); font-weight: bold; }
+        .hl-normal { color: #94A3B8; }
+
+        #status-bar { position: absolute; top: 10px; right: 15px; font-size: 12px; color: #10B981; display: none; background: rgba(16,185,129,0.1); padding: 4px 8px; border-radius: 4px; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        .calculating { animation: pulse 1.5s infinite; color: #F59E0B !important; background: rgba(245,158,11,0.1) !important; }
+
+        /* 高级分页控件 */
+        .pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; background: var(--bg); padding: 10px; border-radius: 10px; }
+        .pagination button { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border); background: #fff; cursor: pointer; font-size: 14px; }
+        .pagination button:disabled { background: transparent; color: #94A3B8; cursor: not-allowed; border-color: transparent; }
+        .page-jumper { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-muted); }
+        .page-jumper input { width: 50px; padding: 6px; text-align: center; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; outline: none; }
+        .page-jumper input:focus { border-color: var(--primary); }
+
+        @media (max-width: 600px) {
+            .input-group { flex-direction: column; } .btn { width: 100%; height: 45px; } .dashboard { flex-direction: column; align-items: flex-start; }
+        }
+    </style>
+</head>
+<body>
+
+    <main>
+        <h1>💳 银行卡号生成器</h1>
+        <p class="subtitle">输入例如: 622* **** aabb cc，极速验证 Luhn 算法</p>
+        
+        <div class="input-group">
+            <input type="text" id="inputField" placeholder="输入号段规则..." autofocus>
+            <button id="calcBtn" class="btn btn-primary">生成</button>
+            <button id="stopBtn" class="btn btn-danger" style="display: none;">停止</button>
+            <button id="clearBtn" class="btn btn-outline">清空</button>
+        </div>
+
+        <div class="dashboard">
+            <div>有效：<span id="validCount" class="stat-num">0</span> 位</div>
+            <div>生成：<span id="count" class="stat-num">0</span> 条</div>
+            <div style="display: flex; gap: 10px;">
+                <button id="copyPageBtn" class="btn btn-outline" style="height: 32px; padding: 0 12px; font-size: 12px; display: none;">复制当前页</button>
+                <button id="downloadBtn" class="btn btn-primary" style="height: 32px; padding: 0 12px; font-size: 12px; display: none;">下载全量 TXT</button>
+            </div>
+        </div>
+
+        <div id="dynamic-legend"></div>
+
+        <div class="terminal-wrap">
+            <div id="status-bar">✓ 计算完成</div>
+            <div id="result-container">等待输入规则...</div>
+        </div>
+
+        <div class="pagination" id="pagination" style="display: none;">
+            <button id="prevBtn">上一页</button>
+            <div class="page-jumper">
+                第 <input type="number" id="pageInput" value="1" min="1"> 页 / 共 <span id="totalPages">1</span> 页
+            </div>
+            <button id="nextBtn">下一页</button>
+        </div>
+    </main>
+
+    <script>
+        let results = [];
+        let currentPattern = '';
+        let uniqueLetters = []; 
+        let currentPage = 1;
+        const pageSize = 100;
+        let worker = null;
+        let isCalculating = false;
+
+        const ui = {
+            input: document.getElementById('inputField'), calcBtn: document.getElementById('calcBtn'),
+            stopBtn: document.getElementById('stopBtn'), clearBtn: document.getElementById('clearBtn'),
+            count: document.getElementById('count'), validCount: document.getElementById('validCount'),
+            resultContent: document.getElementById('result-container'), statusBar: document.getElementById('status-bar'),
+            pagination: document.getElementById('pagination'), pageInput: document.getElementById('pageInput'),
+            totalPages: document.getElementById('totalPages'), prevBtn: document.getElementById('prevBtn'),
+            nextBtn: document.getElementById('nextBtn'), downloadBtn: document.getElementById('downloadBtn'),
+            copyPageBtn: document.getElementById('copyPageBtn'), legendBox: document.getElementById('dynamic-legend')
+        };
+
+        // ==========================================
+        // 核心：Web Worker (流式 Chunk 传输机制)
+        // ==========================================
+        const workerCode = `
+            let isCancelled = false;
+            let chunk = [];
+            let totalFound = 0;
+            let letterMap = {};
+
+            function luhnCheck(str) {
+                let sum = 0, parity = str.length % 2;
+                for (let i = str.length - 1; i >= 0; i--) {
+                    let d = parseInt(str[i], 10);
+                    if ((i + parity) % 2 === 0) { d *= 2; if (d > 9) d -= 9; }
+                    sum += d;
+                }
+                return sum % 10 === 0;
+            }
+
+            function generate(str, combination = '') {
+                if (isCancelled) return;
+                
+                if (str.length === 0) {
+                    if (luhnCheck(combination)) {
+                        chunk.push(combination);
+                        totalFound++;
+                        // 满 200 条向主线程发送一次数据包，实现边算边显
+                        if (chunk.length >= 200) {
+                            postMessage({ type: 'chunk', data: chunk, count: totalFound });
+                            chunk = [];
+                        }
+                    }
+                } else {
+                    let char = str[0];
+                    if (char >= '0' && char <= '9') { generate(str.substring(1), combination + char); } 
+                    else if (char.match(/[a-zA-Z]/)) {
+                        let f = char.toLowerCase();
+                        if (letterMap[f] === undefined) {
+                            for (let i = 0; i < 10; i++) { letterMap[f] = i; generate(str.substring(1), combination + i); }
+                            letterMap[f] = undefined;
+                        } else { generate(str.substring(1), combination + letterMap[f]); }
+                    } 
+                    else if (char === '*') {
+                        for (let i = 0; i < 10; i++) { generate(str.substring(1), combination + i); }
+                    }
+                }
+            }
+
+            self.onmessage = function(e) {
+                if (e.data.type === 'start') {
+                    isCancelled = false; chunk = []; totalFound = 0; letterMap = {};
+                    generate(e.data.input);
+                    // 循环结束，发送剩余的尾部数据
+                    postMessage({ type: 'done', data: chunk, count: totalFound });
+                } else if (e.data.type === 'stop') {
+                    isCancelled = true;
+                    postMessage({ type: 'done', data: chunk, count: totalFound, stopped: true });
+                }
+            };
+        `;
+        const blob = new Blob([workerCode], { type: 'application/javascript' });
+        const workerUrl = URL.createObjectURL(blob);
+
+        function initWorker() {
+            if (worker) worker.terminate();
+            worker = new Worker(workerUrl);
+            
+            worker.onmessage = function(e) {
+                if (e.data.type === 'chunk') {
+                    results.push(...e.data.data);
+                    ui.count.textContent = e.data.count.toLocaleString();
+                    
+                    // 当收到第一批数据时，立刻渲染第一页，实现“秒出”体验
+                    if (results.length <= pageSize && currentPage === 1) {
+                        renderPage();
+                    }
+                    updatePaginationUI();
+                } else if (e.data.type === 'done') {
+                    if (e.data.data.length > 0) results.push(...e.data.data);
+                    ui.count.textContent = e.data.count.toLocaleString();
+                    isCalculating = false;
+                    
+                    ui.calcBtn.style.display = 'block';
+                    ui.stopBtn.style.display = 'none';
+                    ui.statusBar.textContent = e.data.stopped ? '⚠️ 已手动停止' : '✓ 计算完成';
+                    ui.statusBar.className = '';
+                    
+                    if (results.length > 0 && currentPage === 1) renderPage();
+                    updatePaginationUI();
+                }
+            };
+        }
+
+        // ==========================================
+        // UI 渲染、高亮与图例生成
+        // ==========================================
+        function generateLegend(pattern) {
+            uniqueLetters = [];
+            let chars = pattern.toLowerCase().split('');
+            for (let c of chars) { if (/[a-z]/.test(c) && !uniqueLetters.includes(c)) uniqueLetters.push(c); }
+            
+            let html = '';
+            if (pattern.includes('*')) {
+                html += `<div class="legend-item" style="--color-star: #F59E0B"><span class="hl-star">*</span> : 随机推演位</div>`;
+            }
+            uniqueLetters.forEach((letter, index) => {
+                let colorClass = `hl-c${(index % 5) + 1}`;
+                let colorVar = `var(--color-c${(index % 5) + 1})`;
+                html += `<div class="legend-item" style="--color-star: ${colorVar}"><span class="${colorClass}">${letter}</span> : 同一数字</div>`;
+            });
+            ui.legendBox.innerHTML = html;
+        }
+
+        function formatWithHighlight(cardNumber, pattern) {
+            let html = '';
+            for (let i = 0; i < cardNumber.length; i++) {
+                if (i > 0 && i % 4 === 0) html += ' '; 
+                let pChar = pattern[i]; let cChar = cardNumber[i];
+
+                if (pChar === '*') { html += `<span class="hl-star">${cChar}</span>`; } 
+                else if (/[a-zA-Z]/.test(pChar)) {
+                    let idx = uniqueLetters.indexOf(pChar.toLowerCase());
+                    let colorClass = `hl-c${(idx % 5) + 1}`;
+                    html += `<span class="${colorClass}">${cChar}</span>`;
+                } else { html += `<span class="hl-normal">${cChar}</span>`; }
+            }
+            return html;
+        }
+
+        function renderPage() {
+            if (results.length === 0) {
+                ui.resultContent.innerHTML = isCalculating ? "计算中，请稍候..." : "无匹配结果";
+                ui.pagination.style.display = 'none';
+                ui.downloadBtn.style.display = 'none';
+                ui.copyPageBtn.style.display = 'none';
+                return;
+            }
+
+            const start = (currentPage - 1) * pageSize;
+            const currentData = results.slice(start, start + pageSize);
+            ui.resultContent.innerHTML = currentData.map(res => formatWithHighlight(res, currentPattern)).join('\n');
+            
+            ui.pagination.style.display = 'flex';
+            ui.downloadBtn.style.display = 'block';
+            ui.copyPageBtn.style.display = 'block';
+            updatePaginationUI();
+        }
+
+        function updatePaginationUI() {
+            const total = Math.max(1, Math.ceil(results.length / pageSize));
+            ui.totalPages.textContent = total.toLocaleString();
+            ui.pageInput.value = currentPage;
+            ui.pageInput.max = total;
+            ui.prevBtn.disabled = currentPage <= 1;
+            ui.nextBtn.disabled = currentPage >= total;
+        }
+
+        // ==========================================
+        // 交互控制逻辑
+        // ==========================================
+        function startCalculation() {
+            let inputStr = ui.input.value;
+            currentPattern = inputStr.replace(/[^a-zA-Z0-9*]/g, '');
+            if (currentPattern.length === 0) return;
+
+            initWorker();
+            results = []; currentPage = 1; isCalculating = true;
+            generateLegend(currentPattern);
+            
+            ui.resultContent.innerHTML = "";
+            ui.calcBtn.style.display = 'none'; ui.stopBtn.style.display = 'block';
+            ui.count.textContent = "0"; ui.pagination.style.display = 'none';
+            ui.downloadBtn.style.display = 'none'; ui.copyPageBtn.style.display = 'none';
+            
+            ui.statusBar.style.display = 'block';
+            ui.statusBar.textContent = '● 正在后台高速计算...';
+            ui.statusBar.className = 'calculating';
+
+            worker.postMessage({ type: 'start', input: currentPattern });
+        }
+
+        // 跳转页码逻辑
+        function jumpToPage() {
+            let targetPage = parseInt(ui.pageInput.value);
+            const total = Math.max(1, Math.ceil(results.length / pageSize));
+            if (isNaN(targetPage) || targetPage < 1) targetPage = 1;
+            if (targetPage > total) targetPage = total;
+            
+            currentPage = targetPage;
+            ui.pageInput.value = currentPage;
+            renderPage();
+        }
+
+        ui.input.addEventListener('input', () => {
+            let filtered = ui.input.value.replace(/[^a-zA-Z0-9*\s]/g, '').replace(/\s+/g, ' ');
+            ui.input.value = filtered;
+            ui.validCount.textContent = filtered.replace(/\s/g, '').length;
+        });
+
+        ui.input.addEventListener('keydown', (e) => { if (e.key === 'Enter') startCalculation(); });
+        ui.calcBtn.addEventListener('click', startCalculation);
+        ui.stopBtn.addEventListener('click', () => { if (worker) worker.postMessage({ type: 'stop' }); });
+        
+        ui.clearBtn.addEventListener('click', () => {
+            ui.input.value = ''; ui.validCount.textContent = '0'; ui.count.textContent = '0';
+            results = []; currentPattern = ''; isCalculating = false;
+            ui.statusBar.style.display = 'none'; ui.legendBox.innerHTML = '';
+            renderPage(); ui.input.focus();
+        });
+
+        ui.prevBtn.addEventListener('click', () => { if (currentPage > 1) { currentPage--; renderPage(); } });
+        ui.nextBtn.addEventListener('click', () => { if (currentPage < Math.ceil(results.length / pageSize)) { currentPage++; renderPage(); } });
+        
+        // 监听回车或失去焦点触发页码跳转
+        ui.pageInput.addEventListener('change', jumpToPage);
+        ui.pageInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); jumpToPage(); ui.pageInput.blur(); }});
+
+        // 复制本页
+        ui.copyPageBtn.addEventListener('click', () => {
+            const content = ui.resultContent.innerText; // 直接拿去掉标签的纯文本
+            navigator.clipboard.writeText(content).then(() => {
+                let oldText = ui.copyPageBtn.textContent;
+                ui.copyPageBtn.textContent = "已复制!";
+                setTimeout(() => ui.copyPageBtn.textContent = oldText, 2000);
+            });
+        });
+
+        // 下载全量
+        ui.downloadBtn.addEventListener('click', () => {
+            if (results.length === 0) return;
+            const content = results.map(res => res.replace(/\d{4}(?=\d)/g, '$& ')).join('\n');
+            const blobFile = new Blob([content], { type: "text/plain;charset=utf-8" });
+            const url = URL.createObjectURL(blobFile);
+            const a = document.createElement('a'); a.href = url;
+            a.download = `卡号生成结果_${results.length}条.txt`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+    </script>
+</body>
+</html>
