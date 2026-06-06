@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>银行卡号生成器</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <main>
+        <h1>💳 银行卡号生成器</h1>
+        <p class="subtitle">输入卡号规则极速生成组合，支持 Luhn 算法校验、特定数字排除与特征打标</p>
+        
+        <div class="input-group">
+            <input type="text" id="inputField" placeholder="例如输入: 6226 0281 12*a abbb" autofocus maxlength="40">
+            <button id="calcBtn" class="btn btn-primary">生成卡号</button>
+            <button id="stopBtn" class="btn btn-danger" style="display: none;">停止</button>
+            <button id="clearBtn" class="btn btn-outline">清空</button>
+        </div>
+
+        <button id="toggleAdvBtn" class="btn btn-text">⚙️ 展开高级筛选选项 ▼</button>
+
+        <div class="advanced-panel" id="advPanel">
+            <div>
+                <div class="adv-title">不包含的数字 <span class="adv-desc">(仅限制 * 和字母等推演变量)</span></div>
+                <div class="checkbox-grid" id="numberCheckboxes">
+                    <label><input type="checkbox" value="0"> 0</label>
+                    <label><input type="checkbox" value="1"> 1</label>
+                    <label><input type="checkbox" value="2"> 2</label>
+                    <label><input type="checkbox" value="3"> 3</label>
+                    <label><input type="checkbox" value="4"> 4</label>
+                    <label><input type="checkbox" value="5"> 5</label>
+                    <label><input type="checkbox" value="6"> 6</label>
+                    <label><input type="checkbox" value="7"> 7</label>
+                    <label><input type="checkbox" value="8"> 8</label>
+                    <label><input type="checkbox" value="9"> 9</label>
+                </div>
+            </div>
+            <div>
+                <div class="adv-title">不包含的奇偶 <span class="adv-desc">(仅限制推演变量)</span></div>
+                <div class="checkbox-grid">
+                    <label><input type="checkbox" id="excludeOdd"> 排除奇数 (1, 3, 5, 7, 9)</label>
+                    <label><input type="checkbox" id="excludeEven"> 排除偶数 (0, 2, 4, 6, 8)</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard">
+            <div>格式有效位：<span id="validCount" class="stat-num">0</span> 位</div>
+            <div>生成数量：<span id="count" class="stat-num">0</span> 条</div>
+            <div style="display: flex; gap: 10px;">
+                <button id="downloadBtn" class="btn btn-primary" style="height: 32px; padding: 0 12px; font-size: 13px; display: none;">下载结果(.txt)</button>
+            </div>
+        </div>
+
+        <div id="dynamic-legend"></div>
+
+        <div class="terminal-wrap">
+            <div class="terminal-header"><div></div><span id="status-bar">✓ 计算完成</span></div>
+            <div id="result-container">等待输入卡号规则...</div>
+        </div>	
+		<div class="pagination" id="pagination" style="display: none;">
+			<button id="firstBtn">« 第一页</button>
+			<button id="prevBtn">上一页</button>
+			<div class="page-jumper">
+       			 第 <input type="number" id="pageInput" min="1"> 页 / 共 <span id="totalPages">1</span> 页
+    		</div>
+		<button id="nextBtn">下一页</button>
+		<button id="lastBtn">最后一页 »</button>
+		</div>
+    </main>
+	<footer>
+        <p>&copy; 2023 <a href="https://www.linchun.com.cn">林春写字的地方</a></p>
+    </footer>
+    <script src="scripts.js"></script>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-K2S9L4CHNP"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-K2S9L4CHNP');
+    </script>
+    <script src="app.js"></script>
+</body>
+</html>
