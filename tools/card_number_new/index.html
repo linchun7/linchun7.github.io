@@ -5,10 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <meta name="description" content="专业银行卡号生成与靓号计算，支持规则定制、特定数字排除及靓号特征自动打标。">
     <meta property="og:title" content="银行卡号生成器（新版）">
-    <meta property="og:description" content="精准计算靓号号段，一键生成组合，支持多维过滤与卡号导出。">
+    <meta property="og:description" content="精准计算银行卡号靓号号段，一键生成组合，支持多维过滤与卡号导出。">
     
     <title>银行卡号生成器（新版）</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="shortcut icon" href="/images/favicon.ico">
+    <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
+    <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
 </head>
 <body>
 
@@ -16,7 +19,7 @@
 
     <main>
         <h1>💳 银行卡号生成器（新版）</h1>
-        <p class="subtitle">输入卡号规则极速生成组合，满足 Luhn 算法校验，支持特定数字排除。</p>
+        <p class="subtitle">输入卡号规则极速生成组合，支持 Luhn 算法校验、特定数字排除与特征打标</p>
         
         <div class="input-group">
             <input type="text" id="inputField" placeholder="例如输入: 6214 8800 **aa bbbb" autofocus maxlength="100">
@@ -28,7 +31,7 @@
         <button id="toggleAdvBtn" class="btn btn-text">⚙️ 展开高级筛选选项 <span class="toggle-icon">▼</span></button>
 
         <div class="advanced-panel" id="advPanel">
-            <div class="adv-desc" style="color: var(--primary); font-weight: 600; font-size: 13px;">💡 注：以下排除规则仅限制 * 和字母等计算变量。</div>
+            <div class="adv-desc" style="color: var(--primary); font-weight: 600; font-size: 13px;">💡 注：以下排除规则仅对 * 和字母随机位生效。</div>
             
             <div>
                 <div class="adv-title">不包含的数字</div>
@@ -58,7 +61,7 @@
             <div>有效位数：<span id="validCount" class="stat-num">0</span> 位 
                 <span id="lenWarning" style="color: var(--color-star); font-size: 13px; font-weight: normal; display: none; margin-left: 8px;">(💡 已超出常规 19 位长度)</span>
             </div>
-            <div>生成数量：<span id="count" class="stat-num">0</span> 条</div>
+            <div>生成数量：<span id="resultCount" class="stat-num">0</span> 条</div>
             <div style="display: flex; gap: 10px;">
                 <button id="copyPageBtn" class="btn btn-outline" style="height: 32px; padding: 0 12px; font-size: 13px; display: none;">复制本页</button>
                 <button id="downloadBtn" class="btn btn-primary" style="height: 32px; padding: 0 12px; font-size: 13px; display: none;">下载结果(.csv)</button>
@@ -93,6 +96,7 @@
     </footer>
 
     <script src="app.js"></script>
+
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-K2S9L4CHNP"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
