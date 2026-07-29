@@ -1,11 +1,6 @@
-/**
- * 银行卡号生成器 - 样式表 (v1.0.0)
- * 结构：CSS变量定义 -> 基础重置 -> 核心组件 -> 状态样式 -> 响应式适配
- */
+/* 银行卡号生成工具：主题、组件状态与移动端布局。 */
 
-/* =========================================================
-   1. CSS 变量与主题色板
-   ========================================================= */
+/* 主题色 */
 :root {
     --primary: #2563EB; 
     --primary-hover: #1D4ED8;
@@ -14,13 +9,12 @@
     --text-main: #0F172A; 
     --text-muted: #64748B;
     --border: #CBD5E1;
-    --color-star: #D97706; /* 星号推演位的高亮橙色 */
+    --color-star: #2563EB; /* 星号独立变量位使用蓝色，与红色字母位清晰区分 */
+    --color-letter: #DC2626; /* 字母等值位统一使用红色，避免多字母规则过于杂乱 */
     --error-red: #EF4444;
 }
 
-/* =========================================================
-   2. 基础重置与布局
-   ========================================================= */
+/* 页面布局 */
 body { 
     font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; 
     background-color: var(--bg); 
@@ -31,6 +25,20 @@ body {
     flex-direction: column; 
     align-items: center; 
     min-height: 100vh; 
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 main { 
@@ -44,28 +52,27 @@ main {
     margin-bottom: auto; /* 保证高度不足时，下方页脚仍能沉底 */
 }
 
-h1 { text-align: center; font-size: 26px; margin: 0 0 8px 0; color: #1E293B; letter-spacing: 1px; }
-.subtitle { text-align: center; color: var(--text-muted); font-size: 14px; margin-bottom: 22px; line-height: 1.6; }
+h1 { display: flex; justify-content: center; align-items: center; gap: 7px; font-size: 26px; margin: 0 0 8px 0; color: #1E293B; letter-spacing: 0; white-space: nowrap; }
+.version-label { padding: 2px 5px; border: 1px solid #BFDBFE; border-radius: 4px; background: #EFF6FF; color: var(--primary); font-size: 12px; line-height: 1.3; }
+.subtitle { text-align: center; color: var(--text-muted); font-size: 14px; margin: 0 0 22px; line-height: 1.6; }
 
-/* =========================================================
-   3. 全局 Toast 轻提示组件
-   ========================================================= */
+/* 操作反馈 */
 .toast {
     position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-20px);
     background-color: #1E293B; color: #F8FAFC; padding: 12px 24px; border-radius: 8px;
     font-size: 14px; font-weight: 500; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
     opacity: 0; pointer-events: none; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    z-index: 9999; text-align: center; white-space: nowrap;
+    z-index: 9999; text-align: center; white-space: normal; overflow-wrap: anywhere;
+    max-width: calc(100vw - 24px); box-sizing: border-box;
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-/* =========================================================
-   4. 输入控件与按钮体系
-   ========================================================= */
+/* 输入与操作按钮 */
 .input-group { display: flex; gap: 10px; margin-bottom: 12px; }
-input[type="text"] { flex: 1; padding: 14px 18px; font-size: 18px; border: 2px solid var(--border); border-radius: 10px; outline: none; transition: all 0.3s ease; font-family: Menlo, Consolas, monospace; letter-spacing: 1px; color: #334155; }
+input[type="text"] { flex: 1; padding: 14px 18px; font-size: 18px; border: 2px solid var(--border); border-radius: 10px; outline: none; transition: all 0.3s ease; font-family: Menlo, Consolas, monospace; letter-spacing: 0; color: #334155; }
 input[type="text"]:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(37,99,235,0.1); }
 input[type="text"].input-error { border-color: var(--error-red); background-color: #FEF2F2; } /* 错误报警态 */
+.length-warning { color: #B45309; font-size: 13px; font-weight: normal; margin-left: 8px; }
 
 .btn { padding: 0 20px; font-size: 15px; font-weight: 600; border: none; border-radius: 10px; cursor: pointer; transition: 0.2s; white-space: nowrap; height: 50px; }
 .btn-primary { background: var(--primary); color: #fff; box-shadow: 0 2px 4px rgba(37,99,235,0.2); }
@@ -76,13 +83,14 @@ input[type="text"].input-error { border-color: var(--error-red); background-colo
 .btn-outline:hover { background: #F8FAFC; border-color: #94A3B8; }
 .btn-text { background: transparent; border: none; color: var(--primary); padding: 0 10px; height: auto; font-size: 14px; margin-bottom: 15px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
 .btn-text:hover { color: var(--primary-hover); text-decoration: underline; }
+.btn:focus-visible, .result-row:focus-visible, select:focus-visible { outline: 3px solid rgba(37, 99, 235, 0.35); outline-offset: 2px; }
+.btn:disabled { cursor: not-allowed; opacity: 0.6; transform: none; }
+.btn-compact { height: 32px; padding: 0 12px; font-size: 13px; }
 
 .toggle-icon { display: inline-block; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); font-size: 12px; }
 .toggle-icon.rotate { transform: rotate(180deg); }
 
-/* =========================================================
-   5. 高级选项排除面板
-   ========================================================= */
+/* 高级筛选 */
 .advanced-panel { background: #F8FAFC; border: 1px dashed var(--border); border-radius: 10px; padding: 18px; margin-bottom: 20px; display: none; gap: 15px; flex-direction: column; }
 .adv-title { font-size: 14px; font-weight: 600; color: #334155; margin-bottom: 8px; display: flex; align-items: baseline; gap: 8px; }
 .adv-desc { font-weight: normal; color: #94A3B8; font-size: 12px; }
@@ -91,47 +99,54 @@ input[type="text"].input-error { border-color: var(--error-red); background-colo
 .checkbox-grid label:hover { color: var(--primary); }
 .checkbox-grid input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; margin: 0; accent-color: var(--primary); }
 
-/* =========================================================
-   6. 统计看板与动态图例
-   ========================================================= */
+/* 统计与规则图例 */
 .dashboard { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; background: #F8FAFC; padding: 16px 20px; border-radius: 10px; margin-bottom: 15px; border: 1px solid #E2E8F0; font-size: 14px; gap: 10px; }
 .stat-num { font-size: 18px; font-weight: bold; color: var(--primary); transition: color 0.3s; }
+.dashboard > div { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+#expectedCount { word-break: break-all; }
+.dashboard-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 
 #dynamic-legend { display: flex; gap: 10px 18px; font-size: 13px; margin-bottom: 15px; flex-wrap: wrap; color: var(--text-muted); line-height: 24px; word-break: break-all; transition: all 0.3s; }
 .legend-item { display: inline-flex; align-items: center; font-weight: 600; }
 .legend-item::before { content: ''; display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; flex-shrink: 0; }
 
-/* =========================================================
-   7. 结果输出与列表视图 (核心展示区)
-   ========================================================= */
-.terminal-wrap { position: relative; margin-top: 5px; }
-#status-bar { position: absolute; top: -12px; right: 20px; font-size: 12px; color: #059669; display: none; background: #D1FAE5; padding: 4px 12px; border-radius: 20px; border: 1px solid #A7F3D0; font-weight: 600; transition: all 0.3s; z-index: 10; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+/* 计算状态与结果列表 */
+.terminal-wrap { position: relative; margin-top: 5px; display: flex; flex-direction: column; }
+#status-bar { align-self: flex-end; max-width: 100%; box-sizing: border-box; overflow-wrap: anywhere; margin-bottom: 8px; font-size: 12px; line-height: 1.5; color: #059669; display: none; background: #D1FAE5; padding: 4px 12px; border-radius: 20px; border: 1px solid #A7F3D0; font-weight: 600; transition: all 0.3s; z-index: 10; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
 
-/* 无滚动条与最大高度限制，由生成数据量自然撑开页面高度 */
-#result-container { background: #F8FAFC; color: #334155; padding: 25px 20px; border-radius: 10px; border: 1px solid var(--border); font-family: Menlo, Consolas, monospace; font-size: 16px; line-height: 2.2; white-space: pre-wrap; letter-spacing: 0.5px; word-break: break-all; }
-.empty-placeholder { text-align: center; color: #94A3B8; font-size: 15px; padding: 40px 0; user-select: none; }
+/* 每页最多渲染 200 行，无需在结果区域内增加第二层滚动。 */
+#result-container { background: #F8FAFC; color: #334155; padding: 25px 20px; border-radius: 10px; border: 1px solid var(--border); font-family: Menlo, Consolas, monospace; font-size: 16px; line-height: 2.2; white-space: pre-wrap; letter-spacing: 0; word-break: break-all; }
+.empty-placeholder { text-align: center; color: var(--text-muted); font-size: 15px; padding: 40px 0; user-select: none; }
 
-/* 单行数据的弹性容器：支持 Hover 与点击复制交互 */
-.result-row { display: flex; align-items: center; padding: 6px 12px; border-radius: 6px; transition: background-color 0.2s; cursor: pointer; position: relative; }
+/* 结果行同时支持鼠标、触屏和键盘操作。 */
+.result-row { display: flex; align-items: center; min-width: 0; padding: 6px 12px; border-radius: 6px; transition: background-color 0.2s; cursor: pointer; position: relative; }
 .result-row:hover { background-color: #E2E8F0; } 
 .result-row:active { background-color: #CBD5E1; }
-.number-part { font-family: Menlo, Consolas, monospace; font-size: 16px; letter-spacing: 0.5px; margin-right: 14px; flex-shrink: 0; pointer-events: none; }
+.result-row:focus-visible { background-color: #E2E8F0; }
+.number-part { min-width: 0; max-width: 100%; font-family: Menlo, Consolas, monospace; font-size: 16px; letter-spacing: 0; margin-right: 14px; flex-shrink: 1; white-space: normal; overflow-wrap: anywhere; pointer-events: none; }
 .tag-part { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; pointer-events: none; }
 
-/* =========================================================
-   8. 靓号特征徽章 (Badge) 体系
-   ========================================================= */
-.tag { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 100px; letter-spacing: 0.5px; font-family: -apple-system, sans-serif; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
-.tag-repeat { background: #FEF9C3; color: #854D0E; border: 1px solid #FDE047; }   /* 连号特征 */
-.tag-straight { background: #FEE2E2; color: #991B1B; border: 1px solid #FECACA; } /* 顺子特征 */
-.tag-pattern { background: #E0E7FF; color: #3730A3; border: 1px solid #C7D2FE; }  /* 双拼特征 */
+/* 号码特征标签 */
+.tag { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 100px; letter-spacing: 0; font-family: -apple-system, sans-serif; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+.tag::before { width: 1em; text-align: center; font-weight: 800; line-height: 1; }
+.tag-repeat { background: #FEF9C3; color: #854D0E; border: 1px solid #FDE047; }
+.tag-repeat::before { content: '◆'; }
+.tag-sequence-up, .tag-sequence-down { background: #FEE2E2; color: #991B1B; border: 1px solid #FECACA; }
+.tag-sequence-up::before { content: '↗'; }
+.tag-sequence-down::before { content: '↘'; }
+.tag-aabb, .tag-abab { background: #E0E7FF; color: #3730A3; border: 1px solid #C7D2FE; }
+.tag-aabb::before { content: '▦'; }
+.tag-abab::before { content: '↔'; }
+.tag-palindrome { background: #CCFBF1; color: #115E59; border: 1px solid #99F6E4; }
+.tag-palindrome::before { content: '◇'; }
+.tag-cycle { background: #DCFCE7; color: #166534; border: 1px solid #BBF7D0; }
+.tag-cycle::before { content: '↻'; }
 
-.hl-star { color: var(--color-star); font-weight: 700; background: rgba(217, 119, 6, 0.08); padding: 0 2px; border-radius: 3px; }
+.hl-star { color: var(--color-star); font-weight: 700; background: rgba(37, 99, 235, 0.08); padding: 0 2px; border-radius: 3px; }
+.hl-letter { color: var(--color-letter); font-weight: 800; background: rgba(220, 38, 38, 0.08); padding: 0 2px; border-radius: 3px; }
 .hl-normal { color: #64748B; }
 
-/* =========================================================
-   9. 分页组件
-   ========================================================= */
+/* 分页 */
 .pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; background: #F8FAFC; padding: 12px 18px; border-radius: 10px; border: 1px solid var(--border); }
 .pagination-center { display: flex; align-items: center; gap: 12px; }
 .pagination button { padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border); background: #fff; cursor: pointer; font-size: 14px; font-weight: 500; color: #334155; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
@@ -142,9 +157,7 @@ input[type="text"].input-error { border-color: var(--error-red); background-colo
 .page-jumper input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(37,99,235,0.1); }
 .page-slash { margin: 0 4px; color: #CBD5E1; }
 
-/* =========================================================
-   10. 底部版权 (Footer)
-   ========================================================= */
+/* 页脚 */
 footer { text-align: center; margin: 20px auto 10px auto; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; width: 100%; max-width: 800px; font-size: 14px; color: var(--text-muted); }
 footer p { margin: 6px 0; }
 footer a { color: inherit; text-decoration: none; transition: color 0.2s ease; }
@@ -152,20 +165,39 @@ footer a:visited { color: inherit; }
 footer a:hover { color: var(--primary); text-decoration: underline; }
 footer a:active { position: relative; top: 1px; }
 
-/* =========================================================
-   11. 移动端响应式适配 (视口 < 600px)
-   ========================================================= */
+/* 窄屏布局 */
 @media (max-width: 600px) {
+    body { padding: 10px 8px; }
     main { padding: 20px 15px; }
+    h1 { gap: 5px; font-size: 20px; }
+    .toast { top: auto; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(20px); }
+    .toast.show { transform: translateX(-50%) translateY(0); }
     .input-group { flex-direction: column; } .btn { width: 100%; height: 45px; }
     .dashboard { flex-direction: column; align-items: flex-start; }
-    .pagination { padding: 12px 10px; gap: 6px; }
-    .pagination-center { gap: 6px; }
-    .pagination button { padding: 6px 8px; font-size: 13px; }
+    .dashboard-actions { width: 100%; }
+    .dashboard-actions .btn { flex: 1; width: auto; }
+    .length-warning { display: block; margin: 4px 0 0; }
+    .checkbox-grid { gap: 6px 12px; }
+    .checkbox-grid label { min-height: 40px; }
+    .checkbox-grid input[type="checkbox"] { width: 18px; height: 18px; flex-shrink: 0; }
+    .pagination { padding: 12px 10px; gap: 8px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .pagination-center { grid-column: 1 / -1; grid-row: 1; justify-content: center; gap: 6px; min-width: 0; }
+    #firstPageBtn { grid-column: 1; grid-row: 2; }
+    #lastPageBtn { grid-column: 2; grid-row: 2; }
+    .pagination button { min-height: 44px; padding: 6px 8px; font-size: 13px; }
     .page-jumper { font-size: 13px; gap: 4px; }
-    .page-jumper input { width: 40px; padding: 4px; font-size: 13px; }
+    .page-jumper input { width: 44px; min-height: 40px; padding: 4px; font-size: 13px; }
     
-    /* 移动端排版：数字和徽章折行显示以防溢出 */
+    /* 长号码与标签分行，避免挤压操作区。 */
     .result-row { padding: 8px 6px; flex-direction: column; align-items: flex-start; gap: 6px; }
     .number-part { margin-right: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
+}
+
+@media (max-width: 360px) {
+    h1 { font-size: 18px; gap: 4px; }
+    .version-label { font-size: 11px; }
 }
