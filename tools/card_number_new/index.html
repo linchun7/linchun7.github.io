@@ -2,12 +2,12 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="专业银行卡号生成与靓号计算，支持规则定制、特定数字排除及靓号特征自动打标。">
-    <meta property="og:title" content="银行卡号生成器（新版）">
+    <meta property="og:title" content="银行卡号规则计算器（新版）">
     <meta property="og:description" content="精准计算银行卡号靓号号段，一键生成组合，支持多维过滤与卡号导出。">
     
-    <title>银行卡号生成器（新版）</title>
+    <title>银行卡号规则计算器（新版）</title>
     <link rel="stylesheet" href="style.css">
     <link rel="shortcut icon" href="/images/favicon.ico">
     <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
@@ -15,26 +15,27 @@
 </head>
 <body>
 
-    <div id="toast" class="toast"></div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
     <main>
-        <h1>💳 银行卡号生成器（新版）</h1>
+        <h1><span aria-hidden="true">💳</span><span>银行卡号规则计算器</span><span class="version-label">新版</span></h1>
         <p class="subtitle">输入卡号规则极速生成组合，支持 Luhn 算法校验、特定数字排除与特征打标</p>
         
         <div class="input-group">
-            <input type="text" id="inputField" placeholder="例如输入: 6214 8800 **aa bbbb" autofocus maxlength="100">
-            <button id="calcBtn" class="btn btn-primary">生成卡号</button>
-            <button id="stopBtn" class="btn btn-danger" style="display: none;">停止</button>
-            <button id="clearBtn" class="btn btn-outline">清空</button>
+            <label class="sr-only" for="inputField">卡号生成规则</label>
+            <input type="text" id="inputField" placeholder="例如输入：6214 8800 **aa bbbb" autofocus autocomplete="off" spellcheck="false" aria-describedby="lenWarning">
+            <button type="button" id="calcBtn" class="btn btn-primary">生成卡号</button>
+            <button type="button" id="stopBtn" class="btn btn-danger" style="display: none;">停止</button>
+            <button type="button" id="clearBtn" class="btn btn-outline">清空</button>
         </div>
 
-        <button id="toggleAdvBtn" class="btn btn-text">⚙️ 展开高级筛选选项 <span class="toggle-icon">▼</span></button>
+        <button type="button" id="toggleAdvBtn" class="btn btn-text" aria-expanded="false" aria-controls="advPanel">⚙️ <span id="toggleAdvLabel">展开高级筛选选项</span> <span class="toggle-icon" aria-hidden="true">▼</span></button>
 
         <div class="advanced-panel" id="advPanel">
-            <div class="adv-desc" style="color: var(--primary); font-weight: 600; font-size: 13px;">💡 注：以下排除规则仅对 * 和字母随机位生效。</div>
+            <div class="adv-desc" style="color: var(--primary); font-weight: 600; font-size: 13px;">以下排除规则仅对 * 和字母可变位生效。</div>
             
             <div>
-                <div class="adv-title">不包含的数字</div>
+                <div class="adv-title">排除指定数字</div>
                 <div class="checkbox-grid" id="numberCheckboxes">
                     <label><input type="checkbox" value="0"> 0</label>
                     <label><input type="checkbox" value="1"> 1</label>
@@ -49,50 +50,52 @@
                 </div>
             </div>
             <div>
-                <div class="adv-title">不包含的奇偶</div>
+                <div class="adv-title">按奇偶排除</div>
                 <div class="checkbox-grid">
-                    <label><input type="checkbox" id="excludeOdd"> 排除奇数 (1, 3, 5, 7, 9)</label>
-                    <label><input type="checkbox" id="excludeEven"> 排除偶数 (0, 2, 4, 6, 8)</label>
+                    <label><input type="checkbox" id="excludeOdd"> 排除奇数（1、3、5、7、9）</label>
+                    <label><input type="checkbox" id="excludeEven"> 排除偶数（0、2、4、6、8）</label>
                 </div>
             </div>
         </div>
 
         <div class="dashboard">
             <div>有效位数：<span id="validCount" class="stat-num">0</span> 位 
-                <span id="lenWarning" style="color: var(--color-star); font-size: 13px; font-weight: normal; display: none; margin-left: 8px;">(💡 已超出常规 19 位长度)</span>
+                <span id="lenWarning" class="length-warning" style="display: none;"></span>
             </div>
-            <div>生成数量：<span id="resultCount" class="stat-num">0</span> 条</div>
-            <div style="display: flex; gap: 10px;">
-                <button id="copyPageBtn" class="btn btn-outline" style="height: 32px; padding: 0 12px; font-size: 13px; display: none;">复制本页</button>
-                <button id="downloadBtn" class="btn btn-primary" style="height: 32px; padding: 0 12px; font-size: 13px; display: none;">下载结果(.csv)</button>
+            <div>符合规则：<span id="expectedCount" class="stat-num">—</span> 条</div>
+            <div>当前显示：<span id="resultCount" class="stat-num">0</span> 条</div>
+            <div class="dashboard-actions">
+                <button type="button" id="copyPageBtn" class="btn btn-outline btn-compact" style="display: none;">复制本页</button>
+                <button type="button" id="downloadBtn" class="btn btn-primary btn-compact" style="display: none;">下载结果(.csv)</button>
             </div>
         </div>
 
         <div id="dynamic-legend" style="display: none;"></div>
 
         <div class="terminal-wrap">
-            <span id="status-bar">✓ 计算完成</span>
-            <div id="result-container">
-                <div class="empty-placeholder">💳 等待输入卡号规则...</div>
+            <span id="status-bar" role="status" aria-live="polite">✓ 计算完成</span>
+            <div id="result-container" role="region" aria-label="生成结果">
+                <div class="empty-placeholder">等待输入卡号规则：支持数字、英文字母和 *。相同字母代表相同数字，每个 * 独立代表任意数字。空格不计入位数。</div>
             </div>
         </div>
 
         <div class="pagination" id="pagination" style="display: none;">
-            <button id="firstPageBtn" title="跳转至第一页">第一页</button>
+            <button type="button" id="firstPageBtn" title="跳转至第一页">第一页</button>
             <div class="pagination-center">
-                <button id="prevBtn">上一页</button>
+                <button type="button" id="prevBtn">上一页</button>
                 <div class="page-jumper">
-                    <input type="text" id="pageInput" value="1" inputmode="numeric">
+                    <label class="sr-only" for="pageInput">页码</label>
+                    <input type="text" id="pageInput" value="1" inputmode="numeric" aria-label="页码">
                     <span class="page-slash">/</span> <span id="totalPages">1</span>
                 </div>
-                <button id="nextBtn">下一页</button>
+                <button type="button" id="nextBtn">下一页</button>
             </div>
-            <button id="lastPageBtn" title="跳转至最后一页">最后一页</button>
+            <button type="button" id="lastPageBtn" title="跳转至最后一页">最后一页</button>
         </div>
     </main>
 
     <footer>
-        <p>&copy; 2023 <a href="https://www.linchun.com.cn" target="_blank">林春写字的地方</a></p>
+        <p>&copy; 2023 <a href="https://www.linchun.com.cn" target="_blank" rel="noopener noreferrer">林春写字的地方</a></p>
     </footer>
 
     <script src="app.js"></script>

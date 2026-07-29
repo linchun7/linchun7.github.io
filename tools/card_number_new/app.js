@@ -1,591 +1,791 @@
-/**
- * 银行卡号生成器 - 核心业务逻辑 (v1.0.0 白话优版)
- * 采用 Web Worker 多线程计算，Luhn 位运算校验，内存防抖指针生成算法。
- */
+/* 银行卡号生成工具：主线程负责交互，Worker 负责计数和结果生成。 */
 
-// ==========================================
-// 1. 全局配置与状态池
-// ==========================================
-let results = [];             // 全局结果数据集
-let currentPattern = '';      // 当前正在生成的格式规则
-let uniqueLetters = [];       // 当前规则中包含的去重字母
-let letterColors = {};        // 为不同字母分配的颜色映射池
-let currentPage = 1;          // 当前页码
-let worker = null;            // 后台计算线程实例
-let toastTimeout = null;      // Toast 计时器，用于防抖覆盖
+let results = [];
+let currentPattern = '';
+let uniqueLetters = [];
+let currentPage = 1;
+let worker = null;
+let toastTimeout = null;
+let isRunning = false;
+let expectedCount = null;
+let downloadMode = 'complete';
 
-const pageSize = 200;                 // 最佳分页容量体验阈值
-const MAX_SAFE_LIMIT = 5000000;       // 内存保护熔断阈值（500万条）
+const pageSize = 200;
+const MAX_PATTERN_LENGTH = 100;
+// 固定保留上限只控制内存与导出规模，不影响符合规则总数的精确统计。
+const MAX_RETAINED_RESULTS = 1000000;
 
-// 10套高对比度专属色板（超出10个字母自动取模循环使用）
-const COLOR_PALETTE = [
-    { text: '#2563EB', bg: 'rgba(37, 99, 235, 0.12)' }, 
-    { text: '#DC2626', bg: 'rgba(220, 38, 38, 0.12)' }, 
-    { text: '#059669', bg: 'rgba(5, 150, 105, 0.12)' }, 
-    { text: '#7C3AED', bg: 'rgba(124, 58, 237, 0.12)' }, 
-    { text: '#EA580C', bg: 'rgba(234, 88, 12, 0.12)' }, 
-    { text: '#DB2777', bg: 'rgba(219, 39, 119, 0.12)' }, 
-    { text: '#0891B2', bg: 'rgba(8, 145, 178, 0.12)' }, 
-    { text: '#4F46E5', bg: 'rgba(79, 70, 229, 0.12)' }, 
-    { text: '#65A30D', bg: 'rgba(101, 163, 13, 0.12)' }, 
-    { text: '#B91C1C', bg: 'rgba(185, 28, 28, 0.12)' }  
-];
-
-function getLetterStyle(index) { 
-    return COLOR_PALETTE[index % COLOR_PALETTE.length]; 
-}
-
-// ==========================================
-// 2. DOM 元素集中绑定
-// ==========================================
 const ui = {
-    input: document.getElementById('inputField'), 
+    input: document.getElementById('inputField'),
     calcBtn: document.getElementById('calcBtn'),
-    stopBtn: document.getElementById('stopBtn'), 
+    stopBtn: document.getElementById('stopBtn'),
     clearBtn: document.getElementById('clearBtn'),
-    count: document.getElementById('resultCount'), 
+    count: document.getElementById('resultCount'),
+    expectedCount: document.getElementById('expectedCount'),
     validCount: document.getElementById('validCount'),
-    resultContent: document.getElementById('result-container'), 
+    lenWarning: document.getElementById('lenWarning'),
+    resultContent: document.getElementById('result-container'),
     statusBar: document.getElementById('status-bar'),
-    pagination: document.getElementById('pagination'), 
+    pagination: document.getElementById('pagination'),
     pageInput: document.getElementById('pageInput'),
-    totalPages: document.getElementById('totalPages'), 
-    firstPageBtn: document.getElementById('firstPageBtn'), 
+    totalPages: document.getElementById('totalPages'),
+    firstPageBtn: document.getElementById('firstPageBtn'),
     lastPageBtn: document.getElementById('lastPageBtn'),
-    prevBtn: document.getElementById('prevBtn'), 
-    nextBtn: document.getElementById('nextBtn'), 
-    downloadBtn: document.getElementById('downloadBtn'), 
+    prevBtn: document.getElementById('prevBtn'),
+    nextBtn: document.getElementById('nextBtn'),
+    downloadBtn: document.getElementById('downloadBtn'),
     copyPageBtn: document.getElementById('copyPageBtn'),
-    legendBox: document.getElementById('dynamic-legend'), 
-    toggleAdvBtn: document.getElementById('toggleAdvBtn'), 
-    advPanel: document.getElementById('advPanel'), 
-    excludeOdd: document.getElementById('excludeOdd'), 
-    excludeEven: document.getElementById('excludeEven'), 
+    legendBox: document.getElementById('dynamic-legend'),
+    toggleAdvBtn: document.getElementById('toggleAdvBtn'),
+    toggleAdvLabel: document.getElementById('toggleAdvLabel'),
+    advPanel: document.getElementById('advPanel'),
+    excludeOdd: document.getElementById('excludeOdd'),
+    excludeEven: document.getElementById('excludeEven'),
     numberCheckboxes: document.getElementById('numberCheckboxes'),
     toast: document.getElementById('toast')
 };
 
-// ==========================================
-// 3. 通用交互辅助函数
-// ==========================================
+function formatIntegerString(value) {
+    if (value === null || value === undefined) return '—';
+    return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
 
 function showToast(message) {
     ui.toast.textContent = message;
     ui.toast.classList.add('show');
     if (toastTimeout) clearTimeout(toastTimeout);
-    toastTimeout = setTimeout(() => ui.toast.classList.remove('show'), 2000);
+    toastTimeout = setTimeout(() => ui.toast.classList.remove('show'), 2200);
 }
 
-// 奇偶排除的互斥逻辑
+function setStatus(message, type = 'success') {
+    const styles = {
+        success: ['#059669', '#D1FAE5', '#A7F3D0'],
+        warning: ['#B45309', '#FEF3C7', '#FDE68A'],
+        error: ['#B91C1C', '#FEE2E2', '#FECACA']
+    };
+    const [color, background, borderColor] = styles[type] || styles.success;
+    ui.statusBar.style.display = 'block';
+    ui.statusBar.style.color = color;
+    ui.statusBar.style.background = background;
+    ui.statusBar.style.borderColor = borderColor;
+    ui.statusBar.textContent = message;
+}
+
+function updateLengthWarning() {
+    const length = ui.input.value.replace(/\s/g, '').length;
+    ui.validCount.textContent = length;
+
+    if (length > 0 && length < 12) {
+        ui.lenWarning.textContent = '💡 少于常见的 12–19 位';
+        ui.lenWarning.style.display = 'inline';
+    } else if (length > 19) {
+        ui.lenWarning.textContent = '💡 超出常见的 12–19 位';
+        ui.lenWarning.style.display = 'inline';
+    } else {
+        ui.lenWarning.textContent = '';
+        ui.lenWarning.style.display = 'none';
+    }
+}
+
+function updateResultActions() {
+    const hasResults = results.length > 0;
+    ui.copyPageBtn.style.display = hasResults ? 'block' : 'none';
+    ui.downloadBtn.style.display = hasResults && !isRunning ? 'block' : 'none';
+
+    if (downloadMode === 'partial') {
+        ui.downloadBtn.textContent = '下载当前结果（部分）';
+    } else if (downloadMode === 'retained') {
+        ui.downloadBtn.textContent = '下载当前显示结果(.csv)';
+    } else {
+        ui.downloadBtn.textContent = '下载结果(.csv)';
+    }
+}
+
+function setRunning(running) {
+    isRunning = running;
+    ui.calcBtn.style.display = running ? 'none' : 'block';
+    ui.stopBtn.style.display = running ? 'block' : 'none';
+    ui.input.disabled = running;
+    ui.clearBtn.disabled = running;
+    ui.toggleAdvBtn.disabled = running;
+    ui.advPanel.querySelectorAll('input[type="checkbox"]').forEach((input) => { input.disabled = running; });
+    updateResultActions();
+}
+
 ui.excludeOdd.addEventListener('change', function() {
     if (this.checked) ui.excludeEven.checked = false;
 });
+
 ui.excludeEven.addEventListener('change', function() {
     if (this.checked) ui.excludeOdd.checked = false;
 });
 
-// 高级选项面板的折叠与箭头动画
 ui.toggleAdvBtn.addEventListener('click', () => {
     const icon = ui.toggleAdvBtn.querySelector('.toggle-icon');
-    if (ui.advPanel.style.display === 'flex') {
-        ui.advPanel.style.display = 'none';
-        icon.classList.remove('rotate');
-    } else {
-        ui.advPanel.style.display = 'flex';
-        icon.classList.add('rotate');
-    }
+    const expanded = ui.advPanel.style.display !== 'flex';
+    ui.advPanel.style.display = expanded ? 'flex' : 'none';
+    icon.classList.toggle('rotate', expanded);
+    ui.toggleAdvLabel.textContent = expanded ? '收起高级筛选选项' : '展开高级筛选选项';
+    ui.toggleAdvBtn.setAttribute('aria-expanded', String(expanded));
 });
 
-// ==========================================
-// 4. 核心计算引擎 (Web Worker 多线程实现)
-// ==========================================
-const workerCode = `
-    let isCancelled = false; 
-    let chunk = []; 
-    let totalFound = 0; 
-    let letterMap = {};
-    let validDigits = []; 
-    let globalPattern = ''; 
-    let maxLimit = 5000000;
-    
-    // Luhn 算法运算查表法
-    const luhnArr = [ 
-        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], // 奇数位(从右数)无需操作
-        [0, 2, 4, 6, 8, 1, 3, 5, 7, 9]  // 偶数位(从右数)乘2减9
+// Worker 先用 10 个余数状态计算精确总数，再剪掉不可能通过 Luhn 校验的分支。
+function calculationWorker() {
+    // 较大的消息块能减少百万级结果下的线程通信，同时保留渐进显示能力。
+    const RESULT_CHUNK_SIZE = 2000;
+    const luhnTable = [
+        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+        [0, 2, 4, 6, 8, 1, 3, 5, 7, 9]
     ];
 
-    /**
-     * 极速 Luhn 算法校验
-     * 采用位运算 (len - 1 - i) & 1 绝对保证无论卡号多长，始终自右向左精确定位奇偶
-     */
-    function luhnCheckFast(str) {
-        let sum = 0;
-        let len = str.length;
-        for (let i = len - 1; i >= 0; i--) { 
-            sum += luhnArr[(len - 1 - i) & 1][str.charCodeAt(i) - 48]; 
-        }
-        return sum % 10 === 0;
-    }
+    function compile(pattern, validDigits) {
+        const variableIndex = new Map();
+        const tokens = [];
+        const contributions = [];
+        let fixedContribution = 0;
 
-    /**
-     * 游标递归生成器
-     */
-    function generate(index, combination) {
-        // 达到熔断极限或手动停止，强制回溯
-        if (isCancelled || totalFound >= maxLimit) return;
-        
-        // 触底校验层
-        if (index === globalPattern.length) {
-            if (luhnCheckFast(combination)) {
-                chunk.push(combination); 
-                totalFound++;
-                // 满 500 条抛回主线程渲染，防止主线程阻塞
-                if (chunk.length >= 500) { 
-                    postMessage({ type: 'chunk', data: chunk, count: totalFound }); 
-                    chunk = []; 
+        for (let position = 0; position < pattern.length; position++) {
+            const char = pattern[position];
+            const parity = (pattern.length - 1 - position) & 1;
+
+            if (char >= '0' && char <= '9') {
+                const digit = char.charCodeAt(0) - 48;
+                fixedContribution = (fixedContribution + luhnTable[parity][digit]) % 10;
+                tokens.push({ digit: char });
+                continue;
+            }
+
+            // 每个 * 独立取值；相同字母（忽略大小写）共享一个取值。
+            const key = char === '*' ? `star:${position}` : `letter:${char.toLowerCase()}`;
+            let index = variableIndex.get(key);
+            if (index === undefined) {
+                index = contributions.length;
+                variableIndex.set(key, index);
+                contributions.push(new Array(10).fill(0));
+            }
+
+            for (let digit = 0; digit <= 9; digit++) {
+                contributions[index][digit] = (contributions[index][digit] + luhnTable[parity][digit]) % 10;
+            }
+            tokens.push({ variable: index });
+        }
+
+        // BigInt 保证最多 100 位规则产生的巨大组合数仍能精确统计。
+        const suffixCounts = Array.from({ length: contributions.length + 1 }, () => new Array(10).fill(0n));
+        suffixCounts[contributions.length][0] = 1n;
+
+        for (let index = contributions.length - 1; index >= 0; index--) {
+            for (const digit of validDigits) {
+                const ownContribution = contributions[index][digit];
+                for (let residue = 0; residue < 10; residue++) {
+                    const count = suffixCounts[index + 1][residue];
+                    if (count > 0n) {
+                        suffixCounts[index][(ownContribution + residue) % 10] += count;
+                    }
                 }
             }
+        }
+
+        return { tokens, contributions, suffixCounts, fixedContribution };
+    }
+
+    function materialize(tokens, assignment) {
+        const output = new Array(tokens.length);
+        for (let index = 0; index < tokens.length; index++) {
+            const token = tokens[index];
+            output[index] = token.digit === undefined ? assignment[token.variable] : token.digit;
+        }
+        return output.join('');
+    }
+
+    self.onmessage = function(event) {
+        if (event.data.type !== 'start') return;
+
+        try {
+            const { input, validDigits, limit } = event.data;
+            const compiled = compile(input, validDigits);
+            const variableCount = compiled.contributions.length;
+            const requiredResidue = (10 - compiled.fixedContribution) % 10;
+            const exactCount = compiled.suffixCounts[0][requiredResidue];
+            const assignment = new Array(variableCount);
+            let chunk = [];
+            let retainedCount = 0;
+
+            postMessage({ type: 'meta', expectedCount: exactCount.toString() });
+
+            function flush() {
+                if (chunk.length === 0) return;
+                postMessage({ type: 'chunk', data: chunk, count: retainedCount });
+                chunk = [];
+            }
+
+            function generate(index, residue) {
+                if (retainedCount >= limit) return;
+
+                if (index === variableCount) {
+                    if ((compiled.fixedContribution + residue) % 10 === 0) {
+                        chunk.push(materialize(compiled.tokens, assignment));
+                        retainedCount++;
+                        if (chunk.length >= RESULT_CHUNK_SIZE) flush();
+                    }
+                    return;
+                }
+
+                for (const digit of validDigits) {
+                    if (retainedCount >= limit) break;
+                    const nextResidue = (residue + compiled.contributions[index][digit]) % 10;
+                    const suffixNeeded = (10 - ((compiled.fixedContribution + nextResidue) % 10)) % 10;
+                    if (compiled.suffixCounts[index + 1][suffixNeeded] === 0n) continue;
+                    assignment[index] = digit;
+                    generate(index + 1, nextResidue);
+                }
+            }
+
+            generate(0, 0);
+            flush();
+            postMessage({
+                type: 'done',
+                count: retainedCount,
+                truncated: exactCount > BigInt(retainedCount)
+            });
+        } catch (error) {
+            postMessage({ type: 'error', message: error && error.message ? error.message : String(error) });
+        }
+    };
+}
+
+const workerBlob = new Blob([`(${calculationWorker.toString()})()`], { type: 'application/javascript' });
+const workerUrl = URL.createObjectURL(workerBlob);
+
+function failCalculation(message) {
+    if (worker) {
+        worker.terminate();
+        worker = null;
+    }
+    setRunning(false);
+    downloadMode = results.length > 0 ? 'partial' : 'complete';
+    updateResultActions();
+    setStatus(`⚠️ 计算失败：${message}`, 'error');
+    if (results.length === 0) {
+        ui.resultContent.innerHTML = "<div class='empty-placeholder' style='color: var(--error-red); font-weight: bold;'>计算线程发生错误，请重试；如果规则包含大量可变位，可增加固定数字后再计算。</div>";
+    }
+}
+
+function initWorker() {
+    if (worker) worker.terminate();
+
+    const instance = new Worker(workerUrl);
+    worker = instance;
+
+    instance.onmessage = function(event) {
+        if (worker !== instance) return;
+        const data = event.data;
+
+        if (data.type === 'meta') {
+            expectedCount = data.expectedCount;
+            ui.expectedCount.textContent = formatIntegerString(expectedCount);
+            setStatus(`● 共 ${formatIntegerString(expectedCount)} 条符合规则，正在生成...`, 'warning');
             return;
         }
 
-        let char = globalPattern[index];
-
-        // 情景 A: 固定已填写的数字位，直接继承
-        if (char >= '0' && char <= '9') { 
-            generate(index + 1, combination + char); 
-        } 
-        // 情景 B: 字母等值未知位
-        else if (char.match(/[a-zA-Z]/)) {
-            let f = char.toLowerCase();
-            if (letterMap[f] === undefined) {
-                for (let i = 0; i < validDigits.length; i++) {
-                    let d = validDigits[i];
-                    letterMap[f] = d; 
-                    generate(index + 1, combination + d);
-                }
-                letterMap[f] = undefined; 
-            } else { 
-                generate(index + 1, combination + letterMap[f]); 
-            }
-        } 
-        // 情景 C: 星号随机未知位
-        else if (char === '*') {
-            for (let i = 0; i < validDigits.length; i++) {
-                generate(index + 1, combination + validDigits[i]);
-            }
+        if (data.type === 'error') {
+            failCalculation(data.message || '未知错误');
+            return;
         }
-    }
 
-    // Worker 消息接收中枢
-    self.onmessage = function(e) {
-        if (e.data.type === 'start') {
-            isCancelled = false; chunk = []; totalFound = 0; letterMap = {};
-            
-            globalPattern = e.data.input;
-            maxLimit = e.data.limit;
-            validDigits = e.data.validDigits;
-
-            generate(0, '');
-            // 计算自然结束，携带极限触达标志位回传
-            postMessage({ type: 'done', data: chunk, count: totalFound, hitLimit: totalFound >= maxLimit });
-        } else if (e.data.type === 'stop') { 
-            isCancelled = true; 
+        if (data.type === 'chunk') {
+            const oldLength = results.length;
+            results.push(...data.data);
+            ui.count.textContent = formatIntegerString(results.length);
+            if (oldLength < currentPage * pageSize && results.length > 0) renderPage();
+            updatePaginationUI();
+            return;
         }
-    };
-`;
-const blob = new Blob([workerCode], { type: 'application/javascript' });
-const workerUrl = URL.createObjectURL(blob);
 
-// 初始化与接收 Worker 数据
-function initWorker() {
-    if (worker) worker.terminate();
-    worker = new Worker(workerUrl);
-    worker.onmessage = function(e) {
-        if (e.data.type === 'chunk' || e.data.type === 'done') {
-            let oldLen = results.length;
-            results.push(...e.data.data);
-            ui.count.textContent = e.data.count.toLocaleString();
-            
-            // 接收完成指令的视图状态复位
-            if (e.data.type === 'done') {
-                ui.calcBtn.style.display = 'block'; ui.stopBtn.style.display = 'none';
-                ui.statusBar.style.display = 'block'; 
-                
-                // 根据是否触发了安全熔断来呈现不同报警UI
-                if (e.data.hitLimit) {
-                    ui.statusBar.textContent = '⚠️ 触发 500 万条防崩溃熔断';
-                    ui.statusBar.style.color = '#B45309';
-                    ui.statusBar.style.background = '#FEF3C7';
-                    ui.statusBar.style.borderColor = '#FDE68A';
-                } else {
-                    ui.statusBar.textContent = '✓ 计算完成';
-                    ui.statusBar.style.color = '#059669';
-                    ui.statusBar.style.background = '#D1FAE5';
-                    ui.statusBar.style.borderColor = '#A7F3D0';
-                }
+        if (data.type === 'done') {
+            instance.terminate();
+            worker = null;
+            downloadMode = data.truncated ? 'retained' : 'complete';
+            setRunning(false);
 
-                // 未找到符合规则的号码提示
-                if (results.length === 0) {
-                     ui.resultContent.innerHTML = "<div class='empty-placeholder' style='color: var(--error-red); font-weight: bold;'>⚠️ 未找到符合规则的号码（请检查输入的数字是否正确，或放宽排除条件）</div>";
-                }
-            }
-            
-            // 防闪烁优化：仅当当前展示页未填满数据，或已完成计算时触发DOM刷新
-            if (oldLen < currentPage * pageSize || e.data.type === 'done') {
-                if (results.length > 0) renderPage(); 
+            if (results.length === 0) {
+                ui.resultContent.innerHTML = "<div class='empty-placeholder' style='color: var(--error-red); font-weight: bold;'>未找到符合规则的卡号（请检查输入的卡号规则或放宽排除条件）</div>";
+                setStatus('✓ 计算完成，没有符合规则的结果', 'success');
+            } else if (data.truncated) {
+                setStatus(`为保持页面流畅，当前显示前 ${formatIntegerString(results.length)} 条。`, 'warning');
+                renderPage();
+            } else {
+                setStatus(`✓ 计算完成，共 ${formatIntegerString(results.length)} 条`, 'success');
+                renderPage();
             }
             updatePaginationUI();
+            updateResultActions();
         }
+    };
+
+    instance.onerror = function(event) {
+        if (worker !== instance) return;
+        event.preventDefault();
+        failCalculation(event.message || '后台计算线程无法运行');
+    };
+
+    instance.onmessageerror = function() {
+        if (worker !== instance) return;
+        failCalculation('后台计算结果无法读取');
     };
 }
 
-// ==========================================
-// 5. 靓号分析与渲染引擎
-// ==========================================
-
-function parseTags(str, asHtml = true) {
-    let tags = [];
-    
-    // N连号 (锚定末尾)
-    const repeatMatch = str.match(/(\d)\1{3,}$/); 
-    if (repeatMatch) {
-        let text = `${repeatMatch[0].length}连`;
-        tags.push(asHtml ? `<span class="tag tag-repeat">👑 ${text}</span>` : `👑${text}`);
+function hasDifferentDigits(value) {
+    for (let index = 1; index < value.length; index++) {
+        if (value[index] !== value[0]) return true;
     }
-
-    // N顺子 (逆向推导升降序，锚定末尾)
-    let tailAsc = 1;
-    for(let i = str.length - 1; i > 0; i--) {
-        if (str.charCodeAt(i) - str.charCodeAt(i-1) === 1) tailAsc++; else break;
-    }
-    let tailDesc = 1;
-    for(let i = str.length - 1; i > 0; i--) {
-        if (str.charCodeAt(i) - str.charCodeAt(i-1) === -1) tailDesc++; else break;
-    }
-    let maxSeq = Math.max(tailAsc, tailDesc);
-    if (maxSeq >= 4) { 
-        tags.push(asHtml ? `<span class="tag tag-straight">🚀 ${maxSeq}顺</span>` : `🚀${maxSeq}顺`); 
-    }
-
-    // 双拼尾阵提取 (取最后4位)
-    let tail4 = str.slice(-4);
-    if (/(\d)\1(\d)\2/.test(tail4) && tail4[0] !== tail4[2]) {
-        tags.push(asHtml ? '<span class="tag tag-pattern">✨ AABB</span>' : '✨AABB');
-    } else if (/(\d)(\d)\1\2/.test(tail4) && tail4[0] !== tail4[1]) {
-        tags.push(asHtml ? '<span class="tag tag-pattern">💫 ABAB</span>' : '💫ABAB');
-    }
-
-    return asHtml ? tags.join('') : tags;
+    return false;
 }
 
-// 构建页面顶部的色彩规则图例
-function generateLegend(pattern) {
-    uniqueLetters = []; letterColors = {};
-    let chars = pattern.toLowerCase().split('');
-    
-    for (let c of chars) { 
-        if (/[a-z]/.test(c) && !uniqueLetters.includes(c)) {
-            uniqueLetters.push(c); 
-            letterColors[c] = getLetterStyle(uniqueLetters.length - 1); 
+function isPalindrome(value) {
+    for (let left = 0, right = value.length - 1; left < right; left++, right--) {
+        if (value[left] !== value[right]) return false;
+    }
+    return true;
+}
+
+// 靓号特征只分析号码末尾；优先保留更长、更具体的特征，避免重复打标。
+function analyzeCardFeatures(cardNumber) {
+    const features = [];
+    const length = cardNumber.length;
+
+    let repeatLength = 1;
+    while (repeatLength < length && cardNumber[length - 1 - repeatLength] === cardNumber[length - 1]) {
+        repeatLength++;
+    }
+    if (repeatLength >= 4) {
+        features.push({ type: 'repeat', label: `${repeatLength}连`, title: `末尾 ${repeatLength} 位数字相同` });
+    }
+
+    if (length >= 4) {
+        const direction = cardNumber.charCodeAt(length - 1) - cardNumber.charCodeAt(length - 2);
+        if (direction === 1 || direction === -1) {
+            let sequenceLength = 2;
+            while (
+                sequenceLength < length &&
+                cardNumber.charCodeAt(length - sequenceLength) - cardNumber.charCodeAt(length - sequenceLength - 1) === direction
+            ) {
+                sequenceLength++;
+            }
+            if (sequenceLength >= 4) {
+                const ascending = direction === 1;
+                features.push({
+                    type: ascending ? 'sequence-up' : 'sequence-down',
+                    label: `${sequenceLength}${ascending ? '顺' : '倒顺'}`,
+                    title: `末尾 ${sequenceLength} 位数字${ascending ? '连续递增' : '连续递减'}`
+                });
+            }
         }
     }
-    
-    let html = pattern.includes('*') ? `<div class="legend-item"><span class="hl-star">*</span> : 任意数字位</div>` : '';
-    uniqueLetters.forEach((letter) => {
-        let colorStyle = letterColors[letter];
-        html += `<div class="legend-item" style="--color-star: ${colorStyle.text}">
-                    <span style="color: ${colorStyle.text}; background: ${colorStyle.bg}; padding: 0 4px; border-radius: 4px; font-weight: 700;">${letter}</span> : 相同数字位
-                 </div>`;
-    });
-    
-    if (html) {
-        ui.legendBox.style.display = 'flex';
-        ui.legendBox.innerHTML = html;
-    } else {
-        ui.legendBox.style.display = 'none';
+
+    let palindromeLength = 0;
+    for (let size = Math.min(8, length); size >= 4; size--) {
+        const tail = cardNumber.slice(-size);
+        if (hasDifferentDigits(tail) && isPalindrome(tail)) {
+            palindromeLength = size;
+            features.push({ type: 'palindrome', label: `${size}位回文`, title: `末尾 ${size} 位正读与反读相同` });
+            break;
+        }
     }
+
+    let cycleType = '';
+    if (length >= 8) {
+        const tail8 = cardNumber.slice(-8);
+        if (tail8.slice(0, 4) === tail8.slice(4) && hasDifferentDigits(tail8.slice(0, 4))) {
+            cycleType = 'ABCDABCD';
+        }
+    }
+    if (!cycleType && length >= 6) {
+        const tail6 = cardNumber.slice(-6);
+        if (tail6.slice(0, 3) === tail6.slice(3) && hasDifferentDigits(tail6.slice(0, 3))) {
+            cycleType = 'ABCABC';
+        }
+    }
+    if (cycleType) {
+        features.push({ type: 'cycle', label: cycleType, title: '末尾数字按相同组合循环' });
+    }
+
+    if (!palindromeLength && !cycleType && length >= 4) {
+        const tail4 = cardNumber.slice(-4);
+        const [a, b, c, d] = tail4;
+        if (a === b && c === d && a !== c) {
+            features.push({ type: 'aabb', label: 'AABB', title: '末尾为两组不同的重复数字' });
+        } else if (a === c && b === d && a !== b) {
+            features.push({ type: 'abab', label: 'ABAB', title: '末尾为两组交替数字' });
+        }
+    }
+
+    return features;
 }
 
-// 格式化并合并单行数据的 Flex DOM 结构
+function renderFeatureTags(features) {
+    return features.map((feature) => (
+        `<span class="tag tag-${feature.type}" title="${feature.title}">${feature.label}</span>`
+    )).join('');
+}
+
+function getFeatureLabels(features) {
+    return features.map((feature) => feature.label);
+}
+
+function generateLegend(pattern) {
+    uniqueLetters = [];
+
+    for (const char of pattern.toLowerCase()) {
+        if (/[a-z]/.test(char) && !uniqueLetters.includes(char)) {
+            uniqueLetters.push(char);
+        }
+    }
+
+    let html = pattern.includes('*') ? '<div class="legend-item"><span class="hl-star">*</span>：任意数字位</div>' : '';
+    if (uniqueLetters.length > 0) {
+        html += '<div class="legend-item"><span class="hl-letter">字母位</span>：相同字母代表相同数字位</div>';
+    }
+
+    ui.legendBox.innerHTML = html;
+    ui.legendBox.style.display = html ? 'flex' : 'none';
+}
+
 function formatWithHighlight(cardNumber, pattern) {
     let html = '<div class="number-part">';
-    let rawFormatted = cardNumber.replace(/\d{4}(?=\d)/g, '$& ');
-    
-    // 缝合色彩特征高亮
-    for (let i = 0; i < cardNumber.length; i++) {
-        if (i > 0 && i % 4 === 0) html += ' '; 
-        let pChar = pattern[i]; let cChar = cardNumber[i];
-        if (pChar === '*') { 
-            html += `<span class="hl-star">${cChar}</span>`; 
-        } else if (/[a-zA-Z]/.test(pChar)) {
-            let colorStyle = letterColors[pChar.toLowerCase()];
-            html += `<span style="color: ${colorStyle.text}; background: ${colorStyle.bg}; padding: 0 2px; border-radius: 3px; font-weight: 800;">${cChar}</span>`;
-        } else { 
-            html += `<span class="hl-normal">${cChar}</span>`; 
+    const formatted = cardNumber.replace(/\d{4}(?=\d)/g, '$& ');
+
+    for (let index = 0; index < cardNumber.length; index++) {
+        if (index > 0 && index % 4 === 0) html += ' ';
+        const patternChar = pattern[index];
+        const numberChar = cardNumber[index];
+
+        if (patternChar === '*') {
+            html += `<span class="hl-star">${numberChar}</span>`;
+        } else if (/[a-zA-Z]/.test(patternChar)) {
+            html += `<span class="hl-letter">${numberChar}</span>`;
+        } else {
+            html += `<span class="hl-normal">${numberChar}</span>`;
         }
     }
     html += '</div>';
-    
-    // 注入右侧标签系统
-    let tagsHtml = parseTags(cardNumber.replace(/\s/g, ''), true);
-    if(tagsHtml) html += `<div class="tag-part">${tagsHtml}</div>`;
-    
-    // data-clipboard 用于提供无感点击复制的数据源
-    return `<div class="result-row" data-clipboard="${rawFormatted}" title="点击复制号码">${html}</div>`;
+
+    const features = analyzeCardFeatures(cardNumber);
+    if (features.length > 0) html += `<div class="tag-part">${renderFeatureTags(features)}</div>`;
+
+    return `<div class="result-row" role="button" tabindex="0" data-clipboard="${formatted}" title="点击复制号码" aria-label="复制号码 ${formatted}">${html}</div>`;
 }
 
-// 主渲染器
 function renderPage() {
-    if (currentPattern === '') return;
-    if (results.length === 0) return; 
-    
+    if (!currentPattern || results.length === 0) return;
     const start = (currentPage - 1) * pageSize;
     const currentData = results.slice(start, start + pageSize);
-    ui.resultContent.innerHTML = currentData.map(res => formatWithHighlight(res, currentPattern)).join('');
-    
-    // UI 功能解冻
-    ui.pagination.style.display = 'flex'; 
-    ui.downloadBtn.style.display = 'block';
-    ui.copyPageBtn.style.display = 'block';
+    ui.resultContent.innerHTML = currentData.map((result) => formatWithHighlight(result, currentPattern)).join('');
+    // 清除隐藏状态，让 CSS 按桌面或窄屏规则选择 flex / grid 布局。
+    ui.pagination.style.removeProperty('display');
+    updateResultActions();
 }
 
-// ==========================================
-// 6. 生命周期控制与事件响应
-// ==========================================
+function resetCalculationOutput() {
+    results = [];
+    currentPage = 1;
+    expectedCount = null;
+    downloadMode = 'complete';
+    ui.count.textContent = '0';
+    ui.expectedCount.textContent = '—';
+    ui.pagination.style.display = 'none';
+    ui.legendBox.style.display = 'none';
+    ui.legendBox.innerHTML = '';
+    updatePaginationUI();
+    updateResultActions();
+}
 
 function startCalculation() {
-    ui.input.classList.remove('input-error'); 
-    let inputStr = ui.input.value;
-    currentPattern = inputStr.replace(/[^a-zA-Z0-9*]/g, '');
-    
-    // 安全防御：空规则拦截
+    if (isRunning) return;
+    ui.input.classList.remove('input-error');
+    ui.input.setAttribute('aria-invalid', 'false');
+    const sanitizedInput = sanitizeInput(ui.input.value);
+    if (sanitizedInput !== ui.input.value) ui.input.value = sanitizedInput;
+    updateLengthWarning();
+    currentPattern = sanitizedInput.replace(/[^a-zA-Z0-9*]/g, '');
+    resetCalculationOutput();
+
     if (currentPattern.length === 0) {
-        ui.resultContent.innerHTML = "<div class='empty-placeholder' style='color: var(--error-red); font-weight: bold;'>⚠️ 请先输入包含数字、字母或 * 号的卡号规则！</div>";
+        ui.resultContent.innerHTML = "<div class='empty-placeholder' style='color: var(--error-red); font-weight: bold;'>⚠️ 请先输入包含数字、字母或 * 号的卡号规则。</div>";
         ui.input.classList.add('input-error');
+        ui.input.setAttribute('aria-invalid', 'true');
+        setStatus('⚠️ 请输入有效的卡号规则', 'error');
         ui.input.focus();
         return;
     }
 
-    let excludes = [];
-    ui.numberCheckboxes.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => { excludes.push(cb.value); });
-    let hasVariables = /[a-zA-Z*]/.test(currentPattern);
-    
-    // 核心业务防御：前置构建合法数字沙盘，阻断因矛盾互斥产生的死局
-    let validDigits = [];
-    for (let i = 0; i < 10; i++) {
-        if (excludes.includes(i.toString())) continue;
-        if (ui.excludeOdd.checked && i % 2 !== 0) continue;
-        if (ui.excludeEven.checked && i % 2 === 0) continue;
-        validDigits.push(i);
+    const excludes = Array.from(ui.numberCheckboxes.querySelectorAll('input[type="checkbox"]:checked'), (checkbox) => checkbox.value);
+    const hasVariables = /[a-zA-Z*]/.test(currentPattern);
+    const validDigits = [];
+
+    for (let digit = 0; digit <= 9; digit++) {
+        if (excludes.includes(String(digit))) continue;
+        if (ui.excludeOdd.checked && digit % 2 !== 0) continue;
+        if (ui.excludeEven.checked && digit % 2 === 0) continue;
+        validDigits.push(digit);
     }
 
-    // 逻辑死锁拦截
     if (validDigits.length === 0 && hasVariables) {
-        ui.resultContent.innerHTML = "<div class='empty-placeholder' style='color: var(--error-red); font-weight: bold;'>⚠️ 逻辑冲突：您的排除条件过滤掉了所有的 0-9 数字，无法生成卡号。</div>";
+        ui.resultContent.innerHTML = "<div class='empty-placeholder' style='color: var(--error-red); font-weight: bold;'>⚠️ 排除条件过滤掉了全部数字，无法填写 * 或字母位。</div>";
+        setStatus('⚠️ 排除条件存在冲突', 'error');
         return;
     }
 
-    // 开启新任务前置初始化
-    initWorker();
-    results = []; currentPage = 1; generateLegend(currentPattern);
-    
-    // 重置并清理 UI
-    ui.resultContent.innerHTML = "";
-    ui.calcBtn.style.display = 'none'; 
-    ui.stopBtn.style.display = 'block';
-    ui.count.textContent = "0"; 
-    ui.pagination.style.display = 'none'; 
-    ui.downloadBtn.style.display = 'none'; 
-    ui.copyPageBtn.style.display = 'none';
-    
-    ui.statusBar.style.display = 'block'; 
-    ui.statusBar.style.color = '#B45309'; 
-    ui.statusBar.style.background = '#FEF3C7'; 
-    ui.statusBar.style.borderColor = '#FDE68A';
-    ui.statusBar.textContent = '● 算法正在计算中...';
+    ui.expectedCount.textContent = '计算中';
+    ui.resultContent.innerHTML = '';
+    ui.pagination.style.display = 'none';
+    generateLegend(currentPattern);
+    setRunning(true);
+    setStatus('● 正在分析规则...', 'warning');
 
-    // 交派计算任务给子线程
-    worker.postMessage({ 
-        type: 'start', 
-        input: currentPattern, 
-        filters: { exclude: excludes, excludeOdd: ui.excludeOdd.checked, excludeEven: ui.excludeEven.checked }, 
-        validDigits: validDigits, 
-        limit: MAX_SAFE_LIMIT 
-    });
+    try {
+        initWorker();
+        worker.postMessage({
+            type: 'start',
+            input: currentPattern,
+            validDigits,
+            limit: MAX_RETAINED_RESULTS
+        });
+    } catch (error) {
+        failCalculation(error && error.message ? error.message : '无法启动后台计算');
+    }
 }
 
-// 物理销毁线程事件
 ui.stopBtn.addEventListener('click', () => {
-    if (worker) {
-        worker.terminate(); worker = null;
-        ui.calcBtn.style.display = 'block'; ui.stopBtn.style.display = 'none';
-        ui.statusBar.style.display = 'block'; ui.statusBar.textContent = '⏸️ 已手动停止计算';
-        ui.statusBar.style.color = '#B45309'; ui.statusBar.style.background = '#FEF3C7'; ui.statusBar.style.borderColor = '#FDE68A';
+    if (!worker) return;
+    worker.terminate();
+    worker = null;
+    downloadMode = 'partial';
+    setRunning(false);
+    if (expectedCount === null) ui.expectedCount.textContent = '—';
+    setStatus(`⏸ 已手动停止，当前保留 ${formatIntegerString(results.length)} 条`, 'warning');
+    if (results.length === 0) {
+        ui.resultContent.innerHTML = "<div class='empty-placeholder'>已停止计算，暂未生成结果。</div>";
+    } else {
+        renderPage();
     }
+    updatePaginationUI();
 });
 
-// 数据重置归零事件
 ui.clearBtn.addEventListener('click', () => {
-    if (worker) { worker.terminate(); worker = null; } 
-    
-    ui.input.value = ''; ui.input.classList.remove('input-error');
-    ui.validCount.textContent = '0';
-    document.getElementById('lenWarning').style.display = 'none';
+    if (worker) {
+        worker.terminate();
+        worker = null;
+    }
+
+    results = [];
+    currentPattern = '';
+    currentPage = 1;
+    expectedCount = null;
+    downloadMode = 'complete';
+    ui.input.value = '';
+    ui.input.classList.remove('input-error');
+    ui.input.setAttribute('aria-invalid', 'false');
     ui.count.textContent = '0';
-    results = []; currentPattern = '';
-    
-    ui.statusBar.style.display = 'none'; 
-    ui.legendBox.style.display = 'none'; ui.legendBox.innerHTML = '';
-    ui.calcBtn.style.display = 'block'; ui.stopBtn.style.display = 'none';
-    ui.resultContent.innerHTML = "<div class='empty-placeholder'>💳 等待输入卡号规则...</div>";
-    
-    // UI 清场
-    ui.pagination.style.display = 'none'; 
-    ui.downloadBtn.style.display = 'none';
-    ui.copyPageBtn.style.display = 'none'; 
-    
-    ui.numberCheckboxes.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
-    ui.excludeOdd.checked = false; ui.excludeEven.checked = false;
+    ui.expectedCount.textContent = '—';
+    ui.statusBar.style.display = 'none';
+    ui.legendBox.style.display = 'none';
+    ui.legendBox.innerHTML = '';
+    ui.resultContent.innerHTML = "<div class='empty-placeholder'>等待输入卡号规则：支持数字、英文字母和 *。相同字母代表相同数字，每个 * 独立代表任意数字。空格不计入位数。</div>";
+    ui.pagination.style.display = 'none';
+    ui.numberCheckboxes.querySelectorAll('input[type="checkbox"]').forEach((checkbox) => { checkbox.checked = false; });
+    ui.excludeOdd.checked = false;
+    ui.excludeEven.checked = false;
+    updateLengthWarning();
+    updateResultActions();
     ui.input.focus();
 });
 
-// ==========================================
-// 7. 外围辅助交互机制
-// ==========================================
-
-// 事件委托：全列表无感复制捕获
-ui.resultContent.addEventListener('click', (e) => {
-    let row = e.target.closest('.result-row');
-    if (!row) return;
-    let textToCopy = row.getAttribute('data-clipboard');
-    if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(textToCopy).then(() => {
-            showToast('✅ 复制成功: ' + textToCopy);
-        });
-    } else {
-        // 兼容版复制方案
-        let textArea = document.createElement("textarea");
-        textArea.value = textToCopy;
-        textArea.style.position = "fixed";
-        document.body.appendChild(textArea);
-        textArea.focus(); textArea.select();
-        try { document.execCommand('copy'); showToast('✅ 复制成功: ' + textToCopy); } catch (err) {}
-        document.body.removeChild(textArea);
+function fallbackCopy(text) {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.opacity = '0';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    let copied = false;
+    try {
+        copied = document.execCommand('copy');
+    } catch (error) {
+        copied = false;
     }
+    document.body.removeChild(textArea);
+    return copied;
+}
+
+async function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+        try {
+            await navigator.clipboard.writeText(text);
+            return true;
+        } catch (error) {
+            return fallbackCopy(text);
+        }
+    }
+    return fallbackCopy(text);
+}
+
+async function copyResultRow(row) {
+    const text = row.getAttribute('data-clipboard');
+    const copied = await copyText(text);
+    showToast(copied ? `✅ 复制成功：${text}` : '⚠️ 复制失败，请手动选择号码');
+}
+
+ui.resultContent.addEventListener('click', (event) => {
+    const row = event.target.closest('.result-row');
+    if (row) copyResultRow(row);
 });
 
-// 批量单页数据提取
-ui.copyPageBtn.addEventListener('click', () => {
+ui.resultContent.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const row = event.target.closest('.result-row');
+    if (!row) return;
+    event.preventDefault();
+    copyResultRow(row);
+});
+
+ui.copyPageBtn.addEventListener('click', async () => {
     if (results.length === 0) return;
     const start = (currentPage - 1) * pageSize;
     const currentData = results.slice(start, start + pageSize);
-    const content = currentData.map(res => {
-        let formatted = res.replace(/\d{4}(?=\d)/g, '$& ');
-        let tagsArr = parseTags(res, false); 
-        return tagsArr.length > 0 ? `${formatted}  [${tagsArr.join(', ')}]` : formatted;
+    const content = currentData.map((result) => {
+        const formatted = result.replace(/\d{4}(?=\d)/g, '$& ');
+        const tags = getFeatureLabels(analyzeCardFeatures(result));
+        return tags.length > 0 ? `${formatted}  [${tags.join(', ')}]` : formatted;
     }).join('\n');
-    
-    if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(content).then(() => showToast(`✅ 成功复制本页 ${currentData.length} 条数据`));
-    } else {
-        let textArea = document.createElement("textarea");
-        textArea.value = content;
-        textArea.style.position = "fixed";
-        document.body.appendChild(textArea);
-        textArea.focus(); textArea.select();
-        try { document.execCommand('copy'); showToast(`✅ 成功复制本页 ${currentData.length} 条数据`); } catch (err) {}
-        document.body.removeChild(textArea);
-    }
+    const copied = await copyText(content);
+    showToast(copied ? `✅ 成功复制本页 ${currentData.length} 条数据` : '⚠️ 复制失败，请重试');
 });
 
-// 输入框实时清理过滤与报警检测
+function sanitizeInput(value) {
+    const filtered = value.replace(/[^a-zA-Z0-9*\s]/g, '').replace(/\s+/g, ' ');
+    let output = '';
+    let symbolCount = 0;
+
+    for (const char of filtered) {
+        if (char === ' ') {
+            if (output && !output.endsWith(' ') && symbolCount < MAX_PATTERN_LENGTH) output += char;
+        } else if (symbolCount < MAX_PATTERN_LENGTH) {
+            output += char;
+            symbolCount++;
+        }
+    }
+    return output;
+}
+
 ui.input.addEventListener('input', () => {
     ui.input.classList.remove('input-error');
-    
-    let filtered = ui.input.value.replace(/[^a-zA-Z0-9*\s]/g, '').replace(/\s+/g, ' ');
-    ui.input.value = filtered; 
-    
-    let len = filtered.replace(/\s/g, '').length;
-    ui.validCount.textContent = len;
-    
-    // 超过国际标准卡号19位的温和指引
-    const lenWarning = document.getElementById('lenWarning');
-    if (len > 19) { lenWarning.style.display = 'inline'; } 
-    else { lenWarning.style.display = 'none'; }
+    ui.input.setAttribute('aria-invalid', 'false');
+    const exceededLimit = (ui.input.value.match(/[a-zA-Z0-9*]/g) || []).length > MAX_PATTERN_LENGTH;
+    const sanitized = sanitizeInput(ui.input.value);
+    if (sanitized !== ui.input.value) ui.input.value = sanitized;
+    updateLengthWarning();
+    if (exceededLimit) showToast(`最多支持 ${MAX_PATTERN_LENGTH} 位，超出部分已忽略`);
 });
 
-ui.input.addEventListener('keydown', (e) => { if (e.key === 'Enter') startCalculation(); });
+ui.input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') startCalculation();
+});
 ui.calcBtn.addEventListener('click', startCalculation);
-
-// ==========================================
-// 8. 分页流与 CSV 文件导出体系
-// ==========================================
 
 function updatePaginationUI() {
     const total = Math.max(1, Math.ceil(results.length / pageSize));
-    ui.totalPages.textContent = total.toLocaleString();
-    
-    // 防干扰：用户正通过焦点打字时屏蔽刷新
-    if (document.activeElement !== ui.pageInput) {
-        ui.pageInput.value = currentPage;
-    }
-    
-    let isFirst = currentPage <= 1;
-    let isLast = currentPage >= total;
-    
+    ui.totalPages.textContent = formatIntegerString(total);
+    if (document.activeElement !== ui.pageInput) ui.pageInput.value = currentPage;
+
+    const isFirst = currentPage <= 1;
+    const isLast = currentPage >= total;
     ui.prevBtn.disabled = isFirst;
     ui.firstPageBtn.disabled = isFirst;
     ui.nextBtn.disabled = isLast;
     ui.lastPageBtn.disabled = isLast;
 }
 
-ui.pageInput.addEventListener('input', function() { this.value = this.value.replace(/\D/g, ''); });
-ui.pageInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') this.blur(); });
-
-ui.firstPageBtn.addEventListener('click', () => { if (currentPage > 1) { currentPage = 1; renderPage(); updatePaginationUI(); window.scrollTo({ top: 0, behavior: 'smooth' }); } });
-ui.lastPageBtn.addEventListener('click', () => { 
-    const total = Math.ceil(results.length / pageSize);
-    if (currentPage < total) { currentPage = total; renderPage(); updatePaginationUI(); window.scrollTo({ top: 0, behavior: 'smooth' }); } 
-});
-ui.prevBtn.addEventListener('click', () => { if (currentPage > 1) { currentPage--; renderPage(); updatePaginationUI(); window.scrollTo({ top: 0, behavior: 'smooth' }); } });
-ui.nextBtn.addEventListener('click', () => { if (currentPage < Math.ceil(results.length / pageSize)) { currentPage++; renderPage(); updatePaginationUI(); window.scrollTo({ top: 0, behavior: 'smooth' }); } });
-
-// 分页越界强纠错机制
-ui.pageInput.addEventListener('change', function() {
-    let val = parseInt(this.value);
+function goToPage(page) {
     const total = Math.max(1, Math.ceil(results.length / pageSize));
-    
-    if (isNaN(val) || val <= 0) val = 1;
-    if (val > total) val = total;
-    
-    currentPage = val;
-    this.value = currentPage; 
-    
-    renderPage(); updatePaginationUI(); window.scrollTo({ top: 0, behavior: 'smooth' });
+    currentPage = Math.min(Math.max(1, page), total);
+    renderPage();
+    updatePaginationUI();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+ui.pageInput.addEventListener('input', function() {
+    this.value = this.value.replace(/\D/g, '');
+});
+ui.pageInput.addEventListener('keydown', function(event) {
+    if (event.key === 'Enter') this.blur();
+});
+ui.pageInput.addEventListener('change', function() {
+    goToPage(Number.parseInt(this.value, 10) || 1);
+});
+ui.firstPageBtn.addEventListener('click', () => goToPage(1));
+ui.lastPageBtn.addEventListener('click', () => goToPage(Math.ceil(results.length / pageSize)));
+ui.prevBtn.addEventListener('click', () => goToPage(currentPage - 1));
+ui.nextBtn.addEventListener('click', () => goToPage(currentPage + 1));
+
+function escapeCsv(value) {
+    return `"${String(value).replace(/"/g, '""')}"`;
+}
+
+ui.downloadBtn.addEventListener('click', async () => {
+    if (results.length === 0 || isRunning || ui.downloadBtn.disabled) return;
+
+    const exportResults = results;
+    const exportMode = downloadMode;
+    ui.downloadBtn.disabled = true;
+    ui.downloadBtn.textContent = '正在整理文件...';
+
+    try {
+        // 每批文本立即固化为 Blob 分片，避免百万行字符串与最终文件同时常驻 JS 堆。
+        const parts = [new Blob(['\uFEFF银行卡号,特征标签\n'], { type: 'text/plain;charset=utf-8' })];
+        let lines = [];
+
+        for (let index = 0; index < exportResults.length; index++) {
+            const result = exportResults[index];
+            const formatted = result.replace(/\d{4}(?=\d)/g, '$& ');
+            const tags = getFeatureLabels(analyzeCardFeatures(result));
+            lines.push(`${escapeCsv(formatted)},${escapeCsv(tags.length > 0 ? tags.join(' / ') : '无')}\n`);
+
+            if (lines.length >= 2000) {
+                parts.push(new Blob([lines.join('')], { type: 'text/plain;charset=utf-8' }));
+                lines = [];
+            }
+            if (index > 0 && index % 10000 === 0) {
+                await new Promise((resolve) => setTimeout(resolve, 0));
+            }
+        }
+        if (lines.length > 0) {
+            parts.push(new Blob([lines.join('')], { type: 'text/plain;charset=utf-8' }));
+        }
+
+        const blob = new Blob(parts, { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        const suffix = exportMode === 'partial' ? '_部分结果' : exportMode === 'retained' ? '_当前显示结果' : '';
+        link.href = url;
+        link.download = `卡号生成结果_${exportResults.length}条${suffix}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+        showToast('⚠️ 下载文件生成失败，请关闭其他占用内存的页面后重试');
+    } finally {
+        ui.downloadBtn.disabled = false;
+        updateResultActions();
+    }
 });
 
-// CSV 文件构建流，附带防乱码 BOM 头
-ui.downloadBtn.addEventListener('click', () => {
-    if (results.length === 0) return;
-    
-    // 注入 BOM（\uFEFF）强制 Excel 使用 UTF-8 解析
-    let csvContent = '\uFEFF银行卡号,特征标签\n';
-    
-    csvContent += results.map(res => {
-        let formatted = res.replace(/\d{4}(?=\d)/g, '$& ');
-        let tagsArr = parseTags(res, false); 
-        // 隔离符处理：合并数组并避开逗号，防止 CSV 错列
-        let tagsStr = tagsArr.length > 0 ? tagsArr.join(' / ') : '无';
-        return `"${formatted}","${tagsStr}"`; 
-    }).join('\n');
-    
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); 
-    a.href = url; 
-    a.download = `卡号生成结果_${results.length}条.csv`;
-    document.body.appendChild(a); 
-    a.click(); 
-    document.body.removeChild(a); 
-    URL.revokeObjectURL(url);
+window.addEventListener('beforeunload', () => {
+    if (worker) worker.terminate();
+    URL.revokeObjectURL(workerUrl);
 });
+
+updateLengthWarning();
+updatePaginationUI();
