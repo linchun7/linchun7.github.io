@@ -1,0 +1,20 @@
+{
+  "name": "小兵变大王",
+  "short_name": "小兵变大王",
+  "description": "三国乱世成长征战小游戏",
+  "start_url": "./soldier-to-king.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "any",
+  "background_color": "#15100d",
+  "theme_color": "#15100d",
+  "icons": [
+    {
+      "src": "assets/three-kingdoms-ui/tiger-command-emblem-cutout.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
