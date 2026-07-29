@@ -1,0 +1,2374 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#15100d">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="soldier-to-king.webmanifest">
+  <link rel="apple-touch-icon" href="assets/three-kingdoms-ui/tiger-command-emblem-cutout.png">
+  <title>小兵变大王</title>
+  <style>
+    :root {
+      font-family: Arial, "Microsoft YaHei", sans-serif;
+      color: #f4ead6;
+      background: #15100d;
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      min-height: 100%;
+      background: #15100d;
+    }
+
+    body {
+      min-height: 100vh;
+      min-height: 100dvh;
+      margin: 0;
+      padding: 20px 12px;
+      display: grid;
+      place-items: center;
+      overscroll-behavior: none;
+      background-color: #15100d;
+      background-image: url('assets/three-kingdoms-ui/war-camp-table-game.webp');
+      background-position: center;
+      background-size: cover;
+    }
+
+    button {
+      font: inherit;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .game {
+      position: relative;
+      width: min(100%, 840px);
+      min-width: 0;
+      overflow: hidden;
+      padding: clamp(14px, 3vw, 26px);
+      border: 2px solid #9b793d;
+      border-radius: 8px;
+      background-color: #1a1210;
+      background-image: url('assets/three-kingdoms-ui/dark-lacquer-texture-game.webp');
+      background-repeat: repeat;
+      background-size: 320px 320px;
+      box-shadow: 0 18px 44px #070403, inset 0 0 0 1px #4d321f;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+
+    .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .title-emblem { width: 58px; height: 58px; flex: 0 0 auto; object-fit: contain; }
+
+    h1 { margin: 0; color: #f1d18a; font-size: clamp(25px, 6vw, 36px); letter-spacing: 0; text-shadow: 0 2px #27130d; }
+    .subtitle { margin: 4px 0 0; color: #c8ae82; font-size: 13px; }
+
+    .tools { display: flex; gap: 7px; }
+
+    .icon-button {
+      width: 42px;
+      height: 42px;
+      padding: 0;
+      display: grid;
+      place-items: center;
+      border: 1px solid #9b793d;
+      border-radius: 6px;
+      color: #f5e9d1;
+      background: #2c211b;
+      font-size: 19px;
+      font-weight: 800;
+    }
+
+    .icon-button:hover, .icon-button:focus-visible { outline: 3px solid #d4ae5f; outline-offset: 2px; }
+    .icon-button:disabled { cursor: default; opacity: 0.45; }
+
+    .hud {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 9px 18px;
+      margin-bottom: 10px;
+      padding: 12px 14px;
+      border: 1px solid #735631;
+      border-radius: 7px;
+      background: #17100ee8;
+      box-shadow: inset 0 0 0 1px #35251b;
+    }
+
+    .rank-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px 9px; min-width: 0; }
+    #rank-name { color: #e7bd62; font-size: 20px; font-weight: 900; }
+    #weapon-name { color: #92baa3; font-size: 13px; font-weight: 800; }
+    #record { color: #cdbf9f; font-size: 13px; white-space: nowrap; }
+    #hearts { color: #c95549; font-size: 17px; letter-spacing: 0; white-space: nowrap; }
+
+    .progress {
+      grid-column: 1 / 3;
+      height: 10px;
+      overflow: hidden;
+      border: 1px solid #60492d;
+      border-radius: 5px;
+      background: #090706;
+    }
+
+    #progress-fill { width: 0; height: 100%; background: #70a37d; transition: width 200ms; }
+
+    .arena-shell {
+      position: relative;
+      overflow: hidden;
+      border: 2px solid #a17d42;
+      border-radius: 7px;
+      background: #565239;
+      box-shadow: 0 0 0 2px #271a12, inset 0 0 22px #17120d;
+    }
+
+    canvas {
+      width: 100%;
+      display: block;
+      aspect-ratio: 4 / 3;
+      touch-action: none;
+      cursor: crosshair;
+    }
+
+    .arena-shell.steering { border-color: #e6c66f; }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      display: grid;
+      place-content: center;
+      justify-items: center;
+      padding: 12px;
+      background: #160f0de8;
+      text-align: center;
+    }
+
+    .overlay::before {
+      content: '';
+      width: 58px;
+      height: 58px;
+      margin: 0 auto 4px;
+      background: url('assets/three-kingdoms-ui/tiger-command-emblem-cutout.png') center / contain no-repeat;
+    }
+
+    .overlay.victory { background: #142014ed; }
+    .overlay.defeat { background: #281010ed; }
+
+    .overlay[hidden] { display: none; }
+    .overlay strong { color: #e7bd62; font-size: clamp(24px, 7vw, 38px); }
+    .overlay p { margin: 4px 0 10px; color: #ded0b5; line-height: 1.45; }
+
+    .difficulty-picker {
+      width: min(100%, 370px);
+      margin: 0 0 12px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 5px;
+    }
+
+    .difficulty-option {
+      min-width: 0;
+      min-height: 34px;
+      padding: 5px 8px;
+      border: 1px solid #72532f;
+      border-radius: 4px;
+      color: #cbb996;
+      background: #211713;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .difficulty-option[aria-pressed="true"] {
+      border-color: #dfb95f;
+      color: #21150c;
+      background: #d2ad60;
+      box-shadow: inset 0 -2px #8e6932;
+    }
+
+    .primary {
+      min-width: 150px;
+      min-height: 42px;
+      border: 0;
+      border-radius: 6px;
+      color: #20150d;
+      background: #d1ad60;
+      font-weight: 900;
+      box-shadow: inset 0 -3px #8f6b32;
+    }
+
+    .secondary {
+      min-height: 42px;
+      padding: 0 16px;
+      border: 1px solid #8e6a38;
+      border-radius: 6px;
+      color: #ecddc0;
+      background: #2b1d16;
+      font-weight: 800;
+    }
+
+    .end-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; }
+
+    .toast {
+      position: absolute;
+      top: 18px;
+      left: 50%;
+      z-index: 2;
+      min-width: 180px;
+      padding: 8px 13px;
+      transform: translate(-50%, -15px);
+      border: 1px solid #f0d999;
+      border-radius: 6px;
+      color: #25160d;
+      background: #e1c47e;
+      font-weight: 900;
+      text-align: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 160ms, transform 160ms;
+    }
+
+    .toast.show { transform: translate(-50%, 0); opacity: 1; }
+
+    .controls {
+      position: absolute;
+      right: 14px;
+      bottom: 14px;
+      z-index: 2;
+      min-height: 0;
+      margin: 0;
+    }
+
+    .dpad {
+      display: grid;
+      grid-template-columns: repeat(3, 46px);
+      grid-template-rows: repeat(2, 46px);
+      gap: 5px;
+    }
+
+    .direction {
+      border: 1px solid #98733e;
+      border-radius: 6px;
+      color: #f1e4ca;
+      background: #241a16e8;
+      box-shadow: 0 3px 10px #0b0706a8;
+      font-size: 22px;
+      font-weight: 800;
+      user-select: none;
+      touch-action: none;
+    }
+
+    .direction:active, .direction.active { color: #21150c; background: #d2ad60; }
+    .up { grid-column: 2; }
+    .left { grid-column: 1; grid-row: 2; }
+    .down { grid-column: 2; grid-row: 2; }
+    .right { grid-column: 3; grid-row: 2; }
+
+    .rank-road {
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
+      margin-top: 8px;
+      display: flex;
+      gap: 4px;
+      overflow-x: auto;
+      scrollbar-color: #8a6739 #271a13;
+      color: #b9a887;
+      font-size: 11px;
+      text-align: center;
+    }
+
+    .rank-road span { flex: 0 0 76px; padding: 6px 2px; border-bottom: 3px solid #4a3824; overflow-wrap: anywhere; }
+    .rank-road span.done { color: #f1d18a; border-color: #d2ad60; font-weight: 800; }
+
+    .game:fullscreen,
+    .game:-webkit-full-screen {
+      width: 100vw;
+      max-width: none;
+      height: 100vh;
+      height: 100dvh;
+      min-height: 0;
+      padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr) auto;
+      overflow: hidden;
+      border: 0;
+      border-radius: 0;
+    }
+
+    .game:fullscreen .arena-shell,
+    .game:-webkit-full-screen .arena-shell { min-height: 0; height: 100%; }
+    .game:fullscreen canvas,
+    .game:-webkit-full-screen canvas { height: 100%; aspect-ratio: auto; }
+
+    @media (max-width: 700px), (pointer: coarse) and (max-height: 700px) {
+      html, body { width: 100%; height: 100%; overflow: hidden; }
+      body { padding: 0; place-items: stretch; }
+      .game {
+        width: 100%;
+        max-width: none;
+        height: 100vh;
+        height: 100dvh;
+        min-height: 0;
+        max-height: 100dvh;
+        padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+        display: grid;
+        grid-template-rows: auto auto minmax(0, 1fr) auto;
+        overflow: hidden;
+        border: 0;
+        border-radius: 0;
+      }
+      header { margin-bottom: 7px; gap: 8px; }
+      .title-emblem { width: 46px; height: 46px; }
+      .subtitle { display: none; }
+      .tools { gap: 4px; }
+      .icon-button { width: 40px; height: 40px; }
+      .hud { margin-bottom: 7px; padding: 9px 10px; }
+      .arena-shell { min-height: 170px; height: 100%; }
+      canvas { height: 100%; aspect-ratio: auto; cursor: default; }
+      .controls { display: none; }
+      .dpad { grid-template-columns: repeat(3, 42px); grid-template-rows: repeat(2, 42px); gap: 4px; }
+      .direction { min-width: 42px; min-height: 42px; }
+      .rank-road { min-height: 25px; margin-top: 3px; scrollbar-width: none; }
+      .rank-road::-webkit-scrollbar { display: none; }
+      .rank-road span { flex-basis: 68px; padding: 4px 2px; }
+      .toast { top: 12px; width: max-content; max-width: calc(100% - 20px); min-width: 0; }
+      .overlay::before { width: 48px; height: 48px; }
+      .overlay strong { font-size: 27px; }
+      .difficulty-picker { margin-bottom: 8px; }
+      .difficulty-option { min-height: 32px; padding: 3px 5px; font-size: 12px; }
+      .primary, .secondary { min-height: 40px; }
+    }
+
+    @media (max-width: 360px) {
+      .title-emblem { display: none; }
+      h1 { font-size: 22px; }
+      .icon-button { width: 40px; height: 40px; }
+    }
+
+    @media (max-width: 700px) and (max-height: 700px) and (orientation: portrait) {
+      header { margin-bottom: 5px; }
+      .title-emblem { width: 38px; height: 38px; }
+      h1 { font-size: 23px; }
+      .hud { margin-bottom: 5px; padding: 7px 8px; gap: 5px 10px; }
+      #rank-name { font-size: 18px; }
+      #weapon-name, #record { font-size: 12px; }
+      .progress { height: 8px; }
+      .controls { min-height: 84px; margin-top: 3px; }
+      .dpad { grid-template-columns: repeat(3, 40px); grid-template-rows: repeat(2, 40px); }
+      .direction { min-width: 40px; min-height: 40px; }
+      .rank-road { min-height: 23px; }
+      .rank-road span { padding-top: 3px; padding-bottom: 3px; }
+      .overlay { padding: 8px; }
+      .overlay::before { width: 38px; height: 38px; }
+      .overlay strong { font-size: 24px; }
+      .overlay p { margin-bottom: 6px; font-size: 13px; }
+    }
+
+    @media (pointer: coarse) and (orientation: landscape) and (max-height: 600px) {
+      .game,
+      .game:fullscreen,
+      .game:-webkit-full-screen {
+        grid-template-columns: minmax(190px, 32vw) minmax(0, 1fr);
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        gap: 6px 8px;
+        padding: max(6px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+      }
+      header {
+        grid-column: 1;
+        grid-row: 1;
+        margin: 0;
+        flex-wrap: wrap;
+        align-content: start;
+        gap: 4px;
+      }
+      .brand { width: 100%; }
+      .title-emblem { display: block; width: 34px; height: 34px; }
+      h1 { font-size: 21px; }
+      .tools { width: 100%; }
+      .icon-button { width: 36px; height: 36px; font-size: 17px; }
+      .hud {
+        grid-column: 1;
+        grid-row: 2;
+        align-self: start;
+        align-content: start;
+        margin: 0;
+        padding: 7px 8px;
+        gap: 5px 8px;
+        overflow: hidden;
+      }
+      #rank-name { font-size: 17px; }
+      #weapon-name, #record { font-size: 11px; }
+      #hearts { font-size: 14px; }
+      .arena-shell {
+        grid-column: 2;
+        grid-row: 1 / 4;
+        min-height: 0;
+        height: 100%;
+      }
+      .controls {
+        position: absolute;
+        right: max(14px, calc(env(safe-area-inset-right) + 8px));
+        bottom: max(14px, calc(env(safe-area-inset-bottom) + 8px));
+        z-index: 4;
+        min-height: 0;
+        margin: 0;
+      }
+      .dpad { grid-template-columns: repeat(3, 42px); grid-template-rows: repeat(2, 42px); }
+      .direction { min-width: 42px; min-height: 42px; background: #251a16e8; }
+      .rank-road { grid-column: 1; grid-row: 3; margin: 0; }
+      .overlay::before { width: 36px; height: 36px; }
+      .overlay strong { font-size: 24px; }
+      .overlay p { margin-bottom: 5px; font-size: 12px; }
+      .difficulty-picker { max-width: 330px; margin-bottom: 6px; }
+      .difficulty-option { min-height: 30px; }
+      .primary, .secondary { min-height: 36px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="game">
+    <header>
+      <div class="brand">
+        <img class="title-emblem" src="assets/three-kingdoms-ui/tiger-command-emblem-cutout.png" alt="">
+        <div>
+          <h1>小兵变大王</h1>
+        <p class="subtitle">乱世争雄，问鼎天下</p>
+        </div>
+      </div>
+      <div class="tools">
+        <button class="icon-button" id="sound" type="button" aria-label="静音" title="静音">🔊</button>
+        <button class="icon-button" id="pause" type="button" aria-label="暂停" title="暂避锋芒">Ⅱ</button>
+        <button class="icon-button" id="restart" type="button" aria-label="重整旗鼓" title="重整旗鼓">↻</button>
+        <button class="icon-button" id="fullscreen" type="button" aria-label="进入全屏" title="进入全屏">⛶</button>
+      </div>
+    </header>
+
+    <section class="hud" aria-label="当前状态">
+      <div class="rank-line"><span id="rank-name">小兵</span><span id="weapon-name">兵器 · 木杆枪</span><span id="progress-label">战功 0 / 2</span></div>
+      <div id="hearts" aria-label="当前体力">♥ ♥ ♥</div>
+      <div class="progress"><div id="progress-fill"></div></div>
+      <div id="record">破敌 0 · 连破 0</div>
+    </section>
+
+    <section class="arena-shell">
+      <canvas id="arena" width="640" height="480" aria-label="成长地图"></canvas>
+      <div class="toast" id="toast" aria-live="polite"></div>
+      <div class="overlay" id="overlay">
+        <strong>主公，请定军势</strong>
+        <p>乱世已至，选定一场征伐。</p>
+        <div class="difficulty-picker" role="group" aria-label="征战难度">
+          <button class="difficulty-option" type="button" data-difficulty="rookie" aria-pressed="false">初出茅庐</button>
+          <button class="difficulty-option" type="button" data-difficulty="normal" aria-pressed="true">逐鹿中原</button>
+          <button class="difficulty-option" type="button" data-difficulty="heroic" aria-pressed="false">群雄争霸</button>
+          <button class="difficulty-option" type="button" data-difficulty="legend" aria-pressed="false">决战赤壁</button>
+        </div>
+        <button class="primary" id="start" data-action="start" type="button">整军出征</button>
+      </div>
+      <section class="controls" aria-label="方向控制">
+        <div class="dpad">
+          <button class="direction up" type="button" data-direction="up" aria-label="向上" title="向上">↑</button>
+          <button class="direction left" type="button" data-direction="left" aria-label="向左" title="向左">←</button>
+          <button class="direction down" type="button" data-direction="down" aria-label="向下" title="向下">↓</button>
+          <button class="direction right" type="button" data-direction="right" aria-label="向右" title="向右">→</button>
+        </div>
+      </section>
+    </section>
+
+    <div class="rank-road" id="rank-road" aria-label="封将之路"></div>
+  </main>
+
+  <script>
+    const ranks = [
+      { name: '小兵', color: '#687b69', accent: '#d7d8c8', need: 2, size: 22, style: 0, weapon: '木杆枪' },
+      { name: '精兵', color: '#817158', accent: '#dfc68d', need: 3, size: 23, style: 0, weapon: '短刀' },
+      { name: '老兵', color: '#76624c', accent: '#d5b06c', need: 3, size: 24, style: 0, weapon: '铁枪' },
+      { name: '伍长', color: '#865c3e', accent: '#e3a66f', need: 4, size: 25, style: 1, weapon: '环首刀' },
+      { name: '什长', color: '#416f68', accent: '#8fcfc0', need: 4, size: 26, style: 1, weapon: '长枪' },
+      { name: '都伯', color: '#3e667d', accent: '#8fc5dc', need: 5, size: 27, style: 1, weapon: '硬弓' },
+      { name: '队率', color: '#6f4b42', accent: '#d89b83', need: 5, size: 28, style: 2, weapon: '双剑' },
+      { name: '屯长', color: '#3c6b80', accent: '#9acde0', need: 6, size: 29, style: 2, weapon: '重矛' },
+      { name: '都头', color: '#78513a', accent: '#e0ae72', need: 6, size: 30, style: 2, weapon: '朴刀' },
+      { name: '军侯', color: '#405b78', accent: '#95b9df', need: 7, size: 31, style: 3, weapon: '虎头枪' },
+      { name: '军司马', color: '#5b486f', accent: '#baa1d5', need: 7, size: 32, style: 3, weapon: '长戟' },
+      { name: '别部司马', color: '#7a3f45', accent: '#dd8b82', need: 8, size: 33, style: 3, weapon: '铁脊蛇矛' },
+      { name: '百夫长', color: '#865142', accent: '#e8a174', need: 8, size: 34, style: 4, weapon: '剑盾' },
+      { name: '千夫长', color: '#4e5f75', accent: '#acc1db', need: 9, size: 35, style: 4, weapon: '强弩' },
+      { name: '校尉', color: '#496e43', accent: '#9fc58b', need: 9, size: 36, style: 4, weapon: '青龙偃月刀' },
+      { name: '骑都尉', color: '#7a3940', accent: '#e08c75', need: 10, size: 37, style: 5, weapon: '斩马刀' },
+      { name: '都尉', color: '#725b38', accent: '#d8bd72', need: 10, size: 38, style: 5, weapon: '双股剑' },
+      { name: '中郎将', color: '#314f65', accent: '#94c6dc', need: 11, size: 39, style: 5, weapon: '丈八蛇矛' },
+      { name: '偏将军', color: '#3b6c54', accent: '#9bc29b', need: 11, size: 40, style: 6, weapon: '龙胆亮银枪' },
+      { name: '裨将军', color: '#7a4e32', accent: '#ddb277', need: 12, size: 41, style: 6, weapon: '古锭刀' },
+      { name: '牙门将军', color: '#70433c', accent: '#d68d79', need: 12, size: 42, style: 6, weapon: '双铁戟' },
+      { name: '荡寇将军', color: '#305f52', accent: '#8fc4a8', need: 13, size: 43, style: 7, weapon: '凤嘴刀' },
+      { name: '镇军将军', color: '#4f4f74', accent: '#ada9dd', need: 13, size: 44, style: 7, weapon: '狼牙棒' },
+      { name: '前将军', color: '#2f5c7b', accent: '#99cae6', need: 14, size: 45, style: 7, weapon: '龙纹长枪' },
+      { name: '卫将军', color: '#7a452d', accent: '#e1a365', need: 14, size: 46, style: 8, weapon: '方天画戟' },
+      { name: '骠骑将军', color: '#5d3b72', accent: '#c59de0', need: 15, size: 47, style: 8, weapon: '七星宝刀' },
+      { name: '车骑将军', color: '#7c6225', accent: '#e5c76a', need: 16, size: 48, style: 8, weapon: '倚天剑' },
+      { name: '大将军', color: '#7b2938', accent: '#e98d7c', need: 18, size: 50, style: 9, weapon: '霸王枪' },
+      { name: '大都督', color: '#8b641e', accent: '#f2d16b', need: 20, size: 52, style: 9, weapon: '神威画戟' },
+      { name: '大王', color: '#59213a', accent: '#ffd75e', need: 0, size: 55, style: 9, weapon: '王者之剑' }
+    ];
+
+    const difficulties = {
+      rookie: {
+        name: '初出茅庐', hearts: 4, needScale: 0.86, enemySpeed: 0.86,
+        edibleChance: 0.88, dangerRange: 2, population: 42,
+        initialNearby: 7, initialEdible: 5, nearbySoldiers: 3, nearbyEdible: 5,
+        peerChance: 1, progressPenalty: 1, invulnerability: 1.7, pursuit: 0, aggroRange: 0,
+        threatPerLevel: 0, criticalGap: 99
+      },
+      normal: {
+        name: '逐鹿中原', hearts: 3, needScale: 1.14, enemySpeed: 1.06,
+        edibleChance: 0.75, dangerRange: 4, population: 46,
+        initialNearby: 6, initialEdible: 3, nearbySoldiers: 2, nearbyEdible: 3,
+        peerChance: 0.85, progressPenalty: 2, invulnerability: 1.35, pursuit: 0.9, aggroRange: 360,
+        threatPerLevel: 0.025, criticalGap: 99
+      },
+      heroic: {
+        name: '群雄争霸', hearts: 2, needScale: 1.3, enemySpeed: 1.2,
+        edibleChance: 0.66, dangerRange: 5, population: 46,
+        initialNearby: 5, initialEdible: 2, nearbySoldiers: 1, nearbyEdible: 2,
+        peerChance: 0.65, progressPenalty: 3, invulnerability: 1.05, pursuit: 1.35, aggroRange: 440,
+        threatPerLevel: 0.04, criticalGap: 7
+      },
+      legend: {
+        name: '决战赤壁', hearts: 2, needScale: 1.5, enemySpeed: 1.38,
+        edibleChance: 0.57, dangerRange: 7, population: 46,
+        initialNearby: 4, initialEdible: 1, nearbySoldiers: 0, nearbyEdible: 1,
+        peerChance: 0.45, progressPenalty: 4, invulnerability: 0.85, pursuit: 1.8, aggroRange: 520,
+        threatPerLevel: 0.055, criticalGap: 4
+      }
+    };
+
+    const characterPortraitSources = [
+      'assets/three-kingdoms/militia-cutout.png',
+      'assets/three-kingdoms/scout-archer-cutout.png',
+      'assets/three-kingdoms/infantry-officer-cutout.png',
+      'assets/three-kingdoms/twin-blade-captain-cutout.png',
+      'assets/three-kingdoms/cavalry-commander-cutout.png',
+      'assets/three-kingdoms/tiger-spear-general-cutout.png',
+      'assets/three-kingdoms/bearded-general-cutout.png',
+      'assets/three-kingdoms/white-robed-marshal-cutout.png',
+      'assets/three-kingdoms/black-armored-overlord-cutout.png',
+      'assets/three-kingdoms/warlord-king-cutout.png'
+    ];
+    const characterPortraits = characterPortraitSources.map(source => {
+      const image = new Image();
+      image.src = source;
+      return image;
+    });
+    const battlefieldImage = new Image();
+    battlefieldImage.src = 'assets/three-kingdoms-ui/battlefield-ground-game.webp';
+
+    const canvas = document.querySelector('#arena');
+    const ctx = canvas.getContext('2d');
+    const gameElement = document.querySelector('.game');
+    const arenaShell = document.querySelector('.arena-shell');
+    const overlay = document.querySelector('#overlay');
+    const soundButton = document.querySelector('#sound');
+    const pauseButton = document.querySelector('#pause');
+    const fullscreenButton = document.querySelector('#fullscreen');
+    const rankName = document.querySelector('#rank-name');
+    const weaponName = document.querySelector('#weapon-name');
+    const progressLabel = document.querySelector('#progress-label');
+    const progressFill = document.querySelector('#progress-fill');
+    const heartsLabel = document.querySelector('#hearts');
+    const recordLabel = document.querySelector('#record');
+    const toast = document.querySelector('#toast');
+    const rankRoad = document.querySelector('#rank-road');
+    const directionButtons = [...document.querySelectorAll('[data-direction]')];
+
+    const state = {
+      running: false,
+      paused: false,
+      finished: false,
+      ending: false,
+      frameToken: 0,
+      endTimer: null,
+      lastTime: 0,
+      player: null,
+      camera: { x: 0, y: 0 },
+      people: [],
+      particles: [],
+      effects: [],
+      shake: 0,
+      shakeX: 0,
+      shakeY: 0,
+      screenFlash: 0,
+      flashColor: '#ffe3a1',
+      populationTimer: 0,
+      totalEaten: 0,
+      streak: 0,
+      bestStreak: 0,
+      toastTimer: null,
+      audioContext: null,
+      wakeLock: null,
+      pausedByVisibility: false,
+      muted: false,
+      difficulty: 'normal'
+    };
+
+    battlefieldImage.addEventListener('load', () => {
+      if (state.player) draw();
+    });
+
+    const pointerGesture = {
+      active: false,
+      pointerId: null,
+      pointerType: '',
+      startX: 0,
+      startY: 0,
+      moved: false
+    };
+
+    const mobileLayoutQuery = window.matchMedia('(max-width: 700px), (pointer: coarse) and (max-height: 700px)');
+    const canvasView = { width: 640, height: 480, dpr: 1 };
+    let canvasResizeFrame = 0;
+
+    function resizeCanvas() {
+      const bounds = canvas.getBoundingClientRect();
+      const width = Math.max(1, Math.round(bounds.width));
+      const height = Math.max(1, Math.round(bounds.height));
+      const dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+      const pixelWidth = Math.round(width * dpr);
+      const pixelHeight = Math.round(height * dpr);
+      if (canvas.width === pixelWidth && canvas.height === pixelHeight && canvasView.dpr === dpr) return;
+      canvasView.width = width;
+      canvasView.height = height;
+      canvasView.dpr = dpr;
+      canvas.width = pixelWidth;
+      canvas.height = pixelHeight;
+      if (state.player) draw();
+    }
+
+    function scheduleCanvasResize() {
+      window.cancelAnimationFrame(canvasResizeFrame);
+      canvasResizeFrame = window.requestAnimationFrame(resizeCanvas);
+    }
+
+    function currentFullscreenElement() {
+      return document.fullscreenElement || document.webkitFullscreenElement || null;
+    }
+
+    function syncFullscreenButton() {
+      const supported = Boolean(gameElement.requestFullscreen || gameElement.webkitRequestFullscreen);
+      const active = Boolean(currentFullscreenElement());
+      const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+      fullscreenButton.hidden = standalone;
+      fullscreenButton.textContent = active ? '⤢' : '⛶';
+      fullscreenButton.title = active ? '退出全屏' : '进入全屏';
+      fullscreenButton.setAttribute('aria-label', active ? '退出全屏' : '进入全屏');
+      fullscreenButton.dataset.supported = supported ? 'true' : 'false';
+      scheduleCanvasResize();
+    }
+
+    async function enterFullscreen(silent = false) {
+      if (currentFullscreenElement()) return true;
+      try {
+        if (gameElement.requestFullscreen) await gameElement.requestFullscreen({ navigationUI: 'hide' });
+        else if (gameElement.webkitRequestFullscreen) gameElement.webkitRequestFullscreen();
+        else throw new Error('unsupported');
+        return true;
+      } catch {
+        if (!silent) showToast('可添加到主屏幕后全屏游玩');
+        return false;
+      }
+    }
+
+    async function toggleFullscreen() {
+      try {
+        if (currentFullscreenElement()) {
+          if (document.exitFullscreen) await document.exitFullscreen();
+          else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        } else {
+          await enterFullscreen();
+        }
+      } catch {
+        showToast('未能切换全屏');
+      }
+    }
+
+    async function requestWakeLock() {
+      if (!navigator.wakeLock || state.wakeLock || !state.running || state.paused || state.finished || state.ending || document.hidden) return;
+      try {
+        const lock = await navigator.wakeLock.request('screen');
+        if (!state.running || state.paused || state.finished || state.ending || document.hidden) {
+          await lock.release();
+          return;
+        }
+        state.wakeLock = lock;
+        lock.addEventListener('release', () => {
+          if (state.wakeLock === lock) state.wakeLock = null;
+        });
+      } catch {}
+    }
+
+    function releaseWakeLock() {
+      const lock = state.wakeLock;
+      state.wakeLock = null;
+      if (lock) lock.release().catch(() => {});
+    }
+
+    function getDifficulty() {
+      return difficulties[state.difficulty] || difficulties.normal;
+    }
+
+    function rankRequirement(level) {
+      const base = ranks[level].need;
+      return base === 0 ? 0 : Math.max(1, Math.ceil(base * getDifficulty().needScale));
+    }
+
+    function difficultyPickerMarkup() {
+      return `<div class="difficulty-picker" role="group" aria-label="征战难度">${Object.entries(difficulties).map(([key, difficulty]) =>
+        `<button class="difficulty-option" type="button" data-difficulty="${key}" aria-pressed="${key === state.difficulty}">${difficulty.name}</button>`
+      ).join('')}</div>`;
+    }
+
+    function syncDifficultyButtons() {
+      overlay.querySelectorAll('[data-difficulty]').forEach(button => {
+        button.setAttribute('aria-pressed', button.dataset.difficulty === state.difficulty ? 'true' : 'false');
+      });
+    }
+
+    function showStartOverlay() {
+      overlay.className = 'overlay';
+      overlay.innerHTML = `<strong>主公，请定军势</strong><p>乱世已至，选定一场征伐。</p>${difficultyPickerMarkup()}<button class="primary" data-action="start" type="button">整军出征</button>`;
+      overlay.hidden = false;
+      syncDifficultyButtons();
+    }
+
+    function getAudioContext() {
+      if (state.muted) return null;
+      const AudioEngine = window.AudioContext || window.webkitAudioContext;
+      if (!AudioEngine) return null;
+      if (!state.audioContext) state.audioContext = new AudioEngine();
+      if (state.audioContext.state === 'suspended') state.audioContext.resume();
+      return state.audioContext;
+    }
+
+    function playTone(frequency, duration, options = {}) {
+      const audio = getAudioContext();
+      if (!audio) return;
+      const oscillator = audio.createOscillator();
+      const gain = audio.createGain();
+      const startAt = audio.currentTime + (options.delay || 0);
+      const volume = options.volume || 0.045;
+      oscillator.type = options.type || 'sine';
+      oscillator.frequency.setValueAtTime(frequency, startAt);
+      if (options.endFrequency) oscillator.frequency.exponentialRampToValueAtTime(options.endFrequency, startAt + duration);
+      gain.gain.setValueAtTime(0.0001, startAt);
+      gain.gain.exponentialRampToValueAtTime(volume, startAt + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
+      oscillator.connect(gain);
+      gain.connect(audio.destination);
+      oscillator.start(startAt);
+      oscillator.stop(startAt + duration + 0.03);
+    }
+
+    function playSound(name) {
+      if (state.muted) return;
+      if (name === 'start') {
+        playTone(330, 0.12, { type: 'triangle', volume: 0.035 });
+        playTone(440, 0.16, { type: 'triangle', volume: 0.035, delay: 0.09 });
+      } else if (name === 'eat') {
+        playTone(210, 0.12, { type: 'square', endFrequency: 430, volume: 0.035 });
+        playTone(520, 0.09, { type: 'triangle', volume: 0.025, delay: 0.07 });
+      } else if (name === 'upgrade') {
+        [392, 523, 659, 784].forEach((note, index) => playTone(note, 0.24, { type: 'triangle', volume: 0.045, delay: index * 0.09 }));
+      } else if (name === 'hit') {
+        playTone(130, 0.28, { type: 'sawtooth', endFrequency: 58, volume: 0.065 });
+        playTone(72, 0.2, { type: 'square', volume: 0.035, delay: 0.04 });
+      } else if (name === 'win') {
+        [392, 494, 587, 784, 988].forEach((note, index) => playTone(note, 0.38, { type: 'triangle', volume: 0.05, delay: index * 0.12 }));
+      } else if (name === 'lose') {
+        [294, 233, 196, 147].forEach((note, index) => playTone(note, 0.38, { type: 'sawtooth', volume: 0.035, delay: index * 0.14 }));
+      }
+    }
+
+    function makePlayer() {
+      const difficulty = getDifficulty();
+      return {
+        x: 0,
+        y: 0,
+        angle: -Math.PI / 2,
+        level: 0,
+        progress: 0,
+        hearts: difficulty.hearts,
+        maxHearts: difficulty.hearts,
+        invulnerable: 0,
+        pulse: 0
+      };
+    }
+
+    function spawnPerson(forceEdible = false, minDistance = 280, maxDistance = 1450, forcedLevel = null) {
+      const playerLevel = state.player?.level || 0;
+      const difficulty = getDifficulty();
+      let level;
+      if (forcedLevel !== null) {
+        level = forcedLevel;
+      } else if (forceEdible || Math.random() < difficulty.edibleChance) {
+        const roll = Math.random();
+        if (playerLevel === 0) level = 0;
+        else if (roll < 0.32) level = playerLevel;
+        else if (roll < 0.62) level = Math.max(0, playerLevel - 1 - Math.floor(Math.random() * 3));
+        else if (roll < 0.82) level = Math.floor(Math.random() * (playerLevel + 1));
+        else level = 0;
+      } else {
+        level = Math.min(ranks.length - 2, playerLevel + 1 + Math.floor(Math.random() * difficulty.dangerRange));
+      }
+      const angleFromPlayer = Math.random() * Math.PI * 2;
+      const distanceFromPlayer = Math.sqrt(minDistance ** 2 + Math.random() * (maxDistance ** 2 - minDistance ** 2));
+      const x = (state.player?.x || 0) + Math.cos(angleFromPlayer) * distanceFromPlayer;
+      const y = (state.player?.y || 0) + Math.sin(angleFromPlayer) * distanceFromPlayer;
+
+      return {
+        id: `${Date.now()}-${Math.random()}`,
+        x,
+        y,
+        level,
+        angle: Math.random() * Math.PI * 2,
+        turnTimer: 0.6 + Math.random() * 2,
+        bob: Math.random() * Math.PI * 2
+      };
+    }
+
+    function resetGame() {
+      const difficulty = getDifficulty();
+      window.clearTimeout(state.endTimer);
+      releaseWakeLock();
+      state.endTimer = null;
+      state.running = false;
+      state.paused = false;
+      state.pausedByVisibility = false;
+      state.finished = false;
+      state.ending = false;
+      state.frameToken++;
+      state.player = makePlayer();
+      state.camera = { x: 0, y: 0 };
+      state.people = [];
+      state.particles = [];
+      state.effects = [];
+      state.shake = 0;
+      state.shakeX = 0;
+      state.shakeY = 0;
+      state.screenFlash = 0;
+      state.flashColor = '#ffe3a1';
+      pointerGesture.active = false;
+      arenaShell.classList.remove('steering');
+      state.populationTimer = 0;
+      state.totalEaten = 0;
+      state.streak = 0;
+      state.bestStreak = 0;
+      for (let index = 0; index < difficulty.population; index++) {
+        const nearby = index < difficulty.initialNearby;
+        state.people.push(spawnPerson(index < difficulty.initialEdible, nearby ? 190 : 520, nearby ? 650 : 1450));
+      }
+      pauseButton.textContent = 'Ⅱ';
+      pauseButton.disabled = false;
+      pauseButton.title = '暂避锋芒';
+      pauseButton.setAttribute('aria-label', '暂停');
+      overlay.className = 'overlay';
+      updateHud();
+      draw();
+    }
+
+    function startGame() {
+      if (state.finished) resetGame();
+      if (mobileLayoutQuery.matches) enterFullscreen(true);
+      overlay.hidden = true;
+      overlay.className = 'overlay';
+      state.running = true;
+      state.paused = false;
+      state.pausedByVisibility = false;
+      getAudioContext();
+      requestWakeLock();
+      playSound('start');
+      showToast('号令三军，出征！');
+      state.lastTime = performance.now();
+      const token = ++state.frameToken;
+      requestAnimationFrame(time => gameLoop(time, token));
+    }
+
+    function updateHud() {
+      const rank = ranks[state.player.level];
+      const difficulty = getDifficulty();
+      const isMax = state.player.level === ranks.length - 1;
+      const requirement = rankRequirement(state.player.level);
+      rankName.textContent = rank.name;
+      weaponName.textContent = `兵器 · ${rank.weapon}`;
+      progressLabel.textContent = isMax ? '天下归心' : `战功 ${state.player.progress} / ${requirement}`;
+      progressFill.style.width = isMax ? '100%' : `${state.player.progress / requirement * 100}%`;
+      heartsLabel.textContent = Array.from({ length: state.player.maxHearts }, (_, index) => index < state.player.hearts ? '♥' : '♡').join(' ');
+      heartsLabel.setAttribute('aria-label', `体力 ${state.player.hearts} / ${state.player.maxHearts}`);
+      recordLabel.textContent = `破敌 ${state.totalEaten} · 连破 ${state.bestStreak} · ${difficulty.name}`;
+      [...rankRoad.children].forEach((item, index) => item.classList.toggle('done', index <= state.player.level));
+      const activeRank = rankRoad.children[state.player.level];
+      if (activeRank) rankRoad.scrollLeft = Math.max(0, activeRank.offsetLeft - rankRoad.clientWidth / 2);
+    }
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add('show');
+      window.clearTimeout(state.toastTimer);
+      state.toastTimer = window.setTimeout(() => toast.classList.remove('show'), 1000);
+    }
+
+    function setHeading(angle, activeDirection = null) {
+      if (!state.running || state.paused || state.finished || state.ending) return;
+      state.player.angle = angle;
+      directionButtons.forEach(button => button.classList.toggle('active', button.dataset.direction === activeDirection));
+    }
+
+    function setDirection(direction) {
+      const angles = { right: 0, down: Math.PI / 2, left: Math.PI, up: -Math.PI / 2 };
+      setHeading(angles[direction], direction);
+    }
+
+    function personRadius(level) {
+      return ranks[level].size + level * 0.68;
+    }
+
+    function updatePlayer(delta) {
+      const player = state.player;
+      const speed = 188 + player.level * 3.25;
+      player.x += Math.cos(player.angle) * speed * delta;
+      player.y += Math.sin(player.angle) * speed * delta;
+      player.invulnerable = Math.max(0, player.invulnerable - delta);
+      player.pulse = Math.max(0, player.pulse - delta * 1.8);
+      const follow = 1 - Math.pow(0.001, delta);
+      state.camera.x += (player.x - state.camera.x) * follow;
+      state.camera.y += (player.y - state.camera.y) * follow;
+    }
+
+    function updatePeople(delta) {
+      const difficulty = getDifficulty();
+      state.people.forEach(person => {
+        person.turnTimer -= delta;
+        person.bob += delta * 3;
+        if (person.turnTimer <= 0) {
+          person.angle += (Math.random() - 0.5) * 1.8;
+          person.turnTimer = 0.7 + Math.random() * 2;
+        }
+        const dx = state.player.x - person.x;
+        const dy = state.player.y - person.y;
+        const levelGap = Math.max(0, person.level - state.player.level);
+        const threatScale = 1 + Math.min(levelGap, 8) * difficulty.threatPerLevel;
+        const aggroRange = difficulty.aggroRange + Math.min(levelGap, 8) * 24;
+        if (levelGap > 0 && difficulty.pursuit > 0 && Math.hypot(dx, dy) < aggroRange) {
+          const targetAngle = Math.atan2(dy, dx);
+          const angleDelta = Math.atan2(Math.sin(targetAngle - person.angle), Math.cos(targetAngle - person.angle));
+          person.angle += angleDelta * Math.min(1, difficulty.pursuit * (1 + levelGap * 0.06) * delta);
+        }
+        const speed = (44 + person.level * 1.9) * difficulty.enemySpeed * threatScale;
+        person.x += Math.cos(person.angle) * speed * delta;
+        person.y += Math.sin(person.angle) * speed * delta;
+      });
+    }
+
+    function maintainPopulation(delta) {
+      const difficulty = getDifficulty();
+      state.populationTimer -= delta;
+      if (state.populationTimer > 0) return;
+      state.populationTimer = 0.8;
+      state.people = state.people.filter(person => Math.hypot(person.x - state.player.x, person.y - state.player.y) < 1650);
+      while (state.people.length < difficulty.population) state.people.push(spawnPerson(false, 720, 1500));
+      let nearbySoldiers = state.people.filter(person =>
+        person.level === 0 && Math.hypot(person.x - state.player.x, person.y - state.player.y) < 280
+      ).length;
+      while (nearbySoldiers < difficulty.nearbySoldiers) {
+        state.people.push(spawnPerson(true, 170, 230, 0));
+        nearbySoldiers++;
+      }
+      let nearbyEdible = state.people.filter(person =>
+        person.level <= state.player.level && Math.hypot(person.x - state.player.x, person.y - state.player.y) < 280
+      ).length;
+      while (nearbyEdible < difficulty.nearbyEdible) {
+        state.people.push(spawnPerson(true, 170, 230));
+        nearbyEdible++;
+      }
+      const nearbyPeer = state.people.some(person =>
+        person.level === state.player.level && Math.hypot(person.x - state.player.x, person.y - state.player.y) < 390
+      );
+      if (!nearbyPeer && Math.random() < difficulty.peerChance) state.people.push(spawnPerson(true, 250, 360, state.player.level));
+      if (state.people.length > difficulty.population + 4) {
+        state.people.sort((a, b) =>
+          Math.hypot(a.x - state.player.x, a.y - state.player.y) - Math.hypot(b.x - state.player.x, b.y - state.player.y)
+        );
+        state.people = state.people.slice(0, difficulty.population + 4);
+      }
+    }
+
+    function rebalanceAfterUpgrade() {
+      const difficulty = getDifficulty();
+      state.people = state.people.filter(person => {
+        const distance = Math.hypot(person.x - state.player.x, person.y - state.player.y);
+        return distance < 520 || Math.random() < 0.28;
+      });
+      while (state.people.length < difficulty.population) state.people.push(spawnPerson(false, 560, 1450));
+      if (Math.random() < difficulty.peerChance) state.people.push(spawnPerson(true, 250, 350, state.player.level));
+      state.populationTimer = 0;
+    }
+
+    function makeParticles(x, y, color, count = 10) {
+      for (let index = 0; index < count; index++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 70 + Math.random() * 150;
+        const maxLife = 0.55 + Math.random() * 0.45;
+        state.particles.push({
+          x,
+          y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: maxLife,
+          maxLife,
+          size: 3 + Math.random() * 6,
+          rotation: Math.random() * Math.PI,
+          spin: (Math.random() - 0.5) * 10,
+          color
+        });
+      }
+    }
+
+    function makeImpact(x, y, type, color, power = 1) {
+      state.effects.push({ x, y, type, color, power, life: type === 'upgrade' ? 1.05 : 0.72, maxLife: type === 'upgrade' ? 1.05 : 0.72 });
+      state.shake = Math.max(state.shake, type === 'hit' ? 21 : type === 'upgrade' ? 18 : 10);
+      state.screenFlash = Math.max(state.screenFlash, type === 'hit' ? 0.55 : type === 'upgrade' ? 0.48 : 0.2);
+      state.flashColor = type === 'hit' ? '#ff665e' : color;
+    }
+
+    function eatPerson(person) {
+      const player = state.player;
+      const gain = 1 + Math.floor(person.level / 2);
+      player.progress += gain;
+      state.totalEaten++;
+      state.streak++;
+      state.bestStreak = Math.max(state.bestStreak, state.streak);
+      makeParticles(person.x, person.y, ranks[person.level].accent, 30);
+      makeImpact(person.x, person.y, 'eat', ranks[person.level].accent, 1 + person.level * 0.025);
+      player.pulse = Math.max(player.pulse, 0.48);
+      playSound('eat');
+      if (state.streak > 0 && state.streak % 6 === 0) showToast(`威震华夏！连破 ${state.streak}`);
+      else if (state.streak > 0 && state.streak % 3 === 0) showToast(`一鼓作气！连破 ${state.streak}`);
+      else showToast(`破敌 · ${ranks[person.level].name} · 战功 +${gain}`);
+
+      let upgraded = false;
+      while (player.level < ranks.length - 1 && player.progress >= rankRequirement(player.level)) {
+        player.progress -= rankRequirement(player.level);
+        player.level++;
+        upgraded = true;
+        player.pulse = 1;
+        makeParticles(player.x, player.y, ranks[player.level].accent, 58);
+        makeImpact(player.x, player.y, 'upgrade', ranks[player.level].accent, 1.35);
+        playSound('upgrade');
+        showToast(`拜将封侯 · ${ranks[player.level].name}`);
+      }
+
+      if (player.level === ranks.length - 1) {
+        finishGame(true);
+      }
+      updateHud();
+      return upgraded;
+    }
+
+    function hitBySuperior(person) {
+      const player = state.player;
+      const difficulty = getDifficulty();
+      if (player.invulnerable > 0) return;
+      const levelGap = person.level - player.level;
+      const damage = levelGap >= difficulty.criticalGap ? 2 : 1;
+      player.hearts = Math.max(0, player.hearts - damage);
+      player.progress = Math.max(0, player.progress - difficulty.progressPenalty);
+      player.invulnerable = difficulty.invulnerability;
+      player.pulse = 0.8;
+      state.streak = 0;
+      const angle = Math.atan2(player.y - person.y, player.x - person.x);
+      player.x += Math.cos(angle) * 82;
+      player.y += Math.sin(angle) * 82;
+      person.angle += Math.PI;
+      makeParticles(player.x, player.y, '#f47b71', 42);
+      makeImpact(player.x, player.y, 'hit', '#ff665e', 1.25);
+      playSound('hit');
+      showToast(`${damage > 1 ? '敌将强袭' : '敌将来袭'} · 体力 -${damage} · 战功 -${difficulty.progressPenalty}`);
+      updateHud();
+      if (player.hearts <= 0) finishGame(false);
+    }
+
+    function checkCollisions() {
+      const player = state.player;
+      const playerRadius = personRadius(player.level);
+      let shouldRebalance = false;
+      for (let index = state.people.length - 1; index >= 0; index--) {
+        const person = state.people[index];
+        if (!person) continue;
+        const range = playerRadius + personRadius(person.level) - 7;
+        if (Math.hypot(player.x - person.x, player.y - person.y) > range) continue;
+        if (person.level <= player.level) {
+          state.people.splice(index, 1);
+          shouldRebalance = eatPerson(person);
+        } else {
+          hitBySuperior(person);
+        }
+        if (state.ending || shouldRebalance) break;
+      }
+      if (shouldRebalance && !state.ending) rebalanceAfterUpgrade();
+    }
+
+    function updateParticles(delta) {
+      state.particles.forEach(particle => {
+        particle.x += particle.vx * delta;
+        particle.y += particle.vy * delta;
+        particle.vx *= 0.96;
+        particle.vy *= 0.96;
+        particle.life -= delta;
+        particle.rotation += particle.spin * delta;
+      });
+      state.particles = state.particles.filter(particle => particle.life > 0);
+      state.effects.forEach(effect => { effect.life -= delta; });
+      state.effects = state.effects.filter(effect => effect.life > 0);
+      state.shake = Math.max(0, state.shake - delta * 34);
+      state.shakeX = state.shake > 0 ? (Math.random() - 0.5) * state.shake * 2 : 0;
+      state.shakeY = state.shake > 0 ? (Math.random() - 0.5) * state.shake * 2 : 0;
+      state.screenFlash = Math.max(0, state.screenFlash - delta * 1.9);
+    }
+
+    function drawGround() {
+      ctx.fillStyle = '#59543a';
+      ctx.fillRect(0, 0, canvasView.width, canvasView.height);
+      if (battlefieldImage.complete && battlefieldImage.naturalWidth) {
+        const tileSize = 720;
+        const left = Math.floor((state.camera.x - canvasView.width / 2 + tileSize / 2) / tileSize) - 1;
+        const right = Math.ceil((state.camera.x + canvasView.width / 2 + tileSize / 2) / tileSize) + 1;
+        const top = Math.floor((state.camera.y - canvasView.height / 2 + tileSize / 2) / tileSize) - 1;
+        const bottom = Math.ceil((state.camera.y + canvasView.height / 2 + tileSize / 2) / tileSize) + 1;
+        for (let tileX = left; tileX <= right; tileX++) {
+          for (let tileY = top; tileY <= bottom; tileY++) {
+            const x = tileX * tileSize - tileSize / 2 - state.camera.x + canvasView.width / 2;
+            const y = tileY * tileSize - tileSize / 2 - state.camera.y + canvasView.height / 2;
+            const flipX = Math.abs(tileX % 2) === 1;
+            const flipY = Math.abs(tileY % 2) === 1;
+            ctx.save();
+            ctx.translate(x + (flipX ? tileSize : 0), y + (flipY ? tileSize : 0));
+            ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+            ctx.drawImage(battlefieldImage, 0, 0, tileSize, tileSize);
+            ctx.restore();
+          }
+        }
+      }
+      ctx.fillStyle = 'rgba(30, 25, 15, 0.13)';
+      ctx.fillRect(0, 0, canvasView.width, canvasView.height);
+    }
+
+    function worldToScreen(x, y) {
+      return {
+        x: x - state.camera.x + canvasView.width / 2 + state.shakeX,
+        y: y - state.camera.y + canvasView.height / 2 + state.shakeY
+      };
+    }
+
+    function drawCharacterLegacy(x, y, level, angle, isPlayer, alpha = 1) {
+      const rank = ranks[level];
+      const radius = personRadius(level);
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(x, y);
+
+      if (isPlayer) {
+        ctx.strokeStyle = '#ffe27c';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(0, 0, radius + 7, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = '#ffe27c';
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(angle) * (radius + 11), Math.sin(angle) * (radius + 11));
+        ctx.lineTo(Math.cos(angle + 2.5) * (radius + 4), Math.sin(angle + 2.5) * (radius + 4));
+        ctx.lineTo(Math.cos(angle - 2.5) * (radius + 4), Math.sin(angle - 2.5) * (radius + 4));
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      if (level >= 8) {
+        const capeColors = ['#304b69', '#744064', '#7a3c34', '#922f3e', '#e7e1cf', '#7c2741'];
+        ctx.fillStyle = capeColors[level - 8];
+        ctx.beginPath();
+        ctx.moveTo(-radius * 0.78, -radius * 0.25);
+        ctx.lineTo(-radius * 1.18, radius * 1.05);
+        ctx.lineTo(radius * 1.18, radius * 1.05);
+        ctx.lineTo(radius * 0.78, -radius * 0.25);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      ctx.fillStyle = rank.color;
+      ctx.beginPath();
+      if (level <= 2) {
+        ctx.arc(0, radius * 0.18, radius * 0.78, 0, Math.PI * 2);
+      } else if (level <= 6) {
+        ctx.moveTo(-radius * 0.92, -radius * 0.08);
+        ctx.lineTo(-radius * 0.72, radius * 0.88);
+        ctx.lineTo(radius * 0.72, radius * 0.88);
+        ctx.lineTo(radius * 0.92, -radius * 0.08);
+        ctx.closePath();
+      } else if (level <= 10) {
+        ctx.moveTo(-radius, 0);
+        ctx.lineTo(-radius * 0.62, radius);
+        ctx.lineTo(radius * 0.62, radius);
+        ctx.lineTo(radius, 0);
+        ctx.lineTo(radius * 0.62, -radius * 0.18);
+        ctx.lineTo(-radius * 0.62, -radius * 0.18);
+        ctx.closePath();
+      } else {
+        ctx.moveTo(-radius * 0.72, -radius * 0.12);
+        ctx.lineTo(-radius * 1.08, radius * 1.02);
+        ctx.lineTo(radius * 1.08, radius * 1.02);
+        ctx.lineTo(radius * 0.72, -radius * 0.12);
+        ctx.closePath();
+      }
+      ctx.fill();
+
+      if (level >= 3 && level <= 10) {
+        ctx.fillStyle = rank.accent;
+        ctx.beginPath();
+        ctx.arc(-radius * 0.82, radius * 0.05, radius * 0.24, 0, Math.PI * 2);
+        ctx.arc(radius * 0.82, radius * 0.05, radius * 0.24, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.fillStyle = '#f0c8a1';
+      ctx.beginPath();
+      ctx.arc(0, -radius * 0.45, radius * 0.47, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#20292d';
+      ctx.beginPath();
+      ctx.arc(-radius * 0.16, -radius * 0.43, 1.6, 0, Math.PI * 2);
+      ctx.arc(radius * 0.16, -radius * 0.43, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+
+      drawRankGearLegacy(level, radius, rank);
+
+      ctx.fillStyle = '#eef7f2';
+      ctx.font = `800 ${Math.max(9, radius * 0.4)}px Arial, Microsoft YaHei, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(isPlayer ? '你' : level + 1, 0, radius * 0.18);
+      ctx.restore();
+    }
+
+    function drawRankGearLegacy(level, radius, rank) {
+      ctx.strokeStyle = rank.accent;
+      ctx.fillStyle = rank.accent;
+      ctx.lineWidth = Math.max(2, radius * 0.11);
+      ctx.lineCap = 'round';
+
+      const line = (fromX, fromY, toX, toY) => {
+        ctx.beginPath();
+        ctx.moveTo(fromX * radius, fromY * radius);
+        ctx.lineTo(toX * radius, toY * radius);
+        ctx.stroke();
+      };
+      const helmet = (scale = 0.58) => {
+        ctx.beginPath();
+        ctx.arc(0, -radius * 0.51, radius * scale, Math.PI, 0);
+        ctx.lineTo(radius * scale, -radius * 0.45);
+        ctx.lineTo(-radius * scale, -radius * 0.45);
+        ctx.closePath();
+        ctx.fill();
+      };
+      const shield = (side = -1) => {
+        ctx.beginPath();
+        ctx.moveTo(side * radius * 0.72, -radius * 0.06);
+        ctx.lineTo(side * radius * 1.18, radius * 0.08);
+        ctx.lineTo(side * radius * 1.08, radius * 0.72);
+        ctx.lineTo(side * radius * 0.72, radius * 0.88);
+        ctx.closePath();
+        ctx.fill();
+      };
+
+      switch (level) {
+      case 0:
+        ctx.fillRect(-radius * 0.5, -radius * 0.82, radius, radius * 0.16);
+        ctx.fillRect(-radius * 0.28, -radius, radius * 0.66, radius * 0.2);
+        break;
+      case 1:
+        ctx.fillRect(-radius * 0.52, -radius * 0.68, radius * 1.04, radius * 0.14);
+        ctx.beginPath();
+        ctx.arc(radius * 0.48, -radius * 0.64, radius * 0.13, 0, Math.PI * 2);
+        ctx.fill();
+        line(0.72, -0.15, 1.02, 0.82);
+        break;
+      case 2:
+        ctx.beginPath();
+        ctx.moveTo(-radius * 0.55, -radius * 0.82);
+        ctx.lineTo(0, -radius * 1.16);
+        ctx.lineTo(radius * 0.55, -radius * 0.82);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillRect(-radius * 0.95, -radius * 0.08, radius * 0.34, radius * 0.3);
+        ctx.fillRect(radius * 0.61, -radius * 0.08, radius * 0.34, radius * 0.3);
+        break;
+      case 3:
+        ctx.fillRect(-radius * 0.82, -radius * 0.82, radius * 1.64, radius * 0.16);
+        ctx.fillRect(-radius * 0.48, -radius * 1.08, radius * 0.96, radius * 0.28);
+        line(0.72, -0.08, 1.15, 0.68);
+        ctx.beginPath();
+        ctx.arc(radius * 1.18, radius * 0.76, radius * 0.16, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      case 4:
+        helmet();
+        line(0.72, -0.35, 1.08, 0.9);
+        ctx.beginPath();
+        ctx.moveTo(radius * 0.93, -radius * 0.25);
+        ctx.lineTo(radius * 1.1, -radius * 0.68);
+        ctx.lineTo(radius * 1.22, -radius * 0.2);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      case 5:
+        helmet(0.62);
+        ctx.fillStyle = '#e65f4f';
+        ctx.beginPath();
+        ctx.moveTo(-radius * 0.32, -radius * 1.02);
+        ctx.lineTo(0, -radius * 1.52);
+        ctx.lineTo(radius * 0.32, -radius * 1.02);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = rank.accent;
+        shield(-1);
+        break;
+      case 6:
+        helmet(0.64);
+        ctx.beginPath();
+        ctx.arc(0, -radius * 1.03, radius * 0.28, Math.PI, 0);
+        ctx.fill();
+        line(0.82, -0.42, 1.18, 0.92);
+        break;
+      case 7:
+        ctx.fillRect(-radius * 0.74, -radius * 0.76, radius * 1.48, radius * 0.14);
+        ctx.fillRect(-radius * 0.18, -radius * 1.12, radius * 0.36, radius * 0.4);
+        ctx.beginPath();
+        ctx.moveTo(-radius * 0.72, -radius * 0.72);
+        ctx.lineTo(-radius * 1.12, -radius * 0.94);
+        ctx.lineTo(-radius * 0.78, -radius * 0.5);
+        ctx.closePath();
+        ctx.fill();
+        line(0.68, 0, 1.08, 0.72);
+        break;
+      case 8:
+        helmet(0.66);
+        ctx.fillRect(-radius * 0.09, -radius * 0.53, radius * 0.18, radius * 0.7);
+        line(1.0, -0.76, 1.0, 0.92);
+        ctx.beginPath();
+        ctx.moveTo(radius, -radius * 0.75);
+        ctx.lineTo(radius * 1.62, -radius * 0.48);
+        ctx.lineTo(radius, -radius * 0.18);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      case 9:
+        ctx.fillRect(-radius * 0.62, -radius * 0.82, radius * 1.24, radius * 0.16);
+        ctx.beginPath();
+        ctx.arc(0, -radius * 0.82, radius * 0.3, Math.PI, 0);
+        ctx.fill();
+        line(-0.92, -0.35, -0.92, 0.92);
+        ctx.fillRect(-radius * 1.55, -radius * 0.6, radius * 0.63, radius * 0.5);
+        break;
+      case 10:
+        helmet(0.68);
+        ctx.fillStyle = '#e95b4d';
+        ctx.fillRect(-radius * 0.1, -radius * 1.42, radius * 0.2, radius * 0.48);
+        ctx.fillStyle = rank.accent;
+        shield(-1);
+        line(0.7, -0.08, 1.18, 0.76);
+        break;
+      case 11:
+        helmet(0.7);
+        ctx.beginPath();
+        ctx.moveTo(-radius * 0.35, -radius * 0.95);
+        ctx.lineTo(-radius * 0.72, -radius * 1.35);
+        ctx.lineTo(-radius * 0.62, -radius * 0.82);
+        ctx.moveTo(radius * 0.35, -radius * 0.95);
+        ctx.lineTo(radius * 0.72, -radius * 1.35);
+        ctx.lineTo(radius * 0.62, -radius * 0.82);
+        ctx.stroke();
+        line(-0.72, -0.02, -1.14, 0.78);
+        line(0.72, -0.02, 1.14, 0.78);
+        break;
+      case 12:
+        helmet(0.7);
+        ctx.fillStyle = '#f3efe0';
+        ctx.beginPath();
+        ctx.moveTo(-radius * 0.22, -radius * 1.03);
+        ctx.quadraticCurveTo(radius * 0.15, -radius * 1.75, radius * 0.5, -radius * 1.22);
+        ctx.lineTo(radius * 0.18, -radius * 0.95);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = rank.accent;
+        line(0.86, -0.08, 0.98, 0.9);
+        ctx.beginPath();
+        ctx.arc(radius * 0.84, -radius * 0.22, radius * 0.18, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      case 13:
+        ctx.beginPath();
+        ctx.moveTo(-radius * 0.68, -radius * 0.7);
+        ctx.lineTo(-radius * 0.48, -radius * 1.42);
+        ctx.lineTo(0, -radius * 0.94);
+        ctx.lineTo(radius * 0.48, -radius * 1.42);
+        ctx.lineTo(radius * 0.68, -radius * 0.7);
+        ctx.closePath();
+        ctx.fill();
+        line(0.82, -0.05, 1.0, 0.88);
+        ctx.beginPath();
+        ctx.arc(radius * 0.78, -radius * 0.24, radius * 0.2, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      }
+    }
+
+    function drawWeapon(level, radius, rank) {
+      const tier = Math.floor(level / 3);
+      const variant = level % 3;
+      const steel = tier >= 8 ? '#ffe59a' : tier >= 4 ? '#dce8ea' : '#bcc9c8';
+      const wood = tier >= 7 ? '#752f2b' : '#694b32';
+      ctx.lineCap = 'round';
+
+      const spear = (side = 1, length = 1.55, halberd = false, ornate = false) => {
+        const x = side * radius * 0.94;
+        ctx.strokeStyle = wood;
+        ctx.lineWidth = Math.max(3, radius * 0.1);
+        ctx.beginPath();
+        ctx.moveTo(x, radius * 0.98);
+        ctx.lineTo(x - side * radius * 0.16, -radius * length);
+        ctx.stroke();
+        const tipX = x - side * radius * 0.16;
+        const tipY = -radius * length;
+        ctx.fillStyle = steel;
+        ctx.beginPath();
+        ctx.moveTo(tipX, tipY - radius * 0.42);
+        ctx.lineTo(tipX - radius * 0.16, tipY);
+        ctx.lineTo(tipX + radius * 0.16, tipY);
+        ctx.closePath();
+        ctx.fill();
+        if (halberd) {
+          ctx.beginPath();
+          ctx.moveTo(tipX, tipY + radius * 0.06);
+          ctx.quadraticCurveTo(tipX + side * radius * 0.62, tipY - radius * 0.12, tipX + side * radius * 0.38, tipY + radius * 0.38);
+          ctx.lineTo(tipX, tipY + radius * 0.25);
+          ctx.closePath();
+          ctx.fill();
+        }
+        if (ornate) {
+          ctx.fillStyle = '#d84d45';
+          ctx.beginPath();
+          ctx.moveTo(tipX, tipY + radius * 0.17);
+          ctx.lineTo(tipX - radius * 0.34, tipY + radius * 0.44);
+          ctx.lineTo(tipX + radius * 0.26, tipY + radius * 0.35);
+          ctx.closePath();
+          ctx.fill();
+        }
+      };
+
+      const sword = (side = 1, length = 1.0, curved = false) => {
+        const handleX = side * radius * 0.82;
+        const handleY = radius * 0.72;
+        const tipX = side * radius * (0.98 + length * 0.2);
+        const tipY = -radius * length;
+        ctx.strokeStyle = steel;
+        ctx.lineWidth = Math.max(4, radius * 0.16);
+        ctx.beginPath();
+        ctx.moveTo(handleX, handleY);
+        if (curved) ctx.quadraticCurveTo(side * radius * 1.34, -radius * 0.15, tipX, tipY);
+        else ctx.lineTo(tipX, tipY);
+        ctx.stroke();
+        ctx.strokeStyle = '#5e3727';
+        ctx.lineWidth = Math.max(3, radius * 0.11);
+        ctx.beginPath();
+        ctx.moveTo(handleX - side * radius * 0.08, handleY + radius * 0.28);
+        ctx.lineTo(handleX, handleY);
+        ctx.stroke();
+        ctx.strokeStyle = rank.accent;
+        ctx.lineWidth = Math.max(2, radius * 0.08);
+        ctx.beginPath();
+        ctx.moveTo(handleX - radius * 0.22, handleY - radius * 0.02);
+        ctx.lineTo(handleX + radius * 0.22, handleY - radius * 0.02);
+        ctx.stroke();
+      };
+
+      const shield = (side = -1) => {
+        ctx.fillStyle = tier >= 7 ? '#a37027' : '#6c4937';
+        ctx.strokeStyle = rank.accent;
+        ctx.lineWidth = Math.max(2, radius * 0.08);
+        ctx.beginPath();
+        ctx.moveTo(side * radius * 0.62, -radius * 0.14);
+        ctx.lineTo(side * radius * 1.28, radius * 0.06);
+        ctx.lineTo(side * radius * 1.18, radius * 0.82);
+        ctx.lineTo(side * radius * 0.68, radius * 1.0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(side * radius * 0.94, radius * 0.38, radius * 0.14, 0, Math.PI * 2);
+        ctx.stroke();
+      };
+
+      const bow = () => {
+        ctx.strokeStyle = '#b88443';
+        ctx.lineWidth = Math.max(3, radius * 0.1);
+        ctx.beginPath();
+        ctx.arc(radius * 0.9, 0, radius * 0.9, -Math.PI / 2, Math.PI / 2);
+        ctx.stroke();
+        ctx.strokeStyle = '#e4ddd0';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(radius * 0.9, -radius * 0.9);
+        ctx.lineTo(radius * 0.9, radius * 0.9);
+        ctx.stroke();
+      };
+
+      const mace = () => {
+        ctx.strokeStyle = wood;
+        ctx.lineWidth = Math.max(4, radius * 0.12);
+        ctx.beginPath();
+        ctx.moveTo(radius * 0.8, radius * 0.88);
+        ctx.lineTo(radius * 1.1, -radius * 0.82);
+        ctx.stroke();
+        ctx.fillStyle = steel;
+        for (let index = 0; index < 6; index++) {
+          const angle = index * Math.PI / 3;
+          ctx.beginPath();
+          ctx.moveTo(radius * 1.1, -radius * 0.82);
+          ctx.lineTo(radius * 1.1 + Math.cos(angle) * radius * 0.36, -radius * 0.82 + Math.sin(angle) * radius * 0.36);
+          ctx.lineTo(radius * 1.1 + Math.cos(angle + 0.35) * radius * 0.16, -radius * 0.82 + Math.sin(angle + 0.35) * radius * 0.16);
+          ctx.closePath();
+          ctx.fill();
+        }
+      };
+
+      if (tier === 0) {
+        if (variant === 1) sword(1, 0.72, true);
+        else spear(1, variant === 0 ? 1.08 : 1.38, false, false);
+      } else if (tier === 1) {
+        if (variant === 0) sword(1, 0.98, true);
+        else if (variant === 1) spear(1, 1.48, false, false);
+        else bow();
+      } else if (tier === 2) {
+        if (variant === 0) { sword(-1, 0.9, false); sword(1, 0.9, false); }
+        else if (variant === 1) spear(1, 1.65, false, true);
+        else sword(1, 1.22, true);
+      } else if (tier === 3) {
+        spear(1, 1.72, variant === 1, variant !== 0);
+      } else if (tier === 4) {
+        if (variant === 0) { sword(1, 1.2, false); shield(-1); }
+        else if (variant === 1) { bow(); sword(-1, 0.7, false); }
+        else spear(1, 1.75, true, true);
+      } else if (tier === 5) {
+        if (variant === 0) sword(1, 1.48, true);
+        else if (variant === 1) { sword(-1, 1.16, false); sword(1, 1.16, false); }
+        else spear(1, 1.92, false, true);
+      } else if (tier === 6) {
+        if (variant === 0) spear(1, 1.92, false, true);
+        else if (variant === 1) sword(1, 1.45, true);
+        else { spear(-1, 1.38, true, false); spear(1, 1.38, true, false); }
+      } else if (tier === 7) {
+        if (variant === 0) spear(1, 1.94, true, true);
+        else if (variant === 1) mace();
+        else spear(1, 2.02, false, true);
+      } else if (tier === 8) {
+        if (variant === 0) spear(1, 2.08, true, true);
+        else sword(1, variant === 1 ? 1.52 : 1.68, true);
+      } else {
+        if (variant === 0) spear(1, 2.18, false, true);
+        else if (variant === 1) spear(1, 2.22, true, true);
+        else sword(1, 1.82, false);
+      }
+    }
+
+    function drawHeadgear(style, variant, radius, rank) {
+      ctx.fillStyle = rank.accent;
+      ctx.strokeStyle = '#293238';
+      ctx.lineWidth = Math.max(1.5, radius * 0.05);
+      const brim = () => ctx.fillRect(-radius * 0.62, -radius * 0.76, radius * 1.24, radius * 0.12);
+
+      if (style === 0) {
+        if (variant === 0) {
+          ctx.fillStyle = '#4b4e46';
+          ctx.beginPath();
+          ctx.moveTo(-radius * 0.48, -radius * 0.72);
+          ctx.lineTo(-radius * 0.2, -radius * 1.04);
+          ctx.lineTo(radius * 0.48, -radius * 0.72);
+          ctx.closePath();
+          ctx.fill();
+        } else if (variant === 1) {
+          ctx.fillRect(-radius * 0.55, -radius * 0.7, radius * 1.1, radius * 0.14);
+          ctx.fillRect(radius * 0.38, -radius * 0.66, radius * 0.44, radius * 0.08);
+        } else {
+          ctx.beginPath();
+          ctx.arc(0, -radius * 0.52, radius * 0.52, Math.PI, 0);
+          ctx.fill();
+          brim();
+        }
+      } else if (style === 1) {
+        ctx.beginPath();
+        ctx.arc(0, -radius * 0.53, radius * 0.56, Math.PI, 0);
+        ctx.fill();
+        brim();
+        if (variant === 2) {
+          ctx.fillStyle = '#d75445';
+          ctx.fillRect(-radius * 0.08, -radius * 1.36, radius * 0.16, radius * 0.54);
+        }
+      } else if (style === 2) {
+        ctx.fillStyle = '#c8d5d4';
+        ctx.beginPath();
+        ctx.arc(0, -radius * 0.52, radius * 0.6, Math.PI, 0);
+        ctx.fill();
+        ctx.fillStyle = rank.accent;
+        ctx.fillRect(-radius * 0.08, -radius * 1.22, radius * 0.16, radius * 0.42);
+        if (variant === 2) {
+          ctx.beginPath();
+          ctx.moveTo(0, -radius * 1.2);
+          ctx.quadraticCurveTo(radius * 0.56, -radius * 1.48, radius * 0.64, -radius * 0.95);
+          ctx.lineTo(radius * 0.18, -radius * 0.82);
+          ctx.closePath();
+          ctx.fill();
+        }
+      } else if (style === 3) {
+        ctx.fillStyle = '#34383d';
+        ctx.beginPath();
+        ctx.arc(0, -radius * 0.52, radius * 0.62, Math.PI, 0);
+        ctx.fill();
+        ctx.strokeStyle = rank.accent;
+        ctx.lineWidth = radius * 0.09;
+        ctx.beginPath();
+        ctx.moveTo(-radius * 0.48, -radius * 0.9);
+        ctx.lineTo(-radius * 0.72, -radius * 1.24);
+        ctx.moveTo(radius * 0.48, -radius * 0.9);
+        ctx.lineTo(radius * 0.72, -radius * 1.24);
+        ctx.stroke();
+      } else if (style === 4) {
+        ctx.fillStyle = '#315b3b';
+        ctx.fillRect(-radius * 0.52, -radius * 0.77, radius * 1.04, radius * 0.15);
+        ctx.beginPath();
+        ctx.moveTo(-radius * 0.42, -radius * 0.78);
+        ctx.lineTo(0, -radius * 1.18);
+        ctx.lineTo(radius * 0.42, -radius * 0.78);
+        ctx.closePath();
+        ctx.fill();
+        if (variant === 2) {
+          ctx.fillRect(-radius * 0.76, -radius * 0.74, radius * 1.52, radius * 0.09);
+        }
+      } else if (style === 5) {
+        ctx.beginPath();
+        ctx.arc(0, -radius * 0.53, radius * 0.64, Math.PI, 0);
+        ctx.fill();
+        ctx.fillStyle = '#d84b42';
+        ctx.beginPath();
+        ctx.moveTo(-radius * 0.18, -radius * 1.03);
+        ctx.quadraticCurveTo(radius * 0.1, -radius * 1.65, radius * 0.4, -radius * 1.12);
+        ctx.lineTo(radius * 0.18, -radius * 0.9);
+        ctx.closePath();
+        ctx.fill();
+      } else if (style === 6) {
+        ctx.fillStyle = '#d5dedd';
+        ctx.beginPath();
+        ctx.arc(0, -radius * 0.52, radius * 0.66, Math.PI, 0);
+        ctx.fill();
+        ctx.fillStyle = rank.accent;
+        ctx.fillRect(-radius * 0.1, -radius * 1.42, radius * 0.2, radius * 0.58);
+        ctx.fillRect(-radius * 0.67, -radius * 0.55, radius * 0.18, radius * 0.47);
+        ctx.fillRect(radius * 0.49, -radius * 0.55, radius * 0.18, radius * 0.47);
+      } else if (style === 7) {
+        ctx.fillStyle = '#232a2d';
+        ctx.beginPath();
+        ctx.arc(0, -radius * 0.52, radius * 0.68, Math.PI, 0);
+        ctx.fill();
+        ctx.fillStyle = '#b83232';
+        ctx.beginPath();
+        ctx.moveTo(-radius * 0.22, -radius * 1.04);
+        ctx.lineTo(0, -radius * 1.52);
+        ctx.lineTo(radius * 0.22, -radius * 1.04);
+        ctx.closePath();
+        ctx.fill();
+      } else if (style === 8) {
+        ctx.beginPath();
+        ctx.arc(0, -radius * 0.52, radius * 0.7, Math.PI, 0);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(-radius * 0.56, -radius * 0.78);
+        ctx.lineTo(-radius * 0.98, -radius * 1.1);
+        ctx.lineTo(-radius * 0.7, -radius * 0.62);
+        ctx.moveTo(radius * 0.56, -radius * 0.78);
+        ctx.lineTo(radius * 0.98, -radius * 1.1);
+        ctx.lineTo(radius * 0.7, -radius * 0.62);
+        ctx.fill();
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(-radius * 0.72, -radius * 0.7);
+        ctx.lineTo(-radius * 0.5, -radius * 1.42);
+        ctx.lineTo(0, -radius * 0.98);
+        ctx.lineTo(radius * 0.5, -radius * 1.42);
+        ctx.lineTo(radius * 0.72, -radius * 0.7);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#c9423e';
+        ctx.beginPath();
+        ctx.arc(0, -radius * 1.03, radius * 0.11, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function drawCharacterPortrait(x, y, level, angle, isPlayer, alpha = 1, renderScale = 1) {
+      const rank = ranks[level];
+      const radius = personRadius(level);
+      const portrait = characterPortraits[Math.min(characterPortraits.length - 1, Math.floor(level / 3))];
+      const artSize = radius * 3.15;
+      const badgeRadius = Math.max(7, radius * 0.25);
+      const badgeY = -radius * 1.23;
+      const facingLeft = Math.cos(angle) < 0;
+      const badgeColor = isPlayer ? '#ffd369' : level <= state.player.level ? '#7ad891' : '#ff8a7d';
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(x, y);
+      ctx.scale(renderScale, renderScale);
+
+      ctx.fillStyle = 'rgba(8, 14, 17, 0.36)';
+      ctx.beginPath();
+      ctx.ellipse(0, radius * 1.04, radius * 0.95, radius * 0.23, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (level >= 12) {
+        ctx.strokeStyle = level >= 27 ? 'rgba(255, 213, 94, 0.8)' : 'rgba(170, 215, 225, 0.5)';
+        ctx.lineWidth = level >= 27 ? 4 : 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, radius * 1.35, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      const threatGap = level - state.player.level;
+      if (!isPlayer && threatGap > 0 && state.difficulty !== 'rookie') {
+        const difficulty = getDifficulty();
+        const lethal = threatGap >= difficulty.criticalGap;
+        const pulse = 0.5 + Math.sin(performance.now() / 150 + level) * 0.5;
+        ctx.strokeStyle = lethal ? `rgba(255, 58, 48, ${0.72 + pulse * 0.2})` : `rgba(202, 71, 58, ${0.48 + pulse * 0.24})`;
+        ctx.lineWidth = lethal ? 5 : 2.5 + Math.min(2, threatGap * 0.18);
+        ctx.setLineDash(lethal ? [10, 5] : [6, 7]);
+        ctx.lineDashOffset = -performance.now() / (lethal ? 45 : 75);
+        ctx.beginPath();
+        ctx.arc(0, 0, radius * (1.5 + pulse * 0.06), 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      if (isPlayer) {
+        ctx.strokeStyle = '#ffe27c';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(0, 0, radius * 1.42, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      ctx.save();
+      if (facingLeft) ctx.scale(-1, 1);
+      ctx.drawImage(portrait, -artSize / 2, -artSize / 2, artSize, artSize);
+      ctx.restore();
+
+      if (isPlayer) {
+        const pointerTip = radius * 1.68;
+        const pointerBase = radius * 1.42;
+        const pointerHalfWidth = radius * 0.17;
+        ctx.fillStyle = '#ffe27c';
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(angle) * pointerTip, Math.sin(angle) * pointerTip);
+        ctx.lineTo(
+          Math.cos(angle) * pointerBase + Math.cos(angle + Math.PI / 2) * pointerHalfWidth,
+          Math.sin(angle) * pointerBase + Math.sin(angle + Math.PI / 2) * pointerHalfWidth
+        );
+        ctx.lineTo(
+          Math.cos(angle) * pointerBase + Math.cos(angle - Math.PI / 2) * pointerHalfWidth,
+          Math.sin(angle) * pointerBase + Math.sin(angle - Math.PI / 2) * pointerHalfWidth
+        );
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      ctx.fillStyle = '#162128';
+      ctx.strokeStyle = badgeColor;
+      ctx.lineWidth = Math.max(1.5, radius * 0.055);
+      ctx.beginPath();
+      ctx.arc(0, badgeY, badgeRadius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#f7eee1';
+      ctx.font = `800 ${Math.max(9, radius * 0.27)}px Arial, Microsoft YaHei, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(level + 1, 0, badgeY + 0.5);
+      ctx.restore();
+    }
+
+    function drawCharacter(x, y, level, angle, isPlayer, alpha = 1, renderScale = 1) {
+      const portrait = characterPortraits[Math.min(characterPortraits.length - 1, Math.floor(level / 3))];
+      if (portrait && portrait.complete && portrait.naturalWidth) {
+        drawCharacterPortrait(x, y, level, angle, isPlayer, alpha, renderScale);
+        return;
+      }
+      const rank = ranks[level];
+      const radius = personRadius(level);
+      const style = rank.style;
+      const variant = level % 3;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(x, y);
+      ctx.scale(renderScale, renderScale);
+
+      ctx.fillStyle = 'rgba(8, 14, 17, 0.34)';
+      ctx.beginPath();
+      ctx.ellipse(0, radius * 1.08, radius * 0.92, radius * 0.25, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (level >= 12) {
+        ctx.strokeStyle = level >= 27 ? 'rgba(255, 213, 94, 0.72)' : 'rgba(170, 215, 225, 0.42)';
+        ctx.lineWidth = level >= 27 ? 4 : 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, radius * 1.25, 0, Math.PI * 2);
+        ctx.stroke();
+        if (level >= 24) {
+          ctx.beginPath();
+          ctx.arc(0, 0, radius * 1.42, 0.2, Math.PI * 1.45);
+          ctx.stroke();
+        }
+      }
+
+      if (isPlayer) {
+        ctx.strokeStyle = '#ffe27c';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(0, 0, radius + 8, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = '#ffe27c';
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(angle) * (radius + 13), Math.sin(angle) * (radius + 13));
+        ctx.lineTo(Math.cos(angle + 2.55) * (radius + 5), Math.sin(angle + 2.55) * (radius + 5));
+        ctx.lineTo(Math.cos(angle - 2.55) * (radius + 5), Math.sin(angle - 2.55) * (radius + 5));
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      drawWeapon(level, radius, rank);
+
+      if (style >= 4) {
+        const capeColors = ['#31583b', '#7e3438', '#31526d', '#322c31', '#8b3038', '#6c263f'];
+        ctx.fillStyle = capeColors[style - 4];
+        ctx.beginPath();
+        ctx.moveTo(-radius * 0.72, -radius * 0.16);
+        ctx.quadraticCurveTo(-radius * 1.18, radius * 0.52, -radius, radius * 1.14);
+        ctx.lineTo(radius, radius * 1.14);
+        ctx.quadraticCurveTo(radius * 1.18, radius * 0.52, radius * 0.72, -radius * 0.16);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      ctx.strokeStyle = '#252b2d';
+      ctx.lineWidth = Math.max(4, radius * 0.16);
+      ctx.beginPath();
+      ctx.moveTo(-radius * 0.28, radius * 0.64);
+      ctx.lineTo(-radius * 0.34, radius * 1.06);
+      ctx.moveTo(radius * 0.28, radius * 0.64);
+      ctx.lineTo(radius * 0.34, radius * 1.06);
+      ctx.stroke();
+
+      const shoulder = 0.68 + style * 0.035;
+      ctx.fillStyle = rank.color;
+      ctx.beginPath();
+      if (style === 0) {
+        ctx.moveTo(-radius * 0.58, -radius * 0.02);
+        ctx.quadraticCurveTo(-radius * 0.8, radius * 0.45, -radius * 0.58, radius * 0.92);
+        ctx.lineTo(radius * 0.58, radius * 0.92);
+        ctx.quadraticCurveTo(radius * 0.8, radius * 0.45, radius * 0.58, -radius * 0.02);
+      } else if (style === 4 || style === 9) {
+        ctx.moveTo(-radius * shoulder, -radius * 0.06);
+        ctx.lineTo(-radius * 0.95, radius * 1.02);
+        ctx.lineTo(radius * 0.95, radius * 1.02);
+        ctx.lineTo(radius * shoulder, -radius * 0.06);
+      } else {
+        ctx.moveTo(-radius * shoulder, -radius * 0.1);
+        ctx.lineTo(-radius * 0.78, radius * 0.9);
+        ctx.lineTo(radius * 0.78, radius * 0.9);
+        ctx.lineTo(radius * shoulder, -radius * 0.1);
+      }
+      ctx.closePath();
+      ctx.fill();
+
+      if (style > 0 && style !== 4 && style !== 9) {
+        ctx.fillStyle = rank.accent;
+        ctx.beginPath();
+        ctx.ellipse(-radius * shoulder, radius * 0.04, radius * 0.3, radius * 0.22, -0.25, 0, Math.PI * 2);
+        ctx.ellipse(radius * shoulder, radius * 0.04, radius * 0.3, radius * 0.22, 0.25, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = rank.accent;
+        ctx.lineWidth = Math.max(1.5, radius * 0.055);
+        for (let row = 0; row < 3; row++) {
+          ctx.beginPath();
+          ctx.moveTo(-radius * 0.48, radius * (0.2 + row * 0.2));
+          ctx.lineTo(radius * 0.48, radius * (0.2 + row * 0.2));
+          ctx.stroke();
+        }
+      } else {
+        ctx.strokeStyle = rank.accent;
+        ctx.lineWidth = Math.max(2, radius * 0.07);
+        ctx.beginPath();
+        ctx.moveTo(-radius * 0.48, radius * 0.42);
+        ctx.lineTo(radius * 0.48, radius * 0.42);
+        ctx.stroke();
+      }
+
+      ctx.strokeStyle = '#342b27';
+      ctx.lineWidth = Math.max(3, radius * 0.11);
+      ctx.beginPath();
+      ctx.moveTo(-radius * shoulder, radius * 0.12);
+      ctx.lineTo(-radius * 0.82, radius * 0.48);
+      ctx.moveTo(radius * shoulder, radius * 0.12);
+      ctx.lineTo(radius * 0.82, radius * 0.48);
+      ctx.stroke();
+      ctx.fillStyle = '#e6b98f';
+      ctx.beginPath();
+      ctx.arc(-radius * 0.82, radius * 0.5, radius * 0.13, 0, Math.PI * 2);
+      ctx.arc(radius * 0.82, radius * 0.5, radius * 0.13, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#302925';
+      ctx.fillRect(-radius * 0.68, radius * 0.66, radius * 1.36, radius * 0.12);
+      ctx.fillStyle = rank.accent;
+      ctx.fillRect(-radius * 0.1, radius * 0.62, radius * 0.2, radius * 0.2);
+      ctx.strokeStyle = rank.accent;
+      ctx.lineWidth = Math.max(1.5, radius * 0.05);
+      ctx.beginPath();
+      if (variant === 0) {
+        ctx.moveTo(0, radius * 0.06);
+        ctx.lineTo(0, radius * 0.58);
+      } else if (variant === 1) {
+        ctx.moveTo(-radius * 0.38, radius * 0.08);
+        ctx.lineTo(radius * 0.38, radius * 0.55);
+        ctx.moveTo(radius * 0.38, radius * 0.08);
+        ctx.lineTo(-radius * 0.38, radius * 0.55);
+      } else {
+        ctx.moveTo(0, radius * 0.07);
+        ctx.lineTo(radius * 0.24, radius * 0.3);
+        ctx.lineTo(0, radius * 0.55);
+        ctx.lineTo(-radius * 0.24, radius * 0.3);
+        ctx.closePath();
+      }
+      ctx.stroke();
+
+      ctx.fillStyle = '#e6b98f';
+      ctx.beginPath();
+      ctx.ellipse(-radius * 0.47, -radius * 0.42, radius * 0.13, radius * 0.17, 0, 0, Math.PI * 2);
+      ctx.ellipse(radius * 0.47, -radius * 0.42, radius * 0.13, radius * 0.17, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#e9bd94';
+      ctx.beginPath();
+      ctx.ellipse(0, -radius * 0.43, radius * 0.48, radius * 0.55, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#392d29';
+      ctx.lineWidth = Math.max(1.5, radius * 0.055);
+      ctx.beginPath();
+      ctx.moveTo(-radius * 0.31, -radius * 0.55);
+      ctx.lineTo(-radius * 0.1, -radius * 0.6);
+      ctx.moveTo(radius * 0.1, -radius * 0.6);
+      ctx.lineTo(radius * 0.31, -radius * 0.55);
+      ctx.stroke();
+      ctx.fillStyle = '#252322';
+      ctx.beginPath();
+      ctx.ellipse(-radius * 0.2, -radius * 0.47, radius * 0.045, radius * 0.065, 0, 0, Math.PI * 2);
+      ctx.ellipse(radius * 0.2, -radius * 0.47, radius * 0.045, radius * 0.065, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#a56f59';
+      ctx.lineWidth = Math.max(1, radius * 0.035);
+      ctx.beginPath();
+      ctx.moveTo(0, -radius * 0.43);
+      ctx.lineTo(-radius * 0.04, -radius * 0.25);
+      ctx.lineTo(radius * 0.05, -radius * 0.23);
+      ctx.stroke();
+
+      if (style === 3 || style === 7) {
+        ctx.fillStyle = '#262321';
+        ctx.beginPath();
+        ctx.moveTo(-radius * 0.38, -radius * 0.2);
+        ctx.quadraticCurveTo(-radius * 0.4, radius * 0.3, 0, radius * (style === 7 ? 0.72 : 0.48));
+        ctx.quadraticCurveTo(radius * 0.4, radius * 0.3, radius * 0.38, -radius * 0.2);
+        ctx.quadraticCurveTo(0, radius * 0.04, -radius * 0.38, -radius * 0.2);
+        ctx.fill();
+      } else if (style === 4) {
+        ctx.strokeStyle = '#252321';
+        ctx.lineWidth = radius * 0.13;
+        ctx.beginPath();
+        ctx.moveTo(-radius * 0.2, -radius * 0.18);
+        ctx.quadraticCurveTo(-radius * 0.14, radius * 0.4, 0, radius * 0.82);
+        ctx.quadraticCurveTo(radius * 0.14, radius * 0.4, radius * 0.2, -radius * 0.18);
+        ctx.stroke();
+      } else if (style >= 8 || (variant === 2 && style > 0)) {
+        ctx.strokeStyle = '#302522';
+        ctx.lineWidth = Math.max(2, radius * 0.075);
+        ctx.beginPath();
+        ctx.moveTo(-radius * 0.26, -radius * 0.18);
+        ctx.quadraticCurveTo(-radius * 0.12, -radius * 0.05, 0, -radius * 0.16);
+        ctx.quadraticCurveTo(radius * 0.12, -radius * 0.05, radius * 0.26, -radius * 0.18);
+        ctx.stroke();
+      }
+
+      drawHeadgear(style, variant, radius, rank);
+
+      ctx.fillStyle = '#162128';
+      ctx.beginPath();
+      ctx.arc(0, radius * 0.49, radius * 0.18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#f7eee1';
+      ctx.font = `800 ${Math.max(9, radius * 0.29)}px Arial, Microsoft YaHei, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(level + 1, 0, radius * 0.5);
+      ctx.restore();
+    }
+
+    function drawParticles() {
+      state.particles.forEach(particle => {
+        const screen = worldToScreen(particle.x, particle.y);
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, particle.life / particle.maxLife);
+        ctx.fillStyle = particle.color;
+        ctx.translate(screen.x, screen.y);
+        ctx.rotate(particle.rotation);
+        ctx.fillRect(-particle.size / 2, -particle.size / 2, particle.size, particle.size);
+        ctx.restore();
+      });
+      ctx.globalAlpha = 1;
+    }
+
+    function drawEffects() {
+      state.effects.forEach(effect => {
+        const screen = worldToScreen(effect.x, effect.y);
+        const progress = 1 - effect.life / effect.maxLife;
+        const reach = (effect.type === 'upgrade' ? 165 : effect.type === 'hit' ? 120 : 92) * effect.power;
+        const radius = 14 + progress * reach;
+        ctx.save();
+        ctx.translate(screen.x, screen.y);
+        ctx.globalAlpha = Math.max(0, effect.life / effect.maxLife);
+        ctx.strokeStyle = effect.color;
+        ctx.lineWidth = effect.type === 'upgrade' ? 8 : 6;
+        ctx.beginPath();
+        ctx.arc(0, 0, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha *= 0.55;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(0, 0, radius * 0.68, 0, Math.PI * 2);
+        ctx.stroke();
+
+        const rays = effect.type === 'upgrade' ? 16 : effect.type === 'hit' ? 10 : 8;
+        ctx.globalAlpha = Math.max(0, effect.life / effect.maxLife) * 0.8;
+        ctx.lineWidth = effect.type === 'hit' ? 7 : 4;
+        for (let index = 0; index < rays; index++) {
+          const angle = index * Math.PI * 2 / rays + progress * 0.6;
+          const inner = radius * 0.42;
+          const outer = radius * (effect.type === 'upgrade' ? 1.14 : 0.92);
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(angle) * inner, Math.sin(angle) * inner);
+          ctx.lineTo(Math.cos(angle) * outer, Math.sin(angle) * outer);
+          ctx.stroke();
+        }
+        if (effect.type === 'hit') {
+          ctx.strokeStyle = '#fff3e0';
+          ctx.lineWidth = 9;
+          ctx.beginPath();
+          ctx.moveTo(-radius * 0.55, -radius * 0.55);
+          ctx.lineTo(radius * 0.55, radius * 0.55);
+          ctx.moveTo(radius * 0.55, -radius * 0.55);
+          ctx.lineTo(-radius * 0.55, radius * 0.55);
+          ctx.stroke();
+        }
+        ctx.restore();
+      });
+    }
+
+    function draw() {
+      ctx.setTransform(canvasView.dpr, 0, 0, canvasView.dpr, 0, 0);
+      drawGround();
+      const renderScale = canvasView.width < 520 ? 1.38 : 1;
+      state.people
+        .slice()
+        .sort((a, b) => a.level - b.level)
+        .forEach(person => {
+          const screen = worldToScreen(person.x, person.y);
+          const margin = personRadius(person.level) * 2 * renderScale;
+          if (screen.x < -margin || screen.x > canvasView.width + margin || screen.y < -margin || screen.y > canvasView.height + margin) return;
+          drawCharacter(screen.x, screen.y + Math.sin(person.bob) * 2, person.level, person.angle, false, 1, renderScale);
+          if (canvasView.width >= 520) {
+            ctx.fillStyle = person.level <= state.player.level ? '#d7f5d8' : '#ffc2b8';
+            ctx.font = '700 10px Arial, Microsoft YaHei, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(ranks[person.level].name, screen.x, screen.y + personRadius(person.level) * 1.55 + 10);
+          }
+        });
+      const blink = state.player.invulnerable > 0 && Math.floor(state.player.invulnerable * 10) % 2 === 0;
+      const playerScreen = worldToScreen(state.player.x, state.player.y);
+      const pulseScale = renderScale * (1 + state.player.pulse * 0.26);
+      drawCharacter(playerScreen.x, playerScreen.y, state.player.level, state.player.angle, true, blink ? 0.35 : 1, pulseScale);
+      drawEffects();
+      drawParticles();
+      if (state.screenFlash > 0) {
+        ctx.save();
+        ctx.globalAlpha = Math.min(0.24, state.screenFlash * 0.34);
+        ctx.fillStyle = state.flashColor;
+        ctx.fillRect(0, 0, canvasView.width, canvasView.height);
+        ctx.restore();
+      }
+    }
+
+    function update(delta) {
+      if (state.ending) {
+        state.player.pulse = Math.max(0, state.player.pulse - delta * 1.2);
+        updateParticles(delta);
+        return;
+      }
+      updatePlayer(delta);
+      updatePeople(delta);
+      maintainPopulation(delta);
+      checkCollisions();
+      updateParticles(delta);
+    }
+
+    function gameLoop(time, token) {
+      if (!state.running || state.paused || token !== state.frameToken) return;
+      const delta = Math.min((time - state.lastTime) / 1000, 0.04);
+      state.lastTime = time;
+      update(delta);
+      draw();
+      if (!state.finished) requestAnimationFrame(nextTime => gameLoop(nextTime, token));
+    }
+
+    function finishGame(won) {
+      if (state.ending || state.finished) return;
+      const difficulty = getDifficulty();
+      state.ending = true;
+      state.paused = false;
+      state.pausedByVisibility = false;
+      releaseWakeLock();
+      pauseButton.disabled = true;
+      playSound(won ? 'win' : 'lose');
+      overlay.className = `overlay ${won ? 'victory' : 'defeat'}`;
+      overlay.innerHTML = won
+        ? `<strong>天下归心</strong><p>主公已登大王之位。<br>${difficulty.name} · 破敌 ${state.totalEaten} · 最高连破 ${state.bestStreak}</p><div class="end-actions"><button class="primary" id="play-again" type="button">再定乾坤</button><button class="secondary" data-action="choose-difficulty" type="button">另择军势</button></div>`
+        : `<strong>大势已去</strong><p>主公止步于${ranks[state.player.level].name}。<br>${difficulty.name} · 破敌 ${state.totalEaten} · 最高连破 ${state.bestStreak}</p><div class="end-actions"><button class="primary" id="play-again" type="button">卷土重来</button><button class="secondary" data-action="choose-difficulty" type="button">另择军势</button></div>`;
+      overlay.hidden = false;
+      const playAgainButton = document.querySelector('#play-again');
+      playAgainButton.addEventListener('click', () => {
+        resetGame();
+        startGame();
+      });
+      playAgainButton.focus();
+      state.endTimer = window.setTimeout(() => {
+        if (!state.ending) return;
+        state.ending = false;
+        state.finished = true;
+        state.running = false;
+        state.frameToken++;
+        draw();
+      }, 900);
+    }
+
+    function togglePause() {
+      if (!state.running || state.finished || state.ending) return;
+      state.paused = !state.paused;
+      pauseButton.textContent = state.paused ? '▶' : 'Ⅱ';
+      pauseButton.title = state.paused ? '再战' : '暂避锋芒';
+      pauseButton.setAttribute('aria-label', state.paused ? '继续' : '暂停');
+      if (state.paused) {
+        releaseWakeLock();
+      } else {
+        state.pausedByVisibility = false;
+        requestWakeLock();
+        state.lastTime = performance.now();
+        const token = ++state.frameToken;
+        requestAnimationFrame(time => gameLoop(time, token));
+      }
+    }
+
+    function toggleSound() {
+      state.muted = !state.muted;
+      soundButton.textContent = state.muted ? '🔇' : '🔊';
+      soundButton.title = state.muted ? '开启音效' : '静音';
+      soundButton.setAttribute('aria-label', state.muted ? '开启音效' : '静音');
+      if (state.muted) {
+        if (state.audioContext?.state === 'running') state.audioContext.suspend();
+      } else {
+        getAudioContext();
+        playSound('start');
+      }
+    }
+
+    function canvasPosition(event) {
+      const bounds = canvas.getBoundingClientRect();
+      return {
+        x: (event.clientX - bounds.left) * canvasView.width / bounds.width,
+        y: (event.clientY - bounds.top) * canvasView.height / bounds.height
+      };
+    }
+
+    function steerToward(point) {
+      const playerScreen = worldToScreen(state.player.x, state.player.y);
+      const dx = point.x - playerScreen.x;
+      const dy = point.y - playerScreen.y;
+      if (Math.hypot(dx, dy) < 8) return;
+      setHeading(Math.atan2(dy, dx));
+    }
+
+    function endPointerGesture(event, cancelled = false) {
+      if (!pointerGesture.active || event.pointerId !== pointerGesture.pointerId) return;
+      const point = canvasPosition(event);
+      const dx = point.x - pointerGesture.startX;
+      const dy = point.y - pointerGesture.startY;
+      if (!cancelled) {
+        if (pointerGesture.pointerType === 'touch' && pointerGesture.moved && Math.hypot(dx, dy) > 12) {
+          setHeading(Math.atan2(dy, dx));
+        } else {
+          steerToward(point);
+        }
+      }
+      try {
+        if (canvas.hasPointerCapture?.(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+      } catch {}
+      pointerGesture.active = false;
+      pointerGesture.pointerId = null;
+      arenaShell.classList.remove('steering');
+    }
+
+    canvas.addEventListener('pointerdown', event => {
+      if (!state.running || state.paused || state.finished || state.ending) return;
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      event.preventDefault();
+      const point = canvasPosition(event);
+      pointerGesture.active = true;
+      pointerGesture.pointerId = event.pointerId;
+      pointerGesture.pointerType = event.pointerType;
+      pointerGesture.startX = point.x;
+      pointerGesture.startY = point.y;
+      pointerGesture.moved = false;
+      arenaShell.classList.add('steering');
+      try { canvas.setPointerCapture?.(event.pointerId); } catch {}
+      steerToward(point);
+    });
+
+    canvas.addEventListener('pointermove', event => {
+      if (!pointerGesture.active || event.pointerId !== pointerGesture.pointerId) return;
+      event.preventDefault();
+      const point = canvasPosition(event);
+      const dx = point.x - pointerGesture.startX;
+      const dy = point.y - pointerGesture.startY;
+      if (Math.hypot(dx, dy) > 12) pointerGesture.moved = true;
+      if (pointerGesture.pointerType === 'touch' && pointerGesture.moved) {
+        setHeading(Math.atan2(dy, dx));
+      } else {
+        steerToward(point);
+      }
+    });
+
+    canvas.addEventListener('pointerup', event => endPointerGesture(event));
+    canvas.addEventListener('pointercancel', event => endPointerGesture(event, true));
+    canvas.addEventListener('lostpointercapture', event => {
+      if (pointerGesture.active && event.pointerId === pointerGesture.pointerId) endPointerGesture(event, true);
+    });
+    canvas.addEventListener('contextmenu', event => event.preventDefault());
+
+    const keyMap = {
+      ArrowUp: 'up', w: 'up', W: 'up',
+      ArrowDown: 'down', s: 'down', S: 'down',
+      ArrowLeft: 'left', a: 'left', A: 'left',
+      ArrowRight: 'right', d: 'right', D: 'right'
+    };
+
+    document.addEventListener('keydown', event => {
+      if (keyMap[event.key]) {
+        event.preventDefault();
+        setDirection(keyMap[event.key]);
+      }
+      if (event.code === 'Space') {
+        event.preventDefault();
+        togglePause();
+      }
+    });
+
+    directionButtons.forEach(button => {
+      button.addEventListener('pointerdown', event => {
+        event.preventDefault();
+        setDirection(button.dataset.direction);
+      });
+    });
+
+    overlay.addEventListener('click', event => {
+      const difficultyButton = event.target.closest('[data-difficulty]');
+      if (difficultyButton) {
+        state.difficulty = difficultyButton.dataset.difficulty;
+        resetGame();
+        showStartOverlay();
+        return;
+      }
+      const actionButton = event.target.closest('[data-action]');
+      if (!actionButton) return;
+      if (actionButton.dataset.action === 'start') startGame();
+      if (actionButton.dataset.action === 'choose-difficulty') {
+        resetGame();
+        showStartOverlay();
+      }
+    });
+    soundButton.addEventListener('click', toggleSound);
+    pauseButton.addEventListener('click', togglePause);
+    fullscreenButton.addEventListener('click', toggleFullscreen);
+    document.querySelector('#restart').addEventListener('click', () => {
+      resetGame();
+      showStartOverlay();
+    });
+
+    document.addEventListener('fullscreenchange', syncFullscreenButton);
+    document.addEventListener('webkitfullscreenchange', syncFullscreenButton);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        if (state.running && !state.paused && !state.finished && !state.ending) {
+          state.pausedByVisibility = true;
+          togglePause();
+        } else {
+          releaseWakeLock();
+        }
+        return;
+      }
+      scheduleCanvasResize();
+      if (state.running && !state.paused && !state.finished && !state.ending) requestWakeLock();
+    });
+
+    window.addEventListener('resize', scheduleCanvasResize, { passive: true });
+    window.addEventListener('orientationchange', scheduleCanvasResize, { passive: true });
+    window.visualViewport?.addEventListener('resize', scheduleCanvasResize, { passive: true });
+    mobileLayoutQuery.addEventListener?.('change', scheduleCanvasResize);
+    if ('ResizeObserver' in window) new ResizeObserver(scheduleCanvasResize).observe(arenaShell);
+
+    rankRoad.innerHTML = ranks.map(rank => `<span>${rank.name}</span>`).join('');
+    syncFullscreenButton();
+    resizeCanvas();
+    resetGame();
+  </script>
+</body>
+</html>
