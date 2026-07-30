@@ -1,0 +1,2256 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-30T01:01:10.212Z",
+  "source": {
+    "name": "Apple Support",
+    "url": "https://support.apple.com/en-us/108047",
+    "publishedDate": "July 17, 2026"
+  },
+  "fx": {
+    "sourceUrl": "https://open.er-api.com/v6/latest/USD",
+    "base": "USD",
+    "fetchedAt": "2026-07-30T00:02:31.000Z",
+    "stale": false,
+    "rates": {
+      "USD": 1,
+      "AED": 3.6725,
+      "AFN": 65.921657,
+      "ALL": 82.261,
+      "AMD": 366.172019,
+      "ANG": 1.79,
+      "AOA": 923.552166,
+      "ARS": 1496.3521,
+      "AUD": 1.438397,
+      "AWG": 1.79,
+      "AZN": 1.701058,
+      "BAM": 1.712418,
+      "BBD": 2,
+      "BDT": 123.454548,
+      "BGN": 1.712418,
+      "BHD": 0.376,
+      "BIF": 2992.948561,
+      "BMD": 1,
+      "BND": 1.291616,
+      "BOB": 11.38024,
+      "BRL": 5.119853,
+      "BSD": 1,
+      "BTN": 95.762217,
+      "BWP": 13.965664,
+      "BYN": 2.916,
+      "BZD": 2,
+      "CAD": 1.40621,
+      "CDF": 2295.679097,
+      "CHF": 0.817072,
+      "CLF": 0.023631,
+      "CLP": 934.060772,
+      "CNH": 6.764472,
+      "CNY": 6.773647,
+      "COP": 3207.637776,
+      "CRC": 455.181524,
+      "CUP": 24,
+      "CVE": 96.542044,
+      "CZK": 21.188025,
+      "DJF": 177.721,
+      "DKK": 6.5401,
+      "DOP": 58.091243,
+      "DZD": 133.426861,
+      "EGP": 50.693486,
+      "ERN": 15,
+      "ETB": 161.281425,
+      "EUR": 0.875576,
+      "FJD": 2.235816,
+      "FKP": 0.750717,
+      "FOK": 6.540166,
+      "GBP": 0.750708,
+      "GEL": 2.623917,
+      "GGP": 0.750717,
+      "GHS": 11.670727,
+      "GIP": 0.750717,
+      "GMD": 74.470625,
+      "GNF": 8789.755994,
+      "GTQ": 7.634382,
+      "GYD": 209.283995,
+      "HKD": 7.842148,
+      "HNL": 26.823373,
+      "HRK": 6.596799,
+      "HTG": 130.874543,
+      "HUF": 317.219044,
+      "IDR": 18076.946663,
+      "ILS": 3.077842,
+      "IMP": 0.750717,
+      "INR": 95.755723,
+      "IQD": 1310.859145,
+      "IRR": 1296890.591337,
+      "ISK": 125.071132,
+      "JEP": 0.750717,
+      "JMD": 158.176838,
+      "JOD": 0.709,
+      "JPY": 163.530858,
+      "KES": 129.512983,
+      "KGS": 87.46514,
+      "KHR": 4047.577507,
+      "KID": 1.438418,
+      "KMF": 430.740235,
+      "KRW": 1448.987863,
+      "KWD": 0.310071,
+      "KYD": 0.833333,
+      "KZT": 476.635234,
+      "LAK": 22523.482659,
+      "LBP": 89500,
+      "LKR": 335.760765,
+      "LRD": 181.207022,
+      "LSL": 16.708061,
+      "LYD": 6.418183,
+      "MAD": 9.382452,
+      "MDL": 17.663625,
+      "MGA": 4320.502994,
+      "MKD": 54.034424,
+      "MMK": 2100.49476,
+      "MNT": 3602.740061,
+      "MOP": 8.077775,
+      "MRU": 40.102685,
+      "MUR": 47.508589,
+      "MVR": 15.455703,
+      "MWK": 1739.069442,
+      "MXN": 17.462697,
+      "MYR": 4.089576,
+      "MZN": 63.753938,
+      "NAD": 16.708061,
+      "NGN": 1365.763617,
+      "NIO": 36.803597,
+      "NOK": 9.634937,
+      "NPR": 153.219548,
+      "NZD": 1.72687,
+      "OMR": 0.384497,
+      "PAB": 1,
+      "PEN": 3.399105,
+      "PGK": 4.455908,
+      "PHP": 61.441607,
+      "PKR": 277.912382,
+      "PLN": 3.794144,
+      "PYG": 6020.377944,
+      "QAR": 3.64,
+      "RON": 4.598521,
+      "RSD": 103.06658,
+      "RUB": 79.610054,
+      "RWF": 1471.10157,
+      "SAR": 3.75,
+      "SBD": 7.980541,
+      "SCR": 14.261217,
+      "SDG": 544.281068,
+      "SEK": 9.684874,
+      "SGD": 1.291617,
+      "SHP": 0.750717,
+      "SLE": 24.166668,
+      "SLL": 24166.668387,
+      "SOS": 571.721597,
+      "SRD": 38.09073,
+      "SSP": 4959.601397,
+      "STN": 21.450869,
+      "SYP": 121.962092,
+      "SZL": 16.708061,
+      "THB": 33.525647,
+      "TJS": 9.240803,
+      "TMT": 3.501599,
+      "TND": 2.959755,
+      "TOP": 2.378125,
+      "TRY": 47.425938,
+      "TTD": 6.779009,
+      "TVD": 1.438418,
+      "TWD": 32.383727,
+      "TZS": 2644.052254,
+      "UAH": 44.941541,
+      "UGX": 3713.966534,
+      "UYU": 40.237733,
+      "UZS": 12095.150386,
+      "VES": 745.6371,
+      "VND": 26254.003815,
+      "VUV": 119.609041,
+      "WST": 2.719562,
+      "XAF": 574.320314,
+      "XCD": 2.7,
+      "XCG": 1.79,
+      "XDR": 0.737072,
+      "XOF": 574.320314,
+      "XPF": 104.480616,
+      "YER": 238.63995,
+      "ZAR": 16.707472,
+      "ZMW": 18.788824,
+      "ZWG": 26.6947,
+      "ZWL": 26.6947
+    }
+  },
+  "tiers": [
+    {
+      "id": "50GB",
+      "label": "50 GB",
+      "capacityGb": 50
+    },
+    {
+      "id": "200GB",
+      "label": "200 GB",
+      "capacityGb": 200
+    },
+    {
+      "id": "2TB",
+      "label": "2 TB",
+      "capacityGb": 2048
+    },
+    {
+      "id": "6TB",
+      "label": "6 TB",
+      "capacityGb": 6144
+    },
+    {
+      "id": "12TB",
+      "label": "12 TB",
+      "capacityGb": 12288
+    }
+  ],
+  "countries": [
+    {
+      "country": "Bahamas",
+      "region": "Americas",
+      "currency": "USD",
+      "plans": {
+        "50GB": {
+          "price": 0.99,
+          "formattedPrice": "$0.99"
+        },
+        "200GB": {
+          "price": 2.99,
+          "formattedPrice": "$2.99"
+        },
+        "2TB": {
+          "price": 10.99,
+          "formattedPrice": "$10.99"
+        },
+        "6TB": {
+          "price": 32.99,
+          "formattedPrice": "$32.99"
+        },
+        "12TB": {
+          "price": 64.99,
+          "formattedPrice": "$64.99"
+        }
+      },
+      "nameZh": "巴哈马"
+    },
+    {
+      "country": "Barbados",
+      "region": "Americas",
+      "currency": "USD",
+      "plans": {
+        "50GB": {
+          "price": 0.99,
+          "formattedPrice": "$0.99"
+        },
+        "200GB": {
+          "price": 3.49,
+          "formattedPrice": "$3.49"
+        },
+        "2TB": {
+          "price": 11.99,
+          "formattedPrice": "$11.99"
+        },
+        "6TB": {
+          "price": 34.99,
+          "formattedPrice": "$34.99"
+        },
+        "12TB": {
+          "price": 69.99,
+          "formattedPrice": "$69.99"
+        }
+      },
+      "nameZh": "巴巴多斯"
+    },
+    {
+      "country": "Brazil",
+      "region": "Americas",
+      "currency": "BRL",
+      "plans": {
+        "50GB": {
+          "price": 5.9,
+          "formattedPrice": "R$ 5.90"
+        },
+        "200GB": {
+          "price": 19.9,
+          "formattedPrice": "R$ 19.90"
+        },
+        "2TB": {
+          "price": 66.9,
+          "formattedPrice": "R$ 66.90"
+        },
+        "6TB": {
+          "price": 199.9,
+          "formattedPrice": "R$ 199.90"
+        },
+        "12TB": {
+          "price": 399.9,
+          "formattedPrice": "R$ 399.90"
+        }
+      },
+      "nameZh": "巴西"
+    },
+    {
+      "country": "Canada",
+      "region": "Americas",
+      "currency": "CAD",
+      "plans": {
+        "50GB": {
+          "price": 1.29,
+          "formattedPrice": "$1.29"
+        },
+        "200GB": {
+          "price": 3.99,
+          "formattedPrice": "$3.99"
+        },
+        "2TB": {
+          "price": 12.99,
+          "formattedPrice": "$12.99"
+        },
+        "6TB": {
+          "price": 39.99,
+          "formattedPrice": "$39.99"
+        },
+        "12TB": {
+          "price": 79.99,
+          "formattedPrice": "$79.99"
+        }
+      },
+      "nameZh": "加拿大"
+    },
+    {
+      "country": "Chile",
+      "region": "Americas",
+      "currency": "CLP",
+      "plans": {
+        "50GB": {
+          "price": 990,
+          "formattedPrice": "$990"
+        },
+        "200GB": {
+          "price": 3290,
+          "formattedPrice": "$3290"
+        },
+        "2TB": {
+          "price": 10990,
+          "formattedPrice": "$10990"
+        },
+        "6TB": {
+          "price": 32990,
+          "formattedPrice": "$32990"
+        },
+        "12TB": {
+          "price": 64990,
+          "formattedPrice": "$64990"
+        }
+      },
+      "nameZh": "智利"
+    },
+    {
+      "country": "Colombia",
+      "region": "Americas",
+      "currency": "COP",
+      "plans": {
+        "50GB": {
+          "price": 3900,
+          "formattedPrice": "$3900"
+        },
+        "200GB": {
+          "price": 12900,
+          "formattedPrice": "$12900"
+        },
+        "2TB": {
+          "price": 44900,
+          "formattedPrice": "$44900"
+        },
+        "6TB": {
+          "price": 129900,
+          "formattedPrice": "$129900"
+        },
+        "12TB": {
+          "price": 269900,
+          "formattedPrice": "$269900"
+        }
+      },
+      "nameZh": "哥伦比亚"
+    },
+    {
+      "country": "Mexico",
+      "region": "Americas",
+      "currency": "MXN",
+      "plans": {
+        "50GB": {
+          "price": 17,
+          "formattedPrice": "$17"
+        },
+        "200GB": {
+          "price": 49,
+          "formattedPrice": "$49"
+        },
+        "2TB": {
+          "price": 179,
+          "formattedPrice": "$179"
+        },
+        "6TB": {
+          "price": 499,
+          "formattedPrice": "$499"
+        },
+        "12TB": {
+          "price": 999,
+          "formattedPrice": "$999"
+        }
+      },
+      "nameZh": "墨西哥"
+    },
+    {
+      "country": "Peru",
+      "region": "Americas",
+      "currency": "PEN",
+      "plans": {
+        "50GB": {
+          "price": 3.9,
+          "formattedPrice": "S/.3.90"
+        },
+        "200GB": {
+          "price": 12.9,
+          "formattedPrice": "S/.12.90"
+        },
+        "2TB": {
+          "price": 42.9,
+          "formattedPrice": "S/.42.90"
+        },
+        "6TB": {
+          "price": 129.9,
+          "formattedPrice": "S/.129.90"
+        },
+        "12TB": {
+          "price": 259.9,
+          "formattedPrice": "S/.259.90"
+        }
+      },
+      "nameZh": "秘鲁"
+    },
+    {
+      "country": "Suriname",
+      "region": "Americas",
+      "currency": "USD",
+      "plans": {
+        "50GB": {
+          "price": 0.99,
+          "formattedPrice": "$0.99"
+        },
+        "200GB": {
+          "price": 3.49,
+          "formattedPrice": "$3.49"
+        },
+        "2TB": {
+          "price": 11.99,
+          "formattedPrice": "$11.99"
+        },
+        "6TB": {
+          "price": 34.99,
+          "formattedPrice": "$34.99"
+        },
+        "12TB": {
+          "price": 69.99,
+          "formattedPrice": "$69.99"
+        }
+      },
+      "nameZh": "苏里南"
+    },
+    {
+      "country": "United States",
+      "region": "Americas",
+      "currency": "USD",
+      "plans": {
+        "50GB": {
+          "price": 0.99,
+          "formattedPrice": "$0.99"
+        },
+        "200GB": {
+          "price": 2.99,
+          "formattedPrice": "$2.99"
+        },
+        "2TB": {
+          "price": 9.99,
+          "formattedPrice": "$9.99"
+        },
+        "6TB": {
+          "price": 29.99,
+          "formattedPrice": "$29.99"
+        },
+        "12TB": {
+          "price": 59.99,
+          "formattedPrice": "$59.99"
+        }
+      },
+      "nameZh": "美国"
+    },
+    {
+      "country": "Albania",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "50GB": {
+          "price": 1.19,
+          "formattedPrice": "$1.19"
+        },
+        "200GB": {
+          "price": 3.59,
+          "formattedPrice": "$3.59"
+        },
+        "2TB": {
+          "price": 11.99,
+          "formattedPrice": "$11.99"
+        },
+        "6TB": {
+          "price": 34.99,
+          "formattedPrice": "$34.99"
+        },
+        "12TB": {
+          "price": 69.99,
+          "formattedPrice": "$69.99"
+        }
+      },
+      "nameZh": "阿尔巴尼亚"
+    },
+    {
+      "country": "Armenia",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "50GB": {
+          "price": 1.19,
+          "formattedPrice": "$1.19"
+        },
+        "200GB": {
+          "price": 3.49,
+          "formattedPrice": "$3.49"
+        },
+        "2TB": {
+          "price": 11.99,
+          "formattedPrice": "$11.99"
+        },
+        "6TB": {
+          "price": 34.99,
+          "formattedPrice": "$34.99"
+        },
+        "12TB": {
+          "price": 69.99,
+          "formattedPrice": "$69.99"
+        }
+      },
+      "nameZh": "亚美尼亚"
+    },
+    {
+      "country": "Azerbaijan",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "50GB": {
+          "price": 0.99,
+          "formattedPrice": "$0.99"
+        },
+        "200GB": {
+          "price": 3.49,
+          "formattedPrice": "$3.49"
+        },
+        "2TB": {
+          "price": 11.99,
+          "formattedPrice": "$11.99"
+        },
+        "6TB": {
+          "price": 34.99,
+          "formattedPrice": "$34.99"
+        },
+        "12TB": {
+          "price": 69.99,
+          "formattedPrice": "$69.99"
+        }
+      },
+      "nameZh": "阿塞拜疆"
+    },
+    {
+      "country": "Bahrain",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "50GB": {
+          "price": 0.99,
+          "formattedPrice": "$0.99"
+        },
+        "200GB": {
+          "price": 2.99,
+          "formattedPrice": "$2.99"
+        },
+        "2TB": {
+          "price": 10.99,
+          "formattedPrice": "$10.99"
+        },
+        "6TB": {
+          "price": 32.99,
+          "formattedPrice": "$32.99"
+        },
+        "12TB": {
+          "price": 64.99,
+          "formattedPrice": "$64.99"
+        }
+      },
+      "nameZh": "巴林"
+    },
+    {
+      "country": "Belarus",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "50GB": {
+          "price": 1.19,
+          "formattedPrice": "$1.19"
+        },
+        "200GB": {
+          "price": 3.49,
+          "formattedPrice": "$3.49"
+        },
+        "2TB": {
+          "price": 11.99,
+          "formattedPrice": "$11.99"
+        },
+        "6TB": {
+          "price": 34.99,
+          "formattedPrice": "$34.99"
+        },
+        "12TB": {
+          "price": 69.99,
+          "formattedPrice": "$69.99"
+        }
+      },
+      "nameZh": "白俄罗斯"
+    },
+    {
+      "country": "Benin",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "50GB": {
+          "price": 0.99,
+          "formattedPrice": "$0.99"
+        },
+        "200GB": {
+          "price": 3.49,
+          "formattedPrice": "$3.49"
+        },
+        "2TB": {
+          "price": 11.99,
+          "formattedPrice": "$11.99"
+        },
+        "6TB": {
+          "price": 34.99,
+          "formattedPrice": "$34.99"
+        },
+        "12TB": {
+          "price": 69.99,
+          "formattedPrice": "$69.99"
+        }
+      },
+      "nameZh": "贝宁"
+    },
+    {
+      "country": "Bulgaria",
+      "region": "Europe, Middle East & Africa",
+      "currency": "BGN",
+      "plans": {
+        "50GB": {
+          "price": 1.99,
+          "formattedPrice": "1.99 лв"
+        },
+        "200GB": {
+          "price": 5.99,
+          "formattedPrice": "5.99 лв"
+        },
+        "2TB": {
+          "price": 20.99,
+          "formattedPrice": "20.99 лв"
+        },
+        "6TB": {
+          "price": 64.99,
+          "formattedPrice": "64.99 лв"
+        },
+        "12TB": {
+          "price": 129.99,
+          "formattedPrice": "129.99 лв"
+        }
+      },
+      "nameZh": "保加利亚"
+    },
+    {
+      "country": "Cameroon",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "50GB": {
+          "price": 0.99,
+          "formattedPrice": "$0.99"
+        },
+        "200GB": {
+          "price": 3.49,
+          "formattedPrice": "$3.49"
+        },
+        "2TB": {
+          "price": 11.99,
+          "formattedPrice": "$11.99"
+        },
+        "6TB": {
+          "price": 34.99,
+          "formattedPrice": "$34.99"
+        },
+        "12TB": {
+          "price": 69.99,
+          "formattedPrice": "$69.99"
+        }
+      },
+      "nameZh": "喀麦隆"
+    },
+    {
+      "country": "Croatia",
+      "region": "Europe, Middle East & Africa",
+      "currency": "EUR",
+      "plans": {
+        "50GB": {
+          "price": 0.99,
+          "formattedPrice": "0.99 €"
+        },
+        "200GB": {
+          "price": 2.99,
+          "formattedPrice": "2.99 €"
+        },
+        "2TB": {
+          "price": 9.99,
+          "formattedPrice": "9.99 €"
+        },
+        "6TB": {
+          "price": 29.99,
+          "formattedPrice": "29.99 €"
+        },
+        "12TB": {
+          "price": 59.99,
+          "formattedPrice": "59.99 €"
+        }
+      },
+      "nameZh": "克罗地亚"
+    },
+    {
+      "country": "Czechia",
+      "region": "Europe, Middle East & Africa",
+      "currency": "CZK",
+      "plans": {
+        "50GB": {
+          "price": 25,
+          "formattedPrice": "25 Kč"
+        },
+        "200GB": {
+          "price": 79,
+          "formattedPrice": "79 Kč"
+        },
+        "2TB": {
+          "price": 249,
+          "formattedPrice": "249 Kč"
+        },
+        "6TB": {
+          "price": 749,
+          "formattedPrice": "749 Kč"
+        },
+        "12TB": {
+          "price": 1490,
+          "formattedPrice": "1490 Kč"
+        }
+      },
+      "nameZh": "捷克"
+    },
+    {
+      "country": "Denmark",
+      "region": "Europe, Middle East & Africa",
+      "currency": "DKK",
+      "plans": {
+        "50GB": {
+          "price": 9,
+          "formattedPrice": "9 kr"
+        },
+        "200GB": {
+          "price": 25,
+          "formattedPrice": "25 kr"
+        },
+        "2TB": {
+          "price": 89,
+          "formattedPrice": "89 kr"
+        },
+        "6TB": {
+          "price": 269,
+          "formattedPrice": "269 kr"
+        },
+        "12TB": {
+          "price": 549,
+          "formattedPrice": "549 kr"
+        }
+      },
+      "nameZh": "丹麦"
+    },
+    {
+      "country": "Egypt",
+      "region": "Europe, Middle East & Africa",
+      "currency": "EGP",
+      "plans": {
+        "50GB": {
+          "price": 49.99,
+          "formattedPrice": "£49.99"
+        },
+        "200GB": {
+          "price": 179.99,
+          "formattedPrice": "£179.99"
+        },
+        "2TB": {
+          "price": 599.99,
+          "formattedPrice": "£599.99"
+        },
+        "6TB": {
+          "price": 1799.99,
+          "formattedPrice": "£1799.99"
+        },
+        "12TB": {
+          "price": 3599.99,
+          "formattedPrice": "£3599.99"
+        }
+      },
+      "nameZh": "埃及"
+    },
+    {
+      "country": "Euro Zone",
+      "region": "Europe, Middle East & Africa",
+      "currency": "EUR",
+      "plans": {
+        "50GB": {
+          "price": 0.99,
+          "formattedPrice": "0.99 €"
+        },
+        "200GB": {
+          "price": 2.99,
+          "formattedPrice": "2.99 €"
+        },
+        "2TB": {
+          "price": 9.99,
+          "formattedPrice": "9.99 €"
+        },
+        "6TB": {
+          "price": 29.99,
+          "formattedPrice": "29.99 €"
+        },
+        "12TB": {
+          "price": 59.99,
+          "formattedPrice": "59.99 €"
+        }
+      },
+      "nameZh": "欧盟"
+    },
+    {
+      "country": "Georgia",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "50GB": {
+          "price": 0.99,
+          "formattedPrice": "$0.99"
+        },
+        "200GB": {
+          "price": 3.49,
+          "formattedPrice": "$3.49"
+        },
+        "2TB": {
+          "price": 11.99,
+          "formattedPrice": "$11.99"
+        },
+        "6TB": {
+          "price": 34.99,
+          "formattedPrice": "$34.99"
+        },
+        "12TB": {
+          "price": 69.99,
+          "formattedPrice": "$69.99"
+        }
+      },
+      "nameZh": "格鲁吉亚"
+    },
+    {
+      "country": "Ghana",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "50GB": {
+          "price": 0.99,
+          "formattedPrice": "$0.99"
+        },
+        "200GB": {
+          "price": 3.49,
+          "formattedPrice": "$3.49"
+        },
+        "2TB": {
+          "price": 11.99,
+          "formattedPrice": "$11.99"
+        },
+        "6TB": {
+          "price": 34.99,
+          "formattedPrice": "$34.99"
+        },
+        "12TB": {
+          "price": 69.99,
+          "formattedPrice": "$69.99"
+        }
+      },
+      "nameZh": "加纳"
+    },
+    {
+      "country": "Hungary",
+      "region": "Europe, Middle East & Africa",
+      "currency": "HUF",
+      "plans": {
+        "50GB": {
+          "price": 399,
+          "formattedPrice": "399 Ft"
+        },
+        "200GB": {
+          "price": 1290,
+          "formattedPrice": "1290 Ft"
+        },
+        "2TB": {
+          "price": 4490,
+          "formattedPrice": "4490 Ft"
+        },
+        "6TB": {
+          "price": 12990,
+          "formattedPrice": "12990 Ft"
+        },
+        "12TB": {
+          "price": 26990,
+          "formattedPrice": "26990 Ft"
+        }
+      },
+      "nameZh": "匈牙利"
+    },
+    {
+      "country": "Iceland",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "50GB": {
+          "price": 1.19,
+          "formattedPrice": "$1.19"
+        },
+        "200GB": {
+          "price": 3.69,
+          "formattedPrice": "$3.69"
+        },
+        "2TB": {
+          "price": 11.99,
+          "formattedPrice": "$11.99"
+        },
+        "6TB": {
+          "price": 34.99,
+          "formattedPrice": "$34.99"
+        },
+        "12TB": {
+          "price": 69.99,
+          "formattedPrice": "$69.99"
+        }
+      },
+      "nameZh": "冰岛"
+    },
+    {
+      "country": "Israel",
+      "region": "Europe, Middle East & Africa",
+      "currency": "ILS",
+      "plans": {
+        "50GB": {
+          "price": 3.9,
+          "formattedPrice": "₪3.90"
+        },
+        "200GB": {
+          "price": 11.9,
+          "formattedPrice": "₪11.90"
+        },
+        "2TB": {
+          "price": 39.9,
+          "formattedPrice": "₪39.90"
+        },
+        "6TB": {
+          "price": 119.9,
+          "formattedPrice": "₪119.90"
+        },
+        "12TB": {
+          "price": 239.9,
+          "formattedPrice": "₪239.90"
+        }
+      },
+      "nameZh": "以色列"
+    },
+    {
+      "country": "Ivory Coast",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "50GB": {
+          "price": 0.99,
+          "formattedPrice": "$0.99"
+        },
+        "200GB": {
+          "price": 3.49,
+          "formattedPrice": "$3.49"
+        },
+        "2TB": {
+          "price": 11.99,
+          "formattedPrice": "$11.99"
+        },
+        "6TB": {
+          "price": 34.99,
+          "formattedPrice": "$34.99"
+        },
+        "12TB": {
+          "price": 69.99,
+          "formattedPrice": "$69.99"
+        }
+      },
+      "nameZh": "科特迪瓦"
+    },
+    {
+      "country": "Kenya",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "50GB": {
+          "price": 0.99,
+          "formattedPrice": "$0.99"
+        },
+        "200GB": {
+          "price": 3.49,
+          "formattedPrice": "$3.49"
+        },
+        "2TB": {
+          "price": 11.99,
+          "formattedPrice": "$11.99"
+        },
+        "6TB": {
+          "price": 34.99,
+          "formattedPrice": "$34.99"
+        },
+        "12TB": {
+          "price": 69.99,
+          "formattedPrice": "$69.99"
+        }
+      },
+      "nameZh": "肯尼亚"
+    },
+    {
+      "country": "Mauritius",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "50GB": {
+          "price": 1.19,
+          "formattedPrice": "$1.19"
+        },
+        "200GB": {
+          "price": 3.49,
+          "formattedPrice": "$3.49"
+        },
+        "2TB": {
+          "price": 11.99,
+          "formattedPrice": "$11.99"
+        },
+        "6TB": {
+          "price": 34.99,
+          "formattedPrice": "$34.99"
+        },
+        "12TB": {
+          "price": 69.99,
+          "formattedPrice": "$69.99"
+        }
+      },
+      "nameZh": "毛里求斯"
+    },
+    {
+      "country": "Moldova",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "50GB": {
+          "price": 0.99,
+          "formattedPrice": "$0.99"
+        },
+        "200GB": {
+          "price": 3.49,
+          "formattedPrice": "$3.49"
+        },
+        "2TB": {
+          "price": 11.99,
+          "formattedPrice": "$11.99"
+        },
+        "6TB": {
+          "price": 34.99,
+          "formattedPrice": "$34.99"
+        },
+        "12TB": {
+          "price": 69.99,
+          "formattedPrice": "$69.99"
+        }
+      },
+      "nameZh": "摩尔多瓦"
+    },
+    {
+      "country": "Nigeria",
+      "region": "Europe, Middle East & Africa",
+      "currency": "NGN",
+      "plans": {
+        "50GB": {
+          "price": 1300,
+          "formattedPrice": "₦1300"
+        },
+        "200GB": {
+          "price": 4500,
+          "formattedPrice": "₦4500"
+        },
+        "2TB": {
+          "price": 14900,
+          "formattedPrice": "₦14900"
+        },
+        "6TB": {
+          "price": 39900,
+          "formattedPrice": "₦39900"
+        },
+        "12TB": {
+          "price": 66900,
+          "formattedPrice": "₦66900"
+        }
+      },
+      "nameZh": "尼日利亚"
+    },
+    {
+      "country": "Norway",
+      "region": "Europe, Middle East & Africa",
+      "currency": "NOK",
+      "plans": {
+        "50GB": {
+          "price": 12,
+          "formattedPrice": "12 kr"
+        },
+        "200GB": {
+          "price": 39,
+          "formattedPrice": "39 kr"
+        },
+        "2TB": {
+          "price": 129,
+          "formattedPrice": "129 kr"
+        },
+        "6TB": {
+          "price": 399,
+          "formattedPrice": "399 kr"
+        },
+        "12TB": {
+          "price": 799,
+          "formattedPrice": "799 kr"
+        }
+      },
+      "nameZh": "挪威"
+    },
+    {
+      "country": "Pakistan",
+      "region": "Europe, Middle East & Africa",
+      "currency": "PKR",
+      "plans": {
+        "50GB": {
+          "price": 200,
+          "formattedPrice": "Rs200"
+        },
+        "200GB": {
+          "price": 800,
+          "formattedPrice": "Rs800"
+        },
+        "2TB": {
+          "price": 2500,
+          "formattedPrice": "Rs2500"
+        },
+        "6TB": {
+          "price": 8900,
+          "formattedPrice": "Rs8900"
+        },
+        "12TB": {
+          "price": 17900,
+          "formattedPrice": "Rs17900"
+        }
+      },
+      "nameZh": "巴基斯坦"
+    },
+    {
+      "country": "Poland",
+      "region": "Europe, Middle East & Africa",
+      "currency": "PLN",
+      "plans": {
+        "50GB": {
+          "price": 4.99,
+          "formattedPrice": "4.99 zł"
+        },
+        "200GB": {
+          "price": 14.99,
+          "formattedPrice": "14.99 zł"
+        },
+        "2TB": {
+          "price": 49.99,
+          "formattedPrice": "49.99 zł"
+        },
+        "6TB": {
+          "price": 149.99,
+          "formattedPrice": "149.99 zł"
+        },
+        "12TB": {
+          "price": 299.99,
+          "formattedPrice": "299.99 zł"
+        }
+      },
+      "nameZh": "波兰"
+    },
+    {
+      "country": "Qatar",
+      "region": "Europe, Middle East & Africa",
+      "currency": "QAR",
+      "plans": {
+        "50GB": {
+          "price": 3.69,
+          "formattedPrice": "3.69﷼"
+        },
+        "200GB": {
+          "price": 10.99,
+          "formattedPrice": "10.99﷼"
+        },
+        "2TB": {
+          "price": 36.99,
+          "formattedPrice": "36.99﷼"
+        },
+        "6TB": {
+          "price": 109.99,
+          "formattedPrice": "109.99﷼"
+        },
+        "12TB": {
+          "price": 219.99,
+          "formattedPrice": "219.99﷼"
+        }
+      },
+      "nameZh": "卡塔尔"
+    },
+    {
+      "country": "Republic of Congo",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "50GB": {
+          "price": 1.19,
+          "formattedPrice": "$1.19"
+        },
+        "200GB": {
+          "price": 3.49,
+          "formattedPrice": "$3.49"
+        },
+        "2TB": {
+          "price": 11.99,
+          "formattedPrice": "$11.99"
+        },
+        "6TB": {
+          "price": 34.99,
+          "formattedPrice": "$34.99"
+        },
+        "12TB": {
+          "price": 69.99,
+          "formattedPrice": "$69.99"
+        }
+      },
+      "nameZh": "刚果共和国"
+    },
+    {
+      "country": "Romania",
+      "region": "Europe, Middle East & Africa",
+      "currency": "RON",
+      "plans": {
+        "50GB": {
+          "price": 4.99,
+          "formattedPrice": "4.99 lei"
+        },
+        "200GB": {
+          "price": 14.99,
+          "formattedPrice": "14.99 lei"
+        },
+        "2TB": {
+          "price": 49.99,
+          "formattedPrice": "49.99 lei"
+        },
+        "6TB": {
+          "price": 149.99,
+          "formattedPrice": "149.99 lei"
+        },
+        "12TB": {
+          "price": 299.99,
+          "formattedPrice": "299.99 lei"
+        }
+      },
+      "nameZh": "罗马尼亚"
+    },
+    {
+      "country": "Russia",
+      "region": "Europe, Middle East & Africa",
+      "currency": "RUB",
+      "plans": {
+        "50GB": {
+          "price": 59,
+          "formattedPrice": "59 p."
+        },
+        "200GB": {
+          "price": 149,
+          "formattedPrice": "149 p."
+        },
+        "2TB": {
+          "price": 599,
+          "formattedPrice": "599 p."
+        },
+        "6TB": {
+          "price": 3490,
+          "formattedPrice": "3490 p."
+        },
+        "12TB": {
+          "price": 6990,
+          "formattedPrice": "6990 p."
+        }
+      },
+      "nameZh": "俄罗斯"
+    },
+    {
+      "country": "Saudi Arabia",
+      "region": "Europe, Middle East & Africa",
+      "currency": "SAR",
+      "plans": {
+        "50GB": {
+          "price": 3.99,
+          "formattedPrice": "3.99﷼"
+        },
+        "200GB": {
+          "price": 12.99,
+          "formattedPrice": "12.99﷼"
+        },
+        "2TB": {
+          "price": 44.99,
+          "formattedPrice": "44.99﷼"
+        },
+        "6TB": {
+          "price": 129.99,
+          "formattedPrice": "129.99﷼"
+        },
+        "12TB": {
+          "price": 269.99,
+          "formattedPrice": "269.99﷼"
+        }
+      },
+      "nameZh": "沙特阿拉伯"
+    },
+    {
+      "country": "Senegal",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "50GB": {
+          "price": 0.99,
+          "formattedPrice": "$0.99"
+        },
+        "200GB": {
+          "price": 3.49,
+          "formattedPrice": "$3.49"
+        },
+        "2TB": {
+          "price": 11.99,
+          "formattedPrice": "$11.99"
+        },
+        "6TB": {
+          "price": 34.99,
+          "formattedPrice": "$34.99"
+        },
+        "12TB": {
+          "price": 69.99,
+          "formattedPrice": "$69.99"
+        }
+      },
+      "nameZh": "塞内加尔"
+    },
+    {
+      "country": "South Africa",
+      "region": "Europe, Middle East & Africa",
+      "currency": "ZAR",
+      "plans": {
+        "50GB": {
+          "price": 14.99,
+          "formattedPrice": "R14.99"
+        },
+        "200GB": {
+          "price": 59.99,
+          "formattedPrice": "R59.99"
+        },
+        "2TB": {
+          "price": 199.99,
+          "formattedPrice": "R199.99"
+        },
+        "6TB": {
+          "price": 599.99,
+          "formattedPrice": "R599.99"
+        },
+        "12TB": {
+          "price": 1199.99,
+          "formattedPrice": "R1199.99"
+        }
+      },
+      "nameZh": "南非"
+    },
+    {
+      "country": "Sweden",
+      "region": "Europe, Middle East & Africa",
+      "currency": "SEK",
+      "plans": {
+        "50GB": {
+          "price": 12,
+          "formattedPrice": "12 kr"
+        },
+        "200GB": {
+          "price": 39,
+          "formattedPrice": "39 kr"
+        },
+        "2TB": {
+          "price": 129,
+          "formattedPrice": "129 kr"
+        },
+        "6TB": {
+          "price": 399,
+          "formattedPrice": "399 kr"
+        },
+        "12TB": {
+          "price": 799,
+          "formattedPrice": "799 kr"
+        }
+      },
+      "nameZh": "瑞典"
+    },
+    {
+      "country": "Switzerland",
+      "region": "Europe, Middle East & Africa",
+      "currency": "CHF",
+      "plans": {
+        "50GB": {
+          "price": 1,
+          "formattedPrice": "CHF 1"
+        },
+        "200GB": {
+          "price": 3,
+          "formattedPrice": "CHF 3"
+        },
+        "2TB": {
+          "price": 10,
+          "formattedPrice": "CHF 10"
+        },
+        "6TB": {
+          "price": 30,
+          "formattedPrice": "CHF 30"
+        },
+        "12TB": {
+          "price": 60,
+          "formattedPrice": "CHF 60"
+        }
+      },
+      "nameZh": "瑞士"
+    },
+    {
+      "country": "Tanzania",
+      "region": "Europe, Middle East & Africa",
+      "currency": "TZS",
+      "plans": {
+        "50GB": {
+          "price": 2500,
+          "formattedPrice": "2500 TSh"
+        },
+        "200GB": {
+          "price": 8900,
+          "formattedPrice": "8900 TSh"
+        },
+        "2TB": {
+          "price": 29900,
+          "formattedPrice": "29900 TSh"
+        },
+        "6TB": {
+          "price": 89900,
+          "formattedPrice": "89900 TSh"
+        },
+        "12TB": {
+          "price": 179900,
+          "formattedPrice": "179900 TSh"
+        }
+      },
+      "nameZh": "坦桑尼亚"
+    },
+    {
+      "country": "Türkiye",
+      "region": "Europe, Middle East & Africa",
+      "currency": "TRY",
+      "plans": {
+        "50GB": {
+          "price": 49.99,
+          "formattedPrice": "49.99 TL"
+        },
+        "200GB": {
+          "price": 169.99,
+          "formattedPrice": "169.99 TL"
+        },
+        "2TB": {
+          "price": 549.99,
+          "formattedPrice": "549.99 TL"
+        },
+        "6TB": {
+          "price": 1699.99,
+          "formattedPrice": "1699.99 TL"
+        },
+        "12TB": {
+          "price": 3399.99,
+          "formattedPrice": "3399.99 TL"
+        }
+      },
+      "nameZh": "土耳其"
+    },
+    {
+      "country": "Uganda",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "50GB": {
+          "price": 0.99,
+          "formattedPrice": "$0.99"
+        },
+        "200GB": {
+          "price": 3.49,
+          "formattedPrice": "$3.49"
+        },
+        "2TB": {
+          "price": 11.99,
+          "formattedPrice": "$11.99"
+        },
+        "6TB": {
+          "price": 34.99,
+          "formattedPrice": "$34.99"
+        },
+        "12TB": {
+          "price": 69.99,
+          "formattedPrice": "$69.99"
+        }
+      },
+      "nameZh": "乌干达"
+    },
+    {
+      "country": "United Arab Emirates",
+      "region": "Europe, Middle East & Africa",
+      "currency": "AED",
+      "plans": {
+        "50GB": {
+          "price": 3.99,
+          "formattedPrice": "AED 3.99"
+        },
+        "200GB": {
+          "price": 11.99,
+          "formattedPrice": "AED 11.99"
+        },
+        "2TB": {
+          "price": 39.99,
+          "formattedPrice": "AED 39.99"
+        },
+        "6TB": {
+          "price": 119.99,
+          "formattedPrice": "AED 119.99"
+        },
+        "12TB": {
+          "price": 239.99,
+          "formattedPrice": "AED 239.99"
+        }
+      },
+      "nameZh": "阿拉伯联合酋长国"
+    },
+    {
+      "country": "United Kingdom",
+      "region": "Europe, Middle East & Africa",
+      "currency": "GBP",
+      "plans": {
+        "50GB": {
+          "price": 0.99,
+          "formattedPrice": "£0.99"
+        },
+        "200GB": {
+          "price": 2.99,
+          "formattedPrice": "£2.99"
+        },
+        "2TB": {
+          "price": 8.99,
+          "formattedPrice": "£8.99"
+        },
+        "6TB": {
+          "price": 26.99,
+          "formattedPrice": "£26.99"
+        },
+        "12TB": {
+          "price": 54.99,
+          "formattedPrice": "£54.99"
+        }
+      },
+      "nameZh": "英国"
+    },
+    {
+      "country": "Zambia",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "50GB": {
+          "price": 0.99,
+          "formattedPrice": "$0.99"
+        },
+        "200GB": {
+          "price": 3.49,
+          "formattedPrice": "$3.49"
+        },
+        "2TB": {
+          "price": 11.99,
+          "formattedPrice": "$11.99"
+        },
+        "6TB": {
+          "price": 34.99,
+          "formattedPrice": "$34.99"
+        },
+        "12TB": {
+          "price": 69.99,
+          "formattedPrice": "$69.99"
+        }
+      },
+      "nameZh": "赞比亚"
+    },
+    {
+      "country": "Zimbabwe",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "50GB": {
+          "price": 0.99,
+          "formattedPrice": "$0.99"
+        },
+        "200GB": {
+          "price": 3.49,
+          "formattedPrice": "$3.49"
+        },
+        "2TB": {
+          "price": 11.99,
+          "formattedPrice": "$11.99"
+        },
+        "6TB": {
+          "price": 34.99,
+          "formattedPrice": "$34.99"
+        },
+        "12TB": {
+          "price": 69.99,
+          "formattedPrice": "$69.99"
+        }
+      },
+      "nameZh": "津巴布韦"
+    },
+    {
+      "country": "Australia",
+      "region": "Asia Pacific",
+      "currency": "AUD",
+      "plans": {
+        "50GB": {
+          "price": 1.49,
+          "formattedPrice": "$1.49"
+        },
+        "200GB": {
+          "price": 4.49,
+          "formattedPrice": "$4.49"
+        },
+        "2TB": {
+          "price": 14.99,
+          "formattedPrice": "$14.99"
+        },
+        "6TB": {
+          "price": 44.99,
+          "formattedPrice": "$44.99"
+        },
+        "12TB": {
+          "price": 89.99,
+          "formattedPrice": "$89.99"
+        }
+      },
+      "nameZh": "澳大利亚"
+    },
+    {
+      "country": "Cambodia",
+      "region": "Asia Pacific",
+      "currency": "USD",
+      "plans": {
+        "50GB": {
+          "price": 0.99,
+          "formattedPrice": "$0.99"
+        },
+        "200GB": {
+          "price": 2.99,
+          "formattedPrice": "$2.99"
+        },
+        "2TB": {
+          "price": 10.99,
+          "formattedPrice": "$10.99"
+        },
+        "6TB": {
+          "price": 32.99,
+          "formattedPrice": "$32.99"
+        },
+        "12TB": {
+          "price": 64.99,
+          "formattedPrice": "$64.99"
+        }
+      },
+      "nameZh": "柬埔寨"
+    },
+    {
+      "country": "China mainland",
+      "region": "Asia Pacific",
+      "currency": "CNY",
+      "plans": {
+        "50GB": {
+          "price": 6,
+          "formattedPrice": "¥6"
+        },
+        "200GB": {
+          "price": 21,
+          "formattedPrice": "¥21"
+        },
+        "2TB": {
+          "price": 68,
+          "formattedPrice": "¥68"
+        },
+        "6TB": {
+          "price": 198,
+          "formattedPrice": "¥198"
+        },
+        "12TB": {
+          "price": 398,
+          "formattedPrice": "¥398"
+        }
+      },
+      "nameZh": "中国大陆"
+    },
+    {
+      "country": "Hong Kong",
+      "region": "Asia Pacific",
+      "currency": "HKD",
+      "plans": {
+        "50GB": {
+          "price": 8,
+          "formattedPrice": "HK$ 8"
+        },
+        "200GB": {
+          "price": 23,
+          "formattedPrice": "HK$ 23"
+        },
+        "2TB": {
+          "price": 78,
+          "formattedPrice": "HK$ 78"
+        },
+        "6TB": {
+          "price": 238,
+          "formattedPrice": "HK$ 238"
+        },
+        "12TB": {
+          "price": 468,
+          "formattedPrice": "HK$ 468"
+        }
+      },
+      "nameZh": "香港"
+    },
+    {
+      "country": "India",
+      "region": "Asia Pacific",
+      "currency": "INR",
+      "plans": {
+        "50GB": {
+          "price": 75,
+          "formattedPrice": "Rs 75"
+        },
+        "200GB": {
+          "price": 219,
+          "formattedPrice": "Rs 219"
+        },
+        "2TB": {
+          "price": 749,
+          "formattedPrice": "Rs 749"
+        },
+        "6TB": {
+          "price": 2999,
+          "formattedPrice": "Rs 2999"
+        },
+        "12TB": {
+          "price": 5900,
+          "formattedPrice": "Rs 5900"
+        }
+      },
+      "nameZh": "印度"
+    },
+    {
+      "country": "Indonesia",
+      "region": "Asia Pacific",
+      "currency": "IDR",
+      "plans": {
+        "50GB": {
+          "price": 15000,
+          "formattedPrice": "Rp 15000"
+        },
+        "200GB": {
+          "price": 59000,
+          "formattedPrice": "Rp 59000"
+        },
+        "2TB": {
+          "price": 199000,
+          "formattedPrice": "Rp 199000"
+        },
+        "6TB": {
+          "price": 599000,
+          "formattedPrice": "Rp 599000"
+        },
+        "12TB": {
+          "price": 1199000,
+          "formattedPrice": "Rp 1199000"
+        }
+      },
+      "nameZh": "印度尼西亚"
+    },
+    {
+      "country": "Japan",
+      "region": "Asia Pacific",
+      "currency": "JPY",
+      "plans": {
+        "50GB": {
+          "price": 180,
+          "formattedPrice": "¥180"
+        },
+        "200GB": {
+          "price": 540,
+          "formattedPrice": "¥540"
+        },
+        "2TB": {
+          "price": 1800,
+          "formattedPrice": "¥1800"
+        },
+        "6TB": {
+          "price": 5500,
+          "formattedPrice": "¥5500"
+        },
+        "12TB": {
+          "price": 11000,
+          "formattedPrice": "¥11000"
+        }
+      },
+      "nameZh": "日本"
+    },
+    {
+      "country": "Kazakhstan",
+      "region": "Asia Pacific",
+      "currency": "KZT",
+      "plans": {
+        "50GB": {
+          "price": 499,
+          "formattedPrice": "₸499"
+        },
+        "200GB": {
+          "price": 1490,
+          "formattedPrice": "₸1490"
+        },
+        "2TB": {
+          "price": 4990,
+          "formattedPrice": "₸4990"
+        },
+        "6TB": {
+          "price": 14990,
+          "formattedPrice": "₸14990"
+        },
+        "12TB": {
+          "price": 29990,
+          "formattedPrice": "₸29990"
+        }
+      },
+      "nameZh": "哈萨克斯坦"
+    },
+    {
+      "country": "Kyrgyzstan",
+      "region": "Asia Pacific",
+      "currency": "USD",
+      "plans": {
+        "50GB": {
+          "price": 0.99,
+          "formattedPrice": "$0.99"
+        },
+        "200GB": {
+          "price": 2.99,
+          "formattedPrice": "$2.99"
+        },
+        "2TB": {
+          "price": 10.99,
+          "formattedPrice": "$10.99"
+        },
+        "6TB": {
+          "price": 32.99,
+          "formattedPrice": "$32.99"
+        },
+        "12TB": {
+          "price": 64.99,
+          "formattedPrice": "$64.99"
+        }
+      },
+      "nameZh": "吉尔吉斯斯坦"
+    },
+    {
+      "country": "Laos",
+      "region": "Asia Pacific",
+      "currency": "USD",
+      "plans": {
+        "50GB": {
+          "price": 0.99,
+          "formattedPrice": "$0.99"
+        },
+        "200GB": {
+          "price": 3.29,
+          "formattedPrice": "$3.29"
+        },
+        "2TB": {
+          "price": 10.99,
+          "formattedPrice": "$10.99"
+        },
+        "6TB": {
+          "price": 32.99,
+          "formattedPrice": "$32.99"
+        },
+        "12TB": {
+          "price": 64.99,
+          "formattedPrice": "$64.99"
+        }
+      },
+      "nameZh": "老挝"
+    },
+    {
+      "country": "Malaysia",
+      "region": "Asia Pacific",
+      "currency": "MYR",
+      "plans": {
+        "50GB": {
+          "price": 3.9,
+          "formattedPrice": "RM3.90"
+        },
+        "200GB": {
+          "price": 11.9,
+          "formattedPrice": "RM11.90"
+        },
+        "2TB": {
+          "price": 44.9,
+          "formattedPrice": "RM44.90"
+        },
+        "6TB": {
+          "price": 129.9,
+          "formattedPrice": "RM129.90"
+        },
+        "12TB": {
+          "price": 269.9,
+          "formattedPrice": "RM269.90"
+        }
+      },
+      "nameZh": "马来西亚"
+    },
+    {
+      "country": "Nepal",
+      "region": "Asia Pacific",
+      "currency": "USD",
+      "plans": {
+        "50GB": {
+          "price": 0.99,
+          "formattedPrice": "$0.99"
+        },
+        "200GB": {
+          "price": 3.49,
+          "formattedPrice": "$3.49"
+        },
+        "2TB": {
+          "price": 11.99,
+          "formattedPrice": "$11.99"
+        },
+        "6TB": {
+          "price": 34.99,
+          "formattedPrice": "$34.99"
+        },
+        "12TB": {
+          "price": 69.99,
+          "formattedPrice": "$69.99"
+        }
+      },
+      "nameZh": "尼泊尔"
+    },
+    {
+      "country": "New Zealand",
+      "region": "Asia Pacific",
+      "currency": "NZD",
+      "plans": {
+        "50GB": {
+          "price": 1.99,
+          "formattedPrice": "$1.99"
+        },
+        "200GB": {
+          "price": 5.99,
+          "formattedPrice": "$5.99"
+        },
+        "2TB": {
+          "price": 19.99,
+          "formattedPrice": "$19.99"
+        },
+        "6TB": {
+          "price": 59.99,
+          "formattedPrice": "$59.99"
+        },
+        "12TB": {
+          "price": 119.99,
+          "formattedPrice": "$119.99"
+        }
+      },
+      "nameZh": "新西兰"
+    },
+    {
+      "country": "Philippines",
+      "region": "Asia Pacific",
+      "currency": "PHP",
+      "plans": {
+        "50GB": {
+          "price": 59,
+          "formattedPrice": "₱59"
+        },
+        "200GB": {
+          "price": 199,
+          "formattedPrice": "₱199"
+        },
+        "2TB": {
+          "price": 699,
+          "formattedPrice": "₱699"
+        },
+        "6TB": {
+          "price": 1990,
+          "formattedPrice": "₱1990"
+        },
+        "12TB": {
+          "price": 3990,
+          "formattedPrice": "₱3990"
+        }
+      },
+      "nameZh": "菲律宾"
+    },
+    {
+      "country": "Republic of Korea",
+      "region": "Asia Pacific",
+      "currency": "KRW",
+      "plans": {
+        "50GB": {
+          "price": 1100,
+          "formattedPrice": "₩1100"
+        },
+        "200GB": {
+          "price": 4400,
+          "formattedPrice": "₩4400"
+        },
+        "2TB": {
+          "price": 14000,
+          "formattedPrice": "₩14000"
+        },
+        "6TB": {
+          "price": 44000,
+          "formattedPrice": "₩44000"
+        },
+        "12TB": {
+          "price": 88000,
+          "formattedPrice": "₩88000"
+        }
+      },
+      "nameZh": "韩国"
+    },
+    {
+      "country": "Singapore",
+      "region": "Asia Pacific",
+      "currency": "SGD",
+      "plans": {
+        "50GB": {
+          "price": 1.48,
+          "formattedPrice": "S$ 1.48"
+        },
+        "200GB": {
+          "price": 3.98,
+          "formattedPrice": "S$ 3.98"
+        },
+        "2TB": {
+          "price": 13.98,
+          "formattedPrice": "S$ 13.98"
+        },
+        "6TB": {
+          "price": 42.98,
+          "formattedPrice": "S$ 42.98"
+        },
+        "12TB": {
+          "price": 84.98,
+          "formattedPrice": "S$ 84.98"
+        }
+      },
+      "nameZh": "新加坡"
+    },
+    {
+      "country": "Taiwan",
+      "region": "Asia Pacific",
+      "currency": "TWD",
+      "plans": {
+        "50GB": {
+          "price": 30,
+          "formattedPrice": "NT$ 30"
+        },
+        "200GB": {
+          "price": 90,
+          "formattedPrice": "NT$ 90"
+        },
+        "2TB": {
+          "price": 300,
+          "formattedPrice": "NT$ 300"
+        },
+        "6TB": {
+          "price": 900,
+          "formattedPrice": "NT$ 900"
+        },
+        "12TB": {
+          "price": 1790,
+          "formattedPrice": "NT$ 1790"
+        }
+      },
+      "nameZh": "台湾"
+    },
+    {
+      "country": "Tajikistan",
+      "region": "Asia Pacific",
+      "currency": "USD",
+      "plans": {
+        "50GB": {
+          "price": 0.99,
+          "formattedPrice": "$0.99"
+        },
+        "200GB": {
+          "price": 2.99,
+          "formattedPrice": "$2.99"
+        },
+        "2TB": {
+          "price": 10.99,
+          "formattedPrice": "$10.99"
+        },
+        "6TB": {
+          "price": 32.99,
+          "formattedPrice": "$32.99"
+        },
+        "12TB": {
+          "price": 64.99,
+          "formattedPrice": "$64.99"
+        }
+      },
+      "nameZh": "塔吉克斯坦"
+    },
+    {
+      "country": "Thailand",
+      "region": "Asia Pacific",
+      "currency": "THB",
+      "plans": {
+        "50GB": {
+          "price": 35,
+          "formattedPrice": "฿35"
+        },
+        "200GB": {
+          "price": 99,
+          "formattedPrice": "฿99"
+        },
+        "2TB": {
+          "price": 399,
+          "formattedPrice": "฿399"
+        },
+        "6TB": {
+          "price": 1190,
+          "formattedPrice": "฿1190"
+        },
+        "12TB": {
+          "price": 2390,
+          "formattedPrice": "฿2390"
+        }
+      },
+      "nameZh": "泰国"
+    },
+    {
+      "country": "Uzbekistan",
+      "region": "Asia Pacific",
+      "currency": "USD",
+      "plans": {
+        "50GB": {
+          "price": 0.99,
+          "formattedPrice": "$0.99"
+        },
+        "200GB": {
+          "price": 2.99,
+          "formattedPrice": "$2.99"
+        },
+        "2TB": {
+          "price": 10.99,
+          "formattedPrice": "$10.99"
+        },
+        "6TB": {
+          "price": 32.99,
+          "formattedPrice": "$32.99"
+        },
+        "12TB": {
+          "price": 64.99,
+          "formattedPrice": "$64.99"
+        }
+      },
+      "nameZh": "乌兹别克斯坦"
+    },
+    {
+      "country": "Vietnam",
+      "region": "Asia Pacific",
+      "currency": "VND",
+      "plans": {
+        "50GB": {
+          "price": 25000,
+          "formattedPrice": "₫25000"
+        },
+        "200GB": {
+          "price": 89000,
+          "formattedPrice": "₫89000"
+        },
+        "2TB": {
+          "price": 299000,
+          "formattedPrice": "₫299000"
+        },
+        "6TB": {
+          "price": 899000,
+          "formattedPrice": "₫899000"
+        },
+        "12TB": {
+          "price": 1799000,
+          "formattedPrice": "₫1799000"
+        }
+      },
+      "nameZh": "越南"
+    }
+  ]
+}
