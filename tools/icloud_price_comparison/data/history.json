@@ -1,0 +1,1368 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-07-30T01:01:10.212Z",
+  "countries": {
+    "Bahamas": {
+      "nameZh": "巴哈马",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 10.99,
+            "6TB": 32.99,
+            "12TB": 64.99
+          }
+        }
+      ]
+    },
+    "Barbados": {
+      "nameZh": "巴巴多斯",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 3.49,
+            "2TB": 11.99,
+            "6TB": 34.99,
+            "12TB": 69.99
+          }
+        }
+      ]
+    },
+    "Brazil": {
+      "nameZh": "巴西",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "BRL",
+          "plans": {
+            "50GB": 4.9,
+            "200GB": 14.9,
+            "2TB": 49.9,
+            "6TB": 149.9,
+            "12TB": 299.9
+          }
+        },
+        {
+          "observedAt": "2026-07-30",
+          "currency": "BRL",
+          "plans": {
+            "50GB": 5.9,
+            "200GB": 19.9,
+            "2TB": 66.9,
+            "6TB": 199.9,
+            "12TB": 399.9
+          }
+        }
+      ]
+    },
+    "Canada": {
+      "nameZh": "加拿大",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "CAD",
+          "plans": {
+            "50GB": 1.29,
+            "200GB": 3.99,
+            "2TB": 12.99,
+            "6TB": 39.99,
+            "12TB": 79.99
+          }
+        }
+      ]
+    },
+    "Chile": {
+      "nameZh": "智利",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "CLP",
+          "plans": {
+            "50GB": 790,
+            "200GB": 2490,
+            "2TB": 8490,
+            "6TB": 29990,
+            "12TB": 59990
+          }
+        },
+        {
+          "observedAt": "2026-07-30",
+          "currency": "CLP",
+          "plans": {
+            "50GB": 990,
+            "200GB": 3290,
+            "2TB": 10990,
+            "6TB": 32990,
+            "12TB": 64990
+          }
+        }
+      ]
+    },
+    "Colombia": {
+      "nameZh": "哥伦比亚",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "COP",
+          "plans": {
+            "50GB": 3900,
+            "200GB": 12900,
+            "2TB": 44900,
+            "6TB": 129900,
+            "12TB": 269900
+          }
+        }
+      ]
+    },
+    "Mexico": {
+      "nameZh": "墨西哥",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "MXN",
+          "plans": {
+            "50GB": 17,
+            "200GB": 49,
+            "2TB": 179,
+            "6TB": 499,
+            "12TB": 999
+          }
+        }
+      ]
+    },
+    "Peru": {
+      "nameZh": "秘鲁",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "PEN",
+          "plans": {
+            "50GB": 2.9,
+            "200GB": 9.9,
+            "2TB": 34.9,
+            "6TB": 99.9,
+            "12TB": 199.9
+          }
+        },
+        {
+          "observedAt": "2026-07-30",
+          "currency": "PEN",
+          "plans": {
+            "50GB": 3.9,
+            "200GB": 12.9,
+            "2TB": 42.9,
+            "6TB": 129.9,
+            "12TB": 259.9
+          }
+        }
+      ]
+    },
+    "Suriname": {
+      "nameZh": "苏里南",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 3.49,
+            "2TB": 11.99,
+            "6TB": 34.99,
+            "12TB": 69.99
+          }
+        }
+      ]
+    },
+    "United States": {
+      "nameZh": "美国",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "Albania": {
+      "nameZh": "阿尔巴尼亚",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "USD",
+          "plans": {
+            "50GB": 1.19,
+            "200GB": 3.59,
+            "2TB": 11.99,
+            "6TB": 34.99,
+            "12TB": 69.99
+          }
+        }
+      ]
+    },
+    "Armenia": {
+      "nameZh": "亚美尼亚",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "USD",
+          "plans": {
+            "50GB": 1.19,
+            "200GB": 3.49,
+            "2TB": 11.99,
+            "6TB": 34.99,
+            "12TB": 69.99
+          }
+        }
+      ]
+    },
+    "Bahrain": {
+      "nameZh": "巴林",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 10.99,
+            "6TB": 32.99,
+            "12TB": 64.99
+          }
+        }
+      ]
+    },
+    "Belarus": {
+      "nameZh": "白俄罗斯",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "USD",
+          "plans": {
+            "50GB": 1.19,
+            "200GB": 3.49,
+            "2TB": 11.99,
+            "6TB": 34.99,
+            "12TB": 69.99
+          }
+        }
+      ]
+    },
+    "Benin": {
+      "nameZh": "贝宁",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 3.49,
+            "2TB": 11.99,
+            "6TB": 34.99,
+            "12TB": 69.99
+          }
+        }
+      ]
+    },
+    "Bulgaria": {
+      "nameZh": "保加利亚",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "BGN",
+          "plans": {
+            "50GB": 1.99,
+            "200GB": 5.99,
+            "2TB": 20.99,
+            "6TB": 64.99,
+            "12TB": 129.99
+          }
+        }
+      ]
+    },
+    "Cameroon": {
+      "nameZh": "喀麦隆",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 3.49,
+            "2TB": 11.99,
+            "6TB": 34.99,
+            "12TB": 69.99
+          }
+        }
+      ]
+    },
+    "Croatia": {
+      "nameZh": "克罗地亚",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "EUR",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "Czechia": {
+      "nameZh": "捷克",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "CZK",
+          "plans": {
+            "50GB": 25,
+            "200GB": 79,
+            "2TB": 249,
+            "6TB": 749,
+            "12TB": 1490
+          }
+        }
+      ]
+    },
+    "Denmark": {
+      "nameZh": "丹麦",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "DKK",
+          "plans": {
+            "50GB": 9,
+            "200GB": 25,
+            "2TB": 89,
+            "6TB": 269,
+            "12TB": 549
+          }
+        }
+      ]
+    },
+    "Egypt": {
+      "nameZh": "埃及",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "EGP",
+          "plans": {
+            "50GB": 39.99,
+            "200GB": 149.99,
+            "2TB": 499.99,
+            "6TB": 1499.99,
+            "12TB": 2999.99
+          }
+        },
+        {
+          "observedAt": "2026-07-30",
+          "currency": "EGP",
+          "plans": {
+            "50GB": 49.99,
+            "200GB": 179.99,
+            "2TB": 599.99,
+            "6TB": 1799.99,
+            "12TB": 3599.99
+          }
+        }
+      ]
+    },
+    "Euro Zone": {
+      "nameZh": "欧盟",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "EUR",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "Georgia": {
+      "nameZh": "格鲁吉亚",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 3.49,
+            "2TB": 11.99,
+            "6TB": 34.99,
+            "12TB": 69.99
+          }
+        }
+      ]
+    },
+    "Ghana": {
+      "nameZh": "加纳",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 3.49,
+            "2TB": 11.99,
+            "6TB": 34.99,
+            "12TB": 69.99
+          }
+        }
+      ]
+    },
+    "Hungary": {
+      "nameZh": "匈牙利",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "HUF",
+          "plans": {
+            "50GB": 399,
+            "200GB": 1290,
+            "2TB": 4490,
+            "6TB": 12990,
+            "12TB": 26990
+          }
+        }
+      ]
+    },
+    "Iceland": {
+      "nameZh": "冰岛",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "USD",
+          "plans": {
+            "50GB": 1.19,
+            "200GB": 3.69,
+            "2TB": 11.99,
+            "6TB": 34.99,
+            "12TB": 69.99
+          }
+        }
+      ]
+    },
+    "Israel": {
+      "nameZh": "以色列",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "ILS",
+          "plans": {
+            "50GB": 3.9,
+            "200GB": 11.9,
+            "2TB": 39.9,
+            "6TB": 119.9,
+            "12TB": 239.9
+          }
+        }
+      ]
+    },
+    "Ivory Coast": {
+      "nameZh": "科特迪瓦",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 3.49,
+            "2TB": 11.99,
+            "6TB": 34.99,
+            "12TB": 69.99
+          }
+        }
+      ]
+    },
+    "Kenya": {
+      "nameZh": "肯尼亚",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 3.49,
+            "2TB": 11.99,
+            "6TB": 34.99,
+            "12TB": 69.99
+          }
+        }
+      ]
+    },
+    "Moldova": {
+      "nameZh": "摩尔多瓦",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 3.49,
+            "2TB": 11.99,
+            "6TB": 34.99,
+            "12TB": 69.99
+          }
+        }
+      ]
+    },
+    "Nigeria": {
+      "nameZh": "尼日利亚",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "NGN",
+          "plans": {
+            "50GB": 900,
+            "200GB": 2900,
+            "2TB": 9900,
+            "6TB": 26900,
+            "12TB": 44900
+          }
+        },
+        {
+          "observedAt": "2026-07-30",
+          "currency": "NGN",
+          "plans": {
+            "50GB": 1300,
+            "200GB": 4500,
+            "2TB": 14900,
+            "6TB": 39900,
+            "12TB": 66900
+          }
+        }
+      ]
+    },
+    "Norway": {
+      "nameZh": "挪威",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "NOK",
+          "plans": {
+            "50GB": 12,
+            "200GB": 39,
+            "2TB": 129,
+            "6TB": 399,
+            "12TB": 799
+          }
+        }
+      ]
+    },
+    "Pakistan": {
+      "nameZh": "巴基斯坦",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "PKR",
+          "plans": {
+            "50GB": 200,
+            "200GB": 800,
+            "2TB": 2500,
+            "6TB": 8900,
+            "12TB": 17900
+          }
+        }
+      ]
+    },
+    "Poland": {
+      "nameZh": "波兰",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "PLN",
+          "plans": {
+            "50GB": 4.99,
+            "200GB": 14.99,
+            "2TB": 49.99,
+            "6TB": 149.99,
+            "12TB": 299.99
+          }
+        }
+      ]
+    },
+    "Qatar": {
+      "nameZh": "卡塔尔",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "QAR",
+          "plans": {
+            "50GB": 3.69,
+            "200GB": 10.99,
+            "2TB": 36.99,
+            "6TB": 109.99,
+            "12TB": 219.99
+          }
+        }
+      ]
+    },
+    "Romania": {
+      "nameZh": "罗马尼亚",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "RON",
+          "plans": {
+            "50GB": 4.99,
+            "200GB": 14.99,
+            "2TB": 49.99,
+            "6TB": 149.99,
+            "12TB": 299.99
+          }
+        }
+      ]
+    },
+    "Russia": {
+      "nameZh": "俄罗斯",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "RUB",
+          "plans": {
+            "50GB": 59,
+            "200GB": 149,
+            "2TB": 599,
+            "6TB": 3490,
+            "12TB": 6990
+          }
+        }
+      ]
+    },
+    "Saudi Arabia": {
+      "nameZh": "沙特阿拉伯",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "SAR",
+          "plans": {
+            "50GB": 3.99,
+            "200GB": 12.99,
+            "2TB": 44.99,
+            "6TB": 129.99,
+            "12TB": 269.99
+          }
+        }
+      ]
+    },
+    "Senegal": {
+      "nameZh": "塞内加尔",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 3.49,
+            "2TB": 11.99,
+            "6TB": 34.99,
+            "12TB": 69.99
+          }
+        }
+      ]
+    },
+    "South Africa": {
+      "nameZh": "南非",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "ZAR",
+          "plans": {
+            "50GB": 14.99,
+            "200GB": 59.99,
+            "2TB": 199.99,
+            "6TB": 599.99,
+            "12TB": 1199.99
+          }
+        }
+      ]
+    },
+    "Sweden": {
+      "nameZh": "瑞典",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "SEK",
+          "plans": {
+            "50GB": 12,
+            "200GB": 39,
+            "2TB": 129,
+            "6TB": 399,
+            "12TB": 799
+          }
+        }
+      ]
+    },
+    "Switzerland": {
+      "nameZh": "瑞士",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "CHF",
+          "plans": {
+            "50GB": 1,
+            "200GB": 3,
+            "2TB": 10,
+            "6TB": 30,
+            "12TB": 60
+          }
+        }
+      ]
+    },
+    "Tanzania": {
+      "nameZh": "坦桑尼亚",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "TZS",
+          "plans": {
+            "50GB": 2500,
+            "200GB": 8900,
+            "2TB": 29900,
+            "6TB": 89900,
+            "12TB": 179900
+          }
+        }
+      ]
+    },
+    "Türkiye": {
+      "nameZh": "土耳其",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "TRY",
+          "plans": {
+            "50GB": 24.99,
+            "200GB": 79.99,
+            "2TB": 249.99,
+            "6TB": 1299.99,
+            "12TB": 2499.99
+          }
+        },
+        {
+          "observedAt": "2026-07-30",
+          "currency": "TRY",
+          "plans": {
+            "50GB": 49.99,
+            "200GB": 169.99,
+            "2TB": 549.99,
+            "6TB": 1699.99,
+            "12TB": 3399.99
+          }
+        }
+      ]
+    },
+    "Uganda": {
+      "nameZh": "乌干达",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 3.49,
+            "2TB": 11.99,
+            "6TB": 34.99,
+            "12TB": 69.99
+          }
+        }
+      ]
+    },
+    "United Arab Emirates": {
+      "nameZh": "阿拉伯联合酋长国",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "AED",
+          "plans": {
+            "50GB": 3.99,
+            "200GB": 11.99,
+            "2TB": 39.99,
+            "6TB": 119.99,
+            "12TB": 239.99
+          }
+        }
+      ]
+    },
+    "United Kingdom": {
+      "nameZh": "英国",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "GBP",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 8.99,
+            "6TB": 26.99,
+            "12TB": 54.99
+          }
+        }
+      ]
+    },
+    "Zambia": {
+      "nameZh": "赞比亚",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 3.49,
+            "2TB": 11.99,
+            "6TB": 34.99,
+            "12TB": 69.99
+          }
+        }
+      ]
+    },
+    "Zimbabwe": {
+      "nameZh": "津巴布韦",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 3.49,
+            "2TB": 11.99,
+            "6TB": 34.99,
+            "12TB": 69.99
+          }
+        }
+      ]
+    },
+    "Australia": {
+      "nameZh": "澳大利亚",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "AUD",
+          "plans": {
+            "50GB": 1.49,
+            "200GB": 4.49,
+            "2TB": 14.99,
+            "6TB": 44.99,
+            "12TB": 89.99
+          }
+        }
+      ]
+    },
+    "Cambodia": {
+      "nameZh": "柬埔寨",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 10.99,
+            "6TB": 32.99,
+            "12TB": 64.99
+          }
+        }
+      ]
+    },
+    "China mainland": {
+      "nameZh": "中国大陆",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "CNY",
+          "plans": {
+            "50GB": 6,
+            "200GB": 21,
+            "2TB": 68,
+            "6TB": 198,
+            "12TB": 398
+          }
+        }
+      ]
+    },
+    "Hong Kong": {
+      "nameZh": "香港",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "HKD",
+          "plans": {
+            "50GB": 8,
+            "200GB": 23,
+            "2TB": 78,
+            "6TB": 238,
+            "12TB": 468
+          }
+        }
+      ]
+    },
+    "India": {
+      "nameZh": "印度",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "INR",
+          "plans": {
+            "50GB": 75,
+            "200GB": 219,
+            "2TB": 749,
+            "6TB": 2999,
+            "12TB": 5900
+          }
+        }
+      ]
+    },
+    "Indonesia": {
+      "nameZh": "印度尼西亚",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "IDR",
+          "plans": {
+            "50GB": 15000,
+            "200GB": 49000,
+            "2TB": 169000,
+            "6TB": 499000,
+            "12TB": 999000
+          }
+        },
+        {
+          "observedAt": "2026-07-30",
+          "currency": "IDR",
+          "plans": {
+            "50GB": 15000,
+            "200GB": 59000,
+            "2TB": 199000,
+            "6TB": 599000,
+            "12TB": 1199000
+          }
+        }
+      ]
+    },
+    "Japan": {
+      "nameZh": "日本",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "JPY",
+          "plans": {
+            "50GB": 150,
+            "200GB": 450,
+            "2TB": 1500,
+            "6TB": 4500,
+            "12TB": 9000
+          }
+        },
+        {
+          "observedAt": "2026-07-30",
+          "currency": "JPY",
+          "plans": {
+            "50GB": 180,
+            "200GB": 540,
+            "2TB": 1800,
+            "6TB": 5500,
+            "12TB": 11000
+          }
+        }
+      ]
+    },
+    "Kazakhstan": {
+      "nameZh": "哈萨克斯坦",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "KZT",
+          "plans": {
+            "50GB": 499,
+            "200GB": 1490,
+            "2TB": 4990,
+            "6TB": 14990,
+            "12TB": 29990
+          }
+        }
+      ]
+    },
+    "Kyrgyzstan": {
+      "nameZh": "吉尔吉斯斯坦",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 10.99,
+            "6TB": 32.99,
+            "12TB": 64.99
+          }
+        }
+      ]
+    },
+    "Malaysia": {
+      "nameZh": "马来西亚",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "MYR",
+          "plans": {
+            "50GB": 3.9,
+            "200GB": 11.9,
+            "2TB": 44.9,
+            "6TB": 129.9,
+            "12TB": 269.9
+          }
+        }
+      ]
+    },
+    "Nepal": {
+      "nameZh": "尼泊尔",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 3.49,
+            "2TB": 11.99,
+            "6TB": 34.99,
+            "12TB": 69.99
+          }
+        }
+      ]
+    },
+    "New Zealand": {
+      "nameZh": "新西兰",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "NZD",
+          "plans": {
+            "50GB": 1.69,
+            "200GB": 4.99,
+            "2TB": 16.99,
+            "6TB": 49.99,
+            "12TB": 99.99
+          }
+        },
+        {
+          "observedAt": "2026-07-30",
+          "currency": "NZD",
+          "plans": {
+            "50GB": 1.99,
+            "200GB": 5.99,
+            "2TB": 19.99,
+            "6TB": 59.99,
+            "12TB": 119.99
+          }
+        }
+      ]
+    },
+    "Philippines": {
+      "nameZh": "菲律宾",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "PHP",
+          "plans": {
+            "50GB": 49,
+            "200GB": 179,
+            "2TB": 599,
+            "6TB": 1790,
+            "12TB": 3590
+          }
+        },
+        {
+          "observedAt": "2026-07-30",
+          "currency": "PHP",
+          "plans": {
+            "50GB": 59,
+            "200GB": 199,
+            "2TB": 699,
+            "6TB": 1990,
+            "12TB": 3990
+          }
+        }
+      ]
+    },
+    "Republic of Korea": {
+      "nameZh": "韩国",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "KRW",
+          "plans": {
+            "50GB": 1100,
+            "200GB": 4400,
+            "2TB": 14000,
+            "6TB": 44000,
+            "12TB": 88000
+          }
+        }
+      ]
+    },
+    "Singapore": {
+      "nameZh": "新加坡",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "SGD",
+          "plans": {
+            "50GB": 1.48,
+            "200GB": 3.98,
+            "2TB": 13.98,
+            "6TB": 42.98,
+            "12TB": 84.98
+          }
+        }
+      ]
+    },
+    "Taiwan": {
+      "nameZh": "台湾",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "TWD",
+          "plans": {
+            "50GB": 30,
+            "200GB": 90,
+            "2TB": 300,
+            "6TB": 900,
+            "12TB": 1790
+          }
+        }
+      ]
+    },
+    "Tajikistan": {
+      "nameZh": "塔吉克斯坦",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 10.99,
+            "6TB": 32.99,
+            "12TB": 64.99
+          }
+        }
+      ]
+    },
+    "Thailand": {
+      "nameZh": "泰国",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "THB",
+          "plans": {
+            "50GB": 35,
+            "200GB": 99,
+            "2TB": 399,
+            "6TB": 1190,
+            "12TB": 2390
+          }
+        }
+      ]
+    },
+    "Uzbekistan": {
+      "nameZh": "乌兹别克斯坦",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 10.99,
+            "6TB": 32.99,
+            "12TB": 64.99
+          }
+        }
+      ]
+    },
+    "Vietnam": {
+      "nameZh": "越南",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2024-12-08",
+          "currency": "VND",
+          "plans": {
+            "50GB": 19000,
+            "200GB": 69000,
+            "2TB": 249000,
+            "6TB": 749000,
+            "12TB": 1499000
+          }
+        },
+        {
+          "observedAt": "2026-07-30",
+          "currency": "VND",
+          "plans": {
+            "50GB": 25000,
+            "200GB": 89000,
+            "2TB": 299000,
+            "6TB": 899000,
+            "12TB": 1799000
+          }
+        }
+      ]
+    },
+    "Azerbaijan": {
+      "nameZh": "阿塞拜疆",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-07-30",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 3.49,
+            "2TB": 11.99,
+            "6TB": 34.99,
+            "12TB": 69.99
+          }
+        }
+      ]
+    },
+    "Mauritius": {
+      "nameZh": "毛里求斯",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-07-30",
+          "currency": "USD",
+          "plans": {
+            "50GB": 1.19,
+            "200GB": 3.49,
+            "2TB": 11.99,
+            "6TB": 34.99,
+            "12TB": 69.99
+          }
+        }
+      ]
+    },
+    "Republic of Congo": {
+      "nameZh": "刚果共和国",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-07-30",
+          "currency": "USD",
+          "plans": {
+            "50GB": 1.19,
+            "200GB": 3.49,
+            "2TB": 11.99,
+            "6TB": 34.99,
+            "12TB": 69.99
+          }
+        }
+      ]
+    },
+    "Laos": {
+      "nameZh": "老挝",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2026-07-30",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 3.29,
+            "2TB": 10.99,
+            "6TB": 32.99,
+            "12TB": 64.99
+          }
+        }
+      ]
+    }
+  }
+}
