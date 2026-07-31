@@ -254,6 +254,9 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--blue-dark);
 .source-links { min-width: 0; display: flex; align-items: center; gap: 10px; color: var(--muted); }
 .source-links a { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .source-links svg { width: 15px; height: 15px; }
+.source-meta-button { display: inline-flex; align-items: center; gap: 5px; min-width: 0; padding: 0; color: var(--muted); background: transparent; border: 0; font: inherit; text-align: left; cursor: pointer; }
+.source-meta-button:hover { color: var(--blue-dark); }
+.source-meta-button strong { color: var(--muted-strong); font-weight: 680; }
 .source-separator { width: 1px; height: 14px; background: var(--border-strong); }
 .data-disclaimer { margin: 0; padding: 10px 18px; color: var(--muted); background: var(--surface-subtle); border-top: 1px solid var(--border); font-size: 12px; }
 
@@ -293,6 +296,13 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--blue-dark);
 .price-trend.is-up { color: var(--danger); }
 .price-trend.is-down { color: var(--green); }
 .price-trend.is-neutral { color: var(--muted); }
+.source-history-dialog { width: min(620px, calc(100% - 32px)); }
+.source-history-dialog .history-table-scroll table { min-width: 560px; }
+.published-date-current { padding: 20px 24px; background: var(--surface-subtle); border-bottom: 1px solid var(--border); }
+.published-date-current span { display: block; margin-bottom: 4px; color: var(--muted); font-size: 12px; }
+.published-date-current strong { display: block; font-size: 21px; }
+.published-date-list { padding-top: 20px; }
+.published-change-cell { min-width: 320px; line-height: 1.6; white-space: normal; }
 
 .history-toolbar { padding: 16px 24px 0; }
 .segmented.compact { width: min(430px, 100%); min-height: 36px; }

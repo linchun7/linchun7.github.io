@@ -1364,5 +1364,19 @@
         }
       ]
     }
-  }
+  },
+  "sourcePublishedDates": [
+    {
+      "publishedDate": "July 17, 2026",
+      "observedAt": "2026-07-31",
+      "changes": {
+        "addedTiers": [],
+        "removedTiers": [],
+        "addedCountries": [],
+        "removedCountries": [],
+        "changedCountries": []
+      },
+      "kind": "initial"
+    }
+  ]
 }

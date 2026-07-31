@@ -1,0 +1,160 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {
+  buildSnapshotChanges,
+  publicationDateKey,
+  updateHistory,
+  updatePublishedDateHistory
+} from '../scripts/update-prices.mjs';
+
+const TIER_50 = { id: '50GB', label: '50 GB', capacityGb: 50 };
+const TIER_200 = { id: '200GB', label: '200 GB', capacityGb: 200 };
+const TIER_1TB = { id: '1TB', label: '1 TB', capacityGb: 1024 };
+
+function country(countryName, {
+  nameZh = countryName,
+  region = 'Americas',
+  currency = 'USD',
+  prices = { '50GB': 1, '200GB': 3 }
+} = {}) {
+  return {
+    country: countryName,
+    nameZh,
+    region,
+    currency,
+    plans: Object.fromEntries(Object.entries(prices).map(([id, price]) => [id, {
+      price,
+      formattedPrice: `${currency} ${price}`
+    }]))
+  };
+}
+
+function snapshot({ countries, tiers = [TIER_50, TIER_200], publishedDate = 'July 17, 2026' }) {
+  return {
+    generatedAt: '2026-07-31T18:30:00.000Z',
+    source: { publishedDate },
+    tiers,
+    countries
+  };
+}
+
+test('records one initial publication date and only appends genuine date changes', () => {
+  const previousData = snapshot({ countries: [country('Alpha')] });
+  const history = { schemaVersion: 1, countries: {} };
+  const noChanges = { addedTiers: [], removedTiers: [], addedCountries: [], removedCountries: [], changedCountries: [] };
+
+  const initial = updatePublishedDateHistory(history, previousData, '2026-07-17', '2026-08-01', noChanges);
+  assert.equal(initial.changed, false);
+  assert.equal(initial.entries.length, 1);
+  assert.equal(initial.entries[0].kind, 'initial');
+  assert.equal(initial.entries[0].observedAt, '2026-08-01', 'the initial detection date should use Beijing time');
+
+  const repeated = updatePublishedDateHistory(history, previousData, 'July 17, 2026', '2026-08-02', noChanges);
+  assert.equal(repeated.changed, false);
+  assert.equal(repeated.entries.length, 1);
+
+  const changed = updatePublishedDateHistory(history, previousData, 'August 1, 2026', '2026-08-02', noChanges);
+  assert.equal(changed.changed, true);
+  assert.equal(changed.entries.length, 2);
+  assert.equal(changed.entries.at(-1).kind, 'change');
+  assert.deepEqual(changed.entries.at(-1).changes, noChanges);
+});
+
+test('creates a clean initial publication record when no prior snapshot exists', () => {
+  const history = { schemaVersion: 1, countries: {} };
+  const noisyChanges = {
+    addedTiers: [TIER_50],
+    removedTiers: [],
+    addedCountries: [{ country: 'Alpha' }],
+    removedCountries: [],
+    changedCountries: []
+  };
+  const result = updatePublishedDateHistory(history, null, 'July 17, 2026', '2026-08-01', noisyChanges);
+  assert.equal(result.changed, false);
+  assert.equal(result.entries.length, 1);
+  assert.equal(result.entries[0].kind, 'initial');
+  assert.deepEqual(result.entries[0].changes.addedCountries, []);
+});
+
+test('detects tier, country, region, currency, and price changes together', () => {
+  const previousData = snapshot({
+    countries: [
+      country('Alpha', { nameZh: '甲', prices: { '50GB': 1, '200GB': 3 } }),
+      country('Removed', { nameZh: '已移除' })
+    ]
+  });
+  const currentCountries = [
+    country('Alpha', {
+      nameZh: '甲',
+      region: 'Asia Pacific',
+      currency: 'CAD',
+      prices: { '50GB': 2, '1TB': 8 }
+    }),
+    country('Added', { nameZh: '新增', prices: { '50GB': 1.5, '1TB': 6 } })
+  ];
+
+  const changes = buildSnapshotChanges(previousData, currentCountries, [TIER_50, TIER_1TB]);
+  assert.deepEqual(changes.addedTiers, [{ id: '1TB', label: '1 TB' }]);
+  assert.deepEqual(changes.removedTiers, [{ id: '200GB', label: '200 GB' }]);
+  assert.deepEqual(changes.addedCountries, [{ country: 'Added', nameZh: '新增' }]);
+  assert.deepEqual(changes.removedCountries, [{ country: 'Removed', nameZh: '已移除' }]);
+  assert.equal(changes.changedCountries.length, 1);
+  assert.deepEqual(changes.changedCountries[0], {
+    country: 'Alpha',
+    nameZh: '甲',
+    fromCurrency: 'USD',
+    toCurrency: 'CAD',
+    fromRegion: 'Americas',
+    toRegion: 'Asia Pacific',
+    tiers: [{ id: '50GB', from: 1, to: 2 }]
+  });
+});
+
+test('keeps removed-country history and appends complete events for a new tier', () => {
+  const history = {
+    schemaVersion: 1,
+    countries: {
+      Alpha: {
+        nameZh: '甲',
+        region: 'Americas',
+        events: [{ observedAt: '2026-07-01', currency: 'USD', plans: { '50GB': 1, '200GB': 3 } }]
+      },
+      Removed: {
+        nameZh: '已移除',
+        region: 'Americas',
+        events: [{ observedAt: '2026-07-01', currency: 'USD', plans: { '50GB': 1, '200GB': 3 } }]
+      }
+    }
+  };
+  const alphaWithNewTier = country('Alpha', { nameZh: '甲', prices: { '50GB': 1, '1TB': 8 } });
+  const result = updateHistory(history, [alphaWithNewTier], '2026-08-01', [TIER_50, TIER_1TB]);
+
+  assert.ok(result.history.countries.Removed, 'removal should not erase historical events');
+  assert.equal(result.history.countries.Alpha.events.length, 2);
+  assert.deepEqual(result.history.countries.Alpha.events.at(-1).plans, { '50GB': 1, '1TB': 8 });
+
+  const repeated = updateHistory(result.history, [alphaWithNewTier], '2026-08-02', [TIER_50, TIER_1TB]);
+  assert.equal(repeated.history.countries.Alpha.events.length, 2, 'unchanged prices should not duplicate history');
+});
+
+test('reuses preserved history when a removed country later returns', () => {
+  const history = {
+    schemaVersion: 1,
+    countries: {
+      Alpha: {
+        nameZh: '甲',
+        region: 'Americas',
+        events: [{ observedAt: '2026-07-01', currency: 'USD', plans: { '50GB': 1, '200GB': 3 } }]
+      }
+    }
+  };
+  updateHistory(history, [], '2026-07-15', [TIER_50, TIER_200]);
+  const returned = updateHistory(history, [country('Alpha', { nameZh: '甲', prices: { '50GB': 2, '200GB': 4 } })], '2026-08-01', [TIER_50, TIER_200]);
+  assert.equal(returned.history.countries.Alpha.events.length, 2);
+  assert.equal(returned.history.countries.Alpha.events.at(-1).plans['50GB'], 2);
+});
+
+test('normalizes equivalent Apple publication-date formats', () => {
+  assert.equal(publicationDateKey('July 17, 2026'), publicationDateKey('2026-07-17'));
+  assert.notEqual(publicationDateKey('July 17, 2026'), publicationDateKey('August 1, 2026'));
+});
