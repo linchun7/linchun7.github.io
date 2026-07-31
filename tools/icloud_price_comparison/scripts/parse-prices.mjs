@@ -22,6 +22,13 @@ const COUNTRY_ALIASES = {
   Euro: 'Euro Zone'
 };
 
+export const PRICE_CHANGE_THRESHOLDS = {
+  percentage: 0.8,
+  localRelative: 0.5,
+  localMinimum: 1,
+  cnyMinimum: 5
+};
+
 function cleanText(value) {
   return value.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
 }
@@ -89,7 +96,7 @@ function extractPublishedDate($) {
   return null;
 }
 
-function parseCountry($, heading, priceList, region) {
+function parseCountryHeading($, heading) {
   const title = headingText($, heading);
   const titleMatch = title.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
 
@@ -101,6 +108,11 @@ function parseCountry($, heading, priceList, region) {
     ? currencyLabel
     : CURRENCY_ALIASES[currencyLabel];
   if (!currency) throw new Error(`Unknown currency label "${currencyLabel}" for ${country}`);
+  return { country: cleanText(country), currency };
+}
+
+function parseCountry($, heading, priceList, region) {
+  const { country, currency } = parseCountryHeading($, heading);
   const $prices = $(priceList);
 
   const plans = {};
@@ -123,11 +135,63 @@ function parseCountry($, heading, priceList, region) {
     plans[tier.id] = { price, formattedPrice };
   });
 
-  return { country: cleanText(country), region, currency, plans, detectedTiers: [...detectedTiers.values()] };
+  return { country, region, currency, plans, detectedTiers: [...detectedTiers.values()] };
 }
 
-export function parseApplePrices(html) {
-  const $ = cheerio.load(html);
+function parseCountryByAppleMarkers($, heading, priceList, region) {
+  const { country, currency } = parseCountryHeading($, heading);
+  const plans = {};
+  const detectedTiers = new Map();
+  const tierItems = $(priceList).find('li').toArray().filter((item) => (
+    /^(?:\s*\d+(?:\.\d+)?\s*(?:GB|TB))/i.test(cleanText($(item).text()))
+  ));
+
+  $(priceList).find('li').each((_, item) => {
+    const labelNode = $(item).find('b, strong').first();
+    if (!labelNode.length) return;
+    const rawLabel = cleanText(labelNode.text());
+    const tier = parseTierLabel(rawLabel.replace(/:\s*$/, ''));
+    if (!tier) return;
+
+    const itemText = cleanText($(item).text());
+    const formattedPrice = cleanText(itemText.slice(rawLabel.length)).replace(/^:\s*/, '');
+    const price = parsePriceNumber(formattedPrice);
+    if (!Number.isFinite(price)) {
+      throw new Error(`Unable to parse marked price "${itemText}" for ${country}`);
+    }
+    if (detectedTiers.has(tier.id) || plans[tier.id]) {
+      throw new Error(`Duplicate marked ${tier.label} price for ${country}`);
+    }
+    detectedTiers.set(tier.id, tier);
+    plans[tier.id] = { price, formattedPrice };
+  });
+
+  if (!detectedTiers.size) throw new Error(`No marked prices found for ${country}`);
+  if (detectedTiers.size !== tierItems.length) {
+    throw new Error(`Marked parser missed ${tierItems.length - detectedTiers.size} price item(s) for ${country}`);
+  }
+  return { country, region, currency, plans, detectedTiers: [...detectedTiers.values()] };
+}
+
+function finalizeParsedResult($, parsedCountries, foundRegions) {
+  for (const sectionId of Object.keys(REGIONS)) {
+    if (!foundRegions.has(sectionId)) {
+      throw new Error(`Apple pricing section #${sectionId} was not found`);
+    }
+  }
+
+  const tierMap = new Map();
+  for (const country of parsedCountries) {
+    for (const tier of country.detectedTiers) tierMap.set(tier.id, tier);
+  }
+  const tiers = [...tierMap.values()].sort((first, second) => first.capacityGb - second.capacityGb);
+  if (!tiers.length) throw new Error('No storage tiers were found in Apple pricing data');
+
+  const countries = parsedCountries.map(({ detectedTiers, ...country }) => country);
+  return { countries, tiers, sourcePublishedDate: extractPublishedDate($) };
+}
+
+function parseByDocumentOrder($) {
   const parsedCountries = [];
   const foundRegions = new Set();
   const nodes = $('h2, h3, h4, h5, ul').toArray();
@@ -165,26 +229,93 @@ export function parseApplePrices(html) {
     parsedCountries.push(parseCountry($, node, priceList, currentRegion));
   }
 
-  for (const sectionId of Object.keys(REGIONS)) {
-    if (!foundRegions.has(sectionId)) {
-      throw new Error(`Apple pricing section #${sectionId} was not found`);
+  return finalizeParsedResult($, parsedCountries, foundRegions);
+}
+
+function parseByAppleMarkers($) {
+  const parsedCountries = [];
+  const foundRegions = new Set();
+  const nodes = $('#nasalac, #emea, #ap, h4.gb-header, ul').toArray();
+  let currentRegion = null;
+
+  for (let index = 0; index < nodes.length; index += 1) {
+    const node = nodes[index];
+    const sectionId = $(node).attr('id');
+    if (REGIONS[sectionId]) {
+      currentRegion = REGIONS[sectionId];
+      foundRegions.add(sectionId);
+      continue;
     }
+    if (!$(node).is('h4.gb-header')) continue;
+    if (!currentRegion) throw new Error(`Apple marker parser found a country before a region: ${headingText($, node)}`);
+
+    let priceList = null;
+    for (let nextIndex = index + 1; nextIndex < nodes.length; nextIndex += 1) {
+      const candidate = nodes[nextIndex];
+      if ($(candidate).is('h4.gb-header') || REGIONS[$(candidate).attr('id')]) break;
+      if ($(candidate).is('ul') && isPriceList($, candidate)) {
+        priceList = candidate;
+        break;
+      }
+    }
+    if (!priceList) throw new Error(`Apple marker price list not found after ${headingText($, node)}`);
+    parsedCountries.push(parseCountryByAppleMarkers($, node, priceList, currentRegion));
   }
 
-  const tierMap = new Map();
-  for (const country of parsedCountries) {
-    for (const tier of country.detectedTiers) tierMap.set(tier.id, tier);
+  return finalizeParsedResult($, parsedCountries, foundRegions);
+}
+
+function comparableParseResult(result) {
+  return JSON.stringify({
+    sourcePublishedDate: result.sourcePublishedDate,
+    tiers: result.tiers,
+    countries: result.countries
+  });
+}
+
+export function parseApplePrices(html) {
+  const $ = cheerio.load(html);
+  let primary = null;
+  let secondary = null;
+  let primaryError = null;
+  let secondaryError = null;
+
+  try {
+    primary = parseByDocumentOrder($);
+  } catch (error) {
+    primaryError = error;
   }
-  const tiers = [...tierMap.values()].sort((first, second) => first.capacityGb - second.capacityGb);
-  if (!tiers.length) throw new Error('No storage tiers were found in Apple pricing data');
+  try {
+    secondary = parseByAppleMarkers($);
+  } catch (error) {
+    secondaryError = error;
+  }
 
-  const countries = parsedCountries.map(({ detectedTiers, ...country }) => ({ ...country, plans: country.plans }));
-
-  return {
-    countries,
-    tiers,
-    sourcePublishedDate: extractPublishedDate($)
-  };
+  if (primary && secondary) {
+    if (comparableParseResult(primary) !== comparableParseResult(secondary)) {
+      throw new Error('Apple parser disagreement: document-order and marker paths returned different pricing data');
+    }
+    return {
+      ...primary,
+      parser: 'cross-checked',
+      parserStatus: 'Both independent parser paths agreed'
+    };
+  }
+  if (primary) {
+    return {
+      ...primary,
+      parser: 'document-order',
+      parserStatus: `Apple marker parser unavailable: ${secondaryError?.message ?? 'unknown error'}`
+    };
+  }
+  if (secondary) {
+    return {
+      ...secondary,
+      parser: 'apple-markers-fallback',
+      parserStatus: `Document-order parser unavailable: ${primaryError?.message ?? 'unknown error'}`
+    };
+  }
+  throw new Error(`Both Apple parsers failed; document-order: ${primaryError?.message}; apple-markers: ${secondaryError?.message}`);
 }
 
 export function validatePrices(countries, { minCountries = 60, previousCountries = [], tiers = TIERS } = {}) {
@@ -228,4 +359,49 @@ export function validatePrices(countries, { minCountries = 60, previousCountries
 export function getMissingExchangeRates(countries, rates = {}) {
   return [...new Set(countries.map(({ currency }) => currency))]
     .filter((currency) => !Number.isFinite(rates[currency]) || rates[currency] <= 0);
+}
+
+function convertToCny(price, currency, rates) {
+  const currencyRate = rates?.[currency];
+  const cnyRate = rates?.CNY;
+  if (!Number.isFinite(currencyRate) || currencyRate <= 0 || !Number.isFinite(cnyRate) || cnyRate <= 0) return null;
+  return (price / currencyRate) * cnyRate;
+}
+
+export function validatePriceChangeAnomalies(countries, {
+  previousData,
+  currentRates,
+  tiers = TIERS,
+  thresholds = PRICE_CHANGE_THRESHOLDS
+} = {}) {
+  if (!previousData?.countries?.length || !previousData?.fx?.rates) return true;
+  const previousByCountry = new Map(previousData.countries.map((entry) => [entry.country, entry]));
+
+  for (const entry of countries) {
+    const previous = previousByCountry.get(entry.country);
+    if (!previous || previous.currency !== entry.currency) continue;
+    for (const tier of tiers) {
+      const currentPlan = entry.plans[tier.id];
+      const previousPlan = previous.plans[tier.id];
+      if (!currentPlan || !previousPlan || currentPlan.price === previousPlan.price) continue;
+
+      const localDelta = Math.abs(currentPlan.price - previousPlan.price);
+      const percentageDelta = localDelta / previousPlan.price;
+      const previousCny = convertToCny(previousPlan.price, entry.currency, previousData.fx.rates);
+      const currentCny = convertToCny(currentPlan.price, entry.currency, currentRates);
+      if (previousCny == null || currentCny == null) continue;
+      const cnyDelta = Math.abs(currentCny - previousCny);
+      const localThreshold = Math.max(thresholds.localMinimum, previousPlan.price * thresholds.localRelative);
+
+      if (percentageDelta >= thresholds.percentage
+        && localDelta >= localThreshold
+        && cnyDelta >= thresholds.cnyMinimum) {
+        throw new Error(
+          `Suspicious combined ${tier.id} price change for ${entry.country}: `
+          + `${(percentageDelta * 100).toFixed(1)}%, local ${localDelta.toFixed(2)}, CNY ${cnyDelta.toFixed(2)}`
+        );
+      }
+    }
+  }
+  return true;
 }

@@ -1,7 +1,12 @@
 import { appendFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { getMissingExchangeRates, parseApplePrices, validatePrices } from './parse-prices.mjs';
+import {
+  getMissingExchangeRates,
+  parseApplePrices,
+  validatePriceChangeAnomalies,
+  validatePrices
+} from './parse-prices.mjs';
 
 const APPLE_URL = 'https://support.apple.com/en-us/108047';
 const FX_URL = 'https://open.er-api.com/v6/latest/USD';
@@ -101,6 +106,10 @@ function formatBeijingDate(value) {
   }).formatToParts(new Date(value));
   const part = (type) => parts.find((entry) => entry.type === type)?.value;
   return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
+function githubAnnotationValue(value) {
+  return String(value).replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
 }
 
 function snapshotPlans(country, tiers) {
@@ -280,6 +289,8 @@ export function createRunLogEntry(data, summary, startedAt, finishedAt) {
     source: {
       appleUrl: data.source.url,
       applePublishedDate: data.source.publishedDate ?? null,
+      appleParser: data.source.parser ?? null,
+      appleParserStatus: data.source.parserStatus ?? null,
       exchangeRatesFetchedAtUtc: data.fx.fetchedAt ?? null,
       exchangeRatesStale: Boolean(data.fx.stale)
     },
@@ -346,6 +357,8 @@ async function writeActionSummary(data, summary) {
     `- 触发方式：${process.env.GITHUB_EVENT_NAME ?? 'unknown'}`,
     `- 抓取完成时间（北京时间）：${formatBeijingDateTime(data.generatedAt)}`,
     `- Apple 页面标注日期：${data.source.publishedDate ?? 'unknown'}`,
+    `- Apple 解析路径：${data.source.parser ?? 'unknown'}`,
+    `- 解析冗余状态：${data.source.parserStatus ?? 'unknown'}`,
     `- Apple 发布日期记录：${summary.publishedDateHistory.length} 条`,
     `- 本次发布日期对应内容变化：${summary.publicationDateChanged ? `${summary.publicationChanges.changedCountries.length} 个地区内容变化、${summary.publicationChanges.addedCountries.length} 个新增地区、${summary.publicationChanges.removedCountries.length} 个移除地区、${summary.publicationChanges.addedTiers.length} 个新增容量、${summary.publicationChanges.removedTiers.length} 个移除容量` : '发布日期未变化'}`,
     `- 地区数量：${data.countries.length}`,
@@ -385,6 +398,12 @@ export async function main() {
   }
 
   const parsed = parseApplePrices(html);
+  if (parsed.parser !== 'cross-checked') {
+    console.warn(`Apple parser redundancy degraded: ${parsed.parserStatus}`);
+    if (process.env.GITHUB_ACTIONS === 'true') {
+      console.log(`::warning title=Apple parser redundancy::${githubAnnotationValue(parsed.parserStatus)}`);
+    }
+  }
   if (!parsed.sourcePublishedDate || !/^\d{4}-\d{2}-\d{2}$/.test(publicationDateKey(parsed.sourcePublishedDate))) {
     throw new Error('Apple published date was not found or has an unsupported format');
   }
@@ -402,6 +421,11 @@ export async function main() {
   if (missingRates.length) {
     throw new Error(`Exchange rates are missing for: ${missingRates.join(', ')}`);
   }
+  validatePriceChangeAnomalies(countries, {
+    previousData,
+    currentRates: fx.rates,
+    tiers: parsed.tiers
+  });
   const generatedAt = new Date().toISOString();
   const observedAt = formatBeijingDate(generatedAt);
   const finishedAt = new Date(generatedAt);
@@ -411,7 +435,9 @@ export async function main() {
     source: {
       name: 'Apple Support',
       url: APPLE_URL,
-      publishedDate: parsed.sourcePublishedDate
+      publishedDate: parsed.sourcePublishedDate,
+      parser: parsed.parser,
+      parserStatus: parsed.parserStatus
     },
     run: {
       startedAtUtc: runStartedAt.toISOString(),
@@ -448,12 +474,12 @@ export async function main() {
   const runLog = buildRunLog(previousRunLog, run);
 
   if (DRY_RUN) {
-    console.log(`Live check passed: ${countries.length} countries and ${countries.length * parsed.tiers.length} prices. No files were changed.`);
+    console.log(`Live check passed with ${parsed.parser}: ${countries.length} countries and ${countries.length * parsed.tiers.length} prices. No files were changed.`);
   } else {
     await writeJsonAtomic(CURRENT_DATA_PATH, data);
     await writeJsonAtomic(HISTORY_PATH, history);
     await writeJsonAtomic(RUN_LOG_PATH, runLog);
-    console.log(`Saved ${countries.length} countries and ${countries.length * parsed.tiers.length} prices.`);
+    console.log(`Saved ${countries.length} countries and ${countries.length * parsed.tiers.length} prices using ${parsed.parser}.`);
   }
   try {
     await writeActionSummary(data, summary);
