@@ -4,7 +4,7 @@
 
 ## 功能
 
-- 同表比较 50 GB、200 GB、2 TB、6 TB 和 12 TB 月度价格
+- 同表比较 Apple 页面当前公布的所有容量；新增或移除容量会随下一次成功抓取自动同步
 - 点击任一容量表头，按折合人民币价格升降序排列
 - 每个价格同时显示人民币换算值和 Apple 当地货币原价
 - 搜索国家、地区或币种，并按大区筛选
@@ -14,7 +14,8 @@
 - Apple 页面结构异常或价格变化异常时终止更新，保留上一份有效数据
 - 网络请求使用超时、五次退避重试和响应内容检查
 - 更新失败时上传诊断文件，便于分析 Apple 页面结构变化
-- Apple 新增且五档价格完整的国家或地区会自动进入下一份数据
+- Apple 新增且各当前容量价格完整的国家或地区会自动进入下一份数据
+- Apple 页面发布日期只在发生变化时记录；点击页面底部的发布日期可查看新增/移除地区、容量、分区、币种和价格变化
 - 桌面和手机响应式布局
 
 ## GitHub 首次配置
@@ -27,21 +28,21 @@
 6. 等待运行结束。绿色表示抓取、校验、测试和数据提交全部成功；随后确认仓库中出现由 `github-actions[bot]` 创建的 `chore: update iCloud prices` 提交。
 7. 访问 `https://linchun7.github.io/tools/icloud_price_comparison/`，核对页面日期、地区数量以及至少一个当地价格。
 
-工作流不需要 API Key 或 GitHub Secret。GitHub 的定时任务可能比设定时间延迟数分钟，属于正常情况。
+工作流不需要 API Key 或 GitHub Secret。GitHub 的定时任务是尽力而为，可能比设定时间延迟，不能作为严格准点服务。
 
 ## 自动更新
 
-工作流位于仓库根目录的 `.github/workflows/update-icloud-prices.yml`，每天北京时间 12:00 运行（GitHub 可能有几分钟排队延迟），也可以在 GitHub Actions 页面手动运行。
+工作流位于仓库根目录的 `.github/workflows/update-icloud-prices.yml`，计划每天北京时间 12:00 运行（GitHub 可能延迟数分钟甚至数小时），也可以在 GitHub Actions 页面手动运行。
 
 首次使用前，在仓库的 **Settings > Actions > General > Workflow permissions** 中选择 **Read and write permissions**。工作流会：
 
 1. 下载并解析 Apple 的公开价格页。
-2. 校验国家数量及五档容量是否完整。
+2. 校验国家数量及 Apple 当前所有容量是否完整。
 3. 与上一份有效数据比较，拦截国家数量骤降或异常价格跳变。
 4. 获取以 USD 为基准的公开参考汇率；失败时保留上一份汇率。
 5. 更新 `data/prices.json`。
-6. 仅在价格变化时更新 `data/history.json`。
-7. 运行测试并把数据提交到 `main` 分支。
+6. 仅在价格变化时更新国家历史；Apple 发布日期变化时另外记录对应的内容差异。
+7. 写入后再次运行完整性测试，并把数据提交到 `main` 分支。
 
 Apple 请求最多尝试五次，等待时间逐步增加。所有校验通过后才会原子写入数据文件；失败时旧价格不会被覆盖，并会在该次 Actions 运行中保留 14 天诊断附件。
 
@@ -50,13 +51,13 @@ Apple 请求最多尝试五次，等待时间逐步增加。所有校验通过�
 ## 数据保存与运行状态
 
 - `data/prices.json`：最近一次成功抓取的完整价格与汇率。
-- `data/history.json`：各国家和地区的价格变化事件；价格不变时不会重复追加。
+- `data/history.json`：各国家和地区的价格变化事件，以及 Apple 发布日期变化记录；价格或发布日期不变时不会重复追加。旧事件没有后来新增的容量时，前端显示 `--`。
 - Git 提交历史：自动任务每次成功后都会提交 `data` 目录，因此可以查看任意一天的完整快照。
 - `artifacts/`：失败诊断文件，不提交到仓库；GitHub Actions 会把它作为附件保留 14 天。
 
 在 GitHub 仓库的 **Actions > Update iCloud prices** 中查看每次运行：
 
-- 绿色运行：摘要会显示国家数量、价格数量、Apple 页面日期和汇率日期。
+- 绿色运行：摘要会显示国家数量、价格数量、Apple 页面日期、发布日期记录变化、汇率日期和缺少汇率情况。
 - 红色运行：展开 **Fetch and validate prices** 查看直接错误；在页面底部下载 `icloud-price-diagnostics-*` 附件。
 - `update-failure.json` 保存失败时间、错误信息和调用栈。
 - `apple-response.html` 仅在已经取得页面但解析或校验失败时生成，便于定位 Apple 的结构变化。
@@ -85,7 +86,7 @@ python -m http.server 4173
 ## 数据说明
 
 - 当前价格来源：[Apple Support](https://support.apple.com/en-us/108047)
-- 中文名称参考：[Apple 中文支持](https://support.apple.com/zh-cn/108047)。中文页更新较慢，未收录的新增地区使用规范中文名。
+- 中文名称参考：[Apple 中文支持](https://support.apple.com/zh-cn/108047)。中文映射未收录的新增地区暂时使用 Apple 英文名称，价格数据仍会自动进入页面。
 - 每日参考汇率来源：[ExchangeRate-API](https://www.exchangerate-api.com/docs/free)
 - 历史基线来自本工具原有的 2024-12-08 数据，此后按实际检测到的价格变化追加
 - 汇率换算仅用于跨币种比较，不代表结算价格

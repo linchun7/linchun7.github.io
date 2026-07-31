@@ -43,6 +43,9 @@ jobs:
       - name: Fetch and validate prices
         run: pnpm update:data
 
+      - name: Validate updated snapshot
+        run: pnpm test
+
       - name: Upload failure diagnostics
         if: failure()
         uses: actions/upload-artifact@v7

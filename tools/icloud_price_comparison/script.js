@@ -1,7 +1,6 @@
 const REMOTE_DATA_ROOT = 'https://raw.githubusercontent.com/linchun7/linchun7.github.io/main/tools/icloud_price_comparison/data';
 const HOSTED_NAMES = new Set(['linchun7.github.io', 'linchun.com.cn', 'www.linchun.com.cn']);
 const REQUEST_TIMEOUT_MS = 8_000;
-const TIER_IDS = ['50GB', '200GB', '2TB', '6TB', '12TB'];
 const REGION_LABELS = {
   Americas: '美洲',
   'Europe, Middle East & Africa': '欧洲、中东和非洲',
@@ -28,6 +27,8 @@ const elements = {
   regionSelect: document.querySelector('#regionSelect'),
   resultSummary: document.querySelector('#resultSummary'),
   fxStatus: document.querySelector('#fxStatus'),
+  publishedDateButton: document.querySelector('#publishedDateButton'),
+  applePublishedDate: document.querySelector('#applePublishedDate'),
   updatedAt: document.querySelector('#updatedAt'),
   marketCount: document.querySelector('#marketCount'),
   currencyCount: document.querySelector('#currencyCount'),
@@ -43,7 +44,11 @@ const elements = {
   chartWrap: document.querySelector('#chartWrap'),
   emptyHistory: document.querySelector('#emptyHistory'),
   chartCurrency: document.querySelector('#chartCurrency'),
-  historyRows: document.querySelector('#historyRows')
+  historyRows: document.querySelector('#historyRows'),
+  publishedDateDialog: document.querySelector('#publishedDateDialog'),
+  closePublishedDate: document.querySelector('#closePublishedDate'),
+  publishedDateDialogCurrent: document.querySelector('#publishedDateDialogCurrent'),
+  publishedDateRows: document.querySelector('#publishedDateRows')
 };
 
 const numberFormatter = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 });
@@ -81,6 +86,35 @@ function formatBeijingDateTime(value) {
   }).format(date);
 }
 
+function formatBeijingDate(value) {
+  if (!value) return '--';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '--';
+  const parts = new Intl.DateTimeFormat('en', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    timeZone: 'Asia/Shanghai'
+  }).formatToParts(date);
+  const part = (type) => parts.find((entry) => entry.type === type)?.value;
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
+function formatPublishedDate(value) {
+  if (!value) return '--';
+  const dateOnly = String(value).match(/^([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})$/);
+  const date = dateOnly
+    ? new Date(`${dateOnly[1]} ${dateOnly[2]}, ${dateOnly[3]} 00:00:00 UTC`)
+    : new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    timeZone: 'UTC'
+  }).format(date);
+}
+
 function validatePayload(fileName, payload) {
   if (fileName === 'history.json') {
     if (payload?.schemaVersion !== 1 || !payload.countries || typeof payload.countries !== 'object' || Array.isArray(payload.countries)) {
@@ -91,9 +125,19 @@ function validatePayload(fileName, payload) {
       for (const event of record.events) {
         const validEvent = /^\d{4}-\d{2}-\d{2}$/.test(event?.observedAt)
           && typeof event.currency === 'string'
-          && TIER_IDS.every((tierId) => Number.isFinite(event.plans?.[tierId]) && event.plans[tierId] > 0);
+          && event.plans && typeof event.plans === 'object'
+          && Object.values(event.plans).length > 0
+          && Object.values(event.plans).every((price) => Number.isFinite(price) && price > 0);
         if (!validEvent) throw new Error('价格历史事件无效');
       }
+    }
+    if (payload.sourcePublishedDates !== undefined
+      && (!Array.isArray(payload.sourcePublishedDates)
+        || payload.sourcePublishedDates.some((entry) => !entry
+          || typeof entry.publishedDate !== 'string'
+          || typeof entry.observedAt !== 'string'
+          || !/^\d{4}-\d{2}-\d{2}$/.test(entry.observedAt)))) {
+      throw new Error('Apple 发布日期历史结构无效');
     }
     return payload;
   }
@@ -107,8 +151,9 @@ function validatePayload(fileName, payload) {
     throw new Error('价格数据结构无效');
   }
   const tierIds = payload.tiers.map(({ id }) => id);
-  if (tierIds.length !== TIER_IDS.length
-    || tierIds.some((tierId, index) => tierId !== TIER_IDS[index])
+  if (!tierIds.length
+    || new Set(tierIds).size !== tierIds.length
+    || payload.tiers.some((tier) => !tier?.id || !tier.label || !Number.isFinite(tier.capacityGb) || tier.capacityGb <= 0)
     || !payload.countries.length) {
     throw new Error('价格容量或地区数据不完整');
   }
@@ -192,6 +237,41 @@ function populateFilters() {
     option.value = region;
     option.textContent = REGION_LABELS[region] || region;
     elements.regionSelect.append(option);
+  }
+}
+
+function renderTierHeaders() {
+  const placeholder = document.querySelector('#tierHeaderPlaceholder');
+  if (!placeholder) return;
+  const row = placeholder.closest('tr');
+  placeholder.remove();
+  for (const tier of state.data.tiers) {
+    const header = document.createElement('th');
+    header.scope = 'col';
+    header.setAttribute('aria-sort', 'none');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.sortTier = tier.id;
+    button.textContent = `${tier.label} / 月 `;
+    const icon = document.createElement('i');
+    icon.dataset.lucide = 'arrow-up-down';
+    button.append(icon);
+    header.append(button);
+    row.append(header);
+    button.addEventListener('click', () => setTierSort(tier.id));
+  }
+  refreshIcons();
+}
+
+function renderHistoryHeaders() {
+  const placeholder = document.querySelector('#historyTierHeaderPlaceholder');
+  if (!placeholder) return;
+  const row = placeholder.closest('tr');
+  placeholder.remove();
+  for (const tier of state.data.tiers) {
+    const header = document.createElement('th');
+    header.textContent = tier.label;
+    row.append(header);
   }
 }
 
@@ -285,7 +365,7 @@ function renderTable() {
   if (!countries.length) {
     const row = document.createElement('tr');
     const cell = createCell('没有符合当前条件的结果', 'empty-cell');
-    cell.colSpan = 7;
+    cell.colSpan = state.data.tiers.length + 2;
     row.append(cell);
     elements.priceRows.append(row);
     return;
@@ -378,9 +458,10 @@ function renderHistoryTierButtons() {
 }
 
 function compactHistorySeries(events, tier) {
-  return events.filter((event, index) => {
+  const availableEvents = events.filter((event) => Number.isFinite(event.plans[tier]));
+  return availableEvents.filter((event, index) => {
     if (index === 0) return true;
-    const previous = events[index - 1];
+    const previous = availableEvents[index - 1];
     return event.currency !== previous.currency || event.plans[tier] !== previous.plans[tier];
   });
 }
@@ -398,6 +479,13 @@ function renderLocalPriceWithTrend(plan, country, changedSeries) {
     trend.title = `上一次记录使用 ${previous.currency}`;
   } else {
     const previousPrice = previous.plans[state.historyTier];
+    if (!Number.isFinite(previousPrice)) {
+      trend.classList.add('is-neutral');
+      trend.textContent = '（暂无上一期记录）';
+      trend.title = '该容量是新发布的方案，暂无上一期价格可比较';
+      elements.historyLocalPrice.append(trend);
+      return;
+    }
     const changePercent = ((plan.price - previousPrice) / previousPrice) * 100;
     const isIncrease = changePercent > 0;
     trend.classList.add(isIncrease ? 'is-up' : 'is-down');
@@ -462,11 +550,15 @@ function renderChart(record) {
 }
 
 function renderHistoryRows(record) {
+  renderHistoryHeaders();
   elements.historyRows.replaceChildren();
   [...record.events].reverse().forEach((event) => {
     const row = document.createElement('tr');
     row.append(createCell(formatDate(event.observedAt)), createCell(event.currency, 'currency-code'));
-    for (const tier of state.data.tiers) row.append(createCell(numberFormatter.format(event.plans[tier.id])));
+    for (const tier of state.data.tiers) {
+      const price = event.plans[tier.id];
+      row.append(createCell(Number.isFinite(price) ? numberFormatter.format(price) : '--'));
+    }
     elements.historyRows.append(row);
   });
 }
@@ -478,11 +570,99 @@ function getHistoryRecord(country) {
     nameZh: country.nameZh,
     region: country.region,
     events: [{
-      observedAt: state.data.generatedAt.slice(0, 10),
+      observedAt: formatBeijingDate(state.data.generatedAt),
       currency: country.currency,
       plans: Object.fromEntries(state.data.tiers.map(({ id }) => [id, country.plans[id].price]))
     }]
   };
+}
+
+function getPublishedDateHistory() {
+  const entries = state.history?.sourcePublishedDates;
+  if (Array.isArray(entries) && entries.length) return entries;
+  if (state.data?.source?.publishedDate) {
+    return [{
+      publishedDate: state.data.source.publishedDate,
+      observedAt: formatBeijingDate(state.data.generatedAt)
+    }];
+  }
+  return [];
+}
+
+function countryDisplayName(entry) {
+  const current = state.data?.countries?.find(({ country }) => country === entry.country);
+  return current?.nameZh || entry.nameZh || entry.country;
+}
+
+function formatPublishedDateChanges(changes, isInitial = false) {
+  if (isInitial || !changes) return '首次记录';
+  const parts = [];
+  if (changes.addedTiers?.length) {
+    parts.push(`新增容量：${changes.addedTiers.map(({ label, id }) => label || id).join('、')}`);
+  }
+  if (changes.removedTiers?.length) {
+    parts.push(`移除容量：${changes.removedTiers.map(({ label, id }) => label || id).join('、')}`);
+  }
+  if (changes.addedCountries?.length) {
+    parts.push(`新增地区：${changes.addedCountries.map(countryDisplayName).join('、')}`);
+  }
+  if (changes.removedCountries?.length) {
+    parts.push(`移除地区：${changes.removedCountries.map(countryDisplayName).join('、')}`);
+  }
+  if (changes.changedCountries?.length) {
+    const changed = changes.changedCountries.map((entry) => {
+      const details = [];
+      if (entry.fromCurrency !== entry.toCurrency) details.push(`币种 ${entry.fromCurrency}→${entry.toCurrency}`);
+      if (entry.fromRegion !== entry.toRegion) {
+        const fromRegion = REGION_LABELS[entry.fromRegion] || entry.fromRegion;
+        const toRegion = REGION_LABELS[entry.toRegion] || entry.toRegion;
+        details.push(`分区 ${fromRegion}→${toRegion}`);
+      }
+      for (const tierChange of entry.tiers || []) {
+        const tier = state.data.tiers.find(({ id }) => id === tierChange.id);
+        const from = Number.isFinite(tierChange.from) ? numberFormatter.format(tierChange.from) : '无';
+        const to = Number.isFinite(tierChange.to) ? numberFormatter.format(tierChange.to) : '无';
+        details.push(`${tier?.label || tierChange.id} ${from}→${to}`);
+      }
+      return `${countryDisplayName(entry)}（${details.join('；')}）`;
+    });
+    parts.push(`地区内容变化：${changed.join('；')}`);
+  }
+  return parts.length ? parts.join(' | ') : '发布日期变更，未检测到国家或价格变化';
+}
+
+function renderPublishedDateHistory() {
+  if (!state.data || !elements.applePublishedDate) return;
+  const entries = getPublishedDateHistory();
+  const latest = entries.at(-1)?.publishedDate ?? state.data.source.publishedDate;
+  elements.applePublishedDate.textContent = formatPublishedDate(latest);
+  elements.publishedDateDialogCurrent.textContent = formatPublishedDate(latest);
+  elements.publishedDateRows.replaceChildren();
+
+  if (!entries.length) {
+    const row = document.createElement('tr');
+    const cell = createCell('暂无发布日期记录', 'empty-cell');
+    cell.colSpan = 3;
+    row.append(cell);
+    elements.publishedDateRows.append(row);
+    return;
+  }
+
+  [...entries].reverse().forEach((entry) => {
+    const row = document.createElement('tr');
+    row.append(
+      createCell(formatPublishedDate(entry.publishedDate)),
+      createCell(formatDate(entry.observedAt)),
+      createCell(formatPublishedDateChanges(entry.changes, entry.kind === 'initial'), 'published-change-cell')
+    );
+    elements.publishedDateRows.append(row);
+  });
+}
+
+function openPublishedDateHistory() {
+  renderPublishedDateHistory();
+  elements.publishedDateDialog.showModal();
+  refreshIcons();
 }
 
 function renderHistorySubtitle(country, record) {
@@ -529,6 +709,11 @@ function bindEvents() {
   elements.historyDialog.addEventListener('click', (event) => {
     if (event.target === elements.historyDialog) elements.historyDialog.close();
   });
+  elements.publishedDateButton.addEventListener('click', openPublishedDateHistory);
+  elements.closePublishedDate.addEventListener('click', () => elements.publishedDateDialog.close());
+  elements.publishedDateDialog.addEventListener('click', (event) => {
+    if (event.target === elements.publishedDateDialog) elements.publishedDateDialog.close();
+  });
   elements.historyDialog.addEventListener('close', () => {
     state.chart?.destroy();
     state.chart = null;
@@ -544,7 +729,7 @@ function showLoadError(error) {
   elements.priceRows.replaceChildren();
   const row = document.createElement('tr');
   const cell = createCell('请稍后刷新页面重试', 'empty-cell');
-  cell.colSpan = 7;
+  cell.colSpan = (state.data?.tiers?.length || 5) + 2;
   row.append(cell);
   elements.priceRows.append(row);
 }
@@ -555,6 +740,7 @@ async function initialize() {
     fetchJson('history.json')
       .then((historyData) => {
         state.history = historyData;
+        renderPublishedDateHistory();
         if (state.activeCountry && elements.historyDialog.open) {
           renderHistorySubtitle(state.activeCountry, getHistoryRecord(state.activeCountry));
           renderHistoryContent();
@@ -562,7 +748,9 @@ async function initialize() {
       })
       .catch((error) => { console.warn(`价格历史加载失败，使用当前价格作为临时记录：${error.message}`); });
     state.data = await fetchJson('prices.json');
-    if (!state.data.tiers.some(({ id }) => id === state.sortTier)) state.sortTier = '200GB';
+    if (!state.data.tiers.some(({ id }) => id === state.sortTier)) {
+      state.sortTier = state.data.tiers.find(({ id }) => id === '200GB')?.id || state.data.tiers[0].id;
+    }
     state.historyTier = state.sortTier;
     calculateMinimumPrices();
     populateFilters();
@@ -570,6 +758,8 @@ async function initialize() {
     elements.marketCount.textContent = state.data.countries.length;
     elements.currencyCount.textContent = new Set(state.data.countries.map(({ currency }) => currency)).size;
     elements.tierCount.textContent = state.data.tiers.length;
+    renderTierHeaders();
+    renderPublishedDateHistory();
     const dataUpdatedAt = formatBeijingDateTime(state.data.generatedAt);
     const fxUpdatedAt = formatBeijingDateTime(state.data.fx.fetchedAt);
     elements.updatedAt.textContent = `数据更新时间：${dataUpdatedAt}（北京时间）`;
