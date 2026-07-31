@@ -39,6 +39,15 @@ test('tolerates small heading, wrapper, and publication-date markup changes', as
   assert.equal(validatePrices(result.countries, { minCountries: 5, tiers: result.tiers }), true);
 });
 
+test('does not mistake an unrelated time element for the Apple publication date', async () => {
+  const fixture = await readFile(fixtureUrl, 'utf8');
+  const adjusted = fixture.replace(
+    '<p>Published Date: <time>July 17, 2026</time></p>',
+    '<p>Last reviewed: <time>July 16, 2026</time></p>'
+  );
+  assert.equal(parseApplePrices(adjusted).sourcePublishedDate, null);
+});
+
 test('rejects incomplete pricing data', () => {
   assert.throws(
     () => validatePrices([{ country: 'Example', currency: 'USD', plans: {} }], { minCountries: 1 }),
