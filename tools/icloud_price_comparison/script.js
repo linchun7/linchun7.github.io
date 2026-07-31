@@ -18,6 +18,7 @@ const state = {
   sortDirection: 'asc',
   activeCountry: null,
   historyTier: '200GB',
+  minimumPrices: {},
   chart: null
 };
 
@@ -47,6 +48,7 @@ const elements = {
 
 const numberFormatter = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 });
 const moneyFormatter = new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const percentFormatter = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 });
 const collator = new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base' });
 
 function refreshIcons() {
@@ -62,6 +64,21 @@ function formatDate(value) {
     timeZone: 'UTC'
   })
     .format(new Date(`${value.slice(0, 10)}T00:00:00Z`));
+}
+
+function formatBeijingDateTime(value) {
+  if (!value) return '--';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '--';
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'Asia/Shanghai'
+  }).format(date);
 }
 
 function validatePayload(fileName, payload) {
@@ -141,6 +158,15 @@ function convertPrice(price, currency, targetCurrency) {
   return (price / sourceRate) * targetRate;
 }
 
+function calculateMinimumPrices() {
+  state.minimumPrices = Object.fromEntries(state.data.tiers.map(({ id }) => {
+    const values = state.data.countries
+      .map((country) => convertPrice(country.plans[id].price, country.currency, 'CNY'))
+      .filter((value) => value != null);
+    return [id, values.length ? Math.min(...values) : null];
+  }));
+}
+
 function formatConverted(value, symbol) {
   return value == null ? '暂无汇率' : `${symbol}${moneyFormatter.format(value)}`;
 }
@@ -213,6 +239,13 @@ function createPriceCell(country, tierId) {
   if (cny == null) {
     converted.textContent = '--';
   } else {
+    if (state.minimumPrices[tierId] != null && Math.abs(cny - state.minimumPrices[tierId]) < 0.000001) {
+      const badge = document.createElement('span');
+      badge.className = 'minimum-badge';
+      badge.textContent = '最低';
+      badge.title = '该容量人民币换算价最低';
+      converted.append(badge);
+    }
     const symbol = document.createElement('span');
     symbol.className = 'price-symbol';
     symbol.textContent = '¥';
@@ -246,8 +279,8 @@ function renderTable() {
   const tier = state.data.tiers.find(({ id }) => id === state.sortTier);
   const direction = state.sortDirection === 'asc' ? '从低到高' : '从高到低';
   elements.resultSummary.textContent = state.sortKey === 'country'
-    ? '按国家和地区名称排序'
-    : `${tier.label} · 人民币价格${direction}`;
+    ? `按国家和地区名称排序：${state.sortDirection === 'asc' ? '正序' : '倒序'}`
+    : `按 ${tier.label} 方案的人民币月费排序：${direction}`;
 
   if (!countries.length) {
     const row = document.createElement('tr');
@@ -352,6 +385,28 @@ function compactHistorySeries(events, tier) {
   });
 }
 
+function renderLocalPriceWithTrend(plan, country, changedSeries) {
+  elements.historyLocalPrice.replaceChildren(document.createTextNode(`${plan.formattedPrice} / 月`));
+  if (changedSeries.length < 2) return;
+
+  const previous = changedSeries.at(-2);
+  const trend = document.createElement('span');
+  trend.className = 'price-trend';
+  if (previous.currency !== country.currency) {
+    trend.classList.add('is-neutral');
+    trend.textContent = '（币种已变更）';
+    trend.title = `上一次记录使用 ${previous.currency}`;
+  } else {
+    const previousPrice = previous.plans[state.historyTier];
+    const changePercent = ((plan.price - previousPrice) / previousPrice) * 100;
+    const isIncrease = changePercent > 0;
+    trend.classList.add(isIncrease ? 'is-up' : 'is-down');
+    trend.textContent = `（${isIncrease ? '↑' : '↓'} ${percentFormatter.format(Math.abs(changePercent))}%）`;
+    trend.title = `与上一次当地月费相比${isIncrease ? '上涨' : '下降'} ${percentFormatter.format(Math.abs(changePercent))}%`;
+  }
+  elements.historyLocalPrice.append(trend);
+}
+
 function renderChart(record) {
   state.chart?.destroy();
   state.chart = null;
@@ -438,9 +493,11 @@ function renderHistoryContent() {
   const tier = state.data.tiers.find(({ id }) => id === state.historyTier);
   const changedSeries = compactHistorySeries(record.events, state.historyTier);
 
-  elements.historyLocalPrice.textContent = `${plan.formattedPrice} / 月`;
+  renderLocalPriceWithTrend(plan, country, changedSeries);
   elements.historyCnyPrice.textContent = formatConverted(cny, '¥');
-  elements.historyEventCount.textContent = changedSeries.length > 1 ? `${changedSeries.length - 1} 次变化` : '暂无变化';
+  elements.historyEventCount.textContent = changedSeries.length > 1
+    ? `${changedSeries.length - 1} 次 · 最近 ${formatDate(changedSeries.at(-1).observedAt)}`
+    : '暂无变化';
   document.querySelector('#chartTitle').textContent = `${tier.label} 价格变化`;
   elements.chartCurrency.textContent = country.currency;
   renderChart(record);
@@ -497,19 +554,22 @@ async function initialize() {
     state.data = await fetchJson('prices.json');
     if (!state.data.tiers.some(({ id }) => id === state.sortTier)) state.sortTier = '200GB';
     state.historyTier = state.sortTier;
+    calculateMinimumPrices();
     populateFilters();
     bindEvents();
     elements.marketCount.textContent = state.data.countries.length;
     elements.currencyCount.textContent = new Set(state.data.countries.map(({ currency }) => currency)).size;
     elements.tierCount.textContent = state.data.tiers.length;
-    elements.updatedAt.textContent = `更新 ${formatDate(state.data.generatedAt)}`;
-    elements.fxStatus.textContent = formatDate(state.data.fx.fetchedAt);
+    const dataUpdatedAt = formatBeijingDateTime(state.data.generatedAt);
+    const fxUpdatedAt = formatBeijingDateTime(state.data.fx.fetchedAt);
+    elements.updatedAt.textContent = `数据更新时间：${dataUpdatedAt}（北京时间）`;
+    elements.fxStatus.textContent = `汇率更新时间：${fxUpdatedAt}（北京时间）`;
     const priceAgeHours = (Date.now() - new Date(state.data.generatedAt).getTime()) / 3_600_000;
     if (state.data.fx.stale || priceAgeHours > 36) {
       elements.dataStatus.classList.add('is-stale');
       elements.updatedAt.textContent = priceAgeHours > 36
-        ? `价格停留在 ${formatDate(state.data.generatedAt)}`
-        : `价格 ${formatDate(state.data.generatedAt)} · 汇率缓存`;
+        ? `数据更新时间：${dataUpdatedAt}（北京时间） · 超过 36 小时`
+        : `数据更新时间：${dataUpdatedAt}（北京时间） · 汇率沿用上次成功结果`;
     }
     renderSortHeaders();
     renderTable();
