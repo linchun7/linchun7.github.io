@@ -2,7 +2,7 @@ name: Update iCloud prices
 
 on:
   schedule:
-    - cron: '0 4 * * *'
+    - cron: '0 1 * * *'
   workflow_dispatch:
 
 permissions:
@@ -46,8 +46,9 @@ jobs:
       - name: Validate updated snapshot
         run: pnpm test
 
-      - name: Upload failure diagnostics
-        if: failure()
+      - name: Upload run diagnostics and Apple snapshot
+        if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: icloud-price-diagnostics-${{ github.run_id }}

@@ -8,11 +8,13 @@ const FX_URL = 'https://open.er-api.com/v6/latest/USD';
 const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CURRENT_DATA_PATH = path.join(PROJECT_DIR, 'data/prices.json');
 const HISTORY_PATH = path.join(PROJECT_DIR, 'data/history.json');
+const RUN_LOG_PATH = path.join(PROJECT_DIR, 'data/run-log.json');
 const NAMES_PATH = path.join(PROJECT_DIR, 'scripts/country-names.zh.json');
 const DIAGNOSTICS_DIR = path.join(PROJECT_DIR, 'artifacts');
 const RETRY_DELAYS_MS = [0, 2_000, 5_000, 15_000, 30_000];
 const DRY_RUN = process.argv.includes('--dry-run');
 let lastAppleHtml = null;
+let runStartedAt = new Date();
 
 async function fetchResource(url, { json = false, attempts = RETRY_DELAYS_MS.length } = {}) {
   let lastError;
@@ -110,9 +112,9 @@ function hasPriceChange(previousEvent, country, tiers) {
   return tiers.some(({ id }) => previousEvent.plans[id] !== country.plans[id].price);
 }
 
-export function updateHistory(previousHistory, countries, observedAt, tiers) {
-  const history = previousHistory ?? { schemaVersion: 1, countries: {} };
-  history.schemaVersion = 1;
+export function updateHistory(previousHistory, countries, observedAt, tiers, observedAtUtc = null) {
+  const history = previousHistory ?? { schemaVersion: 2, countries: {} };
+  history.schemaVersion = 2;
   history.updatedAt = new Date().toISOString();
   let addedCountries = 0;
   let changedCountries = 0;
@@ -133,6 +135,8 @@ export function updateHistory(previousHistory, countries, observedAt, tiers) {
       changedCountries += 1;
       record.events.push({
         observedAt,
+        ...(observedAtUtc ? { observedAtBeijing: observedAt } : {}),
+        ...(observedAtUtc ? { observedAtUtc } : {}),
         currency: country.currency,
         plans: snapshotPlans(country, tiers)
       });
@@ -208,7 +212,7 @@ export function buildSnapshotChanges(previousData, countries, tiers) {
   return { addedTiers, removedTiers, addedCountries, removedCountries, changedCountries };
 }
 
-export function updatePublishedDateHistory(history, previousData, publishedDate, observedAt, changes) {
+export function updatePublishedDateHistory(history, previousData, publishedDate, observedAt, changes, observedAtUtc = null) {
   const entries = [];
   for (const entry of (Array.isArray(history.sourcePublishedDates) ? history.sourcePublishedDates : [])) {
     if (!entry || typeof entry.publishedDate !== 'string' || typeof entry.observedAt !== 'string') continue;
@@ -224,6 +228,7 @@ export function updatePublishedDateHistory(history, previousData, publishedDate,
     entries.push({
       publishedDate: previousData.source.publishedDate,
       observedAt: previousData.generatedAt ? formatBeijingDate(previousData.generatedAt) : observedAt,
+      ...(previousData.generatedAt ? { observedAtBeijing: formatBeijingDate(previousData.generatedAt), observedAtUtc: previousData.run?.finishedAtUtc ?? previousData.generatedAt } : {}),
       kind: 'initial',
       changes: { addedTiers: [], removedTiers: [], addedCountries: [], removedCountries: [], changedCountries: [] }
     });
@@ -233,6 +238,7 @@ export function updatePublishedDateHistory(history, previousData, publishedDate,
     entries.push({
       publishedDate,
       observedAt,
+      ...(observedAtUtc ? { observedAtBeijing: observedAt, observedAtUtc } : {}),
       kind: 'initial',
       changes: { addedTiers: [], removedTiers: [], addedCountries: [], removedCountries: [], changedCountries: [] }
     });
@@ -241,7 +247,13 @@ export function updatePublishedDateHistory(history, previousData, publishedDate,
   assertPublicationDateNotRegressed(entries.at(-1)?.publishedDate, publishedDate);
   let changed = false;
   if (publishedDate && publicationDateKey(entries.at(-1)?.publishedDate) !== publicationDateKey(publishedDate)) {
-    entries.push({ publishedDate, observedAt, kind: 'change', changes });
+    entries.push({
+      publishedDate,
+      observedAt,
+      ...(observedAtUtc ? { observedAtBeijing: observedAt, observedAtUtc } : {}),
+      kind: 'change',
+      changes
+    });
     changed = true;
   }
   history.sourcePublishedDates = entries;
@@ -253,6 +265,76 @@ async function writeJsonAtomic(filePath, value) {
   const temporaryPath = `${filePath}.tmp`;
   await writeFile(temporaryPath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
   await rename(temporaryPath, filePath);
+}
+
+export function createRunLogEntry(data, summary, startedAt, finishedAt) {
+  return {
+    schemaVersion: 1,
+    id: finishedAt.toISOString(),
+    status: 'success',
+    trigger: process.env.GITHUB_EVENT_NAME ?? 'local',
+    startedAtUtc: startedAt.toISOString(),
+    finishedAtUtc: finishedAt.toISOString(),
+    durationMs: Math.max(0, finishedAt.getTime() - startedAt.getTime()),
+    observedAtBeijing: summary.observedAt,
+    source: {
+      appleUrl: data.source.url,
+      applePublishedDate: data.source.publishedDate ?? null,
+      exchangeRatesFetchedAtUtc: data.fx.fetchedAt ?? null,
+      exchangeRatesStale: Boolean(data.fx.stale)
+    },
+    counts: {
+      countries: data.countries.length,
+      pricePoints: data.countries.length * data.tiers.length,
+      currencies: new Set(data.countries.map(({ currency }) => currency)).size,
+      tiers: data.tiers.map(({ id, label }) => ({ id, label }))
+    },
+    changes: {
+      addedTiers: summary.publicationChanges.addedTiers,
+      removedTiers: summary.publicationChanges.removedTiers,
+      addedCountries: summary.publicationChanges.addedCountries,
+      removedCountries: summary.publicationChanges.removedCountries,
+      changedCountries: summary.publicationChanges.changedCountries.map(({ country, nameZh, fromCurrency, toCurrency, fromRegion, toRegion, tiers }) => ({
+        country, nameZh, fromCurrency, toCurrency, fromRegion, toRegion, tiers
+      }))
+    }
+  };
+}
+
+export function buildRunLog(existing, entry) {
+  if (existing?.schemaVersion !== 1 || !Array.isArray(existing.runs)) {
+    throw new Error('Run log has an unsupported structure');
+  }
+  return {
+    schemaVersion: 1,
+    retention: 90,
+    updatedAtUtc: entry.finishedAtUtc,
+    runs: [...existing.runs, entry].slice(-90)
+  };
+}
+
+async function writeAppleSnapshot(html, startedAt) {
+  const stamp = startedAt.toISOString().replaceAll(/[-:]/g, '').replace('.000Z', 'Z');
+  await mkdir(DIAGNOSTICS_DIR, { recursive: true });
+  await writeFile(path.join(DIAGNOSTICS_DIR, `apple-response-${stamp}.html`), html, 'utf8');
+}
+
+function failureRunLogEntry(error, startedAt, finishedAt) {
+  return {
+    schemaVersion: 1,
+    id: finishedAt.toISOString(),
+    status: 'failure',
+    trigger: process.env.GITHUB_EVENT_NAME ?? 'local',
+    startedAtUtc: startedAt.toISOString(),
+    finishedAtUtc: finishedAt.toISOString(),
+    durationMs: Math.max(0, finishedAt.getTime() - startedAt.getTime()),
+    error: {
+      name: error.name,
+      message: error.message,
+      stack: error.stack ?? null
+    },
+    appleResponseCaptured: Boolean(lastAppleHtml)
+  };
 }
 
 async function writeActionSummary(data, summary) {
@@ -281,13 +363,22 @@ async function writeActionSummary(data, summary) {
 }
 
 export async function main() {
-  const [previousData, previousHistory, countryNames, html] = await Promise.all([
+  runStartedAt = new Date();
+  const [previousData, previousHistory, previousRunLog, countryNames, html] = await Promise.all([
     readJson(CURRENT_DATA_PATH),
     readJson(HISTORY_PATH),
+    readJson(RUN_LOG_PATH, { schemaVersion: 1, retention: 90, runs: [] }),
     readJson(NAMES_PATH, {}),
     fetchResource(APPLE_URL)
   ]);
   lastAppleHtml = html;
+  if (!DRY_RUN) {
+    try {
+      await writeAppleSnapshot(html, runStartedAt);
+    } catch (error) {
+      console.warn(`Unable to save Apple HTML snapshot: ${error.message}`);
+    }
+  }
 
   if (!countryNames || Object.keys(countryNames).length < 60) {
     throw new Error('Chinese country-name mapping is missing or incomplete');
@@ -313,34 +404,36 @@ export async function main() {
   }
   const generatedAt = new Date().toISOString();
   const observedAt = formatBeijingDate(generatedAt);
+  const finishedAt = new Date(generatedAt);
   const data = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     generatedAt,
     source: {
       name: 'Apple Support',
       url: APPLE_URL,
       publishedDate: parsed.sourcePublishedDate
     },
+    run: {
+      startedAtUtc: runStartedAt.toISOString(),
+      finishedAtUtc: generatedAt,
+      observedAtBeijing: observedAt,
+      observedAtUtc: generatedAt,
+      countries: countries.length,
+      pricePoints: countries.length * parsed.tiers.length
+    },
     fx,
     tiers: parsed.tiers,
     countries
   };
   const publicationChanges = buildSnapshotChanges(previousData, countries, parsed.tiers);
-  const historyUpdate = updateHistory(previousHistory, countries, observedAt, parsed.tiers);
+  const historyUpdate = updateHistory(previousHistory, countries, observedAt, parsed.tiers, generatedAt);
   const history = historyUpdate.history;
-  const publishedDateUpdate = updatePublishedDateHistory(history, previousData, parsed.sourcePublishedDate, observedAt, publicationChanges);
+  const publishedDateUpdate = updatePublishedDateHistory(history, previousData, parsed.sourcePublishedDate, observedAt, publicationChanges, generatedAt);
   const publishedDateHistory = publishedDateUpdate.entries;
   const addedCountries = publicationChanges.addedCountries.map(({ country }) => country);
   const removedCountries = publicationChanges.removedCountries.map(({ country }) => country);
 
-  if (DRY_RUN) {
-    console.log(`Live check passed: ${countries.length} countries and ${countries.length * parsed.tiers.length} prices. No files were changed.`);
-  } else {
-    await writeJsonAtomic(CURRENT_DATA_PATH, data);
-    await writeJsonAtomic(HISTORY_PATH, history);
-    console.log(`Saved ${countries.length} countries and ${countries.length * parsed.tiers.length} prices.`);
-  }
-  await writeActionSummary(data, {
+  const summary = {
     history,
     missingRates,
     addedCountries,
@@ -348,21 +441,54 @@ export async function main() {
     changedCountries: historyUpdate.changedCountries,
     publishedDateHistory,
     publicationDateChanged: publishedDateUpdate.changed,
-    publicationChanges
-  });
+    publicationChanges,
+    observedAt
+  };
+  const run = createRunLogEntry(data, summary, runStartedAt, finishedAt);
+  const runLog = buildRunLog(previousRunLog, run);
+
+  if (DRY_RUN) {
+    console.log(`Live check passed: ${countries.length} countries and ${countries.length * parsed.tiers.length} prices. No files were changed.`);
+  } else {
+    await writeJsonAtomic(CURRENT_DATA_PATH, data);
+    await writeJsonAtomic(HISTORY_PATH, history);
+    await writeJsonAtomic(RUN_LOG_PATH, runLog);
+    console.log(`Saved ${countries.length} countries and ${countries.length * parsed.tiers.length} prices.`);
+  }
+  try {
+    await writeActionSummary(data, summary);
+  } catch (error) {
+    console.warn(`Unable to write GitHub Actions summary: ${error.message}`);
+  }
 }
 
 async function handleFailure(error) {
   console.error(error);
   try {
+    const finishedAt = new Date();
+    const report = failureRunLogEntry(error, runStartedAt, finishedAt);
     await mkdir(DIAGNOSTICS_DIR, { recursive: true });
+    await writeFile(path.join(DIAGNOSTICS_DIR, 'run-report.json'), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
     await writeFile(path.join(DIAGNOSTICS_DIR, 'update-failure.json'), `${JSON.stringify({
-      failedAt: new Date().toISOString(),
+      failedAt: finishedAt.toISOString(),
       error: error.message,
       stack: error.stack
     }, null, 2)}\n`, 'utf8');
     if (lastAppleHtml) {
+      await writeAppleSnapshot(lastAppleHtml, runStartedAt);
       await writeFile(path.join(DIAGNOSTICS_DIR, 'apple-response.html'), lastAppleHtml, 'utf8');
+    }
+    if (process.env.GITHUB_STEP_SUMMARY) {
+      await appendFile(process.env.GITHUB_STEP_SUMMARY, [
+        '## iCloud+ 价格更新',
+        '',
+        '- 状态：失败',
+        `- 触发方式：${report.trigger}`,
+        `- 失败时间（北京时间）：${formatBeijingDateTime(finishedAt)}`,
+        `- 失败原因：${error.message}`,
+        `- Apple 原始响应：${report.appleResponseCaptured ? '已保存到运行附件' : '未获取到'}`,
+        ''
+      ].join('\n'), 'utf8');
     }
   } catch (diagnosticError) {
     console.error(`Unable to save diagnostics: ${diagnosticError.message}`);

@@ -117,7 +117,7 @@ function formatPublishedDate(value) {
 
 function validatePayload(fileName, payload) {
   if (fileName === 'history.json') {
-    if (payload?.schemaVersion !== 1 || !payload.countries || typeof payload.countries !== 'object' || Array.isArray(payload.countries)) {
+    if (![1, 2].includes(payload?.schemaVersion) || !payload.countries || typeof payload.countries !== 'object' || Array.isArray(payload.countries)) {
       throw new Error('价格历史数据结构无效');
     }
     for (const record of Object.values(payload.countries)) {
@@ -142,7 +142,7 @@ function validatePayload(fileName, payload) {
     return payload;
   }
 
-  if (payload?.schemaVersion !== 1
+  if (![1, 2].includes(payload?.schemaVersion)
     || !Array.isArray(payload.tiers)
     || !Array.isArray(payload.countries)
     || Number.isNaN(Date.parse(payload.generatedAt))
