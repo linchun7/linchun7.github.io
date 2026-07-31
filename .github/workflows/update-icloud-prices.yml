@@ -26,6 +26,26 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check repository storage
+        working-directory: .
+        shell: bash
+        run: |
+          git_kib=$(du -sk .git | cut -f1)
+          git_mib=$(( (git_kib + 1023) / 1024 ))
+          history_bytes=$(wc -c < tools/icloud_price_comparison/data/history.json)
+          history_kib=$(( (history_bytes + 1023) / 1024 ))
+          echo "- Git 历史体积：${git_mib} MiB" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 价格历史文件：${history_kib} KiB" >> "$GITHUB_STEP_SUMMARY"
+          if (( git_kib >= 512000 )); then
+            echo "::warning title=Repository storage::Git history is ${git_mib} MiB; plan a manual history review before it reaches 1 GiB."
+          fi
+          if (( git_kib >= 819200 )); then
+            echo "::warning title=Repository storage high::Git history is ${git_mib} MiB; manual maintenance should be scheduled soon."
+          fi
+          if (( history_bytes >= 2097152 )); then
+            echo "::warning title=Price history size::history.json is ${history_kib} KiB; consider partitioning history by year or country."
+          fi
+
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
