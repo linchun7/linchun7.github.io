@@ -9,6 +9,7 @@ import {
 } from '../scripts/parse-prices.mjs';
 
 const fixtureUrl = new URL('./fixtures/apple-prices.html', import.meta.url);
+const priceHistoryFixtureUrl = new URL('./fixtures/global-price-adjustments.json', import.meta.url);
 
 test('parses footnotes, currencies, and all storage tiers', async () => {
   const result = parseApplePrices(await readFile(fixtureUrl, 'utf8'));
@@ -195,32 +196,41 @@ test('scales the CNY threshold with the previous plan value', () => {
   }), true);
 });
 
-test('accepts documented Türkiye iCloud+ price adjustments below the extreme-change threshold', () => {
-  const priceSnapshots = [
-    { date: '2024-08', prices: [12.99, 39.99, 129.99, 899.99, 1799.99], rate: 32 },
-    { date: '2024-09', prices: [24.99, 79.99, 249.99, 1299.99, 2499.99], rate: 34 },
-    { date: '2025-08', prices: [39.99, 129.99, 399.99, 1299.99, 2499.99], rate: 40 },
-    { date: '2026-07', prices: [49.99, 169.99, 549.99, 1699.99, 3399.99], rate: 47.5 }
-  ];
-  const tiers = ['50GB', '200GB', '2TB', '6TB', '12TB'].map((id) => ({ id }));
-  const toCountry = (snapshot) => ({
-    country: 'Türkiye',
-    currency: 'TRY',
-    plans: Object.fromEntries(tiers.map(({ id }, index) => [id, { price: snapshot.prices[index] }]))
-  });
+test('accepts documented global iCloud+ adjustments below the extreme-change threshold', async () => {
+  const fixture = JSON.parse(await readFile(priceHistoryFixtureUrl, 'utf8'));
+  let adjustmentCount = 0;
 
-  for (let index = 1; index < priceSnapshots.length; index += 1) {
-    const previous = priceSnapshots[index - 1];
-    const current = priceSnapshots[index];
-    assert.equal(validatePriceChangeAnomalies([toCountry(current)], {
-      previousData: {
-        countries: [toCountry(previous)],
-        fx: { rates: { TRY: previous.rate, CNY: 7 } }
-      },
-      currentRates: { TRY: current.rate, CNY: 7 },
-      tiers
-    }), true, `${previous.date} to ${current.date}`);
+  for (const batch of fixture.batches) {
+    for (const adjustment of batch.adjustments) {
+      const tierIds = Object.keys(adjustment.previous);
+      assert.deepEqual(Object.keys(adjustment.current), tierIds, `${batch.label}: ${adjustment.country}`);
+      const tiers = tierIds.map((id) => ({ id }));
+      const toCountry = (plans) => ({
+        country: adjustment.country,
+        currency: adjustment.currency,
+        plans: Object.fromEntries(Object.entries(plans).map(([id, price]) => [id, { price }]))
+      });
+      const previous = toCountry(adjustment.previous);
+      const current = toCountry(adjustment.current);
+
+      assert.equal(validatePrices([current], {
+        minCountries: 1,
+        previousCountries: [previous],
+        tiers
+      }), true, `${batch.label}: ${adjustment.country} hard limit`);
+      assert.equal(validatePriceChangeAnomalies([current], {
+        previousData: {
+          countries: [previous],
+          fx: { rates: { [adjustment.currency]: 1, CNY: 7 } }
+        },
+        currentRates: { [adjustment.currency]: 1, CNY: 7 },
+        tiers
+      }), true, `${batch.label}: ${adjustment.country} combined limit`);
+      adjustmentCount += 1;
+    }
   }
+
+  assert.equal(adjustmentCount, 25);
 });
 
 test('still rejects a very large price move when exchange rates do not explain it', () => {

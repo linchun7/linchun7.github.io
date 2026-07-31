@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Regression cases reconstructed from public Apple pricing reports and archived project snapshots.",
+  "batches": [
+    {
+      "label": "2023-06 international adjustments",
+      "sources": [
+        "https://www.macrumors.com/2023/06/27/icloud-price-increases/",
+        "https://www.tecmundo.com.br/produto/265735-apple-aumenta-precos-icloud-brasil-confira-valores.htm"
+      ],
+      "adjustments": [
+        {
+          "country": "United Kingdom",
+          "currency": "GBP",
+          "previous": { "50GB": 0.79, "200GB": 2.49, "2TB": 6.99 },
+          "current": { "50GB": 0.99, "200GB": 2.99, "2TB": 8.99 }
+        },
+        {
+          "country": "Brazil",
+          "currency": "BRL",
+          "previous": { "50GB": 3.5, "200GB": 10.9, "2TB": 34.9 },
+          "current": { "50GB": 4.9, "200GB": 14.9, "2TB": 49.9 }
+        },
+        {
+          "country": "Türkiye",
+          "currency": "TRY",
+          "previous": { "50GB": 6.49, "200GB": 19.99, "2TB": 64.99 },
+          "current": { "50GB": 12.99, "200GB": 39.99, "2TB": 129.99 }
+        }
+      ]
+    },
+    {
+      "label": "2024-Q3 ten-country adjustments",
+      "sources": [
+        "https://www.macrumors.com/2024/08/21/icloud-prices-increased-some-countries/",
+        "https://www.linchun.com.cn/posts/4e4a96ad.html"
+      ],
+      "adjustments": [
+        {
+          "country": "Japan",
+          "currency": "JPY",
+          "previous": { "50GB": 130, "200GB": 400, "2TB": 1300 },
+          "current": { "50GB": 150, "200GB": 450, "2TB": 1500 }
+        },
+        {
+          "country": "Republic of Korea",
+          "currency": "KRW",
+          "previous": { "50GB": 1100, "200GB": 3300, "2TB": 11000 },
+          "current": { "50GB": 1100, "200GB": 4400, "2TB": 14000 }
+        },
+        {
+          "country": "Thailand",
+          "currency": "THB",
+          "previous": { "50GB": 35, "200GB": 99, "2TB": 349 },
+          "current": { "50GB": 35, "200GB": 99, "2TB": 399 }
+        },
+        {
+          "country": "Indonesia",
+          "currency": "IDR",
+          "previous": { "50GB": 15000, "200GB": 45000, "2TB": 149000 },
+          "current": { "50GB": 15000, "200GB": 49000, "2TB": 169000 }
+        },
+        {
+          "country": "Türkiye",
+          "currency": "TRY",
+          "previous": { "50GB": 12.99, "200GB": 39.99, "2TB": 129.99 },
+          "current": { "50GB": 24.99, "200GB": 79.99, "2TB": 249.99 }
+        },
+        {
+          "country": "Pakistan",
+          "currency": "PKR",
+          "previous": { "50GB": 200, "200GB": 600, "2TB": 1900 },
+          "current": { "50GB": 200, "200GB": 800, "2TB": 2500 }
+        },
+        {
+          "country": "Nigeria",
+          "currency": "NGN",
+          "previous": { "50GB": 500, "200GB": 1500, "2TB": 4900 },
+          "current": { "50GB": 900, "200GB": 2900, "2TB": 9900 }
+        },
+        {
+          "country": "Egypt",
+          "currency": "EGP",
+          "previous": { "50GB": 29.99, "200GB": 99.99, "2TB": 349.99 },
+          "current": { "50GB": 39.99, "200GB": 149.99, "2TB": 499.99 }
+        },
+        {
+          "country": "Tanzania",
+          "currency": "TZS",
+          "previous": { "50GB": 1500, "200GB": 4900, "2TB": 14900 },
+          "current": { "50GB": 2500, "200GB": 8900, "2TB": 29900 }
+        },
+        {
+          "country": "Philippines",
+          "currency": "PHP",
+          "previous": { "50GB": 49, "200GB": 149, "2TB": 499 },
+          "current": { "50GB": 49, "200GB": 179, "2TB": 599 }
+        }
+      ]
+    },
+    {
+      "label": "2025-08 adjustments",
+      "sources": [
+        "https://www.macrumors.com/2025/08/12/icloud-price-hikes-three-countries/"
+      ],
+      "adjustments": [
+        {
+          "country": "Brazil",
+          "currency": "BRL",
+          "previous": { "50GB": 4.9, "200GB": 14.9, "2TB": 49.9, "6TB": 149.9, "12TB": 299.9 },
+          "current": { "50GB": 5.9, "200GB": 19.9, "2TB": 66.9, "6TB": 199.9, "12TB": 399.9 }
+        },
+        {
+          "country": "Chile",
+          "currency": "CLP",
+          "previous": { "50GB": 790, "200GB": 2490, "2TB": 8490, "6TB": 29990, "12TB": 59990 },
+          "current": { "50GB": 990, "200GB": 3290, "2TB": 10990, "6TB": 32990, "12TB": 64990 }
+        },
+        {
+          "country": "Peru",
+          "currency": "PEN",
+          "previous": { "50GB": 2.9, "200GB": 9.9, "2TB": 34.9, "6TB": 99.9, "12TB": 199.9 },
+          "current": { "50GB": 3.9, "200GB": 12.9, "2TB": 42.9, "6TB": 129.9, "12TB": 259.9 }
+        },
+        {
+          "country": "Türkiye",
+          "currency": "TRY",
+          "previous": { "50GB": 24.99, "200GB": 79.99, "2TB": 249.99, "6TB": 1299.99, "12TB": 2499.99 },
+          "current": { "50GB": 39.99, "200GB": 129.99, "2TB": 399.99, "6TB": 1299.99, "12TB": 2499.99 }
+        }
+      ]
+    },
+    {
+      "label": "2026-07 eight-country adjustments",
+      "sources": [
+        "https://9to5mac.com/2026/07/20/icloud-prices-increased-in-eight-countries-by-20-59/",
+        "https://support.apple.com/en-us/108047"
+      ],
+      "adjustments": [
+        {
+          "country": "Nigeria",
+          "currency": "NGN",
+          "previous": { "50GB": 900, "200GB": 2900, "2TB": 9900, "6TB": 26900, "12TB": 44900 },
+          "current": { "50GB": 1300, "200GB": 4500, "2TB": 14900, "6TB": 39900, "12TB": 66900 }
+        },
+        {
+          "country": "Türkiye",
+          "currency": "TRY",
+          "previous": { "50GB": 39.99, "200GB": 129.99, "2TB": 399.99, "6TB": 1299.99, "12TB": 2499.99 },
+          "current": { "50GB": 49.99, "200GB": 169.99, "2TB": 549.99, "6TB": 1699.99, "12TB": 3399.99 }
+        },
+        {
+          "country": "Vietnam",
+          "currency": "VND",
+          "previous": { "50GB": 19000, "200GB": 69000, "2TB": 249000, "6TB": 749000, "12TB": 1499000 },
+          "current": { "50GB": 25000, "200GB": 89000, "2TB": 299000, "6TB": 899000, "12TB": 1799000 }
+        },
+        {
+          "country": "Japan",
+          "currency": "JPY",
+          "previous": { "50GB": 150, "200GB": 450, "2TB": 1500, "6TB": 4500, "12TB": 9000 },
+          "current": { "50GB": 180, "200GB": 540, "2TB": 1800, "6TB": 5500, "12TB": 11000 }
+        },
+        {
+          "country": "Egypt",
+          "currency": "EGP",
+          "previous": { "50GB": 39.99, "200GB": 149.99, "2TB": 499.99, "6TB": 1499.99, "12TB": 2999.99 },
+          "current": { "50GB": 49.99, "200GB": 179.99, "2TB": 599.99, "6TB": 1799.99, "12TB": 3599.99 }
+        },
+        {
+          "country": "New Zealand",
+          "currency": "NZD",
+          "previous": { "50GB": 1.69, "200GB": 4.99, "2TB": 16.99, "6TB": 49.99, "12TB": 99.99 },
+          "current": { "50GB": 1.99, "200GB": 5.99, "2TB": 19.99, "6TB": 59.99, "12TB": 119.99 }
+        },
+        {
+          "country": "Philippines",
+          "currency": "PHP",
+          "previous": { "50GB": 49, "200GB": 179, "2TB": 599, "6TB": 1790, "12TB": 3590 },
+          "current": { "50GB": 59, "200GB": 199, "2TB": 699, "6TB": 1990, "12TB": 3990 }
+        },
+        {
+          "country": "Indonesia",
+          "currency": "IDR",
+          "previous": { "50GB": 15000, "200GB": 49000, "2TB": 169000, "6TB": 499000, "12TB": 999000 },
+          "current": { "50GB": 15000, "200GB": 59000, "2TB": 199000, "6TB": 599000, "12TB": 1199000 }
+        }
+      ]
+    }
+  ]
+}
