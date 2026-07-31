@@ -23,10 +23,12 @@ const COUNTRY_ALIASES = {
 };
 
 export const PRICE_CHANGE_THRESHOLDS = {
-  percentage: 0.8,
+  percentage: 2,
   localRelative: 0.5,
   localMinimum: 1,
-  cnyMinimum: 5
+  cnyMinimum: 15,
+  cnyRelative: 0.5,
+  marketRelative: 0.5
 };
 
 function cleanText(value) {
@@ -348,7 +350,7 @@ export function validatePrices(countries, { minCountries = 60, previousCountries
     for (const tier of tiers) {
       if (!previous.plans[tier.id]) continue;
       const ratio = entry.plans[tier.id].price / previous.plans[tier.id].price;
-      if (ratio < 0.2 || ratio > 5) {
+      if (ratio < 0.1 || ratio > 10) {
         throw new Error(`Suspicious ${tier.id} price change for ${entry.country}: ratio ${ratio.toFixed(2)}`);
       }
     }
@@ -387,18 +389,48 @@ export function validatePriceChangeAnomalies(countries, {
 
       const localDelta = Math.abs(currentPlan.price - previousPlan.price);
       const percentageDelta = localDelta / previousPlan.price;
-      const previousCny = convertToCny(previousPlan.price, entry.currency, previousData.fx.rates);
-      const currentCny = convertToCny(currentPlan.price, entry.currency, currentRates);
-      if (previousCny == null || currentCny == null) continue;
-      const cnyDelta = Math.abs(currentCny - previousCny);
+      const previousCnyAtPreviousRate = convertToCny(
+        previousPlan.price,
+        entry.currency,
+        previousData.fx.rates
+      );
+      const currentCnyAtPreviousRate = convertToCny(
+        currentPlan.price,
+        entry.currency,
+        previousData.fx.rates
+      );
+      const currentCnyAtCurrentRate = convertToCny(
+        currentPlan.price,
+        entry.currency,
+        currentRates
+      );
+      if ([
+        previousCnyAtPreviousRate,
+        currentCnyAtPreviousRate,
+        currentCnyAtCurrentRate
+      ].some((value) => value == null)) continue;
+
+      const fixedRateCnyDelta = Math.abs(currentCnyAtPreviousRate - previousCnyAtPreviousRate);
+      const marketAdjustedCnyDelta = Math.abs(currentCnyAtCurrentRate - previousCnyAtPreviousRate);
+      const fixedRateThreshold = Math.max(
+        thresholds.cnyMinimum,
+        previousCnyAtPreviousRate * (thresholds.cnyRelative ?? PRICE_CHANGE_THRESHOLDS.cnyRelative)
+      );
+      const marketAdjustedThreshold = Math.max(
+        thresholds.cnyMinimum,
+        previousCnyAtPreviousRate * (thresholds.marketRelative ?? PRICE_CHANGE_THRESHOLDS.marketRelative)
+      );
       const localThreshold = Math.max(thresholds.localMinimum, previousPlan.price * thresholds.localRelative);
 
       if (percentageDelta >= thresholds.percentage
         && localDelta >= localThreshold
-        && cnyDelta >= thresholds.cnyMinimum) {
+        && fixedRateCnyDelta >= fixedRateThreshold
+        && marketAdjustedCnyDelta >= marketAdjustedThreshold) {
         throw new Error(
           `Suspicious combined ${tier.id} price change for ${entry.country}: `
-          + `${(percentageDelta * 100).toFixed(1)}%, local ${localDelta.toFixed(2)}, CNY ${cnyDelta.toFixed(2)}`
+          + `${(percentageDelta * 100).toFixed(1)}%, local ${localDelta.toFixed(2)}, `
+          + `fixed-rate CNY ${fixedRateCnyDelta.toFixed(2)}/${fixedRateThreshold.toFixed(2)}, `
+          + `market-adjusted CNY ${marketAdjustedCnyDelta.toFixed(2)}/${marketAdjustedThreshold.toFixed(2)}`
         );
       }
     }

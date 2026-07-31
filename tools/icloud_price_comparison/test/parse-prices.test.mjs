@@ -85,7 +85,7 @@ test('rejects incomplete pricing data', () => {
 test('rejects implausible changes against the last valid snapshot', async () => {
   const parsed = parseApplePrices(await readFile(fixtureUrl, 'utf8'));
   const changed = structuredClone(parsed.countries);
-  changed[0].plans['200GB'].price *= 10;
+  changed[0].plans['200GB'].price *= 11;
 
   assert.throws(
     () => validatePrices(changed, { minCountries: 5, previousCountries: parsed.countries }),
@@ -93,14 +93,14 @@ test('rejects implausible changes against the last valid snapshot', async () => 
   );
 });
 
-test('rejects a change only when percentage, local, and CNY thresholds all agree', async () => {
+test('rejects a change only when local and exchange-rate-isolated thresholds all agree', async () => {
   const parsed = parseApplePrices(await readFile(fixtureUrl, 'utf8'));
   const previousData = {
     countries: parsed.countries,
     fx: { rates: { USD: 1, GBP: 0.8, EUR: 0.9, HKD: 7.8, CNY: 7 } }
   };
   const changed = structuredClone(parsed.countries);
-  changed[0].plans['200GB'].price = 5.99;
+  changed[0].plans['200GB'].price = 9.99;
 
   assert.throws(
     () => validatePriceChangeAnomalies(changed, {
@@ -112,7 +112,7 @@ test('rejects a change only when percentage, local, and CNY thresholds all agree
   );
 
   const moderate = structuredClone(parsed.countries);
-  moderate[0].plans['200GB'].price = 4.49;
+  moderate[0].plans['200GB'].price = 7.99;
   assert.equal(validatePriceChangeAnomalies(moderate, {
     previousData,
     currentRates: previousData.fx.rates,
@@ -129,6 +129,87 @@ test('rejects a change only when percentage, local, and CNY thresholds all agree
     currentRates: lowCnyPrevious.fx.rates,
     tiers: [{ id: '50GB' }]
   }), true);
+});
+
+test('does not flag an Apple repricing that offsets a large currency move', () => {
+  const previousData = {
+    countries: [{ country: 'Example', currency: 'XYZ', plans: { '50GB': { price: 10 } } }],
+    fx: { rates: { XYZ: 1, CNY: 7 } }
+  };
+  const repriced = [{ country: 'Example', currency: 'XYZ', plans: { '50GB': { price: 30 } } }];
+
+  assert.equal(validatePriceChangeAnomalies(repriced, {
+    previousData,
+    currentRates: { XYZ: 3, CNY: 7 },
+    tiers: [{ id: '50GB' }]
+  }), true);
+});
+
+test('allows a rounded currency-driven repricing whose real value stays close', () => {
+  const previousData = {
+    countries: [{ country: 'Example', currency: 'XYZ', plans: { '12TB': { price: 100 } } }],
+    fx: { rates: { XYZ: 1, CNY: 7 } }
+  };
+  const repriced = [{ country: 'Example', currency: 'XYZ', plans: { '12TB': { price: 300 } } }];
+
+  assert.equal(validatePriceChangeAnomalies(repriced, {
+    previousData,
+    currentRates: { XYZ: 2.5, CNY: 7 },
+    tiers: [{ id: '12TB' }]
+  }), true);
+});
+
+test('does not treat a large exchange-rate move without an Apple price change as an anomaly', () => {
+  const previousData = {
+    countries: [{ country: 'Example', currency: 'XYZ', plans: { '50GB': { price: 10 } } }],
+    fx: { rates: { XYZ: 1, CNY: 7 } }
+  };
+  const unchanged = [{ country: 'Example', currency: 'XYZ', plans: { '50GB': { price: 10 } } }];
+
+  assert.equal(validatePriceChangeAnomalies(unchanged, {
+    previousData,
+    currentRates: { XYZ: 100, CNY: 7 },
+    tiers: [{ id: '50GB' }]
+  }), true);
+});
+
+test('scales the CNY threshold with the previous plan value', () => {
+  const previousData = {
+    countries: [{ country: 'Example', currency: 'XYZ', plans: { '12TB': { price: 100 } } }],
+    fx: { rates: { XYZ: 1, CNY: 7 } }
+  };
+  const changed = [{ country: 'Example', currency: 'XYZ', plans: { '12TB': { price: 120 } } }];
+
+  assert.equal(validatePriceChangeAnomalies(changed, {
+    previousData,
+    currentRates: previousData.fx.rates,
+    tiers: [{ id: '12TB' }],
+    thresholds: {
+      percentage: 0.01,
+      localRelative: 0,
+      localMinimum: 0,
+      cnyMinimum: 15,
+      cnyRelative: 0.5,
+      marketRelative: 0.5
+    }
+  }), true);
+});
+
+test('still rejects a very large price move when exchange rates do not explain it', () => {
+  const previousData = {
+    countries: [{ country: 'Example', currency: 'XYZ', plans: { '50GB': { price: 10 } } }],
+    fx: { rates: { XYZ: 1, CNY: 7 } }
+  };
+  const repriced = [{ country: 'Example', currency: 'XYZ', plans: { '50GB': { price: 35 } } }];
+
+  assert.throws(
+    () => validatePriceChangeAnomalies(repriced, {
+      previousData,
+      currentRates: previousData.fx.rates,
+      tiers: [{ id: '50GB' }]
+    }),
+    /fixed-rate CNY 175.00\/35.00, market-adjusted CNY 175.00\/35.00/
+  );
 });
 
 test('accepts a newly added country with complete pricing', async () => {
