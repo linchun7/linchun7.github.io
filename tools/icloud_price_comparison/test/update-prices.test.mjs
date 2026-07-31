@@ -198,7 +198,12 @@ test('normalizes equivalent Apple publication-date formats', () => {
 
 test('builds a structured successful run log with source, counts, and changes', () => {
   const data = {
-    source: { url: 'https://support.apple.com/en-us/108047', publishedDate: 'July 17, 2026' },
+    source: {
+      url: 'https://support.apple.com/en-us/108047',
+      publishedDate: 'July 17, 2026',
+      parser: 'cross-checked',
+      parserStatus: 'Both independent parser paths agreed'
+    },
     fx: { fetchedAt: '2026-08-01T00:02:31.000Z', stale: false },
     tiers: [TIER_50, TIER_200],
     countries: [country('Alpha'), country('Beta', { currency: 'CAD' })]
@@ -221,6 +226,8 @@ test('builds a structured successful run log with source, counts, and changes', 
   assert.equal(entry.durationMs, 2500);
   assert.equal(entry.observedAtBeijing, '2026-08-01');
   assert.equal(entry.source.applePublishedDate, 'July 17, 2026');
+  assert.equal(entry.source.appleParser, 'cross-checked');
+  assert.match(entry.source.appleParserStatus, /agreed/);
   assert.equal(entry.counts.countries, 2);
   assert.equal(entry.counts.pricePoints, 4);
   assert.equal(entry.counts.currencies, 2);
