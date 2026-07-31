@@ -53,10 +53,14 @@ async function readJson(filePath, fallback = null) {
   }
 }
 
-async function getExchangeRates(previousData) {
+export async function getExchangeRates(previousData) {
   try {
     const payload = await fetchResource(FX_URL, { json: true, attempts: 3 });
-    if (payload?.result !== 'success' || payload?.base_code !== 'USD' || !payload?.rates?.CNY) {
+    if (payload?.result !== 'success'
+      || payload?.base_code !== 'USD'
+      || !Number.isFinite(payload?.time_last_update_unix)
+      || !Number.isFinite(payload?.rates?.CNY)
+      || payload.rates.CNY <= 0) {
       throw new Error('Exchange-rate response is missing required fields');
     }
     return {
@@ -64,7 +68,7 @@ async function getExchangeRates(previousData) {
       base: 'USD',
       fetchedAt: new Date(payload.time_last_update_unix * 1000).toISOString(),
       stale: false,
-      rates: { ...(previousData?.fx?.rates ?? {}), ...payload.rates }
+      rates: payload.rates
     };
   } catch (error) {
     if (!previousData?.fx?.rates?.CNY) throw error;
@@ -152,6 +156,15 @@ export function publicationDateKey(value) {
   return Number.isNaN(parsed) ? `raw:${String(value ?? '').trim()}` : new Date(parsed).toISOString().slice(0, 10);
 }
 
+function assertPublicationDateNotRegressed(previousPublishedDate, publishedDate) {
+  const previousKey = publicationDateKey(previousPublishedDate);
+  const currentKey = publicationDateKey(publishedDate);
+  const validDateKey = /^\d{4}-\d{2}-\d{2}$/;
+  if (validDateKey.test(previousKey) && validDateKey.test(currentKey) && currentKey < previousKey) {
+    throw new Error(`Apple published date moved backwards from ${previousPublishedDate} to ${publishedDate}`);
+  }
+}
+
 export function buildSnapshotChanges(previousData, countries, tiers) {
   const previousByCountry = new Map((previousData?.countries ?? []).map((country) => [country.country, country]));
   const currentByCountry = new Map(countries.map((country) => [country.country, country]));
@@ -225,6 +238,7 @@ export function updatePublishedDateHistory(history, previousData, publishedDate,
     });
   }
 
+  assertPublicationDateNotRegressed(entries.at(-1)?.publishedDate, publishedDate);
   let changed = false;
   if (publishedDate && publicationDateKey(entries.at(-1)?.publishedDate) !== publicationDateKey(publishedDate)) {
     entries.push({ publishedDate, observedAt, kind: 'change', changes });
@@ -280,6 +294,9 @@ export async function main() {
   }
 
   const parsed = parseApplePrices(html);
+  if (!parsed.sourcePublishedDate || !/^\d{4}-\d{2}-\d{2}$/.test(publicationDateKey(parsed.sourcePublishedDate))) {
+    throw new Error('Apple published date was not found or has an unsupported format');
+  }
   validatePrices(parsed.countries, {
     tiers: parsed.tiers,
     previousCountries: previousData?.countries ?? []
