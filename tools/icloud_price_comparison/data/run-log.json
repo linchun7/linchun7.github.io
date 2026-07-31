@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "retention": 90,
-  "updatedAtUtc": "2026-07-31T22:10:00.786Z",
+  "updatedAtUtc": "2026-07-31T23:01:33.015Z",
   "runs": [
     {
       "schemaVersion": 1,
@@ -61,6 +61,58 @@
       "startedAtUtc": "2026-07-31T22:10:00.305Z",
       "finishedAtUtc": "2026-07-31T22:10:00.786Z",
       "durationMs": 481,
+      "observedAtBeijing": "2026-08-01",
+      "source": {
+        "appleUrl": "https://support.apple.com/en-us/108047",
+        "applePublishedDate": "July 17, 2026",
+        "appleParser": "cross-checked",
+        "appleParserStatus": "Both independent parser paths agreed",
+        "exchangeRatesFetchedAtUtc": "2026-07-31T00:02:31.000Z",
+        "exchangeRatesStale": false
+      },
+      "counts": {
+        "countries": 73,
+        "pricePoints": 365,
+        "currencies": 44,
+        "tiers": [
+          {
+            "id": "50GB",
+            "label": "50 GB"
+          },
+          {
+            "id": "200GB",
+            "label": "200 GB"
+          },
+          {
+            "id": "2TB",
+            "label": "2 TB"
+          },
+          {
+            "id": "6TB",
+            "label": "6 TB"
+          },
+          {
+            "id": "12TB",
+            "label": "12 TB"
+          }
+        ]
+      },
+      "changes": {
+        "addedTiers": [],
+        "removedTiers": [],
+        "addedCountries": [],
+        "removedCountries": [],
+        "changedCountries": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "2026-07-31T23:01:33.015Z",
+      "status": "success",
+      "trigger": "workflow_dispatch",
+      "startedAtUtc": "2026-07-31T23:01:32.441Z",
+      "finishedAtUtc": "2026-07-31T23:01:33.015Z",
+      "durationMs": 574,
       "observedAtBeijing": "2026-08-01",
       "source": {
         "appleUrl": "https://support.apple.com/en-us/108047",
