@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   buildSnapshotChanges,
+  getExchangeRates,
   publicationDateKey,
   updateHistory,
   updatePublishedDateHistory
@@ -58,6 +59,38 @@ test('records one initial publication date and only appends genuine date changes
   assert.equal(changed.entries.length, 2);
   assert.equal(changed.entries.at(-1).kind, 'change');
   assert.deepEqual(changed.entries.at(-1).changes, noChanges);
+});
+
+test('rejects a publication date that moves backwards', () => {
+  const previousData = snapshot({ countries: [country('Alpha')], publishedDate: 'July 17, 2026' });
+  const history = { schemaVersion: 1, countries: {}, sourcePublishedDates: [{
+    publishedDate: 'July 17, 2026',
+    observedAt: '2026-07-31',
+    kind: 'initial',
+    changes: { addedTiers: [], removedTiers: [], addedCountries: [], removedCountries: [], changedCountries: [] }
+  }] };
+  assert.throws(
+    () => updatePublishedDateHistory(history, previousData, 'July 16, 2026', '2026-08-01', {}),
+    /published date moved backwards/
+  );
+});
+
+test('does not carry a missing currency from old rates into a successful refresh', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: 1_754_006_400,
+    rates: { USD: 1, CNY: 7.2 }
+  }), { status: 200 });
+  try {
+    const fx = await getExchangeRates({ fx: { rates: { USD: 1, CNY: 7.1, JPY: 150 } } });
+    assert.equal(fx.stale, false);
+    assert.equal(fx.rates.CNY, 7.2);
+    assert.equal(fx.rates.JPY, undefined);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test('creates a clean initial publication record when no prior snapshot exists', () => {

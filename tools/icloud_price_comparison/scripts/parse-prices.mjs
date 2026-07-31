@@ -86,9 +86,7 @@ function extractPublishedDate($) {
   const pageText = cleanText($.root().text());
   const textMatch = pageText.match(/published\s+date\s*:?\s*([A-Za-z]+\s+\d{1,2},\s*\d{4})/i);
   if (textMatch) return cleanText(textMatch[1]);
-
-  const lastTime = $('time').last();
-  return cleanText(lastTime.text()) || cleanText(lastTime.attr('datetime') ?? '') || null;
+  return null;
 }
 
 function parseCountry($, heading, priceList, region) {
