@@ -1,12 +1,19 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { getMissingExchangeRates, parseApplePrices, validatePrices } from '../scripts/parse-prices.mjs';
+import {
+  getMissingExchangeRates,
+  parseApplePrices,
+  validatePriceChangeAnomalies,
+  validatePrices
+} from '../scripts/parse-prices.mjs';
 
 const fixtureUrl = new URL('./fixtures/apple-prices.html', import.meta.url);
 
 test('parses footnotes, currencies, and all storage tiers', async () => {
   const result = parseApplePrices(await readFile(fixtureUrl, 'utf8'));
+  assert.equal(result.parser, 'cross-checked');
+  assert.match(result.parserStatus, /Both independent parser paths agreed/);
   assert.equal(result.countries.length, 5);
   assert.equal(result.sourcePublishedDate, 'July 17, 2026');
   assert.equal(result.countries[0].country, 'United States');
@@ -39,6 +46,26 @@ test('tolerates small heading, wrapper, and publication-date markup changes', as
   assert.equal(validatePrices(result.countries, { minCountries: 5, tiers: result.tiers }), true);
 });
 
+test('falls back to the Apple marker parser when semantic region headings change', async () => {
+  const fixture = await readFile(fixtureUrl, 'utf8');
+  const adjusted = fixture
+    .replace('<h3 id="nasalac">Americas</h3>', '<div id="nasalac">Americas</div>')
+    .replace('<h3 id="emea">Europe</h3>', '<div id="emea">Europe</div>')
+    .replace('<h3 id="ap">Asia Pacific</h3>', '<div id="ap">Asia Pacific</div>');
+  const result = parseApplePrices(adjusted);
+  assert.equal(result.parser, 'apple-markers-fallback');
+  assert.match(result.parserStatus, /Document-order parser unavailable/);
+  assert.equal(result.countries.length, 5);
+});
+
+test('keeps the document-order parser when Apple marker classes disappear', async () => {
+  const fixture = await readFile(fixtureUrl, 'utf8');
+  const result = parseApplePrices(fixture.replaceAll(' class="gb-header"', ''));
+  assert.equal(result.parser, 'document-order');
+  assert.match(result.parserStatus, /Apple marker parser unavailable/);
+  assert.equal(result.countries.length, 5);
+});
+
 test('does not mistake an unrelated time element for the Apple publication date', async () => {
   const fixture = await readFile(fixtureUrl, 'utf8');
   const adjusted = fixture.replace(
@@ -64,6 +91,44 @@ test('rejects implausible changes against the last valid snapshot', async () => 
     () => validatePrices(changed, { minCountries: 5, previousCountries: parsed.countries }),
     /Suspicious 200GB price change/
   );
+});
+
+test('rejects a change only when percentage, local, and CNY thresholds all agree', async () => {
+  const parsed = parseApplePrices(await readFile(fixtureUrl, 'utf8'));
+  const previousData = {
+    countries: parsed.countries,
+    fx: { rates: { USD: 1, GBP: 0.8, EUR: 0.9, HKD: 7.8, CNY: 7 } }
+  };
+  const changed = structuredClone(parsed.countries);
+  changed[0].plans['200GB'].price = 5.99;
+
+  assert.throws(
+    () => validatePriceChangeAnomalies(changed, {
+      previousData,
+      currentRates: previousData.fx.rates,
+      tiers: parsed.tiers
+    }),
+    /Suspicious combined 200GB price change/
+  );
+
+  const moderate = structuredClone(parsed.countries);
+  moderate[0].plans['200GB'].price = 4.49;
+  assert.equal(validatePriceChangeAnomalies(moderate, {
+    previousData,
+    currentRates: previousData.fx.rates,
+    tiers: parsed.tiers
+  }), true);
+
+  const lowCnyPrevious = {
+    countries: [{ country: 'Example', currency: 'JPY', plans: { '50GB': { price: 100 } } }],
+    fx: { rates: { JPY: 150, CNY: 7 } }
+  };
+  const lowCnyCurrent = [{ country: 'Example', currency: 'JPY', plans: { '50GB': { price: 200 } } }];
+  assert.equal(validatePriceChangeAnomalies(lowCnyCurrent, {
+    previousData: lowCnyPrevious,
+    currentRates: lowCnyPrevious.fx.rates,
+    tiers: [{ id: '50GB' }]
+  }), true);
 });
 
 test('accepts a newly added country with complete pricing', async () => {
