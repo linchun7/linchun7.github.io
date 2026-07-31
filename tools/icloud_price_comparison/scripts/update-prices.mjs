@@ -73,6 +73,19 @@ async function getExchangeRates(previousData) {
   }
 }
 
+function formatBeijingDateTime(value) {
+  if (!value) return 'unknown';
+  return new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).format(new Date(value));
+}
+
 function snapshotPlans(country) {
   return Object.fromEntries(TIERS.map(({ id }) => [id, country.plans[id].price]));
 }
@@ -86,18 +99,23 @@ function updateHistory(previousHistory, countries, observedAt) {
   const history = previousHistory ?? { schemaVersion: 1, countries: {} };
   history.schemaVersion = 1;
   history.updatedAt = new Date().toISOString();
+  let addedCountries = 0;
+  let changedCountries = 0;
 
   for (const country of countries) {
-    const record = history.countries[country.country] ?? {
+    const existingRecord = history.countries[country.country];
+    const record = existingRecord ?? {
       nameZh: country.nameZh,
       region: country.region,
       events: []
     };
+    if (!existingRecord) addedCountries += 1;
     record.nameZh = country.nameZh;
     record.region = country.region;
 
     const previousEvent = record.events.at(-1);
     if (hasPriceChange(previousEvent, country)) {
+      changedCountries += 1;
       record.events.push({
         observedAt,
         currency: country.currency,
@@ -106,7 +124,7 @@ function updateHistory(previousHistory, countries, observedAt) {
     }
     history.countries[country.country] = record;
   }
-  return history;
+  return { history, addedCountries, changedCountries };
 }
 
 async function writeJsonAtomic(filePath, value) {
@@ -116,17 +134,24 @@ async function writeJsonAtomic(filePath, value) {
   await rename(temporaryPath, filePath);
 }
 
-async function writeActionSummary(data, missingRates) {
+async function writeActionSummary(data, summary) {
   if (!process.env.GITHUB_STEP_SUMMARY) return;
   const lines = [
-    '## iCloud+ price update',
+    '## iCloud+ 价格更新',
     '',
-    `- Status: success`,
-    `- Countries and regions: ${data.countries.length}`,
-    `- Prices: ${data.countries.length * data.tiers.length}`,
-    `- Apple published date: ${data.source.publishedDate ?? 'unknown'}`,
-    `- Exchange rates: ${data.fx.stale ? 'cached previous rates' : data.fx.fetchedAt}`,
-    `- Missing currency rates: ${missingRates.length ? missingRates.join(', ') : 'none'}`,
+    '- 状态：成功',
+    `- 触发方式：${process.env.GITHUB_EVENT_NAME ?? 'unknown'}`,
+    `- 抓取完成时间（北京时间）：${formatBeijingDateTime(data.generatedAt)}`,
+    `- Apple 页面标注日期：${data.source.publishedDate ?? 'unknown'}`,
+    `- 地区数量：${data.countries.length}`,
+    `- 价格点数量：${data.countries.length * data.tiers.length}`,
+    `- 本次新增地区：${summary.addedCountries.length ? summary.addedCountries.join('、') : '无'}`,
+    `- 本次移除地区：${summary.removedCountries.length ? summary.removedCountries.join('、') : '无'}`,
+    `- 检测到价格或币种变化：${summary.changedCountries} 个地区`,
+    `- 历史记录覆盖：${Object.keys(summary.history.countries).length} 个地区`,
+    `- 汇率数据时间（北京时间）：${formatBeijingDateTime(data.fx.fetchedAt)}`,
+    `- 汇率状态：${data.fx.stale ? '沿用上次成功结果' : '本次成功获取'}`,
+    `- 缺少汇率：${summary.missingRates.length ? summary.missingRates.join('、') : '无'}`,
     ''
   ];
   await appendFile(process.env.GITHUB_STEP_SUMMARY, lines.join('\n'), 'utf8');
@@ -171,7 +196,15 @@ async function main() {
     tiers: TIERS,
     countries
   };
-  const history = updateHistory(previousHistory, countries, observedAt);
+  const historyUpdate = updateHistory(previousHistory, countries, observedAt);
+  const history = historyUpdate.history;
+  const previousCountryNames = new Set((previousData?.countries ?? []).map(({ country }) => country));
+  const currentCountryNames = new Set(countries.map(({ country }) => country));
+  const addedCountries = countries
+    .map(({ country }) => country)
+    .filter((country) => !previousCountryNames.has(country));
+  const removedCountries = [...previousCountryNames]
+    .filter((country) => !currentCountryNames.has(country));
 
   if (DRY_RUN) {
     console.log(`Live check passed: ${countries.length} countries and ${countries.length * TIERS.length} prices. No files were changed.`);
@@ -180,7 +213,13 @@ async function main() {
     await writeJsonAtomic(HISTORY_PATH, history);
     console.log(`Saved ${countries.length} countries and ${countries.length * TIERS.length} prices.`);
   }
-  await writeActionSummary(data, missingRates);
+  await writeActionSummary(data, {
+    history,
+    missingRates,
+    addedCountries,
+    removedCountries,
+    changedCountries: historyUpdate.changedCountries
+  });
 }
 
 main().catch(async (error) => {

@@ -28,12 +28,12 @@
       <div class="app-brand">
         <span class="brand-mark" aria-hidden="true"><i data-lucide="cloud"></i></span>
         <span class="brand-copy">
-          <strong>iCloud+ 全球价格</strong>
+          <strong>iCloud+ 价格比较</strong>
         </span>
       </div>
       <div class="data-status" aria-live="polite">
         <i data-lucide="calendar-clock" aria-hidden="true"></i>
-        <span id="updatedAt">正在读取更新时间</span>
+        <span id="updatedAt">正在读取数据更新时间</span>
       </div>
     </div>
   </header>
@@ -41,7 +41,7 @@
   <main class="page-main">
     <section class="overview" aria-labelledby="pageTitle">
       <div class="overview-copy">
-        <h1 id="pageTitle">iCloud+ 全球价格比较</h1>
+        <h1 id="pageTitle">全球各地区月度价格</h1>
       </div>
       <dl class="overview-stats" aria-label="数据概览">
         <div><dt>国家和地区</dt><dd id="marketCount">--</dd></div>
@@ -50,11 +50,11 @@
       </dl>
     </section>
 
-    <section class="workspace" aria-label="iCloud+ 全球价格比较">
+    <section class="workspace" aria-label="全球各地区 iCloud+ 月费对比">
       <div class="workspace-toolbar">
         <div class="workspace-heading">
-          <h2>价格比较</h2>
-          <p id="resultSummary" aria-live="polite">正在加载价格...</p>
+          <h2>各地区月费对比</h2>
+          <p id="resultSummary" aria-live="polite">正在读取排序方式...</p>
         </div>
         <div class="filters">
           <label class="search-field">
@@ -78,11 +78,11 @@
             <tr>
               <th class="rank-column" scope="col">#</th>
               <th scope="col" aria-sort="none"><button type="button" data-sort="country">国家/地区 <i data-lucide="arrow-up-down"></i></button></th>
-              <th scope="col" aria-sort="none"><button type="button" data-sort-tier="50GB">50 GB <i data-lucide="arrow-up-down"></i></button></th>
-              <th scope="col" aria-sort="ascending"><button type="button" data-sort-tier="200GB">200 GB <i data-lucide="arrow-up"></i></button></th>
-              <th scope="col" aria-sort="none"><button type="button" data-sort-tier="2TB">2 TB <i data-lucide="arrow-up-down"></i></button></th>
-              <th scope="col" aria-sort="none"><button type="button" data-sort-tier="6TB">6 TB <i data-lucide="arrow-up-down"></i></button></th>
-              <th scope="col" aria-sort="none"><button type="button" data-sort-tier="12TB">12 TB <i data-lucide="arrow-up-down"></i></button></th>
+              <th scope="col" aria-sort="none"><button type="button" data-sort-tier="50GB">50 GB / 月 <i data-lucide="arrow-up-down"></i></button></th>
+              <th scope="col" aria-sort="ascending"><button type="button" data-sort-tier="200GB">200 GB / 月 <i data-lucide="arrow-up"></i></button></th>
+              <th scope="col" aria-sort="none"><button type="button" data-sort-tier="2TB">2 TB / 月 <i data-lucide="arrow-up-down"></i></button></th>
+              <th scope="col" aria-sort="none"><button type="button" data-sort-tier="6TB">6 TB / 月 <i data-lucide="arrow-up-down"></i></button></th>
+              <th scope="col" aria-sort="none"><button type="button" data-sort-tier="12TB">12 TB / 月 <i data-lucide="arrow-up-down"></i></button></th>
             </tr>
           </thead>
           <tbody id="priceRows">
@@ -93,13 +93,13 @@
 
       <div class="workspace-footer">
         <div class="source-links">
-          <a href="https://support.apple.com/en-us/108047" target="_blank" rel="noreferrer"><i data-lucide="badge-check"></i>Apple 官方价格</a>
+          <a href="https://support.apple.com/en-us/108047" target="_blank" rel="noreferrer"><i data-lucide="badge-check"></i>Apple 当地价格</a>
           <span class="source-separator"></span>
-          <a href="https://www.exchangerate-api.com/docs/free" target="_blank" rel="noreferrer"><i data-lucide="landmark"></i>每日参考汇率</a>
+          <a href="https://www.exchangerate-api.com/docs/free" target="_blank" rel="noreferrer"><i data-lucide="landmark"></i>人民币换算汇率</a>
           <span id="fxStatus"></span>
         </div>
       </div>
-      <p class="data-disclaimer">人民币金额按每日参考汇率换算；税费、服务可用性和实际购买区域可能不同。</p>
+      <p class="data-disclaimer">人民币金额由 Apple 公布的当地月费按每日参考汇率换算，仅用于横向比较，不代表 Apple 实际人民币结算价。当地价格可能包含或不包含税费；方案可用性、付款方式和购买资格以对应国家或地区的 Apple 页面及结算结果为准。</p>
     </section>
   </main>
 
@@ -116,7 +116,7 @@
     <div class="history-current">
       <div><span>当前当地月费</span><strong id="historyLocalPrice">--</strong></div>
       <div><span>折合人民币</span><strong id="historyCnyPrice">--</strong></div>
-      <div><span>历史记录</span><strong id="historyEventCount">--</strong></div>
+      <div><span>累计价格变更</span><strong id="historyEventCount">--</strong></div>
     </div>
 
     <div class="history-toolbar">

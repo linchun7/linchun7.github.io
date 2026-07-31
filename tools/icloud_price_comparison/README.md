@@ -31,7 +31,7 @@
 
 ## 自动更新
 
-工作流位于仓库根目录的 `.github/workflows/update-icloud-prices.yml`，每天北京时间约 10:17 运行，也可以在 GitHub Actions 页面手动运行。
+工作流位于仓库根目录的 `.github/workflows/update-icloud-prices.yml`，每天北京时间 12:00 运行（GitHub 可能有几分钟排队延迟），也可以在 GitHub Actions 页面手动运行。
 
 首次使用前，在仓库的 **Settings > Actions > General > Workflow permissions** 中选择 **Read and write permissions**。工作流会：
 
