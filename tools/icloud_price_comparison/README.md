@@ -1,81 +1,119 @@
 # iCloud+ 全球价格比较
 
-静态价格比较工具。每天从 Apple Support 的公开页面读取 iCloud+ 月度价格，在浏览器中按容量比较不同国家和地区，并保存价格变化历史。
+线上页面：<https://linchun7.github.io/tools/icloud_price_comparison/>
 
-## 功能
+本 README 面向项目维护者，用于日常运行、故障排查和后续开发。普通访客只需使用线上页面。
 
-- 同表比较 Apple 页面当前公布的所有容量；新增或移除容量会随下一次成功抓取自动同步
-- 点击任一容量表头，按折合人民币价格升降序排列
-- 每个价格同时显示人民币换算值和 Apple 当地货币原价
-- 搜索国家、地区或币种，并按大区筛选
-- 使用每日参考汇率换算成人民币后排序
-- 点击国家或地区查看各容量价格历史
-- 只在当地价格或币种发生变化时追加历史事件
-- Apple 页面结构异常或价格变化异常时终止更新，保留上一份有效数据
-- 网络请求使用超时、五次退避重试和响应内容检查
-- 更新失败时上传诊断文件，便于分析 Apple 页面结构变化
-- Apple 新增且各当前容量价格完整的国家或地区会自动进入下一份数据
-- Apple 页面发布日期只在发生变化时记录；点击页面底部的发布日期可查看新增/移除地区、容量、分区、币种和价格变化
-- 桌面和手机响应式布局
+## 当前能力
 
-## GitHub 首次配置
-
-1. 将整个仓库推送到 `linchun7/linchun7.github.io` 的 `main` 分支。工作流必须位于仓库根目录的 `.github/workflows/update-icloud-prices.yml`，工具目录必须是 `tools/icloud_price_comparison`。
-2. 打开仓库 **Settings > Pages**，在 **Build and deployment** 中选择 **Deploy from a branch**，分支选择 `main`，目录选择 `/(root)`，然后保存。
-3. 打开 **Settings > Actions > General**。在 **Actions permissions** 中允许仓库使用本工作流引用的 Actions；在 **Workflow permissions** 中选择 **Read and write permissions** 并保存。
-4. 如果 `main` 设置了分支保护或 Ruleset，需要允许 GitHub Actions 写入该分支；否则抓取可以成功，但最后的自动提交会失败。
-5. 打开 **Actions > Update iCloud prices**，点击 **Run workflow**，分支选择 `main`，手动运行第一次抓取。
-6. 等待运行结束。绿色表示抓取、校验、测试和数据提交全部成功；随后确认仓库中出现由 `github-actions[bot]` 创建的 `chore: update iCloud prices` 提交。
-7. 访问 `https://linchun7.github.io/tools/icloud_price_comparison/`，核对页面日期、地区数量以及至少一个当地价格。
-
-工作流不需要 API Key 或 GitHub Secret。GitHub 的定时任务是尽力而为，可能比设定时间延迟，不能作为严格准点服务。
+- 每天从 Apple Support 官方页面读取 iCloud+ 月度价格
+- 自动识别 Apple 当前公布的全部容量、国家和地区
+- 使用每日参考汇率换算成人民币并排序，同时保留当地货币原价
+- 点击国家或地区查看价格变化历史
+- 记录 Apple 页面发布日期及该发布日期对应的容量、地区、币种和价格变化
+- 保存最近一次有效数据，抓取或校验失败时不覆盖线上价格
+- 记录结构化运行日志，并把 Apple 原始 HTML 作为 GitHub Actions 附件保留 14 天
+- 在真实 Chrome 中自动验证数据加载、表格、排序和历史弹窗
 
 ## 自动更新
 
-工作流位于仓库根目录的 `.github/workflows/update-icloud-prices.yml`，计划每天北京时间 12:00 运行（GitHub 可能延迟数分钟甚至数小时），也可以在 GitHub Actions 页面手动运行。
+工作流：仓库根目录 `.github/workflows/update-icloud-prices.yml`
 
-首次使用前，在仓库的 **Settings > Actions > General > Workflow permissions** 中选择 **Read and write permissions**。工作流会：
+计划时间：每天北京时间 09:00（UTC 01:00）。当前汇率源通常在北京时间 08:00 左右完成每日更新，09:00 为汇率发布和 GitHub Actions 排队预留了缓冲。GitHub 定时任务是尽力而为，仍可能延迟数分钟甚至数小时。
 
-1. 下载并解析 Apple 的公开价格页。
-2. 校验国家数量及 Apple 当前所有容量是否完整。
-3. 与上一份有效数据比较，拦截国家数量骤降或异常价格跳变。
-4. 获取以 USD 为基准的公开参考汇率；失败时保留上一份汇率。
-5. 更新 `data/prices.json`。
-6. 仅在价格变化时更新国家历史；Apple 发布日期变化时另外记录对应的内容差异。
-7. 写入后再次运行完整性测试，并把数据提交到 `main` 分支。
+每次运行按以下顺序执行：
 
-Apple 请求最多尝试五次，等待时间逐步增加。所有校验通过后才会原子写入数据文件；失败时旧价格不会被覆盖，并会在该次 Actions 运行中保留 14 天诊断附件。
+1. 安装锁定版本的依赖。
+2. 使用固定 Apple HTML fixture 运行解析、历史、数据完整性和真实浏览器 UI 测试。
+3. 请求 Apple 官方页面并解析全部地区和容量。
+4. 校验地区数量、重复地区、容量完整性、价格有效性和异常价格跳变。
+5. 获取汇率；汇率服务失败时沿用上次成功结果并标记为过期。
+6. 比较当前数据与上一份有效数据，更新价格历史、发布日期历史和结构化运行日志。
+7. 使用原子写入更新 JSON，再运行一次完整测试。
+8. 上传原始 HTML 或失败诊断，最后由 GitHub Actions 提交 `data/` 目录。
 
-生产页面优先读取同域 GitHub Pages 数据，避免部分网络环境无法访问 `raw.githubusercontent.com`；同域数据读取失败或结构异常时，再回退到仓库 `main` 分支的原始 JSON。每个数据请求都有超时限制，历史文件异常也不会阻止主价格表显示。
+## 数据模型
 
-## 数据保存与运行状态
+### `data/prices.json`
 
-- `data/prices.json`：最近一次成功抓取的完整价格与汇率。
-- `data/history.json`：各国家和地区的价格变化事件，以及 Apple 发布日期变化记录；价格或发布日期不变时不会重复追加。旧事件没有后来新增的容量时，前端显示 `--`。
-- Git 提交历史：自动任务每次成功后都会提交 `data` 目录，因此可以查看任意一天的完整快照。
-- `artifacts/`：失败诊断文件，不提交到仓库；GitHub Actions 会把它作为附件保留 14 天。
+最近一次成功抓取的完整当前状态，包含来源、Apple 发布日期、汇率、动态容量列表及全部地区价格。
 
-在 GitHub 仓库的 **Actions > Update iCloud prices** 中查看每次运行：
+新抓取使用 `schemaVersion: 2`，并在 `run` 中记录：
 
-- 绿色运行：摘要会显示国家数量、价格数量、Apple 页面日期、发布日期记录变化、汇率日期和缺少汇率情况。
-- 红色运行：展开 **Fetch and validate prices** 查看直接错误；在页面底部下载 `icloud-price-diagnostics-*` 附件。
-- `update-failure.json` 保存失败时间、错误信息和调用栈。
-- `apple-response.html` 仅在已经取得页面但解析或校验失败时生成，便于定位 Apple 的结构变化。
+- 抓取开始和结束 UTC 时间
+- UTC 观测时间和北京时间展示日期
+- 地区数和价格点数
 
-## 本地运行
+前端同时兼容 schema 1 和 schema 2，升级过程中不会中断页面。
 
-需要 Node.js 22 或更高版本以及 pnpm。
+### `data/history.json`
+
+价格历史采用“变化事件”存储，不依赖每天的完整全局快照推导。只有某个地区的价格或币种发生变化时，才追加一条事件。
+
+每条事件保存该地区当时所有容量的完整价格状态。这是“变更点全量状态”模型：既避免每天重复保存不变数据，又能直接还原任意变更时点，不需要重放一长串增量补丁。
+
+`sourcePublishedDates` 是另一组明确的差异事件。Apple 发布日期变化时，记录：
+
+- 新增或移除容量
+- 新增或移除地区
+- 地区分区变化
+- 币种变化
+- 各容量价格变化
+
+旧历史事件无法可靠还原精确 UTC 时刻时，只保留原北京时间日期，不伪造时间。
+
+### `data/run-log.json`
+
+保留最近 90 次成功抓取的结构化日志，包含：
+
+- 触发方式、开始时间、结束时间和耗时
+- Apple 页面发布日期和汇率发布时间
+- 地区、币种、容量和价格点数量
+- 本次容量、地区、币种和价格变化
+- 是否使用旧汇率
+
+失败任务不会写入成功日志；失败原因写入该次 Actions 的 `run-report.json` 和 `update-failure.json` 附件。
+
+## 稳定性保护
+
+- Apple 请求最长 45 秒，最多五次退避重试
+- 响应体过小或缺少关键价格内容时拒绝解析
+- 关键分区缺失、地区重复、容量价格不完整时拒绝更新
+- 地区数量异常下降时拒绝更新
+- 同币种单项价格出现极端倍数变化时拒绝更新
+- Apple 发布日期缺失、格式异常或日期倒退时拒绝更新
+- 汇率缺失时拒绝更新；汇率服务临时失败时保留上次有效汇率
+- 所有校验通过后才写入数据，单个 JSON 使用临时文件原子替换
+- 前端优先读取同域 Pages 数据，失败后回退到 GitHub `main` 分支原始 JSON
+- 历史文件异常不会阻止当前价格表显示
+
+## 日常检查
+
+打开仓库的 **Actions > Update iCloud prices**：
+
+- 绿色：抓取、两轮测试、数据提交均成功。摘要显示地区数、价格点数、Apple 日期、汇率时间和变更统计。
+- 红色：先查看失败步骤，再下载 `icloud-price-diagnostics-*` 附件。
+- `apple-response-<UTC 时间>.html`：本次 Apple 原始页面，用于复现解析问题。
+- `run-report.json`：结构化失败状态、耗时和错误。
+- `update-failure.json`：错误信息和调用栈。
+
+如需恢复上一份数据，优先使用 Git 历史回退对应的 `data/` 文件，不要手工拼接 JSON。
+
+## 本地验证
+
+需要 Node.js 22 或更高版本、pnpm 以及 Chrome 或 Chromium。
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 pnpm test
 pnpm check:live
-pnpm update:data
 ```
 
-`pnpm check:live` 会真实访问 Apple 和汇率接口并执行全部校验，但不会修改价格或历史文件。`pnpm update:data` 才会在校验成功后写入数据。
+- `pnpm test`：不访问 Apple，不写生产数据；运行固定 fixture、历史/日志模型、当前 JSON 完整性和真实浏览器 UI 测试。
+- `pnpm check:live`：真实访问 Apple 和汇率服务并执行全部校验，但不修改价格、历史、日志或附件。
+- `pnpm update:data`：会写入生产 JSON，仅用于隔离测试或明确的手动更新。
 
-用任意静态服务器打开本目录即可预览。例如在仓库根目录运行：
+本地预览需要静态服务器。在仓库根目录运行：
 
 ```bash
 python -m http.server 4173
@@ -83,13 +121,20 @@ python -m http.server 4173
 
 然后访问 `http://127.0.0.1:4173/tools/icloud_price_comparison/`。
 
-## 数据说明
+## 数据来源
 
-- 当前价格来源：[Apple Support](https://support.apple.com/en-us/108047)
-- 中文名称参考：[Apple 中文支持](https://support.apple.com/zh-cn/108047)。中文映射未收录的新增地区暂时使用 Apple 英文名称，价格数据仍会自动进入页面。
-- 每日参考汇率来源：[ExchangeRate-API](https://www.exchangerate-api.com/docs/free)
-- 历史基线来自本工具原有的 2024-12-08 数据，此后按实际检测到的价格变化追加
-- 汇率换算仅用于跨币种比较，不代表结算价格
-- Apple 的税费、服务可用性及购买区域限制可能因国家和地区而异
+- 价格：[Apple Support](https://support.apple.com/en-us/108047)
+- 中文名称：[Apple 中文支持](https://support.apple.com/zh-cn/108047)
+- 汇率：[ExchangeRate-API 免费公开接口](https://www.exchangerate-api.com/docs/free)
+
+中文映射未收录的新地区会先显示 Apple 英文名称，价格仍会进入页面。人民币金额仅用于跨币种比较，不代表 Apple 实际结算价；税费、服务可用性和购买区域限制可能不同。
+
+## 当前边界与后续优先级
+
+1. **Apple 备用策略**：线上可用性已经由“保留上一份有效 JSON”兜底。暂不自动切换到非官方价格源，避免来源不一致。后续优先增加同一 Apple 官方页面的第二解析路径，并用保存的真实 HTML 回放验证。
+2. **异常价格判断**：当前倍数阈值主要拦截小数点、币种和 DOM 错位等严重解析错误。后续可增加“当地货币绝对变化 + 百分比 + 折合人民币变化”的联合规则，并为大幅真实调价保留人工确认入口。
+3. **失败通知和过期监控**：后续可增加数据超过 36 小时未更新的外部监控，以及邮件、Webhook 或 GitHub Issue 通知。
+4. **模块拆分**：解析与校验已经独立。现阶段不做大重构；当抓取来源、汇率源或诊断逻辑继续增长时，再拆分历史、汇率和诊断模块。
+5. **前端拆分**：当前 `script.js` 规模仍可维护，并已有真实浏览器回归。下一次增加较大交互功能时，再拆分数据层、状态层和渲染层，避免仅为文件数量而重构。
 
 本工具与 Apple Inc. 无关联。

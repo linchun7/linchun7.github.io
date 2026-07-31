@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   buildSnapshotChanges,
+  buildRunLog,
+  createRunLogEntry,
   getExchangeRates,
   publicationDateKey,
   updateHistory,
@@ -160,11 +162,13 @@ test('keeps removed-country history and appends complete events for a new tier',
     }
   };
   const alphaWithNewTier = country('Alpha', { nameZh: '甲', prices: { '50GB': 1, '1TB': 8 } });
-  const result = updateHistory(history, [alphaWithNewTier], '2026-08-01', [TIER_50, TIER_1TB]);
+  const result = updateHistory(history, [alphaWithNewTier], '2026-08-01', [TIER_50, TIER_1TB], '2026-07-31T16:00:00.000Z');
 
   assert.ok(result.history.countries.Removed, 'removal should not erase historical events');
   assert.equal(result.history.countries.Alpha.events.length, 2);
   assert.deepEqual(result.history.countries.Alpha.events.at(-1).plans, { '50GB': 1, '1TB': 8 });
+  assert.equal(result.history.countries.Alpha.events.at(-1).observedAtBeijing, '2026-08-01');
+  assert.equal(result.history.countries.Alpha.events.at(-1).observedAtUtc, '2026-07-31T16:00:00.000Z');
 
   const repeated = updateHistory(result.history, [alphaWithNewTier], '2026-08-02', [TIER_50, TIER_1TB]);
   assert.equal(repeated.history.countries.Alpha.events.length, 2, 'unchanged prices should not duplicate history');
@@ -190,4 +194,45 @@ test('reuses preserved history when a removed country later returns', () => {
 test('normalizes equivalent Apple publication-date formats', () => {
   assert.equal(publicationDateKey('July 17, 2026'), publicationDateKey('2026-07-17'));
   assert.notEqual(publicationDateKey('July 17, 2026'), publicationDateKey('August 1, 2026'));
+});
+
+test('builds a structured successful run log with source, counts, and changes', () => {
+  const data = {
+    source: { url: 'https://support.apple.com/en-us/108047', publishedDate: 'July 17, 2026' },
+    fx: { fetchedAt: '2026-08-01T00:02:31.000Z', stale: false },
+    tiers: [TIER_50, TIER_200],
+    countries: [country('Alpha'), country('Beta', { currency: 'CAD' })]
+  };
+  const publicationChanges = {
+    addedTiers: [],
+    removedTiers: [],
+    addedCountries: [{ country: 'Beta', nameZh: 'Beta' }],
+    removedCountries: [],
+    changedCountries: []
+  };
+  const entry = createRunLogEntry(
+    data,
+    { observedAt: '2026-08-01', publicationChanges },
+    new Date('2026-08-01T04:00:00.000Z'),
+    new Date('2026-08-01T04:00:02.500Z')
+  );
+
+  assert.equal(entry.status, 'success');
+  assert.equal(entry.durationMs, 2500);
+  assert.equal(entry.observedAtBeijing, '2026-08-01');
+  assert.equal(entry.source.applePublishedDate, 'July 17, 2026');
+  assert.equal(entry.counts.countries, 2);
+  assert.equal(entry.counts.pricePoints, 4);
+  assert.equal(entry.counts.currencies, 2);
+  assert.deepEqual(entry.changes.addedCountries, [{ country: 'Beta', nameZh: 'Beta' }]);
+
+  const previousRuns = Array.from({ length: 90 }, (_, index) => ({ id: String(index) }));
+  const log = buildRunLog({ schemaVersion: 1, retention: 90, runs: previousRuns }, entry);
+  assert.equal(log.runs.length, 90);
+  assert.equal(log.runs.at(-1), entry);
+  assert.equal(log.runs[0].id, '1');
+  assert.throws(
+    () => buildRunLog({ schemaVersion: 2, runs: [] }, entry),
+    /unsupported structure/
+  );
 });
