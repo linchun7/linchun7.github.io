@@ -78,11 +78,7 @@
             <tr>
               <th class="rank-column" scope="col">#</th>
               <th scope="col" aria-sort="none"><button type="button" data-sort="country">国家/地区 <i data-lucide="arrow-up-down"></i></button></th>
-              <th scope="col" aria-sort="none"><button type="button" data-sort-tier="50GB">50 GB / 月 <i data-lucide="arrow-up-down"></i></button></th>
-              <th scope="col" aria-sort="ascending"><button type="button" data-sort-tier="200GB">200 GB / 月 <i data-lucide="arrow-up"></i></button></th>
-              <th scope="col" aria-sort="none"><button type="button" data-sort-tier="2TB">2 TB / 月 <i data-lucide="arrow-up-down"></i></button></th>
-              <th scope="col" aria-sort="none"><button type="button" data-sort-tier="6TB">6 TB / 月 <i data-lucide="arrow-up-down"></i></button></th>
-              <th scope="col" aria-sort="none"><button type="button" data-sort-tier="12TB">12 TB / 月 <i data-lucide="arrow-up-down"></i></button></th>
+              <th id="tierHeaderPlaceholder" scope="col" colspan="5">容量方案</th>
             </tr>
           </thead>
           <tbody id="priceRows">
@@ -97,6 +93,12 @@
           <span class="source-separator"></span>
           <a href="https://www.exchangerate-api.com/docs/free" target="_blank" rel="noreferrer"><i data-lucide="landmark"></i>人民币换算汇率</a>
           <span id="fxStatus"></span>
+          <span class="source-separator"></span>
+          <button class="source-meta-button" id="publishedDateButton" type="button" title="查看 Apple 页面发布日期变更记录" aria-label="查看 Apple 页面发布日期变更记录">
+            <i data-lucide="calendar-days" aria-hidden="true"></i>
+            <span>Apple 页面发布日期：<strong id="applePublishedDate">--</strong></span>
+            <i data-lucide="history" aria-hidden="true"></i>
+          </button>
         </div>
       </div>
       <p class="data-disclaimer">人民币金额由 Apple 公布的当地月费按每日参考汇率换算，仅用于横向比较，不代表 Apple 实际人民币结算价。当地价格可能包含或不包含税费；方案可用性、付款方式和购买资格以对应国家或地区的 Apple 页面及结算结果为准。</p>
@@ -134,8 +136,34 @@
       <div class="section-heading"><h3 id="historyListTitle">变更记录</h3></div>
       <div class="history-table-scroll">
         <table>
-          <thead><tr><th>记录日期</th><th>币种</th><th>50 GB</th><th>200 GB</th><th>2 TB</th><th>6 TB</th><th>12 TB</th></tr></thead>
+          <thead><tr><th>记录日期</th><th>币种</th><th id="historyTierHeaderPlaceholder" colspan="5">容量方案</th></tr></thead>
           <tbody id="historyRows"></tbody>
+        </table>
+      </div>
+    </section>
+  </dialog>
+
+  <dialog id="publishedDateDialog" class="history-dialog source-history-dialog">
+    <div class="dialog-header">
+      <div>
+        <p class="dialog-eyebrow">Apple 页面记录</p>
+        <h2>发布日期变更</h2>
+        <p>仅在 Apple Support 页面发布日期发生变化时记录。</p>
+      </div>
+      <button class="icon-button" id="closePublishedDate" type="button" aria-label="关闭发布日期记录" title="关闭"><i data-lucide="x"></i></button>
+    </div>
+
+    <div class="published-date-current">
+      <span>最近发布日期</span>
+      <strong id="publishedDateDialogCurrent">--</strong>
+    </div>
+
+    <section class="history-list published-date-list" aria-labelledby="publishedDateListTitle">
+      <div class="section-heading"><h3 id="publishedDateListTitle">发布日期变更记录</h3></div>
+      <div class="history-table-scroll">
+        <table>
+          <thead><tr><th>Apple 页面发布日期</th><th>首次检测日期</th><th>本次内容变化</th></tr></thead>
+          <tbody id="publishedDateRows"></tbody>
         </table>
       </div>
     </section>
