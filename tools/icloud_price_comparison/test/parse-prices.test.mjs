@@ -195,6 +195,34 @@ test('scales the CNY threshold with the previous plan value', () => {
   }), true);
 });
 
+test('accepts documented Türkiye iCloud+ price adjustments below the extreme-change threshold', () => {
+  const priceSnapshots = [
+    { date: '2024-08', prices: [12.99, 39.99, 129.99, 899.99, 1799.99], rate: 32 },
+    { date: '2024-09', prices: [24.99, 79.99, 249.99, 1299.99, 2499.99], rate: 34 },
+    { date: '2025-08', prices: [39.99, 129.99, 399.99, 1299.99, 2499.99], rate: 40 },
+    { date: '2026-07', prices: [49.99, 169.99, 549.99, 1699.99, 3399.99], rate: 47.5 }
+  ];
+  const tiers = ['50GB', '200GB', '2TB', '6TB', '12TB'].map((id) => ({ id }));
+  const toCountry = (snapshot) => ({
+    country: 'Türkiye',
+    currency: 'TRY',
+    plans: Object.fromEntries(tiers.map(({ id }, index) => [id, { price: snapshot.prices[index] }]))
+  });
+
+  for (let index = 1; index < priceSnapshots.length; index += 1) {
+    const previous = priceSnapshots[index - 1];
+    const current = priceSnapshots[index];
+    assert.equal(validatePriceChangeAnomalies([toCountry(current)], {
+      previousData: {
+        countries: [toCountry(previous)],
+        fx: { rates: { TRY: previous.rate, CNY: 7 } }
+      },
+      currentRates: { TRY: current.rate, CNY: 7 },
+      tiers
+    }), true, `${previous.date} to ${current.date}`);
+  }
+});
+
 test('still rejects a very large price move when exchange rates do not explain it', () => {
   const previousData = {
     countries: [{ country: 'Example', currency: 'XYZ', plans: { '50GB': { price: 10 } } }],
