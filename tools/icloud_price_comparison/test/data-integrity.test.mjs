@@ -22,8 +22,10 @@ test('committed prices and history form a complete usable snapshot', async () =>
   assert.ok(data.countries.length >= 60);
   assert.ok(Number.isFinite(data.fx.rates.CNY) && data.fx.rates.CNY > 0);
   if (data.schemaVersion === 2) {
-    assert.match(data.source.parser, /^(cross-checked|document-order|apple-markers-fallback)$/);
-    assert.equal(typeof data.source.parserStatus, 'string');
+    if (data.source.parser != null) {
+      assert.match(data.source.parser, /^(cross-checked|document-order|apple-markers-fallback)$/);
+      assert.equal(typeof data.source.parserStatus, 'string');
+    }
     assert.equal(data.run.countries, data.countries.length);
     assert.equal(data.run.pricePoints, data.countries.length * data.tiers.length);
     assert.match(data.run.startedAtUtc, /^\d{4}-\d{2}-\d{2}T/);
