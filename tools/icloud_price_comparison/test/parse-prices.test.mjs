@@ -17,6 +17,28 @@ test('parses footnotes, currencies, and all storage tiers', async () => {
   assert.equal(validatePrices(result.countries, { minCountries: 5 }), true);
 });
 
+test('discovers a newly published storage tier from Apple markup', async () => {
+  const fixture = await readFile(fixtureUrl, 'utf8');
+  const expanded = parseApplePrices(fixture.replaceAll('</ul>', '<li>1 TB: $5.99</li></ul>'));
+  assert.ok(expanded.tiers.some(({ id, label }) => id === '1TB' && label === '1 TB'));
+  assert.equal(expanded.countries[0].plans['1TB'].price, 5.99);
+  assert.equal(validatePrices(expanded.countries, { minCountries: 5, tiers: expanded.tiers }), true);
+});
+
+test('tolerates small heading, wrapper, and publication-date markup changes', async () => {
+  const fixture = await readFile(fixtureUrl, 'utf8');
+  const adjusted = fixture
+    .replace('<h3 id="nasalac">Americas</h3>', '<h2>North America and the Caribbean</h2>')
+    .replace('<h3 id="emea">Europe</h3>', '<h2>Europe, the Middle East, and Africa</h2>')
+    .replace('<ul><li><b>50 GB</b>: $0.99</li>', '<h5>Monthly plans</h5><ul><li>Taxes may apply</li></ul><section><ul><li><b>50 GB</b>: $0.99</li>')
+    .replace('</li></ul>\n    <h3 id="emea">', '</li></ul></section>\n    <h3 id="emea">')
+    .replace('<time>July 17, 2026</time>', 'July 17, 2026');
+  const result = parseApplePrices(adjusted);
+  assert.equal(result.countries.length, 5);
+  assert.equal(result.sourcePublishedDate, 'July 17, 2026');
+  assert.equal(validatePrices(result.countries, { minCountries: 5, tiers: result.tiers }), true);
+});
+
 test('rejects incomplete pricing data', () => {
   assert.throws(
     () => validatePrices([{ country: 'Example', currency: 'USD', plans: {} }], { minCountries: 1 }),
