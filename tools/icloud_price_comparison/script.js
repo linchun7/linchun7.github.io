@@ -485,6 +485,10 @@ function getHistoryRecord(country) {
   };
 }
 
+function renderHistorySubtitle(country, record) {
+  elements.historySubtitle.textContent = `${country.country} · ${REGION_LABELS[country.region] || country.region} · 记录始于 ${formatDate(record.events[0].observedAt)}`;
+}
+
 function renderHistoryContent() {
   const country = state.activeCountry;
   const record = getHistoryRecord(country);
@@ -509,7 +513,7 @@ function openHistory(country) {
   state.activeCountry = country;
   state.historyTier = state.sortTier;
   elements.historyTitle.textContent = country.nameZh || country.country;
-  elements.historySubtitle.textContent = `${country.country} · ${REGION_LABELS[country.region] || country.region} · 记录始于 ${formatDate(record.events[0].observedAt)}`;
+  renderHistorySubtitle(country, record);
   renderHistoryTierButtons();
   renderHistoryContent();
   elements.historyDialog.showModal();
@@ -549,7 +553,13 @@ async function initialize() {
   try {
     state.history = { schemaVersion: 1, countries: {} };
     fetchJson('history.json')
-      .then((historyData) => { state.history = historyData; })
+      .then((historyData) => {
+        state.history = historyData;
+        if (state.activeCountry && elements.historyDialog.open) {
+          renderHistorySubtitle(state.activeCountry, getHistoryRecord(state.activeCountry));
+          renderHistoryContent();
+        }
+      })
       .catch((error) => { console.warn(`价格历史加载失败，使用当前价格作为临时记录：${error.message}`); });
     state.data = await fetchJson('prices.json');
     if (!state.data.tiers.some(({ id }) => id === state.sortTier)) state.sortTier = '200GB';
