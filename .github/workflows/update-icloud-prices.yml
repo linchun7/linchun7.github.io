@@ -2,7 +2,7 @@ name: Update iCloud prices
 
 on:
   schedule:
-    - cron: '17 2 * * *'
+    - cron: '0 4 * * *'
   workflow_dispatch:
 
 permissions:
@@ -22,21 +22,17 @@ jobs:
         working-directory: tools/icloud_price_comparison
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.14.0
-
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
-          cache: pnpm
-          cache-dependency-path: tools/icloud_price_comparison/pnpm-lock.yaml
+
+      - name: Install pnpm
+        run: npm install --global pnpm@10.14.0
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
