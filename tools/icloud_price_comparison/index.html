@@ -6,10 +6,10 @@
   <meta name="format-detection" content="telephone=no">
   <meta name="description" content="比较全球不同国家和地区的 iCloud+ 月度价格，支持人民币换算、容量排序和历史价格查询。">
   <meta name="keywords" content="iCloud+,Apple,云存储,全球价格,价格历史,汇率换算">
-  <meta property="og:title" content="iCloud+ 全球价格比较">
+  <meta property="og:title" content="iCloud+ 全球价格对比">
   <meta property="og:description" content="统一比较全球 iCloud+ 月度订阅价格和历史变化。">
   <meta property="og:type" content="website">
-  <title>iCloud+ 全球价格比较</title>
+  <title>iCloud+ 全球价格对比</title>
   <link rel="stylesheet" href="style.css">
   <link rel="shortcut icon" href="/images/favicon.ico">
   <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
@@ -28,32 +28,37 @@
       <div class="app-brand">
         <span class="brand-mark" aria-hidden="true"><i data-lucide="cloud"></i></span>
         <span class="brand-copy">
-          <strong>iCloud+ 价格比较</strong>
+        <strong>iCloud+ 全球价格对比</strong>
         </span>
       </div>
       <div class="data-status" aria-live="polite">
         <i data-lucide="calendar-clock" aria-hidden="true"></i>
-        <span id="updatedAt">正在读取数据更新时间</span>
+        <span id="updatedAt">正在读取价格数据更新时间</span>
       </div>
     </div>
   </header>
 
   <main class="page-main">
     <section class="overview" aria-labelledby="pageTitle">
-      <div>
-        <h1 id="pageTitle">全球各地区月度价格</h1>
+      <div class="overview-copy">
+        <p class="overview-kicker">人民币参考价</p>
+        <h1 id="pageTitle">各容量最低价</h1>
+        <p class="overview-note">按人民币参考汇率换算，便于横向比较</p>
       </div>
-      <dl class="overview-stats" aria-label="数据概览">
-        <div><dt>国家和地区</dt><dd id="marketCount">--</dd></div>
-        <div><dt>结算币种</dt><dd id="currencyCount">--</dd></div>
-        <div><dt>容量方案</dt><dd id="tierCount">--</dd></div>
+      <dl class="overview-stats overview-stat-list" aria-label="数据概览">
+        <div><dt>地区</dt><dd id="marketCount">--</dd></div>
+        <div><dt>币种</dt><dd id="currencyCount">--</dd></div>
+        <div><dt>容量</dt><dd id="tierCount">--</dd></div>
+      </dl>
+      <dl id="minimumSummary" class="minimum-stats overview-stat-list" aria-label="各容量最低价概览">
+        <div><dt>正在计算</dt><dd>--</dd></div>
       </dl>
     </section>
 
-    <section class="workspace" aria-label="全球各地区 iCloud+ 月费对比">
+    <section class="workspace" aria-label="全球各地区 iCloud+ 价格">
       <div class="workspace-toolbar">
         <div class="workspace-heading">
-          <h2>各地区月费对比</h2>
+          <h2>各地区 iCloud+ 价格</h2>
           <p id="resultSummary" aria-live="polite">正在读取排序方式...</p>
         </div>
         <div class="filters">
@@ -78,7 +83,7 @@
             <tr>
               <th class="rank-column" scope="col">#</th>
               <th scope="col" aria-sort="none"><button type="button" data-sort="country">国家/地区 <i data-lucide="arrow-up-down"></i></button></th>
-              <th id="tierHeaderPlaceholder" scope="col" colspan="5">容量方案</th>
+              <th id="tierHeaderPlaceholder" scope="col" colspan="5">容量</th>
             </tr>
           </thead>
           <tbody id="priceRows">
@@ -88,20 +93,23 @@
       </div>
 
       <div class="workspace-footer">
-        <div class="source-links">
-          <a href="https://support.apple.com/en-us/108047" target="_blank" rel="noreferrer"><i data-lucide="badge-check"></i>Apple 当地价格</a>
+        <div class="source-links" id="sourceLinks" aria-label="数据来源与更新时间">
+          <div class="source-group">
+            <a class="source-item" href="https://support.apple.com/en-us/108047" target="_blank" rel="noreferrer"><i data-lucide="badge-check"></i>Apple iCloud+价格</a>
+            <button class="source-meta-button" id="publishedDateButton" type="button" title="查看 Apple 官网发布日期变更记录" aria-label="查看 Apple 官网发布日期变更记录">
+              <i data-lucide="calendar-days" aria-hidden="true"></i>
+              <span>页面发布日期：<strong id="applePublishedDate">--</strong></span>
+              <i data-lucide="history" aria-hidden="true"></i>
+            </button>
+          </div>
           <span class="source-separator"></span>
-          <a href="https://www.exchangerate-api.com/docs/free" target="_blank" rel="noreferrer"><i data-lucide="landmark"></i>人民币换算汇率</a>
-          <span id="fxStatus"></span>
-          <span class="source-separator"></span>
-          <button class="source-meta-button" id="publishedDateButton" type="button" title="查看 Apple 页面发布日期变更记录" aria-label="查看 Apple 页面发布日期变更记录">
-            <i data-lucide="calendar-days" aria-hidden="true"></i>
-            <span>Apple 页面发布日期：<strong id="applePublishedDate">--</strong></span>
-            <i data-lucide="history" aria-hidden="true"></i>
-          </button>
+          <div class="source-group">
+            <a class="source-item" href="https://www.exchangerate-api.com/docs/free" target="_blank" rel="noreferrer"><i data-lucide="landmark"></i>人民币参考汇率</a>
+            <span class="source-status"><i data-lucide="clock-3" aria-hidden="true"></i><span id="fxStatus">更新时间：--</span></span>
+          </div>
         </div>
       </div>
-      <p class="data-disclaimer">人民币金额由 Apple 公布的当地月费按每日参考汇率换算，仅用于横向比较，不代表 Apple 实际人民币结算价。当地价格可能包含或不包含税费；方案可用性、付款方式和购买资格以对应国家或地区的 Apple 页面及结算结果为准。</p>
+      <p class="data-disclaimer">人民币金额按参考汇率换算，仅供横向比较；实际结算、税费和方案可用性以 Apple 对应地区页面及结算结果为准。</p>
     </section>
   </main>
 

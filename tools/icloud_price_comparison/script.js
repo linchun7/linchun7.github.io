@@ -18,6 +18,7 @@ const state = {
   activeCountry: null,
   historyTier: '200GB',
   minimumPrices: {},
+  minimumCountries: {},
   chart: null
 };
 
@@ -26,6 +27,7 @@ const elements = {
   searchInput: document.querySelector('#searchInput'),
   regionSelect: document.querySelector('#regionSelect'),
   resultSummary: document.querySelector('#resultSummary'),
+  minimumSummary: document.querySelector('#minimumSummary'),
   fxStatus: document.querySelector('#fxStatus'),
   publishedDateButton: document.querySelector('#publishedDateButton'),
   applePublishedDate: document.querySelector('#applePublishedDate'),
@@ -204,12 +206,39 @@ function convertPrice(price, currency, targetCurrency) {
 }
 
 function calculateMinimumPrices() {
-  state.minimumPrices = Object.fromEntries(state.data.tiers.map(({ id }) => {
-    const values = state.data.countries
-      .map((country) => convertPrice(country.plans[id].price, country.currency, 'CNY'))
-      .filter((value) => value != null);
-    return [id, values.length ? Math.min(...values) : null];
-  }));
+  state.minimumPrices = {};
+  state.minimumCountries = {};
+  for (const { id } of state.data.tiers) {
+    const candidates = state.data.countries
+      .map((country) => ({
+        country,
+        value: convertPrice(country.plans[id].price, country.currency, 'CNY')
+      }))
+      .filter(({ value }) => value != null)
+      .sort((first, second) => first.value - second.value
+        || collator.compare(first.country.nameZh || first.country.country, second.country.nameZh || second.country.country));
+    const winner = candidates[0];
+    state.minimumPrices[id] = winner?.value ?? null;
+    state.minimumCountries[id] = winner?.country ?? null;
+  }
+}
+
+function renderMinimumSummary() {
+  if (!elements.minimumSummary) return;
+  elements.minimumSummary.replaceChildren();
+  for (const tier of state.data.tiers) {
+    const item = document.createElement('div');
+    item.title = `${tier.label}人民币参考价最低地区`;
+
+    const label = document.createElement('dt');
+    const countryName = state.minimumCountries[tier.id]?.nameZh
+      || state.minimumCountries[tier.id]?.country;
+    label.textContent = countryName ? `${tier.label} · ${countryName}` : tier.label;
+    const price = document.createElement('dd');
+    price.textContent = formatConverted(state.minimumPrices[tier.id], '¥');
+    item.append(label, price);
+    elements.minimumSummary.append(item);
+  }
 }
 
 function formatConverted(value, symbol) {
@@ -360,7 +389,7 @@ function renderTable() {
   const direction = state.sortDirection === 'asc' ? '从低到高' : '从高到低';
   elements.resultSummary.textContent = state.sortKey === 'country'
     ? `按国家和地区名称排序：${state.sortDirection === 'asc' ? '正序' : '倒序'}`
-    : `按 ${tier.label} 方案的人民币月费排序：${direction}`;
+    : `按 ${tier.label} 人民币参考价排序：${direction}`;
 
   if (!countries.length) {
     const row = document.createElement('tr');
@@ -763,7 +792,7 @@ async function initialize() {
     const dataUpdatedAt = formatBeijingDateTime(state.data.generatedAt);
     const fxUpdatedAt = formatBeijingDateTime(state.data.fx.fetchedAt);
     elements.updatedAt.textContent = `数据更新时间：${dataUpdatedAt}（北京时间）`;
-    elements.fxStatus.textContent = `汇率更新时间：${fxUpdatedAt}（北京时间）`;
+    elements.fxStatus.textContent = `更新时间：${fxUpdatedAt}（北京时间）`;
     const priceAgeHours = (Date.now() - new Date(state.data.generatedAt).getTime()) / 3_600_000;
     if (state.data.fx.stale || priceAgeHours > 36) {
       elements.dataStatus.classList.add('is-stale');
@@ -772,6 +801,7 @@ async function initialize() {
         : `数据更新时间：${dataUpdatedAt}（北京时间） · 汇率沿用上次成功结果`;
     }
     renderSortHeaders();
+    renderMinimumSummary();
     renderTable();
     refreshIcons();
   } catch (error) {
