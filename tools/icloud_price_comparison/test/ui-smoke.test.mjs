@@ -97,8 +97,12 @@ test('renders current prices, sorting, and country history in a real browser', {
         }
       });
       await page.route('https://**/*', (route) => route.abort());
+      let releasePriceRequest;
+      const priceRequestReleased = new Promise((resolve) => {
+        releasePriceRequest = resolve;
+      });
       await page.route('**/data/prices.json*', async (route) => {
-        await new Promise((resolve) => setTimeout(resolve, viewport.name === 'desktop' ? 1_800 : 250));
+        await priceRequestReleased;
         await route.continue();
       });
 
@@ -113,6 +117,7 @@ test('renders current prices, sorting, and country history in a real browser', {
           await page.waitForTimeout(1_600);
           assert.match(await page.locator('#loadStatusText').textContent(), /网络较慢，仍在加载/);
         }
+        releasePriceRequest();
         await page.waitForFunction(
           (count) => document.querySelectorAll('#priceRows tr[data-country]').length === count,
           expectedData.countries.length
@@ -251,6 +256,7 @@ test('renders current prices, sorting, and country history in a real browser', {
         }
         assert.deepEqual(errors, []);
       } finally {
+        releasePriceRequest?.();
         await page.close();
       }
     }
