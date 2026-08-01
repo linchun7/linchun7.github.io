@@ -1,6 +1,7 @@
 const REMOTE_DATA_ROOT = 'https://raw.githubusercontent.com/linchun7/linchun7.github.io/main/tools/icloud_price_comparison/data';
 const HOSTED_NAMES = new Set(['linchun7.github.io', 'linchun.com.cn', 'www.linchun.com.cn']);
 const REQUEST_TIMEOUT_MS = 8_000;
+const SLOW_LOADING_MS = 1_500;
 const REGION_LABELS = {
   Americas: '美洲',
   'Europe, Middle East & Africa': '欧洲、中东和非洲',
@@ -19,7 +20,9 @@ const state = {
   historyTier: '200GB',
   minimumPrices: {},
   minimumCountries: {},
-  chart: null
+  chart: null,
+  eventsBound: false,
+  loading: false
 };
 
 const elements = {
@@ -27,6 +30,10 @@ const elements = {
   searchInput: document.querySelector('#searchInput'),
   regionSelect: document.querySelector('#regionSelect'),
   resultSummary: document.querySelector('#resultSummary'),
+  loadStatus: document.querySelector('#loadStatus'),
+  loadStatusText: document.querySelector('#loadStatusText'),
+  retryButton: document.querySelector('#retryButton'),
+  workspace: document.querySelector('.workspace'),
   minimumSummary: document.querySelector('#minimumSummary'),
   fxStatus: document.querySelector('#fxStatus'),
   publishedDateButton: document.querySelector('#publishedDateButton'),
@@ -57,9 +64,24 @@ const numberFormatter = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 
 const moneyFormatter = new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const percentFormatter = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 });
 const collator = new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base' });
+let slowLoadingTimer = null;
 
 function refreshIcons() {
   window.lucide?.createIcons({ attrs: { 'stroke-width': 1.8 } });
+}
+
+function setLoadStatus(message, { error = false, hidden = false } = {}) {
+  if (!elements.loadStatus || !elements.loadStatusText) return;
+  elements.loadStatusText.textContent = message;
+  elements.loadStatus.classList.toggle('is-error', error);
+  elements.loadStatus.hidden = hidden;
+  if (elements.retryButton) elements.retryButton.hidden = !error;
+  elements.workspace?.setAttribute('aria-busy', String(!hidden && !error));
+}
+
+function setFiltersDisabled(disabled) {
+  elements.searchInput.disabled = disabled;
+  elements.regionSelect.disabled = disabled;
 }
 
 function formatDate(value) {
@@ -739,6 +761,8 @@ function openHistory(country) {
 }
 
 function bindEvents() {
+  if (state.eventsBound) return;
+  state.eventsBound = true;
   elements.searchInput.addEventListener('input', (event) => { state.query = event.target.value; renderTable(); });
   elements.regionSelect.addEventListener('change', (event) => { state.region = event.target.value; renderTable(); });
   document.querySelector('button[data-sort="country"]').addEventListener('click', setCountrySort);
@@ -763,6 +787,8 @@ function showLoadError(error) {
   elements.dataStatus.classList.add('is-error');
   elements.updatedAt.textContent = '数据加载失败，请稍后重试';
   elements.resultSummary.textContent = '暂时无法读取价格数据';
+  setLoadStatus('价格数据加载失败，请检查网络后重试', { error: true });
+  setFiltersDisabled(true);
   elements.fxStatus.textContent = '';
   elements.priceRows.replaceChildren();
   const row = document.createElement('tr');
@@ -773,6 +799,15 @@ function showLoadError(error) {
 }
 
 async function initialize() {
+  if (state.loading) return;
+  state.loading = true;
+  clearTimeout(slowLoadingTimer);
+  setLoadStatus('正在加载价格数据，请稍候…');
+  setFiltersDisabled(true);
+  slowLoadingTimer = setTimeout(() => {
+    setLoadStatus('网络较慢，仍在加载价格数据…');
+  }, SLOW_LOADING_MS);
+  elements.dataStatus.classList.remove('is-error', 'is-stale');
   try {
     state.history = { schemaVersion: 1, countries: {} };
     fetchJson('history.json')
@@ -793,6 +828,7 @@ async function initialize() {
     calculateMinimumPrices();
     populateFilters();
     bindEvents();
+    setFiltersDisabled(false);
     elements.marketCount.textContent = state.data.countries.length;
     elements.currencyCount.textContent = new Set(state.data.countries.map(({ currency }) => currency)).size;
     elements.tierCount.textContent = state.data.tiers.length;
@@ -812,10 +848,21 @@ async function initialize() {
     renderSortHeaders();
     renderMinimumSummary();
     renderTable();
+    setLoadStatus('', { hidden: true });
     refreshIcons();
   } catch (error) {
     showLoadError(error);
+  } finally {
+    clearTimeout(slowLoadingTimer);
+    slowLoadingTimer = null;
+    state.loading = false;
   }
 }
+
+elements.retryButton?.addEventListener('click', () => {
+  elements.retryButton.hidden = true;
+  setLoadStatus('正在重新加载价格数据，请稍候…');
+  initialize();
+});
 
 initialize();

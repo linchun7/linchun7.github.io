@@ -35,8 +35,13 @@ body {
 
 button, input, select { font: inherit; }
 button, select { cursor: pointer; }
+button, a, input, select { touch-action: manipulation; }
 a { color: var(--accent-dark); text-decoration: none; }
 a:hover { color: var(--accent); }
+
+.skip-link { position: fixed; top: 8px; left: 8px; z-index: 100; padding: 8px 12px; color: var(--ink); background: var(--surface); border: 1px solid var(--line-strong); border-radius: 6px; box-shadow: var(--shadow); transform: translateY(-150%); }
+.skip-link:focus { transform: translateY(0); }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .visually-hidden {
   position: absolute;
@@ -246,6 +251,13 @@ a:hover { color: var(--accent); }
 .workspace-heading { min-width: 200px; }
 .workspace-heading h2 { margin: 0; font-size: 18px; line-height: 1.2; letter-spacing: 0; }
 .workspace-heading p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+.load-status { min-width: 0; display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.load-status[hidden] { display: none; }
+.load-status.is-error { color: var(--danger); }
+.load-status.is-error .spinner { display: none; }
+.load-status .spinner { width: 14px; height: 14px; margin: 0; flex: 0 0 14px; }
+.load-status button { padding: 3px 8px; color: var(--accent-dark); background: var(--surface); border: 1px solid var(--line-strong); border-radius: 5px; font-size: 11px; font-weight: 680; }
+.load-status button:hover { background: var(--surface-soft); border-color: var(--accent); }
 
 .filters {
   width: min(560px, 100%);
@@ -264,12 +276,13 @@ a:hover { color: var(--accent); }
   background: var(--surface-soft);
   border: 1px solid var(--line-strong);
   border-radius: 6px;
-  outline: none;
 }
 
 .search-field input { padding: 0 12px 0 38px; }
 .select-field select { padding: 0 32px 0 38px; }
 .search-field input:focus, .select-field select:focus { background: var(--surface); border-color: var(--accent); box-shadow: 0 0 0 3px rgba(17, 104, 212, .12); }
+.search-field input:disabled, .select-field select:disabled { color: var(--muted); background: #f0f3f6; cursor: wait; opacity: .78; }
+.workspace[aria-busy="false"] .search-field input:disabled, .workspace[aria-busy="false"] .select-field select:disabled { cursor: not-allowed; }
 
 .table-scroll { width: 100%; overflow-x: auto; scrollbar-gutter: stable; }
 table { width: 100%; border-collapse: collapse; }
@@ -373,6 +386,7 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--accent-dark
   max-height: min(850px, calc(100dvh - 32px));
   padding: 0;
   overflow: auto;
+  overscroll-behavior: contain;
   color: var(--ink);
   background: var(--surface);
   border: 1px solid var(--line-strong);
@@ -425,10 +439,18 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--accent-dark
 .page-footer { margin-top: 20px; margin-bottom: 28px; color: var(--muted); font-size: 11px; text-align: center; }
 .page-footer p { margin: 3px 0; }
 
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; }
+  .spinner { animation: none; }
+  .minimum-stats div:hover, .overview-stats div:hover { transform: none; }
+}
+
 @media (max-width: 980px) {
   .overview { gap: 10px; }
   .overview-stats { min-height: 0; }
-  .workspace-toolbar { align-items: flex-start; flex-direction: column; gap: 14px; }
+  .workspace-toolbar { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .load-status { order: 2; }
+  .filters { order: 3; }
   .filters { width: 100%; }
 }
 
@@ -459,6 +481,7 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--accent-dark
   .workspace-toolbar { min-height: 0; padding: 14px 12px; }
   .workspace-heading h2 { font-size: 16px; }
   .workspace-heading p { font-size: 11px; }
+  .load-status { width: 100%; font-size: 11px; }
   .filters { grid-template-columns: 1fr; gap: 8px; }
   .search-field input, .select-field select { height: 40px; }
 
