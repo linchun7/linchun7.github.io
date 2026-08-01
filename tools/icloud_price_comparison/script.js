@@ -126,11 +126,12 @@ function formatBeijingDate(value) {
 
 function formatPublishedDate(value) {
   if (!value) return '--';
-  const dateOnly = String(value).match(/^([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})$/);
+  const text = String(value).trim().replace(/^published\s+date\s*:?\s*/i, '');
+  const dateOnly = text.match(/^([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})$/);
   const date = dateOnly
     ? new Date(`${dateOnly[1]} ${dateOnly[2]}, ${dateOnly[3]} 00:00:00 UTC`)
-    : new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
+    : new Date(text);
+  if (Number.isNaN(date.getTime())) return text;
   return new Intl.DateTimeFormat('zh-CN', {
     year: 'numeric',
     month: '2-digit',
@@ -152,8 +153,9 @@ function isValidIsoTimestamp(value) {
 }
 
 function isValidPublishedDate(value) {
-  if (isValidDateOnly(value)) return true;
-  const match = String(value ?? '').match(/^([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})$/);
+  const text = String(value ?? '').trim().replace(/^published\s+date\s*:?\s*/i, '');
+  if (isValidDateOnly(text)) return true;
+  const match = text.match(/^([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})$/);
   if (!match) return false;
   const months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
   const month = months.indexOf(match[1].toLowerCase());

@@ -284,6 +284,7 @@ test('reuses preserved history when a removed country later returns', () => {
 
 test('normalizes equivalent Apple publication-date formats', () => {
   assert.equal(publicationDateKey('July 17, 2026'), publicationDateKey('2026-07-17'));
+  assert.equal(publicationDateKey('Published Date: July 17, 2026'), publicationDateKey('2026-07-17'));
   assert.notEqual(publicationDateKey('July 17, 2026'), publicationDateKey('August 1, 2026'));
 });
 
@@ -362,7 +363,12 @@ test('builds a structured successful run log with source, counts, and changes', 
   };
   const entry = createRunLogEntry(
     data,
-    { observedAt: '2026-08-01', publicationChanges },
+    {
+      observedAt: '2026-08-01',
+      publicationChanges,
+      publicationDateChanged: true,
+      publishedDateHistory: [{ publishedDate: 'July 1, 2026' }, { publishedDate: 'July 17, 2026' }]
+    },
     new Date('2026-08-01T04:00:00.000Z'),
     new Date('2026-08-01T04:00:02.500Z')
   );
@@ -376,6 +382,11 @@ test('builds a structured successful run log with source, counts, and changes', 
   assert.equal(entry.counts.countries, 2);
   assert.equal(entry.counts.pricePoints, 4);
   assert.equal(entry.counts.currencies, 2);
+  assert.deepEqual(entry.changes.publishedDate, {
+    changed: true,
+    from: 'July 1, 2026',
+    to: 'July 17, 2026'
+  });
   assert.deepEqual(entry.changes.addedCountries, [{ country: 'Beta', nameZh: 'Beta' }]);
 
   const previousRuns = Array.from({ length: 90 }, (_, index) => ({ id: String(index) }));
@@ -458,6 +469,50 @@ test('keeps successful Action summaries concise and promotes warnings', () => {
   assert.match(stale, /### 警告/);
   assert.match(stale, /汇率降级/);
   assert.match(stale, /缺少汇率.*JPY/);
+});
+
+test('shows price, currency, region, country, tier, and publication-date changes separately', () => {
+  const data = {
+    source: { publishedDate: 'July 17, 2026', parser: 'cross-checked' },
+    generatedAt: '2026-08-01T00:30:00.000Z',
+    fx: { fetchedAt: '2026-08-01T00:02:31.000Z', stale: false },
+    tiers: [TIER_50, TIER_1TB],
+    countries: [country('Alpha')]
+  };
+  const summary = {
+    history: { countries: { Alpha: {} } },
+    missingRates: [],
+    addedCountries: ['Added'],
+    removedCountries: ['Removed'],
+    changedCountries: 1,
+    publishedDateHistory: [{ publishedDate: 'July 1, 2026' }, { publishedDate: 'July 17, 2026' }],
+    publicationDateChanged: true,
+    publicationChanges: {
+      addedTiers: [{ id: '1TB', label: '1 TB' }],
+      removedTiers: [{ id: '200GB', label: '200 GB' }],
+      addedCountries: [{ country: 'Added', nameZh: '新增' }],
+      removedCountries: [{ country: 'Removed', nameZh: '移除' }],
+      changedCountries: [{
+        country: 'Alpha',
+        nameZh: '甲',
+        fromCurrency: 'USD',
+        toCurrency: 'CAD',
+        fromRegion: 'Americas',
+        toRegion: 'Asia Pacific',
+        tiers: [{ id: '50GB', from: 1, to: 2 }]
+      }]
+    }
+  };
+
+  const rendered = buildActionSummaryLines(data, summary, 'schedule').join('\n');
+  assert.match(rendered, /Apple 发布日期：July 1, 2026 → July 17, 2026/);
+  assert.match(rendered, /新增容量：1 TB/);
+  assert.match(rendered, /移除容量：200 GB/);
+  assert.match(rendered, /新增地区：新增/);
+  assert.match(rendered, /移除地区：移除/);
+  assert.match(rendered, /所属分区变化：甲/);
+  assert.match(rendered, /币种变化：甲/);
+  assert.match(rendered, /价格变化：甲/);
 });
 
 test('keeps failure diagnostics compact without duplicate files', async () => {

@@ -470,8 +470,13 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
   const scenarios = [
     {
       label: 'old snapshot',
-      mutate: (data) => { data.generatedAt = '2020-01-01T00:00:00.000Z'; data.fx.stale = false; },
-      expected: /超过 36 小时/
+      mutate: (data) => {
+        data.generatedAt = '2020-01-01T00:00:00.000Z';
+        data.fx.stale = false;
+        data.source.publishedDate = 'Published Date: July 17, 2026';
+      },
+      expected: /超过 36 小时/,
+      expectedPublishedDate: '2026/07/17'
     },
     {
       label: 'fallback rates',
@@ -488,7 +493,7 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
   const { port } = server.address();
   const browser = await chromium.launch({ executablePath: chromePath, headless: true });
   try {
-    for (const { label, mutate, expected } of scenarios) {
+    for (const { label, mutate, expected, expectedPublishedDate } of scenarios) {
       const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
       const payload = structuredClone(validData);
       mutate(payload);
@@ -502,6 +507,9 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
         await page.goto(`http://127.0.0.1:${port}/?tier=not-a-real-tier`, { waitUntil: 'domcontentloaded' });
         await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, validData.countries.length);
         assert.match(await page.locator('#updatedAt').textContent(), expected, label);
+        if (expectedPublishedDate) {
+          assert.equal(await page.locator('#applePublishedDate').textContent(), expectedPublishedDate, label);
+        }
         assert.equal(await page.locator('.data-status').evaluate((element) => element.classList.contains('is-stale')), true, label);
         const statusLayout = await page.evaluate(() => {
           const rect = document.querySelector('.data-status').getBoundingClientRect();
