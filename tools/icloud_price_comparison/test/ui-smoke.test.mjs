@@ -101,7 +101,27 @@ test('renders current prices, sorting, and country history in a real browser', {
 
         assert.equal(await page.locator('#marketCount').textContent(), String(expectedData.countries.length));
         assert.equal(await page.locator('#tierCount').textContent(), String(expectedData.tiers.length));
+        assert.equal(await page.locator('.app-brand strong').textContent(), 'iCloud+ 全球价格对比');
+        assert.equal(await page.locator('#pageTitle').textContent(), '各容量最低价');
+        assert.equal(await page.locator('.workspace-heading h2').textContent(), '各地区 iCloud+ 价格');
         assert.equal(await page.locator('button[data-sort-tier]').count(), expectedData.tiers.length);
+        assert.equal(await page.locator('#minimumSummary > div').count(), expectedData.tiers.length);
+        for (const tier of expectedData.tiers) {
+          const lowest = expectedData.countries
+            .map((country) => ({
+              country,
+              cny: country.plans[tier.id].price / expectedData.fx.rates[country.currency] * expectedData.fx.rates.CNY
+            }))
+            .sort((first, second) => first.cny - second.cny)[0];
+          const summaryText = await page.locator('#minimumSummary > div').filter({ hasText: tier.label }).textContent();
+          assert.ok(summaryText.includes(lowest.country.nameZh || lowest.country.country));
+        }
+        const sourceText = await page.locator('#sourceLinks').innerText();
+        assert.equal(await page.locator('#sourceLinks .source-group').count(), 2);
+        assert.equal(await page.locator('#sourceLinks .source-status svg').count(), 1);
+        assert.ok(sourceText.indexOf('Apple iCloud+价格') < sourceText.indexOf('页面发布日期'));
+        assert.ok(sourceText.indexOf('页面发布日期') < sourceText.indexOf('人民币参考汇率'));
+        assert.match(sourceText, /更新时间：.+北京时间/);
         const layout = await page.evaluate(() => ({
           documentWidth: document.documentElement.scrollWidth,
           viewportWidth: document.documentElement.clientWidth
