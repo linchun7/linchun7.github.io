@@ -11,7 +11,7 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
     /cron:\s*['"](?:[0-5]?\d) (?:[01]?\d|2[0-3]) \* \* \*['"]/,
     'workflow must keep a valid daily schedule without locking its execution time',
   );
-  assert.match(workflow, /cron:\s*['"]57 9 \* \* \*['"]/, 'schedule must target 17:57 Beijing time');
+  assert.match(workflow, /cron:\s*['"]52 23 \* \* \*['"]/, 'schedule must target 07:52 Beijing time');
   assert.match(workflow, /pnpm install --frozen-lockfile/);
   assert.match(workflow, /name: 运行解析与数据安全测试\s+run: pnpm test:core/);
   assert.match(workflow, /name: 验证更新后的页面[\s\S]*?id: ui_after[\s\S]*?if pnpm test:ui; then[\s\S]*?ui_failed=false[\s\S]*?ui_failed=true/);
