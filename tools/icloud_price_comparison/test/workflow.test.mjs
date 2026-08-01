@@ -18,7 +18,8 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.doesNotMatch(workflow, /name: 验证更新后的页面[\s\S]*?continue-on-error: true[\s\S]*?run: pnpm test:ui/);
   assert.doesNotMatch(workflow, /ui_before|运行浏览器界面测试（更新前）/, 'the workflow must not repeat UI tests before fetching data');
   assert.match(workflow, /name: 验证更新后的价格数据\s+run: pnpm test:data/);
-  assert.match(workflow, /pnpm update:data/);
+  assert.match(workflow, /name: 抓取并校验 Apple 价格[\s\S]*?EXCHANGE_RATE_API_KEY:\s*\$\{\{ secrets\.EXCHANGE_RATE_API_KEY \}\}[\s\S]*?run: pnpm update:data/);
+  assert.doesNotMatch(workflow, /v6\/\$\{\{ secrets\.EXCHANGE_RATE_API_KEY \}\}/, 'the API key must not be placed in a request URL');
   assert.match(workflow, /actions\/upload-artifact@v7/);
   assert.match(workflow, /retention-days:\s*14/);
   assert.match(workflow, /git pull --rebase origin main/);

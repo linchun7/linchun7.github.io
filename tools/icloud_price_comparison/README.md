@@ -27,6 +27,14 @@
 - 选择 `:52`：避开常见整点和半点高峰，让排队后的实际运行尽量落在 08:30 以后
 - GitHub 可能准时或延迟执行；Action 摘要会显示实际抓取时间和汇率发布时间
 
+汇率按以下顺序获取：
+
+1. 使用 Actions Secret `EXCHANGE_RATE_API_KEY` 请求 ExchangeRate-API Key 接口。
+2. 主接口额度用尽、请求失败、结构异常或缺少所需币种时，自动改用开放接口。
+3. 两个在线来源都失败时，沿用并标记上一份有效汇率。
+
+Secret 仅配置在仓库 **Settings > Secrets and variables > Actions**，不要写入代码、日志或数据文件。
+
 运行顺序：
 
 1. 安装锁定依赖并运行固定 fixture、历史调价、工作流和数据测试。
@@ -67,7 +75,7 @@ Apple 当前使用 `Published Date: July 17, 2026` 格式。解析、更新和�
 - 地区重复、关键分区缺失、容量不完整或地区数异常下降时拒绝更新。
 - 单项价格超过旧价 10 倍或低于旧价 1/10 时拒绝更新。
 - 联合异常需同时满足 200% 涨幅、当地金额门槛、固定汇率人民币门槛和实际汇率人民币门槛才拒绝；人民币门槛为 `max(15 元, 上次人民币价值 × 50%)`。
-- 汇率缺失时拒绝更新；汇率服务临时失败时沿用并标记上一份有效汇率。
+- Key 接口和开放接口执行相同校验；两者都无法提供完整汇率时沿用并标记上一份有效结果。
 - `history.json` 异常不阻断当前价格页，前端可在数据恢复后重新加载。
 
 ## 日常检查
@@ -110,6 +118,6 @@ python -m http.server 4173
 
 - 价格：[Apple Support](https://support.apple.com/en-us/108047)
 - 中文名称：[Apple 中文支持](https://support.apple.com/zh-cn/108047)
-- 汇率：[ExchangeRate-API](https://www.exchangerate-api.com/docs/free)
+- 汇率：[ExchangeRate-API](https://www.exchangerate-api.com/docs/overview)，开放接口作为自动回退
 
 人民币金额仅用于横向比较，不代表 Apple 实际结算价。税费、可用性和购买区域限制可能不同。本工具与 Apple Inc. 无关联。
