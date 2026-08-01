@@ -545,14 +545,8 @@ async function handleFailure(error) {
     const report = failureRunLogEntry(error, runStartedAt, finishedAt);
     await mkdir(DIAGNOSTICS_DIR, { recursive: true });
     await writeFile(path.join(DIAGNOSTICS_DIR, 'run-report.json'), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-    await writeFile(path.join(DIAGNOSTICS_DIR, 'update-failure.json'), `${JSON.stringify({
-      failedAt: finishedAt.toISOString(),
-      error: error.message,
-      stack: error.stack
-    }, null, 2)}\n`, 'utf8');
     if (lastAppleHtml) {
       await writeAppleSnapshot(lastAppleHtml, runStartedAt);
-      await writeFile(path.join(DIAGNOSTICS_DIR, 'apple-response.html'), lastAppleHtml, 'utf8');
     }
     if (process.env.GITHUB_STEP_SUMMARY) {
       await appendFile(process.env.GITHUB_STEP_SUMMARY, [

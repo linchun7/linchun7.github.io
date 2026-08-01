@@ -66,16 +66,11 @@ jobs:
       - name: 运行解析与数据安全测试
         run: pnpm test:core
 
-      - name: 运行浏览器界面测试（更新前）
-        id: ui_before
-        continue-on-error: true
-        run: pnpm test:ui
-
       - name: 抓取并校验 Apple 价格
         run: pnpm update:data
 
       - name: 验证更新后的价格数据
-        run: pnpm test:core
+        run: pnpm test:data
 
       - name: 验证更新后的页面
         id: ui_after
@@ -118,7 +113,7 @@ jobs:
           git push origin HEAD:main
 
       - name: 记录浏览器界面测试警告
-        if: always() && !cancelled() && (steps.ui_before.outcome == 'failure' || steps.ui_after.outcome == 'failure')
+        if: always() && !cancelled() && steps.ui_after.outcome == 'failure'
         working-directory: .
         shell: bash
         run: |
@@ -128,7 +123,6 @@ jobs:
             echo ""
             echo "> **警告：** 页面自动化验收未通过；价格抓取、核心数据校验和提交未因此中断。"
             echo ""
-            echo "- 更新前测试：${{ steps.ui_before.outcome }}"
             echo "- 更新后测试：${{ steps.ui_after.outcome }}"
             echo "- 数据提交步骤：${{ steps.commit_data.outcome }}"
           } >> "$GITHUB_STEP_SUMMARY"
