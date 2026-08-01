@@ -129,7 +129,7 @@ test('renders current prices, sorting, and country history in a real browser', {
         const minimumPriceSize = await page.locator('#minimumSummary .minimum-price').first().evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
         assert.ok(minimumCountrySize > minimumPriceSize, 'minimum country should be the visual focus');
         assert.equal(await page.locator('#minimumSummary .minimum-tier-label').count(), expectedData.tiers.length);
-        assert.equal(await page.locator('#minimumSummary .minimum-tier-label svg').count(), expectedData.tiers.length);
+        assert.equal(await page.locator('#minimumSummary .minimum-tier-label svg').count(), 0);
         const sourceText = await page.locator('#sourceLinks').innerText();
         assert.equal(await page.locator('#sourceLinks .source-group').count(), 2);
         assert.equal(await page.locator('#sourceLinks .source-status svg').count(), 1);
