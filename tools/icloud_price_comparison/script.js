@@ -230,13 +230,18 @@ function renderMinimumSummary() {
     const item = document.createElement('div');
     item.title = `${tier.label}人民币参考价最低地区`;
 
-    const label = document.createElement('dt');
+    const tierLabel = document.createElement('dt');
+    tierLabel.className = 'minimum-tier-label';
+    tierLabel.textContent = tier.label;
     const countryName = state.minimumCountries[tier.id]?.nameZh
       || state.minimumCountries[tier.id]?.country;
-    label.textContent = countryName ? `${tier.label} · ${countryName}` : tier.label;
+    const country = document.createElement('span');
+    country.className = 'minimum-country';
+    country.textContent = countryName || '暂无地区';
     const price = document.createElement('dd');
+    price.className = 'minimum-price';
     price.textContent = formatConverted(state.minimumPrices[tier.id], '¥');
-    item.append(label, price);
+    item.append(tierLabel, country, price);
     elements.minimumSummary.append(item);
   }
 }
