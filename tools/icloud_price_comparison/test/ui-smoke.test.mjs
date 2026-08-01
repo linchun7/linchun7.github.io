@@ -71,8 +71,11 @@ test('renders current prices, sorting, and country history in a real browser', {
 
   try {
     for (const viewport of [
+      { name: 'wide-desktop', width: 1920, height: 1080 },
       { name: 'desktop', width: 1365, height: 900 },
-      { name: 'mobile', width: 390, height: 844 }
+      { name: 'tablet', width: 768, height: 1024 },
+      { name: 'mobile', width: 390, height: 844 },
+      { name: 'narrow-mobile', width: 320, height: 720 }
     ]) {
       const page = await browser.newPage({ viewport: { width: viewport.width, height: viewport.height } });
       const errors = [];
@@ -111,10 +114,24 @@ test('renders current prices, sorting, and country history in a real browser', {
           assert.ok(referenceBox && statsBox && statsBox.y >= referenceBox.y + referenceBox.height, `${viewport.name} metrics should form a separate row below the minimum summary`);
           assert.ok(referenceBox && statsBox && Math.abs(referenceBox.width - statsBox.width) <= 2, `${viewport.name} overview rows should share the same width`);
         }
-        const statValues = await page.locator('.overview-stats dd').evaluateAll((elements) => elements.map((element) => ({ text: element.textContent, fontSize: Number.parseFloat(getComputedStyle(element).fontSize) })));
+        const statValues = await page.locator('.overview-stats dd').evaluateAll((elements) => elements.map((element) => {
+          const style = getComputedStyle(element);
+          return {
+            text: element.textContent,
+            color: style.color,
+            fontSize: Number.parseFloat(style.fontSize)
+          };
+        }));
         assert.deepEqual(statValues.map(({ text }) => text), [String(expectedData.countries.length), String(new Set(expectedData.countries.map(({ currency }) => currency)).size), String(expectedData.tiers.length)]);
-        assert.ok(statValues[0].fontSize >= (viewport.width > 900 ? 34 : 28), `${viewport.name} primary stat should remain prominent`);
-        assert.ok(statValues.slice(1).every(({ fontSize }) => fontSize >= (viewport.width > 900 ? 28 : 24)), `${viewport.name} supporting stats should remain readable`);
+        assert.equal(new Set(statValues.map(({ color }) => color)).size, 1, `${viewport.name} stat colors should have equal emphasis`);
+        assert.equal(new Set(statValues.map(({ fontSize }) => fontSize)).size, 1, `${viewport.name} stat sizes should have equal emphasis`);
+        assert.ok(statValues.every(({ fontSize }) => fontSize >= (viewport.width > 900 ? 28 : 24)), `${viewport.name} stats should remain readable`);
+        const statCards = await page.locator('.overview-stats > div').evaluateAll((elements) => elements.map((element) => {
+          const style = getComputedStyle(element);
+          return { backgroundColor: style.backgroundColor, borderColor: style.borderColor };
+        }));
+        assert.equal(new Set(statCards.map(({ backgroundColor }) => backgroundColor)).size, 1, `${viewport.name} stat backgrounds should have equal emphasis`);
+        assert.equal(new Set(statCards.map(({ borderColor }) => borderColor)).size, 1, `${viewport.name} stat borders should have equal emphasis`);
         assert.equal(await page.locator('#minimumSummary > div').count(), expectedData.tiers.length);
         for (const tier of expectedData.tiers) {
           const lowest = expectedData.countries
@@ -134,6 +151,19 @@ test('renders current prices, sorting, and country history in a real browser', {
         assert.ok(minimumCountrySize > minimumPriceSize, 'minimum country should be the visual focus');
         assert.equal(await page.locator('#minimumSummary .minimum-tier-label').count(), expectedData.tiers.length);
         assert.equal(await page.locator('#minimumSummary .minimum-tier-label svg').count(), 0);
+        const minimumBadges = page.locator('.price-cell.is-minimum .minimum-badge');
+        assert.ok(await minimumBadges.count() >= expectedData.tiers.length, 'each tier should expose at least one minimum-price badge');
+        const minimumBadgePosition = await minimumBadges.first().evaluate((badge) => ({
+          badgeIndex: [...badge.parentElement.children].indexOf(badge),
+          gapToPrice: badge.nextElementSibling.getBoundingClientRect().left - badge.getBoundingClientRect().right,
+          text: badge.textContent
+        }));
+        assert.equal(minimumBadgePosition.badgeIndex, 0, 'minimum badge should sit directly before the price');
+        assert.equal(minimumBadgePosition.text, '最低');
+        assert.ok(minimumBadgePosition.gapToPrice >= 0 && minimumBadgePosition.gapToPrice <= 6, `${viewport.name} minimum badge should stay close to the price`);
+        const minimumCellBackground = await page.locator('.price-cell.is-minimum').first().evaluate((cell) => getComputedStyle(cell).backgroundColor);
+        const standardCellBackground = await page.locator('.price-cell:not(.is-minimum):not(.is-sorted)').first().evaluate((cell) => getComputedStyle(cell).backgroundColor);
+        assert.notEqual(minimumCellBackground, standardCellBackground, 'minimum cell should use a restrained green tint');
         const sourceText = await page.locator('#sourceLinks').innerText();
         assert.equal(await page.locator('#sourceLinks .source-group').count(), 2);
         assert.equal(await page.locator('#sourceLinks .source-status svg').count(), 1);
