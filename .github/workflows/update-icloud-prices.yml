@@ -66,7 +66,9 @@ jobs:
       - name: 运行解析与数据安全测试
         run: pnpm test:core
 
-      - name: 运行浏览器界面测试
+      - name: 运行浏览器界面测试（更新前）
+        id: ui_before
+        continue-on-error: true
         run: pnpm test:ui
 
       - name: 抓取并校验 Apple 价格
@@ -76,6 +78,8 @@ jobs:
         run: pnpm test:core
 
       - name: 验证更新后的页面
+        id: ui_after
+        continue-on-error: true
         run: pnpm test:ui
 
       - name: 上传诊断信息和 Apple 页面快照
@@ -98,6 +102,7 @@ jobs:
           fi
 
       - name: 提交价格数据变更
+        id: commit_data
         working-directory: .
         shell: bash
         run: |
@@ -112,16 +117,38 @@ jobs:
           git pull --rebase origin main
           git push origin HEAD:main
 
+      - name: 汇总浏览器界面测试结果
+        if: always() && !cancelled() && (steps.ui_before.outcome == 'failure' || steps.ui_after.outcome == 'failure')
+        working-directory: .
+        shell: bash
+        run: |
+          echo "::error title=浏览器界面测试失败::价格抓取与核心数据校验已继续执行，但页面自动化验收未通过。请查看上方浏览器界面测试步骤。"
+          {
+            echo "## 浏览器界面测试失败"
+            echo ""
+            echo "> **错误：** 页面自动化验收未通过；价格抓取流程未因此中断。"
+            echo ""
+            echo "- 更新前测试：${{ steps.ui_before.outcome }}"
+            echo "- 更新后测试：${{ steps.ui_after.outcome }}"
+            echo "- 数据提交步骤：${{ steps.commit_data.outcome }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
       - name: 写入失败摘要
         if: failure()
         working-directory: .
         shell: bash
         run: |
           echo "::error title=iCloud+ 价格更新失败::自动任务未完成，请查看上方第一个标红步骤确定失败阶段。"
+          if [[ "${{ steps.commit_data.outcome }}" == "success" ]]; then
+            data_status="价格数据步骤已经完成；本次失败来自其他验收或收尾步骤。"
+          else
+            data_status="本次运行未确认价格数据已成功提交。上一份有效数据继续保留。"
+          fi
           {
             echo "## iCloud+ 价格更新失败"
             echo ""
             echo "> **错误：** 自动任务未完成，请查看上方第一个标红步骤确定失败阶段。"
             echo ""
-            echo "本次运行未确认价格数据已成功提交。上一份有效数据继续保留。"
+            echo "$data_status"
           } >> "$GITHUB_STEP_SUMMARY"
