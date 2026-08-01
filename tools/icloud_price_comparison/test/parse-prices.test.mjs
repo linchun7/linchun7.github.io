@@ -110,6 +110,21 @@ test('rejects incomplete pricing data', () => {
   );
 });
 
+test('rejects zero, negative, non-finite, and duplicate Apple prices', () => {
+  const tiers = [{ id: '50GB' }];
+  for (const price of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+    assert.throws(
+      () => validatePrices([{ country: 'Example', currency: 'USD', plans: { '50GB': { price } } }], { minCountries: 1, tiers }),
+      /Invalid 50GB price/
+    );
+  }
+  const valid = { country: 'Example', currency: 'USD', plans: { '50GB': { price: 1 } } };
+  assert.throws(
+    () => validatePrices([valid, structuredClone(valid)], { minCountries: 1, tiers }),
+    /Duplicate country entry/
+  );
+});
+
 test('rejects implausible changes against the last valid snapshot', async () => {
   const parsed = parseApplePrices(await readFile(fixtureUrl, 'utf8'));
   const changed = structuredClone(parsed.countries);

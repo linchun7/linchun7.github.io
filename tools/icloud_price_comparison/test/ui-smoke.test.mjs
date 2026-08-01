@@ -94,9 +94,22 @@ test('renders current prices, sorting, and country history in a real browser', {
         }
       });
       await page.route('https://**/*', (route) => route.abort());
+      await page.route('**/data/prices.json*', async (route) => {
+        await new Promise((resolve) => setTimeout(resolve, viewport.name === 'desktop' ? 1_800 : 250));
+        await route.continue();
+      });
 
       try {
         await page.goto(`${baseUrl}/`, { waitUntil: 'domcontentloaded' });
+        assert.equal(await page.locator('#loadStatus').isVisible(), true, `${viewport.name} should show loading status before price data arrives`);
+        assert.match(await page.locator('#loadStatusText').textContent(), /正在加载价格数据/);
+        assert.equal(await page.locator('.workspace').getAttribute('aria-busy'), 'true');
+        assert.equal(await page.locator('#searchInput').isDisabled(), true);
+        assert.equal(await page.locator('#regionSelect').isDisabled(), true);
+        if (viewport.name === 'desktop') {
+          await page.waitForTimeout(1_600);
+          assert.match(await page.locator('#loadStatusText').textContent(), /网络较慢，仍在加载/);
+        }
         await page.waitForFunction(
           (count) => document.querySelectorAll('#priceRows tr[data-country]').length === count,
           expectedData.countries.length
@@ -104,6 +117,10 @@ test('renders current prices, sorting, and country history in a real browser', {
 
         assert.equal(await page.locator('#marketCount').textContent(), String(expectedData.countries.length));
         assert.equal(await page.locator('#tierCount').textContent(), String(expectedData.tiers.length));
+        assert.equal(await page.locator('#loadStatus').isVisible(), false, `${viewport.name} should hide loading status after price data arrives`);
+        assert.equal(await page.locator('.workspace').getAttribute('aria-busy'), 'false');
+        assert.equal(await page.locator('#searchInput').isEnabled(), true);
+        assert.equal(await page.locator('#regionSelect').isEnabled(), true);
         assert.equal(await page.locator('.app-brand strong').textContent(), 'iCloud+ 全球价格对比');
         assert.equal(await page.locator('#pageTitle').textContent(), '各容量最低价');
         assert.equal(await page.locator('.workspace-heading h2').textContent(), '各地区 iCloud+ 价格');
@@ -237,5 +254,75 @@ test('renders current prices, sorting, and country history in a real browser', {
   } finally {
     await browser.close();
     await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test('shows an actionable error and recovers after a temporary price-data outage', { timeout: 30_000 }, async (context) => {
+  const chromePath = await findChrome();
+  if (!chromePath) {
+    if (process.env.CI) assert.fail('Chrome or Chromium is required for the UI error-state test');
+    context.skip('Chrome or Chromium is not installed');
+    return;
+  }
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await chromium.launch({ executablePath: chromePath, headless: true });
+  let attempts = 0;
+  try {
+    const page = await browser.newPage({ viewport: { width: 1365, height: 900 } });
+    await page.route('https://**/*', (route) => route.abort());
+    await page.route('**/data/prices.json*', async (route) => {
+      attempts += 1;
+      if (attempts === 1) {
+        await route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"temporary outage"}' });
+        return;
+      }
+      await route.continue();
+    });
+    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
+    assert.equal(await page.locator('#loadStatus').isVisible(), true);
+    assert.equal(await page.locator('.workspace').getAttribute('aria-busy'), 'false');
+    assert.equal(await page.locator('#searchInput').isDisabled(), true);
+    assert.match(await page.locator('#loadStatusText').textContent(), /加载失败/);
+    assert.equal(await page.locator('#retryButton').textContent(), '重新加载');
+    await page.locator('#retryButton').click();
+    await page.locator('#retryButton').press('Enter');
+    await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length === 73);
+    assert.equal(await page.locator('#loadStatus').isVisible(), false);
+    assert.equal(await page.locator('.data-status').evaluate((element) => element.classList.contains('is-error')), false);
+    assert.equal(attempts, 2);
+  } finally {
+    await browser.close();
+    server.close();
+  }
+});
+
+test('keeps current prices usable when optional history data is unavailable', { timeout: 30_000 }, async (context) => {
+  const chromePath = await findChrome();
+  if (!chromePath) {
+    if (process.env.CI) assert.fail('Chrome or Chromium is required for the history fallback test');
+    context.skip('Chrome or Chromium is not installed');
+    return;
+  }
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await chromium.launch({ executablePath: chromePath, headless: true });
+  try {
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await page.route('https://**/*', (route) => route.abort());
+    await page.route('**/data/history.json*', (route) => route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: '{"error":"history temporarily unavailable"}'
+    }));
+    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length === 73);
+    assert.equal(await page.locator('#loadStatus').isVisible(), false);
+    assert.equal(await page.locator('#marketCount').textContent(), '73');
+    assert.equal(await page.locator('#publishedDateButton').isVisible(), true);
+  } finally {
+    await browser.close();
+    server.close();
   }
 });
