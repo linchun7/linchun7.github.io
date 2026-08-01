@@ -66,6 +66,17 @@ test('tolerates small heading, wrapper, and publication-date markup changes', as
   assert.equal(validatePrices(result.countries, { minCountries: 5, tiers: result.tiers }), true);
 });
 
+test('parses the Apple plain-text Published Date label exactly as rendered', async () => {
+  const fixture = await readFile(fixtureUrl, 'utf8');
+  const plainTextDate = fixture.replace(
+    '<p>Published Date: <time>July 17, 2026</time></p>',
+    '<p>Published Date: July 17, 2026</p>'
+  );
+  const result = parseApplePrices(plainTextDate);
+  assert.equal(result.parser, 'cross-checked');
+  assert.equal(result.sourcePublishedDate, 'July 17, 2026');
+});
+
 test('falls back to the Apple marker parser when semantic region headings change', async () => {
   const fixture = await readFile(fixtureUrl, 'utf8');
   const adjusted = fixture

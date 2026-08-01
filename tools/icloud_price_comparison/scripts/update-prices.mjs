@@ -158,7 +158,7 @@ export function updateHistory(previousHistory, countries, observedAt, tiers, obs
 }
 
 export function publicationDateKey(value) {
-  const text = String(value ?? '').trim();
+  const text = String(value ?? '').trim().replace(/^published\s+date\s*:?\s*/i, '');
   const dateKey = (year, month, day) => {
     const date = new Date(Date.UTC(year, month, day));
     return date.getUTCFullYear() === year
@@ -289,6 +289,10 @@ async function writeJsonAtomic(filePath, value) {
 }
 
 export function createRunLogEntry(data, summary, startedAt, finishedAt) {
+  const publishedDate = data.source.publishedDate ?? null;
+  const previousPublishedDate = summary.publicationDateChanged
+    ? summary.publishedDateHistory?.at(-2)?.publishedDate ?? null
+    : publishedDate;
   return {
     schemaVersion: 1,
     id: finishedAt.toISOString(),
@@ -313,6 +317,11 @@ export function createRunLogEntry(data, summary, startedAt, finishedAt) {
       tiers: data.tiers.map(({ id, label }) => ({ id, label }))
     },
     changes: {
+      publishedDate: {
+        changed: Boolean(summary.publicationDateChanged),
+        from: previousPublishedDate,
+        to: publishedDate
+      },
       addedTiers: summary.publicationChanges.addedTiers,
       removedTiers: summary.publicationChanges.removedTiers,
       addedCountries: summary.publicationChanges.addedCountries,
@@ -365,6 +374,10 @@ function summarizeNames(names) {
   return `${names.slice(0, 8).join('、')} 等 ${names.length} 个`;
 }
 
+function summarizeChangedCountries(entries) {
+  return summarizeNames(entries.map(({ nameZh, country }) => nameZh || country));
+}
+
 function describeParser(data) {
   const parser = data.source.parser ?? 'unknown';
   if (parser === 'cross-checked') return `${parser}（双解析器一致）`;
@@ -375,23 +388,32 @@ export function buildActionSummaryLines(data, summary, trigger = process.env.GIT
   const publicationChanges = summary.publicationChanges ?? {
     addedTiers: [], removedTiers: [], addedCountries: [], removedCountries: [], changedCountries: []
   };
+  const changedCountries = publicationChanges.changedCountries ?? [];
+  const priceChanges = changedCountries.filter(({ tiers }) => tiers?.length);
+  const currencyChanges = changedCountries.filter(({ fromCurrency, toCurrency }) => fromCurrency !== toCurrency);
+  const regionChanges = changedCountries.filter(({ fromRegion, toRegion }) => fromRegion !== toRegion);
   const changes = [];
   const warnings = [];
 
   if (summary.publicationDateChanged) {
     const previousDate = summary.publishedDateHistory.at(-2)?.publishedDate ?? 'unknown';
     changes.push(`Apple 发布日期：${previousDate} → ${data.source.publishedDate ?? 'unknown'}`);
-    changes.push(
-      `发布日期对应内容变化：${publicationChanges.changedCountries.length} 个地区、`
-      + `${publicationChanges.addedCountries.length} 个新增地区、`
-      + `${publicationChanges.removedCountries.length} 个移除地区、`
-      + `${publicationChanges.addedTiers.length} 个新增容量、`
-      + `${publicationChanges.removedTiers.length} 个移除容量`
-    );
   }
-  if (summary.addedCountries.length) changes.push(`新增地区：${summarizeNames(summary.addedCountries)}`);
-  if (summary.removedCountries.length) changes.push(`移除地区：${summarizeNames(summary.removedCountries)}`);
-  if (summary.changedCountries) changes.push(`价格或币种变化：${summary.changedCountries} 个地区`);
+  if (publicationChanges.addedTiers.length) {
+    changes.push(`新增容量：${publicationChanges.addedTiers.map(({ label, id }) => label || id).join('、')}`);
+  }
+  if (publicationChanges.removedTiers.length) {
+    changes.push(`移除容量：${publicationChanges.removedTiers.map(({ label, id }) => label || id).join('、')}`);
+  }
+  if (publicationChanges.addedCountries.length) {
+    changes.push(`新增地区：${summarizeChangedCountries(publicationChanges.addedCountries)}`);
+  }
+  if (publicationChanges.removedCountries.length) {
+    changes.push(`移除地区：${summarizeChangedCountries(publicationChanges.removedCountries)}`);
+  }
+  if (regionChanges.length) changes.push(`所属分区变化：${summarizeChangedCountries(regionChanges)}`);
+  if (currencyChanges.length) changes.push(`币种变化：${summarizeChangedCountries(currencyChanges)}`);
+  if (priceChanges.length) changes.push(`价格变化：${summarizeChangedCountries(priceChanges)}`);
   if (!changes.length) changes.push('本次变化：无');
 
   if (data.source.parser !== 'cross-checked') warnings.push(`- **解析降级**：${describeParser(data)}`);
@@ -516,15 +538,9 @@ export async function main({ dryRun = DRY_RUN } = {}) {
   const history = historyUpdate.history;
   const publishedDateUpdate = updatePublishedDateHistory(history, previousData, parsed.sourcePublishedDate, observedAt, publicationChanges, generatedAt);
   const publishedDateHistory = publishedDateUpdate.entries;
-  const addedCountries = publicationChanges.addedCountries.map(({ country }) => country);
-  const removedCountries = publicationChanges.removedCountries.map(({ country }) => country);
-
   const summary = {
     history,
     missingRates,
-    addedCountries,
-    removedCountries,
-    changedCountries: historyUpdate.changedCountries,
     publishedDateHistory,
     publicationDateChanged: publishedDateUpdate.changed,
     publicationChanges,
