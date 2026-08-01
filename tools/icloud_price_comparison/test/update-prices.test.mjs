@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import {
   buildSnapshotChanges,
@@ -14,6 +15,7 @@ import {
 const TIER_50 = { id: '50GB', label: '50 GB', capacityGb: 50 };
 const TIER_200 = { id: '200GB', label: '200 GB', capacityGb: 200 };
 const TIER_1TB = { id: '1TB', label: '1 TB', capacityGb: 1024 };
+const updaterUrl = new URL('../scripts/update-prices.mjs', import.meta.url);
 
 function country(countryName, {
   nameZh = countryName,
@@ -98,7 +100,9 @@ test('does not carry a missing currency from old rates into a successful refresh
 
 test('keeps the previous exchange rates when the refresh fails', async () => {
   const originalFetch = globalThis.fetch;
+  const originalSetTimeout = globalThis.setTimeout;
   globalThis.fetch = async () => { throw new Error('temporary outage'); };
+  globalThis.setTimeout = (callback, _delay, ...args) => originalSetTimeout(callback, 0, ...args);
   try {
     const fx = await getExchangeRates({
       fx: {
@@ -113,6 +117,7 @@ test('keeps the previous exchange rates when the refresh fails', async () => {
     assert.equal(fx.rates.JPY, 150);
   } finally {
     globalThis.fetch = originalFetch;
+    globalThis.setTimeout = originalSetTimeout;
   }
 });
 
@@ -347,4 +352,11 @@ test('keeps successful Action summaries concise and promotes warnings', () => {
   assert.match(stale, /### 警告/);
   assert.match(stale, /汇率降级/);
   assert.match(stale, /缺少汇率.*JPY/);
+});
+
+test('keeps failure diagnostics compact without duplicate files', async () => {
+  const source = await readFile(updaterUrl, 'utf8');
+  assert.match(source, /run-report\.json/);
+  assert.doesNotMatch(source, /update-failure\.json/);
+  assert.doesNotMatch(source, /path\.join\(DIAGNOSTICS_DIR, 'apple-response\.html'\)/);
 });
