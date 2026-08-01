@@ -13,12 +13,15 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   );
   assert.match(workflow, /pnpm install --frozen-lockfile/);
   assert.match(workflow, /name: 运行解析与数据安全测试\s+run: pnpm test:core/);
-  assert.match(workflow, /name: 运行浏览器界面测试\s+run: pnpm test:ui/);
+  assert.match(workflow, /name: 运行浏览器界面测试（更新前）[\s\S]*?id: ui_before[\s\S]*?continue-on-error: true[\s\S]*?run: pnpm test:ui/);
+  assert.match(workflow, /name: 验证更新后的页面[\s\S]*?id: ui_after[\s\S]*?continue-on-error: true[\s\S]*?run: pnpm test:ui/);
   assert.match(workflow, /pnpm update:data/);
   assert.match(workflow, /actions\/upload-artifact@v7/);
   assert.match(workflow, /retention-days:\s*14/);
   assert.match(workflow, /git pull --rebase origin main/);
   assert.doesNotMatch(workflow, /git push --force/);
+  assert.match(workflow, /name: 汇总浏览器界面测试结果[\s\S]*?steps\.ui_before\.outcome == 'failure'[\s\S]*?steps\.ui_after\.outcome == 'failure'/);
+  assert.match(workflow, /价格抓取流程未因此中断/);
   assert.match(workflow, /RUNNER_TEMP\/icloud-storage-summary\.md/);
   assert.match(workflow, /name: 追加仓库容量摘要[\s\S]*if: always\(\)/);
   assert.match(workflow, /name: 写入失败摘要[\s\S]*if: failure\(\)/);
@@ -33,10 +36,13 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   const secondUiTest = workflow.indexOf('run: pnpm test:ui', firstUiTest + 1);
   const commit = workflow.indexOf('name: 提交价格数据变更');
   assert.ok(firstCoreTest >= 0 && firstCoreTest < firstUiTest, 'core tests must run before UI tests');
-  assert.ok(firstUiTest < update, 'all fixture tests must run before live update');
+  assert.ok(firstUiTest < update, 'the pre-update UI test must run before the live update');
   assert.ok(update < secondCoreTest, 'the updated snapshot must pass core validation');
   assert.ok(secondCoreTest < secondUiTest, 'updated data must pass before the final UI test');
-  assert.ok(secondUiTest < commit, 'all updated output must pass before commit');
+  assert.ok(secondUiTest < commit, 'the final UI test must finish before commit');
+
+  const uiGate = workflow.indexOf('name: 汇总浏览器界面测试结果');
+  assert.ok(commit < uiGate, 'UI failures must be reported only after the data commit step');
 
   const summaryAppend = workflow.indexOf('name: 追加仓库容量摘要');
   assert.ok(secondUiTest < summaryAppend, 'the main update summary must be written before capacity details');
