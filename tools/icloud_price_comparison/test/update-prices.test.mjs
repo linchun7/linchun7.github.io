@@ -278,6 +278,27 @@ test('builds a structured successful run log with source, counts, and changes', 
   );
 });
 
+test('rejects invalid USD anchors, timestamps, and stale fallback rates', async () => {
+  const originalFetch = globalThis.fetch;
+  const invalidPayloads = [
+    { result: 'success', base_code: 'USD', time_last_update_unix: 1_754_006_400, rates: { USD: 2, CNY: 7.2 } },
+    { result: 'success', base_code: 'USD', time_last_update_unix: 0, rates: { USD: 1, CNY: 7.2 } },
+    { result: 'success', base_code: 'EUR', time_last_update_unix: 1_754_006_400, rates: { USD: 1, CNY: 7.2 } },
+    { result: 'success', base_code: 'USD', time_last_update_unix: 1_754_006_400, rates: { USD: 1, CNY: -7.2 } }
+  ];
+  try {
+    for (const payload of invalidPayloads) {
+      globalThis.fetch = async () => new Response(JSON.stringify(payload), { status: 200 });
+      await assert.rejects(
+        () => getExchangeRates({ fx: { rates: { USD: 0, CNY: -1 } } }),
+        /Exchange-rate response is missing required fields/
+      );
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('keeps successful Action summaries concise and promotes warnings', () => {
   const data = {
     source: {

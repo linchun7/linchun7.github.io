@@ -66,6 +66,8 @@ export async function getExchangeRates(previousData) {
     if (payload?.result !== 'success'
       || payload?.base_code !== 'USD'
       || !Number.isFinite(payload?.time_last_update_unix)
+      || payload.time_last_update_unix <= 0
+      || payload?.rates?.USD !== 1
       || !Number.isFinite(payload?.rates?.CNY)
       || payload.rates.CNY <= 0) {
       throw new Error('Exchange-rate response is missing required fields');
@@ -78,7 +80,9 @@ export async function getExchangeRates(previousData) {
       rates: payload.rates
     };
   } catch (error) {
-    if (!previousData?.fx?.rates?.CNY) throw error;
+    const previousUsd = previousData?.fx?.rates?.USD;
+    const previousCny = previousData?.fx?.rates?.CNY;
+    if (previousUsd !== 1 || !Number.isFinite(previousCny) || previousCny <= 0) throw error;
     console.warn(`Exchange-rate update failed; keeping previous rates: ${error.message}`);
     return { ...previousData.fx, stale: true };
   }
