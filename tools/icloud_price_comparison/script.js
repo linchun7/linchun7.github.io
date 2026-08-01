@@ -232,7 +232,12 @@ function renderMinimumSummary() {
 
     const tierLabel = document.createElement('dt');
     tierLabel.className = 'minimum-tier-label';
-    tierLabel.textContent = tier.label;
+    const tierIcon = document.createElement('i');
+    tierIcon.dataset.lucide = 'hard-drive';
+    tierIcon.setAttribute('aria-hidden', 'true');
+    const tierText = document.createElement('span');
+    tierText.textContent = tier.label;
+    tierLabel.append(tierIcon, tierText);
     const countryName = state.minimumCountries[tier.id]?.nameZh
       || state.minimumCountries[tier.id]?.country;
     const country = document.createElement('span');
