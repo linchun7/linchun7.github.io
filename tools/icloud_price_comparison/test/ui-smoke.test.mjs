@@ -18,7 +18,10 @@ async function findChrome() {
   const candidates = [
     process.env.CHROME_PATH,
     process.platform === 'win32' ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe' : '/usr/bin/google-chrome',
-    process.platform === 'win32' ? 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe' : '/usr/bin/chromium'
+    process.platform === 'win32' ? 'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe' : '/usr/bin/google-chrome-stable',
+    process.platform === 'win32' ? 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe' : '/usr/bin/chromium',
+    process.platform === 'win32' ? 'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe' : '/usr/bin/chromium-browser',
+    process.platform === 'win32' ? null : '/snap/bin/chromium'
   ].filter(Boolean);
   for (const candidate of candidates) {
     try {
@@ -287,14 +290,13 @@ test('shows an actionable error and recovers after a temporary price-data outage
     assert.match(await page.locator('#loadStatusText').textContent(), /加载失败/);
     assert.equal(await page.locator('#retryButton').textContent(), '重新加载');
     await page.locator('#retryButton').click();
-    await page.locator('#retryButton').press('Enter');
     await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length === 73);
     assert.equal(await page.locator('#loadStatus').isVisible(), false);
     assert.equal(await page.locator('.data-status').evaluate((element) => element.classList.contains('is-error')), false);
     assert.equal(attempts, 2);
   } finally {
     await browser.close();
-    server.close();
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }
 });
 
@@ -323,6 +325,6 @@ test('keeps current prices usable when optional history data is unavailable', { 
     assert.equal(await page.locator('#publishedDateButton').isVisible(), true);
   } finally {
     await browser.close();
-    server.close();
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }
 });
