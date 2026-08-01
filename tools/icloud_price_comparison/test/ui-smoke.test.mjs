@@ -121,6 +121,9 @@ test('renders current prices, sorting, and country history in a real browser', {
           const summaryText = await page.locator('#minimumSummary > div').filter({ hasText: tier.label }).textContent();
           assert.ok(summaryText.includes(lowest.country.nameZh || lowest.country.country));
         }
+        const minimumCountrySize = await page.locator('#minimumSummary .minimum-country').first().evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
+        const minimumPriceSize = await page.locator('#minimumSummary .minimum-price').first().evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
+        assert.ok(minimumCountrySize > minimumPriceSize, 'minimum country should be the visual focus');
         const sourceText = await page.locator('#sourceLinks').innerText();
         assert.equal(await page.locator('#sourceLinks .source-group').count(), 2);
         assert.equal(await page.locator('#sourceLinks .source-status svg').count(), 1);
