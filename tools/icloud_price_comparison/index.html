@@ -28,7 +28,7 @@
       <div class="app-brand">
         <span class="brand-mark" aria-hidden="true"><i data-lucide="cloud"></i></span>
         <span class="brand-copy">
-        <strong>iCloud+ 全球价格对比</strong>
+          <strong>iCloud+ 全球价格对比</strong>
         </span>
       </div>
       <div class="data-status" aria-live="polite">
@@ -40,18 +40,20 @@
 
   <main class="page-main">
     <section class="overview" aria-labelledby="pageTitle">
-      <div class="overview-copy">
-        <p class="overview-kicker">人民币参考价</p>
-        <h1 id="pageTitle">各容量最低价</h1>
-        <p class="overview-note">按人民币参考汇率换算，便于横向比较</p>
+      <div class="overview-reference">
+        <div class="overview-copy">
+          <p class="overview-kicker">人民币参考价</p>
+          <h1 id="pageTitle">各容量最低价</h1>
+          <p class="overview-note">按人民币参考汇率换算，便于横向比较</p>
+        </div>
+        <dl id="minimumSummary" class="minimum-stats overview-stat-list" aria-label="各容量最低价概览">
+          <div><dt>正在计算</dt><dd>--</dd></div>
+        </dl>
       </div>
       <dl class="overview-stats overview-stat-list" aria-label="数据概览">
         <div><dt>地区</dt><dd id="marketCount">--</dd></div>
         <div><dt>币种</dt><dd id="currencyCount">--</dd></div>
         <div><dt>容量</dt><dd id="tierCount">--</dd></div>
-      </dl>
-      <dl id="minimumSummary" class="minimum-stats overview-stat-list" aria-label="各容量最低价概览">
-        <div><dt>正在计算</dt><dd>--</dd></div>
       </dl>
     </section>
 
