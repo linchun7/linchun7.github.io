@@ -535,3 +535,194 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
     await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }
 });
+
+test('keeps 100 price and publication history records inside scrollable dialogs', { timeout: 30_000 }, async (context) => {
+  const chromePath = await findChrome();
+  if (!chromePath) {
+    if (process.env.CI) assert.fail('Chrome or Chromium is required for the long-history UI test');
+    context.skip('Chrome or Chromium is not installed');
+    return;
+  }
+
+  const data = JSON.parse(await readFile(path.join(PROJECT_DIR, 'data/prices.json'), 'utf8'));
+  const country = data.countries[0];
+  const firstTier = data.tiers[0];
+  const dayMs = 86_400_000;
+  const priceEnd = Date.UTC(2026, 7, 1);
+  const publicationEnd = Date.UTC(2026, 6, 17);
+  const priceEvents = Array.from({ length: 100 }, (_, index) => {
+    const observedAt = new Date(priceEnd - (99 - index) * dayMs).toISOString().slice(0, 10);
+    return {
+      observedAt,
+      currency: country.currency,
+      plans: Object.fromEntries(data.tiers.map(({ id }) => [id, country.plans[id].price + index / 100]))
+    };
+  });
+  const verboseCountries = Array.from({ length: 24 }, (_, index) => ({
+    country: `SyntheticCountry${index}${'UnbrokenName'.repeat(8)}`,
+    nameZh: index === 0 ? '' : `测试地区${index}${'超长变化内容'.repeat(8)}`
+  }));
+  const verboseChanges = {
+    addedTiers: Array.from({ length: 12 }, (_, index) => ({ id: `NEW${index}TB`, label: `新增容量 ${index + 1} TB` })),
+    removedTiers: Array.from({ length: 12 }, (_, index) => ({ id: `OLD${index}TB`, label: `移除容量 ${index + 1} TB` })),
+    addedCountries: verboseCountries,
+    removedCountries: verboseCountries.map((entry, index) => ({ ...entry, country: `Removed${index}${entry.country}` })),
+    changedCountries: verboseCountries.map((entry, index) => ({
+      ...entry,
+      fromCurrency: 'USD',
+      toCurrency: 'CNY',
+      fromRegion: 'Americas',
+      toRegion: 'Asia Pacific',
+      tiers: data.tiers.map(({ id }, tierIndex) => ({ id, from: index + tierIndex + 1, to: index + tierIndex + 2 }))
+    }))
+  };
+  const sourcePublishedDates = Array.from({ length: 100 }, (_, index) => {
+    const date = new Date(publicationEnd - (99 - index) * dayMs);
+    const publishedDate = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'UTC', year: 'numeric', month: 'long', day: 'numeric'
+    }).format(date);
+    const emptyChanges = { addedTiers: [], removedTiers: [], addedCountries: [], removedCountries: [] };
+    return {
+      publishedDate,
+      observedAt: date.toISOString().slice(0, 10),
+      kind: index === 0 ? 'initial' : 'change',
+      changes: index === 99 ? verboseChanges : {
+        ...emptyChanges,
+        changedCountries: index === 0 ? [] : [{
+          country: country.country,
+          nameZh: country.nameZh,
+          fromCurrency: country.currency,
+          toCurrency: country.currency,
+          fromRegion: country.region,
+          toRegion: country.region,
+          tiers: [{ id: firstTier.id, from: index, to: index + 1 }]
+        }]
+      }
+    };
+  });
+  const history = {
+    schemaVersion: 2,
+    countries: {
+      [country.country]: {
+        nameZh: country.nameZh,
+        region: country.region,
+        events: priceEvents
+      }
+    },
+    sourcePublishedDates
+  };
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await chromium.launch({ executablePath: chromePath, headless: true });
+
+  const assertScrollableDialog = async (page, dialogSelector, closeSelector, label) => {
+    const dialog = page.locator(dialogSelector);
+    const before = await dialog.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        left: rect.left,
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+        viewportHeight: innerHeight,
+        viewportWidth: innerWidth,
+        documentWidth: document.documentElement.scrollWidth
+      };
+    });
+    assert.ok(before.top >= -1 && before.bottom <= before.viewportHeight + 1, `${label} dialog must stay inside the viewport`);
+    assert.ok(before.left >= -1 && before.right <= before.viewportWidth + 1, `${label} dialog width must stay inside the viewport`);
+    assert.ok(before.scrollHeight > before.clientHeight, `${label} dialog must scroll vertically`);
+    assert.ok(before.scrollWidth <= before.clientWidth + 1, `${label} dialog must not scroll horizontally`);
+    assert.ok(before.documentWidth <= before.viewportWidth + 1, `${label} must not overflow the page`);
+    assert.equal(
+      await dialog.locator('.dialog-header').evaluate((header) => getComputedStyle(header).backgroundColor),
+      'rgb(255, 255, 255)',
+      `${label} sticky header must hide scrolling content behind it`
+    );
+
+    await dialog.evaluate((element) => { element.scrollTop = element.scrollHeight; });
+    const sticky = await page.locator(closeSelector).evaluate((button) => {
+      const buttonRect = button.getBoundingClientRect();
+      const dialogRect = button.closest('dialog').getBoundingClientRect();
+      return {
+        buttonTop: buttonRect.top,
+        buttonBottom: buttonRect.bottom,
+        dialogTop: dialogRect.top,
+        dialogBottom: dialogRect.bottom,
+        viewportHeight: innerHeight
+      };
+    });
+    assert.ok(sticky.buttonTop >= sticky.dialogTop - 1, `${label} close button must remain in the dialog`);
+    assert.ok(sticky.buttonBottom <= Math.min(sticky.dialogBottom, sticky.viewportHeight) + 1, `${label} close button must remain visible after scrolling`);
+  };
+
+  try {
+    for (const viewport of [
+      { name: 'desktop', width: 1365, height: 900 },
+      { name: 'narrow-mobile', width: 320, height: 720 }
+    ]) {
+      const page = await browser.newPage({ viewport: { width: viewport.width, height: viewport.height } });
+      await page.route('https://**/*', (route) => route.abort());
+      await page.route('**/data/history.json*', (route) => route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(history)
+      }));
+      try {
+        await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+        await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, data.countries.length);
+
+        await page.locator('#searchInput').fill(country.country);
+        await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length === 1);
+        await page.locator('#priceRows tr[data-country]').click();
+        await page.waitForFunction(() => document.querySelectorAll('#historyRows tr').length === 100);
+        await assertScrollableDialog(page, '#historyDialog', '#closeHistory', `${viewport.name} price history`);
+        const priceTableScroller = page.locator('#historyDialog .history-table-scroll');
+        if (viewport.name === 'narrow-mobile') {
+          assert.ok(await priceTableScroller.evaluate((element) => element.scrollWidth > element.clientWidth), 'mobile price history must use its own horizontal scroller');
+        } else {
+          assert.ok(await priceTableScroller.evaluate((element) => element.scrollWidth <= element.clientWidth + 1), 'desktop price history must not scroll horizontally');
+        }
+        if (process.env.SCREENSHOT_DIR) {
+          await page.screenshot({ path: path.join(process.env.SCREENSHOT_DIR, `long-price-history-${viewport.name}.png`) });
+        }
+        await page.locator('#closeHistory').click();
+
+        await page.locator('#publishedDateButton').click();
+        await page.waitForFunction(() => document.querySelectorAll('#publishedDateRows tr').length === 100);
+        await assertScrollableDialog(page, '#publishedDateDialog', '#closePublishedDate', `${viewport.name} publication history`);
+        const tableScroller = page.locator('#publishedDateDialog .history-table-scroll');
+        const verboseCell = page.locator('#publishedDateRows .published-change-cell').first();
+        const verboseMetrics = await verboseCell.evaluate((element) => ({
+          textLength: element.textContent.length,
+          clientWidth: element.clientWidth,
+          scrollWidth: element.scrollWidth,
+          height: element.getBoundingClientRect().height,
+          lineHeight: Number.parseFloat(getComputedStyle(element).lineHeight)
+        }));
+        assert.ok(verboseMetrics.textLength > 5_000, 'publication history must render the complete long change description');
+        assert.ok(verboseMetrics.scrollWidth <= verboseMetrics.clientWidth + 1, 'long change text must wrap inside its cell');
+        assert.ok(verboseMetrics.height > verboseMetrics.lineHeight * 5, 'long change text must use multiple lines');
+        if (viewport.name === 'narrow-mobile') {
+          assert.ok(await tableScroller.evaluate((element) => element.scrollWidth > element.clientWidth), 'mobile publication table must use its own horizontal scroller');
+        } else {
+          assert.ok(await tableScroller.evaluate((element) => element.scrollWidth <= element.clientWidth + 1), 'desktop publication table must not gain horizontal overflow from long text');
+        }
+        if (process.env.SCREENSHOT_DIR) {
+          await verboseCell.scrollIntoViewIfNeeded();
+          await page.screenshot({ path: path.join(process.env.SCREENSHOT_DIR, `long-publication-history-${viewport.name}.png`) });
+        }
+        await page.locator('#closePublishedDate').click();
+      } finally {
+        await page.close();
+      }
+    }
+  } finally {
+    await browser.close();
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
