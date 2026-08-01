@@ -109,7 +109,11 @@ test('renders current prices, sorting, and country history in a real browser', {
           const referenceBox = await page.locator('.overview-reference').boundingBox();
           const statsBox = await page.locator('.overview-stats').boundingBox();
           assert.ok(referenceBox && statsBox && statsBox.x > referenceBox.x + referenceBox.width * 0.6, `${viewport.name} overview panels should stay independent`);
+          assert.ok(statsBox && statsBox.width >= 320, `${viewport.name} stats panel should have a stable readable width`);
         }
+        const statValues = await page.locator('.overview-stats dd').evaluateAll((elements) => elements.map((element) => ({ text: element.textContent, fontSize: Number.parseFloat(getComputedStyle(element).fontSize) })));
+        assert.deepEqual(statValues.map(({ text }) => text), [String(expectedData.countries.length), String(new Set(expectedData.countries.map(({ currency }) => currency)).size), String(expectedData.tiers.length)]);
+        assert.ok(statValues.every(({ fontSize }) => fontSize >= (viewport.width > 900 ? 34 : 24)), `${viewport.name} stats values should remain prominent`);
         assert.equal(await page.locator('#minimumSummary > div').count(), expectedData.tiers.length);
         for (const tier of expectedData.tiers) {
           const lowest = expectedData.countries
