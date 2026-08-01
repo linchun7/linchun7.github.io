@@ -51,9 +51,18 @@
         </dl>
       </div>
       <dl class="overview-stats overview-stat-list" aria-label="数据概览">
-        <div><dt>地区</dt><dd id="marketCount">--</dd></div>
-        <div><dt>币种</dt><dd id="currencyCount">--</dd></div>
-        <div><dt>容量</dt><dd id="tierCount">--</dd></div>
+        <div class="metric-card metric-card--primary">
+          <dt><span class="metric-icon" aria-hidden="true"><i data-lucide="globe-2"></i></span><span>覆盖地区</span></dt>
+          <dd id="marketCount">--</dd>
+        </div>
+        <div class="metric-card">
+          <dt><span class="metric-icon" aria-hidden="true"><i data-lucide="coins"></i></span><span>当地币种</span></dt>
+          <dd id="currencyCount">--</dd>
+        </div>
+        <div class="metric-card">
+          <dt><span class="metric-icon" aria-hidden="true"><i data-lucide="database"></i></span><span>容量方案</span></dt>
+          <dd id="tierCount">--</dd>
+        </div>
       </dl>
     </section>
 
