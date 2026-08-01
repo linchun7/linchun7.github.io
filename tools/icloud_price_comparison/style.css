@@ -109,18 +109,18 @@ a:hover { color: var(--blue); text-decoration: none; }
 }
 
 .overview {
-  min-height: 178px;
+  min-height: 142px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 326px;
+  grid-template-columns: minmax(0, 1fr) 304px;
   align-items: stretch;
-  gap: 40px;
-  padding: 28px 4px 24px;
+  gap: 28px;
+  padding: 20px 4px 18px;
 }
 
-.overview-reference { min-width: 0; padding: 20px 22px; display: flex; flex-direction: column; justify-content: space-between; background: var(--surface); border: 1px solid #d8dde3; border-radius: 8px; box-shadow: var(--shadow); }
+.overview-reference { min-width: 0; padding: 16px 18px; display: flex; flex-direction: column; justify-content: space-between; background: var(--surface); border: 1px solid #d8dde3; border-radius: 8px; box-shadow: var(--shadow); }
 .overview-copy { min-width: 0; }
 .overview-kicker { margin: 0 0 2px; color: var(--blue-dark); font-size: 12px; font-weight: 760; }
-.overview h1 { margin: 0; font-size: 30px; line-height: 1.2; letter-spacing: 0; }
+.overview h1 { margin: 0; font-size: 28px; line-height: 1.15; letter-spacing: 0; }
 .overview-note { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
 
 .overview-stat-list {
@@ -133,15 +133,14 @@ a:hover { color: var(--blue); text-decoration: none; }
 .overview-stat-list div { min-width: 118px; padding: 2px 26px; border-right: 1px solid var(--border); }
 .overview-stat-list div:last-child { border-right: 0; }
 .overview-stat-list dt { color: var(--muted); font-size: 13px; }
-.overview-stats { align-self: stretch; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 16px 12px; background: var(--surface); border: 1px solid #d8dde3; border-radius: 8px; box-shadow: var(--shadow); }
+.overview-stats { align-self: center; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 10px 8px; background: #f8fafc; border: 1px solid #d8dde3; border-radius: 8px; box-shadow: none; }
 .overview-stats div { min-width: 0; padding: 12px 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
 .overview-stats div + div { border-left: 1px solid var(--border); }
 .overview-stats dt { font-size: 13px; line-height: 1.2; }
-.overview-stats dd { margin-top: 8px; font-size: 38px; line-height: 1; }
-.minimum-stats { grid-template-columns: repeat(5, minmax(100px, 1fr)); border-left: 0; padding-top: 0; margin-top: 22px; }
-.minimum-stats div { min-width: 0; padding: 0 14px 0 0; border-right: 0; }
-.minimum-tier-label { width: fit-content; max-width: 100%; min-height: 22px; padding: 3px 7px; display: inline-flex; align-items: center; gap: 4px; overflow: hidden; color: var(--blue-dark); background: #edf6ff; border: 1px solid #cfe5fb; border-radius: 5px; font-size: 11px; font-weight: 750; line-height: 1; text-overflow: ellipsis; white-space: nowrap; }
-.minimum-tier-label svg { width: 12px; height: 12px; flex: 0 0 12px; stroke-width: 2; }
+.overview-stats dd { margin-top: 6px; font-size: 34px; line-height: 1; }
+.minimum-stats { grid-template-columns: repeat(5, minmax(100px, 1fr)); border-left: 0; padding-top: 0; margin-top: 16px; }
+.minimum-stats div { position: relative; min-width: 0; padding: 18px 14px 0 0; border-right: 0; }
+.minimum-tier-label { position: absolute; top: 0; left: 0; max-width: calc(100% - 14px); padding: 2px 6px; overflow: hidden; color: var(--blue-dark); background: #edf6ff; border: 1px solid #cfe5fb; border-radius: 4px; font-size: 10px; font-weight: 750; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
 .minimum-country { display: block; overflow: hidden; margin-top: 2px; color: var(--text); font-size: 20px; font-weight: 760; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
 .minimum-stats dd { margin: 4px 0 0; color: var(--blue-dark); font-size: 17px; font-weight: 780; line-height: 1; }
 
@@ -368,8 +367,7 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--blue-dark);
   .overview h1 { font-size: 23px; }
   .minimum-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 0; margin-top: 16px; }
   .minimum-stats div { padding-right: 10px; border-right: 0; }
-  .minimum-tier-label { min-height: 20px; padding: 2px 6px; font-size: 10px; }
-  .minimum-tier-label svg { width: 11px; height: 11px; flex-basis: 11px; }
+  .minimum-tier-label { max-width: calc(100% - 10px); padding: 2px 5px; font-size: 10px; }
   .minimum-country { font-size: 16px; }
   .minimum-stats dd { font-size: 15px; }
   .overview-stats { padding: 10px 4px; }
