@@ -81,6 +81,7 @@ test('renders current prices, sorting, and country history in a real browser', {
       { name: 'narrow-mobile', width: 320, height: 720 }
     ]) {
       const page = await browser.newPage({ viewport: { width: viewport.width, height: viewport.height } });
+      if (viewport.name === 'narrow-mobile') await page.emulateMedia({ reducedMotion: 'reduce' });
       const errors = [];
       page.on('pageerror', (error) => errors.push(error.message));
       page.on('console', (message) => {
@@ -113,6 +114,9 @@ test('renders current prices, sorting, and country history in a real browser', {
         assert.equal(await page.locator('.workspace').getAttribute('aria-busy'), 'true');
         assert.equal(await page.locator('#searchInput').isDisabled(), true);
         assert.equal(await page.locator('#regionSelect').isDisabled(), true);
+        if (viewport.name === 'narrow-mobile') {
+          assert.equal(await page.locator('.spinner').first().evaluate((element) => getComputedStyle(element).animationName), 'none');
+        }
         if (viewport.name === 'desktop') {
           await page.waitForTimeout(1_600);
           assert.match(await page.locator('#loadStatusText').textContent(), /网络较慢，仍在加载/);
@@ -176,6 +180,22 @@ test('renders current prices, sorting, and country history in a real browser', {
         assert.ok(minimumCountrySize > minimumPriceSize, 'minimum country should be the visual focus');
         assert.equal(await page.locator('#minimumSummary .minimum-tier-label').count(), expectedData.tiers.length);
         assert.equal(await page.locator('#minimumSummary .minimum-tier-label svg').count(), 0);
+        if (viewport.name === 'tablet') {
+          const countryVisibility = await page.evaluate(() => {
+            const scroller = document.querySelector('.table-scroll').getBoundingClientRect();
+            const countryHeader = document.querySelector('.price-table th:nth-child(2)').getBoundingClientRect();
+            return { scrollerLeft: scroller.left, scrollerRight: scroller.right, countryLeft: countryHeader.left, countryRight: countryHeader.right };
+          });
+          assert.ok(countryVisibility.countryLeft >= countryVisibility.scrollerLeft - 1, 'tablet country column must not be shifted off-screen');
+          assert.ok(countryVisibility.countryRight <= countryVisibility.scrollerRight + 1, 'tablet country column must remain visible inside the table scroller');
+        }
+        if (viewport.name === 'narrow-mobile') {
+          const metricLabels = await page.locator('.overview-stats dt > span:last-child').evaluateAll((labels) => labels.map((label) => ({
+            height: label.getBoundingClientRect().height,
+            lineHeight: Number.parseFloat(getComputedStyle(label).lineHeight)
+          })));
+          assert.ok(metricLabels.every(({ height, lineHeight }) => height <= lineHeight * 1.2), '320px metric labels must stay on one line');
+        }
         const minimumBadges = page.locator('.price-cell.is-minimum .minimum-badge');
         assert.ok(await minimumBadges.count() >= expectedData.tiers.length, 'each tier should expose at least one minimum-price badge');
         const minimumBadgePosition = await minimumBadges.first().evaluate((badge) => ({
@@ -200,6 +220,9 @@ test('renders current prices, sorting, and country history in a real browser', {
           viewportWidth: document.documentElement.clientWidth
         }));
         assert.ok(layout.documentWidth <= layout.viewportWidth + 1, `${viewport.name} page has unexpected body overflow`);
+        if (process.env.SCREENSHOT_DIR) {
+          await page.screenshot({ path: path.join(process.env.SCREENSHOT_DIR, `${viewport.name}.png`) });
+        }
 
         const firstCountry = expectedData.countries[0].country;
         await page.locator('#searchInput').fill(firstCountry);
@@ -224,8 +247,25 @@ test('renders current prices, sorting, and country history in a real browser', {
         const historySearch = historyCountry ?? firstCountry;
         await page.locator('#searchInput').fill(historySearch);
         await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length === 1);
-        await page.locator('#priceRows tr[data-country]').first().click();
+        const historyRow = page.locator('#priceRows tr[data-country]').first();
+        if (viewport.name === 'desktop') {
+          await page.evaluate(() => {
+            document.body.tabIndex = -1;
+            document.body.focus();
+            document.body.removeAttribute('tabindex');
+          });
+          await page.keyboard.press('Tab');
+          assert.equal(await page.locator('.skip-link').evaluate((element) => document.activeElement === element), true, 'skip link must be the first keyboard stop');
+          await page.keyboard.press('Enter');
+          assert.equal(await page.locator('#priceWorkspace').evaluate((element) => document.activeElement === element), true, 'skip link must move focus to the price workspace');
+          await historyRow.focus();
+          await page.keyboard.press('Enter');
+        } else {
+          await historyRow.click();
+        }
         await page.waitForFunction(() => document.querySelector('#historyDialog')?.open === true);
+        const expectedDialogName = expectedData.countries.find(({ country }) => country === historySearch)?.nameZh || historySearch;
+        assert.equal(await page.getByRole('dialog', { name: expectedDialogName }).count(), 1, 'history dialog must have an accessible name');
         assert.ok(await page.locator('#historyRows tr').count() > 0);
         assert.equal(await page.locator('#historyTierControl button').count(), expectedData.tiers.length);
         if (historyCountry) {
@@ -252,18 +292,20 @@ test('renders current prices, sorting, and country history in a real browser', {
           });
           assert.ok(chartPixels > 0, `${viewport.name} chart canvas is blank`);
         }
-        await page.locator('#closeHistory').click();
+        if (viewport.name === 'desktop') await page.keyboard.press('Escape');
+        else await page.locator('#closeHistory').click();
         await page.waitForFunction(() => document.querySelector('#historyDialog')?.open === false);
+        if (viewport.name === 'desktop') {
+          assert.equal(await historyRow.evaluate((element) => document.activeElement === element), true, 'closing history with Escape must restore row focus');
+        }
 
         await page.locator('#publishedDateButton').click();
         await page.waitForFunction(() => document.querySelector('#publishedDateDialog')?.open === true);
+        assert.equal(await page.getByRole('dialog', { name: '发布日期变更' }).count(), 1, 'publication-date dialog must have an accessible name');
         assert.ok(await page.locator('#publishedDateRows tr').count() > 0);
         await page.locator('#closePublishedDate').click();
         await page.waitForFunction(() => document.querySelector('#publishedDateDialog')?.open === false);
 
-        if (process.env.SCREENSHOT_DIR) {
-          await page.screenshot({ path: path.join(process.env.SCREENSHOT_DIR, `${viewport.name}.png`), fullPage: true });
-        }
         assert.deepEqual(errors, []);
       } finally {
         releasePriceRequest?.();
@@ -316,7 +358,7 @@ test('shows an actionable error and recovers after a temporary price-data outage
   }
 });
 
-test('keeps current prices usable when optional history data is unavailable', { timeout: 30_000 }, async (context) => {
+test('keeps current prices usable when optional history data is unavailable or malformed', { timeout: 30_000 }, async (context) => {
   const chromePath = await findChrome();
   if (!chromePath) {
     if (process.env.CI) assert.fail('Chrome or Chromium is required for the history fallback test');
@@ -327,18 +369,159 @@ test('keeps current prices usable when optional history data is unavailable', { 
   const { port } = server.address();
   const browser = await chromium.launch({ executablePath: chromePath, headless: true });
   try {
-    const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-    await page.route('https://**/*', (route) => route.abort());
-    await page.route('**/data/history.json*', (route) => route.fulfill({
-      status: 503,
-      contentType: 'application/json',
-      body: '{"error":"history temporarily unavailable"}'
-    }));
-    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length === 73);
-    assert.equal(await page.locator('#loadStatus').isVisible(), false);
-    assert.equal(await page.locator('#marketCount').textContent(), '73');
-    assert.equal(await page.locator('#publishedDateButton').isVisible(), true);
+    const scenarios = [
+      { status: 503, body: '{"error":"history temporarily unavailable"}' },
+      {
+        status: 200,
+        body: JSON.stringify({
+          schemaVersion: 2,
+          countries: {},
+          sourcePublishedDates: [{
+            publishedDate: 'July 17, 2026',
+            observedAt: '2026-08-01',
+            kind: 'change',
+            changes: { addedCountries: 'not-an-array' }
+          }]
+        })
+      }
+    ];
+    for (const scenario of scenarios) {
+      const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+      await page.route('https://**/*', (route) => route.abort());
+      await page.route('**/data/history.json*', (route) => route.fulfill({
+        status: scenario.status,
+        contentType: 'application/json',
+        body: scenario.body
+      }));
+      try {
+        await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+        await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length === 73);
+        assert.equal(await page.locator('#loadStatus').isVisible(), false);
+        assert.equal(await page.locator('#marketCount').textContent(), '73');
+        assert.equal(await page.locator('#publishedDateButton').isVisible(), true);
+      } finally {
+        await page.close();
+      }
+    }
+  } finally {
+    await browser.close();
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test('rejects malformed price payloads and recovers without a full-page refresh', { timeout: 30_000 }, async (context) => {
+  const chromePath = await findChrome();
+  if (!chromePath) {
+    if (process.env.CI) assert.fail('Chrome or Chromium is required for the malformed-data UI test');
+    context.skip('Chrome or Chromium is not installed');
+    return;
+  }
+  const validData = JSON.parse(await readFile(path.join(PROJECT_DIR, 'data/prices.json'), 'utf8'));
+  const corruptions = [
+    ['duplicate country', (data) => data.countries.push(structuredClone(data.countries[0]))],
+    ['invalid USD anchor', (data) => { data.fx.rates.USD = 2; }],
+    ['invalid generated timestamp', (data) => { data.generatedAt = '2026-02-30T00:00:00.000Z'; }],
+    ['invalid FX timestamp', (data) => { data.fx.fetchedAt = '2026-02-30'; }],
+    ['invalid Apple publication date', (data) => { data.source.publishedDate = 'February 30, 2026'; }],
+    ['missing region', (data) => { data.countries[0].region = ''; }],
+    ['empty formatted price', (data) => { data.countries[0].plans[data.tiers[0].id].formattedPrice = '   '; }]
+  ];
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await chromium.launch({ executablePath: chromePath, headless: true });
+  try {
+    for (const [label, corrupt] of corruptions) {
+      const page = await browser.newPage({ viewport: { width: 1365, height: 900 } });
+      let serveValidData = false;
+      const malformed = structuredClone(validData);
+      corrupt(malformed);
+      await page.route('https://**/*', (route) => route.abort());
+      await page.route('**/data/prices.json*', (route) => {
+        if (serveValidData) return route.continue();
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(malformed) });
+      });
+      try {
+        await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+        await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
+        assert.match(await page.locator('#loadStatusText').textContent(), /加载失败/, label);
+        assert.equal(await page.locator('#searchInput').isDisabled(), true, label);
+        serveValidData = true;
+        await page.locator('#retryButton').click();
+        await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, validData.countries.length);
+        assert.equal(await page.locator('#loadStatus').isVisible(), false, `${label} should recover after retry`);
+      } finally {
+        await page.close();
+      }
+    }
+  } finally {
+    await browser.close();
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test('marks stale data clearly and falls back from an invalid tier query', { timeout: 30_000 }, async (context) => {
+  const chromePath = await findChrome();
+  if (!chromePath) {
+    if (process.env.CI) assert.fail('Chrome or Chromium is required for the stale-data UI test');
+    context.skip('Chrome or Chromium is not installed');
+    return;
+  }
+  const validData = JSON.parse(await readFile(path.join(PROJECT_DIR, 'data/prices.json'), 'utf8'));
+  const scenarios = [
+    {
+      label: 'old snapshot',
+      mutate: (data) => { data.generatedAt = '2020-01-01T00:00:00.000Z'; data.fx.stale = false; },
+      expected: /超过 36 小时/
+    },
+    {
+      label: 'fallback rates',
+      mutate: (data) => { data.generatedAt = new Date().toISOString(); data.fx.stale = true; },
+      expected: /汇率沿用上次成功结果/
+    },
+    {
+      label: 'old snapshot with fallback rates',
+      mutate: (data) => { data.generatedAt = '2020-01-01T00:00:00.000Z'; data.fx.stale = true; },
+      expected: /超过 36 小时 · 汇率沿用上次成功结果/
+    }
+  ];
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await chromium.launch({ executablePath: chromePath, headless: true });
+  try {
+    for (const { label, mutate, expected } of scenarios) {
+      const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+      const payload = structuredClone(validData);
+      mutate(payload);
+      await page.route('https://**/*', (route) => route.abort());
+      await page.route('**/data/prices.json*', (route) => route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(payload)
+      }));
+      try {
+        await page.goto(`http://127.0.0.1:${port}/?tier=not-a-real-tier`, { waitUntil: 'domcontentloaded' });
+        await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, validData.countries.length);
+        assert.match(await page.locator('#updatedAt').textContent(), expected, label);
+        assert.equal(await page.locator('.data-status').evaluate((element) => element.classList.contains('is-stale')), true, label);
+        const statusLayout = await page.evaluate(() => {
+          const rect = document.querySelector('.data-status').getBoundingClientRect();
+          return {
+            right: rect.right,
+            viewportWidth: document.documentElement.clientWidth,
+            documentWidth: document.documentElement.scrollWidth
+          };
+        });
+        assert.ok(statusLayout.right <= statusLayout.viewportWidth + 1, `${label} status text must stay inside the viewport`);
+        assert.ok(statusLayout.documentWidth <= statusLayout.viewportWidth + 1, `${label} must not create page-level horizontal overflow`);
+        assert.equal(await page.locator('button[data-sort-tier="200GB"]').locator('xpath=ancestor::th').getAttribute('aria-sort'), 'ascending');
+        assert.match(await page.locator('#resultSummary').textContent(), /200 GB/);
+        if (process.env.SCREENSHOT_DIR && label === 'old snapshot with fallback rates') {
+          await page.screenshot({ path: path.join(process.env.SCREENSHOT_DIR, 'stale-combined.png') });
+        }
+      } finally {
+        await page.close();
+      }
+    }
   } finally {
     await browser.close();
     await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
