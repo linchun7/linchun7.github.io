@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="format-detection" content="telephone=no">
+  <meta name="theme-color" content="#ffffff">
   <meta name="description" content="比较全球不同国家和地区的 iCloud+ 月度价格，支持人民币换算、容量排序和历史价格查询。">
   <meta name="keywords" content="iCloud+,Apple,云存储,全球价格,价格历史,汇率换算">
   <meta property="og:title" content="iCloud+ 全球价格对比">
@@ -23,6 +24,7 @@
   </script>
 </head>
 <body>
+  <a class="skip-link" href="#priceWorkspace">跳到价格表</a>
   <header class="app-header">
     <div class="app-header-inner">
       <div class="app-brand">
@@ -66,22 +68,27 @@
       </dl>
     </section>
 
-    <section class="workspace" aria-label="全球各地区 iCloud+ 价格">
+    <section id="priceWorkspace" class="workspace" aria-label="全球各地区 iCloud+ 价格" aria-busy="true">
       <div class="workspace-toolbar">
         <div class="workspace-heading">
           <h2>各地区 iCloud+ 价格</h2>
-          <p id="resultSummary" aria-live="polite">正在读取排序方式...</p>
+          <p id="resultSummary" aria-live="polite">等待价格数据</p>
+        </div>
+        <div id="loadStatus" class="load-status" role="status" aria-live="polite">
+          <span class="spinner" aria-hidden="true"></span>
+          <span id="loadStatusText">正在加载价格数据，请稍候…</span>
+          <button id="retryButton" type="button" hidden>重新加载</button>
         </div>
         <div class="filters">
           <label class="search-field">
             <i data-lucide="search" aria-hidden="true"></i>
             <span class="visually-hidden">搜索国家、地区或币种</span>
-            <input id="searchInput" type="search" placeholder="搜索国家、地区或币种" autocomplete="off">
+            <input id="searchInput" name="price-search" type="search" placeholder="搜索国家、地区或币种…" autocomplete="off" disabled>
           </label>
           <label class="select-field">
             <i data-lucide="globe-2" aria-hidden="true"></i>
             <span class="visually-hidden">筛选地区</span>
-            <select id="regionSelect" aria-label="筛选地区">
+            <select id="regionSelect" name="region" aria-label="筛选地区" disabled>
               <option value="all">所有地区</option>
             </select>
           </label>
@@ -98,7 +105,7 @@
             </tr>
           </thead>
           <tbody id="priceRows">
-            <tr><td class="loading-cell" colspan="7"><span class="spinner"></span>正在加载</td></tr>
+            <tr><td class="loading-cell" colspan="7"><span class="spinner"></span>正在加载…</td></tr>
           </tbody>
         </table>
       </div>
