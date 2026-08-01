@@ -68,7 +68,7 @@
       </dl>
     </section>
 
-    <section id="priceWorkspace" class="workspace" aria-label="全球各地区 iCloud+ 价格" aria-busy="true">
+    <section id="priceWorkspace" class="workspace" aria-label="全球各地区 iCloud+ 价格" aria-busy="true" tabindex="-1">
       <div class="workspace-toolbar">
         <div class="workspace-heading">
           <h2>各地区 iCloud+ 价格</h2>
@@ -131,7 +131,7 @@
     </section>
   </main>
 
-  <dialog id="historyDialog" class="history-dialog">
+  <dialog id="historyDialog" class="history-dialog" aria-labelledby="historyTitle">
     <div class="dialog-header">
       <div>
         <p class="dialog-eyebrow">价格历史</p>
@@ -169,11 +169,11 @@
     </section>
   </dialog>
 
-  <dialog id="publishedDateDialog" class="history-dialog source-history-dialog">
+  <dialog id="publishedDateDialog" class="history-dialog source-history-dialog" aria-labelledby="publishedDateDialogTitle">
     <div class="dialog-header">
       <div>
         <p class="dialog-eyebrow">Apple 页面记录</p>
-        <h2>发布日期变更</h2>
+        <h2 id="publishedDateDialogTitle">发布日期变更</h2>
         <p>仅在 Apple Support 页面发布日期发生变化时记录。</p>
       </div>
       <button class="icon-button" id="closePublishedDate" type="button" aria-label="关闭发布日期记录" title="关闭"><i data-lucide="x"></i></button>
