@@ -142,14 +142,18 @@ export async function getExchangeRates(previousData, {
       }
       const fallbackUsed = Boolean(normalizedApiKey && source.sourceMode === 'open-access');
       const fallbackReason = fallbackUsed ? failures[0]?.reason ?? 'request-failed' : null;
+      const apiKeyStatus = normalizedApiKey
+        ? (source.sourceMode === 'api-key' ? 'valid' : fallbackReason)
+        : 'not-configured';
       if (fallbackUsed) {
-        console.warn(`Authenticated exchange-rate source unavailable (${fallbackReason}); using open-access fallback.`);
+        console.info(`汇率 Key 接口不可用（${describeExchangeRateFallback(fallbackReason)}），已使用开放接口。`);
       }
       return {
         sourceUrl: source.url,
         sourceMode: source.sourceMode,
         fallbackUsed,
         fallbackReason,
+        apiKeyStatus,
         base: 'USD',
         fetchedAt: parsed.fetchedAt,
         stale: false,
@@ -175,7 +179,8 @@ export async function getExchangeRates(previousData, {
     ...previousData.fx,
     stale: true,
     fallbackUsed: Boolean(normalizedApiKey),
-    fallbackReason: failures[0]?.reason ?? 'request-failed'
+    fallbackReason: failures[0]?.reason ?? 'request-failed',
+    apiKeyStatus: normalizedApiKey ? failures[0]?.reason ?? 'request-failed' : 'not-configured'
   };
 }
 
@@ -402,7 +407,8 @@ export function createRunLogEntry(data, summary, startedAt, finishedAt) {
       exchangeRatesStale: Boolean(data.fx.stale),
       exchangeRatesSourceMode: data.fx.sourceMode ?? null,
       exchangeRatesFallbackUsed: Boolean(data.fx.fallbackUsed),
-      exchangeRatesFallbackReason: data.fx.fallbackReason ?? null
+      exchangeRatesFallbackReason: data.fx.fallbackReason ?? null,
+      exchangeRatesApiKeyStatus: data.fx.apiKeyStatus ?? null
     },
     counts: {
       countries: data.countries.length,
@@ -499,6 +505,16 @@ function describeExchangeRateFallback(reason) {
   return labels[reason] ?? '主接口不可用';
 }
 
+function describeExchangeRateAuthentication(fx) {
+  if (fx.apiKeyStatus === 'valid') return 'API Key 有效';
+  if (fx.apiKeyStatus === 'not-configured') {
+    return fx.stale ? '未配置 API Key，开放接口失败' : '未配置 API Key，使用开放接口';
+  }
+  return fx.stale
+    ? `${describeExchangeRateFallback(fx.apiKeyStatus)}，开放接口也不可用`
+    : `${describeExchangeRateFallback(fx.apiKeyStatus)}，使用开放接口`;
+}
+
 export function buildActionSummaryLines(data, summary, trigger = process.env.GITHUB_EVENT_NAME ?? 'unknown') {
   const publicationChanges = summary.publicationChanges ?? {
     addedTiers: [], removedTiers: [], addedCountries: [], removedCountries: [], changedCountries: []
@@ -533,7 +549,6 @@ export function buildActionSummaryLines(data, summary, trigger = process.env.GIT
 
   if (data.source.parser !== 'cross-checked') warnings.push(`- **解析降级**：${describeParser(data)}`);
   if (data.fx.stale) warnings.push('- **汇率降级**：本次获取失败，沿用上次成功结果');
-  else if (data.fx.fallbackUsed) warnings.push(`- **汇率来源回退**：${describeExchangeRateFallback(data.fx.fallbackReason)}，已改用开放接口`);
   if (summary.missingRates.length) warnings.push(`- **缺少汇率**：${summary.missingRates.join('、')}`);
 
   const lines = [
@@ -554,6 +569,7 @@ export function buildActionSummaryLines(data, summary, trigger = process.env.GIT
     '### 校验与来源',
     `- Apple 解析路径：${describeParser(data)}`,
     `- 汇率来源：${describeExchangeRateSource(data.fx)}`,
+    `- 汇率认证：${describeExchangeRateAuthentication(data.fx)}`,
     `- 汇率更新时间（北京时间）：${formatBeijingDateTime(data.fx.fetchedAt)}`,
     `- 汇率状态：${data.fx.stale ? '沿用上次成功结果' : '本次成功获取'}`,
     '',
@@ -618,8 +634,11 @@ export async function main({ dryRun = DRY_RUN } = {}) {
   const fx = await getExchangeRates(previousData, {
     requiredCurrencies: [...new Set(countries.map(({ currency }) => currency))]
   });
-  if (process.env.GITHUB_ACTIONS === 'true' && fx.fallbackUsed && !fx.stale) {
-    console.log(`::warning title=汇率来源已回退::${githubAnnotationValue(`${describeExchangeRateFallback(fx.fallbackReason)}，已改用开放接口。`)}`);
+  if (process.env.GITHUB_ACTIONS === 'true' && fx.apiKeyStatus === 'not-configured') {
+    console.log('::notice title=未配置汇率 API Key::已直接使用开放接口，价格更新继续执行。');
+  } else if (process.env.GITHUB_ACTIONS === 'true' && fx.apiKeyStatus !== 'valid') {
+    const handling = fx.stale ? '已沿用上一份有效汇率' : '已使用开放接口';
+    console.log(`::notice title=汇率 API Key 未生效::${githubAnnotationValue(`${describeExchangeRateFallback(fx.apiKeyStatus)}，${handling}。`)}`);
   }
   if (process.env.GITHUB_ACTIONS === 'true' && fx.stale) {
     console.log('::warning title=汇率更新失败::两个在线汇率来源均不可用，已沿用上一份有效汇率。');
