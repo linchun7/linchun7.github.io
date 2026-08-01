@@ -2,7 +2,8 @@ name: Update iCloud prices
 
 on:
   schedule:
-    - cron: '57 9 * * *'
+    # 北京时间 07:52，避开整点和半点高峰。
+    - cron: '52 23 * * *'
   workflow_dispatch:
 
 permissions:

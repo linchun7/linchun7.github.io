@@ -35,6 +35,10 @@ function cleanText(value) {
   return value.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+function cleanPublishedDate(value) {
+  return cleanText(value).replace(/^published\s+date\s*:?\s*/i, '');
+}
+
 function headingText($, heading) {
   const $heading = $(heading).clone();
   $heading.find('sup').remove();
@@ -101,11 +105,12 @@ function isPriceList($, node) {
 }
 
 function extractPublishedDate($) {
+  // Accept Apple publication dates with or without a <time> element.
   const publishedTime = $('time').toArray().reverse().find((node) => (
     /published\s+date/i.test(cleanText($(node).parent().text()))
   ));
   if (publishedTime) {
-    return cleanText($(publishedTime).text()) || cleanText($(publishedTime).attr('datetime') ?? '');
+    return cleanPublishedDate($(publishedTime).text()) || cleanPublishedDate($(publishedTime).attr('datetime') ?? '');
   }
 
   const pageText = cleanText($.root().text());
