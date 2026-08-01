@@ -12,8 +12,8 @@
   --accent: #1168d4;
   --accent-dark: #0755b5;
   --accent-soft: #eaf3ff;
-  --green: #14764f;
-  --green-soft: #e9f7f0;
+  --green: #087a45;
+  --green-soft: #effaf4;
   --amber: #966000;
   --danger: #b93632;
   --shadow: 0 8px 24px rgba(24, 43, 61, 0.06);
@@ -223,14 +223,10 @@ a:hover { color: var(--accent); }
 }
 
 .overview-stats div:hover { background: var(--surface-soft); border-color: var(--line-strong); transform: translateY(-1px); }
-.overview-stats .metric-card--primary { background: var(--surface-blue); border-color: #cfe2fa; }
-.overview-stats .metric-card--primary:hover { background: #eaf3ff; border-color: #b9d4f4; }
 .overview-stats dt { min-width: 0; display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; line-height: 1.2; }
 .metric-icon { width: 28px; height: 28px; flex: 0 0 28px; display: grid; place-items: center; color: #7a8793; background: #eef2f5; border-radius: 50%; }
 .metric-icon svg { width: 15px; height: 15px; }
-.metric-card--primary .metric-icon { color: var(--accent); background: #dcecff; }
 .overview-stats dd { margin: 12px 0 0; color: var(--ink); font-size: 29px; font-weight: 720; line-height: 1; font-variant-numeric: tabular-nums; }
-.overview-stats .metric-card--primary dd { color: var(--accent-dark); font-size: 34px; }
 
 .workspace {
   overflow: hidden;
@@ -333,10 +329,12 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--accent-dark
 .price-cell { font-variant-numeric: tabular-nums; }
 .price-cell.is-sorted { background: #f5faff; box-shadow: inset 1px 0 #e3eef9, inset -1px 0 #e3eef9; }
 .price-table tbody tr[data-country]:hover .price-cell.is-sorted { background: #edf6ff; }
-.price-cny { display: flex; align-items: baseline; justify-content: flex-end; gap: 3px; color: var(--ink); font-size: 15px; font-weight: 740; line-height: 1.2; }
+.price-table tbody tr[data-country] .price-cell.is-minimum { background: var(--green-soft); box-shadow: inset 1px 0 #d5ecdf, inset -1px 0 #d5ecdf; }
+.price-table tbody tr[data-country]:hover .price-cell.is-minimum { background: #e5f6ed; }
+.price-cny { display: flex; align-items: baseline; justify-content: flex-end; gap: 2px; color: var(--ink); font-size: 15px; font-weight: 740; line-height: 1.2; }
 .price-symbol { color: var(--ink-soft); font-size: 11px; font-weight: 650; }
 .price-local { display: block; margin-top: 3px; overflow: hidden; color: var(--muted); font-size: 10px; line-height: 1.1; text-overflow: ellipsis; }
-.minimum-badge { margin-right: 4px; padding: 1px 4px; color: var(--green); background: var(--green-soft); border: 1px solid #c7e7d7; border-radius: 4px; font-size: 9px; font-weight: 750; line-height: 1.2; }
+.minimum-badge { margin-right: 2px; padding: 2px 6px; color: #fff; background: var(--green); border-radius: 999px; font-size: 9px; font-weight: 760; line-height: 1.15; }
 
 .loading-cell, .empty-cell { height: 230px; text-align: center !important; color: var(--muted); }
 .spinner { width: 16px; height: 16px; margin-right: 8px; display: inline-block; vertical-align: -3px; border: 2px solid #d3dce4; border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
@@ -457,7 +455,6 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--accent-dark
   .metric-icon { width: 24px; height: 24px; flex-basis: 24px; }
   .metric-icon svg { width: 13px; height: 13px; }
   .overview-stats dd { margin-top: 11px; font-size: 24px; }
-  .overview-stats .metric-card--primary dd { font-size: 28px; }
 
   .workspace-toolbar { min-height: 0; padding: 14px 12px; }
   .workspace-heading h2 { font-size: 16px; }
