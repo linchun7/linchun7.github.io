@@ -9,7 +9,8 @@ import {
 } from './parse-prices.mjs';
 
 const APPLE_URL = 'https://support.apple.com/en-us/108047';
-const FX_URL = 'https://open.er-api.com/v6/latest/USD';
+const FX_AUTH_URL = 'https://v6.exchangerate-api.com/v6/latest/USD';
+const FX_OPEN_URL = 'https://open.er-api.com/v6/latest/USD';
 const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CURRENT_DATA_PATH = path.join(PROJECT_DIR, 'data/prices.json');
 const HISTORY_PATH = path.join(PROJECT_DIR, 'data/history.json');
@@ -21,7 +22,12 @@ const DRY_RUN = process.argv.includes('--dry-run');
 let lastAppleHtml = null;
 let runStartedAt = new Date();
 
-async function fetchResource(url, { json = false, attempts = RETRY_DELAYS_MS.length } = {}) {
+async function fetchResource(url, {
+  json = false,
+  attempts = RETRY_DELAYS_MS.length,
+  headers = {},
+  resourceName = url
+} = {}) {
   let lastError;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     const delay = RETRY_DELAYS_MS[attempt - 1] ?? RETRY_DELAYS_MS.at(-1);
@@ -32,7 +38,8 @@ async function fetchResource(url, { json = false, attempts = RETRY_DELAYS_MS.len
           accept: json ? 'application/json' : 'text/html,application/xhtml+xml',
           'accept-language': 'en-US,en;q=0.9',
           'cache-control': attempt === 1 ? 'max-age=0' : 'no-cache',
-          'user-agent': 'Mozilla/5.0 (compatible; iCloud-Price-Comparison/2.0; +https://github.com/linchun7/linchun7.github.io)'
+          'user-agent': 'Mozilla/5.0 (compatible; iCloud-Price-Comparison/2.0; +https://github.com/linchun7/linchun7.github.io)',
+          ...headers
         },
         redirect: 'follow',
         signal: AbortSignal.timeout(45_000)
@@ -45,10 +52,10 @@ async function fetchResource(url, { json = false, attempts = RETRY_DELAYS_MS.len
       return json ? JSON.parse(body) : body;
     } catch (error) {
       lastError = error;
-      console.warn(`Fetch attempt ${attempt}/${attempts} failed for ${url}: ${error.message}`);
+      console.warn(`Fetch attempt ${attempt}/${attempts} failed for ${resourceName}: ${error.message}`);
     }
   }
-  throw new Error(`Failed to fetch ${url}: ${lastError?.message}`);
+  throw new Error(`Failed to fetch ${resourceName}: ${lastError?.message}`);
 }
 
 async function readJson(filePath, fallback = null) {
@@ -60,32 +67,116 @@ async function readJson(filePath, fallback = null) {
   }
 }
 
-export async function getExchangeRates(previousData) {
-  try {
-    const payload = await fetchResource(FX_URL, { json: true, attempts: 3 });
-    if (payload?.result !== 'success'
-      || payload?.base_code !== 'USD'
-      || !Number.isFinite(payload?.time_last_update_unix)
-      || payload.time_last_update_unix <= 0
-      || payload?.rates?.USD !== 1
-      || !Number.isFinite(payload?.rates?.CNY)
-      || payload.rates.CNY <= 0) {
-      throw new Error('Exchange-rate response is missing required fields');
-    }
-    return {
-      sourceUrl: FX_URL,
-      base: 'USD',
-      fetchedAt: new Date(payload.time_last_update_unix * 1000).toISOString(),
-      stale: false,
-      rates: payload.rates
-    };
-  } catch (error) {
-    const previousUsd = previousData?.fx?.rates?.USD;
-    const previousCny = previousData?.fx?.rates?.CNY;
-    if (previousUsd !== 1 || !Number.isFinite(previousCny) || previousCny <= 0) throw error;
-    console.warn(`Exchange-rate update failed; keeping previous rates: ${error.message}`);
-    return { ...previousData.fx, stale: true };
+function exchangeRateError(message, reason = 'invalid-response') {
+  const error = new Error(message);
+  error.fxReason = reason;
+  return error;
+}
+
+function parseExchangeRatePayload(payload, ratesField) {
+  const serviceError = typeof payload?.['error-type'] === 'string' ? payload['error-type'] : null;
+  if (payload?.result !== 'success') {
+    throw exchangeRateError(
+      serviceError ? `Exchange-rate service returned ${serviceError}` : 'Exchange-rate response is missing required fields',
+      serviceError ?? 'invalid-response'
+    );
   }
+  const rates = payload?.[ratesField];
+  if (payload.base_code !== 'USD'
+    || !Number.isFinite(payload.time_last_update_unix)
+    || payload.time_last_update_unix <= 0
+    || rates?.USD !== 1
+    || !Number.isFinite(rates?.CNY)
+    || rates.CNY <= 0) {
+    throw exchangeRateError('Exchange-rate response is missing required fields');
+  }
+  return {
+    fetchedAt: new Date(payload.time_last_update_unix * 1000).toISOString(),
+    rates
+  };
+}
+
+export async function getExchangeRates(previousData, {
+  apiKey = process.env.EXCHANGE_RATE_API_KEY,
+  requiredCurrencies = []
+} = {}) {
+  const normalizedApiKey = typeof apiKey === 'string' ? apiKey.trim() : '';
+  const sources = [];
+  if (normalizedApiKey) {
+    sources.push({
+      url: FX_AUTH_URL,
+      resourceName: 'ExchangeRate-API authenticated endpoint',
+      headers: { authorization: `Bearer ${normalizedApiKey}` },
+      ratesField: 'conversion_rates',
+      sourceMode: 'api-key',
+      attempts: 2
+    });
+  }
+  sources.push({
+    url: FX_OPEN_URL,
+    resourceName: 'ExchangeRate-API open endpoint',
+    headers: {},
+    ratesField: 'rates',
+    sourceMode: 'open-access',
+    attempts: 3
+  });
+
+  const failures = [];
+  for (const source of sources) {
+    try {
+      const payload = await fetchResource(source.url, {
+        json: true,
+        attempts: source.attempts,
+        headers: source.headers,
+        resourceName: source.resourceName
+      });
+      const parsed = parseExchangeRatePayload(payload, source.ratesField);
+      const missingRequiredRates = requiredCurrencies.filter(
+        (currency) => !Number.isFinite(parsed.rates[currency]) || parsed.rates[currency] <= 0
+      );
+      if (missingRequiredRates.length) {
+        throw exchangeRateError(
+          `Exchange rates are missing for: ${missingRequiredRates.join(', ')}`,
+          'missing-rates'
+        );
+      }
+      const fallbackUsed = Boolean(normalizedApiKey && source.sourceMode === 'open-access');
+      const fallbackReason = fallbackUsed ? failures[0]?.reason ?? 'request-failed' : null;
+      if (fallbackUsed) {
+        console.warn(`Authenticated exchange-rate source unavailable (${fallbackReason}); using open-access fallback.`);
+      }
+      return {
+        sourceUrl: source.url,
+        sourceMode: source.sourceMode,
+        fallbackUsed,
+        fallbackReason,
+        base: 'USD',
+        fetchedAt: parsed.fetchedAt,
+        stale: false,
+        rates: parsed.rates
+      };
+    } catch (error) {
+      failures.push({
+        sourceMode: source.sourceMode,
+        reason: error.fxReason ?? 'request-failed',
+        message: error.message
+      });
+    }
+  }
+
+  const previousUsd = previousData?.fx?.rates?.USD;
+  const previousCny = previousData?.fx?.rates?.CNY;
+  const failureMessage = failures.map(({ sourceMode, message }) => `${sourceMode}: ${message}`).join('; ');
+  if (previousUsd !== 1 || !Number.isFinite(previousCny) || previousCny <= 0) {
+    throw new Error(failureMessage || 'Exchange-rate update failed');
+  }
+  console.warn(`Exchange-rate update failed; keeping previous rates: ${failureMessage}`);
+  return {
+    ...previousData.fx,
+    stale: true,
+    fallbackUsed: Boolean(normalizedApiKey),
+    fallbackReason: failures[0]?.reason ?? 'request-failed'
+  };
 }
 
 function formatBeijingDateTime(value) {
@@ -308,7 +399,10 @@ export function createRunLogEntry(data, summary, startedAt, finishedAt) {
       appleParser: data.source.parser ?? null,
       appleParserStatus: data.source.parserStatus ?? null,
       exchangeRatesFetchedAtUtc: data.fx.fetchedAt ?? null,
-      exchangeRatesStale: Boolean(data.fx.stale)
+      exchangeRatesStale: Boolean(data.fx.stale),
+      exchangeRatesSourceMode: data.fx.sourceMode ?? null,
+      exchangeRatesFallbackUsed: Boolean(data.fx.fallbackUsed),
+      exchangeRatesFallbackReason: data.fx.fallbackReason ?? null
     },
     counts: {
       countries: data.countries.length,
@@ -384,6 +478,27 @@ function describeParser(data) {
   return `${parser}（${data.source.parserStatus ?? 'unknown'}）`;
 }
 
+function describeExchangeRateSource(fx) {
+  if (fx.stale) return '上一份有效汇率';
+  if (fx.sourceMode === 'api-key') return 'ExchangeRate-API Key 接口（主来源）';
+  if (fx.fallbackUsed) return 'ExchangeRate-API 开放接口（自动回退）';
+  return 'ExchangeRate-API 开放接口';
+}
+
+function describeExchangeRateFallback(reason) {
+  const labels = {
+    'quota-reached': 'API 额度已用完',
+    'invalid-key': 'API Key 无效',
+    'inactive-account': 'API 账户未激活',
+    'unsupported-code': 'API 不支持请求的币种',
+    'malformed-request': 'API 请求格式无效',
+    'missing-rates': '主接口缺少所需币种',
+    'invalid-response': '主接口响应校验失败',
+    'request-failed': '主接口请求失败'
+  };
+  return labels[reason] ?? '主接口不可用';
+}
+
 export function buildActionSummaryLines(data, summary, trigger = process.env.GITHUB_EVENT_NAME ?? 'unknown') {
   const publicationChanges = summary.publicationChanges ?? {
     addedTiers: [], removedTiers: [], addedCountries: [], removedCountries: [], changedCountries: []
@@ -418,6 +533,7 @@ export function buildActionSummaryLines(data, summary, trigger = process.env.GIT
 
   if (data.source.parser !== 'cross-checked') warnings.push(`- **解析降级**：${describeParser(data)}`);
   if (data.fx.stale) warnings.push('- **汇率降级**：本次获取失败，沿用上次成功结果');
+  else if (data.fx.fallbackUsed) warnings.push(`- **汇率来源回退**：${describeExchangeRateFallback(data.fx.fallbackReason)}，已改用开放接口`);
   if (summary.missingRates.length) warnings.push(`- **缺少汇率**：${summary.missingRates.join('、')}`);
 
   const lines = [
@@ -437,6 +553,7 @@ export function buildActionSummaryLines(data, summary, trigger = process.env.GIT
     '',
     '### 校验与来源',
     `- Apple 解析路径：${describeParser(data)}`,
+    `- 汇率来源：${describeExchangeRateSource(data.fx)}`,
     `- 汇率更新时间（北京时间）：${formatBeijingDateTime(data.fx.fetchedAt)}`,
     `- 汇率状态：${data.fx.stale ? '沿用上次成功结果' : '本次成功获取'}`,
     '',
@@ -498,7 +615,15 @@ export async function main({ dryRun = DRY_RUN } = {}) {
     nameZh: countryNames[country.country] ?? country.country
   }));
 
-  const fx = await getExchangeRates(previousData);
+  const fx = await getExchangeRates(previousData, {
+    requiredCurrencies: [...new Set(countries.map(({ currency }) => currency))]
+  });
+  if (process.env.GITHUB_ACTIONS === 'true' && fx.fallbackUsed && !fx.stale) {
+    console.log(`::warning title=汇率来源已回退::${githubAnnotationValue(`${describeExchangeRateFallback(fx.fallbackReason)}，已改用开放接口。`)}`);
+  }
+  if (process.env.GITHUB_ACTIONS === 'true' && fx.stale) {
+    console.log('::warning title=汇率更新失败::两个在线汇率来源均不可用，已沿用上一份有效汇率。');
+  }
   const missingRates = getMissingExchangeRates(countries, fx.rates);
   if (missingRates.length) {
     throw new Error(`Exchange rates are missing for: ${missingRates.join(', ')}`);
