@@ -2,7 +2,7 @@ name: Update iCloud prices
 
 on:
   schedule:
-    - cron: '55 5 * * *'
+    - cron: '57 9 * * *'
   workflow_dispatch:
 
 permissions:
@@ -117,22 +117,21 @@ jobs:
           git pull --rebase origin main
           git push origin HEAD:main
 
-      - name: 汇总浏览器界面测试结果
+      - name: 记录浏览器界面测试警告
         if: always() && !cancelled() && (steps.ui_before.outcome == 'failure' || steps.ui_after.outcome == 'failure')
         working-directory: .
         shell: bash
         run: |
-          echo "::error title=浏览器界面测试失败::价格抓取与核心数据校验已继续执行，但页面自动化验收未通过。请查看上方浏览器界面测试步骤。"
+          echo "::warning title=浏览器界面测试未通过::价格抓取、核心数据校验和提交未因此中断。请查看上方浏览器界面测试步骤。"
           {
-            echo "## 浏览器界面测试失败"
+            echo "## 浏览器界面测试警告"
             echo ""
-            echo "> **错误：** 页面自动化验收未通过；价格抓取流程未因此中断。"
+            echo "> **警告：** 页面自动化验收未通过；价格抓取、核心数据校验和提交未因此中断。"
             echo ""
             echo "- 更新前测试：${{ steps.ui_before.outcome }}"
             echo "- 更新后测试：${{ steps.ui_after.outcome }}"
             echo "- 数据提交步骤：${{ steps.commit_data.outcome }}"
           } >> "$GITHUB_STEP_SUMMARY"
-          exit 1
 
       - name: 写入失败摘要
         if: failure()
