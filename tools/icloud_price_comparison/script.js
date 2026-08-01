@@ -139,6 +139,46 @@ function formatPublishedDate(value) {
   }).format(date);
 }
 
+function isValidDateOnly(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value ?? '')) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+function isValidIsoTimestamp(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) return false;
+  const date = new Date(value);
+  return !Number.isNaN(date.getTime()) && date.toISOString() === value;
+}
+
+function isValidPublishedDate(value) {
+  if (isValidDateOnly(value)) return true;
+  const match = String(value ?? '').match(/^([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})$/);
+  if (!match) return false;
+  const months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+  const month = months.indexOf(match[1].toLowerCase());
+  if (month < 0) return false;
+  const year = Number(match[3]);
+  const day = Number(match[2]);
+  const date = new Date(Date.UTC(year, month, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month && date.getUTCDate() === day;
+}
+
+function isValidPublicationChanges(changes) {
+  if (changes === undefined || changes === null) return true;
+  if (typeof changes !== 'object' || Array.isArray(changes)) return false;
+  const arrays = ['addedTiers', 'removedTiers', 'addedCountries', 'removedCountries', 'changedCountries'];
+  if (arrays.some((key) => changes[key] !== undefined && !Array.isArray(changes[key]))) return false;
+  const validTier = (tier) => tier && typeof tier.id === 'string' && tier.id.trim();
+  const validCountry = (country) => country && typeof country.country === 'string' && country.country.trim();
+  if ((changes.addedTiers ?? []).some((tier) => !validTier(tier))) return false;
+  if ((changes.removedTiers ?? []).some((tier) => !validTier(tier))) return false;
+  if ((changes.addedCountries ?? []).some((country) => !validCountry(country))) return false;
+  if ((changes.removedCountries ?? []).some((country) => !validCountry(country))) return false;
+  return (changes.changedCountries ?? []).every((country) => validCountry(country)
+    && (country.tiers === undefined || (Array.isArray(country.tiers) && country.tiers.every((tier) => validTier(tier)))));
+}
+
 function validatePayload(fileName, payload) {
   if (fileName === 'history.json') {
     if (![1, 2].includes(payload?.schemaVersion) || !payload.countries || typeof payload.countries !== 'object' || Array.isArray(payload.countries)) {
@@ -147,9 +187,9 @@ function validatePayload(fileName, payload) {
     for (const record of Object.values(payload.countries)) {
       if (!Array.isArray(record?.events) || !record.events.length) throw new Error('价格历史记录不完整');
       for (const event of record.events) {
-        const validEvent = /^\d{4}-\d{2}-\d{2}$/.test(event?.observedAt)
-          && typeof event.currency === 'string'
-          && event.plans && typeof event.plans === 'object'
+        const validEvent = isValidDateOnly(event?.observedAt)
+          && typeof event.currency === 'string' && event.currency.trim()
+          && event.plans && typeof event.plans === 'object' && !Array.isArray(event.plans)
           && Object.values(event.plans).length > 0
           && Object.values(event.plans).every((price) => Number.isFinite(price) && price > 0);
         if (!validEvent) throw new Error('价格历史事件无效');
@@ -158,9 +198,10 @@ function validatePayload(fileName, payload) {
     if (payload.sourcePublishedDates !== undefined
       && (!Array.isArray(payload.sourcePublishedDates)
         || payload.sourcePublishedDates.some((entry) => !entry
-          || typeof entry.publishedDate !== 'string'
-          || typeof entry.observedAt !== 'string'
-          || !/^\d{4}-\d{2}-\d{2}$/.test(entry.observedAt)))) {
+          || !isValidPublishedDate(entry.publishedDate)
+          || !isValidDateOnly(entry.observedAt)
+          || (entry.kind !== undefined && !['initial', 'change'].includes(entry.kind))
+          || !isValidPublicationChanges(entry.changes)))) {
       throw new Error('Apple 发布日期历史结构无效');
     }
     return payload;
@@ -169,7 +210,12 @@ function validatePayload(fileName, payload) {
   if (![1, 2].includes(payload?.schemaVersion)
     || !Array.isArray(payload.tiers)
     || !Array.isArray(payload.countries)
-    || Number.isNaN(Date.parse(payload.generatedAt))
+    || !isValidIsoTimestamp(payload.generatedAt)
+    || !isValidPublishedDate(payload.source?.publishedDate)
+    || payload.fx?.base !== 'USD'
+    || typeof payload.fx?.stale !== 'boolean'
+    || !isValidIsoTimestamp(payload.fx?.fetchedAt)
+    || payload.fx?.rates?.USD !== 1
     || !Number.isFinite(payload.fx?.rates?.CNY)
     || payload.fx.rates.CNY <= 0) {
     throw new Error('价格数据结构无效');
@@ -177,17 +223,27 @@ function validatePayload(fileName, payload) {
   const tierIds = payload.tiers.map(({ id }) => id);
   if (!tierIds.length
     || new Set(tierIds).size !== tierIds.length
-    || payload.tiers.some((tier) => !tier?.id || !tier.label || !Number.isFinite(tier.capacityGb) || tier.capacityGb <= 0)
+    || payload.tiers.some((tier) => typeof tier?.id !== 'string' || !tier.id.trim()
+      || typeof tier.label !== 'string' || !tier.label.trim()
+      || !Number.isFinite(tier.capacityGb) || tier.capacityGb <= 0)
     || !payload.countries.length) {
     throw new Error('价格容量或地区数据不完整');
   }
+  const countryNames = new Set();
   for (const country of payload.countries) {
-    if (!country.country || !country.currency || !country.plans) throw new Error('地区价格数据不完整');
+    if (typeof country?.country !== 'string' || !country.country.trim()
+      || typeof country.region !== 'string' || !country.region.trim()
+      || typeof country.currency !== 'string' || !country.currency.trim()
+      || !country.plans || typeof country.plans !== 'object' || Array.isArray(country.plans)) {
+      throw new Error('地区价格数据不完整');
+    }
+    if (countryNames.has(country.country)) throw new Error(`地区重复：${country.country}`);
+    countryNames.add(country.country);
     const currencyRate = payload.fx.rates[country.currency];
     if (!Number.isFinite(currencyRate) || currencyRate <= 0) throw new Error(`${country.currency} 汇率无效`);
     for (const tierId of tierIds) {
       const plan = country.plans[tierId];
-      if (!plan || !Number.isFinite(plan.price) || plan.price <= 0 || !plan.formattedPrice) {
+      if (!plan || !Number.isFinite(plan.price) || plan.price <= 0 || typeof plan.formattedPrice !== 'string' || !plan.formattedPrice.trim()) {
         throw new Error(`${country.country} 的 ${tierId} 价格无效`);
       }
     }
@@ -839,11 +895,15 @@ async function initialize() {
     elements.updatedAt.textContent = `数据更新时间：${dataUpdatedAt}（北京时间）`;
     elements.fxStatus.textContent = `更新时间：${fxUpdatedAt}（北京时间）`;
     const priceAgeHours = (Date.now() - new Date(state.data.generatedAt).getTime()) / 3_600_000;
-    if (state.data.fx.stale || priceAgeHours > 36) {
+    const freshnessWarnings = [];
+    if (priceAgeHours > 36) freshnessWarnings.push('超过 36 小时');
+    if (state.data.fx.stale) freshnessWarnings.push('汇率沿用上次成功结果');
+    if (freshnessWarnings.length) {
       elements.dataStatus.classList.add('is-stale');
-      elements.updatedAt.textContent = priceAgeHours > 36
-        ? `数据更新时间：${dataUpdatedAt}（北京时间） · 超过 36 小时`
-        : `数据更新时间：${dataUpdatedAt}（北京时间） · 汇率沿用上次成功结果`;
+      const warning = document.createElement('span');
+      warning.className = 'freshness-warning';
+      warning.textContent = freshnessWarnings.join(' · ');
+      elements.updatedAt.append(warning);
     }
     renderSortHeaders();
     renderMinimumSummary();
