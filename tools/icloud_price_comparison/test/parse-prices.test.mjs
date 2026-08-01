@@ -25,6 +25,25 @@ test('parses footnotes, currencies, and all storage tiers', async () => {
   assert.equal(validatePrices(result.countries, { minCountries: 5 }), true);
 });
 
+test('parses decimal commas and common thousands separators without changing scale', async () => {
+  const fixture = await readFile(fixtureUrl, 'utf8');
+  const cases = [
+    { markup: '$2,99', expected: 2.99 },
+    { markup: '$1,234.56', expected: 1234.56 },
+    { markup: '$1.234,56', expected: 1234.56 },
+    { markup: '$1,234', expected: 1234 },
+    { markup: "$1'234.56", expected: 1234.56 },
+    { markup: '$1’234,56', expected: 1234.56 }
+  ];
+
+  for (const { markup, expected } of cases) {
+    const adjusted = fixture.replace('$2.99', markup);
+    const parsed = parseApplePrices(adjusted);
+    assert.equal(parsed.parser, 'cross-checked');
+    assert.equal(parsed.countries[0].plans['200GB'].price, expected, markup);
+  }
+});
+
 test('discovers a newly published storage tier from Apple markup', async () => {
   const fixture = await readFile(fixtureUrl, 'utf8');
   const expanded = parseApplePrices(fixture.replaceAll('</ul>', '<li>1 TB: $5.99</li></ul>'));

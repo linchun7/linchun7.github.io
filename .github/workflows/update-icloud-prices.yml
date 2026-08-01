@@ -74,8 +74,13 @@ jobs:
 
       - name: 验证更新后的页面
         id: ui_after
-        continue-on-error: true
-        run: pnpm test:ui
+        shell: bash
+        run: |
+          if pnpm test:ui; then
+            echo "ui_failed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ui_failed=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: 上传诊断信息和 Apple 页面快照
         if: always()
@@ -113,7 +118,7 @@ jobs:
           git push origin HEAD:main
 
       - name: 记录浏览器界面测试警告
-        if: always() && !cancelled() && steps.ui_after.outcome == 'failure'
+        if: always() && !cancelled() && steps.ui_after.outputs.ui_failed == 'true'
         working-directory: .
         shell: bash
         run: |
@@ -123,7 +128,7 @@ jobs:
             echo ""
             echo "> **警告：** 页面自动化验收未通过；价格抓取、核心数据校验和提交未因此中断。"
             echo ""
-            echo "- 更新后测试：${{ steps.ui_after.outcome }}"
+            echo "- 更新后测试：未通过（已按非阻断警告处理）"
             echo "- 数据提交步骤：${{ steps.commit_data.outcome }}"
           } >> "$GITHUB_STEP_SUMMARY"
 

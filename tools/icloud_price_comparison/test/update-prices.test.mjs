@@ -7,6 +7,7 @@ import {
   buildActionSummaryLines,
   createRunLogEntry,
   getExchangeRates,
+  main,
   publicationDateKey,
   updateHistory,
   updatePublishedDateHistory
@@ -16,6 +17,57 @@ const TIER_50 = { id: '50GB', label: '50 GB', capacityGb: 50 };
 const TIER_200 = { id: '200GB', label: '200 GB', capacityGb: 200 };
 const TIER_1TB = { id: '1TB', label: '1 TB', capacityGb: 1024 };
 const updaterUrl = new URL('../scripts/update-prices.mjs', import.meta.url);
+const pricesUrl = new URL('../data/prices.json', import.meta.url);
+const historyUrl = new URL('../data/history.json', import.meta.url);
+const runLogUrl = new URL('../data/run-log.json', import.meta.url);
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
+}
+
+function buildAppleHtml(data, publishedDate = data.source.publishedDate) {
+  const sections = [
+    ['nasalac', 'Americas'],
+    ['emea', 'Europe, Middle East & Africa'],
+    ['ap', 'Asia Pacific']
+  ];
+  const sectionHtml = sections.map(([sectionId, region]) => {
+    const countries = data.countries.filter((entry) => entry.region === region).map((entry) => [
+      `<h4 class="gb-header">${escapeHtml(entry.country)} (${escapeHtml(entry.currency)})</h4>`,
+      '<ul>',
+      ...data.tiers.map((tier) => `<li><strong>${escapeHtml(tier.label)}</strong>: ${escapeHtml(entry.plans[tier.id].formattedPrice)}</li>`),
+      '</ul>'
+    ].join('')).join('');
+    return `<h3 id="${sectionId}">${escapeHtml(region)}</h3>${countries}`;
+  }).join('');
+  const publication = publishedDate
+    ? `<p>Published Date: <time>${escapeHtml(publishedDate)}</time></p>`
+    : '';
+  return `<!doctype html><html><body>${sectionHtml}${publication}<!--${'x'.repeat(20_000)}--></body></html>`;
+}
+
+async function runDryMain({ html, fxPayload }) {
+  const originalFetch = globalThis.fetch;
+  const originalSummary = process.env.GITHUB_STEP_SUMMARY;
+  delete process.env.GITHUB_STEP_SUMMARY;
+  globalThis.fetch = async (url) => {
+    const target = String(url);
+    if (target.includes('support.apple.com')) return new Response(html, { status: 200 });
+    if (target.includes('open.er-api.com')) return new Response(JSON.stringify(fxPayload), { status: 200 });
+    throw new Error(`Unexpected URL in dry-run test: ${target}`);
+  };
+  try {
+    return await main({ dryRun: true });
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalSummary === undefined) delete process.env.GITHUB_STEP_SUMMARY;
+    else process.env.GITHUB_STEP_SUMMARY = originalSummary;
+  }
+}
 
 function country(countryName, {
   nameZh = countryName,
@@ -233,6 +285,60 @@ test('reuses preserved history when a removed country later returns', () => {
 test('normalizes equivalent Apple publication-date formats', () => {
   assert.equal(publicationDateKey('July 17, 2026'), publicationDateKey('2026-07-17'));
   assert.notEqual(publicationDateKey('July 17, 2026'), publicationDateKey('August 1, 2026'));
+});
+
+test('rejects impossible or unsupported calendar dates instead of normalizing them', () => {
+  for (const value of ['February 30, 2026', 'April 31, 2026', '2026-02-30', '2026-13-01', 'Feb 28, 2026']) {
+    assert.match(publicationDateKey(value), /^raw:/, value);
+  }
+  assert.equal(publicationDateKey('February 29, 2024'), '2024-02-29');
+  assert.match(publicationDateKey('February 29, 2026'), /^raw:/);
+});
+
+test('runs the complete updater in dry-run mode without modifying committed data', async () => {
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const before = await Promise.all([pricesUrl, historyUrl, runLogUrl].map((url) => readFile(url, 'utf8')));
+  const messages = [];
+  const originalLog = console.log;
+  console.log = (...parts) => messages.push(parts.join(' '));
+  try {
+    await runDryMain({
+      html: buildAppleHtml(data),
+      fxPayload: {
+        result: 'success',
+        base_code: 'USD',
+        time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
+        rates: data.fx.rates
+      }
+    });
+  } finally {
+    console.log = originalLog;
+  }
+  const after = await Promise.all([pricesUrl, historyUrl, runLogUrl].map((url) => readFile(url, 'utf8')));
+  assert.deepEqual(after, before, 'dry-run must not change prices, history, or run logs');
+  assert.ok(messages.some((message) => /Live check passed with cross-checked: 73 countries and 365 prices/.test(message)));
+});
+
+test('complete dry-run rejects missing exchange rates and a missing Apple publication date', async () => {
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const missingCurrency = data.countries.find(({ currency }) => currency !== 'USD').currency;
+  const incompleteRates = { ...data.fx.rates };
+  delete incompleteRates[missingCurrency];
+  const fxPayload = {
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
+    rates: incompleteRates
+  };
+
+  await assert.rejects(
+    () => runDryMain({ html: buildAppleHtml(data), fxPayload }),
+    new RegExp(`Exchange rates are missing for:.*${missingCurrency}`)
+  );
+  await assert.rejects(
+    () => runDryMain({ html: buildAppleHtml(data, null), fxPayload: { ...fxPayload, rates: data.fx.rates } }),
+    /Apple published date was not found/
+  );
 });
 
 test('builds a structured successful run log with source, counts, and changes', () => {

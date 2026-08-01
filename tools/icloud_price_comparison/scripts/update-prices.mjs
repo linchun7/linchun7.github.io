@@ -159,16 +159,26 @@ export function updateHistory(previousHistory, countries, observedAt, tiers, obs
 
 export function publicationDateKey(value) {
   const text = String(value ?? '').trim();
+  const dateKey = (year, month, day) => {
+    const date = new Date(Date.UTC(year, month, day));
+    return date.getUTCFullYear() === year
+      && date.getUTCMonth() === month
+      && date.getUTCDate() === day
+      ? date.toISOString().slice(0, 10)
+      : null;
+  };
   const englishDate = text.match(/^([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})$/);
   if (englishDate) {
     const monthNames = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
     const month = monthNames.indexOf(englishDate[1].toLowerCase());
-    if (month >= 0) return new Date(Date.UTC(Number(englishDate[3]), month, Number(englishDate[2]))).toISOString().slice(0, 10);
+    if (month < 0) return `raw:${text}`;
+    return dateKey(Number(englishDate[3]), month, Number(englishDate[2])) ?? `raw:${text}`;
   }
   const dateOnly = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (dateOnly) return text;
-  const parsed = Date.parse(text);
-  return Number.isNaN(parsed) ? `raw:${String(value ?? '').trim()}` : new Date(parsed).toISOString().slice(0, 10);
+  if (dateOnly) {
+    return dateKey(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3])) ?? `raw:${text}`;
+  }
+  return `raw:${text}`;
 }
 
 function assertPublicationDateNotRegressed(previousPublishedDate, publishedDate) {
@@ -425,7 +435,7 @@ async function writeActionSummary(data, summary) {
   );
 }
 
-export async function main() {
+export async function main({ dryRun = DRY_RUN } = {}) {
   runStartedAt = new Date();
   const [previousData, previousHistory, previousRunLog, countryNames, html] = await Promise.all([
     readJson(CURRENT_DATA_PATH),
@@ -435,7 +445,7 @@ export async function main() {
     fetchResource(APPLE_URL)
   ]);
   lastAppleHtml = html;
-  if (!DRY_RUN) {
+  if (!dryRun) {
     try {
       await writeAppleSnapshot(html, runStartedAt);
     } catch (error) {
@@ -523,7 +533,7 @@ export async function main() {
   const run = createRunLogEntry(data, summary, runStartedAt, finishedAt);
   const runLog = buildRunLog(previousRunLog, run);
 
-  if (DRY_RUN) {
+  if (dryRun) {
     console.log(`Live check passed with ${parsed.parser}: ${countries.length} countries and ${countries.length * parsed.tiers.length} prices. No files were changed.`);
   } else {
     await writeJsonAtomic(CURRENT_DATA_PATH, data);

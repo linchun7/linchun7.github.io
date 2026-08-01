@@ -59,9 +59,25 @@ function resolveRegion($, heading) {
 }
 
 function parsePriceNumber(value) {
-  const match = value.match(/[0-9][0-9.,\s]*/);
+  const match = value.match(/[0-9][0-9.,\s'’]*/);
   if (!match) return Number.NaN;
-  return Number(match[0].replace(/[\s,]/g, ''));
+  const compact = match[0].replace(/[\s'’]/g, '');
+  const lastComma = compact.lastIndexOf(',');
+  const lastDot = compact.lastIndexOf('.');
+  let normalized = compact;
+
+  if (lastComma >= 0 && lastDot >= 0) {
+    const decimalSeparator = lastComma > lastDot ? ',' : '.';
+    const groupingSeparator = decimalSeparator === ',' ? '.' : ',';
+    normalized = compact.replaceAll(groupingSeparator, '').replace(decimalSeparator, '.');
+  } else if (lastComma >= 0) {
+    const groups = compact.split(',');
+    normalized = groups.length === 2 && groups[1].length > 0 && groups[1].length <= 2
+      ? `${groups[0]}.${groups[1]}`
+      : groups.join('');
+  }
+
+  return Number(normalized);
 }
 
 function parseTierLabel(label) {

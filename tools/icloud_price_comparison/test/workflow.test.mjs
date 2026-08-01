@@ -14,7 +14,8 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /cron:\s*['"]57 9 \* \* \*['"]/, 'schedule must target 17:57 Beijing time');
   assert.match(workflow, /pnpm install --frozen-lockfile/);
   assert.match(workflow, /name: 运行解析与数据安全测试\s+run: pnpm test:core/);
-  assert.match(workflow, /name: 验证更新后的页面[\s\S]*?id: ui_after[\s\S]*?continue-on-error: true[\s\S]*?run: pnpm test:ui/);
+  assert.match(workflow, /name: 验证更新后的页面[\s\S]*?id: ui_after[\s\S]*?if pnpm test:ui; then[\s\S]*?ui_failed=false[\s\S]*?ui_failed=true/);
+  assert.doesNotMatch(workflow, /name: 验证更新后的页面[\s\S]*?continue-on-error: true[\s\S]*?run: pnpm test:ui/);
   assert.doesNotMatch(workflow, /ui_before|运行浏览器界面测试（更新前）/, 'the workflow must not repeat UI tests before fetching data');
   assert.match(workflow, /name: 验证更新后的价格数据\s+run: pnpm test:data/);
   assert.match(workflow, /pnpm update:data/);
@@ -22,7 +23,7 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /retention-days:\s*14/);
   assert.match(workflow, /git pull --rebase origin main/);
   assert.doesNotMatch(workflow, /git push --force/);
-  assert.match(workflow, /name: 记录浏览器界面测试警告[\s\S]*?steps\.ui_after\.outcome == 'failure'/);
+  assert.match(workflow, /name: 记录浏览器界面测试警告[\s\S]*?steps\.ui_after\.outputs\.ui_failed == 'true'/);
   assert.match(workflow, /::warning title=浏览器界面测试未通过/);
   assert.match(workflow, /价格抓取、核心数据校验和提交未因此中断/);
   assert.match(workflow, /RUNNER_TEMP\/icloud-storage-summary\.md/);
@@ -36,8 +37,8 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   const duplicateCoreTest = workflow.indexOf('run: pnpm test:core', firstCoreTest + 1);
   const update = workflow.indexOf('run: pnpm update:data');
   const dataTest = workflow.indexOf('run: pnpm test:data');
-  const uiTest = workflow.indexOf('run: pnpm test:ui');
-  const duplicateUiTest = workflow.indexOf('run: pnpm test:ui', uiTest + 1);
+  const uiTest = workflow.indexOf('if pnpm test:ui; then');
+  const duplicateUiTest = workflow.indexOf('pnpm test:ui', uiTest + 'if pnpm test:ui; then'.length);
   const commit = workflow.indexOf('name: 提交价格数据变更');
   assert.ok(firstCoreTest >= 0 && firstCoreTest < update, 'core tests must run before the live update');
   assert.equal(duplicateCoreTest, -1, 'the workflow must not repeat unchanged fixture and workflow tests after the update');
@@ -51,6 +52,8 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
 
   const uiWarningBlock = workflow.slice(uiGate, workflow.indexOf('name: 写入失败摘要'));
   assert.doesNotMatch(uiWarningBlock, /::error|exit 1/, 'UI failures must warn without failing the update job');
+  const uiStepBlock = workflow.slice(uiTest, workflow.indexOf('name: 上传诊断信息'));
+  assert.doesNotMatch(uiStepBlock, /continue-on-error/, 'the UI command must be captured instead of producing a red failed step');
 
   const summaryAppend = workflow.indexOf('name: 追加仓库容量摘要');
   assert.ok(uiTest < summaryAppend, 'the main update summary must be written before capacity details');
