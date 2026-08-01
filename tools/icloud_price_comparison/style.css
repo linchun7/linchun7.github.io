@@ -398,7 +398,7 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--accent-dark
 }
 
 .history-dialog::backdrop { background: rgba(20, 31, 42, .62); }
-.dialog-header { position: sticky; top: 0; z-index: 3; padding: 20px 24px 17px; display: flex; justify-content: space-between; gap: 24px; background: rgba(255, 255, 255, .97); border-bottom: 1px solid var(--line); }
+.dialog-header { position: sticky; top: 0; z-index: 3; padding: 20px 24px 17px; display: flex; justify-content: space-between; gap: 24px; background: #fff; border-bottom: 1px solid var(--line); }
 .dialog-eyebrow { margin: 0 0 3px; color: var(--accent-dark); font-size: 12px; font-weight: 760; }
 .dialog-header h2 { margin: 0; font-size: 22px; letter-spacing: 0; }
 .dialog-header p:last-child { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
@@ -420,7 +420,7 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--accent-dark
 .published-date-current span { display: block; margin-bottom: 4px; color: var(--muted); font-size: 12px; }
 .published-date-current strong { display: block; font-size: 21px; }
 .published-date-list { padding-top: 20px; }
-.published-change-cell { min-width: 320px; line-height: 1.6; white-space: normal; }
+.published-change-cell { min-width: 320px; line-height: 1.6; overflow-wrap: anywhere; white-space: normal; }
 .history-toolbar { padding: 16px 24px 0; }
 .segmented.compact { width: min(430px, 100%); min-height: 36px; }
 .segmented.compact button { padding: 4px 8px; font-size: 12px; }
