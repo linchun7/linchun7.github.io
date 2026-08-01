@@ -34,16 +34,21 @@ jobs:
           git_mib=$(( (git_kib + 1023) / 1024 ))
           history_bytes=$(wc -c < tools/icloud_price_comparison/data/history.json)
           history_kib=$(( (history_bytes + 1023) / 1024 ))
-          echo "- Git 历史体积：${git_mib} MiB" >> "$GITHUB_STEP_SUMMARY"
-          echo "- 价格历史文件：${history_kib} KiB" >> "$GITHUB_STEP_SUMMARY"
-          if (( git_kib >= 512000 )); then
-            echo "::warning title=Repository storage::Git history is ${git_mib} MiB; plan a manual history review before it reaches 1 GiB."
-          fi
+          {
+            echo "### 容量监控"
+            echo "- Git 历史：${git_mib} MiB"
+            echo "- 价格历史：${history_kib} KiB"
+          } > "$RUNNER_TEMP/icloud-storage-summary.md"
           if (( git_kib >= 819200 )); then
-            echo "::warning title=Repository storage high::Git history is ${git_mib} MiB; manual maintenance should be scheduled soon."
+            echo "::warning title=Git 历史体积较高::Git 历史已达 ${git_mib} MiB，请尽快安排人工维护。"
+            echo "- **警告**：Git 历史体积较高，请尽快安排人工维护。" >> "$RUNNER_TEMP/icloud-storage-summary.md"
+          elif (( git_kib >= 512000 )); then
+            echo "::warning title=Git 历史体积::Git 历史已达 ${git_mib} MiB，请在达到 1 GiB 前安排人工审查。"
+            echo "- **警告**：Git 历史已达 ${git_mib} MiB，请安排人工审查。" >> "$RUNNER_TEMP/icloud-storage-summary.md"
           fi
           if (( history_bytes >= 2097152 )); then
-            echo "::warning title=Price history size::history.json is ${history_kib} KiB; consider partitioning history by year or country."
+            echo "::warning title=价格历史体积::history.json 已达 ${history_kib} KiB，请考虑按年份或地区拆分。"
+            echo "- **警告**：价格历史已达 ${history_kib} KiB，请考虑按年份或地区拆分。" >> "$RUNNER_TEMP/icloud-storage-summary.md"
           fi
 
       - name: Set up Node.js
@@ -75,6 +80,15 @@ jobs:
           path: tools/icloud_price_comparison/artifacts
           if-no-files-found: ignore
           retention-days: 14
+
+      - name: Append repository storage summary
+        if: always()
+        working-directory: .
+        shell: bash
+        run: |
+          if [[ -f "$RUNNER_TEMP/icloud-storage-summary.md" ]]; then
+            cat "$RUNNER_TEMP/icloud-storage-summary.md" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Commit data changes
         working-directory: .
