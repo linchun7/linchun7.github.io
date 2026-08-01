@@ -12,6 +12,7 @@
     "update:data": "node scripts/update-prices.mjs",
     "test": "node --test",
     "test:core": "node --test test/data-integrity.test.mjs test/parse-prices.test.mjs test/update-prices.test.mjs test/workflow.test.mjs",
+    "test:data": "node --test test/data-integrity.test.mjs",
     "test:ui": "node --test test/ui-smoke.test.mjs"
   },
   "dependencies": {
