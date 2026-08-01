@@ -67,6 +67,33 @@ test('keeps the document-order parser when Apple marker classes disappear', asyn
   assert.equal(result.countries.length, 5);
 });
 
+test('rejects disagreement when both independent parsers return different countries', async () => {
+  const fixture = await readFile(fixtureUrl, 'utf8');
+  const adjusted = fixture.replace(
+    '    <h3 id="emea">Europe</h3>',
+    '    <h5>Canada (USD)</h5>\n    <ul><li>50 GB: $0.99</li><li>200 GB: $2.99</li><li>2 TB: $9.99</li><li>6 TB: $29.99</li><li>12 TB: $59.99</li></ul>\n    <h3 id="emea">Europe</h3>'
+  );
+  assert.throws(
+    () => parseApplePrices(adjusted),
+    /Apple parser disagreement/
+  );
+});
+
+test('rejects input when both independent parsers fail', async () => {
+  const fixture = await readFile(fixtureUrl, 'utf8');
+  const adjusted = fixture
+    .replace(' id="nasalac"', '')
+    .replace(' id="emea"', '')
+    .replace(' id="ap"', '')
+    .replaceAll('<h3>Americas</h3>', '<div>Americas</div>')
+    .replaceAll('<h3>Europe</h3>', '<div>Europe</div>')
+    .replaceAll('<h3>Asia Pacific</h3>', '<div>Asia Pacific</div>');
+  assert.throws(
+    () => parseApplePrices(adjusted),
+    /Both Apple parsers failed/
+  );
+});
+
 test('does not mistake an unrelated time element for the Apple publication date', async () => {
   const fixture = await readFile(fixtureUrl, 'utf8');
   const adjusted = fixture.replace(
@@ -91,6 +118,23 @@ test('rejects implausible changes against the last valid snapshot', async () => 
   assert.throws(
     () => validatePrices(changed, { minCountries: 5, previousCountries: parsed.countries }),
     /Suspicious 200GB price change/
+  );
+});
+
+test('allows exact tenfold hard-limit boundaries but rejects either side', () => {
+  const tiers = [{ id: '50GB' }];
+  const previousCountries = [{ country: 'Example', currency: 'USD', plans: { '50GB': { price: 10 } } }];
+  const atLowerBoundary = [{ country: 'Example', currency: 'USD', plans: { '50GB': { price: 1 } } }];
+  const atUpperBoundary = [{ country: 'Example', currency: 'USD', plans: { '50GB': { price: 100 } } }];
+  assert.equal(validatePrices(atLowerBoundary, { minCountries: 1, previousCountries, tiers }), true);
+  assert.equal(validatePrices(atUpperBoundary, { minCountries: 1, previousCountries, tiers }), true);
+  assert.throws(
+    () => validatePrices([{ ...atLowerBoundary[0], plans: { '50GB': { price: 0.99 } } }], { minCountries: 1, previousCountries, tiers }),
+    /Suspicious 50GB price change/
+  );
+  assert.throws(
+    () => validatePrices([{ ...atUpperBoundary[0], plans: { '50GB': { price: 100.1 } } }], { minCountries: 1, previousCountries, tiers }),
+    /Suspicious 50GB price change/
   );
 });
 
