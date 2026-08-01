@@ -50,15 +50,22 @@ function buildAppleHtml(data, publishedDate = data.source.publishedDate) {
   return `<!doctype html><html><body>${sectionHtml}${publication}<!--${'x'.repeat(20_000)}--></body></html>`;
 }
 
-async function runDryMain({ html, fxPayload }) {
+async function runDryMain({ html, fxPayload, apiKey = '', authenticatedFxPayload, githubActions = false }) {
   const originalFetch = globalThis.fetch;
   const originalSummary = process.env.GITHUB_STEP_SUMMARY;
   const originalApiKey = process.env.EXCHANGE_RATE_API_KEY;
+  const originalGithubActions = process.env.GITHUB_ACTIONS;
   delete process.env.GITHUB_STEP_SUMMARY;
-  delete process.env.EXCHANGE_RATE_API_KEY;
+  if (apiKey) process.env.EXCHANGE_RATE_API_KEY = apiKey;
+  else delete process.env.EXCHANGE_RATE_API_KEY;
+  if (githubActions) process.env.GITHUB_ACTIONS = 'true';
+  else delete process.env.GITHUB_ACTIONS;
   globalThis.fetch = async (url) => {
     const target = String(url);
     if (target.includes('support.apple.com')) return new Response(html, { status: 200 });
+    if (target.includes('v6.exchangerate-api.com')) {
+      return new Response(JSON.stringify(authenticatedFxPayload), { status: 200 });
+    }
     if (target.includes('open.er-api.com')) return new Response(JSON.stringify(fxPayload), { status: 200 });
     throw new Error(`Unexpected URL in dry-run test: ${target}`);
   };
@@ -70,6 +77,8 @@ async function runDryMain({ html, fxPayload }) {
     else process.env.GITHUB_STEP_SUMMARY = originalSummary;
     if (originalApiKey === undefined) delete process.env.EXCHANGE_RATE_API_KEY;
     else process.env.EXCHANGE_RATE_API_KEY = originalApiKey;
+    if (originalGithubActions === undefined) delete process.env.GITHUB_ACTIONS;
+    else process.env.GITHUB_ACTIONS = originalGithubActions;
   }
 }
 
@@ -147,6 +156,7 @@ test('does not carry a missing currency from old rates into a successful refresh
   try {
     const fx = await getExchangeRates({ fx: { rates: { USD: 1, CNY: 7.1, JPY: 150 } } }, { apiKey: '' });
     assert.equal(fx.stale, false);
+    assert.equal(fx.apiKeyStatus, 'not-configured');
     assert.equal(fx.rates.CNY, 7.2);
     assert.equal(fx.rates.JPY, undefined);
   } finally {
@@ -176,6 +186,7 @@ test('uses the authenticated exchange-rate endpoint without putting the key in t
     assert.equal(fx.sourceMode, 'api-key');
     assert.equal(fx.fallbackUsed, false);
     assert.equal(fx.fallbackReason, null);
+    assert.equal(fx.apiKeyStatus, 'valid');
     assert.equal(fx.rates.JPY, 150);
   } finally {
     globalThis.fetch = originalFetch;
@@ -209,6 +220,7 @@ test('falls back to the open endpoint when the authenticated quota is exhausted'
     assert.equal(fx.sourceMode, 'open-access');
     assert.equal(fx.fallbackUsed, true);
     assert.equal(fx.fallbackReason, 'quota-reached');
+    assert.equal(fx.apiKeyStatus, 'quota-reached');
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -238,6 +250,7 @@ test('falls back when the authenticated response omits a required currency', asy
     assert.equal(fx.sourceMode, 'open-access');
     assert.equal(fx.fallbackUsed, true);
     assert.equal(fx.fallbackReason, 'missing-rates');
+    assert.equal(fx.apiKeyStatus, 'missing-rates');
     assert.equal(fx.rates.JPY, 150);
   } finally {
     globalThis.fetch = originalFetch;
@@ -285,6 +298,7 @@ test('keeps the previous exchange rates when the refresh fails', async () => {
       }
     });
     assert.equal(fx.stale, true);
+    assert.equal(fx.apiKeyStatus, 'not-configured');
     assert.equal(fx.fetchedAt, '2026-07-30T00:00:00.000Z');
     assert.equal(fx.rates.JPY, 150);
   } finally {
@@ -481,7 +495,8 @@ test('builds a structured successful run log with source, counts, and changes', 
       stale: false,
       sourceMode: 'api-key',
       fallbackUsed: false,
-      fallbackReason: null
+      fallbackReason: null,
+      apiKeyStatus: 'valid'
     },
     tiers: [TIER_50, TIER_200],
     countries: [country('Alpha'), country('Beta', { currency: 'CAD' })]
@@ -514,6 +529,7 @@ test('builds a structured successful run log with source, counts, and changes', 
   assert.equal(entry.source.exchangeRatesSourceMode, 'api-key');
   assert.equal(entry.source.exchangeRatesFallbackUsed, false);
   assert.equal(entry.source.exchangeRatesFallbackReason, null);
+  assert.equal(entry.source.exchangeRatesApiKeyStatus, 'valid');
   assert.equal(entry.counts.countries, 2);
   assert.equal(entry.counts.pricePoints, 4);
   assert.equal(entry.counts.currencies, 2);
@@ -569,7 +585,8 @@ test('keeps successful Action summaries concise and promotes warnings', () => {
       stale: false,
       sourceMode: 'api-key',
       fallbackUsed: false,
-      fallbackReason: null
+      fallbackReason: null,
+      apiKeyStatus: 'valid'
     },
     tiers: [TIER_50, TIER_200],
     countries: [country('Alpha')]
@@ -595,19 +612,34 @@ test('keeps successful Action summaries concise and promotes warnings', () => {
   assert.match(rendered, /### 结论/);
   assert.match(rendered, /Apple 解析路径：cross-checked（双解析器一致）/);
   assert.match(rendered, /汇率来源：ExchangeRate-API Key 接口（主来源）/);
+  assert.match(rendered, /汇率认证：API Key 有效/);
   assert.match(rendered, /### 本次变化\n本次变化：无/);
   assert.doesNotMatch(rendered, /本次新增地区：无|本次移除地区：无|缺少汇率：无/);
 
   const stale = buildActionSummaryLines({
     ...data,
-    fx: { ...data.fx, stale: true }
+    fx: { ...data.fx, stale: true, apiKeyStatus: 'request-failed' }
   }, {
     ...summary,
     missingRates: ['JPY']
   }, 'schedule').join('\n');
   assert.match(stale, /### 警告/);
   assert.match(stale, /汇率降级/);
+  assert.match(stale, /汇率认证：主接口请求失败，开放接口也不可用/);
   assert.match(stale, /缺少汇率.*JPY/);
+
+  const noSecret = buildActionSummaryLines({
+    ...data,
+    fx: {
+      ...data.fx,
+      sourceMode: 'open-access',
+      fallbackUsed: false,
+      fallbackReason: null,
+      apiKeyStatus: 'not-configured'
+    }
+  }, summary, 'schedule').join('\n');
+  assert.match(noSecret, /汇率认证：未配置 API Key，使用开放接口/);
+  assert.doesNotMatch(noSecret, /### 警告/);
 
   const fallback = buildActionSummaryLines({
     ...data,
@@ -615,11 +647,43 @@ test('keeps successful Action summaries concise and promotes warnings', () => {
       ...data.fx,
       sourceMode: 'open-access',
       fallbackUsed: true,
-      fallbackReason: 'quota-reached'
+      fallbackReason: 'quota-reached',
+      apiKeyStatus: 'quota-reached'
     }
   }, summary, 'schedule').join('\n');
   assert.match(fallback, /汇率来源：ExchangeRate-API 开放接口（自动回退）/);
-  assert.match(fallback, /汇率来源回退.*API 额度已用完/);
+  assert.match(fallback, /汇率认证：API 额度已用完，使用开放接口/);
+  assert.doesNotMatch(fallback, /### 警告/);
+});
+
+test('reports missing or invalid exchange-rate credentials as notices without warnings', async () => {
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const fxPayload = {
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
+    rates: data.fx.rates
+  };
+  const messages = [];
+  const originalLog = console.log;
+  console.log = (...parts) => messages.push(parts.join(' '));
+  try {
+    await runDryMain({ html: buildAppleHtml(data), fxPayload, githubActions: true });
+    await runDryMain({
+      html: buildAppleHtml(data),
+      fxPayload,
+      apiKey: 'invalid-test-key',
+      authenticatedFxPayload: { result: 'error', 'error-type': 'invalid-key' },
+      githubActions: true
+    });
+  } finally {
+    console.log = originalLog;
+  }
+
+  const output = messages.join('\n');
+  assert.match(output, /::notice title=未配置汇率 API Key::/);
+  assert.match(output, /::notice title=汇率 API Key 未生效::API Key 无效，已使用开放接口。/);
+  assert.doesNotMatch(output, /::warning/);
 });
 
 test('shows price, currency, region, country, tier, and publication-date changes separately', () => {
