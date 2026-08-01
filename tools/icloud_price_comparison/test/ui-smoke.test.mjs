@@ -105,6 +105,11 @@ test('renders current prices, sorting, and country history in a real browser', {
         assert.equal(await page.locator('#pageTitle').textContent(), '各容量最低价');
         assert.equal(await page.locator('.workspace-heading h2').textContent(), '各地区 iCloud+ 价格');
         assert.equal(await page.locator('button[data-sort-tier]').count(), expectedData.tiers.length);
+        if (viewport.width > 900) {
+          const referenceBox = await page.locator('.overview-reference').boundingBox();
+          const statsBox = await page.locator('.overview-stats').boundingBox();
+          assert.ok(referenceBox && statsBox && statsBox.x > referenceBox.x + referenceBox.width * 0.6, `${viewport.name} overview panels should stay independent`);
+        }
         assert.equal(await page.locator('#minimumSummary > div').count(), expectedData.tiers.length);
         for (const tier of expectedData.tiers) {
           const lowest = expectedData.countries
