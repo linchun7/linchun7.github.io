@@ -68,6 +68,8 @@ jobs:
         run: pnpm test:core
 
       - name: 抓取并校验 Apple 价格
+        env:
+          EXCHANGE_RATE_API_KEY: ${{ secrets.EXCHANGE_RATE_API_KEY }}
         run: pnpm update:data
 
       - name: 验证更新后的价格数据

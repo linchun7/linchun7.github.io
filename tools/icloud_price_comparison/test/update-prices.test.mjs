@@ -53,7 +53,9 @@ function buildAppleHtml(data, publishedDate = data.source.publishedDate) {
 async function runDryMain({ html, fxPayload }) {
   const originalFetch = globalThis.fetch;
   const originalSummary = process.env.GITHUB_STEP_SUMMARY;
+  const originalApiKey = process.env.EXCHANGE_RATE_API_KEY;
   delete process.env.GITHUB_STEP_SUMMARY;
+  delete process.env.EXCHANGE_RATE_API_KEY;
   globalThis.fetch = async (url) => {
     const target = String(url);
     if (target.includes('support.apple.com')) return new Response(html, { status: 200 });
@@ -66,6 +68,8 @@ async function runDryMain({ html, fxPayload }) {
     globalThis.fetch = originalFetch;
     if (originalSummary === undefined) delete process.env.GITHUB_STEP_SUMMARY;
     else process.env.GITHUB_STEP_SUMMARY = originalSummary;
+    if (originalApiKey === undefined) delete process.env.EXCHANGE_RATE_API_KEY;
+    else process.env.EXCHANGE_RATE_API_KEY = originalApiKey;
   }
 }
 
@@ -141,12 +145,128 @@ test('does not carry a missing currency from old rates into a successful refresh
     rates: { USD: 1, CNY: 7.2 }
   }), { status: 200 });
   try {
-    const fx = await getExchangeRates({ fx: { rates: { USD: 1, CNY: 7.1, JPY: 150 } } });
+    const fx = await getExchangeRates({ fx: { rates: { USD: 1, CNY: 7.1, JPY: 150 } } }, { apiKey: '' });
     assert.equal(fx.stale, false);
     assert.equal(fx.rates.CNY, 7.2);
     assert.equal(fx.rates.JPY, undefined);
   } finally {
     globalThis.fetch = originalFetch;
+  }
+});
+
+test('uses the authenticated exchange-rate endpoint without putting the key in the URL', async () => {
+  const originalFetch = globalThis.fetch;
+  const apiKey = 'test-secret-key';
+  let requestCount = 0;
+  globalThis.fetch = async (url, options) => {
+    requestCount += 1;
+    assert.equal(String(url), 'https://v6.exchangerate-api.com/v6/latest/USD');
+    assert.equal(options.headers.authorization, `Bearer ${apiKey}`);
+    assert.doesNotMatch(String(url), new RegExp(apiKey));
+    return new Response(JSON.stringify({
+      result: 'success',
+      base_code: 'USD',
+      time_last_update_unix: 1_754_006_400,
+      conversion_rates: { USD: 1, CNY: 7.2, JPY: 150 }
+    }), { status: 200 });
+  };
+  try {
+    const fx = await getExchangeRates(null, { apiKey, requiredCurrencies: ['USD', 'CNY', 'JPY'] });
+    assert.equal(requestCount, 1);
+    assert.equal(fx.sourceMode, 'api-key');
+    assert.equal(fx.fallbackUsed, false);
+    assert.equal(fx.fallbackReason, null);
+    assert.equal(fx.rates.JPY, 150);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('falls back to the open endpoint when the authenticated quota is exhausted', async () => {
+  const originalFetch = globalThis.fetch;
+  const apiKey = 'test-secret-key';
+  const requests = [];
+  globalThis.fetch = async (url, options) => {
+    requests.push({ url: String(url), authorization: options.headers.authorization });
+    if (String(url).includes('v6.exchangerate-api.com')) {
+      return new Response(JSON.stringify({ result: 'error', 'error-type': 'quota-reached' }), { status: 200 });
+    }
+    return new Response(JSON.stringify({
+      result: 'success',
+      base_code: 'USD',
+      time_last_update_unix: 1_754_006_400,
+      rates: { USD: 1, CNY: 7.2, JPY: 150 }
+    }), { status: 200 });
+  };
+  try {
+    const fx = await getExchangeRates(null, { apiKey, requiredCurrencies: ['USD', 'CNY', 'JPY'] });
+    assert.deepEqual(requests.map(({ url }) => url), [
+      'https://v6.exchangerate-api.com/v6/latest/USD',
+      'https://open.er-api.com/v6/latest/USD'
+    ]);
+    assert.equal(requests[0].authorization, `Bearer ${apiKey}`);
+    assert.equal(requests[1].authorization, undefined);
+    assert.equal(fx.sourceMode, 'open-access');
+    assert.equal(fx.fallbackUsed, true);
+    assert.equal(fx.fallbackReason, 'quota-reached');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('falls back when the authenticated response omits a required currency', async () => {
+  const originalFetch = globalThis.fetch;
+  let requestCount = 0;
+  globalThis.fetch = async (url) => {
+    requestCount += 1;
+    const authenticated = String(url).includes('v6.exchangerate-api.com');
+    return new Response(JSON.stringify({
+      result: 'success',
+      base_code: 'USD',
+      time_last_update_unix: 1_754_006_400,
+      ...(authenticated
+        ? { conversion_rates: { USD: 1, CNY: 7.2 } }
+        : { rates: { USD: 1, CNY: 7.2, JPY: 150 } })
+    }), { status: 200 });
+  };
+  try {
+    const fx = await getExchangeRates(null, {
+      apiKey: 'test-secret-key',
+      requiredCurrencies: ['USD', 'CNY', 'JPY']
+    });
+    assert.equal(requestCount, 2);
+    assert.equal(fx.sourceMode, 'open-access');
+    assert.equal(fx.fallbackUsed, true);
+    assert.equal(fx.fallbackReason, 'missing-rates');
+    assert.equal(fx.rates.JPY, 150);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('does not expose the exchange-rate key when both online sources fail', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalSetTimeout = globalThis.setTimeout;
+  const originalWarn = console.warn;
+  const warnings = [];
+  const apiKey = 'secret-that-must-not-appear';
+  globalThis.fetch = async () => { throw new Error('temporary outage'); };
+  globalThis.setTimeout = (callback, _delay, ...args) => originalSetTimeout(callback, 0, ...args);
+  console.warn = (message) => warnings.push(String(message));
+  try {
+    await assert.rejects(
+      () => getExchangeRates(null, { apiKey }),
+      (error) => {
+        assert.doesNotMatch(error.message, new RegExp(apiKey));
+        return true;
+      }
+    );
+    assert.ok(warnings.length >= 5);
+    assert.doesNotMatch(warnings.join('\n'), new RegExp(apiKey));
+  } finally {
+    globalThis.fetch = originalFetch;
+    globalThis.setTimeout = originalSetTimeout;
+    console.warn = originalWarn;
   }
 });
 
@@ -178,7 +298,7 @@ test('does not invent exchange rates when no previous valid rates exist', async 
   globalThis.fetch = async () => new Response(JSON.stringify({ result: 'error' }), { status: 200 });
   try {
     await assert.rejects(
-      () => getExchangeRates({ fx: { rates: { USD: 1 } } }),
+      () => getExchangeRates({ fx: { rates: { USD: 1 } } }, { apiKey: '' }),
       /Exchange-rate response is missing required fields/
     );
   } finally {
@@ -320,7 +440,7 @@ test('runs the complete updater in dry-run mode without modifying committed data
   assert.ok(messages.some((message) => /Live check passed with cross-checked: 73 countries and 365 prices/.test(message)));
 });
 
-test('complete dry-run rejects missing exchange rates and a missing Apple publication date', async () => {
+test('complete dry-run keeps previous rates for an incomplete online response and rejects a missing Apple publication date', async () => {
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
   const missingCurrency = data.countries.find(({ currency }) => currency !== 'USD').currency;
   const incompleteRates = { ...data.fx.rates };
@@ -332,10 +452,16 @@ test('complete dry-run rejects missing exchange rates and a missing Apple public
     rates: incompleteRates
   };
 
-  await assert.rejects(
-    () => runDryMain({ html: buildAppleHtml(data), fxPayload }),
-    new RegExp(`Exchange rates are missing for:.*${missingCurrency}`)
-  );
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (message) => warnings.push(String(message));
+  try {
+    await runDryMain({ html: buildAppleHtml(data), fxPayload });
+  } finally {
+    console.warn = originalWarn;
+  }
+  assert.match(warnings.join('\n'), new RegExp(`Exchange rates are missing for:.*${missingCurrency}`));
+  assert.match(warnings.join('\n'), /keeping previous rates/);
   await assert.rejects(
     () => runDryMain({ html: buildAppleHtml(data, null), fxPayload: { ...fxPayload, rates: data.fx.rates } }),
     /Apple published date was not found/
@@ -350,7 +476,13 @@ test('builds a structured successful run log with source, counts, and changes', 
       parser: 'cross-checked',
       parserStatus: 'Both independent parser paths agreed'
     },
-    fx: { fetchedAt: '2026-08-01T00:02:31.000Z', stale: false },
+    fx: {
+      fetchedAt: '2026-08-01T00:02:31.000Z',
+      stale: false,
+      sourceMode: 'api-key',
+      fallbackUsed: false,
+      fallbackReason: null
+    },
     tiers: [TIER_50, TIER_200],
     countries: [country('Alpha'), country('Beta', { currency: 'CAD' })]
   };
@@ -379,6 +511,9 @@ test('builds a structured successful run log with source, counts, and changes', 
   assert.equal(entry.source.applePublishedDate, 'July 17, 2026');
   assert.equal(entry.source.appleParser, 'cross-checked');
   assert.match(entry.source.appleParserStatus, /agreed/);
+  assert.equal(entry.source.exchangeRatesSourceMode, 'api-key');
+  assert.equal(entry.source.exchangeRatesFallbackUsed, false);
+  assert.equal(entry.source.exchangeRatesFallbackReason, null);
   assert.equal(entry.counts.countries, 2);
   assert.equal(entry.counts.pricePoints, 4);
   assert.equal(entry.counts.currencies, 2);
@@ -412,7 +547,7 @@ test('rejects invalid USD anchors, timestamps, and stale fallback rates', async 
     for (const payload of invalidPayloads) {
       globalThis.fetch = async () => new Response(JSON.stringify(payload), { status: 200 });
       await assert.rejects(
-        () => getExchangeRates({ fx: { rates: { USD: 0, CNY: -1 } } }),
+        () => getExchangeRates({ fx: { rates: { USD: 0, CNY: -1 } } }, { apiKey: '' }),
         /Exchange-rate response is missing required fields/
       );
     }
@@ -431,7 +566,10 @@ test('keeps successful Action summaries concise and promotes warnings', () => {
     generatedAt: '2026-07-31T22:10:00.000Z',
     fx: {
       fetchedAt: '2026-07-31T00:02:31.000Z',
-      stale: false
+      stale: false,
+      sourceMode: 'api-key',
+      fallbackUsed: false,
+      fallbackReason: null
     },
     tiers: [TIER_50, TIER_200],
     countries: [country('Alpha')]
@@ -456,6 +594,7 @@ test('keeps successful Action summaries concise and promotes warnings', () => {
   const rendered = buildActionSummaryLines(data, summary, 'workflow_dispatch').join('\n');
   assert.match(rendered, /### 结论/);
   assert.match(rendered, /Apple 解析路径：cross-checked（双解析器一致）/);
+  assert.match(rendered, /汇率来源：ExchangeRate-API Key 接口（主来源）/);
   assert.match(rendered, /### 本次变化\n本次变化：无/);
   assert.doesNotMatch(rendered, /本次新增地区：无|本次移除地区：无|缺少汇率：无/);
 
@@ -469,13 +608,31 @@ test('keeps successful Action summaries concise and promotes warnings', () => {
   assert.match(stale, /### 警告/);
   assert.match(stale, /汇率降级/);
   assert.match(stale, /缺少汇率.*JPY/);
+
+  const fallback = buildActionSummaryLines({
+    ...data,
+    fx: {
+      ...data.fx,
+      sourceMode: 'open-access',
+      fallbackUsed: true,
+      fallbackReason: 'quota-reached'
+    }
+  }, summary, 'schedule').join('\n');
+  assert.match(fallback, /汇率来源：ExchangeRate-API 开放接口（自动回退）/);
+  assert.match(fallback, /汇率来源回退.*API 额度已用完/);
 });
 
 test('shows price, currency, region, country, tier, and publication-date changes separately', () => {
   const data = {
     source: { publishedDate: 'July 17, 2026', parser: 'cross-checked' },
     generatedAt: '2026-08-01T00:30:00.000Z',
-    fx: { fetchedAt: '2026-08-01T00:02:31.000Z', stale: false },
+    fx: {
+      fetchedAt: '2026-08-01T00:02:31.000Z',
+      stale: false,
+      sourceMode: 'api-key',
+      fallbackUsed: false,
+      fallbackReason: null
+    },
     tiers: [TIER_50, TIER_1TB],
     countries: [country('Alpha')]
   };
