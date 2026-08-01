@@ -347,24 +347,28 @@ function createPriceCell(country, tierId) {
   cell.className = 'price-cell';
   cell.dataset.tier = tierId;
   if (state.sortKey === 'tier' && state.sortTier === tierId) cell.classList.add('is-sorted');
+  const isMinimum = cny != null
+    && state.minimumPrices[tierId] != null
+    && Math.abs(cny - state.minimumPrices[tierId]) < 0.000001;
+  if (isMinimum) cell.classList.add('is-minimum');
 
   const converted = document.createElement('strong');
   converted.className = 'price-cny';
   if (cny == null) {
     converted.textContent = '--';
   } else {
-    if (state.minimumPrices[tierId] != null && Math.abs(cny - state.minimumPrices[tierId]) < 0.000001) {
+    const symbol = document.createElement('span');
+    symbol.className = 'price-symbol';
+    symbol.textContent = '¥';
+    const amount = document.createElement('span');
+    amount.textContent = moneyFormatter.format(cny);
+    if (isMinimum) {
       const badge = document.createElement('span');
       badge.className = 'minimum-badge';
       badge.textContent = '最低';
       badge.title = '该容量人民币换算价最低';
       converted.append(badge);
     }
-    const symbol = document.createElement('span');
-    symbol.className = 'price-symbol';
-    symbol.textContent = '¥';
-    const amount = document.createElement('span');
-    amount.textContent = moneyFormatter.format(cny);
     converted.append(symbol, amount);
   }
   const local = document.createElement('span');
