@@ -125,7 +125,6 @@ export function updateHistory(previousHistory, countries, observedAt, tiers, obs
   const history = previousHistory ?? { schemaVersion: 2, countries: {} };
   history.schemaVersion = 2;
   history.updatedAt = new Date().toISOString();
-  let addedCountries = 0;
   let changedCountries = 0;
 
   for (const country of countries) {
@@ -135,7 +134,6 @@ export function updateHistory(previousHistory, countries, observedAt, tiers, obs
       region: country.region,
       events: []
     };
-    if (!existingRecord) addedCountries += 1;
     record.nameZh = country.nameZh;
     record.region = country.region;
 
@@ -152,7 +150,7 @@ export function updateHistory(previousHistory, countries, observedAt, tiers, obs
     }
     history.countries[country.country] = record;
   }
-  return { history, addedCountries, changedCountries };
+  return { history, changedCountries };
 }
 
 export function publicationDateKey(value) {
@@ -348,31 +346,79 @@ function failureRunLogEntry(error, startedAt, finishedAt) {
   };
 }
 
-async function writeActionSummary(data, summary) {
-  if (!process.env.GITHUB_STEP_SUMMARY) return;
+function summarizeNames(names) {
+  if (names.length <= 8) return names.join('、');
+  return `${names.slice(0, 8).join('、')} 等 ${names.length} 个`;
+}
+
+function describeParser(data) {
+  const parser = data.source.parser ?? 'unknown';
+  if (parser === 'cross-checked') return `${parser}（双解析器一致）`;
+  return `${parser}（${data.source.parserStatus ?? 'unknown'}）`;
+}
+
+export function buildActionSummaryLines(data, summary, trigger = process.env.GITHUB_EVENT_NAME ?? 'unknown') {
+  const publicationChanges = summary.publicationChanges ?? {
+    addedTiers: [], removedTiers: [], addedCountries: [], removedCountries: [], changedCountries: []
+  };
+  const changes = [];
+  const warnings = [];
+
+  if (summary.publicationDateChanged) {
+    const previousDate = summary.publishedDateHistory.at(-2)?.publishedDate ?? 'unknown';
+    changes.push(`Apple 发布日期：${previousDate} → ${data.source.publishedDate ?? 'unknown'}`);
+    changes.push(
+      `发布日期对应内容变化：${publicationChanges.changedCountries.length} 个地区、`
+      + `${publicationChanges.addedCountries.length} 个新增地区、`
+      + `${publicationChanges.removedCountries.length} 个移除地区、`
+      + `${publicationChanges.addedTiers.length} 个新增容量、`
+      + `${publicationChanges.removedTiers.length} 个移除容量`
+    );
+  }
+  if (summary.addedCountries.length) changes.push(`新增地区：${summarizeNames(summary.addedCountries)}`);
+  if (summary.removedCountries.length) changes.push(`移除地区：${summarizeNames(summary.removedCountries)}`);
+  if (summary.changedCountries) changes.push(`价格或币种变化：${summary.changedCountries} 个地区`);
+  if (!changes.length) changes.push('本次变化：无');
+
+  if (data.source.parser !== 'cross-checked') warnings.push(`- **解析降级**：${describeParser(data)}`);
+  if (data.fx.stale) warnings.push('- **汇率降级**：本次获取失败，沿用上次成功结果');
+  if (summary.missingRates.length) warnings.push(`- **缺少汇率**：${summary.missingRates.join('、')}`);
+
   const lines = [
     '## iCloud+ 价格更新',
     '',
-    '- 状态：成功',
-    `- 触发方式：${process.env.GITHUB_EVENT_NAME ?? 'unknown'}`,
+    '### 结论',
+    '- **状态：成功**',
+    `- 触发方式：${trigger}`,
     `- 抓取完成时间（北京时间）：${formatBeijingDateTime(data.generatedAt)}`,
-    `- Apple 页面标注日期：${data.source.publishedDate ?? 'unknown'}`,
-    `- Apple 解析路径：${data.source.parser ?? 'unknown'}`,
-    `- 解析冗余状态：${data.source.parserStatus ?? 'unknown'}`,
-    `- Apple 发布日期记录：${summary.publishedDateHistory.length} 条`,
-    `- 本次发布日期对应内容变化：${summary.publicationDateChanged ? `${summary.publicationChanges.changedCountries.length} 个地区内容变化、${summary.publicationChanges.addedCountries.length} 个新增地区、${summary.publicationChanges.removedCountries.length} 个移除地区、${summary.publicationChanges.addedTiers.length} 个新增容量、${summary.publicationChanges.removedTiers.length} 个移除容量` : '发布日期未变化'}`,
+    '',
+    '### 数据概览',
     `- 地区数量：${data.countries.length}`,
     `- 价格点数量：${data.countries.length * data.tiers.length}`,
-    `- 本次新增地区：${summary.addedCountries.length ? summary.addedCountries.join('、') : '无'}`,
-    `- 本次移除地区：${summary.removedCountries.length ? summary.removedCountries.join('、') : '无'}`,
-    `- 检测到价格或币种变化：${summary.changedCountries} 个地区`,
-    `- 历史记录覆盖：${Object.keys(summary.history.countries).length} 个地区`,
-    `- 汇率数据时间（北京时间）：${formatBeijingDateTime(data.fx.fetchedAt)}`,
+    `- 历史记录覆盖：${Object.keys(summary.history?.countries ?? {}).length} 个地区`,
+    `- Apple 页面标注日期：${data.source.publishedDate ?? 'unknown'}`,
+    `- Apple 发布日期记录：${summary.publishedDateHistory.length} 条`,
+    '',
+    '### 校验与来源',
+    `- Apple 解析路径：${describeParser(data)}`,
+    `- 汇率更新时间（北京时间）：${formatBeijingDateTime(data.fx.fetchedAt)}`,
     `- 汇率状态：${data.fx.stale ? '沿用上次成功结果' : '本次成功获取'}`,
-    `- 缺少汇率：${summary.missingRates.length ? summary.missingRates.join('、') : '无'}`,
-    ''
+    '',
+    '### 本次变化',
+    ...changes
   ];
-  await appendFile(process.env.GITHUB_STEP_SUMMARY, lines.join('\n'), 'utf8');
+  if (warnings.length) lines.push('', '### 警告', ...warnings);
+  lines.push('');
+  return lines;
+}
+
+async function writeActionSummary(data, summary) {
+  if (!process.env.GITHUB_STEP_SUMMARY) return;
+  await appendFile(
+    process.env.GITHUB_STEP_SUMMARY,
+    buildActionSummaryLines(data, summary).join('\n'),
+    'utf8'
+  );
 }
 
 export async function main() {
@@ -508,11 +554,15 @@ async function handleFailure(error) {
       await appendFile(process.env.GITHUB_STEP_SUMMARY, [
         '## iCloud+ 价格更新',
         '',
-        '- 状态：失败',
+        '### 失败',
+        '- **状态：失败**',
         `- 触发方式：${report.trigger}`,
         `- 失败时间（北京时间）：${formatBeijingDateTime(finishedAt)}`,
-        `- 失败原因：${error.message}`,
+        `- **失败原因：${error.message}**`,
         `- Apple 原始响应：${report.appleResponseCaptured ? '已保存到运行附件' : '未获取到'}`,
+        '',
+        '### 处理建议',
+        '- 请先查看当前失败步骤日志，再下载 `icloud-price-diagnostics-*` 附件。',
         ''
       ].join('\n'), 'utf8');
     }

@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   buildSnapshotChanges,
   buildRunLog,
+  buildActionSummaryLines,
   createRunLogEntry,
   getExchangeRates,
   publicationDateKey,
@@ -90,6 +91,39 @@ test('does not carry a missing currency from old rates into a successful refresh
     assert.equal(fx.stale, false);
     assert.equal(fx.rates.CNY, 7.2);
     assert.equal(fx.rates.JPY, undefined);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('keeps the previous exchange rates when the refresh fails', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => { throw new Error('temporary outage'); };
+  try {
+    const fx = await getExchangeRates({
+      fx: {
+        sourceUrl: 'https://example.test/rates',
+        base: 'USD',
+        fetchedAt: '2026-07-30T00:00:00.000Z',
+        rates: { USD: 1, CNY: 7.1, JPY: 150 }
+      }
+    });
+    assert.equal(fx.stale, true);
+    assert.equal(fx.fetchedAt, '2026-07-30T00:00:00.000Z');
+    assert.equal(fx.rates.JPY, 150);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('does not invent exchange rates when no previous valid rates exist', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ result: 'error' }), { status: 200 });
+  try {
+    await assert.rejects(
+      () => getExchangeRates({ fx: { rates: { USD: 1 } } }),
+      /Exchange-rate response is missing required fields/
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -242,4 +276,54 @@ test('builds a structured successful run log with source, counts, and changes', 
     () => buildRunLog({ schemaVersion: 2, runs: [] }, entry),
     /unsupported structure/
   );
+});
+
+test('keeps successful Action summaries concise and promotes warnings', () => {
+  const data = {
+    source: {
+      publishedDate: 'July 17, 2026',
+      parser: 'cross-checked',
+      parserStatus: 'Both independent parser paths agreed'
+    },
+    generatedAt: '2026-07-31T22:10:00.000Z',
+    fx: {
+      fetchedAt: '2026-07-31T00:02:31.000Z',
+      stale: false
+    },
+    tiers: [TIER_50, TIER_200],
+    countries: [country('Alpha')]
+  };
+  const summary = {
+    history: { countries: { Alpha: {} } },
+    missingRates: [],
+    addedCountries: [],
+    removedCountries: [],
+    changedCountries: 0,
+    publishedDateHistory: [{ publishedDate: 'July 17, 2026' }],
+    publicationDateChanged: false,
+    publicationChanges: {
+      addedTiers: [],
+      removedTiers: [],
+      addedCountries: [],
+      removedCountries: [],
+      changedCountries: []
+    }
+  };
+
+  const rendered = buildActionSummaryLines(data, summary, 'workflow_dispatch').join('\n');
+  assert.match(rendered, /### 结论/);
+  assert.match(rendered, /Apple 解析路径：cross-checked（双解析器一致）/);
+  assert.match(rendered, /### 本次变化\n本次变化：无/);
+  assert.doesNotMatch(rendered, /本次新增地区：无|本次移除地区：无|缺少汇率：无/);
+
+  const stale = buildActionSummaryLines({
+    ...data,
+    fx: { ...data.fx, stale: true }
+  }, {
+    ...summary,
+    missingRates: ['JPY']
+  }, 'schedule').join('\n');
+  assert.match(stale, /### 警告/);
+  assert.match(stale, /汇率降级/);
+  assert.match(stale, /缺少汇率.*JPY/);
 });
