@@ -230,6 +230,16 @@ test('renders current prices, sorting, and country history in a real browser', {
         assert.equal(await page.locator('#historyTierControl button').count(), expectedData.tiers.length);
         if (historyCountry) {
           await page.waitForFunction(() => !document.querySelector('#chartWrap')?.hidden);
+          await page.waitForFunction(() => {
+            const canvas = document.querySelector('#historyChart');
+            const context = canvas?.getContext('2d');
+            if (!context || !canvas.width || !canvas.height) return false;
+            const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+            for (let index = 3; index < pixels.length; index += 4) {
+              if (pixels[index] > 0) return true;
+            }
+            return false;
+          }, undefined, { timeout: 5_000 });
           const chartPixels = await page.locator('#historyChart').evaluate((canvas) => {
             const context = canvas.getContext('2d');
             if (!context || !canvas.width || !canvas.height) return 0;
