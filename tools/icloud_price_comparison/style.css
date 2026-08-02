@@ -416,7 +416,13 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--accent-dark
 .price-trend.is-neutral { color: var(--muted); }
 .source-history-dialog { width: min(620px, calc(100% - 32px)); }
 .source-history-dialog .history-table-scroll table { min-width: 560px; table-layout: fixed; }
-.source-history-dialog .history-table-scroll th:nth-child(-n + 2) { width: 112px; }
+.source-history-dialog .history-table-scroll th { position: static; }
+.source-history-dialog .history-table-scroll th:nth-child(-n + 2) {
+  width: 112px;
+  white-space: normal;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
 .published-date-current { padding: 20px 24px; background: var(--surface-soft); border-bottom: 1px solid var(--line); }
 .published-date-current span { display: block; margin-bottom: 4px; color: var(--muted); font-size: 12px; }
 .published-date-current strong { display: block; font-size: 21px; }
