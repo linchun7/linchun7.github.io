@@ -54,7 +54,8 @@ test('keeps same-date archive revisions as separate HTML and JSON evidence', asy
   const snapshotIndexPath = path.join(snapshotsDir, 'index.json');
   const firstHtml = archiveHtml({ stamp: '20250512010000', alphaPrice: '0.99' });
   const secondHtml = archiveHtml({ stamp: '20250513010000', alphaPrice: '1.99' });
-  const parsedCurrent = parseLegacyAppleArchive(secondHtml);
+  const thirdHtml = archiveHtml({ stamp: '20250514010000', alphaPrice: '2.99' });
+  const parsedCurrent = parseLegacyAppleArchive(thirdHtml);
 
   try {
     await mkdir(inputDir, { recursive: true });
@@ -62,6 +63,7 @@ test('keeps same-date archive revisions as separate HTML and JSON evidence', asy
       // Reverse the file names so revision order must come from Wayback timestamps.
       writeFile(path.join(inputDir, '02-first.html'), firstHtml, 'utf8'),
       writeFile(path.join(inputDir, '01-second.html'), secondHtml, 'utf8'),
+      writeFile(path.join(inputDir, '00-third.html'), thirdHtml, 'utf8'),
       writeFile(historyPath, JSON.stringify({ schemaVersion: 2, countries: {}, sourcePublishedDates: [] }), 'utf8'),
       writeFile(pricesPath, `${JSON.stringify(currentData(parsedCurrent))}\n`, 'utf8'),
       writeFile(namesPath, '{}', 'utf8')
@@ -76,16 +78,22 @@ test('keeps same-date archive revisions as separate HTML and JSON evidence', asy
     });
     const snapshot = result.snapshotIndex.snapshots.find(({ publishedDate }) => publishedDate === '2025-05-12');
     assert.ok(snapshot);
-    assert.equal(snapshot.revisions.length, 2);
+    assert.equal(snapshot.revisions.length, 3);
     assert.equal(snapshot.revisions[0].firstConfirmedDate, '2025-05-12');
     assert.equal(snapshot.revisions[1].firstConfirmedDate, '2025-05-13');
+    assert.equal(snapshot.revisions[2].firstConfirmedDate, '2025-05-14');
     assert.notEqual(snapshot.revisions[0].file, snapshot.revisions[1].file);
     assert.notEqual(snapshot.revisions[0].dataFile, snapshot.revisions[1].dataFile);
     for (const revision of snapshot.revisions) {
       await access(path.join(snapshotsDir, revision.file));
       await access(path.join(snapshotsDir, revision.dataFile));
     }
-    assert.equal(result.history.countries['Alpha 1'].events.length, 2);
+    assert.equal(result.history.countries['Alpha 1'].events.length, 3);
+    assert.equal(result.history.sourcePublishedDates.length, 1);
+    assert.equal(result.history.sourcePublishedDates[0].changes.changedCountries[0].country, 'Alpha 1');
+    assert.deepEqual(result.history.sourcePublishedDates[0].changes.changedCountries[0].tiers, [
+      { id: '50GB', from: 0.99, to: 2.99 }
+    ]);
 
     const filesBeforeRepeat = await readdir(snapshotsDir);
     const repeated = await importAppleArchives(inputDir, {
@@ -96,9 +104,63 @@ test('keeps same-date archive revisions as separate HTML and JSON evidence', asy
       snapshotIndexPath
     });
     const repeatedSnapshot = repeated.snapshotIndex.snapshots.find(({ publishedDate }) => publishedDate === '2025-05-12');
-    assert.equal(repeatedSnapshot.revisions.length, 2);
+    assert.equal(repeatedSnapshot.revisions.length, 3);
     assert.deepEqual(await readdir(snapshotsDir), filesBeforeRepeat);
     assert.deepEqual(JSON.parse(await readFile(snapshotIndexPath, 'utf8')), repeated.snapshotIndex);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('rejects empty or incomplete archive inputs without rewriting history', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'icloud-archive-guard-'));
+  const inputDir = path.join(root, 'input');
+  const snapshotsDir = path.join(root, 'snapshots');
+  const historyPath = path.join(root, 'history.json');
+  const pricesPath = path.join(root, 'prices.json');
+  const namesPath = path.join(root, 'names.json');
+  const snapshotIndexPath = path.join(snapshotsDir, 'index.json');
+  const html = archiveHtml({ stamp: '20250513010000', alphaPrice: '1.99' });
+  const parsed = parseLegacyAppleArchive(html);
+  const originalHistory = JSON.stringify({ schemaVersion: 2, countries: { Preserved: { events: [] } }, sourcePublishedDates: [] });
+
+  try {
+    await mkdir(inputDir, { recursive: true });
+    await mkdir(snapshotsDir, { recursive: true });
+    await Promise.all([
+      writeFile(historyPath, originalHistory, 'utf8'),
+      writeFile(pricesPath, `${JSON.stringify(currentData(parsed))}\n`, 'utf8'),
+      writeFile(namesPath, '{}', 'utf8'),
+      writeFile(snapshotIndexPath, JSON.stringify({
+        schemaVersion: 1,
+        snapshots: [{
+          publishedDate: '2025-04-01',
+          activeFile: '2025-04-01.html',
+          activeDataFile: '2025-04-01.json',
+          activeContentHash: 'a'.repeat(64),
+          revisions: [{
+            publishedDate: '2025-04-01',
+            file: '2025-04-01.html',
+            dataFile: '2025-04-01.json',
+            firstConfirmedDate: '2025-04-02',
+            contentHash: 'a'.repeat(64)
+          }]
+        }]
+      }), 'utf8')
+    ]);
+
+    await assert.rejects(
+      importAppleArchives(inputDir, { historyPath, pricesPath, namesPath, snapshotsDir, snapshotIndexPath }),
+      /No validated Apple archives/
+    );
+    assert.equal(await readFile(historyPath, 'utf8'), originalHistory);
+
+    await writeFile(path.join(inputDir, 'may.html'), html, 'utf8');
+    await assert.rejects(
+      importAppleArchives(inputDir, { historyPath, pricesPath, namesPath, snapshotsDir, snapshotIndexPath }),
+      /Archive input is incomplete.*2025-04-01/
+    );
+    assert.equal(await readFile(historyPath, 'utf8'), originalHistory);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
