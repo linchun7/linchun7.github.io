@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "updatedAt": "2026-08-02T08:06:08.060Z",
+  "updatedAt": "2026-08-02T08:29:36.032Z",
   "countries": {
     "Bahamas": {
       "nameZh": "巴哈马",
@@ -8,8 +8,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -27,8 +25,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -46,8 +42,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "BRL",
           "plans": {
             "50GB": 4.9,
@@ -59,8 +53,6 @@
         },
         {
           "observedAt": "2025-05-22",
-          "observedAtBeijing": "2025-05-22",
-          "observedAtUtc": "2025-08-13T00:58:53.000Z",
           "currency": "BRL",
           "plans": {
             "50GB": 5.9,
@@ -78,8 +70,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "CAD",
           "plans": {
             "50GB": 1.29,
@@ -97,8 +87,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "CLP",
           "plans": {
             "50GB": 790,
@@ -110,8 +98,6 @@
         },
         {
           "observedAt": "2025-05-22",
-          "observedAtBeijing": "2025-05-22",
-          "observedAtUtc": "2025-08-13T00:58:53.000Z",
           "currency": "CLP",
           "plans": {
             "50GB": 990,
@@ -129,8 +115,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "COP",
           "plans": {
             "50GB": 3900,
@@ -148,8 +132,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "MXN",
           "plans": {
             "50GB": 17,
@@ -167,8 +149,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "PEN",
           "plans": {
             "50GB": 2.9,
@@ -180,8 +160,6 @@
         },
         {
           "observedAt": "2025-05-22",
-          "observedAtBeijing": "2025-05-22",
-          "observedAtUtc": "2025-08-13T00:58:53.000Z",
           "currency": "PEN",
           "plans": {
             "50GB": 3.9,
@@ -199,8 +177,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -218,8 +194,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -237,8 +211,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 1.19,
@@ -250,8 +222,6 @@
         },
         {
           "observedAt": "2025-05-22",
-          "observedAtBeijing": "2025-05-22",
-          "observedAtUtc": "2025-08-13T00:58:53.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 1.19,
@@ -269,8 +239,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -288,8 +256,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 1.19,
@@ -307,8 +273,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -326,8 +290,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "BGN",
           "plans": {
             "50GB": 1.99,
@@ -345,8 +307,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -364,8 +324,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "EUR",
           "plans": {
             "50GB": 0.99,
@@ -383,8 +341,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "CZK",
           "plans": {
             "50GB": 25,
@@ -402,8 +358,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "DKK",
           "plans": {
             "50GB": 9,
@@ -421,8 +375,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "EGP",
           "plans": {
             "50GB": 39.99,
@@ -434,8 +386,6 @@
         },
         {
           "observedAt": "2026-07-30",
-          "observedAtBeijing": "2026-07-30",
-          "observedAtUtc": "2026-08-02T05:59:02.427Z",
           "currency": "EGP",
           "plans": {
             "50GB": 49.99,
@@ -453,8 +403,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "EUR",
           "plans": {
             "50GB": 0.99,
@@ -472,8 +420,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -491,8 +437,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -510,8 +454,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "HUF",
           "plans": {
             "50GB": 399,
@@ -529,8 +471,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 1.19,
@@ -548,8 +488,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "ILS",
           "plans": {
             "50GB": 3.9,
@@ -567,8 +505,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -586,8 +522,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -605,8 +539,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -624,8 +556,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "NGN",
           "plans": {
             "50GB": 900,
@@ -637,8 +567,6 @@
         },
         {
           "observedAt": "2026-07-30",
-          "observedAtBeijing": "2026-07-30",
-          "observedAtUtc": "2026-08-02T05:59:02.427Z",
           "currency": "NGN",
           "plans": {
             "50GB": 1300,
@@ -656,8 +584,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "NOK",
           "plans": {
             "50GB": 12,
@@ -675,8 +601,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "PKR",
           "plans": {
             "50GB": 200,
@@ -694,8 +618,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "PLN",
           "plans": {
             "50GB": 4.99,
@@ -713,8 +635,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "QAR",
           "plans": {
             "50GB": 3.69,
@@ -732,8 +652,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "RON",
           "plans": {
             "50GB": 4.99,
@@ -751,8 +669,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "RUB",
           "plans": {
             "50GB": 59,
@@ -770,8 +686,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "SAR",
           "plans": {
             "50GB": 3.99,
@@ -789,8 +703,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -808,8 +720,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "ZAR",
           "plans": {
             "50GB": 14.99,
@@ -827,8 +737,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "SEK",
           "plans": {
             "50GB": 12,
@@ -846,8 +754,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "CHF",
           "plans": {
             "50GB": 1,
@@ -865,8 +771,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "TZS",
           "plans": {
             "50GB": 2500,
@@ -884,8 +788,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "TRY",
           "plans": {
             "50GB": 24.99,
@@ -897,8 +799,6 @@
         },
         {
           "observedAt": "2025-08-21",
-          "observedAtBeijing": "2025-08-21",
-          "observedAtUtc": "2025-12-14T03:00:06.000Z",
           "currency": "TRY",
           "plans": {
             "50GB": 39.99,
@@ -910,8 +810,6 @@
         },
         {
           "observedAt": "2026-07-30",
-          "observedAtBeijing": "2026-07-30",
-          "observedAtUtc": "2026-08-02T05:59:02.427Z",
           "currency": "TRY",
           "plans": {
             "50GB": 49.99,
@@ -929,8 +827,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -948,8 +844,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "AED",
           "plans": {
             "50GB": 3.99,
@@ -967,8 +861,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "GBP",
           "plans": {
             "50GB": 0.99,
@@ -986,8 +878,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -1005,8 +895,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -1024,8 +912,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "AUD",
           "plans": {
             "50GB": 1.49,
@@ -1043,8 +929,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -1062,8 +946,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "CNY",
           "plans": {
             "50GB": 6,
@@ -1081,8 +963,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "HKD",
           "plans": {
             "50GB": 8,
@@ -1100,8 +980,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "INR",
           "plans": {
             "50GB": 75,
@@ -1119,8 +997,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "IDR",
           "plans": {
             "50GB": 15000,
@@ -1132,8 +1008,6 @@
         },
         {
           "observedAt": "2026-07-30",
-          "observedAtBeijing": "2026-07-30",
-          "observedAtUtc": "2026-08-02T05:59:02.427Z",
           "currency": "IDR",
           "plans": {
             "50GB": 15000,
@@ -1151,8 +1025,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "JPY",
           "plans": {
             "50GB": 150,
@@ -1164,8 +1036,6 @@
         },
         {
           "observedAt": "2026-07-30",
-          "observedAtBeijing": "2026-07-30",
-          "observedAtUtc": "2026-08-02T05:59:02.427Z",
           "currency": "JPY",
           "plans": {
             "50GB": 180,
@@ -1183,8 +1053,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "KZT",
           "plans": {
             "50GB": 499,
@@ -1202,8 +1070,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -1221,8 +1087,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "MYR",
           "plans": {
             "50GB": 3.9,
@@ -1240,8 +1104,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -1259,8 +1121,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "NZD",
           "plans": {
             "50GB": 1.69,
@@ -1272,8 +1132,6 @@
         },
         {
           "observedAt": "2026-07-30",
-          "observedAtBeijing": "2026-07-30",
-          "observedAtUtc": "2026-08-02T05:59:02.427Z",
           "currency": "NZD",
           "plans": {
             "50GB": 1.99,
@@ -1291,8 +1149,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "PHP",
           "plans": {
             "50GB": 49,
@@ -1304,8 +1160,6 @@
         },
         {
           "observedAt": "2026-07-30",
-          "observedAtBeijing": "2026-07-30",
-          "observedAtUtc": "2026-08-02T05:59:02.427Z",
           "currency": "PHP",
           "plans": {
             "50GB": 59,
@@ -1323,8 +1177,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "KRW",
           "plans": {
             "50GB": 1100,
@@ -1342,8 +1194,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "SGD",
           "plans": {
             "50GB": 1.48,
@@ -1361,8 +1211,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "TWD",
           "plans": {
             "50GB": 30,
@@ -1380,8 +1228,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -1399,8 +1245,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "THB",
           "plans": {
             "50GB": 35,
@@ -1418,8 +1262,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -1437,8 +1279,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "observedAtBeijing": "2024-12-05",
-          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "VND",
           "plans": {
             "50GB": 19000,
@@ -1450,8 +1290,6 @@
         },
         {
           "observedAt": "2026-07-30",
-          "observedAtBeijing": "2026-07-30",
-          "observedAtUtc": "2026-08-02T05:59:02.427Z",
           "currency": "VND",
           "plans": {
             "50GB": 25000,
@@ -1469,8 +1307,6 @@
       "events": [
         {
           "observedAt": "2025-05-22",
-          "observedAtBeijing": "2025-05-22",
-          "observedAtUtc": "2025-08-13T00:58:53.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 1.19,
@@ -1488,8 +1324,6 @@
       "events": [
         {
           "observedAt": "2025-05-22",
-          "observedAtBeijing": "2025-05-22",
-          "observedAtUtc": "2025-08-13T00:58:53.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -1507,8 +1341,6 @@
       "events": [
         {
           "observedAt": "2026-07-30",
-          "observedAtBeijing": "2026-07-30",
-          "observedAtUtc": "2026-08-02T05:59:02.427Z",
           "currency": "USD",
           "plans": {
             "50GB": 1.19,
@@ -1526,8 +1358,6 @@
       "events": [
         {
           "observedAt": "2026-07-30",
-          "observedAtBeijing": "2026-07-30",
-          "observedAtUtc": "2026-08-02T05:59:02.427Z",
           "currency": "USD",
           "plans": {
             "50GB": 1.19,
@@ -1545,8 +1375,6 @@
       "events": [
         {
           "observedAt": "2026-07-30",
-          "observedAtBeijing": "2026-07-30",
-          "observedAtUtc": "2026-08-02T05:59:02.427Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,

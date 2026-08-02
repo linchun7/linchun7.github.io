@@ -68,11 +68,15 @@ function latestExistingEventDate(history, afterDate) {
 
 export async function importAppleArchives(inputDir) {
   if (!inputDir) throw new Error('Archive input directory is required');
-  const [history, currentData, names, fileNames] = await Promise.all([
+  const [history, currentData, names, fileNames, existingSnapshotIndex] = await Promise.all([
     readFile(HISTORY_PATH, 'utf8').then(JSON.parse),
     readFile(PRICES_PATH, 'utf8').then(JSON.parse),
     readFile(NAMES_PATH, 'utf8').then(JSON.parse),
-    readdir(inputDir)
+    readdir(inputDir),
+    readFile(SNAPSHOT_INDEX_PATH, 'utf8').then(JSON.parse).catch((error) => {
+      if (error.code === 'ENOENT') return { schemaVersion: 1, snapshots: [] };
+      throw error;
+    })
   ]);
 
   const archives = [];
@@ -89,7 +93,7 @@ export async function importAppleArchives(inputDir) {
 
   const rebuilt = { schemaVersion: 2, updatedAt: new Date().toISOString(), countries: {}, sourcePublishedDates: [] };
   let previousData = null;
-  let snapshotIndex = { schemaVersion: 1, snapshots: [] };
+  let snapshotIndex = existingSnapshotIndex;
   await mkdir(SNAPSHOTS_DIR, { recursive: true });
 
   for (const archive of archives) {
@@ -105,7 +109,7 @@ export async function importAppleArchives(inputDir) {
     });
     snapshotIndex = buildAppleSnapshotIndex(snapshotIndex, entry);
     await copyFile(archive.filePath, path.join(SNAPSHOTS_DIR, entry.file));
-    updateHistory(rebuilt, archive.parsed.countries, archive.publishedDate, archive.parsed.tiers, archive.capturedAtUtc);
+    updateHistory(rebuilt, archive.parsed.countries, archive.publishedDate, archive.parsed.tiers);
     const changes = previousData ? buildSnapshotChanges(previousData, archive.parsed.countries, archive.parsed.tiers) : emptyChanges();
     rebuilt.sourcePublishedDates.push({
       publishedDate: archive.parsed.sourcePublishedDate,
@@ -119,7 +123,10 @@ export async function importAppleArchives(inputDir) {
 
   const lastArchiveDate = archives.at(-1)?.publishedDate ?? '0000-00-00';
   const currentObservedAt = latestExistingEventDate(history, lastArchiveDate) ?? currentData.run?.observedAtBeijing ?? currentData.generatedAt.slice(0, 10);
-  updateHistory(rebuilt, currentData.countries, currentObservedAt, currentData.tiers, currentData.run?.observedAtUtc ?? currentData.generatedAt);
+  const currentObservedAtUtc = currentData.run?.observedAtBeijing === currentObservedAt
+    ? currentData.run?.observedAtUtc ?? currentData.generatedAt
+    : null;
+  updateHistory(rebuilt, currentData.countries, currentObservedAt, currentData.tiers, currentObservedAtUtc);
   const currentPublishedDate = publicationDateKey(currentData.source.publishedDate);
   if (currentPublishedDate > lastArchiveDate) {
     rebuilt.sourcePublishedDates.push({
