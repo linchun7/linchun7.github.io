@@ -17,7 +17,8 @@ import {
   publicationDateKey,
   writeFailureDiagnostics,
   updateHistory,
-  updatePublishedDateHistory
+  updatePublishedDateHistory,
+  writeJsonAtomic
 } from '../scripts/update-prices.mjs';
 
 test('builds a deduplicated Apple snapshot index by published date', () => {
@@ -271,6 +272,48 @@ test('does not write a snapshot when publication-date validation fails', async (
     ]);
     assert.deepEqual(after, before);
     await assert.rejects(readFile(paths.snapshotIndexPath, 'utf8'), { code: 'ENOENT' });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('rolls back prices, history, logs, and snapshots when a production write fails midway', async () => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const fxPayload = {
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
+    rates: data.fx.rates
+  };
+  const before = await Promise.all([
+    readFile(paths.currentDataPath, 'utf8'),
+    readFile(paths.historyPath, 'utf8'),
+    readFile(paths.runLogPath, 'utf8')
+  ]);
+  let writes = 0;
+  const failSecondWrite = async (filePath, value) => {
+    writes += 1;
+    if (writes === 2) throw new Error('simulated history write failure');
+    await writeJsonAtomic(filePath, value);
+  };
+
+  try {
+    await withMockedFetch(
+      { html: buildAppleHtml(data), fxPayload },
+      () => assert.rejects(
+        main({ dryRun: false, paths, stepSummaryPath: null, writeJson: failSecondWrite }),
+        /simulated history write failure/
+      )
+    );
+    const after = await Promise.all([
+      readFile(paths.currentDataPath, 'utf8'),
+      readFile(paths.historyPath, 'utf8'),
+      readFile(paths.runLogPath, 'utf8')
+    ]);
+    assert.deepEqual(after.map(JSON.parse), before.map(JSON.parse));
+    await assert.rejects(readFile(paths.snapshotIndexPath, 'utf8'), { code: 'ENOENT' });
+    assert.deepEqual(await readdir(paths.snapshotsDir), []);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -767,6 +810,20 @@ test('runs the complete updater in dry-run mode without modifying committed data
   const after = await Promise.all([pricesUrl, historyUrl, runLogUrl].map((url) => readFile(url, 'utf8')));
   assert.deepEqual(after, before, 'dry-run must not change prices, history, or run logs');
   assert.ok(messages.some((message) => /Live check passed with cross-checked: 73 countries and 365 prices/.test(message)));
+});
+
+test('accepts compact Apple 50GB labels during the fetch preflight', async () => {
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const fxPayload = {
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
+    rates: data.fx.rates
+  };
+  await runDryMain({
+    html: buildAppleHtml(data).replaceAll('50 GB', '50GB'),
+    fxPayload
+  });
 });
 
 test('complete dry-run keeps previous rates for an incomplete online response and rejects a missing Apple publication date', async () => {

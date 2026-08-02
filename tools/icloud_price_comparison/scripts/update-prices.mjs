@@ -50,7 +50,7 @@ async function fetchResource(url, {
       });
       if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
       const body = await response.text();
-      if (!json && (body.length < 20_000 || !body.includes('50 GB'))) {
+      if (!json && (body.length < 20_000 || !/50\s*GB/i.test(body))) {
         throw new Error(`Unexpected Apple response (${body.length} bytes)`);
       }
       return json ? JSON.parse(body) : body;
@@ -370,11 +370,16 @@ export function updatePublishedDateHistory(history, previousData, publishedDate,
   return { entries, changed };
 }
 
-async function writeJsonAtomic(filePath, value) {
+export async function writeJsonAtomic(filePath, value) {
   await mkdir(path.dirname(filePath), { recursive: true });
-  const temporaryPath = `${filePath}.tmp`;
-  await writeFile(temporaryPath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
-  await rename(temporaryPath, filePath);
+  const temporaryPath = `${filePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  try {
+    await writeFile(temporaryPath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+    await rename(temporaryPath, filePath);
+  } catch (error) {
+    await unlinkIfExists(temporaryPath);
+    throw error;
+  }
 }
 
 export function createRunLogEntry(data, summary, startedAt, finishedAt) {
@@ -447,6 +452,36 @@ async function writeAppleSnapshot(html, startedAt, diagnosticsDir = DIAGNOSTICS_
   const stamp = startedAt.toISOString().replaceAll(/[-:]/g, '').replace('.000Z', 'Z');
   await mkdir(diagnosticsDir, { recursive: true });
   await writeFile(path.join(diagnosticsDir, `apple-response-${stamp}.html`), html, 'utf8');
+}
+
+async function unlinkIfExists(filePath) {
+  try {
+    await unlink(filePath);
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+}
+
+async function restoreProductionFiles(entries) {
+  const results = await Promise.allSettled(entries.map(({ filePath, value, existed = true }) => (
+    existed ? writeJsonAtomic(filePath, value) : unlinkIfExists(filePath)
+  )));
+  const failures = results.filter(({ status }) => status === 'rejected');
+  if (failures.length) {
+    throw new Error(`Unable to restore ${failures.length} production data file(s) after a failed update`);
+  }
+}
+
+async function restorePublishedSnapshot({ snapshotsDir, snapshotIndexPath, originalSnapshotIndex, file }) {
+  const results = await Promise.allSettled([
+    unlinkIfExists(path.join(snapshotsDir, file)),
+    unlinkIfExists(path.join(snapshotsDir, file.replace(/\.html$/, '.json'))),
+    originalSnapshotIndex
+      ? writeJsonAtomic(snapshotIndexPath, originalSnapshotIndex)
+      : unlinkIfExists(snapshotIndexPath)
+  ]);
+  const failures = results.filter(({ status }) => status === 'rejected');
+  if (failures.length) throw new Error(`Unable to restore Apple snapshot files after a failed update`);
 }
 
 function failureRunLogEntry(error, startedAt, finishedAt, appleResponseCaptured = Boolean(lastAppleHtml)) {
@@ -724,7 +759,8 @@ async function writeActionSummary(data, summary, stepSummaryPath) {
 export async function main({
   dryRun = DRY_RUN,
   paths = {},
-  stepSummaryPath = process.env.GITHUB_STEP_SUMMARY
+  stepSummaryPath = process.env.GITHUB_STEP_SUMMARY,
+  writeJson = writeJsonAtomic
 } = {}) {
   const currentDataPath = paths.currentDataPath ?? CURRENT_DATA_PATH;
   const historyPath = paths.historyPath ?? HISTORY_PATH;
@@ -740,6 +776,15 @@ export async function main({
     readJson(namesPath, {}),
     fetchResource(APPLE_URL)
   ]);
+  const runLogExisted = await readFile(runLogPath, 'utf8').then(() => true).catch((error) => {
+    if (error.code === 'ENOENT') return false;
+    throw error;
+  });
+  const originalFiles = [
+    { filePath: currentDataPath, value: structuredClone(previousData) },
+    { filePath: historyPath, value: structuredClone(previousHistory) },
+    { filePath: runLogPath, value: structuredClone(previousRunLog), existed: runLogExisted }
+  ];
   lastAppleHtml = html;
   if (!countryNames || Object.keys(countryNames).length < 60) {
     throw new Error('Chinese country-name mapping is missing or incomplete');
@@ -815,8 +860,10 @@ export async function main({
   const history = historyUpdate.history;
   const publishedDateUpdate = updatePublishedDateHistory(history, previousData, parsed.sourcePublishedDate, observedAt, publicationChanges, generatedAt);
   const publishedDateHistory = publishedDateUpdate.entries;
+  const originalSnapshotIndex = dryRun ? null : await readJson(snapshotIndexPath, null);
+  let snapshotSaved = false;
   if (!dryRun) {
-    await savePublishedAppleSnapshot(html, parsed, observedAt, {
+    snapshotSaved = await savePublishedAppleSnapshot(html, parsed, observedAt, {
       snapshotsDir,
       indexPath: snapshotIndexPath
     });
@@ -835,9 +882,30 @@ export async function main({
   if (dryRun) {
     console.log(`Live check passed with ${parsed.parser}: ${countries.length} countries and ${countries.length * parsed.tiers.length} prices. No files were changed.`);
   } else {
-    await writeJsonAtomic(currentDataPath, data);
-    await writeJsonAtomic(historyPath, history);
-    await writeJsonAtomic(runLogPath, runLog);
+    try {
+      await writeJson(currentDataPath, data);
+      await writeJson(historyPath, history);
+      await writeJson(runLogPath, runLog);
+    } catch (error) {
+      const rollbackTasks = [restoreProductionFiles(originalFiles)];
+      if (snapshotSaved) {
+        const publishedDate = publicationDateKey(parsed.sourcePublishedDate);
+        const contentHash = appleSnapshotContentHash(parsed);
+        const existingDate = originalSnapshotIndex?.snapshots?.some((item) => item.publishedDate === publishedDate);
+        const file = existingDate ? `${publishedDate}-${contentHash.slice(0, 12)}.html` : `${publishedDate}.html`;
+        rollbackTasks.push(restorePublishedSnapshot({
+          snapshotsDir,
+          snapshotIndexPath,
+          originalSnapshotIndex,
+          file
+        }));
+      }
+      const rollbackResults = await Promise.allSettled(rollbackTasks);
+      if (rollbackResults.some(({ status }) => status === 'rejected')) {
+        throw new AggregateError([error, ...rollbackResults.filter(({ status }) => status === 'rejected').map(({ reason }) => reason)], 'Production update failed and rollback was incomplete');
+      }
+      throw error;
+    }
     console.log(`Saved ${countries.length} countries and ${countries.length * parsed.tiers.length} prices using ${parsed.parser}.`);
   }
   try {
