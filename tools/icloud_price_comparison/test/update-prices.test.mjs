@@ -483,6 +483,12 @@ test('complete dry-run keeps previous rates for an incomplete online response an
 });
 
 test('builds a structured successful run log with source, counts, and changes', () => {
+  const originalEventName = process.env.GITHUB_EVENT_NAME;
+  const originalTriggerSource = process.env.ICLOUD_TRIGGER_SOURCE;
+  const originalAutomaticDate = process.env.ICLOUD_AUTOMATIC_RUN_DATE_BEIJING;
+  process.env.GITHUB_EVENT_NAME = 'workflow_dispatch';
+  process.env.ICLOUD_TRIGGER_SOURCE = 'cloudflare';
+  process.env.ICLOUD_AUTOMATIC_RUN_DATE_BEIJING = '2026-08-01';
   const data = {
     source: {
       url: 'https://support.apple.com/en-us/108047',
@@ -508,19 +514,31 @@ test('builds a structured successful run log with source, counts, and changes', 
     removedCountries: [],
     changedCountries: []
   };
-  const entry = createRunLogEntry(
-    data,
-    {
-      observedAt: '2026-08-01',
-      publicationChanges,
-      publicationDateChanged: true,
-      publishedDateHistory: [{ publishedDate: 'July 1, 2026' }, { publishedDate: 'July 17, 2026' }]
-    },
-    new Date('2026-08-01T04:00:00.000Z'),
-    new Date('2026-08-01T04:00:02.500Z')
-  );
+  let entry;
+  try {
+    entry = createRunLogEntry(
+      data,
+      {
+        observedAt: '2026-08-01',
+        publicationChanges,
+        publicationDateChanged: true,
+        publishedDateHistory: [{ publishedDate: 'July 1, 2026' }, { publishedDate: 'July 17, 2026' }]
+      },
+      new Date('2026-08-01T04:00:00.000Z'),
+      new Date('2026-08-01T04:00:02.500Z')
+    );
+  } finally {
+    if (originalEventName === undefined) delete process.env.GITHUB_EVENT_NAME;
+    else process.env.GITHUB_EVENT_NAME = originalEventName;
+    if (originalTriggerSource === undefined) delete process.env.ICLOUD_TRIGGER_SOURCE;
+    else process.env.ICLOUD_TRIGGER_SOURCE = originalTriggerSource;
+    if (originalAutomaticDate === undefined) delete process.env.ICLOUD_AUTOMATIC_RUN_DATE_BEIJING;
+    else process.env.ICLOUD_AUTOMATIC_RUN_DATE_BEIJING = originalAutomaticDate;
+  }
 
   assert.equal(entry.status, 'success');
+  assert.equal(entry.trigger, 'cloudflare');
+  assert.equal(entry.automaticRunDateBeijing, '2026-08-01');
   assert.equal(entry.durationMs, 2500);
   assert.equal(entry.observedAtBeijing, '2026-08-01');
   assert.equal(entry.source.applePublishedDate, 'July 17, 2026');
@@ -610,11 +628,18 @@ test('keeps successful Action summaries concise and promotes warnings', () => {
 
   const rendered = buildActionSummaryLines(data, summary, 'workflow_dispatch').join('\n');
   assert.match(rendered, /### 结论/);
+  assert.match(rendered, /触发方式：手动执行/);
   assert.match(rendered, /Apple 解析路径：cross-checked（双解析器一致）/);
   assert.match(rendered, /汇率来源：ExchangeRate-API Key 接口（主来源）/);
   assert.match(rendered, /汇率认证：API Key 有效/);
   assert.match(rendered, /### 本次变化\n本次变化：无/);
   assert.doesNotMatch(rendered, /本次新增地区：无|本次移除地区：无|缺少汇率：无/);
+
+  const cloudflare = buildActionSummaryLines(data, summary, 'cloudflare').join('\n');
+  assert.match(cloudflare, /触发方式：Cloudflare 定时主触发/);
+
+  const githubBackup = buildActionSummaryLines(data, summary, 'github-schedule').join('\n');
+  assert.match(githubBackup, /触发方式：GitHub 定时备用/);
 
   const stale = buildActionSummaryLines({
     ...data,
