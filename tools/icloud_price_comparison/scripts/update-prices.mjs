@@ -571,10 +571,13 @@ export function buildAppleSnapshotIndex(existing, entry) {
   };
 }
 
-async function savePublishedAppleSnapshot(html, parsed, firstConfirmedDate) {
+export async function savePublishedAppleSnapshot(html, parsed, firstConfirmedDate, {
+  snapshotsDir = APPLE_SNAPSHOTS_DIR,
+  indexPath = APPLE_SNAPSHOT_INDEX_PATH
+} = {}) {
   const publishedDate = publicationDateKey(parsed.sourcePublishedDate);
   const contentHash = appleSnapshotContentHash(parsed);
-  const index = await readJson(APPLE_SNAPSHOT_INDEX_PATH, { schemaVersion: 1, snapshots: [] });
+  const index = await readJson(indexPath, { schemaVersion: 1, snapshots: [] });
   const existing = index.snapshots?.find((item) => item.publishedDate === publishedDate);
   const revisions = Array.isArray(existing?.revisions) ? existing.revisions : existing ? [existing] : [];
   if (revisions.some((revision) => revision.contentHash === contentHash)) return false;
@@ -588,10 +591,10 @@ async function savePublishedAppleSnapshot(html, parsed, firstConfirmedDate) {
   });
   entry.file = file;
   entry.dataFile = file.replace(/\.html$/, '.json');
-  await mkdir(APPLE_SNAPSHOTS_DIR, { recursive: true });
-  await writeFile(path.join(APPLE_SNAPSHOTS_DIR, entry.file), html, 'utf8');
-  await writeJsonAtomic(path.join(APPLE_SNAPSHOTS_DIR, entry.dataFile), normalizeAppleSnapshot(parsed));
-  await writeJsonAtomic(APPLE_SNAPSHOT_INDEX_PATH, buildAppleSnapshotIndex(index, entry));
+  await mkdir(snapshotsDir, { recursive: true });
+  await writeFile(path.join(snapshotsDir, entry.file), html, 'utf8');
+  await writeJsonAtomic(path.join(snapshotsDir, entry.dataFile), normalizeAppleSnapshot(parsed));
+  await writeJsonAtomic(indexPath, buildAppleSnapshotIndex(index, entry));
   return true;
 }
 
@@ -714,13 +717,19 @@ async function writeActionSummary(data, summary) {
   );
 }
 
-export async function main({ dryRun = DRY_RUN } = {}) {
+export async function main({ dryRun = DRY_RUN, paths = {} } = {}) {
+  const currentDataPath = paths.currentDataPath ?? CURRENT_DATA_PATH;
+  const historyPath = paths.historyPath ?? HISTORY_PATH;
+  const runLogPath = paths.runLogPath ?? RUN_LOG_PATH;
+  const namesPath = paths.namesPath ?? NAMES_PATH;
+  const snapshotsDir = paths.snapshotsDir ?? APPLE_SNAPSHOTS_DIR;
+  const snapshotIndexPath = paths.snapshotIndexPath ?? APPLE_SNAPSHOT_INDEX_PATH;
   runStartedAt = new Date();
   const [previousData, previousHistory, previousRunLog, countryNames, html] = await Promise.all([
-    readJson(CURRENT_DATA_PATH),
-    readJson(HISTORY_PATH),
-    readJson(RUN_LOG_PATH, { schemaVersion: 1, retention: 90, runs: [] }),
-    readJson(NAMES_PATH, {}),
+    readJson(currentDataPath),
+    readJson(historyPath),
+    readJson(runLogPath, { schemaVersion: 1, retention: 90, runs: [] }),
+    readJson(namesPath, {}),
     fetchResource(APPLE_URL)
   ]);
   lastAppleHtml = html;
@@ -770,9 +779,6 @@ export async function main({ dryRun = DRY_RUN } = {}) {
   });
   const generatedAt = new Date().toISOString();
   const observedAt = formatBeijingDate(generatedAt);
-  if (!dryRun) {
-    await savePublishedAppleSnapshot(html, parsed, observedAt);
-  }
   const finishedAt = new Date(generatedAt);
   const data = {
     schemaVersion: 2,
@@ -801,6 +807,12 @@ export async function main({ dryRun = DRY_RUN } = {}) {
   const history = historyUpdate.history;
   const publishedDateUpdate = updatePublishedDateHistory(history, previousData, parsed.sourcePublishedDate, observedAt, publicationChanges, generatedAt);
   const publishedDateHistory = publishedDateUpdate.entries;
+  if (!dryRun) {
+    await savePublishedAppleSnapshot(html, parsed, observedAt, {
+      snapshotsDir,
+      indexPath: snapshotIndexPath
+    });
+  }
   const summary = {
     history,
     missingRates,
@@ -815,9 +827,9 @@ export async function main({ dryRun = DRY_RUN } = {}) {
   if (dryRun) {
     console.log(`Live check passed with ${parsed.parser}: ${countries.length} countries and ${countries.length * parsed.tiers.length} prices. No files were changed.`);
   } else {
-    await writeJsonAtomic(CURRENT_DATA_PATH, data);
-    await writeJsonAtomic(HISTORY_PATH, history);
-    await writeJsonAtomic(RUN_LOG_PATH, runLog);
+    await writeJsonAtomic(currentDataPath, data);
+    await writeJsonAtomic(historyPath, history);
+    await writeJsonAtomic(runLogPath, runLog);
     console.log(`Saved ${countries.length} countries and ${countries.length * parsed.tiers.length} prices using ${parsed.parser}.`);
   }
   try {
