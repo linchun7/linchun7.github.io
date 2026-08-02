@@ -11,7 +11,7 @@
     "check:live": "node scripts/update-prices.mjs --dry-run",
     "update:data": "node scripts/update-prices.mjs",
     "test": "node --test",
-    "test:core": "node --test test/daily-run-guard.test.mjs test/data-integrity.test.mjs test/parse-prices.test.mjs test/update-prices.test.mjs test/workflow.test.mjs",
+    "test:core": "node --test test/daily-run-guard.test.mjs test/data-integrity.test.mjs test/parse-prices.test.mjs test/import-apple-archives.test.mjs test/update-prices.test.mjs test/workflow.test.mjs",
     "test:data": "node --test test/data-integrity.test.mjs",
     "test:ui": "node --test test/ui-smoke.test.mjs"
   },

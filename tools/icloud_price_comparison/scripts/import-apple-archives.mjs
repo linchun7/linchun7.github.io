@@ -27,6 +27,7 @@ function archiveMetadata(html) {
   const stamp = match[1];
   const capturedAtUtc = `${stamp.slice(0, 4)}-${stamp.slice(4, 6)}-${stamp.slice(6, 8)}T${stamp.slice(8, 10)}:${stamp.slice(10, 12)}:${stamp.slice(12, 14)}.000Z`;
   return {
+    capturedAtUtc,
     firstConfirmedDate: capturedAtUtc.slice(0, 10),
     archiveUrl: `https://web.archive.org/web/${stamp}/${APPLE_URL}`
   };
@@ -86,14 +87,19 @@ function latestExistingEventDate(history, afterDate) {
     .at(-1) ?? null;
 }
 
-export async function importAppleArchives(inputDir) {
+export async function importAppleArchives(inputDir, paths = {}) {
   if (!inputDir) throw new Error('Archive input directory is required');
+  const historyPath = paths.historyPath ?? HISTORY_PATH;
+  const pricesPath = paths.pricesPath ?? PRICES_PATH;
+  const namesPath = paths.namesPath ?? NAMES_PATH;
+  const snapshotsDir = paths.snapshotsDir ?? SNAPSHOTS_DIR;
+  const snapshotIndexPath = paths.snapshotIndexPath ?? SNAPSHOT_INDEX_PATH;
   const [history, currentData, names, fileNames, existingSnapshotIndex] = await Promise.all([
-    readFile(HISTORY_PATH, 'utf8').then(JSON.parse),
-    readFile(PRICES_PATH, 'utf8').then(JSON.parse),
-    readFile(NAMES_PATH, 'utf8').then(JSON.parse),
+    readFile(historyPath, 'utf8').then(JSON.parse),
+    readFile(pricesPath, 'utf8').then(JSON.parse),
+    readFile(namesPath, 'utf8').then(JSON.parse),
     readdir(inputDir),
-    readFile(SNAPSHOT_INDEX_PATH, 'utf8').then(JSON.parse).catch((error) => {
+    readFile(snapshotIndexPath, 'utf8').then(JSON.parse).catch((error) => {
       if (error.code === 'ENOENT') return { schemaVersion: 1, snapshots: [] };
       throw error;
     })
@@ -109,15 +115,21 @@ export async function importAppleArchives(inputDir) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(publishedDate)) throw new Error(`Invalid publication date in ${fileName}`);
     archives.push({ fileName, filePath, html, parsed, publishedDate, ...archiveMetadata(html) });
   }
-  archives.sort((a, b) => a.publishedDate.localeCompare(b.publishedDate));
+  archives.sort((a, b) => (
+    a.publishedDate.localeCompare(b.publishedDate)
+    || a.capturedAtUtc.localeCompare(b.capturedAtUtc)
+    || a.fileName.localeCompare(b.fileName)
+  ));
 
   const rebuilt = { schemaVersion: 2, updatedAt: new Date().toISOString(), countries: {}, sourcePublishedDates: [] };
   let previousData = null;
   let snapshotIndex = migrateSnapshotIndex(existingSnapshotIndex);
-  await mkdir(SNAPSHOTS_DIR, { recursive: true });
+  await mkdir(snapshotsDir, { recursive: true });
 
   for (const archive of archives) {
     const contentHash = appleSnapshotContentHash(archive.parsed);
+    const existingSnapshot = snapshotIndex.snapshots.find(({ publishedDate }) => publishedDate === archive.publishedDate);
+    const existingRevision = existingSnapshot?.revisions?.find(({ contentHash: existingHash }) => existingHash === contentHash);
     const entry = buildAppleSnapshotEntry(archive.publishedDate, {
       firstConfirmedDate: archive.firstConfirmedDate,
       sourceUrl: APPLE_URL,
@@ -127,13 +139,22 @@ export async function importAppleArchives(inputDir) {
       pricePoints: archive.parsed.countries.length * archive.parsed.tiers.length,
       contentHash
     });
+    if (existingRevision) {
+      entry.file = existingRevision.file;
+      entry.dataFile = existingRevision.dataFile ?? entry.dataFile;
+    } else if (existingSnapshot) {
+      entry.file = `${archive.publishedDate}-${contentHash.slice(0, 12)}.html`;
+      entry.dataFile = `${archive.publishedDate}-${contentHash.slice(0, 12)}.json`;
+    }
     snapshotIndex = buildAppleSnapshotIndex(snapshotIndex, entry);
-    await copyFile(archive.filePath, path.join(SNAPSHOTS_DIR, entry.file));
-    await writeFile(
-      path.join(SNAPSHOTS_DIR, entry.dataFile),
-      `${JSON.stringify(normalizeAppleSnapshot(archive.parsed), null, 2)}\n`,
-      'utf8'
-    );
+    if (!existingRevision) {
+      await copyFile(archive.filePath, path.join(snapshotsDir, entry.file));
+      await writeFile(
+        path.join(snapshotsDir, entry.dataFile),
+        `${JSON.stringify(normalizeAppleSnapshot(archive.parsed), null, 2)}\n`,
+        'utf8'
+      );
+    }
     updateHistory(rebuilt, archive.parsed.countries, archive.publishedDate, archive.parsed.tiers);
     const changes = previousData ? buildSnapshotChanges(previousData, archive.parsed.countries, archive.parsed.tiers) : emptyChanges();
     rebuilt.sourcePublishedDates.push({
@@ -161,30 +182,9 @@ export async function importAppleArchives(inputDir) {
     });
   }
 
-  const currentContentHash = appleSnapshotContentHash(currentData);
-  const currentEntry = buildAppleSnapshotEntry(currentData.source.publishedDate, {
-    firstConfirmedDate: history.sourcePublishedDates?.at(-1)?.observedAt ?? currentEventDate,
-    parser: currentData.source.parser,
-    countries: currentData.countries.length,
-    pricePoints: currentData.countries.length * currentData.tiers.length,
-    contentHash: currentContentHash
-  });
-  const currentSnapshot = snapshotIndex.snapshots.find(({ publishedDate }) => publishedDate === currentPublishedDate);
-  currentEntry.file = currentSnapshot?.activeFile ?? currentEntry.file;
-  currentEntry.dataFile = currentEntry.file.replace(/\.html$/, '.json');
-  snapshotIndex = buildAppleSnapshotIndex(snapshotIndex, currentEntry);
-  await writeFile(
-    path.join(SNAPSHOTS_DIR, currentEntry.dataFile),
-    `${JSON.stringify(normalizeAppleSnapshot({
-      ...currentData,
-      sourcePublishedDate: currentData.source.publishedDate
-    }), null, 2)}\n`,
-    'utf8'
-  );
-
   await Promise.all([
-    writeFile(HISTORY_PATH, `${JSON.stringify(rebuilt, null, 2)}\n`, 'utf8'),
-    writeFile(SNAPSHOT_INDEX_PATH, `${JSON.stringify(snapshotIndex, null, 2)}\n`, 'utf8')
+    writeFile(historyPath, `${JSON.stringify(rebuilt, null, 2)}\n`, 'utf8'),
+    writeFile(snapshotIndexPath, `${JSON.stringify(snapshotIndex, null, 2)}\n`, 'utf8')
   ]);
   return { archives, history: rebuilt, snapshotIndex };
 }
