@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "updatedAt": "2026-08-02T08:29:36.032Z",
+  "updatedAt": "2026-08-02T08:31:57.287Z",
   "countries": {
     "Bahamas": {
       "nameZh": "巴哈马",
@@ -385,7 +385,7 @@
           }
         },
         {
-          "observedAt": "2026-07-30",
+          "observedAt": "2026-07-17",
           "currency": "EGP",
           "plans": {
             "50GB": 49.99,
@@ -566,7 +566,7 @@
           }
         },
         {
-          "observedAt": "2026-07-30",
+          "observedAt": "2026-07-17",
           "currency": "NGN",
           "plans": {
             "50GB": 1300,
@@ -809,7 +809,7 @@
           }
         },
         {
-          "observedAt": "2026-07-30",
+          "observedAt": "2026-07-17",
           "currency": "TRY",
           "plans": {
             "50GB": 49.99,
@@ -1007,7 +1007,7 @@
           }
         },
         {
-          "observedAt": "2026-07-30",
+          "observedAt": "2026-07-17",
           "currency": "IDR",
           "plans": {
             "50GB": 15000,
@@ -1035,7 +1035,7 @@
           }
         },
         {
-          "observedAt": "2026-07-30",
+          "observedAt": "2026-07-17",
           "currency": "JPY",
           "plans": {
             "50GB": 180,
@@ -1131,7 +1131,7 @@
           }
         },
         {
-          "observedAt": "2026-07-30",
+          "observedAt": "2026-07-17",
           "currency": "NZD",
           "plans": {
             "50GB": 1.99,
@@ -1159,7 +1159,7 @@
           }
         },
         {
-          "observedAt": "2026-07-30",
+          "observedAt": "2026-07-17",
           "currency": "PHP",
           "plans": {
             "50GB": 59,
@@ -1289,7 +1289,7 @@
           }
         },
         {
-          "observedAt": "2026-07-30",
+          "observedAt": "2026-07-17",
           "currency": "VND",
           "plans": {
             "50GB": 25000,
@@ -1340,7 +1340,7 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2026-07-30",
+          "observedAt": "2026-07-17",
           "currency": "USD",
           "plans": {
             "50GB": 1.19,
@@ -1357,7 +1357,7 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2026-07-30",
+          "observedAt": "2026-07-17",
           "currency": "USD",
           "plans": {
             "50GB": 1.19,
@@ -1374,7 +1374,7 @@
       "region": "Asia Pacific",
       "events": [
         {
-          "observedAt": "2026-07-30",
+          "observedAt": "2026-07-17",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
