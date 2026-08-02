@@ -703,7 +703,9 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
           position: getComputedStyle(header).position
         })));
         assert.equal(publicationHeaders[0].text, 'Apple 页面发布日期');
-        assert.equal(publicationHeaders[1].text, '首次确认日期');
+        assert.equal(publicationHeaders[1].text, '本次内容变化');
+        assert.equal(publicationHeaders.length, 2, 'internal confirmation dates must not be shown to end users');
+        assert.equal(await page.locator('#publishedDateRows tr').first().locator('td').count(), 2, 'publication rows must omit the internal confirmation date');
         assert.equal(publicationHeaders[0].whiteSpace, 'normal', 'Apple publication-date header must be allowed to wrap');
         assert.equal(publicationHeaders[0].position, 'static', 'publication history header must not overlap the sticky dialog header');
         assert.ok(publicationHeaders[0].scrollWidth <= publicationHeaders[0].clientWidth + 1, 'Apple publication-date header must not clip horizontally');

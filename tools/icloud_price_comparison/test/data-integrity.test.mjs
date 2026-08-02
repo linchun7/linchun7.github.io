@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { access, readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { publicationDateKey } from '../scripts/update-prices.mjs';
 
 async function readJson(relativePath) {
   return JSON.parse(await readFile(new URL(relativePath, import.meta.url), 'utf8'));
@@ -108,7 +109,10 @@ test('committed prices and history form a complete usable snapshot', async () =>
 });
 
 test('committed Apple snapshot index has unique dates and existing revision files', async () => {
-  const index = await readJson('../data/apple-snapshots/index.json');
+  const [index, history] = await Promise.all([
+    readJson('../data/apple-snapshots/index.json'),
+    readJson('../data/history.json')
+  ]);
   assert.equal(index.schemaVersion, 1);
   const dates = new Set();
   for (const snapshot of index.snapshots) {
@@ -119,6 +123,15 @@ test('committed Apple snapshot index has unique dates and existing revision file
     assert.equal(snapshot.activeFile, snapshot.revisions.at(-1).file);
     assert.equal(snapshot.activeDataFile, snapshot.revisions.at(-1).dataFile);
     assert.equal(snapshot.activeContentHash, snapshot.revisions.at(-1).contentHash);
+    const publicationRecord = history.sourcePublishedDates.find(
+      ({ publishedDate }) => publicationDateKey(publishedDate) === snapshot.publishedDate
+    );
+    assert.ok(publicationRecord, `missing publication history for ${snapshot.publishedDate}`);
+    assert.equal(
+      snapshot.revisions[0].firstConfirmedDate,
+      publicationRecord.observedAt,
+      `earliest confirmation date mismatch for ${snapshot.publishedDate}`
+    );
     for (const revision of snapshot.revisions) {
       assert.match(revision.contentHash, /^[a-f0-9]{64}$/);
       assert.match(revision.firstConfirmedDate, /^\d{4}-\d{2}-\d{2}$/);
