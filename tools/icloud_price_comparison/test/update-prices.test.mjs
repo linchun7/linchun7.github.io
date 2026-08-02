@@ -5,6 +5,9 @@ import {
   buildSnapshotChanges,
   buildRunLog,
   buildActionSummaryLines,
+  buildAppleSnapshotEntry,
+  buildAppleSnapshotIndex,
+  appleSnapshotContentHash,
   createRunLogEntry,
   getExchangeRates,
   main,
@@ -12,6 +15,34 @@ import {
   updateHistory,
   updatePublishedDateHistory
 } from '../scripts/update-prices.mjs';
+
+test('builds a deduplicated Apple snapshot index by published date', () => {
+  const first = buildAppleSnapshotEntry('Published Date: April 06, 2026', {
+    capturedAtUtc: '2026-07-16T06:27:20.000Z',
+    archiveUrl: 'https://web.archive.org/web/20260716062720/https://support.apple.com/en-us/108047',
+    countries: 70,
+    pricePoints: 350,
+    contentHash: 'abc'
+  });
+  assert.equal(first.file, '2026-04-06.html');
+  const index = buildAppleSnapshotIndex(null, first);
+  const duplicate = buildAppleSnapshotIndex(index, { ...first, capturedAtUtc: '2026-08-02T00:00:00.000Z' });
+  assert.deepEqual(duplicate, index);
+  const revised = buildAppleSnapshotIndex(index, { ...first, file: '2026-04-06-different.html', contentHash: 'different' });
+  assert.equal(revised.snapshots.length, 1);
+  assert.equal(revised.snapshots[0].revisions.length, 2);
+  assert.equal(revised.snapshots[0].activeContentHash, 'different');
+});
+
+test('Apple snapshot semantic hash ignores formatted price text', () => {
+  const parsed = {
+    tiers: [{ id: '50GB', label: '50 GB', capacityGb: 50 }],
+    countries: [{ country: 'Alpha', region: 'Americas', currency: 'USD', plans: { '50GB': { price: 0.99, formattedPrice: '$0.99' } } }]
+  };
+  const reformatted = structuredClone(parsed);
+  reformatted.countries[0].plans['50GB'].formattedPrice = 'USD 0.99';
+  assert.equal(appleSnapshotContentHash(parsed), appleSnapshotContentHash(reformatted));
+});
 
 const TIER_50 = { id: '50GB', label: '50 GB', capacityGb: 50 };
 const TIER_200 = { id: '200GB', label: '200 GB', capacityGb: 200 };
