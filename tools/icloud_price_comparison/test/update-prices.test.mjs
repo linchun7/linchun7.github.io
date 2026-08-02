@@ -43,6 +43,19 @@ test('builds a deduplicated Apple snapshot index by published date', () => {
   assert.equal(revised.snapshots[0].revisions.length, 2);
   assert.equal(revised.snapshots[0].activeContentHash, 'different');
   assert.equal(revised.snapshots[0].activeDataFile, '2026-04-06-different.json');
+
+  const olderImportedLater = buildAppleSnapshotIndex(revised, {
+    ...first,
+    file: '2026-04-06-older.html',
+    dataFile: '2026-04-06-older.json',
+    firstConfirmedDate: '2026-07-01',
+    contentHash: 'older'
+  });
+  assert.deepEqual(
+    olderImportedLater.snapshots[0].revisions.map(({ contentHash }) => contentHash),
+    ['older', 'abc', 'different']
+  );
+  assert.equal(olderImportedLater.snapshots[0].activeContentHash, 'different');
 });
 
 test('Apple snapshot semantic hash ignores formatted price text', () => {
@@ -207,7 +220,10 @@ test('runs the production write path against isolated files', async () => {
     rates: data.fx.rates
   };
   try {
-    await withMockedFetch({ html: buildAppleHtml(data), fxPayload }, () => main({ dryRun: false, paths }));
+    await withMockedFetch(
+      { html: buildAppleHtml(data), fxPayload },
+      () => main({ dryRun: false, paths, stepSummaryPath: null })
+    );
     const [writtenData, index] = await Promise.all([
       readFile(paths.currentDataPath, 'utf8').then(JSON.parse),
       readFile(paths.snapshotIndexPath, 'utf8').then(JSON.parse)

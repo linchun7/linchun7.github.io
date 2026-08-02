@@ -545,12 +545,16 @@ export function buildAppleSnapshotIndex(existing, entry) {
   } else {
     const revisions = Array.isArray(current.revisions) ? current.revisions : [current];
     if (!revisions.some(({ contentHash }) => contentHash === entry.contentHash)) {
+      const orderedRevisions = [...revisions, entry].sort((a, b) => (
+        (a.firstConfirmedDate ?? '').localeCompare(b.firstConfirmedDate ?? '')
+      ));
+      const activeRevision = orderedRevisions.at(-1);
       byDate.set(entry.publishedDate, {
         ...current,
-        activeFile: entry.file,
-        activeDataFile: entry.dataFile,
-        activeContentHash: entry.contentHash,
-        revisions: [...revisions, entry]
+        activeFile: activeRevision.file,
+        activeDataFile: activeRevision.dataFile,
+        activeContentHash: activeRevision.contentHash,
+        revisions: orderedRevisions
       });
     }
   }
@@ -708,16 +712,20 @@ export function buildActionSummaryLines(data, summary, trigger = resolveTriggerS
   return lines;
 }
 
-async function writeActionSummary(data, summary) {
-  if (!process.env.GITHUB_STEP_SUMMARY) return;
+async function writeActionSummary(data, summary, stepSummaryPath) {
+  if (!stepSummaryPath) return;
   await appendFile(
-    process.env.GITHUB_STEP_SUMMARY,
+    stepSummaryPath,
     buildActionSummaryLines(data, summary).join('\n'),
     'utf8'
   );
 }
 
-export async function main({ dryRun = DRY_RUN, paths = {} } = {}) {
+export async function main({
+  dryRun = DRY_RUN,
+  paths = {},
+  stepSummaryPath = process.env.GITHUB_STEP_SUMMARY
+} = {}) {
   const currentDataPath = paths.currentDataPath ?? CURRENT_DATA_PATH;
   const historyPath = paths.historyPath ?? HISTORY_PATH;
   const runLogPath = paths.runLogPath ?? RUN_LOG_PATH;
@@ -833,7 +841,7 @@ export async function main({ dryRun = DRY_RUN, paths = {} } = {}) {
     console.log(`Saved ${countries.length} countries and ${countries.length * parsed.tiers.length} prices using ${parsed.parser}.`);
   }
   try {
-    await writeActionSummary(data, summary);
+    await writeActionSummary(data, summary, stepSummaryPath);
   } catch (error) {
     console.warn(`Unable to write GitHub Actions summary: ${error.message}`);
   }
