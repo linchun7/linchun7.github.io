@@ -21,6 +21,10 @@ test('committed prices and history form a complete usable snapshot', async () =>
   assert.equal(new Set(data.tiers.map(({ id }) => id)).size, data.tiers.length);
   assert.ok(data.countries.length >= 60);
   assert.ok(Number.isFinite(data.fx.rates.CNY) && data.fx.rates.CNY > 0);
+  assert.ok([
+    'https://v6.exchangerate-api.com/v6/latest/USD',
+    'https://open.er-api.com/v6/latest/USD'
+  ].includes(data.fx.sourceUrl), 'exchange-rate credentials must never be stored in the source URL');
   if (data.schemaVersion === 2) {
     if (data.source.parser != null) {
       assert.match(data.source.parser, /^(cross-checked|document-order|apple-markers-fallback)$/);
