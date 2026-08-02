@@ -16,7 +16,7 @@ on:
           - cloudflare
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: update-icloud-prices
@@ -51,6 +51,8 @@ jobs:
     name: 更新并验证 iCloud+ 价格
     needs: prepare
     if: needs.prepare.outputs.should_run == 'true'
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:

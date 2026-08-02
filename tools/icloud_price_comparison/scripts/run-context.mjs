@@ -41,6 +41,7 @@ export function findSuccessfulAutomaticRun(runLog, automaticRunDateBeijing) {
   if (!Array.isArray(runLog?.runs) || !automaticRunDateBeijing) return null;
   return [...runLog.runs].reverse().find((run) => (
     run?.status === 'success'
+    && isAutomaticTriggerSource(run.trigger)
     && run.automaticRunDateBeijing === automaticRunDateBeijing
     && run.source?.exchangeRatesStale === false
     && formatBeijingDate(run.source?.exchangeRatesFetchedAtUtc) === automaticRunDateBeijing

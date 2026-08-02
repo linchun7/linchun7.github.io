@@ -12,6 +12,17 @@ import {
 const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RUN_LOG_PATH = path.join(PROJECT_DIR, 'data/run-log.json');
 
+export async function readRunLog(filePath = RUN_LOG_PATH) {
+  try {
+    return JSON.parse(await readFile(filePath, 'utf8'));
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return { schemaVersion: 1, retention: 90, runs: [] };
+    }
+    throw error;
+  }
+}
+
 export function evaluateDailyRun({ runLog, eventName, requestedSource, now = new Date() }) {
   const triggerSource = resolveTriggerSource(eventName, requestedSource);
   const automatic = isAutomaticTriggerSource(triggerSource);
@@ -48,7 +59,7 @@ async function writeSkipSummary(result) {
 }
 
 export async function main() {
-  const runLog = JSON.parse(await readFile(RUN_LOG_PATH, 'utf8'));
+  const runLog = await readRunLog();
   const result = evaluateDailyRun({
     runLog,
     eventName: process.env.GITHUB_EVENT_NAME,
