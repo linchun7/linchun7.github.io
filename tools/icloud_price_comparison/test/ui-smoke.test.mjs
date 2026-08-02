@@ -695,6 +695,18 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
         await page.locator('#publishedDateButton').click();
         await page.waitForFunction(() => document.querySelectorAll('#publishedDateRows tr').length === 100);
         await assertScrollableDialog(page, '#publishedDateDialog', '#closePublishedDate', `${viewport.name} publication history`);
+        const publicationHeaders = await page.locator('#publishedDateDialog thead th').evaluateAll((headers) => headers.map((header) => ({
+          text: header.textContent.trim(),
+          clientWidth: header.clientWidth,
+          scrollWidth: header.scrollWidth,
+          whiteSpace: getComputedStyle(header).whiteSpace,
+          position: getComputedStyle(header).position
+        })));
+        assert.equal(publicationHeaders[0].text, 'Apple 页面发布日期');
+        assert.equal(publicationHeaders[1].text, '首次确认日期');
+        assert.equal(publicationHeaders[0].whiteSpace, 'normal', 'Apple publication-date header must be allowed to wrap');
+        assert.equal(publicationHeaders[0].position, 'static', 'publication history header must not overlap the sticky dialog header');
+        assert.ok(publicationHeaders[0].scrollWidth <= publicationHeaders[0].clientWidth + 1, 'Apple publication-date header must not clip horizontally');
         const tableScroller = page.locator('#publishedDateDialog .history-table-scroll');
         const verboseCell = page.locator('#publishedDateRows .published-change-cell').first();
         const verboseMetrics = await verboseCell.evaluate((element) => ({
