@@ -19,6 +19,8 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /ICLOUD_TRIGGER_SOURCE:\s*\$\{\{ needs\.prepare\.outputs\.trigger_source \}\}/);
   assert.match(workflow, /ICLOUD_AUTOMATIC_RUN_DATE_BEIJING:\s*\$\{\{ needs\.prepare\.outputs\.automatic_run_date_beijing \}\}/);
   assert.match(workflow, /concurrency:[\s\S]*?group: update-icloud-prices[\s\S]*?cancel-in-progress: false/);
+  assert.match(workflow, /permissions:\s+contents: read/, 'the workflow must default to read-only repository access');
+  assert.match(workflow, /update:[\s\S]*?permissions:\s+contents: write/, 'only the update job may write committed data');
   assert.match(workflow, /pnpm install --frozen-lockfile/);
   assert.match(workflow, /name: 运行解析与数据安全测试\s+run: pnpm test:core/);
   assert.match(workflow, /name: 验证更新后的页面[\s\S]*?id: ui_after[\s\S]*?if pnpm test:ui; then[\s\S]*?ui_failed=false[\s\S]*?ui_failed=true/);
