@@ -744,7 +744,7 @@ function formatPublishedDateChanges(changes, isInitial = false) {
       }
       return `${countryDisplayName(entry)}（${details.join('；')}）`;
     });
-    parts.push(`地区内容变化：\n${changed.join('\n')}`);
+    parts.push(`地区内容变化：\n${changed.map((item) => `• ${item}`).join('\n')}`);
   }
   return parts.length ? parts.join('\n') : '发布日期变更，未检测到国家或价格变化';
 }

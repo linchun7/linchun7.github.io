@@ -701,6 +701,7 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
           textLength: element.textContent.length,
           lineBreaks: element.textContent.split('\n').length - 1,
           includesCurrencyUnit: element.textContent.includes('USD'),
+          changeBullets: element.textContent.split('\n').filter((line) => line.trim().startsWith('• ')).length,
           clientWidth: element.clientWidth,
           scrollWidth: element.scrollWidth,
           height: element.getBoundingClientRect().height,
@@ -709,6 +710,7 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
         assert.ok(verboseMetrics.textLength > 5_000, 'publication history must render the complete long change description');
         assert.ok(verboseMetrics.lineBreaks > 10, 'publication change groups and countries must render on separate lines');
         assert.equal(verboseMetrics.includesCurrencyUnit, true, 'publication price changes must include currency units');
+        assert.ok(verboseMetrics.changeBullets > 10, 'changed countries must have visible list markers');
         assert.ok(verboseMetrics.scrollWidth <= verboseMetrics.clientWidth + 1, 'long change text must wrap inside its cell');
         assert.ok(verboseMetrics.height > verboseMetrics.lineHeight * 5, 'long change text must use multiple lines');
         if (viewport.name === 'narrow-mobile') {
