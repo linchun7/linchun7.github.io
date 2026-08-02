@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
-import { evaluateDailyRun } from '../scripts/daily-run-guard.mjs';
+import { evaluateDailyRun, readRunLog } from '../scripts/daily-run-guard.mjs';
 import {
   findSuccessfulAutomaticRun,
   formatBeijingDate,
@@ -17,6 +20,7 @@ function run({
   return {
     id,
     status,
+    trigger: 'cloudflare',
     automaticRunDateBeijing: date,
     source: {
       exchangeRatesFetchedAtUtc: fetchedAt,
@@ -81,4 +85,19 @@ test('manual runs are always allowed and do not create an automatic date', () =>
 test('ignores malformed and legacy run records', () => {
   assert.equal(findSuccessfulAutomaticRun(null, '2026-08-02'), null);
   assert.equal(findSuccessfulAutomaticRun({ runs: [{ status: 'success' }] }, '2026-08-02'), null);
+  assert.equal(findSuccessfulAutomaticRun({ runs: [{ ...run(), trigger: 'manual' }] }, '2026-08-02'), null);
+});
+
+test('allows recovery when the run log is missing but rejects malformed JSON', async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'icloud-run-guard-'));
+  try {
+    const missingPath = path.join(directory, 'missing.json');
+    assert.deepEqual(await readRunLog(missingPath), { schemaVersion: 1, retention: 90, runs: [] });
+
+    const malformedPath = path.join(directory, 'malformed.json');
+    await writeFile(malformedPath, '{not-json', 'utf8');
+    await assert.rejects(() => readRunLog(malformedPath), SyntaxError);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
