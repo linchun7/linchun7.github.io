@@ -1,0 +1,849 @@
+{
+  "schemaVersion": 1,
+  "publishedDate": "2024-12-05",
+  "tiers": [
+    {
+      "id": "50GB",
+      "label": "50 GB",
+      "capacityGb": 50
+    },
+    {
+      "id": "200GB",
+      "label": "200 GB",
+      "capacityGb": 200
+    },
+    {
+      "id": "2TB",
+      "label": "2 TB",
+      "capacityGb": 2048
+    },
+    {
+      "id": "6TB",
+      "label": "6 TB",
+      "capacityGb": 6144
+    },
+    {
+      "id": "12TB",
+      "label": "12 TB",
+      "capacityGb": 12288
+    }
+  ],
+  "countries": [
+    {
+      "country": "Albania",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "12TB": 69.99,
+        "200GB": 3.49,
+        "2TB": 11.99,
+        "50GB": 1.19,
+        "6TB": 34.99
+      }
+    },
+    {
+      "country": "Australia",
+      "region": "Asia Pacific",
+      "currency": "AUD",
+      "plans": {
+        "12TB": 89.99,
+        "200GB": 4.49,
+        "2TB": 14.99,
+        "50GB": 1.49,
+        "6TB": 44.99
+      }
+    },
+    {
+      "country": "Bahamas",
+      "region": "Americas",
+      "currency": "USD",
+      "plans": {
+        "12TB": 64.99,
+        "200GB": 2.99,
+        "2TB": 10.99,
+        "50GB": 0.99,
+        "6TB": 32.99
+      }
+    },
+    {
+      "country": "Bahrain",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "12TB": 64.99,
+        "200GB": 2.99,
+        "2TB": 10.99,
+        "50GB": 0.99,
+        "6TB": 32.99
+      }
+    },
+    {
+      "country": "Barbados",
+      "region": "Americas",
+      "currency": "USD",
+      "plans": {
+        "12TB": 69.99,
+        "200GB": 3.49,
+        "2TB": 11.99,
+        "50GB": 0.99,
+        "6TB": 34.99
+      }
+    },
+    {
+      "country": "Belarus",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "12TB": 69.99,
+        "200GB": 3.49,
+        "2TB": 11.99,
+        "50GB": 1.19,
+        "6TB": 34.99
+      }
+    },
+    {
+      "country": "Benin",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "12TB": 69.99,
+        "200GB": 3.49,
+        "2TB": 11.99,
+        "50GB": 0.99,
+        "6TB": 34.99
+      }
+    },
+    {
+      "country": "Brazil",
+      "region": "Americas",
+      "currency": "BRL",
+      "plans": {
+        "12TB": 299.9,
+        "200GB": 14.9,
+        "2TB": 49.9,
+        "50GB": 4.9,
+        "6TB": 149.9
+      }
+    },
+    {
+      "country": "Bulgaria",
+      "region": "Europe, Middle East & Africa",
+      "currency": "BGN",
+      "plans": {
+        "12TB": 129.99,
+        "200GB": 5.99,
+        "2TB": 20.99,
+        "50GB": 1.99,
+        "6TB": 64.99
+      }
+    },
+    {
+      "country": "Cambodia",
+      "region": "Asia Pacific",
+      "currency": "USD",
+      "plans": {
+        "12TB": 64.99,
+        "200GB": 2.99,
+        "2TB": 10.99,
+        "50GB": 0.99,
+        "6TB": 32.99
+      }
+    },
+    {
+      "country": "Cameroon",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "12TB": 69.99,
+        "200GB": 3.49,
+        "2TB": 11.99,
+        "50GB": 0.99,
+        "6TB": 34.99
+      }
+    },
+    {
+      "country": "Canada",
+      "region": "Americas",
+      "currency": "CAD",
+      "plans": {
+        "12TB": 79.99,
+        "200GB": 3.99,
+        "2TB": 12.99,
+        "50GB": 1.29,
+        "6TB": 39.99
+      }
+    },
+    {
+      "country": "Chile",
+      "region": "Americas",
+      "currency": "CLP",
+      "plans": {
+        "12TB": 59990,
+        "200GB": 2490,
+        "2TB": 8490,
+        "50GB": 790,
+        "6TB": 29990
+      }
+    },
+    {
+      "country": "China mainland",
+      "region": "Asia Pacific",
+      "currency": "CNY",
+      "plans": {
+        "12TB": 398,
+        "200GB": 21,
+        "2TB": 68,
+        "50GB": 6,
+        "6TB": 198
+      }
+    },
+    {
+      "country": "Colombia",
+      "region": "Americas",
+      "currency": "COP",
+      "plans": {
+        "12TB": 269900,
+        "200GB": 12900,
+        "2TB": 44900,
+        "50GB": 3900,
+        "6TB": 129900
+      }
+    },
+    {
+      "country": "Croatia",
+      "region": "Europe, Middle East & Africa",
+      "currency": "EUR",
+      "plans": {
+        "12TB": 59.99,
+        "200GB": 2.99,
+        "2TB": 9.99,
+        "50GB": 0.99,
+        "6TB": 29.99
+      }
+    },
+    {
+      "country": "Czechia",
+      "region": "Europe, Middle East & Africa",
+      "currency": "CZK",
+      "plans": {
+        "12TB": 1490,
+        "200GB": 79,
+        "2TB": 249,
+        "50GB": 25,
+        "6TB": 749
+      }
+    },
+    {
+      "country": "Denmark",
+      "region": "Europe, Middle East & Africa",
+      "currency": "DKK",
+      "plans": {
+        "12TB": 549,
+        "200GB": 25,
+        "2TB": 89,
+        "50GB": 9,
+        "6TB": 269
+      }
+    },
+    {
+      "country": "Egypt",
+      "region": "Europe, Middle East & Africa",
+      "currency": "EGP",
+      "plans": {
+        "12TB": 2999.99,
+        "200GB": 149.99,
+        "2TB": 499.99,
+        "50GB": 39.99,
+        "6TB": 1499.99
+      }
+    },
+    {
+      "country": "Euro Zone",
+      "region": "Europe, Middle East & Africa",
+      "currency": "EUR",
+      "plans": {
+        "12TB": 59.99,
+        "200GB": 2.99,
+        "2TB": 9.99,
+        "50GB": 0.99,
+        "6TB": 29.99
+      }
+    },
+    {
+      "country": "Georgia",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "12TB": 69.99,
+        "200GB": 3.49,
+        "2TB": 11.99,
+        "50GB": 0.99,
+        "6TB": 34.99
+      }
+    },
+    {
+      "country": "Ghana",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "12TB": 69.99,
+        "200GB": 3.49,
+        "2TB": 11.99,
+        "50GB": 0.99,
+        "6TB": 34.99
+      }
+    },
+    {
+      "country": "Hong Kong",
+      "region": "Asia Pacific",
+      "currency": "HKD",
+      "plans": {
+        "12TB": 468,
+        "200GB": 23,
+        "2TB": 78,
+        "50GB": 8,
+        "6TB": 238
+      }
+    },
+    {
+      "country": "Hungary",
+      "region": "Europe, Middle East & Africa",
+      "currency": "HUF",
+      "plans": {
+        "12TB": 26990,
+        "200GB": 1290,
+        "2TB": 4490,
+        "50GB": 399,
+        "6TB": 12990
+      }
+    },
+    {
+      "country": "Iceland",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "12TB": 69.99,
+        "200GB": 3.69,
+        "2TB": 11.99,
+        "50GB": 1.19,
+        "6TB": 34.99
+      }
+    },
+    {
+      "country": "India",
+      "region": "Asia Pacific",
+      "currency": "INR",
+      "plans": {
+        "12TB": 5900,
+        "200GB": 219,
+        "2TB": 749,
+        "50GB": 75,
+        "6TB": 2999
+      }
+    },
+    {
+      "country": "Indonesia",
+      "region": "Asia Pacific",
+      "currency": "IDR",
+      "plans": {
+        "12TB": 999000,
+        "200GB": 49000,
+        "2TB": 169000,
+        "50GB": 15000,
+        "6TB": 499000
+      }
+    },
+    {
+      "country": "Israel",
+      "region": "Europe, Middle East & Africa",
+      "currency": "ILS",
+      "plans": {
+        "12TB": 239.9,
+        "200GB": 11.9,
+        "2TB": 39.9,
+        "50GB": 3.9,
+        "6TB": 119.9
+      }
+    },
+    {
+      "country": "Ivory Coast",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "12TB": 69.99,
+        "200GB": 3.49,
+        "2TB": 11.99,
+        "50GB": 0.99,
+        "6TB": 34.99
+      }
+    },
+    {
+      "country": "Japan",
+      "region": "Asia Pacific",
+      "currency": "JPY",
+      "plans": {
+        "12TB": 9000,
+        "200GB": 450,
+        "2TB": 1500,
+        "50GB": 150,
+        "6TB": 4500
+      }
+    },
+    {
+      "country": "Kazakhstan",
+      "region": "Asia Pacific",
+      "currency": "KZT",
+      "plans": {
+        "12TB": 29990,
+        "200GB": 1490,
+        "2TB": 4990,
+        "50GB": 499,
+        "6TB": 14990
+      }
+    },
+    {
+      "country": "Kenya",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "12TB": 69.99,
+        "200GB": 3.49,
+        "2TB": 11.99,
+        "50GB": 0.99,
+        "6TB": 34.99
+      }
+    },
+    {
+      "country": "Kyrgyzstan",
+      "region": "Asia Pacific",
+      "currency": "USD",
+      "plans": {
+        "12TB": 64.99,
+        "200GB": 2.99,
+        "2TB": 10.99,
+        "50GB": 0.99,
+        "6TB": 32.99
+      }
+    },
+    {
+      "country": "Malaysia",
+      "region": "Asia Pacific",
+      "currency": "MYR",
+      "plans": {
+        "12TB": 269.9,
+        "200GB": 11.9,
+        "2TB": 44.9,
+        "50GB": 3.9,
+        "6TB": 129.9
+      }
+    },
+    {
+      "country": "Mexico",
+      "region": "Americas",
+      "currency": "MXN",
+      "plans": {
+        "12TB": 999,
+        "200GB": 49,
+        "2TB": 179,
+        "50GB": 17,
+        "6TB": 499
+      }
+    },
+    {
+      "country": "Moldova",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "12TB": 69.99,
+        "200GB": 3.49,
+        "2TB": 11.99,
+        "50GB": 0.99,
+        "6TB": 34.99
+      }
+    },
+    {
+      "country": "Nepal",
+      "region": "Asia Pacific",
+      "currency": "USD",
+      "plans": {
+        "12TB": 69.99,
+        "200GB": 3.49,
+        "2TB": 11.99,
+        "50GB": 0.99,
+        "6TB": 34.99
+      }
+    },
+    {
+      "country": "New Zealand",
+      "region": "Asia Pacific",
+      "currency": "NZD",
+      "plans": {
+        "12TB": 99.99,
+        "200GB": 4.99,
+        "2TB": 16.99,
+        "50GB": 1.69,
+        "6TB": 49.99
+      }
+    },
+    {
+      "country": "Nigeria",
+      "region": "Europe, Middle East & Africa",
+      "currency": "NGN",
+      "plans": {
+        "12TB": 44900,
+        "200GB": 2900,
+        "2TB": 9900,
+        "50GB": 900,
+        "6TB": 26900
+      }
+    },
+    {
+      "country": "Norway",
+      "region": "Europe, Middle East & Africa",
+      "currency": "NOK",
+      "plans": {
+        "12TB": 799,
+        "200GB": 39,
+        "2TB": 129,
+        "50GB": 12,
+        "6TB": 399
+      }
+    },
+    {
+      "country": "Pakistan",
+      "region": "Europe, Middle East & Africa",
+      "currency": "PKR",
+      "plans": {
+        "12TB": 17900,
+        "200GB": 800,
+        "2TB": 2500,
+        "50GB": 200,
+        "6TB": 8900
+      }
+    },
+    {
+      "country": "Peru",
+      "region": "Americas",
+      "currency": "PEN",
+      "plans": {
+        "12TB": 199.9,
+        "200GB": 9.9,
+        "2TB": 34.9,
+        "50GB": 2.9,
+        "6TB": 99.9
+      }
+    },
+    {
+      "country": "Philippines",
+      "region": "Asia Pacific",
+      "currency": "PHP",
+      "plans": {
+        "12TB": 3590,
+        "200GB": 179,
+        "2TB": 599,
+        "50GB": 49,
+        "6TB": 1790
+      }
+    },
+    {
+      "country": "Poland",
+      "region": "Europe, Middle East & Africa",
+      "currency": "PLN",
+      "plans": {
+        "12TB": 299.99,
+        "200GB": 14.99,
+        "2TB": 49.99,
+        "50GB": 4.99,
+        "6TB": 149.99
+      }
+    },
+    {
+      "country": "Qatar",
+      "region": "Europe, Middle East & Africa",
+      "currency": "QAR",
+      "plans": {
+        "12TB": 219.99,
+        "200GB": 10.99,
+        "2TB": 36.99,
+        "50GB": 3.69,
+        "6TB": 109.99
+      }
+    },
+    {
+      "country": "Republic of Korea",
+      "region": "Asia Pacific",
+      "currency": "KRW",
+      "plans": {
+        "12TB": 88000,
+        "200GB": 4400,
+        "2TB": 14000,
+        "50GB": 1100,
+        "6TB": 44000
+      }
+    },
+    {
+      "country": "Romania",
+      "region": "Europe, Middle East & Africa",
+      "currency": "RON",
+      "plans": {
+        "12TB": 299.99,
+        "200GB": 14.99,
+        "2TB": 49.99,
+        "50GB": 4.99,
+        "6TB": 149.99
+      }
+    },
+    {
+      "country": "Russia",
+      "region": "Europe, Middle East & Africa",
+      "currency": "RUB",
+      "plans": {
+        "12TB": 6990,
+        "200GB": 149,
+        "2TB": 599,
+        "50GB": 59,
+        "6TB": 3490
+      }
+    },
+    {
+      "country": "Saudi Arabia",
+      "region": "Europe, Middle East & Africa",
+      "currency": "SAR",
+      "plans": {
+        "12TB": 269.99,
+        "200GB": 12.99,
+        "2TB": 44.99,
+        "50GB": 3.99,
+        "6TB": 129.99
+      }
+    },
+    {
+      "country": "Senegal",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "12TB": 69.99,
+        "200GB": 3.49,
+        "2TB": 11.99,
+        "50GB": 0.99,
+        "6TB": 34.99
+      }
+    },
+    {
+      "country": "Singapore",
+      "region": "Asia Pacific",
+      "currency": "SGD",
+      "plans": {
+        "12TB": 84.98,
+        "200GB": 3.98,
+        "2TB": 13.98,
+        "50GB": 1.48,
+        "6TB": 42.98
+      }
+    },
+    {
+      "country": "South Africa",
+      "region": "Europe, Middle East & Africa",
+      "currency": "ZAR",
+      "plans": {
+        "12TB": 1199.99,
+        "200GB": 59.99,
+        "2TB": 199.99,
+        "50GB": 14.99,
+        "6TB": 599.99
+      }
+    },
+    {
+      "country": "Suriname",
+      "region": "Americas",
+      "currency": "USD",
+      "plans": {
+        "12TB": 69.99,
+        "200GB": 3.49,
+        "2TB": 11.99,
+        "50GB": 0.99,
+        "6TB": 34.99
+      }
+    },
+    {
+      "country": "Sweden",
+      "region": "Europe, Middle East & Africa",
+      "currency": "SEK",
+      "plans": {
+        "12TB": 799,
+        "200GB": 39,
+        "2TB": 129,
+        "50GB": 12,
+        "6TB": 399
+      }
+    },
+    {
+      "country": "Switzerland",
+      "region": "Europe, Middle East & Africa",
+      "currency": "CHF",
+      "plans": {
+        "12TB": 60,
+        "200GB": 3,
+        "2TB": 10,
+        "50GB": 1,
+        "6TB": 30
+      }
+    },
+    {
+      "country": "Taiwan",
+      "region": "Asia Pacific",
+      "currency": "TWD",
+      "plans": {
+        "12TB": 1790,
+        "200GB": 90,
+        "2TB": 300,
+        "50GB": 30,
+        "6TB": 900
+      }
+    },
+    {
+      "country": "Tajikistan",
+      "region": "Asia Pacific",
+      "currency": "USD",
+      "plans": {
+        "12TB": 64.99,
+        "200GB": 2.99,
+        "2TB": 10.99,
+        "50GB": 0.99,
+        "6TB": 32.99
+      }
+    },
+    {
+      "country": "Tanzania",
+      "region": "Europe, Middle East & Africa",
+      "currency": "TZS",
+      "plans": {
+        "12TB": 179900,
+        "200GB": 8900,
+        "2TB": 29900,
+        "50GB": 2500,
+        "6TB": 89900
+      }
+    },
+    {
+      "country": "Thailand",
+      "region": "Asia Pacific",
+      "currency": "THB",
+      "plans": {
+        "12TB": 2390,
+        "200GB": 99,
+        "2TB": 399,
+        "50GB": 35,
+        "6TB": 1190
+      }
+    },
+    {
+      "country": "Türkiye",
+      "region": "Europe, Middle East & Africa",
+      "currency": "TRY",
+      "plans": {
+        "12TB": 2499.99,
+        "200GB": 79.99,
+        "2TB": 249.99,
+        "50GB": 24.99,
+        "6TB": 1299.99
+      }
+    },
+    {
+      "country": "Uganda",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "12TB": 69.99,
+        "200GB": 3.49,
+        "2TB": 11.99,
+        "50GB": 0.99,
+        "6TB": 34.99
+      }
+    },
+    {
+      "country": "United Arab Emirates",
+      "region": "Europe, Middle East & Africa",
+      "currency": "AED",
+      "plans": {
+        "12TB": 239.99,
+        "200GB": 11.99,
+        "2TB": 39.99,
+        "50GB": 3.99,
+        "6TB": 119.99
+      }
+    },
+    {
+      "country": "United Kingdom",
+      "region": "Europe, Middle East & Africa",
+      "currency": "GBP",
+      "plans": {
+        "12TB": 54.99,
+        "200GB": 2.99,
+        "2TB": 8.99,
+        "50GB": 0.99,
+        "6TB": 26.99
+      }
+    },
+    {
+      "country": "United States",
+      "region": "Americas",
+      "currency": "USD",
+      "plans": {
+        "12TB": 59.99,
+        "200GB": 2.99,
+        "2TB": 9.99,
+        "50GB": 0.99,
+        "6TB": 29.99
+      }
+    },
+    {
+      "country": "Uzbekistan",
+      "region": "Asia Pacific",
+      "currency": "USD",
+      "plans": {
+        "12TB": 64.99,
+        "200GB": 2.99,
+        "2TB": 10.99,
+        "50GB": 0.99,
+        "6TB": 32.99
+      }
+    },
+    {
+      "country": "Vietnam",
+      "region": "Asia Pacific",
+      "currency": "VND",
+      "plans": {
+        "12TB": 1499000,
+        "200GB": 69000,
+        "2TB": 249000,
+        "50GB": 19000,
+        "6TB": 749000
+      }
+    },
+    {
+      "country": "Zambia",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "12TB": 69.99,
+        "200GB": 3.49,
+        "2TB": 11.99,
+        "50GB": 0.99,
+        "6TB": 34.99
+      }
+    },
+    {
+      "country": "Zimbabwe",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "12TB": 69.99,
+        "200GB": 3.49,
+        "2TB": 11.99,
+        "50GB": 0.99,
+        "6TB": 34.99
+      }
+    }
+  ]
+}

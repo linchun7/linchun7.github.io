@@ -117,10 +117,17 @@ test('committed Apple snapshot index has unique dates and existing revision file
     dates.add(snapshot.publishedDate);
     assert.ok(snapshot.revisions.length >= 1);
     assert.equal(snapshot.activeFile, snapshot.revisions.at(-1).file);
+    assert.equal(snapshot.activeDataFile, snapshot.revisions.at(-1).dataFile);
     assert.equal(snapshot.activeContentHash, snapshot.revisions.at(-1).contentHash);
     for (const revision of snapshot.revisions) {
       assert.match(revision.contentHash, /^[a-f0-9]{64}$/);
+      assert.match(revision.firstConfirmedDate, /^\d{4}-\d{2}-\d{2}$/);
+      assert.equal('capturedAtUtc' in revision, false);
       await access(new URL(`../data/apple-snapshots/${revision.file}`, import.meta.url));
+      const normalized = await readJson(`../data/apple-snapshots/${revision.dataFile}`);
+      assert.equal(normalized.schemaVersion, 1);
+      assert.equal(normalized.publishedDate, snapshot.publishedDate);
+      assert.equal(normalized.countries.length, revision.countries);
     }
   }
 });
