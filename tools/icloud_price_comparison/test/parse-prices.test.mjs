@@ -155,6 +155,12 @@ test('rejects zero, negative, non-finite, and duplicate Apple prices', () => {
   );
 });
 
+test('rejects negative prices in Apple markup instead of stripping the sign', async () => {
+  const fixture = await readFile(fixtureUrl, 'utf8');
+  const adjusted = fixture.replace('$0.99', '-$0.99');
+  assert.throws(() => parseApplePrices(adjusted), /Unable to parse price|Apple parser disagreement/);
+});
+
 test('rejects implausible changes against the last valid snapshot', async () => {
   const parsed = parseApplePrices(await readFile(fixtureUrl, 'utf8'));
   const changed = structuredClone(parsed.countries);
