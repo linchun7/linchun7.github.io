@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { copyFile, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -235,6 +235,103 @@ test('does not write a snapshot when publication-date validation fails', async (
         main({ dryRun: false, paths }),
         /Apple published date moved backwards/
       )
+    );
+    const after = await Promise.all([
+      readFile(paths.currentDataPath, 'utf8'),
+      readFile(paths.historyPath, 'utf8'),
+      readFile(paths.runLogPath, 'utf8')
+    ]);
+    assert.deepEqual(after, before);
+    await assert.rejects(readFile(paths.snapshotIndexPath, 'utf8'), { code: 'ENOENT' });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('cleans up snapshot files when index writing fails', async () => {
+  const snapshotsDir = await mkdtemp(path.join(tmpdir(), 'icloud-snapshot-failure-'));
+  const indexPath = path.join(snapshotsDir, 'blocked-index');
+  const base = {
+    sourcePublishedDate: 'Published Date: April 06, 2026',
+    parser: 'cross-checked',
+    tiers: [TIER_50],
+    countries: [country('Alpha', { prices: { '50GB': 1 } })]
+  };
+  try {
+    await mkdir(indexPath);
+    await assert.rejects(
+      savePublishedAppleSnapshot('<html>failed</html>', base, '2026-08-02', {
+        snapshotsDir,
+        indexPath
+      })
+    );
+    assert.deepEqual(await readdir(snapshotsDir), ['blocked-index']);
+  } finally {
+    await rm(snapshotsDir, { recursive: true, force: true });
+  }
+});
+
+test('does not write production files when a price anomaly is rejected', async () => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const changed = structuredClone(data);
+  const changedCountry = changed.countries.find(({ currency }) => currency === 'USD') ?? changed.countries[0];
+  const changedTier = changed.tiers[0].id;
+  changedCountry.plans[changedTier].price *= 11;
+  changedCountry.plans[changedTier].formattedPrice = `${changedCountry.currency} ${changedCountry.plans[changedTier].price}`;
+  const fxPayload = {
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
+    rates: data.fx.rates
+  };
+  const before = await Promise.all([
+    readFile(paths.currentDataPath, 'utf8'),
+    readFile(paths.historyPath, 'utf8'),
+    readFile(paths.runLogPath, 'utf8')
+  ]);
+  try {
+    await withMockedFetch(
+      { html: buildAppleHtml(changed), fxPayload },
+      () => assert.rejects(main({ dryRun: false, paths }), /suspicious|implausible|anomal|异常/i)
+    );
+    const after = await Promise.all([
+      readFile(paths.currentDataPath, 'utf8'),
+      readFile(paths.historyPath, 'utf8'),
+      readFile(paths.runLogPath, 'utf8')
+    ]);
+    assert.deepEqual(after, before);
+    await assert.rejects(readFile(paths.snapshotIndexPath, 'utf8'), { code: 'ENOENT' });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('does not write production files when required exchange rates are missing', async () => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const missingCurrency = data.countries.find(({ currency }) => currency !== 'USD')?.currency;
+  assert.ok(missingCurrency, 'fixture must contain a non-USD currency');
+  const rates = { ...data.fx.rates };
+  delete rates[missingCurrency];
+  const previousData = structuredClone(data);
+  delete previousData.fx.rates[missingCurrency];
+  await writeFile(paths.currentDataPath, `${JSON.stringify(previousData, null, 2)}\n`, 'utf8');
+  const fxPayload = {
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
+    rates
+  };
+  const before = await Promise.all([
+    readFile(paths.currentDataPath, 'utf8'),
+    readFile(paths.historyPath, 'utf8'),
+    readFile(paths.runLogPath, 'utf8')
+  ]);
+  try {
+    await withMockedFetch(
+      { html: buildAppleHtml(data), fxPayload },
+      () => assert.rejects(main({ dryRun: false, paths }), /missing|缺少|currency/i)
     );
     const after = await Promise.all([
       readFile(paths.currentDataPath, 'utf8'),
