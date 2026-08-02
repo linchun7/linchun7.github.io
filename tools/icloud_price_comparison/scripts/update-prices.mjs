@@ -1,4 +1,4 @@
-import { appendFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,7 +8,7 @@ import {
   validatePriceChangeAnomalies,
   validatePrices
 } from './parse-prices.mjs';
-import { describeTriggerSource, resolveTriggerSource } from './run-context.mjs';
+import { describeTriggerSource, formatBeijingDate, resolveTriggerSource } from './run-context.mjs';
 
 const APPLE_URL = 'https://support.apple.com/en-us/108047';
 const FX_AUTH_URL = 'https://v6.exchangerate-api.com/v6/latest/USD';
@@ -199,17 +199,6 @@ function formatBeijingDateTime(value) {
     minute: '2-digit',
     hour12: false
   }).format(new Date(value));
-}
-
-function formatBeijingDate(value) {
-  const parts = new Intl.DateTimeFormat('en', {
-    timeZone: 'Asia/Shanghai',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  }).formatToParts(new Date(value));
-  const part = (type) => parts.find((entry) => entry.type === type)?.value;
-  return `${part('year')}-${part('month')}-${part('day')}`;
 }
 
 function githubAnnotationValue(value) {
@@ -591,10 +580,21 @@ export async function savePublishedAppleSnapshot(html, parsed, firstConfirmedDat
   });
   entry.file = file;
   entry.dataFile = file.replace(/\.html$/, '.json');
-  await mkdir(snapshotsDir, { recursive: true });
-  await writeFile(path.join(snapshotsDir, entry.file), html, 'utf8');
-  await writeJsonAtomic(path.join(snapshotsDir, entry.dataFile), normalizeAppleSnapshot(parsed));
-  await writeJsonAtomic(indexPath, buildAppleSnapshotIndex(index, entry));
+  const snapshotPath = path.join(snapshotsDir, entry.file);
+  const dataPath = path.join(snapshotsDir, entry.dataFile);
+  try {
+    await mkdir(snapshotsDir, { recursive: true });
+    await writeFile(snapshotPath, html, 'utf8');
+    await writeJsonAtomic(dataPath, normalizeAppleSnapshot(parsed));
+    await writeJsonAtomic(indexPath, buildAppleSnapshotIndex(index, entry));
+  } catch (error) {
+    await Promise.allSettled([
+      unlink(snapshotPath),
+      unlink(dataPath),
+      unlink(`${indexPath}.tmp`)
+    ]);
+    throw error;
+  }
   return true;
 }
 
