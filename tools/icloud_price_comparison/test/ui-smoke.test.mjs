@@ -699,24 +699,30 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
         const verboseCell = page.locator('#publishedDateRows .published-change-cell').first();
         const verboseMetrics = await verboseCell.evaluate((element) => ({
           textLength: element.textContent.length,
-          lineBreaks: element.textContent.split('\n').length - 1,
           includesCurrencyUnit: element.textContent.includes('USD'),
-          changeBullets: element.textContent.split('\n').filter((line) => line.trim().startsWith('• ')).length,
-          clientWidth: element.clientWidth,
-          scrollWidth: element.scrollWidth,
+          changeGroups: element.querySelectorAll('.published-change-group').length,
+          changeBullets: element.querySelectorAll('.published-change-country').length,
+          boldChangedCountries: element.querySelectorAll('.published-change-country > strong').length,
+          boldAddedCountries: element.querySelectorAll('.published-change-group:not(.published-change-country-group) strong ~ strong').length,
+          groupsFitCell: [...element.querySelectorAll('.published-change-group')].every((group) => (
+            group.getBoundingClientRect().right <= element.getBoundingClientRect().right + 1
+          )),
           height: element.getBoundingClientRect().height,
           lineHeight: Number.parseFloat(getComputedStyle(element).lineHeight)
         }));
         assert.ok(verboseMetrics.textLength > 5_000, 'publication history must render the complete long change description');
-        assert.ok(verboseMetrics.lineBreaks > 10, 'publication change groups and countries must render on separate lines');
+        assert.ok(verboseMetrics.changeGroups > 1, 'publication change groups must render as separate blocks');
         assert.equal(verboseMetrics.includesCurrencyUnit, true, 'publication price changes must include currency units');
         assert.ok(verboseMetrics.changeBullets > 10, 'changed countries must have visible list markers');
-        assert.ok(verboseMetrics.scrollWidth <= verboseMetrics.clientWidth + 1, 'long change text must wrap inside its cell');
+        assert.equal(verboseMetrics.boldChangedCountries, verboseMetrics.changeBullets, 'each changed country name must be bold');
+        assert.equal(verboseMetrics.boldAddedCountries, 0, 'added country names must remain regular weight');
+        assert.equal(verboseMetrics.groupsFitCell, true, 'long change groups must stay inside their cell');
         assert.ok(verboseMetrics.height > verboseMetrics.lineHeight * 5, 'long change text must use multiple lines');
         if (viewport.name === 'narrow-mobile') {
           assert.ok(await tableScroller.evaluate((element) => element.scrollWidth > element.clientWidth), 'mobile publication table must use its own horizontal scroller');
         } else {
-          assert.ok(await tableScroller.evaluate((element) => element.scrollWidth <= element.clientWidth + 1), 'desktop publication table must not gain horizontal overflow from long text');
+          const tableWidths = await tableScroller.evaluate((element) => ({ clientWidth: element.clientWidth, scrollWidth: element.scrollWidth }));
+          assert.ok(tableWidths.scrollWidth <= tableWidths.clientWidth + 1, `desktop publication table must not gain horizontal overflow from long text (${tableWidths.scrollWidth}/${tableWidths.clientWidth})`);
         }
         if (process.env.SCREENSHOT_DIR) {
           await verboseCell.scrollIntoViewIfNeeded();
