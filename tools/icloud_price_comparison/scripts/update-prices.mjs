@@ -768,11 +768,11 @@ export async function main({ dryRun = DRY_RUN } = {}) {
     currentRates: fx.rates,
     tiers: parsed.tiers
   });
+  const generatedAt = new Date().toISOString();
+  const observedAt = formatBeijingDate(generatedAt);
   if (!dryRun) {
     await savePublishedAppleSnapshot(html, parsed, observedAt);
   }
-  const generatedAt = new Date().toISOString();
-  const observedAt = formatBeijingDate(generatedAt);
   const finishedAt = new Date(generatedAt);
   const data = {
     schemaVersion: 2,

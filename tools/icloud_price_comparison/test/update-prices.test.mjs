@@ -805,3 +805,11 @@ test('keeps failure diagnostics compact without duplicate files', async () => {
   assert.doesNotMatch(source, /update-failure\.json/);
   assert.doesNotMatch(source, /path\.join\(DIAGNOSTICS_DIR, 'apple-response\.html'\)/);
 });
+
+test('initializes the confirmation date before saving a production snapshot', async () => {
+  const source = await readFile(updaterUrl, 'utf8');
+  const observedAtDeclaration = source.indexOf('const observedAt = formatBeijingDate(generatedAt);');
+  const snapshotWrite = source.indexOf('await savePublishedAppleSnapshot(html, parsed, observedAt);');
+  assert.ok(observedAtDeclaration >= 0, 'confirmation date declaration must exist');
+  assert.ok(snapshotWrite > observedAtDeclaration, 'production snapshot must only use an initialized confirmation date');
+});
