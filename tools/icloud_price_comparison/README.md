@@ -127,7 +127,7 @@ python -m http.server 4173
 
 正式入口：<https://www.linchun.com.cn/tools/icloud_price_comparison/>。
 
-`data/apple-snapshots/` 保存每个 Apple `Published Date` 的 HTML 证据、规范化 JSON 和 `index.json` 索引。`publishedDate` 是 Apple 官方日期；`firstConfirmedDate` 是本项目首次以北京时间确认该修订版的日期。Wayback 抓取时间只用于历史导入排序和来源追溯，不替代这两个日期。
+`data/apple-snapshots/` 保存每个 Apple `Published Date` 的 HTML 证据、规范化 JSON 和 `index.json` 索引。`publishedDate` 是 Apple 官方日期；`firstConfirmedDate` 是现有证据能够确认该修订版已经存在的最早北京时间日期。历史页面使用 Wayback 存档时间，项目运行后的页面使用首次成功抓取时间。
 
 同一发布日期且内容指纹相同的页面只保存一次；同一发布日期但价格、容量、地区或其他规范化内容发生变化，会保存为 `YYYY-MM-DD-<hash>.html/json` 新修订版，并正常更新 `history.json`。旧修订版不得覆盖或手工删除。
 
