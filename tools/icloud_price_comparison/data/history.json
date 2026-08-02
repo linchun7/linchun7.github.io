@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "updatedAt": "2026-08-02T08:31:57.287Z",
+  "updatedAt": "2026-08-02T09:08:29.976Z",
   "countries": {
     "Bahamas": {
       "nameZh": "巴哈马",
@@ -1391,7 +1391,6 @@
     {
       "publishedDate": "December 05, 2024",
       "observedAt": "2025-05-18",
-      "observedAtUtc": "2025-05-18T12:52:56.000Z",
       "kind": "initial",
       "changes": {
         "addedTiers": [],
@@ -1404,7 +1403,6 @@
     {
       "publishedDate": "May 22, 2025",
       "observedAt": "2025-08-13",
-      "observedAtUtc": "2025-08-13T00:58:53.000Z",
       "kind": "change",
       "changes": {
         "addedTiers": [],
@@ -1547,7 +1545,6 @@
     {
       "publishedDate": "August 21, 2025",
       "observedAt": "2025-12-14",
-      "observedAtUtc": "2025-12-14T03:00:06.000Z",
       "kind": "change",
       "changes": {
         "addedTiers": [],
@@ -1586,7 +1583,6 @@
     {
       "publishedDate": "December 16, 2025",
       "observedAt": "2026-03-30",
-      "observedAtUtc": "2026-03-30T01:44:43.000Z",
       "kind": "change",
       "changes": {
         "addedTiers": [],
@@ -1599,7 +1595,6 @@
     {
       "publishedDate": "April 02, 2026",
       "observedAt": "2026-04-03",
-      "observedAtUtc": "2026-04-03T00:08:51.000Z",
       "kind": "change",
       "changes": {
         "addedTiers": [],
@@ -1617,7 +1612,6 @@
     {
       "publishedDate": "April 06, 2026",
       "observedAt": "2026-07-16",
-      "observedAtUtc": "2026-07-16T06:27:20.000Z",
       "kind": "change",
       "changes": {
         "addedTiers": [],
