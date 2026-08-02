@@ -63,6 +63,9 @@ function resolveRegion($, heading) {
 }
 
 function parsePriceNumber(value) {
+  const firstDigit = value.search(/\d/);
+  const sign = value.search(/[−-]/);
+  if (sign >= 0 && (firstDigit < 0 || sign < firstDigit)) return Number.NaN;
   const match = value.match(/[0-9][0-9.,\s'’]*/);
   if (!match) return Number.NaN;
   const compact = match[0].replace(/[\s'’]/g, '');
