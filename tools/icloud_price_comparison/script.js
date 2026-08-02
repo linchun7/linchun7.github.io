@@ -712,41 +712,72 @@ function countryDisplayName(entry) {
   return current?.nameZh || entry.nameZh || entry.country;
 }
 
-function formatPublishedDateChanges(changes, isInitial = false) {
-  if (isInitial || !changes) return '首次记录';
-  const parts = [];
+function changedCountryDetails(entry) {
+  const details = [];
+  if (entry.fromCurrency !== entry.toCurrency) details.push(`币种 ${entry.fromCurrency}→${entry.toCurrency}`);
+  if (entry.fromRegion !== entry.toRegion) {
+    const fromRegion = REGION_LABELS[entry.fromRegion] || entry.fromRegion;
+    const toRegion = REGION_LABELS[entry.toRegion] || entry.toRegion;
+    details.push(`分区 ${fromRegion}→${toRegion}`);
+  }
+  for (const tierChange of entry.tiers || []) {
+    const tier = state.data.tiers.find(({ id }) => id === tierChange.id);
+    const from = Number.isFinite(tierChange.from) ? `${numberFormatter.format(tierChange.from)} ${entry.fromCurrency}` : '无';
+    const to = Number.isFinite(tierChange.to) ? `${numberFormatter.format(tierChange.to)} ${entry.toCurrency}` : '无';
+    details.push(`${tier?.label || tierChange.id} ${from}→${to}`);
+  }
+  return details.join('；');
+}
+
+function createPublishedDateChangesCell(changes, isInitial = false) {
+  const cell = document.createElement('td');
+  cell.className = 'published-change-cell';
+  if (isInitial || !changes) {
+    cell.textContent = '首次记录';
+    return cell;
+  }
+
+  const appendGroup = (label, content) => {
+    const group = document.createElement('div');
+    group.className = 'published-change-group';
+    const heading = document.createElement('strong');
+    heading.className = 'published-change-heading';
+    heading.textContent = `${label}：`;
+    group.append(heading, document.createTextNode(content));
+    cell.append(group);
+  };
+
   if (changes.addedTiers?.length) {
-    parts.push(`新增容量：${changes.addedTiers.map(({ label, id }) => label || id).join('、')}`);
+    appendGroup('新增容量', changes.addedTiers.map(({ label, id }) => label || id).join('、'));
   }
   if (changes.removedTiers?.length) {
-    parts.push(`移除容量：${changes.removedTiers.map(({ label, id }) => label || id).join('、')}`);
+    appendGroup('移除容量', changes.removedTiers.map(({ label, id }) => label || id).join('、'));
   }
   if (changes.addedCountries?.length) {
-    parts.push(`新增地区：${changes.addedCountries.map(countryDisplayName).join('、')}`);
+    appendGroup('新增地区', changes.addedCountries.map(countryDisplayName).join('、'));
   }
   if (changes.removedCountries?.length) {
-    parts.push(`移除地区：${changes.removedCountries.map(countryDisplayName).join('、')}`);
+    appendGroup('移除地区', changes.removedCountries.map(countryDisplayName).join('、'));
   }
   if (changes.changedCountries?.length) {
-    const changed = changes.changedCountries.map((entry) => {
-      const details = [];
-      if (entry.fromCurrency !== entry.toCurrency) details.push(`币种 ${entry.fromCurrency}→${entry.toCurrency}`);
-      if (entry.fromRegion !== entry.toRegion) {
-        const fromRegion = REGION_LABELS[entry.fromRegion] || entry.fromRegion;
-        const toRegion = REGION_LABELS[entry.toRegion] || entry.toRegion;
-        details.push(`分区 ${fromRegion}→${toRegion}`);
-      }
-      for (const tierChange of entry.tiers || []) {
-        const tier = state.data.tiers.find(({ id }) => id === tierChange.id);
-        const from = Number.isFinite(tierChange.from) ? `${numberFormatter.format(tierChange.from)} ${entry.fromCurrency}` : '无';
-        const to = Number.isFinite(tierChange.to) ? `${numberFormatter.format(tierChange.to)} ${entry.toCurrency}` : '无';
-        details.push(`${tier?.label || tierChange.id} ${from}→${to}`);
-      }
-      return `${countryDisplayName(entry)}（${details.join('；')}）`;
-    });
-    parts.push(`地区内容变化：\n${changed.map((item) => `• ${item}`).join('\n')}`);
+    const group = document.createElement('div');
+    group.className = 'published-change-group published-change-country-group';
+    const heading = document.createElement('strong');
+    heading.className = 'published-change-heading';
+    heading.textContent = '地区内容变化：';
+    group.append(heading);
+    for (const entry of changes.changedCountries) {
+      const line = document.createElement('div');
+      line.className = 'published-change-country';
+      const country = document.createElement('strong');
+      country.textContent = countryDisplayName(entry);
+      line.append(document.createTextNode('• '), country, document.createTextNode(`（${changedCountryDetails(entry)}）`));
+      group.append(line);
+    }
+    cell.append(group);
   }
-  return parts.length ? parts.join('\n') : '发布日期变更，未检测到国家或价格变化';
+  if (!cell.childElementCount) cell.textContent = '发布日期变更，未检测到国家或价格变化';
+  return cell;
 }
 
 function renderPublishedDateHistory() {
@@ -771,7 +802,7 @@ function renderPublishedDateHistory() {
     row.append(
       createCell(formatPublishedDate(entry.publishedDate)),
       createCell(formatDate(entry.observedAt)),
-      createCell(formatPublishedDateChanges(entry.changes, entry.kind === 'initial'), 'published-change-cell')
+      createPublishedDateChangesCell(entry.changes, entry.kind === 'initial')
     );
     elements.publishedDateRows.append(row);
   });
