@@ -1,13 +1,15 @@
 {
   "schemaVersion": 2,
-  "updatedAt": "2026-08-02T05:59:02.441Z",
+  "updatedAt": "2026-08-02T08:06:08.060Z",
   "countries": {
     "Bahamas": {
       "nameZh": "巴哈马",
       "region": "Americas",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -24,7 +26,9 @@
       "region": "Americas",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -41,7 +45,9 @@
       "region": "Americas",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "BRL",
           "plans": {
             "50GB": 4.9,
@@ -52,7 +58,9 @@
           }
         },
         {
-          "observedAt": "2026-07-30",
+          "observedAt": "2025-05-22",
+          "observedAtBeijing": "2025-05-22",
+          "observedAtUtc": "2025-08-13T00:58:53.000Z",
           "currency": "BRL",
           "plans": {
             "50GB": 5.9,
@@ -69,7 +77,9 @@
       "region": "Americas",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "CAD",
           "plans": {
             "50GB": 1.29,
@@ -86,7 +96,9 @@
       "region": "Americas",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "CLP",
           "plans": {
             "50GB": 790,
@@ -97,7 +109,9 @@
           }
         },
         {
-          "observedAt": "2026-07-30",
+          "observedAt": "2025-05-22",
+          "observedAtBeijing": "2025-05-22",
+          "observedAtUtc": "2025-08-13T00:58:53.000Z",
           "currency": "CLP",
           "plans": {
             "50GB": 990,
@@ -114,7 +128,9 @@
       "region": "Americas",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "COP",
           "plans": {
             "50GB": 3900,
@@ -131,7 +147,9 @@
       "region": "Americas",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "MXN",
           "plans": {
             "50GB": 17,
@@ -148,7 +166,9 @@
       "region": "Americas",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "PEN",
           "plans": {
             "50GB": 2.9,
@@ -159,7 +179,9 @@
           }
         },
         {
-          "observedAt": "2026-07-30",
+          "observedAt": "2025-05-22",
+          "observedAtBeijing": "2025-05-22",
+          "observedAtUtc": "2025-08-13T00:58:53.000Z",
           "currency": "PEN",
           "plans": {
             "50GB": 3.9,
@@ -176,7 +198,9 @@
       "region": "Americas",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -193,7 +217,9 @@
       "region": "Americas",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -210,28 +236,26 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
-          "currency": "USD",
-          "plans": {
-            "50GB": 1.19,
-            "200GB": 3.59,
-            "2TB": 11.99,
-            "6TB": 34.99,
-            "12TB": 69.99
-          }
-        }
-      ]
-    },
-    "Armenia": {
-      "nameZh": "亚美尼亚",
-      "region": "Europe, Middle East & Africa",
-      "events": [
-        {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 1.19,
             "200GB": 3.49,
+            "2TB": 11.99,
+            "6TB": 34.99,
+            "12TB": 69.99
+          }
+        },
+        {
+          "observedAt": "2025-05-22",
+          "observedAtBeijing": "2025-05-22",
+          "observedAtUtc": "2025-08-13T00:58:53.000Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 1.19,
+            "200GB": 3.59,
             "2TB": 11.99,
             "6TB": 34.99,
             "12TB": 69.99
@@ -244,7 +268,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -261,7 +287,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 1.19,
@@ -278,7 +306,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -295,7 +325,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "BGN",
           "plans": {
             "50GB": 1.99,
@@ -312,7 +344,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -329,7 +363,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "EUR",
           "plans": {
             "50GB": 0.99,
@@ -346,7 +382,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "CZK",
           "plans": {
             "50GB": 25,
@@ -363,7 +401,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "DKK",
           "plans": {
             "50GB": 9,
@@ -380,7 +420,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "EGP",
           "plans": {
             "50GB": 39.99,
@@ -392,6 +434,8 @@
         },
         {
           "observedAt": "2026-07-30",
+          "observedAtBeijing": "2026-07-30",
+          "observedAtUtc": "2026-08-02T05:59:02.427Z",
           "currency": "EGP",
           "plans": {
             "50GB": 49.99,
@@ -408,7 +452,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "EUR",
           "plans": {
             "50GB": 0.99,
@@ -425,7 +471,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -442,7 +490,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -459,7 +509,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "HUF",
           "plans": {
             "50GB": 399,
@@ -476,7 +528,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 1.19,
@@ -493,7 +547,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "ILS",
           "plans": {
             "50GB": 3.9,
@@ -510,7 +566,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -527,7 +585,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -544,7 +604,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -561,7 +623,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "NGN",
           "plans": {
             "50GB": 900,
@@ -573,6 +637,8 @@
         },
         {
           "observedAt": "2026-07-30",
+          "observedAtBeijing": "2026-07-30",
+          "observedAtUtc": "2026-08-02T05:59:02.427Z",
           "currency": "NGN",
           "plans": {
             "50GB": 1300,
@@ -589,7 +655,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "NOK",
           "plans": {
             "50GB": 12,
@@ -606,7 +674,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "PKR",
           "plans": {
             "50GB": 200,
@@ -623,7 +693,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "PLN",
           "plans": {
             "50GB": 4.99,
@@ -640,7 +712,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "QAR",
           "plans": {
             "50GB": 3.69,
@@ -657,7 +731,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "RON",
           "plans": {
             "50GB": 4.99,
@@ -674,7 +750,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "RUB",
           "plans": {
             "50GB": 59,
@@ -691,7 +769,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "SAR",
           "plans": {
             "50GB": 3.99,
@@ -708,7 +788,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -725,7 +807,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "ZAR",
           "plans": {
             "50GB": 14.99,
@@ -742,7 +826,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "SEK",
           "plans": {
             "50GB": 12,
@@ -759,7 +845,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "CHF",
           "plans": {
             "50GB": 1,
@@ -776,7 +864,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "TZS",
           "plans": {
             "50GB": 2500,
@@ -793,7 +883,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "TRY",
           "plans": {
             "50GB": 24.99,
@@ -804,7 +896,22 @@
           }
         },
         {
+          "observedAt": "2025-08-21",
+          "observedAtBeijing": "2025-08-21",
+          "observedAtUtc": "2025-12-14T03:00:06.000Z",
+          "currency": "TRY",
+          "plans": {
+            "50GB": 39.99,
+            "200GB": 129.99,
+            "2TB": 399.99,
+            "6TB": 1299.99,
+            "12TB": 2499.99
+          }
+        },
+        {
           "observedAt": "2026-07-30",
+          "observedAtBeijing": "2026-07-30",
+          "observedAtUtc": "2026-08-02T05:59:02.427Z",
           "currency": "TRY",
           "plans": {
             "50GB": 49.99,
@@ -821,7 +928,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -838,7 +947,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "AED",
           "plans": {
             "50GB": 3.99,
@@ -855,7 +966,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "GBP",
           "plans": {
             "50GB": 0.99,
@@ -872,7 +985,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -889,7 +1004,9 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -906,7 +1023,9 @@
       "region": "Asia Pacific",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "AUD",
           "plans": {
             "50GB": 1.49,
@@ -923,7 +1042,9 @@
       "region": "Asia Pacific",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -940,7 +1061,9 @@
       "region": "Asia Pacific",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "CNY",
           "plans": {
             "50GB": 6,
@@ -957,7 +1080,9 @@
       "region": "Asia Pacific",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "HKD",
           "plans": {
             "50GB": 8,
@@ -974,7 +1099,9 @@
       "region": "Asia Pacific",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "INR",
           "plans": {
             "50GB": 75,
@@ -991,7 +1118,9 @@
       "region": "Asia Pacific",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "IDR",
           "plans": {
             "50GB": 15000,
@@ -1003,6 +1132,8 @@
         },
         {
           "observedAt": "2026-07-30",
+          "observedAtBeijing": "2026-07-30",
+          "observedAtUtc": "2026-08-02T05:59:02.427Z",
           "currency": "IDR",
           "plans": {
             "50GB": 15000,
@@ -1019,7 +1150,9 @@
       "region": "Asia Pacific",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "JPY",
           "plans": {
             "50GB": 150,
@@ -1031,6 +1164,8 @@
         },
         {
           "observedAt": "2026-07-30",
+          "observedAtBeijing": "2026-07-30",
+          "observedAtUtc": "2026-08-02T05:59:02.427Z",
           "currency": "JPY",
           "plans": {
             "50GB": 180,
@@ -1047,7 +1182,9 @@
       "region": "Asia Pacific",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "KZT",
           "plans": {
             "50GB": 499,
@@ -1064,7 +1201,9 @@
       "region": "Asia Pacific",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -1081,7 +1220,9 @@
       "region": "Asia Pacific",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "MYR",
           "plans": {
             "50GB": 3.9,
@@ -1098,7 +1239,9 @@
       "region": "Asia Pacific",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -1115,7 +1258,9 @@
       "region": "Asia Pacific",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "NZD",
           "plans": {
             "50GB": 1.69,
@@ -1127,6 +1272,8 @@
         },
         {
           "observedAt": "2026-07-30",
+          "observedAtBeijing": "2026-07-30",
+          "observedAtUtc": "2026-08-02T05:59:02.427Z",
           "currency": "NZD",
           "plans": {
             "50GB": 1.99,
@@ -1143,7 +1290,9 @@
       "region": "Asia Pacific",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "PHP",
           "plans": {
             "50GB": 49,
@@ -1155,6 +1304,8 @@
         },
         {
           "observedAt": "2026-07-30",
+          "observedAtBeijing": "2026-07-30",
+          "observedAtUtc": "2026-08-02T05:59:02.427Z",
           "currency": "PHP",
           "plans": {
             "50GB": 59,
@@ -1171,7 +1322,9 @@
       "region": "Asia Pacific",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "KRW",
           "plans": {
             "50GB": 1100,
@@ -1188,7 +1341,9 @@
       "region": "Asia Pacific",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "SGD",
           "plans": {
             "50GB": 1.48,
@@ -1205,7 +1360,9 @@
       "region": "Asia Pacific",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "TWD",
           "plans": {
             "50GB": 30,
@@ -1222,7 +1379,9 @@
       "region": "Asia Pacific",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -1239,7 +1398,9 @@
       "region": "Asia Pacific",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "THB",
           "plans": {
             "50GB": 35,
@@ -1256,7 +1417,9 @@
       "region": "Asia Pacific",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -1273,7 +1436,9 @@
       "region": "Asia Pacific",
       "events": [
         {
-          "observedAt": "2024-12-08",
+          "observedAt": "2024-12-05",
+          "observedAtBeijing": "2024-12-05",
+          "observedAtUtc": "2025-05-18T12:52:56.000Z",
           "currency": "VND",
           "plans": {
             "50GB": 19000,
@@ -1285,6 +1450,8 @@
         },
         {
           "observedAt": "2026-07-30",
+          "observedAtBeijing": "2026-07-30",
+          "observedAtUtc": "2026-08-02T05:59:02.427Z",
           "currency": "VND",
           "plans": {
             "50GB": 25000,
@@ -1296,12 +1463,33 @@
         }
       ]
     },
+    "Armenia": {
+      "nameZh": "亚美尼亚",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2025-05-22",
+          "observedAtBeijing": "2025-05-22",
+          "observedAtUtc": "2025-08-13T00:58:53.000Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 1.19,
+            "200GB": 3.49,
+            "2TB": 11.99,
+            "6TB": 34.99,
+            "12TB": 69.99
+          }
+        }
+      ]
+    },
     "Azerbaijan": {
       "nameZh": "阿塞拜疆",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2026-07-30",
+          "observedAt": "2025-05-22",
+          "observedAtBeijing": "2025-05-22",
+          "observedAtUtc": "2025-08-13T00:58:53.000Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -1319,6 +1507,8 @@
       "events": [
         {
           "observedAt": "2026-07-30",
+          "observedAtBeijing": "2026-07-30",
+          "observedAtUtc": "2026-08-02T05:59:02.427Z",
           "currency": "USD",
           "plans": {
             "50GB": 1.19,
@@ -1336,6 +1526,8 @@
       "events": [
         {
           "observedAt": "2026-07-30",
+          "observedAtBeijing": "2026-07-30",
+          "observedAtUtc": "2026-08-02T05:59:02.427Z",
           "currency": "USD",
           "plans": {
             "50GB": 1.19,
@@ -1353,6 +1545,8 @@
       "events": [
         {
           "observedAt": "2026-07-30",
+          "observedAtBeijing": "2026-07-30",
+          "observedAtUtc": "2026-08-02T05:59:02.427Z",
           "currency": "USD",
           "plans": {
             "50GB": 0.99,
@@ -1367,16 +1561,549 @@
   },
   "sourcePublishedDates": [
     {
-      "publishedDate": "July 17, 2026",
-      "observedAt": "2026-07-31",
+      "publishedDate": "December 05, 2024",
+      "observedAt": "2025-05-18",
+      "observedAtUtc": "2025-05-18T12:52:56.000Z",
+      "kind": "initial",
       "changes": {
         "addedTiers": [],
         "removedTiers": [],
         "addedCountries": [],
         "removedCountries": [],
         "changedCountries": []
-      },
-      "kind": "initial"
+      }
+    },
+    {
+      "publishedDate": "May 22, 2025",
+      "observedAt": "2025-08-13",
+      "observedAtUtc": "2025-08-13T00:58:53.000Z",
+      "kind": "change",
+      "changes": {
+        "addedTiers": [],
+        "removedTiers": [],
+        "addedCountries": [
+          {
+            "country": "Armenia",
+            "nameZh": "亚美尼亚"
+          },
+          {
+            "country": "Azerbaijan",
+            "nameZh": "阿塞拜疆"
+          }
+        ],
+        "removedCountries": [],
+        "changedCountries": [
+          {
+            "country": "Brazil",
+            "nameZh": "巴西",
+            "fromCurrency": "BRL",
+            "toCurrency": "BRL",
+            "fromRegion": "Americas",
+            "toRegion": "Americas",
+            "tiers": [
+              {
+                "id": "50GB",
+                "from": 4.9,
+                "to": 5.9
+              },
+              {
+                "id": "200GB",
+                "from": 14.9,
+                "to": 19.9
+              },
+              {
+                "id": "2TB",
+                "from": 49.9,
+                "to": 66.9
+              },
+              {
+                "id": "6TB",
+                "from": 149.9,
+                "to": 199.9
+              },
+              {
+                "id": "12TB",
+                "from": 299.9,
+                "to": 399.9
+              }
+            ]
+          },
+          {
+            "country": "Chile",
+            "nameZh": "智利",
+            "fromCurrency": "CLP",
+            "toCurrency": "CLP",
+            "fromRegion": "Americas",
+            "toRegion": "Americas",
+            "tiers": [
+              {
+                "id": "50GB",
+                "from": 790,
+                "to": 990
+              },
+              {
+                "id": "200GB",
+                "from": 2490,
+                "to": 3290
+              },
+              {
+                "id": "2TB",
+                "from": 8490,
+                "to": 10990
+              },
+              {
+                "id": "6TB",
+                "from": 29990,
+                "to": 32990
+              },
+              {
+                "id": "12TB",
+                "from": 59990,
+                "to": 64990
+              }
+            ]
+          },
+          {
+            "country": "Peru",
+            "nameZh": "秘鲁",
+            "fromCurrency": "PEN",
+            "toCurrency": "PEN",
+            "fromRegion": "Americas",
+            "toRegion": "Americas",
+            "tiers": [
+              {
+                "id": "50GB",
+                "from": 2.9,
+                "to": 3.9
+              },
+              {
+                "id": "200GB",
+                "from": 9.9,
+                "to": 12.9
+              },
+              {
+                "id": "2TB",
+                "from": 34.9,
+                "to": 42.9
+              },
+              {
+                "id": "6TB",
+                "from": 99.9,
+                "to": 129.9
+              },
+              {
+                "id": "12TB",
+                "from": 199.9,
+                "to": 259.9
+              }
+            ]
+          },
+          {
+            "country": "Albania",
+            "nameZh": "阿尔巴尼亚",
+            "fromCurrency": "USD",
+            "toCurrency": "USD",
+            "fromRegion": "Europe, Middle East & Africa",
+            "toRegion": "Europe, Middle East & Africa",
+            "tiers": [
+              {
+                "id": "200GB",
+                "from": 3.49,
+                "to": 3.59
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "publishedDate": "August 21, 2025",
+      "observedAt": "2025-12-14",
+      "observedAtUtc": "2025-12-14T03:00:06.000Z",
+      "kind": "change",
+      "changes": {
+        "addedTiers": [],
+        "removedTiers": [],
+        "addedCountries": [],
+        "removedCountries": [],
+        "changedCountries": [
+          {
+            "country": "Türkiye",
+            "nameZh": "土耳其",
+            "fromCurrency": "TRY",
+            "toCurrency": "TRY",
+            "fromRegion": "Europe, Middle East & Africa",
+            "toRegion": "Europe, Middle East & Africa",
+            "tiers": [
+              {
+                "id": "50GB",
+                "from": 24.99,
+                "to": 39.99
+              },
+              {
+                "id": "200GB",
+                "from": 79.99,
+                "to": 129.99
+              },
+              {
+                "id": "2TB",
+                "from": 249.99,
+                "to": 399.99
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "publishedDate": "December 16, 2025",
+      "observedAt": "2026-03-30",
+      "observedAtUtc": "2026-03-30T01:44:43.000Z",
+      "kind": "change",
+      "changes": {
+        "addedTiers": [],
+        "removedTiers": [],
+        "addedCountries": [],
+        "removedCountries": [],
+        "changedCountries": []
+      }
+    },
+    {
+      "publishedDate": "April 02, 2026",
+      "observedAt": "2026-04-03",
+      "observedAtUtc": "2026-04-03T00:08:51.000Z",
+      "kind": "change",
+      "changes": {
+        "addedTiers": [],
+        "removedTiers": [],
+        "addedCountries": [],
+        "removedCountries": [
+          {
+            "country": "Russia",
+            "nameZh": "俄罗斯"
+          }
+        ],
+        "changedCountries": []
+      }
+    },
+    {
+      "publishedDate": "April 06, 2026",
+      "observedAt": "2026-07-16",
+      "observedAtUtc": "2026-07-16T06:27:20.000Z",
+      "kind": "change",
+      "changes": {
+        "addedTiers": [],
+        "removedTiers": [],
+        "addedCountries": [
+          {
+            "country": "Russia",
+            "nameZh": "俄罗斯"
+          }
+        ],
+        "removedCountries": [],
+        "changedCountries": []
+      }
+    },
+    {
+      "publishedDate": "July 17, 2026",
+      "observedAt": "2026-07-31",
+      "kind": "change",
+      "changes": {
+        "addedTiers": [],
+        "removedTiers": [],
+        "addedCountries": [
+          {
+            "country": "Mauritius",
+            "nameZh": "毛里求斯"
+          },
+          {
+            "country": "Republic of Congo",
+            "nameZh": "刚果共和国"
+          },
+          {
+            "country": "Laos",
+            "nameZh": "老挝"
+          }
+        ],
+        "removedCountries": [],
+        "changedCountries": [
+          {
+            "country": "Egypt",
+            "nameZh": "埃及",
+            "fromCurrency": "EGP",
+            "toCurrency": "EGP",
+            "fromRegion": "Europe, Middle East & Africa",
+            "toRegion": "Europe, Middle East & Africa",
+            "tiers": [
+              {
+                "id": "50GB",
+                "from": 39.99,
+                "to": 49.99
+              },
+              {
+                "id": "200GB",
+                "from": 149.99,
+                "to": 179.99
+              },
+              {
+                "id": "2TB",
+                "from": 499.99,
+                "to": 599.99
+              },
+              {
+                "id": "6TB",
+                "from": 1499.99,
+                "to": 1799.99
+              },
+              {
+                "id": "12TB",
+                "from": 2999.99,
+                "to": 3599.99
+              }
+            ]
+          },
+          {
+            "country": "Nigeria",
+            "nameZh": "尼日利亚",
+            "fromCurrency": "NGN",
+            "toCurrency": "NGN",
+            "fromRegion": "Europe, Middle East & Africa",
+            "toRegion": "Europe, Middle East & Africa",
+            "tiers": [
+              {
+                "id": "50GB",
+                "from": 900,
+                "to": 1300
+              },
+              {
+                "id": "200GB",
+                "from": 2900,
+                "to": 4500
+              },
+              {
+                "id": "2TB",
+                "from": 9900,
+                "to": 14900
+              },
+              {
+                "id": "6TB",
+                "from": 26900,
+                "to": 39900
+              },
+              {
+                "id": "12TB",
+                "from": 44900,
+                "to": 66900
+              }
+            ]
+          },
+          {
+            "country": "Türkiye",
+            "nameZh": "土耳其",
+            "fromCurrency": "TRY",
+            "toCurrency": "TRY",
+            "fromRegion": "Europe, Middle East & Africa",
+            "toRegion": "Europe, Middle East & Africa",
+            "tiers": [
+              {
+                "id": "50GB",
+                "from": 39.99,
+                "to": 49.99
+              },
+              {
+                "id": "200GB",
+                "from": 129.99,
+                "to": 169.99
+              },
+              {
+                "id": "2TB",
+                "from": 399.99,
+                "to": 549.99
+              },
+              {
+                "id": "6TB",
+                "from": 1299.99,
+                "to": 1699.99
+              },
+              {
+                "id": "12TB",
+                "from": 2499.99,
+                "to": 3399.99
+              }
+            ]
+          },
+          {
+            "country": "Indonesia",
+            "nameZh": "印度尼西亚",
+            "fromCurrency": "IDR",
+            "toCurrency": "IDR",
+            "fromRegion": "Asia Pacific",
+            "toRegion": "Asia Pacific",
+            "tiers": [
+              {
+                "id": "200GB",
+                "from": 49000,
+                "to": 59000
+              },
+              {
+                "id": "2TB",
+                "from": 169000,
+                "to": 199000
+              },
+              {
+                "id": "6TB",
+                "from": 499000,
+                "to": 599000
+              },
+              {
+                "id": "12TB",
+                "from": 999000,
+                "to": 1199000
+              }
+            ]
+          },
+          {
+            "country": "Japan",
+            "nameZh": "日本",
+            "fromCurrency": "JPY",
+            "toCurrency": "JPY",
+            "fromRegion": "Asia Pacific",
+            "toRegion": "Asia Pacific",
+            "tiers": [
+              {
+                "id": "50GB",
+                "from": 150,
+                "to": 180
+              },
+              {
+                "id": "200GB",
+                "from": 450,
+                "to": 540
+              },
+              {
+                "id": "2TB",
+                "from": 1500,
+                "to": 1800
+              },
+              {
+                "id": "6TB",
+                "from": 4500,
+                "to": 5500
+              },
+              {
+                "id": "12TB",
+                "from": 9000,
+                "to": 11000
+              }
+            ]
+          },
+          {
+            "country": "New Zealand",
+            "nameZh": "新西兰",
+            "fromCurrency": "NZD",
+            "toCurrency": "NZD",
+            "fromRegion": "Asia Pacific",
+            "toRegion": "Asia Pacific",
+            "tiers": [
+              {
+                "id": "50GB",
+                "from": 1.69,
+                "to": 1.99
+              },
+              {
+                "id": "200GB",
+                "from": 4.99,
+                "to": 5.99
+              },
+              {
+                "id": "2TB",
+                "from": 16.99,
+                "to": 19.99
+              },
+              {
+                "id": "6TB",
+                "from": 49.99,
+                "to": 59.99
+              },
+              {
+                "id": "12TB",
+                "from": 99.99,
+                "to": 119.99
+              }
+            ]
+          },
+          {
+            "country": "Philippines",
+            "nameZh": "菲律宾",
+            "fromCurrency": "PHP",
+            "toCurrency": "PHP",
+            "fromRegion": "Asia Pacific",
+            "toRegion": "Asia Pacific",
+            "tiers": [
+              {
+                "id": "50GB",
+                "from": 49,
+                "to": 59
+              },
+              {
+                "id": "200GB",
+                "from": 179,
+                "to": 199
+              },
+              {
+                "id": "2TB",
+                "from": 599,
+                "to": 699
+              },
+              {
+                "id": "6TB",
+                "from": 1790,
+                "to": 1990
+              },
+              {
+                "id": "12TB",
+                "from": 3590,
+                "to": 3990
+              }
+            ]
+          },
+          {
+            "country": "Vietnam",
+            "nameZh": "越南",
+            "fromCurrency": "VND",
+            "toCurrency": "VND",
+            "fromRegion": "Asia Pacific",
+            "toRegion": "Asia Pacific",
+            "tiers": [
+              {
+                "id": "50GB",
+                "from": 19000,
+                "to": 25000
+              },
+              {
+                "id": "200GB",
+                "from": 69000,
+                "to": 89000
+              },
+              {
+                "id": "2TB",
+                "from": 249000,
+                "to": 299000
+              },
+              {
+                "id": "6TB",
+                "from": 749000,
+                "to": 899000
+              },
+              {
+                "id": "12TB",
+                "from": 1499000,
+                "to": 1799000
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 }
