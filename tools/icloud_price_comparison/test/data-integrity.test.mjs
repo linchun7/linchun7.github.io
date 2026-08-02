@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 async function readJson(relativePath) {
@@ -103,6 +103,24 @@ test('committed prices and history form a complete usable snapshot', async () =>
     for (const { id } of data.tiers) {
       assert.ok(Number.isFinite(latestEvent.plans[id]) && latestEvent.plans[id] > 0,
         `latest history is missing ${id}: ${country.country}`);
+    }
+  }
+});
+
+test('committed Apple snapshot index has unique dates and existing revision files', async () => {
+  const index = await readJson('../data/apple-snapshots/index.json');
+  assert.equal(index.schemaVersion, 1);
+  const dates = new Set();
+  for (const snapshot of index.snapshots) {
+    assert.match(snapshot.publishedDate, /^\d{4}-\d{2}-\d{2}$/);
+    assert.ok(!dates.has(snapshot.publishedDate), `duplicate snapshot date: ${snapshot.publishedDate}`);
+    dates.add(snapshot.publishedDate);
+    assert.ok(snapshot.revisions.length >= 1);
+    assert.equal(snapshot.activeFile, snapshot.revisions.at(-1).file);
+    assert.equal(snapshot.activeContentHash, snapshot.revisions.at(-1).contentHash);
+    for (const revision of snapshot.revisions) {
+      assert.match(revision.contentHash, /^[a-f0-9]{64}$/);
+      await access(new URL(`../data/apple-snapshots/${revision.file}`, import.meta.url));
     }
   }
 });

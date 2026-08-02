@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "retention": 90,
-  "updatedAtUtc": "2026-08-02T05:59:02.427Z",
+  "updatedAtUtc": "2026-08-02T08:06:08.054Z",
   "runs": [
     {
       "schemaVersion": 1,
@@ -834,6 +834,68 @@
         "exchangeRatesFallbackUsed": false,
         "exchangeRatesFallbackReason": null,
         "exchangeRatesApiKeyStatus": "valid"
+      },
+      "counts": {
+        "countries": 73,
+        "pricePoints": 365,
+        "currencies": 44,
+        "tiers": [
+          {
+            "id": "50GB",
+            "label": "50 GB"
+          },
+          {
+            "id": "200GB",
+            "label": "200 GB"
+          },
+          {
+            "id": "2TB",
+            "label": "2 TB"
+          },
+          {
+            "id": "6TB",
+            "label": "6 TB"
+          },
+          {
+            "id": "12TB",
+            "label": "12 TB"
+          }
+        ]
+      },
+      "changes": {
+        "publishedDate": {
+          "changed": false,
+          "from": "July 17, 2026",
+          "to": "July 17, 2026"
+        },
+        "addedTiers": [],
+        "removedTiers": [],
+        "addedCountries": [],
+        "removedCountries": [],
+        "changedCountries": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "2026-08-02T08:06:08.054Z",
+      "status": "success",
+      "trigger": "local",
+      "automaticRunDateBeijing": null,
+      "startedAtUtc": "2026-08-02T08:06:06.439Z",
+      "finishedAtUtc": "2026-08-02T08:06:08.054Z",
+      "durationMs": 1615,
+      "observedAtBeijing": "2026-08-02",
+      "source": {
+        "appleUrl": "https://support.apple.com/en-us/108047",
+        "applePublishedDate": "July 17, 2026",
+        "appleParser": "cross-checked",
+        "appleParserStatus": "Both independent parser paths agreed",
+        "exchangeRatesFetchedAtUtc": "2026-08-02T00:02:31.000Z",
+        "exchangeRatesStale": false,
+        "exchangeRatesSourceMode": "open-access",
+        "exchangeRatesFallbackUsed": false,
+        "exchangeRatesFallbackReason": null,
+        "exchangeRatesApiKeyStatus": "not-configured"
       },
       "counts": {
         "countries": 73,

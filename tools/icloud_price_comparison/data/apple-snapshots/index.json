@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "snapshots": [
+    {
+      "publishedDate": "2024-12-05",
+      "activeFile": "2024-12-05.html",
+      "activeContentHash": "ec83bc8f0580563e3d73e2e1eb776565a4305b38a7124d934b7b9ec24f83df06",
+      "revisions": [
+        {
+          "publishedDate": "2024-12-05",
+          "file": "2024-12-05.html",
+          "capturedAtUtc": "2025-05-18T12:52:56.000Z",
+          "sourceUrl": "https://support.apple.com/en-us/108047",
+          "archiveUrl": "https://web.archive.org/web/20250518125256/https://support.apple.com/en-us/108047",
+          "parser": "legacy-archive-cross-checked",
+          "countries": 68,
+          "pricePoints": 340,
+          "contentHash": "ec83bc8f0580563e3d73e2e1eb776565a4305b38a7124d934b7b9ec24f83df06"
+        }
+      ]
+    },
+    {
+      "publishedDate": "2025-05-22",
+      "activeFile": "2025-05-22.html",
+      "activeContentHash": "08ec908c03cd89112385fe282dacd8d9a6a79707aa1b7a4579a0562a174d2f4b",
+      "revisions": [
+        {
+          "publishedDate": "2025-05-22",
+          "file": "2025-05-22.html",
+          "capturedAtUtc": "2025-08-13T00:58:53.000Z",
+          "sourceUrl": "https://support.apple.com/en-us/108047",
+          "archiveUrl": "https://web.archive.org/web/20250813005853/https://support.apple.com/en-us/108047",
+          "parser": "legacy-archive-cross-checked",
+          "countries": 70,
+          "pricePoints": 350,
+          "contentHash": "08ec908c03cd89112385fe282dacd8d9a6a79707aa1b7a4579a0562a174d2f4b"
+        }
+      ]
+    },
+    {
+      "publishedDate": "2025-08-21",
+      "activeFile": "2025-08-21.html",
+      "activeContentHash": "f7f2e7874a7c22c8e242424e04e3cda81aedb6d6af3da1af4aa6abc59971e876",
+      "revisions": [
+        {
+          "publishedDate": "2025-08-21",
+          "file": "2025-08-21.html",
+          "capturedAtUtc": "2025-12-14T03:00:06.000Z",
+          "sourceUrl": "https://support.apple.com/en-us/108047",
+          "archiveUrl": "https://web.archive.org/web/20251214030006/https://support.apple.com/en-us/108047",
+          "parser": "legacy-archive-cross-checked",
+          "countries": 70,
+          "pricePoints": 350,
+          "contentHash": "f7f2e7874a7c22c8e242424e04e3cda81aedb6d6af3da1af4aa6abc59971e876"
+        }
+      ]
+    },
+    {
+      "publishedDate": "2025-12-16",
+      "activeFile": "2025-12-16.html",
+      "activeContentHash": "f7f2e7874a7c22c8e242424e04e3cda81aedb6d6af3da1af4aa6abc59971e876",
+      "revisions": [
+        {
+          "publishedDate": "2025-12-16",
+          "file": "2025-12-16.html",
+          "capturedAtUtc": "2026-03-30T01:44:43.000Z",
+          "sourceUrl": "https://support.apple.com/en-us/108047",
+          "archiveUrl": "https://web.archive.org/web/20260330014443/https://support.apple.com/en-us/108047",
+          "parser": "cross-checked",
+          "countries": 70,
+          "pricePoints": 350,
+          "contentHash": "f7f2e7874a7c22c8e242424e04e3cda81aedb6d6af3da1af4aa6abc59971e876"
+        }
+      ]
+    },
+    {
+      "publishedDate": "2026-04-02",
+      "activeFile": "2026-04-02.html",
+      "activeContentHash": "d7064f3625c768169e5fc6c49a36d994eb7565e9feea9f15ff4f9857a26bb51b",
+      "revisions": [
+        {
+          "publishedDate": "2026-04-02",
+          "file": "2026-04-02.html",
+          "capturedAtUtc": "2026-04-03T00:08:51.000Z",
+          "sourceUrl": "https://support.apple.com/en-us/108047",
+          "archiveUrl": "https://web.archive.org/web/20260403000851/https://support.apple.com/en-us/108047",
+          "parser": "cross-checked",
+          "countries": 69,
+          "pricePoints": 345,
+          "contentHash": "d7064f3625c768169e5fc6c49a36d994eb7565e9feea9f15ff4f9857a26bb51b"
+        }
+      ]
+    },
+    {
+      "publishedDate": "2026-04-06",
+      "activeFile": "2026-04-06.html",
+      "activeContentHash": "f7f2e7874a7c22c8e242424e04e3cda81aedb6d6af3da1af4aa6abc59971e876",
+      "revisions": [
+        {
+          "publishedDate": "2026-04-06",
+          "file": "2026-04-06.html",
+          "capturedAtUtc": "2026-07-16T06:27:20.000Z",
+          "sourceUrl": "https://support.apple.com/en-us/108047",
+          "archiveUrl": "https://web.archive.org/web/20260716062720/https://support.apple.com/en-us/108047",
+          "parser": "cross-checked",
+          "countries": 70,
+          "pricePoints": 350,
+          "contentHash": "f7f2e7874a7c22c8e242424e04e3cda81aedb6d6af3da1af4aa6abc59971e876"
+        }
+      ]
+    },
+    {
+      "publishedDate": "2026-07-17",
+      "activeFile": "2026-07-17.html",
+      "activeContentHash": "174395538fa9529d56611dbf994798b5a395e22184e78600b1765b5bb918af05",
+      "revisions": [
+        {
+          "publishedDate": "2026-07-17",
+          "file": "2026-07-17.html",
+          "capturedAtUtc": "2026-08-02T08:06:08.036Z",
+          "sourceUrl": "https://support.apple.com/en-us/108047",
+          "parser": "cross-checked",
+          "countries": 73,
+          "pricePoints": 365,
+          "contentHash": "174395538fa9529d56611dbf994798b5a395e22184e78600b1765b5bb918af05"
+        }
+      ]
+    }
+  ]
+}

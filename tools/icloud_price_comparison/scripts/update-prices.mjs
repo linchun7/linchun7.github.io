@@ -1,4 +1,5 @@
 import { appendFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -16,6 +17,8 @@ const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 const CURRENT_DATA_PATH = path.join(PROJECT_DIR, 'data/prices.json');
 const HISTORY_PATH = path.join(PROJECT_DIR, 'data/history.json');
 const RUN_LOG_PATH = path.join(PROJECT_DIR, 'data/run-log.json');
+const APPLE_SNAPSHOTS_DIR = path.join(PROJECT_DIR, 'data/apple-snapshots');
+const APPLE_SNAPSHOT_INDEX_PATH = path.join(APPLE_SNAPSHOTS_DIR, 'index.json');
 const NAMES_PATH = path.join(PROJECT_DIR, 'scripts/country-names.zh.json');
 const DIAGNOSTICS_DIR = path.join(PROJECT_DIR, 'artifacts');
 const RETRY_DELAYS_MS = [0, 2_000, 5_000, 15_000, 30_000];
@@ -485,6 +488,97 @@ function summarizeNames(names) {
   return `${names.slice(0, 8).join('、')} 等 ${names.length} 个`;
 }
 
+export function buildAppleSnapshotEntry(publishedDate, {
+  capturedAtUtc,
+  sourceUrl = APPLE_URL,
+  archiveUrl = null,
+  parser = 'cross-checked',
+  countries,
+  pricePoints,
+  contentHash
+} = {}) {
+  const publishedDateIso = publicationDateKey(publishedDate);
+  if (!publishedDateIso) throw new Error('Apple snapshot published date is invalid');
+  return {
+    publishedDate: publishedDateIso,
+    file: `${publishedDateIso}.html`,
+    capturedAtUtc,
+    sourceUrl,
+    ...(archiveUrl ? { archiveUrl } : {}),
+    parser,
+    countries,
+    pricePoints,
+    contentHash
+  };
+}
+
+export function appleSnapshotContentHash(parsed) {
+  const normalized = {
+    tiers: parsed.tiers
+      .map(({ id, label, capacityGb }) => ({ id, label, capacityGb }))
+      .sort((a, b) => a.capacityGb - b.capacityGb),
+    countries: parsed.countries.map(({ country, region, currency, plans }) => ({
+      country,
+      region,
+      currency,
+      plans: Object.fromEntries(Object.entries(plans)
+        .map(([tier, value]) => [tier, value.price])
+        .sort(([a], [b]) => a.localeCompare(b)))
+    })).sort((a, b) => a.country.localeCompare(b.country))
+  };
+  return createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
+}
+
+export function buildAppleSnapshotIndex(existing, entry) {
+  const snapshots = Array.isArray(existing?.snapshots) ? existing.snapshots : [];
+  const byDate = new Map(snapshots.map((item) => [item.publishedDate, item]));
+  const current = byDate.get(entry.publishedDate);
+  if (!current) {
+    byDate.set(entry.publishedDate, {
+      publishedDate: entry.publishedDate,
+      activeFile: entry.file,
+      activeContentHash: entry.contentHash,
+      revisions: [entry]
+    });
+  } else {
+    const revisions = Array.isArray(current.revisions) ? current.revisions : [current];
+    if (!revisions.some(({ contentHash }) => contentHash === entry.contentHash)) {
+      byDate.set(entry.publishedDate, {
+        ...current,
+        activeFile: entry.file,
+        activeContentHash: entry.contentHash,
+        revisions: [...revisions, entry]
+      });
+    }
+  }
+  return {
+    schemaVersion: 1,
+    snapshots: [...byDate.values()].sort((a, b) => a.publishedDate.localeCompare(b.publishedDate))
+  };
+}
+
+async function savePublishedAppleSnapshot(html, parsed, capturedAtUtc) {
+  const publishedDate = publicationDateKey(parsed.sourcePublishedDate);
+  const contentHash = appleSnapshotContentHash(parsed);
+  const index = await readJson(APPLE_SNAPSHOT_INDEX_PATH, { schemaVersion: 1, snapshots: [] });
+  const existing = index.snapshots?.find((item) => item.publishedDate === publishedDate);
+  const revisions = Array.isArray(existing?.revisions) ? existing.revisions : existing ? [existing] : [];
+  if (revisions.some((revision) => revision.contentHash === contentHash)) return false;
+  const file = existing ? `${publishedDate}-${contentHash.slice(0, 12)}.html` : `${publishedDate}.html`;
+  const entry = buildAppleSnapshotEntry(parsed.sourcePublishedDate, {
+    capturedAtUtc,
+    parser: parsed.parser,
+    countries: parsed.countries.length,
+    pricePoints: parsed.countries.length * parsed.tiers.length,
+    contentHash
+  });
+  entry.file = file;
+  await mkdir(APPLE_SNAPSHOTS_DIR, { recursive: true });
+  await writeFile(path.join(APPLE_SNAPSHOTS_DIR, entry.file), html, 'utf8');
+  await writeJsonAtomic(APPLE_SNAPSHOT_INDEX_PATH, buildAppleSnapshotIndex(index, entry));
+  return true;
+}
+
 function summarizeChangedCountries(entries) {
   return summarizeNames(entries.map(({ nameZh, country }) => nameZh || country));
 }
@@ -614,14 +708,6 @@ export async function main({ dryRun = DRY_RUN } = {}) {
     fetchResource(APPLE_URL)
   ]);
   lastAppleHtml = html;
-  if (!dryRun) {
-    try {
-      await writeAppleSnapshot(html, runStartedAt);
-    } catch (error) {
-      console.warn(`Unable to save Apple HTML snapshot: ${error.message}`);
-    }
-  }
-
   if (!countryNames || Object.keys(countryNames).length < 60) {
     throw new Error('Chinese country-name mapping is missing or incomplete');
   }
@@ -666,6 +752,9 @@ export async function main({ dryRun = DRY_RUN } = {}) {
     currentRates: fx.rates,
     tiers: parsed.tiers
   });
+  if (!dryRun) {
+    await savePublishedAppleSnapshot(html, parsed, new Date().toISOString());
+  }
   const generatedAt = new Date().toISOString();
   const observedAt = formatBeijingDate(generatedAt);
   const finishedAt = new Date(generatedAt);
