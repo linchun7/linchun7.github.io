@@ -59,6 +59,37 @@ function emptyChanges() {
   return { addedTiers: [], removedTiers: [], addedCountries: [], removedCountries: [], changedCountries: [] };
 }
 
+function mergeSnapshotChanges(first = emptyChanges(), second = emptyChanges()) {
+  const unique = (items, key) => [...new Map(items.map((item) => [key(item), item])).values()];
+  const changed = new Map();
+  for (const entry of [...(first.changedCountries ?? []), ...(second.changedCountries ?? [])]) {
+    const current = changed.get(entry.country);
+    if (!current) {
+      changed.set(entry.country, { ...entry, tiers: [...(entry.tiers ?? [])] });
+      continue;
+    }
+    const tiers = new Map((current.tiers ?? []).map((tier) => [tier.id, tier]));
+    for (const tier of entry.tiers ?? []) {
+      const previousTier = tiers.get(tier.id);
+      tiers.set(tier.id, previousTier ? { ...previousTier, to: tier.to } : tier);
+    }
+    changed.set(entry.country, {
+      ...current,
+      ...entry,
+      fromCurrency: current.fromCurrency,
+      fromRegion: current.fromRegion,
+      tiers: [...tiers.values()]
+    });
+  }
+  return {
+    addedTiers: unique([...(first.addedTiers ?? []), ...(second.addedTiers ?? [])], (item) => item.id),
+    removedTiers: unique([...(first.removedTiers ?? []), ...(second.removedTiers ?? [])], (item) => item.id),
+    addedCountries: unique([...(first.addedCountries ?? []), ...(second.addedCountries ?? [])], (item) => item.country),
+    removedCountries: unique([...(first.removedCountries ?? []), ...(second.removedCountries ?? [])], (item) => item.country),
+    changedCountries: [...changed.values()]
+  };
+}
+
 function migrateSnapshotIndex(index) {
   return {
     schemaVersion: 1,
@@ -78,15 +109,6 @@ function migrateSnapshotIndex(index) {
   };
 }
 
-function latestExistingEventDate(history, afterDate) {
-  return Object.values(history.countries ?? {})
-    .flatMap(({ events }) => events ?? [])
-    .map(({ observedAt }) => observedAt)
-    .filter((date) => date > afterDate)
-    .sort()
-    .at(-1) ?? null;
-}
-
 export async function importAppleArchives(inputDir, paths = {}) {
   if (!inputDir) throw new Error('Archive input directory is required');
   const historyPath = paths.historyPath ?? HISTORY_PATH;
@@ -94,7 +116,7 @@ export async function importAppleArchives(inputDir, paths = {}) {
   const namesPath = paths.namesPath ?? NAMES_PATH;
   const snapshotsDir = paths.snapshotsDir ?? SNAPSHOTS_DIR;
   const snapshotIndexPath = paths.snapshotIndexPath ?? SNAPSHOT_INDEX_PATH;
-  const [history, currentData, names, fileNames, existingSnapshotIndex] = await Promise.all([
+  const [, currentData, names, fileNames, existingSnapshotIndex] = await Promise.all([
     readFile(historyPath, 'utf8').then(JSON.parse),
     readFile(pricesPath, 'utf8').then(JSON.parse),
     readFile(namesPath, 'utf8').then(JSON.parse),
@@ -124,6 +146,15 @@ export async function importAppleArchives(inputDir, paths = {}) {
   const rebuilt = { schemaVersion: 2, updatedAt: new Date().toISOString(), countries: {}, sourcePublishedDates: [] };
   let previousData = null;
   let snapshotIndex = migrateSnapshotIndex(existingSnapshotIndex);
+  const currentPublishedDate = publicationDateKey(currentData.source.publishedDate);
+  if (!archives.length) throw new Error('No validated Apple archives were found in the input directory');
+  const archiveDates = new Set(archives.map(({ publishedDate }) => publishedDate));
+  const missingDates = snapshotIndex.snapshots
+    .map(({ publishedDate }) => publishedDate)
+    .filter((publishedDate) => publishedDate !== currentPublishedDate && !archiveDates.has(publishedDate));
+  if (missingDates.length) {
+    throw new Error(`Archive input is incomplete; missing existing snapshot dates: ${missingDates.join(', ')}`);
+  }
   await mkdir(snapshotsDir, { recursive: true });
 
   for (const archive of archives) {
@@ -157,29 +188,38 @@ export async function importAppleArchives(inputDir, paths = {}) {
     }
     updateHistory(rebuilt, archive.parsed.countries, archive.publishedDate, archive.parsed.tiers);
     const changes = previousData ? buildSnapshotChanges(previousData, archive.parsed.countries, archive.parsed.tiers) : emptyChanges();
-    rebuilt.sourcePublishedDates.push({
+    const sourceEntry = {
       publishedDate: archive.parsed.sourcePublishedDate,
       observedAt: archive.firstConfirmedDate,
       kind: previousData ? 'change' : 'initial',
       changes
-    });
+    };
+    const previousSourceEntry = rebuilt.sourcePublishedDates.at(-1);
+    if (publicationDateKey(previousSourceEntry?.publishedDate) === archive.publishedDate) {
+      previousSourceEntry.changes = mergeSnapshotChanges(previousSourceEntry.changes, changes);
+    } else {
+      rebuilt.sourcePublishedDates.push(sourceEntry);
+    }
     previousData = archive.parsed;
   }
 
-  const currentPublishedDate = publicationDateKey(currentData.source.publishedDate);
   const lastArchiveDate = archives.at(-1)?.publishedDate ?? '0000-00-00';
-  const currentEventDate = currentPublishedDate > lastArchiveDate
-    ? currentPublishedDate
-    : latestExistingEventDate(history, lastArchiveDate) ?? currentData.run?.observedAtBeijing ?? currentData.generatedAt.slice(0, 10);
+  const currentEventDate = currentData.run?.observedAtBeijing
+    ?? currentData.generatedAt.slice(0, 10);
   updateHistory(rebuilt, currentData.countries, currentEventDate, currentData.tiers);
+  const currentChanges = buildSnapshotChanges(previousData, currentData.countries, currentData.tiers);
   if (currentPublishedDate > lastArchiveDate) {
     rebuilt.sourcePublishedDates.push({
       publishedDate: currentData.source.publishedDate,
-      observedAt: history.sourcePublishedDates?.at(-1)?.observedAt ?? currentEventDate,
-      ...(history.sourcePublishedDates?.at(-1)?.observedAtUtc ? { observedAtUtc: history.sourcePublishedDates.at(-1).observedAtUtc } : {}),
+      observedAt: currentEventDate,
       kind: 'change',
-      changes: buildSnapshotChanges(previousData, currentData.countries, currentData.tiers)
+      changes: currentChanges
     });
+  } else if (publicationDateKey(rebuilt.sourcePublishedDates.at(-1)?.publishedDate) === currentPublishedDate) {
+    rebuilt.sourcePublishedDates.at(-1).changes = mergeSnapshotChanges(
+      rebuilt.sourcePublishedDates.at(-1).changes,
+      currentChanges
+    );
   }
 
   await Promise.all([

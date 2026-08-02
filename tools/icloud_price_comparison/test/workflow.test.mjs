@@ -27,7 +27,7 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.doesNotMatch(workflow, /name: 验证更新后的页面[\s\S]*?continue-on-error: true[\s\S]*?run: pnpm test:ui/);
   assert.doesNotMatch(workflow, /ui_before|运行浏览器界面测试（更新前）/, 'the workflow must not repeat UI tests before fetching data');
   assert.match(workflow, /name: 验证更新后的价格数据\s+run: pnpm test:data/);
-  assert.match(workflow, /name: 抓取并校验 Apple 价格[\s\S]*?EXCHANGE_RATE_API_KEY:\s*\$\{\{ secrets\.EXCHANGE_RATE_API_KEY \}\}[\s\S]*?run: pnpm update:data/);
+  assert.match(workflow, /name: 抓取并校验 Apple 价格[\s\S]*?id: update_data[\s\S]*?EXCHANGE_RATE_API_KEY:\s*\$\{\{ secrets\.EXCHANGE_RATE_API_KEY \}\}[\s\S]*?run: pnpm update:data/);
   assert.doesNotMatch(workflow, /v6\/\$\{\{ secrets\.EXCHANGE_RATE_API_KEY \}\}/, 'the API key must not be placed in a request URL');
   assert.match(workflow, /actions\/upload-artifact@v7/);
   assert.match(workflow, /retention-days:\s*14/);
@@ -38,7 +38,8 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /价格抓取、核心数据校验和提交未因此中断/);
   assert.match(workflow, /RUNNER_TEMP\/icloud-storage-summary\.md/);
   assert.match(workflow, /name: 追加仓库容量摘要[\s\S]*if: always\(\)/);
-  assert.match(workflow, /name: 写入失败摘要[\s\S]*if: failure\(\)/);
+  assert.match(workflow, /name: 补充未报告的失败摘要[\s\S]*if: failure\(\)/);
+  assert.match(workflow, /steps\.update_data\.outcome[\s\S]*artifacts\/run-report\.json[\s\S]*Updater already wrote a detailed failure summary/);
   assert.match(workflow, /::error title=iCloud\+ 价格更新失败/);
   assert.match(workflow, /上一份有效数据继续保留/);
   assert.match(workflow, /git_kib >= 819200[\s\S]*elif \(\( git_kib >= 512000 \)\)/);
@@ -60,7 +61,7 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   const uiGate = workflow.indexOf('name: 记录浏览器界面测试警告');
   assert.ok(commit < uiGate, 'UI failures must be reported only after the data commit step');
 
-  const uiWarningBlock = workflow.slice(uiGate, workflow.indexOf('name: 写入失败摘要'));
+  const uiWarningBlock = workflow.slice(uiGate, workflow.indexOf('name: 补充未报告的失败摘要'));
   assert.doesNotMatch(uiWarningBlock, /::error|exit 1/, 'UI failures must warn without failing the update job');
   const uiStepBlock = workflow.slice(uiTest, workflow.indexOf('name: 上传诊断信息'));
   assert.doesNotMatch(uiStepBlock, /continue-on-error/, 'the UI command must be captured instead of producing a red failed step');
