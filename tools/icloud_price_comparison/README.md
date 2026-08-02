@@ -123,3 +123,29 @@ python -m http.server 4173
 - 汇率：[ExchangeRate-API](https://www.exchangerate-api.com/docs/overview)，开放接口作为自动回退
 
 人民币金额仅用于横向比较，不代表 Apple 实际结算价。税费、可用性和购买区域限制可能不同。本工具与 Apple Inc. 无关联。
+\n+## Apple 页面快照与历史导入
+
+正式入口：<https://www.linchun.com.cn/tools/icloud_price_comparison/>。
+
+`data/apple-snapshots/` 保存每个 Apple `Published Date` 的 HTML 证据、规范化 JSON 和 `index.json` 索引。`publishedDate` 是 Apple 官方日期；`firstConfirmedDate` 是本项目首次以北京时间确认该修订版的日期。Wayback 抓取时间只用于历史导入排序和来源追溯，不替代这两个日期。
+
+同一发布日期且内容指纹相同的页面只保存一次；同一发布日期但价格、容量、地区或其他规范化内容发生变化，会保存为 `YYYY-MM-DD-<hash>.html/json` 新修订版，并正常更新 `history.json`。旧修订版不得覆盖或手工删除。
+
+历史资料使用：
+
+```bash
+node scripts/import-apple-archives.mjs --input <包含完整历史快照的目录>
+```
+
+导入目录必须包含现有历史发布日期（当前 live 日期除外），空目录或不完整目录会拒绝。生产更新和历史导入均在校验完成后才写入；快照、历史或索引写入失败会回滚并保留上一份有效数据。详见 `data/apple-snapshots/README.md`。
+
+## 全链路验证
+
+```bash
+pnpm test
+pnpm test:core
+pnpm check:live
+pnpm audit --audit-level low
+```
+
+测试覆盖固定 fixture、旧版快照解析、双解析器一致性、发布日期和价格完整性、汇率主备、快照修订去重、失败回滚、工作流触发、真实 Apple 只读抓取和浏览器 UI。`check:live` 不写生产文件；`update:data` 才允许正式写入。
