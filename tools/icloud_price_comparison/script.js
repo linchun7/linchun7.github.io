@@ -738,15 +738,15 @@ function formatPublishedDateChanges(changes, isInitial = false) {
       }
       for (const tierChange of entry.tiers || []) {
         const tier = state.data.tiers.find(({ id }) => id === tierChange.id);
-        const from = Number.isFinite(tierChange.from) ? numberFormatter.format(tierChange.from) : '无';
-        const to = Number.isFinite(tierChange.to) ? numberFormatter.format(tierChange.to) : '无';
+        const from = Number.isFinite(tierChange.from) ? `${numberFormatter.format(tierChange.from)} ${entry.fromCurrency}` : '无';
+        const to = Number.isFinite(tierChange.to) ? `${numberFormatter.format(tierChange.to)} ${entry.toCurrency}` : '无';
         details.push(`${tier?.label || tierChange.id} ${from}→${to}`);
       }
       return `${countryDisplayName(entry)}（${details.join('；')}）`;
     });
-    parts.push(`地区内容变化：${changed.join('；')}`);
+    parts.push(`地区内容变化：\n${changed.join('\n')}`);
   }
-  return parts.length ? parts.join(' | ') : '发布日期变更，未检测到国家或价格变化';
+  return parts.length ? parts.join('\n') : '发布日期变更，未检测到国家或价格变化';
 }
 
 function renderPublishedDateHistory() {
