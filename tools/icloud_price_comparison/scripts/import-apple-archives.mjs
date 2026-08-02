@@ -121,17 +121,16 @@ export async function importAppleArchives(inputDir) {
     previousData = archive.parsed;
   }
 
-  const lastArchiveDate = archives.at(-1)?.publishedDate ?? '0000-00-00';
-  const currentObservedAt = latestExistingEventDate(history, lastArchiveDate) ?? currentData.run?.observedAtBeijing ?? currentData.generatedAt.slice(0, 10);
-  const currentObservedAtUtc = currentData.run?.observedAtBeijing === currentObservedAt
-    ? currentData.run?.observedAtUtc ?? currentData.generatedAt
-    : null;
-  updateHistory(rebuilt, currentData.countries, currentObservedAt, currentData.tiers, currentObservedAtUtc);
   const currentPublishedDate = publicationDateKey(currentData.source.publishedDate);
+  const lastArchiveDate = archives.at(-1)?.publishedDate ?? '0000-00-00';
+  const currentEventDate = currentPublishedDate > lastArchiveDate
+    ? currentPublishedDate
+    : latestExistingEventDate(history, lastArchiveDate) ?? currentData.run?.observedAtBeijing ?? currentData.generatedAt.slice(0, 10);
+  updateHistory(rebuilt, currentData.countries, currentEventDate, currentData.tiers);
   if (currentPublishedDate > lastArchiveDate) {
     rebuilt.sourcePublishedDates.push({
       publishedDate: currentData.source.publishedDate,
-      observedAt: history.sourcePublishedDates?.at(-1)?.observedAt ?? currentObservedAt,
+      observedAt: history.sourcePublishedDates?.at(-1)?.observedAt ?? currentEventDate,
       ...(history.sourcePublishedDates?.at(-1)?.observedAtUtc ? { observedAtUtc: history.sourcePublishedDates.at(-1).observedAtUtc } : {}),
       kind: 'change',
       changes: buildSnapshotChanges(previousData, currentData.countries, currentData.tiers)
