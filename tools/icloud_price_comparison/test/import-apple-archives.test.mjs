@@ -84,6 +84,12 @@ test('keeps same-date archive revisions as separate HTML and JSON evidence', asy
     assert.equal(snapshot.revisions[2].firstConfirmedDate, '2025-05-14');
     assert.notEqual(snapshot.revisions[0].file, snapshot.revisions[1].file);
     assert.notEqual(snapshot.revisions[0].dataFile, snapshot.revisions[1].dataFile);
+    assert.equal(snapshot.revisions[0].file, '2025-05-12.html');
+    assert.equal(snapshot.revisions[0].dataFile, '2025-05-12.json');
+    for (const revision of snapshot.revisions.slice(1)) {
+      assert.match(revision.file, /^2025-05-12-[0-9a-f]{12}\.html$/);
+      assert.match(revision.dataFile, /^2025-05-12-[0-9a-f]{12}\.json$/);
+    }
     for (const revision of snapshot.revisions) {
       await access(path.join(snapshotsDir, revision.file));
       await access(path.join(snapshotsDir, revision.dataFile));
