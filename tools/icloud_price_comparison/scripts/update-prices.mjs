@@ -443,13 +443,13 @@ export function buildRunLog(existing, entry) {
   };
 }
 
-async function writeAppleSnapshot(html, startedAt) {
+async function writeAppleSnapshot(html, startedAt, diagnosticsDir = DIAGNOSTICS_DIR) {
   const stamp = startedAt.toISOString().replaceAll(/[-:]/g, '').replace('.000Z', 'Z');
-  await mkdir(DIAGNOSTICS_DIR, { recursive: true });
-  await writeFile(path.join(DIAGNOSTICS_DIR, `apple-response-${stamp}.html`), html, 'utf8');
+  await mkdir(diagnosticsDir, { recursive: true });
+  await writeFile(path.join(diagnosticsDir, `apple-response-${stamp}.html`), html, 'utf8');
 }
 
-function failureRunLogEntry(error, startedAt, finishedAt) {
+function failureRunLogEntry(error, startedAt, finishedAt, appleResponseCaptured = Boolean(lastAppleHtml)) {
   const trigger = resolveTriggerSource(
     process.env.GITHUB_EVENT_NAME,
     process.env.ICLOUD_TRIGGER_SOURCE
@@ -468,7 +468,7 @@ function failureRunLogEntry(error, startedAt, finishedAt) {
       message: error.message,
       stack: error.stack ?? null
     },
-    appleResponseCaptured: Boolean(lastAppleHtml)
+    appleResponseCaptured
   };
 }
 
@@ -839,32 +839,42 @@ export async function main({ dryRun = DRY_RUN, paths = {} } = {}) {
   }
 }
 
+export async function writeFailureDiagnostics(error, {
+  diagnosticsDir = DIAGNOSTICS_DIR,
+  appleHtml = lastAppleHtml,
+  startedAt = runStartedAt,
+  finishedAt = new Date(),
+  stepSummaryPath = process.env.GITHUB_STEP_SUMMARY
+} = {}) {
+  const report = failureRunLogEntry(error, startedAt, finishedAt, Boolean(appleHtml));
+  await mkdir(diagnosticsDir, { recursive: true });
+  await writeFile(path.join(diagnosticsDir, 'run-report.json'), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+  if (appleHtml) {
+    await writeAppleSnapshot(appleHtml, startedAt, diagnosticsDir);
+  }
+  if (stepSummaryPath) {
+    await appendFile(stepSummaryPath, [
+      '## iCloud+ 价格更新',
+      '',
+      '### 失败',
+      '- **状态：失败**',
+      `- 触发方式：${describeTriggerSource(report.trigger)}`,
+      `- 失败时间（北京时间）：${formatBeijingDateTime(finishedAt)}`,
+      `- **失败原因：${error.message}**`,
+      `- Apple 原始响应：${report.appleResponseCaptured ? '已保存到运行附件' : '未获取到'}`,
+      '',
+      '### 处理建议',
+      '- 请先查看当前失败步骤日志，再下载 `icloud-price-diagnostics-*` 附件。',
+      ''
+    ].join('\n'), 'utf8');
+  }
+  return report;
+}
+
 async function handleFailure(error) {
   console.error(error);
   try {
-    const finishedAt = new Date();
-    const report = failureRunLogEntry(error, runStartedAt, finishedAt);
-    await mkdir(DIAGNOSTICS_DIR, { recursive: true });
-    await writeFile(path.join(DIAGNOSTICS_DIR, 'run-report.json'), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-    if (lastAppleHtml) {
-      await writeAppleSnapshot(lastAppleHtml, runStartedAt);
-    }
-    if (process.env.GITHUB_STEP_SUMMARY) {
-      await appendFile(process.env.GITHUB_STEP_SUMMARY, [
-        '## iCloud+ 价格更新',
-        '',
-        '### 失败',
-        '- **状态：失败**',
-        `- 触发方式：${describeTriggerSource(report.trigger)}`,
-        `- 失败时间（北京时间）：${formatBeijingDateTime(finishedAt)}`,
-        `- **失败原因：${error.message}**`,
-        `- Apple 原始响应：${report.appleResponseCaptured ? '已保存到运行附件' : '未获取到'}`,
-        '',
-        '### 处理建议',
-        '- 请先查看当前失败步骤日志，再下载 `icloud-price-diagnostics-*` 附件。',
-        ''
-      ].join('\n'), 'utf8');
-    }
+    await writeFailureDiagnostics(error);
   } catch (diagnosticError) {
     console.error(`Unable to save diagnostics: ${diagnosticError.message}`);
   }
