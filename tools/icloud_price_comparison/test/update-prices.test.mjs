@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 import {
   buildSnapshotChanges,
@@ -8,6 +10,7 @@ import {
   buildAppleSnapshotEntry,
   buildAppleSnapshotIndex,
   appleSnapshotContentHash,
+  savePublishedAppleSnapshot,
   createRunLogEntry,
   getExchangeRates,
   main,
@@ -51,6 +54,33 @@ test('Apple snapshot semantic hash ignores formatted price text', () => {
   assert.equal(appleSnapshotContentHash(parsed), appleSnapshotContentHash(reformatted));
 });
 
+test('writes, deduplicates, and revises Apple snapshots in production format', async () => {
+  const snapshotsDir = await mkdtemp(path.join(tmpdir(), 'icloud-snapshots-'));
+  const indexPath = path.join(snapshotsDir, 'index.json');
+  const base = {
+    sourcePublishedDate: 'Published Date: April 06, 2026',
+    parser: 'cross-checked',
+    tiers: [TIER_50],
+    countries: [country('Alpha', { prices: { '50GB': 1 } })]
+  };
+  try {
+    assert.equal(await savePublishedAppleSnapshot('<html>one</html>', base, '2026-08-02', { snapshotsDir, indexPath }), true);
+    assert.equal(await savePublishedAppleSnapshot('<html>one</html>', base, '2026-08-03', { snapshotsDir, indexPath }), false);
+    const revised = structuredClone(base);
+    revised.countries[0].plans['50GB'].price = 2;
+    assert.equal(await savePublishedAppleSnapshot('<html>two</html>', revised, '2026-08-03', { snapshotsDir, indexPath }), true);
+
+    const index = JSON.parse(await readFile(indexPath, 'utf8'));
+    assert.equal(index.snapshots.length, 1);
+    assert.equal(index.snapshots[0].revisions.length, 2);
+    assert.equal(index.snapshots[0].revisions[0].firstConfirmedDate, '2026-08-02');
+    assert.equal(index.snapshots[0].revisions[1].firstConfirmedDate, '2026-08-03');
+    assert.equal((await readFile(path.join(snapshotsDir, index.snapshots[0].activeFile), 'utf8')), '<html>two</html>');
+  } finally {
+    await rm(snapshotsDir, { recursive: true, force: true });
+  }
+});
+
 const TIER_50 = { id: '50GB', label: '50 GB', capacityGb: 50 };
 const TIER_200 = { id: '200GB', label: '200 GB', capacityGb: 200 };
 const TIER_1TB = { id: '1TB', label: '1 TB', capacityGb: 1024 };
@@ -58,6 +88,7 @@ const updaterUrl = new URL('../scripts/update-prices.mjs', import.meta.url);
 const pricesUrl = new URL('../data/prices.json', import.meta.url);
 const historyUrl = new URL('../data/history.json', import.meta.url);
 const runLogUrl = new URL('../data/run-log.json', import.meta.url);
+const namesUrl = new URL('../scripts/country-names.zh.json', import.meta.url);
 
 function escapeHtml(value) {
   return String(value)
@@ -119,6 +150,103 @@ async function runDryMain({ html, fxPayload, apiKey = '', authenticatedFxPayload
     else process.env.GITHUB_ACTIONS = originalGithubActions;
   }
 }
+
+async function withMockedFetch({ html, fxPayload }, callback) {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const target = String(url);
+    if (target.includes('support.apple.com')) return new Response(html, { status: 200 });
+    if (target.includes('v6.exchangerate-api.com')) return new Response(JSON.stringify(fxPayload), { status: 200 });
+    if (target.includes('open.er-api.com')) return new Response(JSON.stringify(fxPayload), { status: 200 });
+    throw new Error(`Unexpected URL in production-path test: ${target}`);
+  };
+  try {
+    return await callback();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+}
+
+async function createTemporaryProductionPaths() {
+  const root = await mkdtemp(path.join(tmpdir(), 'icloud-production-'));
+  const dataDir = path.join(root, 'data');
+  const paths = {
+    currentDataPath: path.join(dataDir, 'prices.json'),
+    historyPath: path.join(dataDir, 'history.json'),
+    runLogPath: path.join(dataDir, 'run-log.json'),
+    namesPath: path.join(root, 'country-names.zh.json'),
+    snapshotsDir: path.join(dataDir, 'apple-snapshots'),
+    snapshotIndexPath: path.join(dataDir, 'apple-snapshots', 'index.json')
+  };
+  await mkdir(dataDir, { recursive: true });
+  await Promise.all([
+    copyFile(pricesUrl, paths.currentDataPath),
+    copyFile(historyUrl, paths.historyPath),
+    copyFile(runLogUrl, paths.runLogPath),
+    copyFile(namesUrl, paths.namesPath)
+  ]);
+  return { root, paths };
+}
+
+test('runs the production write path against isolated files', async () => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const fxPayload = {
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
+    rates: data.fx.rates
+  };
+  try {
+    await withMockedFetch({ html: buildAppleHtml(data), fxPayload }, () => main({ dryRun: false, paths }));
+    const [writtenData, index] = await Promise.all([
+      readFile(paths.currentDataPath, 'utf8').then(JSON.parse),
+      readFile(paths.snapshotIndexPath, 'utf8').then(JSON.parse)
+    ]);
+    const snapshot = index.snapshots.find(({ publishedDate }) => publishedDate === '2026-07-17');
+    assert.ok(snapshot, 'production run must write the current Apple snapshot');
+    assert.equal(snapshot.revisions.length, 1);
+    assert.equal(snapshot.revisions[0].firstConfirmedDate, writtenData.run.observedAtBeijing);
+    assert.equal(writtenData.source.publishedDate, data.source.publishedDate);
+    assert.equal(writtenData.countries.length, data.countries.length);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('does not write a snapshot when publication-date validation fails', async () => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const fxPayload = {
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
+    rates: data.fx.rates
+  };
+  const before = await Promise.all([
+    readFile(paths.currentDataPath, 'utf8'),
+    readFile(paths.historyPath, 'utf8'),
+    readFile(paths.runLogPath, 'utf8')
+  ]);
+  try {
+    await withMockedFetch(
+      { html: buildAppleHtml(data, 'July 1, 2026'), fxPayload },
+      () => assert.rejects(
+        main({ dryRun: false, paths }),
+        /Apple published date moved backwards/
+      )
+    );
+    const after = await Promise.all([
+      readFile(paths.currentDataPath, 'utf8'),
+      readFile(paths.historyPath, 'utf8'),
+      readFile(paths.runLogPath, 'utf8')
+    ]);
+    assert.deepEqual(after, before);
+    await assert.rejects(readFile(paths.snapshotIndexPath, 'utf8'), { code: 'ENOENT' });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 function country(countryName, {
   nameZh = countryName,
@@ -809,7 +937,9 @@ test('keeps failure diagnostics compact without duplicate files', async () => {
 test('initializes the confirmation date before saving a production snapshot', async () => {
   const source = await readFile(updaterUrl, 'utf8');
   const observedAtDeclaration = source.indexOf('const observedAt = formatBeijingDate(generatedAt);');
-  const snapshotWrite = source.indexOf('await savePublishedAppleSnapshot(html, parsed, observedAt);');
+  const publicationValidation = source.indexOf('const publishedDateUpdate = updatePublishedDateHistory(');
+  const snapshotWrite = source.indexOf('await savePublishedAppleSnapshot(html, parsed, observedAt, {');
   assert.ok(observedAtDeclaration >= 0, 'confirmation date declaration must exist');
   assert.ok(snapshotWrite > observedAtDeclaration, 'production snapshot must only use an initialized confirmation date');
+  assert.ok(snapshotWrite > publicationValidation, 'production snapshot must only be written after publication-date validation');
 });
