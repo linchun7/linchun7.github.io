@@ -9,6 +9,7 @@ import {
   buildAppleSnapshotIndex,
   buildSnapshotChanges,
   publicationDateKey,
+  normalizeAppleSnapshot,
   updateHistory
 } from './update-prices.mjs';
 
@@ -26,7 +27,7 @@ function archiveMetadata(html) {
   const stamp = match[1];
   const capturedAtUtc = `${stamp.slice(0, 4)}-${stamp.slice(4, 6)}-${stamp.slice(6, 8)}T${stamp.slice(8, 10)}:${stamp.slice(10, 12)}:${stamp.slice(12, 14)}.000Z`;
   return {
-    capturedAtUtc,
+    firstConfirmedDate: capturedAtUtc.slice(0, 10),
     archiveUrl: `https://web.archive.org/web/${stamp}/${APPLE_URL}`
   };
 }
@@ -55,6 +56,25 @@ function withNames(parsed, names) {
 
 function emptyChanges() {
   return { addedTiers: [], removedTiers: [], addedCountries: [], removedCountries: [], changedCountries: [] };
+}
+
+function migrateSnapshotIndex(index) {
+  return {
+    schemaVersion: 1,
+    snapshots: (index.snapshots ?? []).map((snapshot) => {
+      const revisions = (snapshot.revisions ?? []).map((revision) => {
+        const dataFile = revision.dataFile ?? revision.file.replace(/\.html$/, '.json');
+        const firstConfirmedDate = revision.firstConfirmedDate ?? revision.capturedAtUtc?.slice(0, 10);
+        const { capturedAtUtc, ...rest } = revision;
+        return { ...rest, dataFile, firstConfirmedDate };
+      });
+      return {
+        ...snapshot,
+        activeDataFile: revisions.at(-1)?.dataFile,
+        revisions
+      };
+    })
+  };
 }
 
 function latestExistingEventDate(history, afterDate) {
@@ -93,13 +113,13 @@ export async function importAppleArchives(inputDir) {
 
   const rebuilt = { schemaVersion: 2, updatedAt: new Date().toISOString(), countries: {}, sourcePublishedDates: [] };
   let previousData = null;
-  let snapshotIndex = existingSnapshotIndex;
+  let snapshotIndex = migrateSnapshotIndex(existingSnapshotIndex);
   await mkdir(SNAPSHOTS_DIR, { recursive: true });
 
   for (const archive of archives) {
     const contentHash = appleSnapshotContentHash(archive.parsed);
     const entry = buildAppleSnapshotEntry(archive.publishedDate, {
-      capturedAtUtc: archive.capturedAtUtc,
+      firstConfirmedDate: archive.firstConfirmedDate,
       sourceUrl: APPLE_URL,
       archiveUrl: archive.archiveUrl,
       parser: archive.parsed.parser,
@@ -109,12 +129,16 @@ export async function importAppleArchives(inputDir) {
     });
     snapshotIndex = buildAppleSnapshotIndex(snapshotIndex, entry);
     await copyFile(archive.filePath, path.join(SNAPSHOTS_DIR, entry.file));
+    await writeFile(
+      path.join(SNAPSHOTS_DIR, entry.dataFile),
+      `${JSON.stringify(normalizeAppleSnapshot(archive.parsed), null, 2)}\n`,
+      'utf8'
+    );
     updateHistory(rebuilt, archive.parsed.countries, archive.publishedDate, archive.parsed.tiers);
     const changes = previousData ? buildSnapshotChanges(previousData, archive.parsed.countries, archive.parsed.tiers) : emptyChanges();
     rebuilt.sourcePublishedDates.push({
       publishedDate: archive.parsed.sourcePublishedDate,
-      observedAt: archive.capturedAtUtc.slice(0, 10),
-      observedAtUtc: archive.capturedAtUtc,
+      observedAt: archive.firstConfirmedDate,
       kind: previousData ? 'change' : 'initial',
       changes
     });
@@ -136,6 +160,27 @@ export async function importAppleArchives(inputDir) {
       changes: buildSnapshotChanges(previousData, currentData.countries, currentData.tiers)
     });
   }
+
+  const currentContentHash = appleSnapshotContentHash(currentData);
+  const currentEntry = buildAppleSnapshotEntry(currentData.source.publishedDate, {
+    firstConfirmedDate: history.sourcePublishedDates?.at(-1)?.observedAt ?? currentEventDate,
+    parser: currentData.source.parser,
+    countries: currentData.countries.length,
+    pricePoints: currentData.countries.length * currentData.tiers.length,
+    contentHash: currentContentHash
+  });
+  const currentSnapshot = snapshotIndex.snapshots.find(({ publishedDate }) => publishedDate === currentPublishedDate);
+  currentEntry.file = currentSnapshot?.activeFile ?? currentEntry.file;
+  currentEntry.dataFile = currentEntry.file.replace(/\.html$/, '.json');
+  snapshotIndex = buildAppleSnapshotIndex(snapshotIndex, currentEntry);
+  await writeFile(
+    path.join(SNAPSHOTS_DIR, currentEntry.dataFile),
+    `${JSON.stringify(normalizeAppleSnapshot({
+      ...currentData,
+      sourcePublishedDate: currentData.source.publishedDate
+    }), null, 2)}\n`,
+    'utf8'
+  );
 
   await Promise.all([
     writeFile(HISTORY_PATH, `${JSON.stringify(rebuilt, null, 2)}\n`, 'utf8'),

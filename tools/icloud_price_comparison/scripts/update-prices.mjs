@@ -489,7 +489,7 @@ function summarizeNames(names) {
 }
 
 export function buildAppleSnapshotEntry(publishedDate, {
-  capturedAtUtc,
+  firstConfirmedDate,
   sourceUrl = APPLE_URL,
   archiveUrl = null,
   parser = 'cross-checked',
@@ -502,7 +502,8 @@ export function buildAppleSnapshotEntry(publishedDate, {
   return {
     publishedDate: publishedDateIso,
     file: `${publishedDateIso}.html`,
-    capturedAtUtc,
+    dataFile: `${publishedDateIso}.json`,
+    firstConfirmedDate,
     sourceUrl,
     ...(archiveUrl ? { archiveUrl } : {}),
     parser,
@@ -513,7 +514,11 @@ export function buildAppleSnapshotEntry(publishedDate, {
 }
 
 export function appleSnapshotContentHash(parsed) {
-  const normalized = {
+  return createHash('sha256').update(JSON.stringify(normalizeApplePricing(parsed))).digest('hex');
+}
+
+function normalizeApplePricing(parsed) {
+  return {
     tiers: parsed.tiers
       .map(({ id, label, capacityGb }) => ({ id, label, capacityGb }))
       .sort((a, b) => a.capacityGb - b.capacityGb),
@@ -526,7 +531,14 @@ export function appleSnapshotContentHash(parsed) {
         .sort(([a], [b]) => a.localeCompare(b)))
     })).sort((a, b) => a.country.localeCompare(b.country))
   };
-  return createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
+}
+
+export function normalizeAppleSnapshot(parsed) {
+  return {
+    schemaVersion: 1,
+    publishedDate: publicationDateKey(parsed.sourcePublishedDate),
+    ...normalizeApplePricing(parsed)
+  };
 }
 
 export function buildAppleSnapshotIndex(existing, entry) {
@@ -537,6 +549,7 @@ export function buildAppleSnapshotIndex(existing, entry) {
     byDate.set(entry.publishedDate, {
       publishedDate: entry.publishedDate,
       activeFile: entry.file,
+      activeDataFile: entry.dataFile,
       activeContentHash: entry.contentHash,
       revisions: [entry]
     });
@@ -546,6 +559,7 @@ export function buildAppleSnapshotIndex(existing, entry) {
       byDate.set(entry.publishedDate, {
         ...current,
         activeFile: entry.file,
+        activeDataFile: entry.dataFile,
         activeContentHash: entry.contentHash,
         revisions: [...revisions, entry]
       });
@@ -557,7 +571,7 @@ export function buildAppleSnapshotIndex(existing, entry) {
   };
 }
 
-async function savePublishedAppleSnapshot(html, parsed, capturedAtUtc) {
+async function savePublishedAppleSnapshot(html, parsed, firstConfirmedDate) {
   const publishedDate = publicationDateKey(parsed.sourcePublishedDate);
   const contentHash = appleSnapshotContentHash(parsed);
   const index = await readJson(APPLE_SNAPSHOT_INDEX_PATH, { schemaVersion: 1, snapshots: [] });
@@ -566,15 +580,17 @@ async function savePublishedAppleSnapshot(html, parsed, capturedAtUtc) {
   if (revisions.some((revision) => revision.contentHash === contentHash)) return false;
   const file = existing ? `${publishedDate}-${contentHash.slice(0, 12)}.html` : `${publishedDate}.html`;
   const entry = buildAppleSnapshotEntry(parsed.sourcePublishedDate, {
-    capturedAtUtc,
+    firstConfirmedDate,
     parser: parsed.parser,
     countries: parsed.countries.length,
     pricePoints: parsed.countries.length * parsed.tiers.length,
     contentHash
   });
   entry.file = file;
+  entry.dataFile = file.replace(/\.html$/, '.json');
   await mkdir(APPLE_SNAPSHOTS_DIR, { recursive: true });
   await writeFile(path.join(APPLE_SNAPSHOTS_DIR, entry.file), html, 'utf8');
+  await writeJsonAtomic(path.join(APPLE_SNAPSHOTS_DIR, entry.dataFile), normalizeAppleSnapshot(parsed));
   await writeJsonAtomic(APPLE_SNAPSHOT_INDEX_PATH, buildAppleSnapshotIndex(index, entry));
   return true;
 }
@@ -753,7 +769,7 @@ export async function main({ dryRun = DRY_RUN } = {}) {
     tiers: parsed.tiers
   });
   if (!dryRun) {
-    await savePublishedAppleSnapshot(html, parsed, new Date().toISOString());
+    await savePublishedAppleSnapshot(html, parsed, observedAt);
   }
   const generatedAt = new Date().toISOString();
   const observedAt = formatBeijingDate(generatedAt);

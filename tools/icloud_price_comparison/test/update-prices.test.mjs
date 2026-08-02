@@ -18,7 +18,7 @@ import {
 
 test('builds a deduplicated Apple snapshot index by published date', () => {
   const first = buildAppleSnapshotEntry('Published Date: April 06, 2026', {
-    capturedAtUtc: '2026-07-16T06:27:20.000Z',
+    firstConfirmedDate: '2026-07-16',
     archiveUrl: 'https://web.archive.org/web/20260716062720/https://support.apple.com/en-us/108047',
     countries: 70,
     pricePoints: 350,
@@ -26,12 +26,19 @@ test('builds a deduplicated Apple snapshot index by published date', () => {
   });
   assert.equal(first.file, '2026-04-06.html');
   const index = buildAppleSnapshotIndex(null, first);
-  const duplicate = buildAppleSnapshotIndex(index, { ...first, capturedAtUtc: '2026-08-02T00:00:00.000Z' });
+  assert.equal(first.dataFile, '2026-04-06.json');
+  const duplicate = buildAppleSnapshotIndex(index, { ...first, firstConfirmedDate: '2026-08-02' });
   assert.deepEqual(duplicate, index);
-  const revised = buildAppleSnapshotIndex(index, { ...first, file: '2026-04-06-different.html', contentHash: 'different' });
+  const revised = buildAppleSnapshotIndex(index, {
+    ...first,
+    file: '2026-04-06-different.html',
+    dataFile: '2026-04-06-different.json',
+    contentHash: 'different'
+  });
   assert.equal(revised.snapshots.length, 1);
   assert.equal(revised.snapshots[0].revisions.length, 2);
   assert.equal(revised.snapshots[0].activeContentHash, 'different');
+  assert.equal(revised.snapshots[0].activeDataFile, '2026-04-06-different.json');
 });
 
 test('Apple snapshot semantic hash ignores formatted price text', () => {
