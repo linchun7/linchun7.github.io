@@ -12,7 +12,7 @@
 索引中的关键字段：
 
 - `publishedDate`：Apple 页面显示的官方发布日期。
-- `firstConfirmedDate`：本项目首次确认该修订版的北京时间日期。
+- `firstConfirmedDate`：现有证据能够确认该修订版已经存在的最早北京时间日期，仅供内部追溯与校验，不在前端展示。
 - `contentHash`：规范化价格内容指纹，用于去重和识别同日修订。
 - `file` / `dataFile`：HTML 证据和 JSON 数据文件名。
 - `archiveUrl`：Wayback 来源地址（历史导入时存在）。
@@ -27,6 +27,6 @@
 
 快照写入采用临时 staging 目录；HTML、JSON、历史和索引任一环节失败，正式目录会回滚并保留上一份有效数据。
 
-Wayback 的抓取时间仅用于历史导入排序和来源追溯；历史导入会将其换算为北京时间后写入 `firstConfirmedDate`，不把 UTC 日期直接当作确认日期。前端展示以 Apple 官方 `publishedDate` 和项目 `firstConfirmedDate` 为准。
+Wayback 的抓取时间用于历史导入排序、来源追溯和历史版本的最早可确认日期；导入时先换算为北京时间。项目开始自动监测后的新版本使用首次成功抓取日期。前端仅展示 Apple 官方 `publishedDate` 与内容变化。
 
 请勿手工修改 `index.json`，也不要只复制单个快照文件进行重建；应保留完整目录后再运行导入工具。

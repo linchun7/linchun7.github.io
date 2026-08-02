@@ -791,7 +791,7 @@ function renderPublishedDateHistory() {
   if (!entries.length) {
     const row = document.createElement('tr');
     const cell = createCell('暂无发布日期记录', 'empty-cell');
-    cell.colSpan = 3;
+    cell.colSpan = 2;
     row.append(cell);
     elements.publishedDateRows.append(row);
     return;
@@ -801,7 +801,6 @@ function renderPublishedDateHistory() {
     const row = document.createElement('tr');
     row.append(
       createCell(formatPublishedDate(entry.publishedDate)),
-      createCell(formatDate(entry.observedAt)),
       createPublishedDateChangesCell(entry.changes, entry.kind === 'initial')
     );
     elements.publishedDateRows.append(row);
