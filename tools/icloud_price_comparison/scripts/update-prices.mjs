@@ -7,6 +7,7 @@ import {
   validatePriceChangeAnomalies,
   validatePrices
 } from './parse-prices.mjs';
+import { describeTriggerSource, resolveTriggerSource } from './run-context.mjs';
 
 const APPLE_URL = 'https://support.apple.com/en-us/108047';
 const FX_AUTH_URL = 'https://v6.exchangerate-api.com/v6/latest/USD';
@@ -386,6 +387,10 @@ async function writeJsonAtomic(filePath, value) {
 
 export function createRunLogEntry(data, summary, startedAt, finishedAt) {
   const publishedDate = data.source.publishedDate ?? null;
+  const trigger = resolveTriggerSource(
+    process.env.GITHUB_EVENT_NAME,
+    process.env.ICLOUD_TRIGGER_SOURCE
+  );
   const previousPublishedDate = summary.publicationDateChanged
     ? summary.publishedDateHistory?.at(-2)?.publishedDate ?? null
     : publishedDate;
@@ -393,7 +398,8 @@ export function createRunLogEntry(data, summary, startedAt, finishedAt) {
     schemaVersion: 1,
     id: finishedAt.toISOString(),
     status: 'success',
-    trigger: process.env.GITHUB_EVENT_NAME ?? 'local',
+    trigger,
+    automaticRunDateBeijing: process.env.ICLOUD_AUTOMATIC_RUN_DATE_BEIJING || null,
     startedAtUtc: startedAt.toISOString(),
     finishedAtUtc: finishedAt.toISOString(),
     durationMs: Math.max(0, finishedAt.getTime() - startedAt.getTime()),
@@ -452,11 +458,16 @@ async function writeAppleSnapshot(html, startedAt) {
 }
 
 function failureRunLogEntry(error, startedAt, finishedAt) {
+  const trigger = resolveTriggerSource(
+    process.env.GITHUB_EVENT_NAME,
+    process.env.ICLOUD_TRIGGER_SOURCE
+  );
   return {
     schemaVersion: 1,
     id: finishedAt.toISOString(),
     status: 'failure',
-    trigger: process.env.GITHUB_EVENT_NAME ?? 'local',
+    trigger,
+    automaticRunDateBeijing: process.env.ICLOUD_AUTOMATIC_RUN_DATE_BEIJING || null,
     startedAtUtc: startedAt.toISOString(),
     finishedAtUtc: finishedAt.toISOString(),
     durationMs: Math.max(0, finishedAt.getTime() - startedAt.getTime()),
@@ -515,7 +526,10 @@ function describeExchangeRateAuthentication(fx) {
     : `${describeExchangeRateFallback(fx.apiKeyStatus)}，使用开放接口`;
 }
 
-export function buildActionSummaryLines(data, summary, trigger = process.env.GITHUB_EVENT_NAME ?? 'unknown') {
+export function buildActionSummaryLines(data, summary, trigger = resolveTriggerSource(
+  process.env.GITHUB_EVENT_NAME,
+  process.env.ICLOUD_TRIGGER_SOURCE
+)) {
   const publicationChanges = summary.publicationChanges ?? {
     addedTiers: [], removedTiers: [], addedCountries: [], removedCountries: [], changedCountries: []
   };
@@ -556,7 +570,7 @@ export function buildActionSummaryLines(data, summary, trigger = process.env.GIT
     '',
     '### 结论',
     '- **状态：成功**',
-    `- 触发方式：${trigger}`,
+    `- 触发方式：${describeTriggerSource(trigger)}`,
     `- 抓取完成时间（北京时间）：${formatBeijingDateTime(data.generatedAt)}`,
     '',
     '### 数据概览',
@@ -724,7 +738,7 @@ async function handleFailure(error) {
         '',
         '### 失败',
         '- **状态：失败**',
-        `- 触发方式：${report.trigger}`,
+        `- 触发方式：${describeTriggerSource(report.trigger)}`,
         `- 失败时间（北京时间）：${formatBeijingDateTime(finishedAt)}`,
         `- **失败原因：${error.message}**`,
         `- Apple 原始响应：${report.appleResponseCaptured ? '已保存到运行附件' : '未获取到'}`,

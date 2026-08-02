@@ -2,9 +2,18 @@ name: Update iCloud prices
 
 on:
   schedule:
-    # 北京时间 07:52，避开整点和半点高峰。
-    - cron: '52 23 * * *'
+    # 北京时间 09:05，作为 Cloudflare 08:05 主触发的备用。
+    - cron: '5 1 * * *'
   workflow_dispatch:
+    inputs:
+      trigger_source:
+        description: 触发来源（手动运行保持 manual）
+        required: false
+        default: manual
+        type: choice
+        options:
+          - manual
+          - cloudflare
 
 permissions:
   contents: write
@@ -14,9 +23,34 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  prepare:
+    name: 检查每日自动更新
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.daily_guard.outputs.should_run }}
+      trigger_source: ${{ steps.daily_guard.outputs.trigger_source }}
+      automatic_run_date_beijing: ${{ steps.daily_guard.outputs.automatic_run_date_beijing }}
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v5
+
+      - name: 配置 Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: 检查每日幂等状态
+        id: daily_guard
+        working-directory: tools/icloud_price_comparison
+        env:
+          REQUESTED_TRIGGER_SOURCE: ${{ inputs.trigger_source }}
+        run: node scripts/daily-run-guard.mjs
+
   update:
     name: 更新并验证 iCloud+ 价格
-    if: github.ref == 'refs/heads/main'
+    needs: prepare
+    if: needs.prepare.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -70,6 +104,8 @@ jobs:
       - name: 抓取并校验 Apple 价格
         env:
           EXCHANGE_RATE_API_KEY: ${{ secrets.EXCHANGE_RATE_API_KEY }}
+          ICLOUD_TRIGGER_SOURCE: ${{ needs.prepare.outputs.trigger_source }}
+          ICLOUD_AUTOMATIC_RUN_DATE_BEIJING: ${{ needs.prepare.outputs.automatic_run_date_beijing }}
         run: pnpm update:data
 
       - name: 验证更新后的价格数据
