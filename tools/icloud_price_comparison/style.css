@@ -415,12 +415,17 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--accent-dark
 .price-trend.is-down { color: var(--green); }
 .price-trend.is-neutral { color: var(--muted); }
 .source-history-dialog { width: min(620px, calc(100% - 32px)); }
-.source-history-dialog .history-table-scroll table { min-width: 560px; }
+.source-history-dialog .history-table-scroll table { min-width: 560px; table-layout: fixed; }
+.source-history-dialog .history-table-scroll th:nth-child(-n + 2) { width: 112px; }
 .published-date-current { padding: 20px 24px; background: var(--surface-soft); border-bottom: 1px solid var(--line); }
 .published-date-current span { display: block; margin-bottom: 4px; color: var(--muted); font-size: 12px; }
 .published-date-current strong { display: block; font-size: 21px; }
 .published-date-list { padding-top: 20px; }
-.published-change-cell { min-width: 320px; line-height: 1.6; overflow-wrap: anywhere; white-space: pre-line; }
+.published-change-cell { width: 336px; line-height: 1.6; overflow-wrap: anywhere; }
+.published-change-group { min-width: 0; max-width: 100%; white-space: normal; }
+.published-change-group + .published-change-group { margin-top: 5px; }
+.published-change-heading { margin-right: 3px; font-size: 1.04em; color: var(--text); }
+.published-change-country { min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: break-all; }
 .history-toolbar { padding: 16px 24px 0; }
 .segmented.compact { width: min(430px, 100%); min-height: 36px; }
 .segmented.compact button { padding: 4px 8px; font-size: 12px; }
