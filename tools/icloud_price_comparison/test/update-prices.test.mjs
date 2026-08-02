@@ -15,6 +15,7 @@ import {
   getExchangeRates,
   main,
   publicationDateKey,
+  writeFailureDiagnostics,
   updateHistory,
   updatePublishedDateHistory
 } from '../scripts/update-prices.mjs';
@@ -268,6 +269,30 @@ test('cleans up snapshot files when index writing fails', async () => {
     assert.deepEqual(await readdir(snapshotsDir), ['blocked-index']);
   } finally {
     await rm(snapshotsDir, { recursive: true, force: true });
+  }
+});
+
+test('writes a failure report and Apple response diagnostic', async () => {
+  const diagnosticsDir = await mkdtemp(path.join(tmpdir(), 'icloud-diagnostics-'));
+  const summaryPath = path.join(diagnosticsDir, 'summary.md');
+  const startedAt = new Date('2026-08-02T15:00:00.000Z');
+  const finishedAt = new Date('2026-08-02T15:00:02.500Z');
+  try {
+    const report = await writeFailureDiagnostics(new Error('snapshot write failed'), {
+      diagnosticsDir,
+      appleHtml: '<html>diagnostic</html>',
+      startedAt,
+      finishedAt,
+      stepSummaryPath: summaryPath
+    });
+    const files = await readdir(diagnosticsDir);
+    assert.deepEqual(files.sort(), ['apple-response-20260802T150000Z.html', 'run-report.json', 'summary.md']);
+    assert.equal(report.status, 'failure');
+    assert.equal(report.appleResponseCaptured, true);
+    assert.equal(JSON.parse(await readFile(path.join(diagnosticsDir, 'run-report.json'), 'utf8')).error.message, 'snapshot write failed');
+    assert.match(await readFile(summaryPath, 'utf8'), /snapshot write failed/);
+  } finally {
+    await rm(diagnosticsDir, { recursive: true, force: true });
   }
 });
 
