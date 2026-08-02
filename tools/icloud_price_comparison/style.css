@@ -420,7 +420,7 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--accent-dark
 .published-date-current span { display: block; margin-bottom: 4px; color: var(--muted); font-size: 12px; }
 .published-date-current strong { display: block; font-size: 21px; }
 .published-date-list { padding-top: 20px; }
-.published-change-cell { min-width: 320px; line-height: 1.6; overflow-wrap: anywhere; white-space: normal; }
+.published-change-cell { min-width: 320px; line-height: 1.6; overflow-wrap: anywhere; white-space: pre-line; }
 .history-toolbar { padding: 16px 24px 0; }
 .segmented.compact { width: min(430px, 100%); min-height: 36px; }
 .segmented.compact button { padding: 4px 8px; font-size: 12px; }
