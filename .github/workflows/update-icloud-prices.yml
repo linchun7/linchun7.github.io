@@ -104,6 +104,7 @@ jobs:
         run: pnpm test:core
 
       - name: 抓取并校验 Apple 价格
+        id: update_data
         env:
           EXCHANGE_RATE_API_KEY: ${{ secrets.EXCHANGE_RATE_API_KEY }}
           ICLOUD_TRIGGER_SOURCE: ${{ needs.prepare.outputs.trigger_source }}
@@ -173,11 +174,15 @@ jobs:
             echo "- 数据提交步骤：${{ steps.commit_data.outcome }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: 写入失败摘要
+      - name: 补充未报告的失败摘要
         if: failure()
         working-directory: .
         shell: bash
         run: |
+          if [[ "${{ steps.update_data.outcome }}" == "failure" && -f "tools/icloud_price_comparison/artifacts/run-report.json" ]]; then
+            echo "Updater already wrote a detailed failure summary"
+            exit 0
+          fi
           echo "::error title=iCloud+ 价格更新失败::自动任务未完成，请查看上方第一个标红步骤确定失败阶段。"
           if [[ "${{ steps.commit_data.outcome }}" == "success" ]]; then
             data_status="价格数据步骤已经完成；本次失败来自其他验收或收尾步骤。"
