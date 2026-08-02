@@ -12,6 +12,7 @@ import {
   normalizeAppleSnapshot,
   updateHistory
 } from './update-prices.mjs';
+import { formatBeijingDate } from './run-context.mjs';
 
 const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const HISTORY_PATH = path.join(PROJECT_DIR, 'data/history.json');
@@ -28,7 +29,7 @@ function archiveMetadata(html) {
   const capturedAtUtc = `${stamp.slice(0, 4)}-${stamp.slice(4, 6)}-${stamp.slice(6, 8)}T${stamp.slice(8, 10)}:${stamp.slice(10, 12)}:${stamp.slice(12, 14)}.000Z`;
   return {
     capturedAtUtc,
-    firstConfirmedDate: capturedAtUtc.slice(0, 10),
+    firstConfirmedDate: formatBeijingDate(capturedAtUtc),
     archiveUrl: `https://web.archive.org/web/${stamp}/${APPLE_URL}`
   };
 }
