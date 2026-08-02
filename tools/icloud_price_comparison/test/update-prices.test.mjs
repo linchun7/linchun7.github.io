@@ -154,6 +154,9 @@ async function runDryMain({ html, fxPayload, apiKey = '', authenticatedFxPayload
 
 async function withMockedFetch({ html, fxPayload }, callback) {
   const originalFetch = globalThis.fetch;
+  const originalSummary = process.env.GITHUB_STEP_SUMMARY;
+  // Production-path tests must not append a second report to the Actions job summary.
+  delete process.env.GITHUB_STEP_SUMMARY;
   globalThis.fetch = async (url) => {
     const target = String(url);
     if (target.includes('support.apple.com')) return new Response(html, { status: 200 });
@@ -165,6 +168,8 @@ async function withMockedFetch({ html, fxPayload }, callback) {
     return await callback();
   } finally {
     globalThis.fetch = originalFetch;
+    if (originalSummary === undefined) delete process.env.GITHUB_STEP_SUMMARY;
+    else process.env.GITHUB_STEP_SUMMARY = originalSummary;
   }
 }
 
@@ -191,6 +196,9 @@ async function createTemporaryProductionPaths() {
 
 test('runs the production write path against isolated files', async () => {
   const { root, paths } = await createTemporaryProductionPaths();
+  const summaryPath = path.join(root, 'unexpected-summary.md');
+  const originalSummary = process.env.GITHUB_STEP_SUMMARY;
+  process.env.GITHUB_STEP_SUMMARY = summaryPath;
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
   const fxPayload = {
     result: 'success',
@@ -210,7 +218,10 @@ test('runs the production write path against isolated files', async () => {
     assert.equal(snapshot.revisions[0].firstConfirmedDate, writtenData.run.observedAtBeijing);
     assert.equal(writtenData.source.publishedDate, data.source.publishedDate);
     assert.equal(writtenData.countries.length, data.countries.length);
+    await assert.rejects(readFile(summaryPath, 'utf8'), { code: 'ENOENT' });
   } finally {
+    if (originalSummary === undefined) delete process.env.GITHUB_STEP_SUMMARY;
+    else process.env.GITHUB_STEP_SUMMARY = originalSummary;
     await rm(root, { recursive: true, force: true });
   }
 });
