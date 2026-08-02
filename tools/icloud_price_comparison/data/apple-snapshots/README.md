@@ -27,6 +27,6 @@
 
 快照写入采用临时 staging 目录；HTML、JSON、历史和索引任一环节失败，正式目录会回滚并保留上一份有效数据。
 
-Wayback 的抓取时间仅用于历史导入排序和来源追溯，不作为前端展示日期。前端展示以 Apple 官方 `publishedDate` 和项目 `firstConfirmedDate` 为准。
+Wayback 的抓取时间仅用于历史导入排序和来源追溯；历史导入会将其换算为北京时间后写入 `firstConfirmedDate`，不把 UTC 日期直接当作确认日期。前端展示以 Apple 官方 `publishedDate` 和项目 `firstConfirmedDate` 为准。
 
 请勿手工修改 `index.json`，也不要只复制单个快照文件进行重建；应保留完整目录后再运行导入工具。
