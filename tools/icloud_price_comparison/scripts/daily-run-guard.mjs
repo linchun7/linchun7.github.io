@@ -28,7 +28,7 @@ export function evaluateDailyRun({ runLog, eventName, requestedSource, now = new
   const automatic = isAutomaticTriggerSource(triggerSource);
   const automaticRunDateBeijing = automatic ? formatBeijingDate(now) : null;
   const previousRun = automatic
-    ? findSuccessfulAutomaticRun(runLog, automaticRunDateBeijing)
+    ? findSuccessfulAutomaticRun(runLog, automaticRunDateBeijing, now)
     : null;
   return {
     triggerSource,

@@ -10,6 +10,8 @@ import {
   buildAppleSnapshotEntry,
   buildAppleSnapshotIndex,
   appleSnapshotContentHash,
+  acquireUpdateLock,
+  normalizeAppleSnapshotIndex,
   savePublishedAppleSnapshot,
   createRunLogEntry,
   getExchangeRates,
@@ -69,6 +71,109 @@ test('Apple snapshot semantic hash ignores formatted price text', () => {
   assert.equal(appleSnapshotContentHash(parsed), appleSnapshotContentHash(reformatted));
 });
 
+test('rejects malformed Apple snapshot indexes before writing', () => {
+  assert.throws(
+    () => normalizeAppleSnapshotIndex({ schemaVersion: 1, snapshots: [{ publishedDate: 'not-a-date', revisions: [] }] }),
+    /snapshot index/i
+  );
+  assert.throws(
+    () => normalizeAppleSnapshotIndex({
+      schemaVersion: 1,
+      snapshots: [{ publishedDate: '2026-04-06', revisions: [] }]
+    }),
+    /no revisions/i
+  );
+});
+
+test('recovers a stale updater lock and protects an active lock', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'icloud-lock-'));
+  const lockPath = path.join(root, '.icloud-price-update.lock');
+  try {
+    await writeFile(lockPath, JSON.stringify({ pid: 999_999_999, acquiredAtUtc: new Date().toISOString() }), 'utf8');
+    const release = await acquireUpdateLock(lockPath, { staleAfterMs: 60_000 });
+    await assert.rejects(() => acquireUpdateLock(lockPath, { staleAfterMs: 60_000 }), /already running/);
+    await release();
+    await assert.rejects(readFile(lockPath, 'utf8'), { code: 'ENOENT' });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('does not delete a winner lock during stale-lock contention', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'icloud-lock-contention-'));
+  const lockPath = path.join(root, '.icloud-price-update.lock');
+  let claimReachedResolve;
+  let allowRecoveryResolve;
+  const claimReached = new Promise((resolve) => { claimReachedResolve = resolve; });
+  const allowRecovery = new Promise((resolve) => { allowRecoveryResolve = resolve; });
+  try {
+    await writeFile(lockPath, JSON.stringify({ pid: 999_999_999, acquiredAtUtc: new Date().toISOString() }), 'utf8');
+    const firstRun = acquireUpdateLock(lockPath, {
+      staleAfterMs: 60_000,
+      onStaleLockClaimed: async () => {
+        claimReachedResolve();
+        await allowRecovery;
+      }
+    });
+    await claimReached;
+    await assert.rejects(
+      () => acquireUpdateLock(lockPath, { staleAfterMs: 60_000 }),
+      /already running/
+    );
+    allowRecoveryResolve();
+    const release = await firstRun;
+    await assert.rejects(
+      () => acquireUpdateLock(lockPath, { staleAfterMs: 60_000 }),
+      /already running/
+    );
+    await release();
+    await assert.rejects(readFile(lockPath, 'utf8'), { code: 'ENOENT' });
+  } finally {
+    allowRecoveryResolve();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('serializes concurrent production runs and releases the updater lock', async () => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const html = buildAppleHtml(data);
+  const fxPayload = {
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: recentFxTimestamp(),
+    rates: data.fx.rates
+  };
+  const originalFetch = globalThis.fetch;
+  const originalApiKey = process.env.EXCHANGE_RATE_API_KEY;
+  delete process.env.EXCHANGE_RATE_API_KEY;
+  globalThis.fetch = async (url) => {
+    const target = String(url);
+    if (target.includes('support.apple.com')) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      return new Response(html, { status: 200 });
+    }
+    if (target.includes('exchangerate-api.com') || target.includes('open.er-api.com')) return new Response(JSON.stringify(fxPayload), { status: 200 });
+    throw new Error('Unexpected URL in concurrent-run test: ' + target);
+  };
+  const lockPath = path.join(root, '.icloud-price-update.lock');
+  try {
+    const firstRun = main({ dryRun: false, paths: { ...paths, lockPath }, stepSummaryPath: null });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await assert.rejects(
+      () => main({ dryRun: false, paths: { ...paths, lockPath }, stepSummaryPath: null }),
+      /already running/
+    );
+    await firstRun;
+    await assert.rejects(readFile(lockPath, 'utf8'), { code: 'ENOENT' });
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalApiKey === undefined) delete process.env.EXCHANGE_RATE_API_KEY;
+    else process.env.EXCHANGE_RATE_API_KEY = originalApiKey;
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('writes, deduplicates, and revises Apple snapshots in production format', async () => {
   const snapshotsDir = await mkdtemp(path.join(tmpdir(), 'icloud-snapshots-'));
   const indexPath = path.join(snapshotsDir, 'index.json');
@@ -104,6 +209,10 @@ const pricesUrl = new URL('../data/prices.json', import.meta.url);
 const historyUrl = new URL('../data/history.json', import.meta.url);
 const runLogUrl = new URL('../data/run-log.json', import.meta.url);
 const namesUrl = new URL('../scripts/country-names.zh.json', import.meta.url);
+
+function recentFxTimestamp() {
+  return Math.floor(Date.now() / 1000);
+}
 
 function escapeHtml(value) {
   return String(value)
@@ -243,6 +352,87 @@ test('runs the production write path against isolated files', async () => {
   }
 });
 
+test('removes unambiguous updater temporary files before a production run', async () => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const html = await readFile(new URL('../data/apple-snapshots/2026-07-17.html', import.meta.url), 'utf8');
+  const fxPayload = {
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
+    rates: data.fx.rates
+  };
+  const staleFiles = [
+    `${paths.currentDataPath}.tmp-1-2-stale`,
+    `${paths.historyPath}.tmp-1-2-stale`,
+    `${paths.snapshotIndexPath}.tmp-1-2-stale`
+  ];
+  await mkdir(paths.snapshotsDir, { recursive: true });
+  await Promise.all(staleFiles.map((filePath) => writeFile(filePath, 'partial', 'utf8')));
+  try {
+    await withMockedFetch(
+      { html, fxPayload },
+      () => main({ dryRun: false, paths, stepSummaryPath: null })
+    );
+    for (const filePath of staleFiles) await assert.rejects(readFile(filePath, 'utf8'), { code: 'ENOENT' });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('preserves updater temporary files during a dry-run', async () => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const html = buildAppleHtml(data);
+  const fxPayload = {
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: recentFxTimestamp(),
+    rates: data.fx.rates
+  };
+  const temporaryPath = `${paths.currentDataPath}.tmp-1-2-dry-run`;
+  await writeFile(temporaryPath, 'partial', 'utf8');
+  try {
+    await withMockedFetch(
+      { html, fxPayload },
+      () => main({ dryRun: true, paths, stepSummaryPath: null })
+    );
+    assert.equal(await readFile(temporaryPath, 'utf8'), 'partial');
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+test('rejects a future Apple publication date before dry-run or production writes', async () => {
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const fxPayload = {
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: recentFxTimestamp(),
+    rates: data.fx.rates
+  };
+  await withMockedFetch(
+    { html: buildAppleHtml(data, 'January 1, 2099'), fxPayload },
+    () => assert.rejects(
+      main({ dryRun: true }),
+      /Apple published date is in the future/
+    )
+  );
+
+  const { root, paths } = await createTemporaryProductionPaths();
+  try {
+    await withMockedFetch(
+      { html: buildAppleHtml(data, 'January 1, 2099'), fxPayload },
+      () => assert.rejects(
+        main({ dryRun: false, paths, stepSummaryPath: null }),
+        /Apple published date is in the future/
+      )
+    );
+    await assert.rejects(readFile(paths.snapshotIndexPath, 'utf8'), { code: 'ENOENT' });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('does not write a snapshot when publication-date validation fails', async () => {
   const { root, paths } = await createTemporaryProductionPaths();
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
@@ -271,6 +461,67 @@ test('does not write a snapshot when publication-date validation fails', async (
       readFile(paths.runLogPath, 'utf8')
     ]);
     assert.deepEqual(after, before);
+    await assert.rejects(readFile(paths.snapshotIndexPath, 'utf8'), { code: 'ENOENT' });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('validates the run-log schema before persisting snapshots', async () => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const fxPayload = {
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: recentFxTimestamp(),
+    rates: data.fx.rates
+  };
+  await mkdir(paths.snapshotsDir, { recursive: true });
+  await writeFile(paths.runLogPath, JSON.stringify({ schemaVersion: 1, retention: 90, runs: {} }), 'utf8');
+  try {
+    await withMockedFetch(
+      { html: buildAppleHtml(data), fxPayload },
+      () => assert.rejects(
+        main({ dryRun: false, paths, stepSummaryPath: null }),
+        /Run log has an unsupported structure/
+      )
+    );
+    await assert.rejects(readFile(paths.snapshotIndexPath, 'utf8'), { code: 'ENOENT' });
+    assert.deepEqual(await readdir(paths.snapshotsDir), []);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('preserves missing prices and history files during rollback', async () => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const fxPayload = {
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: recentFxTimestamp(),
+    rates: data.fx.rates
+  };
+  await rm(paths.currentDataPath);
+  await rm(paths.historyPath);
+  const runLogBefore = await readFile(paths.runLogPath, 'utf8');
+  let writes = 0;
+  const failSecondWrite = async (filePath, value) => {
+    writes += 1;
+    if (writes === 2) throw new Error('simulated history write failure');
+    await writeJsonAtomic(filePath, value);
+  };
+  try {
+    await withMockedFetch(
+      { html: buildAppleHtml(data), fxPayload },
+      () => assert.rejects(
+        main({ dryRun: false, paths, stepSummaryPath: null, writeJson: failSecondWrite }),
+        /simulated history write failure/
+      )
+    );
+    await assert.rejects(readFile(paths.currentDataPath, 'utf8'), { code: 'ENOENT' });
+    await assert.rejects(readFile(paths.historyPath, 'utf8'), { code: 'ENOENT' });
+    assert.deepEqual(JSON.parse(await readFile(paths.runLogPath, 'utf8')), JSON.parse(runLogBefore));
     await assert.rejects(readFile(paths.snapshotIndexPath, 'utf8'), { code: 'ENOENT' });
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -363,6 +614,43 @@ test('writes a failure report and Apple response diagnostic', async () => {
     assert.match(await readFile(summaryPath, 'utf8'), /snapshot write failed/);
   } finally {
     await rm(diagnosticsDir, { recursive: true, force: true });
+  }
+});
+
+test('captures the current Apple response for failure diagnostics', async () => {
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const fxPayload = {
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: recentFxTimestamp(),
+    rates: data.fx.rates
+  };
+  await withMockedFetch(
+    { html: buildAppleHtml(data, 'January 1, 2099'), fxPayload },
+    () => assert.rejects(main({ dryRun: true }), /Apple published date is in the future/)
+  );
+
+  const { root, paths } = await createTemporaryProductionPaths();
+  const diagnosticsDir = path.join(root, 'diagnostics');
+  const invalidData = structuredClone(data);
+  invalidData.fx.rates = { USD: 1 };
+  await writeFile(paths.currentDataPath, JSON.stringify(invalidData), 'utf8');
+  try {
+    await withMockedFetch(
+      { html: buildAppleHtml(data), fxPayload: { result: 'error', 'error-type': 'quota-reached' } },
+      () => assert.rejects(main({ dryRun: true, paths }), /Exchange-rate service returned quota-reached/)
+    );
+    await writeFailureDiagnostics(new Error('rate refresh failed'), {
+      diagnosticsDir,
+      stepSummaryPath: null
+    });
+    const diagnosticFile = (await readdir(diagnosticsDir)).find((name) => name.startsWith('apple-response-'));
+    assert.ok(diagnosticFile, 'failure diagnostics should include the current Apple response');
+    const diagnosticHtml = await readFile(path.join(diagnosticsDir, diagnosticFile), 'utf8');
+    assert.match(diagnosticHtml, /July 17, 2026/);
+    assert.doesNotMatch(diagnosticHtml, /January 1, 2099/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
   }
 });
 
@@ -508,7 +796,7 @@ test('does not carry a missing currency from old rates into a successful refresh
   globalThis.fetch = async () => new Response(JSON.stringify({
     result: 'success',
     base_code: 'USD',
-    time_last_update_unix: 1_754_006_400,
+    time_last_update_unix: recentFxTimestamp(),
     rates: { USD: 1, CNY: 7.2 }
   }), { status: 200 });
   try {
@@ -534,7 +822,7 @@ test('uses the authenticated exchange-rate endpoint without putting the key in t
     return new Response(JSON.stringify({
       result: 'success',
       base_code: 'USD',
-      time_last_update_unix: 1_754_006_400,
+      time_last_update_unix: recentFxTimestamp(),
       conversion_rates: { USD: 1, CNY: 7.2, JPY: 150 }
     }), { status: 200 });
   };
@@ -563,7 +851,7 @@ test('falls back to the open endpoint when the authenticated quota is exhausted'
     return new Response(JSON.stringify({
       result: 'success',
       base_code: 'USD',
-      time_last_update_unix: 1_754_006_400,
+      time_last_update_unix: recentFxTimestamp(),
       rates: { USD: 1, CNY: 7.2, JPY: 150 }
     }), { status: 200 });
   };
@@ -593,7 +881,7 @@ test('falls back when the authenticated response omits a required currency', asy
     return new Response(JSON.stringify({
       result: 'success',
       base_code: 'USD',
-      time_last_update_unix: 1_754_006_400,
+      time_last_update_unix: recentFxTimestamp(),
       ...(authenticated
         ? { conversion_rates: { USD: 1, CNY: 7.2 } }
         : { rates: { USD: 1, CNY: 7.2, JPY: 150 } })
@@ -755,6 +1043,28 @@ test('keeps removed-country history and appends complete events for a new tier',
 
   const repeated = updateHistory(result.history, [alphaWithNewTier], '2026-08-02', [TIER_50, TIER_1TB]);
   assert.equal(repeated.history.countries.Alpha.events.length, 2, 'unchanged prices should not duplicate history');
+});
+
+test('rejects a price event whose observation date moves backwards', () => {
+  const history = {
+    schemaVersion: 2,
+    countries: {
+      Alpha: {
+        nameZh: 'Alpha',
+        region: 'Americas',
+        events: [{ observedAt: '2026-08-02', currency: 'USD', plans: { '50GB': 1 } }]
+      }
+    }
+  };
+  assert.throws(
+    () => updateHistory(
+      history,
+      [country('Alpha', { prices: { '50GB': 2 } })],
+      '2026-08-01',
+      [TIER_50]
+    ),
+    /observation date moved backwards/
+  );
 });
 
 test('reuses preserved history when a removed country later returns', () => {
@@ -941,13 +1251,43 @@ test('builds a structured successful run log with source, counts, and changes', 
   );
 });
 
+test('clamps run-log completion timestamps when the clock moves backwards', () => {
+  const startedAt = new Date('2026-08-03T00:00:02.000Z');
+  const finishedAt = new Date('2026-08-03T00:00:01.000Z');
+  const entry = createRunLogEntry(
+    {
+      source: { url: 'https://support.apple.com/en-us/108047', publishedDate: 'July 17, 2026' },
+      fx: { fetchedAt: '2026-08-03T00:00:00.000Z', stale: false },
+      tiers: [TIER_50],
+      countries: [country('Alpha')]
+    },
+    {
+      observedAt: '2026-08-03',
+      publicationChanges: {
+        addedTiers: [],
+        removedTiers: [],
+        addedCountries: [],
+        removedCountries: [],
+        changedCountries: []
+      },
+      publicationDateChanged: false,
+      publishedDateHistory: [{ publishedDate: 'July 17, 2026' }]
+    },
+    startedAt,
+    finishedAt
+  );
+  assert.equal(entry.finishedAtUtc, startedAt.toISOString());
+  assert.equal(entry.id, startedAt.toISOString());
+  assert.equal(entry.durationMs, 0);
+});
+
 test('rejects invalid USD anchors, timestamps, and stale fallback rates', async () => {
   const originalFetch = globalThis.fetch;
   const invalidPayloads = [
-    { result: 'success', base_code: 'USD', time_last_update_unix: 1_754_006_400, rates: { USD: 2, CNY: 7.2 } },
+    { result: 'success', base_code: 'USD', time_last_update_unix: recentFxTimestamp(), rates: { USD: 2, CNY: 7.2 } },
     { result: 'success', base_code: 'USD', time_last_update_unix: 0, rates: { USD: 1, CNY: 7.2 } },
-    { result: 'success', base_code: 'EUR', time_last_update_unix: 1_754_006_400, rates: { USD: 1, CNY: 7.2 } },
-    { result: 'success', base_code: 'USD', time_last_update_unix: 1_754_006_400, rates: { USD: 1, CNY: -7.2 } }
+    { result: 'success', base_code: 'EUR', time_last_update_unix: recentFxTimestamp(), rates: { USD: 1, CNY: 7.2 } },
+    { result: 'success', base_code: 'USD', time_last_update_unix: recentFxTimestamp(), rates: { USD: 1, CNY: -7.2 } }
   ];
   try {
     for (const payload of invalidPayloads) {
@@ -955,6 +1295,42 @@ test('rejects invalid USD anchors, timestamps, and stale fallback rates', async 
       await assert.rejects(
         () => getExchangeRates({ fx: { rates: { USD: 0, CNY: -1 } } }, { apiKey: '' }),
         /Exchange-rate response is missing required fields/
+      );
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('rejects stale and future exchange-rate timestamps', async () => {
+  const originalFetch = globalThis.fetch;
+  const nowSeconds = recentFxTimestamp();
+  const payloads = [
+    {
+      payload: {
+        result: 'success',
+        base_code: 'USD',
+        time_last_update_unix: nowSeconds - (37 * 60 * 60),
+        rates: { USD: 1, CNY: 7.2 }
+      },
+      message: /too old/
+    },
+    {
+      payload: {
+        result: 'success',
+        base_code: 'USD',
+        time_last_update_unix: nowSeconds + (6 * 60),
+        rates: { USD: 1, CNY: 7.2 }
+      },
+      message: /future/
+    }
+  ];
+  try {
+    for (const { payload, message } of payloads) {
+      globalThis.fetch = async () => new Response(JSON.stringify(payload), { status: 200 });
+      await assert.rejects(
+        () => getExchangeRates(null, { apiKey: '' }),
+        message
       );
     }
   } finally {

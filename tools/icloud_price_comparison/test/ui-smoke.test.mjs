@@ -479,6 +479,11 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
       expectedPublishedDate: '2026/07/17'
     },
     {
+      label: 'future snapshot',
+      mutate: (data) => { data.generatedAt = '2099-01-01T00:00:00.000Z'; data.fx.stale = false; },
+      expected: /数据生成时间在未来/
+    },
+    {
       label: 'fallback rates',
       mutate: (data) => { data.generatedAt = new Date().toISOString(); data.fx.stale = true; },
       expected: /汇率沿用上次成功结果/
@@ -531,6 +536,155 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
       }
     }
   } finally {
+    await browser.close();
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test('ignores stale history responses after a price retry', { timeout: 30_000 }, async (context) => {
+  const chromePath = await findChrome();
+  if (!chromePath) {
+    if (process.env.CI) assert.fail('Chrome or Chromium is required for the history-race UI test');
+    context.skip('Chrome or Chromium is not installed');
+    return;
+  }
+  const validData = JSON.parse(await readFile(path.join(PROJECT_DIR, 'data/prices.json'), 'utf8'));
+  const validHistory = JSON.parse(await readFile(path.join(PROJECT_DIR, 'data/history.json'), 'utf8'));
+  const staleHistory = structuredClone(validHistory);
+  staleHistory.countries.Brazil.events = [staleHistory.countries.Brazil.events[0]];
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await chromium.launch({ executablePath: chromePath, headless: true });
+  const page = await browser.newPage({ viewport: { width: 1365, height: 900 } });
+  let priceCalls = 0;
+  let historyCalls = 0;
+  const pageErrors = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await page.route('https://**/*', (route) => route.abort());
+  await page.route('**/data/prices.json*', (route) => {
+    priceCalls += 1;
+    return route.fulfill({
+      status: priceCalls === 1 ? 500 : 200,
+      contentType: 'application/json',
+      body: priceCalls === 1 ? 'temporary outage' : JSON.stringify(validData)
+    });
+  });
+  await page.route('**/data/history.json*', async (route) => {
+    historyCalls += 1;
+    const requestNumber = historyCalls;
+    await new Promise((resolve) => setTimeout(resolve, requestNumber === 1 ? 1_000 : 20));
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(requestNumber === 1 ? staleHistory : validHistory)
+    });
+  });
+  try {
+    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
+    await page.locator('#retryButton').click();
+    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, validData.countries.length);
+    await page.waitForTimeout(1_200);
+    await page.locator('#priceRows tr[data-country="Brazil"]').click();
+    assert.equal(await page.locator('#historyDialog').evaluate((element) => element.open), true);
+    assert.equal(await page.locator('#historyRows tr').count(), validHistory.countries.Brazil.events.length);
+    assert.deepEqual(pageErrors, []);
+    assert.equal(priceCalls, 2);
+    assert.equal(historyCalls, 2);
+  } finally {
+    await page.close();
+    await browser.close();
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test('keeps history dialog usable when Chart construction fails', { timeout: 30_000 }, async (context) => {
+  const chromePath = await findChrome();
+  if (!chromePath) {
+    if (process.env.CI) assert.fail('Chrome or Chromium is required for the Chart-failure UI test');
+    context.skip('Chrome or Chromium is not installed');
+    return;
+  }
+  const validData = JSON.parse(await readFile(path.join(PROJECT_DIR, 'data/prices.json'), 'utf8'));
+  const validHistory = JSON.parse(await readFile(path.join(PROJECT_DIR, 'data/history.json'), 'utf8'));
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await chromium.launch({ executablePath: chromePath, headless: true });
+  const page = await browser.newPage({ viewport: { width: 1365, height: 900 } });
+  const pageErrors = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await page.route('https://**/*', (route) => route.abort());
+  await page.route('**/data/prices.json*', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify(validData)
+  }));
+  await page.route('**/data/history.json*', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify(validHistory)
+  }));
+  await page.route('**/vendor/chart.umd.min.js', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/javascript',
+    body: 'window.Chart = class { constructor() { throw new Error("chart-bomb"); } };'
+  }));
+  try {
+    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, validData.countries.length);
+    await page.locator('#priceRows tr[data-country="Brazil"]').click();
+    assert.equal(await page.locator('#historyDialog').evaluate((element) => element.open), true);
+    assert.equal(await page.locator('#historyRows tr').count(), validHistory.countries.Brazil.events.length);
+    assert.equal(await page.locator('#chartWrap').isVisible(), false);
+    assert.equal(await page.locator('#emptyHistory').isVisible(), true);
+    assert.deepEqual(pageErrors, []);
+  } finally {
+    await page.close();
+    await browser.close();
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test('keeps the page bounded at 280px while the price table scrolls', { timeout: 30_000 }, async (context) => {
+  const chromePath = await findChrome();
+  if (!chromePath) {
+    if (process.env.CI) assert.fail('Chrome or Chromium is required for the 280px UI test');
+    context.skip('Chrome or Chromium is not installed');
+    return;
+  }
+  const validData = JSON.parse(await readFile(path.join(PROJECT_DIR, 'data/prices.json'), 'utf8'));
+  const validHistory = JSON.parse(await readFile(path.join(PROJECT_DIR, 'data/history.json'), 'utf8'));
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await chromium.launch({ executablePath: chromePath, headless: true });
+  const page = await browser.newPage({ viewport: { width: 280, height: 844 } });
+  await page.route('https://**/*', (route) => route.abort());
+  await page.route('**/data/prices.json*', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify(validData)
+  }));
+  await page.route('**/data/history.json*', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify(validHistory)
+  }));
+  try {
+    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, validData.countries.length);
+    const layout = await page.evaluate(() => {
+      const table = document.querySelector('.table-scroll');
+      return {
+        documentWidth: document.documentElement.scrollWidth,
+        viewportWidth: document.documentElement.clientWidth,
+        tableWidth: table.scrollWidth,
+        tableClientWidth: table.clientWidth
+      };
+    });
+    assert.ok(layout.documentWidth <= layout.viewportWidth + 1);
+    assert.ok(layout.tableWidth > layout.tableClientWidth);
+  } finally {
+    await page.close();
     await browser.close();
     await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }
