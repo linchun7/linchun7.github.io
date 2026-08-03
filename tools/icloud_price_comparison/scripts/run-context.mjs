@@ -37,13 +37,18 @@ export function isAutomaticTriggerSource(source) {
   return AUTOMATIC_TRIGGER_SOURCES.has(source);
 }
 
-export function findSuccessfulAutomaticRun(runLog, automaticRunDateBeijing) {
+export function findSuccessfulAutomaticRun(runLog, automaticRunDateBeijing, now = null) {
   if (!Array.isArray(runLog?.runs) || !automaticRunDateBeijing) return null;
+  const nowMs = now instanceof Date ? now.getTime() : null;
   return [...runLog.runs].reverse().find((run) => (
     run?.status === 'success'
     && isAutomaticTriggerSource(run.trigger)
     && run.automaticRunDateBeijing === automaticRunDateBeijing
     && run.source?.exchangeRatesStale === false
     && formatBeijingDate(run.source?.exchangeRatesFetchedAtUtc) === automaticRunDateBeijing
+    && (nowMs === null
+      || (Number.isFinite(nowMs)
+        && Number.isFinite(Date.parse(run.source?.exchangeRatesFetchedAtUtc))
+        && Date.parse(run.source.exchangeRatesFetchedAtUtc) <= nowMs))
   )) ?? null;
 }

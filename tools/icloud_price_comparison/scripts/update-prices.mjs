@@ -1,4 +1,4 @@
-import { appendFile, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, readdir, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,6 +22,10 @@ const APPLE_SNAPSHOT_INDEX_PATH = path.join(APPLE_SNAPSHOTS_DIR, 'index.json');
 const NAMES_PATH = path.join(PROJECT_DIR, 'scripts/country-names.zh.json');
 const DIAGNOSTICS_DIR = path.join(PROJECT_DIR, 'artifacts');
 const RETRY_DELAYS_MS = [0, 2_000, 5_000, 15_000, 30_000];
+const FX_MAX_AGE_MS = 36 * 60 * 60 * 1_000;
+const FX_MAX_FUTURE_SKEW_MS = 5 * 60 * 1_000;
+const UPDATE_LOCK_STALE_MS = 30 * 60 * 1_000;
+const TEMPORARY_FILE_PATTERN = /\.tmp-\d+-\d+-[a-z0-9]+$/i;
 const DRY_RUN = process.argv.includes('--dry-run');
 let lastAppleHtml = null;
 let runStartedAt = new Date();
@@ -100,6 +104,29 @@ function parseExchangeRatePayload(payload, ratesField) {
   };
 }
 
+function validateExchangeRateFreshness(fetchedAt, now = new Date()) {
+  const fetchedAtMs = Date.parse(fetchedAt);
+  const nowMs = now.getTime();
+  if (!Number.isFinite(fetchedAtMs) || !Number.isFinite(nowMs)) {
+    throw exchangeRateError('Exchange-rate timestamp is invalid', 'invalid-timestamp');
+  }
+  if (fetchedAtMs > nowMs + FX_MAX_FUTURE_SKEW_MS) {
+    throw exchangeRateError('Exchange-rate timestamp is in the future', 'future-timestamp');
+  }
+  if (nowMs - fetchedAtMs > FX_MAX_AGE_MS) {
+    throw exchangeRateError('Exchange-rate response is too old', 'stale-response');
+  }
+}
+
+async function readJsonWithExistence(filePath, fallback = null) {
+  try {
+    return { value: JSON.parse(await readFile(filePath, 'utf8')), existed: true };
+  } catch (error) {
+    if (error.code === 'ENOENT') return { value: fallback, existed: false };
+    throw new Error(`Unable to read valid JSON from ${path.basename(filePath)}: ${error.message}`);
+  }
+}
+
 export async function getExchangeRates(previousData, {
   apiKey = process.env.EXCHANGE_RATE_API_KEY,
   requiredCurrencies = []
@@ -135,6 +162,7 @@ export async function getExchangeRates(previousData, {
         resourceName: source.resourceName
       });
       const parsed = parseExchangeRatePayload(payload, source.ratesField);
+      validateExchangeRateFreshness(parsed.fetchedAt);
       const missingRequiredRates = requiredCurrencies.filter(
         (currency) => !Number.isFinite(parsed.rates[currency]) || parsed.rates[currency] <= 0
       );
@@ -231,7 +259,11 @@ export function updateHistory(previousHistory, countries, observedAt, tiers, obs
     record.region = country.region;
 
     const previousEvent = record.events.at(-1);
-    if (hasPriceChange(previousEvent, country, tiers)) {
+    const priceChanged = hasPriceChange(previousEvent, country, tiers);
+    if (priceChanged && previousEvent?.observedAt && observedAt < previousEvent.observedAt) {
+      throw new Error(`Price history observation date moved backwards for ${country.country}`);
+    }
+    if (priceChanged) {
       changedCountries += 1;
       record.events.push({
         observedAt,
@@ -357,6 +389,9 @@ export function updatePublishedDateHistory(history, previousData, publishedDate,
   assertPublicationDateNotRegressed(entries.at(-1)?.publishedDate, publishedDate);
   let changed = false;
   if (publishedDate && publicationDateKey(entries.at(-1)?.publishedDate) !== publicationDateKey(publishedDate)) {
+    if (entries.at(-1)?.observedAt && observedAt < entries.at(-1).observedAt) {
+      throw new Error('Apple publication observation date moved backwards');
+    }
     entries.push({
       publishedDate,
       observedAt,
@@ -382,7 +417,18 @@ export async function writeJsonAtomic(filePath, value) {
   }
 }
 
+function assertPublicationDateNotFuture(publishedDate, observedAt) {
+  const publishedKey = publicationDateKey(publishedDate);
+  const observedKey = publicationDateKey(observedAt);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(publishedKey)
+    && /^\d{4}-\d{2}-\d{2}$/.test(observedKey)
+    && publishedKey > observedKey) {
+    throw new Error(`Apple published date is in the future: ${publishedDate}`);
+  }
+}
+
 export function createRunLogEntry(data, summary, startedAt, finishedAt) {
+  const orderedFinishedAt = finishedAt.getTime() < startedAt.getTime() ? new Date(startedAt) : finishedAt;
   const publishedDate = data.source.publishedDate ?? null;
   const trigger = resolveTriggerSource(
     process.env.GITHUB_EVENT_NAME,
@@ -393,13 +439,13 @@ export function createRunLogEntry(data, summary, startedAt, finishedAt) {
     : publishedDate;
   return {
     schemaVersion: 1,
-    id: finishedAt.toISOString(),
+    id: orderedFinishedAt.toISOString(),
     status: 'success',
     trigger,
     automaticRunDateBeijing: process.env.ICLOUD_AUTOMATIC_RUN_DATE_BEIJING || null,
     startedAtUtc: startedAt.toISOString(),
-    finishedAtUtc: finishedAt.toISOString(),
-    durationMs: Math.max(0, finishedAt.getTime() - startedAt.getTime()),
+    finishedAtUtc: orderedFinishedAt.toISOString(),
+    durationMs: orderedFinishedAt.getTime() - startedAt.getTime(),
     observedAtBeijing: summary.observedAt,
     source: {
       appleUrl: data.source.url,
@@ -459,6 +505,197 @@ async function unlinkIfExists(filePath) {
     await unlink(filePath);
   } catch (error) {
     if (error.code !== 'ENOENT') throw error;
+  }
+}
+
+function isProcessAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code === 'EPERM';
+  }
+}
+
+function lockClaimPath(lockPath, key) {
+  const digest = createHash('sha256').update(key).digest('hex');
+  return `${lockPath}.claim-${digest}`;
+}
+
+function parseLockClaim(contents) {
+  try {
+    const metadata = JSON.parse(contents);
+    if (typeof metadata?.expectedContents !== 'string') return null;
+    return metadata;
+  } catch {
+    return null;
+  }
+}
+
+function isActiveLockClaim(metadata) {
+  return Number.isInteger(Number(metadata?.pid)) && isProcessAlive(Number(metadata.pid));
+}
+
+async function readLockContents(lockPath) {
+  return readFile(lockPath, 'utf8').catch((error) => {
+    if (error.code === 'ENOENT') return null;
+    throw error;
+  });
+}
+
+async function hasActiveLockClaim(lockPath) {
+  const directory = path.dirname(lockPath);
+  const prefix = `${path.basename(lockPath)}.claim-`;
+  const entries = await readdir(directory, { withFileTypes: true }).catch((error) => {
+    if (error.code === 'ENOENT') return [];
+    throw error;
+  });
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.startsWith(prefix)) continue;
+    const contents = await readFile(path.join(directory, entry.name), 'utf8').catch((error) => {
+      if (error.code === 'ENOENT') return null;
+      throw error;
+    });
+    const metadata = contents === null ? null : parseLockClaim(contents);
+    if (metadata && isActiveLockClaim(metadata)) return true;
+  }
+  return false;
+}
+
+async function claimLockMutation(lockPath, expectedContents, operation) {
+  let claimKey = expectedContents;
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const claimPath = lockClaimPath(lockPath, claimKey);
+    const claimContents = `${JSON.stringify({
+      pid: process.pid,
+      acquiredAtUtc: new Date().toISOString(),
+      operation,
+      expectedContents,
+      token: `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    })}\n`;
+    try {
+      await writeFile(claimPath, claimContents, { flag: 'wx', encoding: 'utf8' });
+      return { owned: true, claimPath };
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+    }
+
+    const existingContents = await readFile(claimPath, 'utf8').catch((error) => {
+      if (error.code === 'ENOENT') return null;
+      throw error;
+    });
+    if (existingContents === null) continue;
+    const existing = parseLockClaim(existingContents);
+    if (existing?.expectedContents === expectedContents && isActiveLockClaim(existing)) {
+      return { owned: false, active: true, claimPath };
+    }
+    claimKey = `${expectedContents}\u0000${existingContents}`;
+  }
+  throw new Error('Unable to claim the iCloud price update lock for stale recovery');
+}
+
+async function releaseLockClaim(claimPath) {
+  await unlinkIfExists(claimPath);
+}
+
+function createLockRelease(lockPath, lockContents) {
+  return async () => {
+    const current = await readLockContents(lockPath);
+    if (current !== lockContents) return;
+    const claim = await claimLockMutation(lockPath, lockContents, 'release');
+    if (!claim.owned) return;
+    try {
+      const confirmed = await readLockContents(lockPath);
+      if (confirmed === lockContents) await unlinkIfExists(lockPath);
+    } finally {
+      await releaseLockClaim(claim.claimPath);
+    }
+  };
+}
+
+async function isStaleUpdateLock(lockPath, contents, staleAfterMs) {
+  const fileStat = await stat(lockPath).catch((error) => {
+    if (error.code === 'ENOENT') return null;
+    throw error;
+  });
+  if (!fileStat) return true;
+  let metadata = null;
+  try {
+    metadata = JSON.parse(contents);
+  } catch {
+    metadata = null;
+  }
+  const acquiredAtMs = Date.parse(metadata?.acquiredAtUtc ?? '');
+  const ageMs = Number.isFinite(acquiredAtMs)
+    ? Date.now() - acquiredAtMs
+    : Date.now() - fileStat.mtimeMs;
+  if (ageMs > staleAfterMs) return true;
+  if (metadata?.pid && !isProcessAlive(Number(metadata.pid))) return true;
+  return !metadata;
+}
+
+export async function acquireUpdateLock(lockPath, {
+  staleAfterMs = UPDATE_LOCK_STALE_MS,
+  onStaleLockClaimed = null
+} = {}) {
+  await mkdir(path.dirname(lockPath), { recursive: true });
+  const lockContents = `${JSON.stringify({
+    pid: process.pid,
+    acquiredAtUtc: new Date().toISOString(),
+    token: `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  })}\n`;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    if (await hasActiveLockClaim(lockPath)) {
+      throw new Error('Another iCloud price update is already running');
+    }
+    try {
+      await writeFile(lockPath, lockContents, { flag: 'wx', encoding: 'utf8' });
+      return createLockRelease(lockPath, lockContents);
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+      const contents = await readLockContents(lockPath);
+      if (contents === null) continue;
+      if (!(await isStaleUpdateLock(lockPath, contents, staleAfterMs))) {
+        throw new Error('Another iCloud price update is already running');
+      }
+      const claim = await claimLockMutation(lockPath, contents, 'stale-recovery');
+      if (!claim.owned) throw new Error('Another iCloud price update is already running');
+      try {
+        if (onStaleLockClaimed) await onStaleLockClaimed({ lockPath, claimPath: claim.claimPath });
+        const confirmed = await readLockContents(lockPath);
+        if (confirmed !== contents) continue;
+        await unlinkIfExists(lockPath);
+        try {
+          await writeFile(lockPath, lockContents, { flag: 'wx', encoding: 'utf8' });
+        } catch (writeError) {
+          if (writeError.code === 'EEXIST') continue;
+          throw writeError;
+        }
+        return createLockRelease(lockPath, lockContents);
+      } finally {
+        await releaseLockClaim(claim.claimPath);
+      }
+    }
+  }
+  throw new Error('Unable to acquire the iCloud price update lock');
+}
+async function cleanupUpdaterTemporaryFiles({ currentDataPath, historyPath, runLogPath, snapshotsDir, snapshotIndexPath }) {
+  const directories = new Set([
+    path.dirname(currentDataPath),
+    path.dirname(historyPath),
+    path.dirname(runLogPath),
+    path.dirname(snapshotIndexPath),
+    snapshotsDir
+  ]);
+  for (const directory of directories) {
+    const entries = await readdir(directory, { withFileTypes: true }).catch((error) => {
+      if (error.code === 'ENOENT') return [];
+      throw error;
+    });
+    await Promise.all(entries
+      .filter((entry) => entry.isFile() && TEMPORARY_FILE_PATTERN.test(entry.name))
+      .map((entry) => unlink(path.join(directory, entry.name))));
   }
 }
 
@@ -565,6 +802,73 @@ export function normalizeAppleSnapshot(parsed) {
   };
 }
 
+function isIsoDate(value) {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && publicationDateKey(value) === value;
+}
+
+function validateSnapshotFileName(value, extension) {
+  return typeof value === 'string'
+    && path.basename(value) === value
+    && value.endsWith(extension)
+    && !value.includes('..');
+}
+
+export function normalizeAppleSnapshotIndex(index) {
+  if (index?.schemaVersion !== 1 || !Array.isArray(index.snapshots)) {
+    throw new Error('Apple snapshot index has an unsupported structure');
+  }
+  const dates = new Set();
+  const snapshots = index.snapshots.map((snapshot) => {
+    const publishedDate = snapshot?.publishedDate;
+    if (!isIsoDate(publishedDate) || dates.has(publishedDate)) {
+      throw new Error('Apple snapshot index contains an invalid or duplicate published date');
+    }
+    dates.add(publishedDate);
+    const revisions = Array.isArray(snapshot.revisions)
+      ? snapshot.revisions
+      : snapshot.file ? [{ ...snapshot }] : null;
+    if (!revisions?.length) throw new Error(`Apple snapshot index has no revisions for ${publishedDate}`);
+    const hashes = new Set();
+    const files = new Set();
+    const normalizedRevisions = revisions.map((revision) => {
+      const normalized = {
+        ...revision,
+        publishedDate: revision.publishedDate ?? publishedDate,
+        dataFile: revision.dataFile ?? revision.file?.replace(/\.html$/, '.json')
+      };
+      if (normalized.publishedDate !== publishedDate
+        || !isIsoDate(normalized.firstConfirmedDate)
+        || !validateSnapshotFileName(normalized.file, '.html')
+        || !validateSnapshotFileName(normalized.dataFile, '.json')
+        || !/^[a-f0-9]{64}$/.test(normalized.contentHash ?? '')
+        || hashes.has(normalized.contentHash)
+        || files.has(normalized.file)
+        || files.has(normalized.dataFile)) {
+        throw new Error(`Apple snapshot index has an invalid revision for ${publishedDate}`);
+      }
+      hashes.add(normalized.contentHash);
+      files.add(normalized.file);
+      files.add(normalized.dataFile);
+      return normalized;
+    }).sort((a, b) => a.firstConfirmedDate.localeCompare(b.firstConfirmedDate));
+    const active = normalizedRevisions.at(-1);
+    if ((snapshot.activeFile && snapshot.activeFile !== active.file)
+      || (snapshot.activeDataFile && snapshot.activeDataFile !== active.dataFile)
+      || (snapshot.activeContentHash && snapshot.activeContentHash !== active.contentHash)) {
+      throw new Error(`Apple snapshot index has an invalid active revision for ${publishedDate}`);
+    }
+    return {
+      ...snapshot,
+      publishedDate,
+      activeFile: active.file,
+      activeDataFile: active.dataFile,
+      activeContentHash: active.contentHash,
+      revisions: normalizedRevisions
+    };
+  });
+  return { schemaVersion: 1, snapshots };
+}
+
 export function buildAppleSnapshotIndex(existing, entry) {
   const snapshots = Array.isArray(existing?.snapshots) ? existing.snapshots : [];
   const byDate = new Map(snapshots.map((item) => [item.publishedDate, item]));
@@ -605,7 +909,7 @@ export async function savePublishedAppleSnapshot(html, parsed, firstConfirmedDat
 } = {}) {
   const publishedDate = publicationDateKey(parsed.sourcePublishedDate);
   const contentHash = appleSnapshotContentHash(parsed);
-  const index = await readJson(indexPath, { schemaVersion: 1, snapshots: [] });
+  const index = normalizeAppleSnapshotIndex(await readJson(indexPath, { schemaVersion: 1, snapshots: [] }));
   const existing = index.snapshots?.find((item) => item.publishedDate === publishedDate);
   const revisions = Array.isArray(existing?.revisions) ? existing.revisions : existing ? [existing] : [];
   if (revisions.some((revision) => revision.contentHash === contentHash)) return false;
@@ -662,6 +966,9 @@ function describeExchangeRateFallback(reason) {
     'unsupported-code': 'API 不支持请求的币种',
     'malformed-request': 'API 请求格式无效',
     'missing-rates': '主接口缺少所需币种',
+    'stale-response': '主接口返回的汇率过旧',
+    'future-timestamp': '主接口返回了未来时间戳',
+    'invalid-timestamp': '主接口返回了无效时间戳',
     'invalid-response': '主接口响应校验失败',
     'request-failed': '主接口请求失败'
   };
@@ -768,24 +1075,38 @@ export async function main({
   const namesPath = paths.namesPath ?? NAMES_PATH;
   const snapshotsDir = paths.snapshotsDir ?? APPLE_SNAPSHOTS_DIR;
   const snapshotIndexPath = paths.snapshotIndexPath ?? APPLE_SNAPSHOT_INDEX_PATH;
-  runStartedAt = new Date();
-  const [previousData, previousHistory, previousRunLog, countryNames, html] = await Promise.all([
-    readJson(currentDataPath),
-    readJson(historyPath),
-    readJson(runLogPath, { schemaVersion: 1, retention: 90, runs: [] }),
-    readJson(namesPath, {}),
-    fetchResource(APPLE_URL)
-  ]);
-  const runLogExisted = await readFile(runLogPath, 'utf8').then(() => true).catch((error) => {
-    if (error.code === 'ENOENT') return false;
-    throw error;
-  });
+  const lockPath = paths.lockPath ?? path.join(path.dirname(path.dirname(currentDataPath)), '.icloud-price-update.lock');
+  const releaseLock = dryRun ? null : await acquireUpdateLock(lockPath);
+  try {
+    runStartedAt = new Date();
+    lastAppleHtml = null;
+    if (!dryRun) {
+      await cleanupUpdaterTemporaryFiles({
+        currentDataPath,
+        historyPath,
+        runLogPath,
+        snapshotsDir,
+        snapshotIndexPath
+      });
+    }
+    const [previousDataState, previousHistoryState, previousRunLogState, countryNames, html] = await Promise.all([
+      readJsonWithExistence(currentDataPath),
+      readJsonWithExistence(historyPath),
+      readJsonWithExistence(runLogPath, { schemaVersion: 1, retention: 90, runs: [] }),
+      readJson(namesPath, {}),
+      fetchResource(APPLE_URL).then((response) => {
+        lastAppleHtml = response;
+        return response;
+      })
+    ]);
+    const previousData = previousDataState.value;
+    const previousHistory = previousHistoryState.value;
+    const previousRunLog = previousRunLogState.value;
   const originalFiles = [
-    { filePath: currentDataPath, value: structuredClone(previousData) },
-    { filePath: historyPath, value: structuredClone(previousHistory) },
-    { filePath: runLogPath, value: structuredClone(previousRunLog), existed: runLogExisted }
+      { filePath: currentDataPath, value: structuredClone(previousData), existed: previousDataState.existed },
+      { filePath: historyPath, value: structuredClone(previousHistory), existed: previousHistoryState.existed },
+      { filePath: runLogPath, value: structuredClone(previousRunLog), existed: previousRunLogState.existed }
   ];
-  lastAppleHtml = html;
   if (!countryNames || Object.keys(countryNames).length < 60) {
     throw new Error('Chinese country-name mapping is missing or incomplete');
   }
@@ -830,9 +1151,11 @@ export async function main({
     currentRates: fx.rates,
     tiers: parsed.tiers
   });
-  const generatedAt = new Date().toISOString();
+  let finishedAt = new Date();
+  if (finishedAt.getTime() < runStartedAt.getTime()) finishedAt = new Date(runStartedAt);
+  const generatedAt = finishedAt.toISOString();
   const observedAt = formatBeijingDate(generatedAt);
-  const finishedAt = new Date(generatedAt);
+  assertPublicationDateNotFuture(parsed.sourcePublishedDate, observedAt);
   const data = {
     schemaVersion: 2,
     generatedAt,
@@ -860,14 +1183,6 @@ export async function main({
   const history = historyUpdate.history;
   const publishedDateUpdate = updatePublishedDateHistory(history, previousData, parsed.sourcePublishedDate, observedAt, publicationChanges, generatedAt);
   const publishedDateHistory = publishedDateUpdate.entries;
-  const originalSnapshotIndex = dryRun ? null : await readJson(snapshotIndexPath, null);
-  let snapshotSaved = false;
-  if (!dryRun) {
-    snapshotSaved = await savePublishedAppleSnapshot(html, parsed, observedAt, {
-      snapshotsDir,
-      indexPath: snapshotIndexPath
-    });
-  }
   const summary = {
     history,
     missingRates,
@@ -878,6 +1193,14 @@ export async function main({
   };
   const run = createRunLogEntry(data, summary, runStartedAt, finishedAt);
   const runLog = buildRunLog(previousRunLog, run);
+  const originalSnapshotIndex = dryRun ? null : await readJson(snapshotIndexPath, null);
+  let snapshotSaved = false;
+  if (!dryRun) {
+    snapshotSaved = await savePublishedAppleSnapshot(html, parsed, observedAt, {
+      snapshotsDir,
+      indexPath: snapshotIndexPath
+    });
+  }
 
   if (dryRun) {
     console.log(`Live check passed with ${parsed.parser}: ${countries.length} countries and ${countries.length * parsed.tiers.length} prices. No files were changed.`);
@@ -912,6 +1235,15 @@ export async function main({
     await writeActionSummary(data, summary, stepSummaryPath);
   } catch (error) {
     console.warn(`Unable to write GitHub Actions summary: ${error.message}`);
+  }
+  } finally {
+    if (releaseLock) {
+      try {
+        await releaseLock();
+      } catch (error) {
+        console.warn(`Unable to release the iCloud price update lock: ${error.message}`);
+      }
+    }
   }
 }
 

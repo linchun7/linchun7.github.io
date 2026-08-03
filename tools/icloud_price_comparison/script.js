@@ -22,7 +22,8 @@ const state = {
   minimumCountries: {},
   chart: null,
   eventsBound: false,
-  loading: false
+  loading: false,
+  historyRequestId: 0
 };
 
 const elements = {
@@ -67,7 +68,11 @@ const collator = new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base'
 let slowLoadingTimer = null;
 
 function refreshIcons() {
-  window.lucide?.createIcons({ attrs: { 'stroke-width': 1.8 } });
+  try {
+    window.lucide?.createIcons({ attrs: { 'stroke-width': 1.8 } });
+  } catch (error) {
+    console.warn(`图标加载失败：${error.message}`);
+  }
 }
 
 function setLoadStatus(message, { error = false, hidden = false } = {}) {
@@ -614,8 +619,7 @@ function renderLocalPriceWithTrend(plan, country, changedSeries) {
 }
 
 function renderChart(record) {
-  state.chart?.destroy();
-  state.chart = null;
+  destroyChart();
   const series = compactHistorySeries(record.events, state.historyTier);
   const currencies = new Set(series.map(({ currency }) => currency));
   const canChart = series.length > 1 && currencies.size === 1 && window.Chart;
@@ -634,7 +638,8 @@ function renderChart(record) {
   const currency = series[0].currency;
   elements.chartCurrency.textContent = currency;
   const context = document.querySelector('#historyChart');
-  state.chart = new window.Chart(context, {
+  try {
+    state.chart = new window.Chart(context, {
     type: 'line',
     data: {
       labels: series.map(({ observedAt }) => formatDate(observedAt)),
@@ -664,7 +669,26 @@ function renderChart(record) {
         y: { beginAtZero: false, grid: { color: '#e7e9eb' }, ticks: { color: '#687078', callback: (value) => numberFormatter.format(value) } }
       }
     }
-  });
+    });
+  } catch (error) {
+    state.chart = null;
+    elements.chartWrap.hidden = true;
+    elements.emptyHistory.hidden = false;
+    elements.emptyHistory.querySelector('p').textContent = '图表暂时不可用，请通过下方表格查看原始价格。';
+    console.warn(`价格历史图表加载失败：${error.message}`);
+    refreshIcons();
+  }
+}
+
+function destroyChart() {
+  if (!state.chart) return;
+  try {
+    state.chart.destroy?.();
+  } catch (error) {
+    console.warn(`价格历史图表清理失败：${error.message}`);
+  } finally {
+    state.chart = null;
+  }
 }
 
 function renderHistoryRows(record) {
@@ -865,8 +889,7 @@ function bindEvents() {
     if (event.target === elements.publishedDateDialog) elements.publishedDateDialog.close();
   });
   elements.historyDialog.addEventListener('close', () => {
-    state.chart?.destroy();
-    state.chart = null;
+    destroyChart();
   });
 }
 
@@ -897,9 +920,12 @@ async function initialize() {
   }, SLOW_LOADING_MS);
   elements.dataStatus.classList.remove('is-error', 'is-stale');
   try {
+    const historyRequestId = state.historyRequestId + 1;
+    state.historyRequestId = historyRequestId;
     state.history = { schemaVersion: 1, countries: {} };
     fetchJson('history.json')
       .then((historyData) => {
+        if (historyRequestId !== state.historyRequestId) return;
         state.history = historyData;
         renderPublishedDateHistory();
         if (state.activeCountry && elements.historyDialog.open) {
@@ -907,7 +933,11 @@ async function initialize() {
           renderHistoryContent();
         }
       })
-      .catch((error) => { console.warn(`价格历史加载失败，使用当前价格作为临时记录：${error.message}`); });
+      .catch((error) => {
+        if (historyRequestId === state.historyRequestId) {
+          console.warn(`价格历史加载失败，使用当前价格作为临时记录：${error.message}`);
+        }
+      });
     state.data = await fetchJson('prices.json');
     if (!state.data.tiers.some(({ id }) => id === state.sortTier)) {
       state.sortTier = state.data.tiers.find(({ id }) => id === '200GB')?.id || state.data.tiers[0].id;
@@ -928,6 +958,7 @@ async function initialize() {
     elements.fxStatus.textContent = `更新时间：${fxUpdatedAt}（北京时间）`;
     const priceAgeHours = (Date.now() - new Date(state.data.generatedAt).getTime()) / 3_600_000;
     const freshnessWarnings = [];
+    if (priceAgeHours < 0) freshnessWarnings.push('数据生成时间在未来');
     if (priceAgeHours > 36) freshnessWarnings.push('超过 36 小时');
     if (state.data.fx.stale) freshnessWarnings.push('汇率沿用上次成功结果');
     if (freshnessWarnings.length) {
