@@ -22,6 +22,53 @@ const COUNTRY_ALIASES = {
   Euro: 'Euro Zone'
 };
 
+const PRICE_CURRENCY_MARKERS = {
+  AED: ['AED'],
+  AUD: ['$'],
+  BGN: ['лв'],
+  BRL: ['R$'],
+  CAD: ['$'],
+  CHF: ['CHF'],
+  CLP: ['$'],
+  CNY: ['¥'],
+  COP: ['$'],
+  CZK: ['Kč'],
+  DKK: ['kr'],
+  EGP: ['£'],
+  EUR: ['€', 'Euro'],
+  GBP: ['£'],
+  HKD: ['HK$'],
+  HUF: ['Ft'],
+  IDR: ['Rp'],
+  ILS: ['₪'],
+  INR: ['Rs'],
+  JPY: ['¥'],
+  KRW: ['₩'],
+  KZT: ['₸'],
+  MXN: ['$'],
+  MYR: ['RM'],
+  NGN: ['₦'],
+  NOK: ['kr'],
+  NZD: ['$'],
+  PEN: ['S/.'],
+  PHP: ['₱'],
+  PKR: ['Rs'],
+  PLN: ['zł'],
+  QAR: ['﷼'],
+  RON: ['lei'],
+  RUB: ['p.'],
+  SAR: ['﷼'],
+  SEK: ['kr'],
+  SGD: ['S$'],
+  THB: ['฿'],
+  TRY: ['TL'],
+  TWD: ['NT$'],
+  TZS: ['TSh'],
+  USD: ['$'],
+  VND: ['₫'],
+  ZAR: ['R']
+};
+
 export const PRICE_CHANGE_THRESHOLDS = {
   percentage: 2,
   localRelative: 0.5,
@@ -62,29 +109,64 @@ function resolveRegion($, heading) {
   return null;
 }
 
-function parsePriceNumber(value) {
-  const firstDigit = value.search(/\d/);
-  const sign = value.search(/[−-]/);
-  if (sign >= 0 && (firstDigit < 0 || sign < firstDigit)) return Number.NaN;
-  const match = value.match(/[0-9][0-9.,\s'’]*/);
-  if (!match) return Number.NaN;
-  const compact = match[0].replace(/[\s'’]/g, '');
-  const lastComma = compact.lastIndexOf(',');
-  const lastDot = compact.lastIndexOf('.');
-  let normalized = compact;
+function normalizeCurrencyMarker(value) {
+  return cleanText(value).replace(/\s+/g, '');
+}
 
-  if (lastComma >= 0 && lastDot >= 0) {
-    const decimalSeparator = lastComma > lastDot ? ',' : '.';
-    const groupingSeparator = decimalSeparator === ',' ? '.' : ',';
-    normalized = compact.replaceAll(groupingSeparator, '').replace(decimalSeparator, '.');
-  } else if (lastComma >= 0) {
-    const groups = compact.split(',');
-    normalized = groups.length === 2 && groups[1].length > 0 && groups[1].length <= 2
-      ? `${groups[0]}.${groups[1]}`
-      : groups.join('');
+function isCurrencyDecoration(value, currency) {
+  const normalized = normalizeCurrencyMarker(value);
+  if (!normalized) return true;
+  const allowed = new Set([
+    currency,
+    ...(PRICE_CURRENCY_MARKERS[currency] ?? [])
+  ].map(normalizeCurrencyMarker));
+  return allowed.has(normalized);
+}
+
+function parseNumericToken(token) {
+  const normalized = token
+    .replace(/[\u00a0\u202f]/g, ' ')
+    .replace(/’/g, "'")
+    .trim();
+  const groupedInteger = /[1-9]\d{0,2}(?:[.,' ]\d{3})+/;
+  const decimal = new RegExp(`^(?:${groupedInteger.source}|\\d+)[.,]\\d{1,2}$`);
+  const grouped = new RegExp(`^${groupedInteger.source}$`);
+  const plain = /^\d+$/;
+  if (!decimal.test(normalized) && !grouped.test(normalized) && !plain.test(normalized)) {
+    return Number.NaN;
   }
 
-  return Number(normalized);
+  if (decimal.test(normalized)) {
+    const decimalIndex = Math.max(normalized.lastIndexOf(','), normalized.lastIndexOf('.'));
+    if (normalized.slice(0, decimalIndex).includes(normalized[decimalIndex])) return Number.NaN;
+    const integerPart = normalized.slice(0, decimalIndex).replace(/[.,' ]/g, '');
+    const fractionPart = normalized.slice(decimalIndex + 1);
+    return Number(`${integerPart}.${fractionPart}`);
+  }
+  return Number(normalized.replace(/[.,' ]/g, ''));
+}
+
+function parsePriceNumber(value, currency) {
+  const text = cleanText(value);
+  const firstDigit = text.search(/\d/);
+  const sign = text.search(/[+−-]/);
+  if (sign >= 0 && (firstDigit < 0 || sign < firstDigit)) return Number.NaN;
+  if (/[()]/.test(text)) return Number.NaN;
+
+  const matches = [...text.matchAll(/[0-9][0-9.,\s'’]*/g)];
+  if (matches.length !== 1) return Number.NaN;
+  const match = matches[0];
+  const rawToken = match[0];
+  const token = rawToken.trim();
+  const tokenStart = match.index + rawToken.search(/\S/);
+  const tokenEnd = tokenStart + token.length;
+  const prefix = text.slice(0, tokenStart).trim();
+  const suffix = text.slice(tokenEnd).trim();
+  if (!isCurrencyDecoration(prefix, currency) || !isCurrencyDecoration(suffix, currency)) {
+    return Number.NaN;
+  }
+  const price = parseNumericToken(token);
+  return Number.isFinite(price) ? price : Number.NaN;
 }
 
 function parseTierLabel(label) {
@@ -93,6 +175,7 @@ function parseTierLabel(label) {
   const amount = Number(match[1]);
   const unit = match[2].toUpperCase();
   const capacityGb = amount * (unit === 'TB' ? 1024 : 1);
+  if (!Number.isFinite(amount) || amount <= 0 || !Number.isFinite(capacityGb) || capacityGb <= 0) return null;
   const normalizedAmount = String(amount).replace(/\.0+$/, '');
   return {
     id: `${normalizedAmount}${unit}`,
@@ -105,6 +188,16 @@ function isPriceList($, node) {
   return $(node).find('li').toArray().some((item) => (
     /^\d+(?:\.\d+)?\s*(?:GB|TB)\s*:?\s*\S+/i.test(cleanText($(item).text()))
   ));
+}
+
+function itemText($, item) {
+  const $item = $(item).clone();
+  $item.find('sup').remove();
+  return cleanText($item.text());
+}
+
+function isCountryHeading($, node) {
+  return /\([^)]+\)\s*$/.test(headingText($, node));
 }
 
 function extractPublishedDate($) {
@@ -144,13 +237,13 @@ function parseCountry($, heading, priceList, region) {
   const plans = {};
   const detectedTiers = new Map();
   $prices.find('li').each((_, item) => {
-    const text = cleanText($(item).text());
+    const text = itemText($, item);
     const match = text.match(/^(\d+(?:\.\d+)?\s*(?:GB|TB))\s*:?\s*(.+)$/i);
     if (!match) return;
 
     const tier = parseTierLabel(match[1]);
     const formattedPrice = cleanText(match[2]).replace(/^:\s*/, '');
-    const price = parsePriceNumber(formattedPrice);
+    const price = parsePriceNumber(formattedPrice, currency);
     if (!tier || !Number.isFinite(price)) {
       throw new Error(`Unable to parse price "${text}" for ${country}`);
     }
@@ -169,21 +262,23 @@ function parseCountryByAppleMarkers($, heading, priceList, region) {
   const plans = {};
   const detectedTiers = new Map();
   const tierItems = $(priceList).find('li').toArray().filter((item) => (
-    /^(?:\s*\d+(?:\.\d+)?\s*(?:GB|TB))/i.test(cleanText($(item).text()))
+    /^(?:\s*\d+(?:\.\d+)?\s*(?:GB|TB))/i.test(itemText($, item))
   ));
 
   $(priceList).find('li').each((_, item) => {
-    const labelNode = $(item).find('b, strong').first();
+    const $item = $(item).clone();
+    $item.find('sup').remove();
+    const labelNode = $item.find('b, strong').first();
     if (!labelNode.length) return;
     const rawLabel = cleanText(labelNode.text());
     const tier = parseTierLabel(rawLabel.replace(/:\s*$/, ''));
     if (!tier) return;
 
-    const itemText = cleanText($(item).text());
-    const formattedPrice = cleanText(itemText.slice(rawLabel.length)).replace(/^:\s*/, '');
-    const price = parsePriceNumber(formattedPrice);
+    const markedItemText = cleanText($item.text());
+    const formattedPrice = cleanText(markedItemText.slice(rawLabel.length)).replace(/^:\s*/, '');
+    const price = parsePriceNumber(formattedPrice, currency);
     if (!Number.isFinite(price)) {
-      throw new Error(`Unable to parse marked price "${itemText}" for ${country}`);
+      throw new Error(`Unable to parse marked price "${markedItemText}" for ${country}`);
     }
     if (detectedTiers.has(tier.id) || plans[tier.id]) {
       throw new Error(`Duplicate marked ${tier.label} price for ${country}`);
@@ -207,8 +302,19 @@ function finalizeParsedResult($, parsedCountries, foundRegions) {
   }
 
   const tierMap = new Map();
+  const capacityMap = new Map();
   for (const country of parsedCountries) {
-    for (const tier of country.detectedTiers) tierMap.set(tier.id, tier);
+    for (const tier of country.detectedTiers) {
+      if (!Number.isFinite(tier.capacityGb) || tier.capacityGb <= 0) {
+        throw new Error(`Invalid storage capacity for ${tier.label}`);
+      }
+      const equivalent = capacityMap.get(tier.capacityGb);
+      if (equivalent && equivalent.id !== tier.id) {
+        throw new Error(`Duplicate storage capacity ${tier.capacityGb} GB: ${equivalent.label} and ${tier.label}`);
+      }
+      capacityMap.set(tier.capacityGb, tier);
+      tierMap.set(tier.id, tier);
+    }
   }
   const tiers = [...tierMap.values()].sort((first, second) => first.capacityGb - second.capacityGb);
   if (!tiers.length) throw new Error('No storage tiers were found in Apple pricing data');
@@ -220,7 +326,7 @@ function finalizeParsedResult($, parsedCountries, foundRegions) {
 function parseByDocumentOrder($) {
   const parsedCountries = [];
   const foundRegions = new Set();
-  const nodes = $('h2, h3, h4, h5, ul').toArray();
+  const nodes = $('h2, h3, h4, h5, .gb-header, ul').toArray();
   let currentRegion = null;
 
   for (let index = 0; index < nodes.length; index += 1) {
@@ -233,26 +339,25 @@ function parseByDocumentOrder($) {
       foundRegions.add(resolvedRegion.sectionId);
       continue;
     }
-    if (!currentRegion || !/\([^)]+\)\s*$/.test(headingText($, node))) {
+    if (!currentRegion || !isCountryHeading($, node)) {
       if ($(node).is('h2, h3')) currentRegion = null;
       continue;
     }
 
-    let priceList = null;
+    const priceLists = [];
     for (let nextIndex = index + 1; nextIndex < nodes.length; nextIndex += 1) {
       const candidate = nodes[nextIndex];
+      if (resolveRegion($, candidate) || isCountryHeading($, candidate)) break;
       if ($(candidate).is('h2, h3, h4, h5')) {
-        const candidateText = headingText($, candidate);
-        if (resolveRegion($, candidate) || /\([^)]+\)\s*$/.test(candidateText)) break;
         continue;
       }
       if ($(candidate).is('ul') && isPriceList($, candidate)) {
-        priceList = candidate;
-        break;
+        priceLists.push(candidate);
       }
     }
-    if (!priceList) throw new Error(`Price list not found after ${headingText($, node)}`);
-    parsedCountries.push(parseCountry($, node, priceList, currentRegion));
+    if (!priceLists.length) throw new Error(`Price list not found after ${headingText($, node)}`);
+    if (priceLists.length > 1) throw new Error(`Ambiguous price lists found after ${headingText($, node)}`);
+    parsedCountries.push(parseCountry($, node, priceLists[0], currentRegion));
   }
 
   return finalizeParsedResult($, parsedCountries, foundRegions);
@@ -261,7 +366,7 @@ function parseByDocumentOrder($) {
 function parseByAppleMarkers($) {
   const parsedCountries = [];
   const foundRegions = new Set();
-  const nodes = $('#nasalac, #emea, #ap, h4.gb-header, ul').toArray();
+  const nodes = $('#nasalac, #emea, #ap, h2, h3, h4, h5, .gb-header, ul').toArray();
   let currentRegion = null;
 
   for (let index = 0; index < nodes.length; index += 1) {
@@ -272,20 +377,20 @@ function parseByAppleMarkers($) {
       foundRegions.add(sectionId);
       continue;
     }
-    if (!$(node).is('h4.gb-header')) continue;
+    if (!$(node).hasClass('gb-header') || !isCountryHeading($, node)) continue;
     if (!currentRegion) throw new Error(`Apple marker parser found a country before a region: ${headingText($, node)}`);
 
-    let priceList = null;
+    const priceLists = [];
     for (let nextIndex = index + 1; nextIndex < nodes.length; nextIndex += 1) {
       const candidate = nodes[nextIndex];
-      if ($(candidate).is('h4.gb-header') || REGIONS[$(candidate).attr('id')]) break;
+      if (isCountryHeading($, candidate) || REGIONS[$(candidate).attr('id')]) break;
       if ($(candidate).is('ul') && isPriceList($, candidate)) {
-        priceList = candidate;
-        break;
+        priceLists.push(candidate);
       }
     }
-    if (!priceList) throw new Error(`Apple marker price list not found after ${headingText($, node)}`);
-    parsedCountries.push(parseCountryByAppleMarkers($, node, priceList, currentRegion));
+    if (!priceLists.length) throw new Error(`Apple marker price list not found after ${headingText($, node)}`);
+    if (priceLists.length > 1) throw new Error(`Ambiguous Apple marker price lists after ${headingText($, node)}`);
+    parsedCountries.push(parseCountryByAppleMarkers($, node, priceLists[0], currentRegion));
   }
 
   return finalizeParsedResult($, parsedCountries, foundRegions);
