@@ -1,6 +1,8 @@
 # iCloud+ 全球价格比较
 
-线上页面：<https://linchun7.github.io/tools/icloud_price_comparison/>
+正式页面：<https://www.linchun.com.cn/tools/icloud_price_comparison/>
+
+原 GitHub Pages 地址：<https://linchun7.github.io/tools/icloud_price_comparison/>
 
 本目录从 Apple Support 官方页面抓取 iCloud+ 月费，使用参考汇率换算人民币，并展示各地区价格、最低价和历史变化。
 
