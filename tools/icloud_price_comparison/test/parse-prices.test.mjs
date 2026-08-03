@@ -32,6 +32,7 @@ test('parses decimal commas and common thousands separators without changing sca
     { markup: '$1,234.56', expected: 1234.56 },
     { markup: '$1.234,56', expected: 1234.56 },
     { markup: '$1,234', expected: 1234 },
+    { markup: '$1.234', expected: 1234 },
     { markup: "$1'234.56", expected: 1234.56 },
     { markup: '$1’234,56', expected: 1234.56 }
   ];
@@ -44,12 +45,89 @@ test('parses decimal commas and common thousands separators without changing sca
   }
 });
 
+test('rejects mismatched currency symbols and codes', async () => {
+  const fixture = await readFile(fixtureUrl, 'utf8');
+  for (const markup of ['€0.99', '0.99 €', 'EUR 0.99', '0.99 EUR']) {
+    assert.throws(
+      () => parseApplePrices(fixture.replace('$0.99', markup)),
+      /Unable to parse price|Apple parser disagreement|Both Apple parsers failed/,
+      markup
+    );
+  }
+});
+
+test('accepts matching currency codes in either price position', async () => {
+  const fixture = await readFile(fixtureUrl, 'utf8');
+  for (const markup of ['USD 0.99', '0.99 USD']) {
+    const parsed = parseApplePrices(fixture.replace('$0.99', markup));
+    assert.equal(parsed.countries[0].plans['50GB'].price, 0.99, markup);
+  }
+});
+
+test('strips price-item footnotes and rejects malformed full price tokens', async () => {
+  const fixture = await readFile(fixtureUrl, 'utf8');
+  const footnoted = parseApplePrices(fixture.replace('$0.99', '$0.99<sup>1</sup>'));
+  assert.equal(footnoted.countries[0].plans['50GB'].price, 0.99);
+
+  for (const markup of ['$1e3', '$12abc', '$12 July 17, 2026', '($0.99)', '$1,2,3', '$1,234,56', '$1.2.3', '$0.999', '$.99']) {
+    assert.throws(
+      () => parseApplePrices(fixture.replace('$0.99', markup)),
+      /Unable to parse price|Apple parser disagreement|Both Apple parsers failed/,
+      markup
+    );
+  }
+});
+
 test('discovers a newly published storage tier from Apple markup', async () => {
   const fixture = await readFile(fixtureUrl, 'utf8');
-  const expanded = parseApplePrices(fixture.replaceAll('</ul>', '<li>1 TB: $5.99</li></ul>'));
+  const expanded = parseApplePrices(fixture.replaceAll('</ul>', '<li>1 TB: 5.99</li></ul>'));
   assert.ok(expanded.tiers.some(({ id, label }) => id === '1TB' && label === '1 TB'));
   assert.equal(expanded.countries[0].plans['1TB'].price, 5.99);
   assert.equal(validatePrices(expanded.countries, { minCountries: 5, tiers: expanded.tiers }), true);
+});
+
+test('rejects ambiguous full-tier decoy lists before a country price list', async () => {
+  const fixture = await readFile(fixtureUrl, 'utf8');
+  const decoy = '<ul><li><b>50 GB</b>: $1.99</li><li><b>200 GB</b>: $5.99</li>'
+    + '<li><b>2 TB</b>: $19.99</li><li><b>6 TB</b>: $59.99</li><li><b>12 TB</b>: $119.99</li></ul>';
+  const adjusted = fixture.replace(
+    '<h4 class="gb-header">United States<sup>4</sup> (USD)</h4>',
+    '<h4 class="gb-header">United States<sup>4</sup> (USD)</h4>' + decoy
+  );
+
+  assert.throws(
+    () => parseApplePrices(adjusted),
+    /Ambiguous .*price lists/
+  );
+});
+
+test('rejects equivalent storage capacities even when tier labels differ', async () => {
+  const fixture = await readFile(fixtureUrl, 'utf8');
+  const adjusted = fixture.replaceAll(
+    '<li><b>2 TB</b>',
+    '<li><b>2048 GB</b>: 1</li><li><b>2 TB</b>'
+  );
+
+  assert.throws(
+    () => parseApplePrices(adjusted),
+    /Duplicate storage capacity/
+  );
+});
+
+test('rejects zero and non-finite storage capacities', async () => {
+  const fixture = await readFile(fixtureUrl, 'utf8');
+  const zero = fixture.replaceAll(
+    '<li><b>12 TB</b>',
+    '<li><b>0 GB</b>: 1</li><li><b>12 TB</b>'
+  );
+  const hugeLabel = `${'9'.repeat(400)} TB`;
+  const huge = fixture.replaceAll(
+    '<li><b>12 TB</b>',
+    `<li><b>${hugeLabel}</b>: 1</li><li><b>12 TB</b>`
+  );
+
+  assert.throws(() => parseApplePrices(zero), /Unable to parse price/);
+  assert.throws(() => parseApplePrices(huge), /Unable to parse price/);
 });
 
 test('tolerates small heading, wrapper, and publication-date markup changes', async () => {
@@ -87,6 +165,18 @@ test('falls back to the Apple marker parser when semantic region headings change
   assert.equal(result.parser, 'apple-markers-fallback');
   assert.match(result.parserStatus, /Document-order parser unavailable/);
   assert.equal(result.countries.length, 5);
+});
+
+test('cross-checks country markers when their element changes but gb-header remains', async () => {
+  const fixture = await readFile(fixtureUrl, 'utf8');
+  const adjusted = fixture.replace(
+    /<h4 class="gb-header">United States[\s\S]*?<\/h4>/,
+    (heading) => heading.replace('<h4', '<div').replace('</h4>', '</div>')
+  );
+  const result = parseApplePrices(adjusted);
+  assert.equal(result.parser, 'cross-checked');
+  assert.equal(result.countries.length, 5);
+  assert.equal(result.countries[0].country, 'United States');
 });
 
 test('keeps the document-order parser when Apple marker classes disappear', async () => {
