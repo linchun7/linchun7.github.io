@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "retention": 90,
-  "updatedAtUtc": "2026-08-04T00:05:33.749Z",
+  "updatedAtUtc": "2026-08-04T02:37:04.857Z",
   "runs": [
     {
       "schemaVersion": 1,
@@ -1256,6 +1256,68 @@
       "startedAtUtc": "2026-08-04T00:05:32.934Z",
       "finishedAtUtc": "2026-08-04T00:05:33.749Z",
       "durationMs": 815,
+      "observedAtBeijing": "2026-08-04",
+      "source": {
+        "appleUrl": "https://support.apple.com/en-us/108047",
+        "applePublishedDate": "July 17, 2026",
+        "appleParser": "cross-checked",
+        "appleParserStatus": "Both independent parser paths agreed",
+        "exchangeRatesFetchedAtUtc": "2026-08-04T00:00:01.000Z",
+        "exchangeRatesStale": false,
+        "exchangeRatesSourceMode": "api-key",
+        "exchangeRatesFallbackUsed": false,
+        "exchangeRatesFallbackReason": null,
+        "exchangeRatesApiKeyStatus": "valid"
+      },
+      "counts": {
+        "countries": 73,
+        "pricePoints": 365,
+        "currencies": 44,
+        "tiers": [
+          {
+            "id": "50GB",
+            "label": "50 GB"
+          },
+          {
+            "id": "200GB",
+            "label": "200 GB"
+          },
+          {
+            "id": "2TB",
+            "label": "2 TB"
+          },
+          {
+            "id": "6TB",
+            "label": "6 TB"
+          },
+          {
+            "id": "12TB",
+            "label": "12 TB"
+          }
+        ]
+      },
+      "changes": {
+        "publishedDate": {
+          "changed": false,
+          "from": "July 17, 2026",
+          "to": "July 17, 2026"
+        },
+        "addedTiers": [],
+        "removedTiers": [],
+        "addedCountries": [],
+        "removedCountries": [],
+        "changedCountries": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "2026-08-04T02:37:04.857Z",
+      "status": "success",
+      "trigger": "manual",
+      "automaticRunDateBeijing": null,
+      "startedAtUtc": "2026-08-04T02:37:03.948Z",
+      "finishedAtUtc": "2026-08-04T02:37:04.857Z",
+      "durationMs": 909,
       "observedAtBeijing": "2026-08-04",
       "source": {
         "appleUrl": "https://support.apple.com/en-us/108047",
