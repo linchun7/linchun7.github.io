@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-08-04T00:05:33.749Z",
+  "generatedAt": "2026-08-04T02:37:04.857Z",
   "source": {
     "name": "Apple Support",
     "url": "https://support.apple.com/en-us/108047",
@@ -9,10 +9,10 @@
     "parserStatus": "Both independent parser paths agreed"
   },
   "run": {
-    "startedAtUtc": "2026-08-04T00:05:32.934Z",
-    "finishedAtUtc": "2026-08-04T00:05:33.749Z",
+    "startedAtUtc": "2026-08-04T02:37:03.948Z",
+    "finishedAtUtc": "2026-08-04T02:37:04.857Z",
     "observedAtBeijing": "2026-08-04",
-    "observedAtUtc": "2026-08-04T00:05:33.749Z",
+    "observedAtUtc": "2026-08-04T02:37:04.857Z",
     "countries": 73,
     "pricePoints": 365
   },
