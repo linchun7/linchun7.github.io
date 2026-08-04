@@ -46,7 +46,7 @@ test('skips a repeated automatic run only after fresh rates were committed', () 
   const result = evaluateDailyRun({
     runLog: { schemaVersion: 1, runs: [run()] },
     eventName: 'schedule',
-    now: new Date('2026-08-02T01:05:00.000Z')
+    now: new Date('2026-08-02T00:10:00.000Z')
   });
   assert.equal(result.triggerSource, 'github-schedule');
   assert.equal(result.automaticRunDateBeijing, '2026-08-02');
@@ -55,7 +55,7 @@ test('skips a repeated automatic run only after fresh rates were committed', () 
 });
 
 test('reruns when a same-day automatic run has future exchange-rate data', () => {
-  const now = new Date('2026-08-02T01:05:00.000Z');
+  const now = new Date('2026-08-02T00:10:00.000Z');
   const result = evaluateDailyRun({
     runLog: { schemaVersion: 1, runs: [run({ fetchedAt: '2026-08-02T02:00:00.000Z' })] },
     eventName: 'schedule',
@@ -76,7 +76,7 @@ test('reruns when the earlier automatic run used stale or previous-day rates', (
     const result = evaluateDailyRun({
       runLog: { schemaVersion: 1, runs: [previousRun] },
       eventName: 'schedule',
-      now: new Date('2026-08-02T01:05:00.000Z')
+      now: new Date('2026-08-02T00:10:00.000Z')
     });
     assert.equal(result.shouldRun, true, JSON.stringify(previousRun));
   }
