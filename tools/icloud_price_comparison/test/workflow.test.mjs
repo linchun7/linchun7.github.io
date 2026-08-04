@@ -11,7 +11,8 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
     /cron:\s*['"](?:[0-5]?\d) (?:[01]?\d|2[0-3]) \* \* \*['"]/,
     'workflow must keep a valid daily schedule without locking its execution time',
   );
-  assert.match(workflow, /cron:\s*['"]5 1 \* \* \*['"]/, 'GitHub backup must target 09:05 Beijing time');
+  assert.match(workflow, /cron:\s*['"]10 0 \* \* \*['"]/, 'GitHub backup must target 08:10 Beijing time');
+  assert.doesNotMatch(workflow, /cron:\s*['"]5 1 \* \* \*['"]/, 'the old 09:05 Beijing backup schedule must be removed');
   assert.doesNotMatch(workflow, /cron:\s*['"]5 0 \* \* \*['"]/, 'Cloudflare owns the 08:05 primary trigger');
   assert.match(workflow, /workflow_dispatch:[\s\S]*?trigger_source:[\s\S]*?default: manual[\s\S]*?options:[\s\S]*?- manual[\s\S]*?- cloudflare/);
   assert.match(workflow, /name: 检查每日幂等状态[\s\S]*?id: daily_guard[\s\S]*?node scripts\/daily-run-guard\.mjs/);
