@@ -60,10 +60,10 @@ function emptyChanges() {
   return { addedTiers: [], removedTiers: [], addedCountries: [], removedCountries: [], changedCountries: [] };
 }
 
-function mergeSnapshotChanges(first = emptyChanges(), second = emptyChanges()) {
+function mergeSnapshotChanges(baseChanges = emptyChanges(), additionalChanges = emptyChanges()) {
   const unique = (items, key) => [...new Map(items.map((item) => [key(item), item])).values()];
   const changed = new Map();
-  for (const entry of [...(first.changedCountries ?? []), ...(second.changedCountries ?? [])]) {
+  for (const entry of [...(baseChanges.changedCountries ?? []), ...(additionalChanges.changedCountries ?? [])]) {
     const current = changed.get(entry.country);
     if (!current) {
       changed.set(entry.country, { ...entry, tiers: [...(entry.tiers ?? [])] });
@@ -83,10 +83,10 @@ function mergeSnapshotChanges(first = emptyChanges(), second = emptyChanges()) {
     });
   }
   return {
-    addedTiers: unique([...(first.addedTiers ?? []), ...(second.addedTiers ?? [])], (item) => item.id),
-    removedTiers: unique([...(first.removedTiers ?? []), ...(second.removedTiers ?? [])], (item) => item.id),
-    addedCountries: unique([...(first.addedCountries ?? []), ...(second.addedCountries ?? [])], (item) => item.country),
-    removedCountries: unique([...(first.removedCountries ?? []), ...(second.removedCountries ?? [])], (item) => item.country),
+    addedTiers: unique([...(baseChanges.addedTiers ?? []), ...(additionalChanges.addedTiers ?? [])], (item) => item.id),
+    removedTiers: unique([...(baseChanges.removedTiers ?? []), ...(additionalChanges.removedTiers ?? [])], (item) => item.id),
+    addedCountries: unique([...(baseChanges.addedCountries ?? []), ...(additionalChanges.addedCountries ?? [])], (item) => item.country),
+    removedCountries: unique([...(baseChanges.removedCountries ?? []), ...(additionalChanges.removedCountries ?? [])], (item) => item.country),
     changedCountries: [...changed.values()]
   };
 }

@@ -406,47 +406,47 @@ function comparableParseResult(result) {
 
 export function parseApplePrices(html) {
   const $ = cheerio.load(html);
-  let primary = null;
-  let secondary = null;
-  let primaryError = null;
-  let secondaryError = null;
+  let documentOrderResult = null;
+  let appleMarkerResult = null;
+  let documentOrderError = null;
+  let appleMarkerError = null;
 
   try {
-    primary = parseByDocumentOrder($);
+    documentOrderResult = parseByDocumentOrder($);
   } catch (error) {
-    primaryError = error;
+    documentOrderError = error;
   }
   try {
-    secondary = parseByAppleMarkers($);
+    appleMarkerResult = parseByAppleMarkers($);
   } catch (error) {
-    secondaryError = error;
+    appleMarkerError = error;
   }
 
-  if (primary && secondary) {
-    if (comparableParseResult(primary) !== comparableParseResult(secondary)) {
+  if (documentOrderResult && appleMarkerResult) {
+    if (comparableParseResult(documentOrderResult) !== comparableParseResult(appleMarkerResult)) {
       throw new Error('Apple parser disagreement: document-order and marker paths returned different pricing data');
     }
     return {
-      ...primary,
+      ...documentOrderResult,
       parser: 'cross-checked',
       parserStatus: 'Both independent parser paths agreed'
     };
   }
-  if (primary) {
+  if (documentOrderResult) {
     return {
-      ...primary,
+      ...documentOrderResult,
       parser: 'document-order',
-      parserStatus: `Apple marker parser unavailable: ${secondaryError?.message ?? 'unknown error'}`
+      parserStatus: `Apple marker parser unavailable: ${appleMarkerError?.message ?? 'unknown error'}`
     };
   }
-  if (secondary) {
+  if (appleMarkerResult) {
     return {
-      ...secondary,
+      ...appleMarkerResult,
       parser: 'apple-markers-fallback',
-      parserStatus: `Document-order parser unavailable: ${primaryError?.message ?? 'unknown error'}`
+      parserStatus: `Document-order parser unavailable: ${documentOrderError?.message ?? 'unknown error'}`
     };
   }
-  throw new Error(`Both Apple parsers failed; document-order: ${primaryError?.message}; apple-markers: ${secondaryError?.message}`);
+  throw new Error(`Both Apple parsers failed; document-order: ${documentOrderError?.message}; apple-markers: ${appleMarkerError?.message}`);
 }
 
 export function validatePrices(countries, { minCountries = 60, previousCountries = [], tiers = TIERS } = {}) {

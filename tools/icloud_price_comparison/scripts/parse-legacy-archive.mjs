@@ -146,13 +146,13 @@ function comparable(value) {
 
 export function parseLegacyAppleArchive(html) {
   const $ = cheerio.load(html);
-  const first = parseByFlatDocumentOrder($);
-  const second = parseByRegionMarkers($);
-  if (comparable(first) !== comparable(second)) {
+  const flatDocumentResult = parseByFlatDocumentOrder($);
+  const regionMarkerResult = parseByRegionMarkers($);
+  if (comparable(flatDocumentResult) !== comparable(regionMarkerResult)) {
     throw new Error('Legacy Apple archive parsers returned different pricing data');
   }
   return {
-    ...first,
+    ...flatDocumentResult,
     parser: 'legacy-archive-cross-checked',
     parserStatus: 'Both independent legacy archive parser paths agreed'
   };
