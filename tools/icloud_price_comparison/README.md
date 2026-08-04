@@ -2,152 +2,127 @@
 
 正式页面：<https://www.linchun.com.cn/tools/icloud_price_comparison/>
 
-原 GitHub Pages 地址：<https://linchun7.github.io/tools/icloud_price_comparison/>
+原 GitHub Pages 地址（保留为旧入口）：<https://linchun7.github.io/tools/icloud_price_comparison/>
 
-本目录从 Apple Support 官方页面抓取 iCloud+ 月费，使用参考汇率换算人民币，并展示各地区价格、最低价和历史变化。
+本工具只把 Apple Support 的 iCloud+ 价格作为价格和发布日期来源；当地价格会保留，并按汇率换算人民币作横向比较。人民币金额不是 Apple 的结算价。
 
-## 已实现功能
+## 功能
 
-- 展示 Apple 官网公布的全部地区、币种和容量价格。
-- 人民币参考价作为主价格，当地货币原价同时保留。
-- 汇总各容量最低价，并标明对应地区。
-- 支持地区搜索、分区筛选和容量排序。
-- 点击地区查看价格历史、当地月费和涨跌比例。
-- 显示 Apple 页面发布日期及发布日期变化记录。
-- 发布日期变化时关联容量、地区、分区、币种和价格差异。
-- 自动识别新增或移除的地区与容量，地区恢复后沿用原历史。
-- 使用 Apple 中文页面名称映射，未知地区保留官方英文名。
-- 显示加载、慢网络、失败重试、旧数据和旧汇率状态。
-- 适配桌面、平板和手机，并支持键盘操作与减弱动画设置。
-- 通过双解析器、异常价格校验、结构化日志和真实 Chrome 测试保护自动更新。
+- 展示 Apple 页面解析出的地区、分区、币种、容量和当地月费，并计算人民币参考价。
+- 汇总每个容量的最低价和对应地区，支持地区搜索、分区筛选、容量排序。
+- 点击地区查看当地月费、人民币参考价、价格历史和涨跌比例。
+- 展示 Apple `Published Date`，并在发布日期变化时记录容量、地区、分区、币种和价格差异。
+- 记录新增或移除的地区和容量；地区恢复后继续使用原有历史。
+- 使用 Apple 中文支持页面的名称映射；没有映射时保留 Apple 官方英文名。
+- 提供加载、慢网络、重试、旧数据和旧汇率状态；适配桌面、平板和手机，支持键盘和减弱动画。
 
 ## 自动更新
 
 工作流：`.github/workflows/update-icloud-prices.yml`
 
-- Cloudflare 主触发：每天北京时间 08:05（UTC 00:05）。
+- Cloudflare 主触发：每天北京时间 08:05（UTC 00:05），以 `workflow_dispatch` 的 `trigger_source=cloudflare` 运行。
 - GitHub 原生备用：每天北京时间 08:10（UTC 00:10）。
-- 两个入口共用每日幂等保护；当天已有自动成功记录且汇率为当天新数据时，备用任务直接跳过。
-- 主任务失败、使用旧汇率或未成功提交时，备用任务仍会完整执行。手动运行不受每日保护限制。
+- 两个自动入口共用每日幂等保护：当天已有成功的自动运行，且汇率不是旧值、抓取日期也是当天，北京时间备用任务会跳过；`main` 分支上的手动运行始终允许。
 
 汇率按以下顺序获取：
 
-1. 使用 Actions Secret `EXCHANGE_RATE_API_KEY` 请求 ExchangeRate-API Key 接口。
-2. 主接口额度用尽、请求失败、结构异常或缺少所需币种时，自动改用开放接口。
-3. 两个在线来源都失败时，沿用并标记上一份有效汇率。
+1. 使用 Actions Secret `EXCHANGE_RATE_API_KEY`，通过 ExchangeRate-API 的认证接口请求；密钥放在请求头，不写入 URL。
+2. 认证接口失败、额度耗尽、响应缺字段或缺少所需币种时，改用 ExchangeRate-API 开放接口。
+3. 两个在线来源都失败时，沿用并标记上一份有效汇率；没有上一份有效汇率则停止更新。
 
-Secret 仅配置在仓库 **Settings > Secrets and variables > Actions**，不要写入代码、日志或数据文件。
-Secret 缺失或无效但开放接口成功时仅显示普通提示；两个在线来源都失败时才显示警告。
+Secret 只配置在仓库 **Settings > Secrets and variables > Actions**。密钥缺失或认证接口失效但开放接口成功时只写普通提示；沿用旧汇率才写警告。
 
-完整更新的运行顺序：
+一次完整更新的顺序是：
 
-1. 安装锁定依赖并运行固定 fixture、历史调价、工作流和数据测试。
+1. 安装锁定依赖，运行 `pnpm test:core`。
 2. 抓取 Apple 页面，由 `document-order` 和 `apple-markers` 两条路径独立解析。
-3. 校验发布日期、地区、容量、价格、汇率和异常调价。
-4. 原子更新 `data/`，再运行更新后的真实 Chrome UI 测试。
-5. 提交数据并上传 Apple HTML 与诊断附件，附件保留 14 天。
+3. 校验发布日期、地区、分区、容量、价格、汇率和异常调价。
+4. 写入当前价格、历史、运行日志和 Apple 快照；随后运行 `pnpm test:data` 和真实 Chrome UI 测试。
+5. 上传诊断附件（保留 14 天），再提交 `data/` 变更并先 `git pull --rebase`。
 
-UI 测试失败只产生警告，不阻断已经通过抓取和核心校验的数据；抓取、解析或数据校验失败会停止更新，并保留上一份有效数据。
+UI 测试失败只产生警告，不阻断已经通过抓取和核心数据校验的数据；抓取、解析、数据校验或生产写入失败会停止更新，并恢复上一份有效数据。
 
 ## 数据文件
 
 | 文件 | 内容 | 保留策略 |
 | --- | --- | --- |
-| `data/prices.json` | 当前价格、容量、来源、发布日期、汇率和运行时间 | 仅保留最新有效快照 |
-| `data/history.json` | 地区价格/币种变化事件及 Apple 发布日期事件 | 只在真实变化时增长 |
-| `data/run-log.json` | 成功运行的来源、数量、耗时和差异 | 最近 90 次 |
+| `data/prices.json` | 当前有效价格、Apple 来源和发布日期、容量、汇率、解析器和运行时间 | 只保留最新有效快照 |
+| `data/history.json` | 地区价格/币种事件和 Apple 发布日期事件 | 真实变化才追加；同一发布日期不重复 |
+| `data/run-log.json` | 成功运行的来源、数量、耗时、汇率状态和差异 | 最近 90 条成功运行 |
+| `data/apple-snapshots/` | Apple HTML 证据、规范化 JSON 和 `index.json` | 见 `data/apple-snapshots/README.md`；旧修订不覆盖 |
 
-Apple 当前使用 `Published Date: July 17, 2026` 格式。解析、更新和前端均兼容完整标签、英文日期值及历史 ISO 日期值。
+当前有效快照的生成时间和 Apple `Published Date` 见 `data/prices.json`；当前快照包含 73 个地区、44 种币种、5 个容量和 365 个价格点，后续自动运行可能改变这些数量。
 
-## 变化记录
+`history.json` 的 `sourcePublishedDates` 会保存首次记录和后续发布日期变化；发布日期未变化时，价格、币种、分区等变化仍记录在地区事件和 `run-log.json` 中。前端把历史文件视为可选数据：历史文件加载失败时仍可显示当前价格；更新脚本读取到损坏的生产 JSON 会停止并要求从 Git 历史恢复，不会静默修复。
 
-| 变化 | 记录位置 | Action 摘要 |
-| --- | --- | --- |
-| 价格或币种 | `history.json`、`run-log.json` | 分别显示变化地区 |
-| 新增或移除地区 | `run-log.json`，旧历史不删除 | 显示地区名称 |
-| 所属分区变化 | `run-log.json` | 单独显示变化地区 |
-| 新增或移除容量 | `run-log.json` | 显示容量名称 |
-| Apple 发布日期 | `history.json.sourcePublishedDates`、`run-log.json` | 显示旧日期到新日期 |
-
-发布日期未变化时，其他变化仍会记录和显示。`sourcePublishedDates` 仅在发布日期变化时追加，并保存同次容量、地区、分区、币种和价格差异。
-
-## 核心保护
+## 变化与保护
 
 - 两套解析器一致时标记 `cross-checked`；单路失败可降级，两路分歧或同时失败则拒绝更新。
-- 不使用非 Apple 价格源替代官方数据。
-- 发布日期缺失、格式无效或倒退时拒绝更新。
-- 地区重复、关键分区缺失、容量不完整或地区数异常下降时拒绝更新。
-- 单项价格超过旧价 10 倍或低于旧价 1/10 时拒绝更新。
-- 联合异常需同时满足 200% 涨幅、当地金额门槛、固定汇率人民币门槛和实际汇率人民币门槛才拒绝；人民币门槛为 `max(15 元, 上次人民币价值 × 50%)`。
-- Key 接口和开放接口执行相同校验；两者都无法提供完整汇率时沿用并标记上一份有效结果。
-- `history.json` 异常不阻断当前价格页，前端可在数据恢复后重新加载。
+- 只接受 Apple 价格；Wayback 仅用于导入历史 Apple 页面证据，不是替代价格源。
+- Apple 发布日期缺失、格式无效、倒退或晚于本次观测日期时拒绝更新。
+- 拒绝重复地区、关键分区缺失、价格容量不完整，以及地区数比上一份有效数据下降超过 3 个。
+- 同一币种的单项价格超过旧价 10 倍或低于旧价 1/10 时拒绝更新。
+- 联合异常需同时达到至少 200% 的涨幅、当地金额门槛、按旧汇率计算的人民币门槛和按当前汇率计算的人民币门槛；人民币门槛为 `max(15 元, 上次人民币价值 × 50%)`。
+- Key 接口和开放接口执行相同的响应、时间戳和所需币种校验；汇率过旧或在未来时也会失败。
+- 生产 JSON 使用原子写入；快照、历史或索引写入失败时清理本次文件并回滚上一份有效数据。
 
-## 日常检查
+## 日常维护
 
 在 **Actions > Update iCloud prices** 查看：
 
-- 成功摘要：解析状态、地区/价格点数量、Apple 日期、汇率时间和本次变化。
-- 黄色警告：UI 或非关键步骤需复核，核心数据可能已经成功提交。
-- 红色失败：先看第一个失败步骤，再下载 `icloud-price-diagnostics-*`。
-- `apple-response-*.html`：本次 Apple 原始页面。
-- `run-report.json`：失败阶段、耗时和错误。
+- 成功摘要：解析状态、地区/价格点数量、Apple 日期、汇率时间、汇率来源和本次变化。
+- 黄色提示：解析降级、汇率回退或 UI 等非核心步骤需要复核；核心数据可能已经提交。
+- 红色失败：先看第一个失败步骤，再下载 `icloud-price-diagnostics-*` 附件。失败附件通常含 `run-report.json` 和 `apple-response-*.html`。
 
-容量预警：Git 历史达到 500 MiB、800 MiB，或 `history.json` 达到 2 MiB。工作流不自动清理 Git 历史。
-
-恢复数据时使用 Git 历史中的完整 `data/` 文件，不要手工拼接 JSON。
+容量预警阈值为 Git 历史 500 MiB、800 MiB，或 `history.json` 2 MiB；工作流不会自动清理 Git 历史。恢复数据时使用 Git 历史中的完整 `data/` 文件，不要手工拼接 JSON。
 
 ## 本地验证
 
-需要 Node.js 22+、pnpm 和 Chrome/Chromium。
+以下命令从 `tools/icloud_price_comparison/` 执行，需要 Node.js 22+、pnpm 和 Chrome/Chromium：
 
 ```bash
 pnpm install --frozen-lockfile
 pnpm test
+pnpm test:core
+pnpm test:data
+pnpm test:ui
 pnpm check:live
+pnpm audit --audit-level low
 ```
 
-- `pnpm test`：固定数据、当前数据和真实浏览器测试；不访问 Apple，不写生产数据。
-- `pnpm check:live`：只读访问 Apple 和汇率服务并执行校验，不写文件。
-- `pnpm update:data`：写生产数据，仅用于明确的手动更新或隔离环境。
+- `pnpm test`：运行全部 Node 测试（包含离线 fixture、数据、工作流、快照和 UI 测试）。
+- `pnpm test:core`：运行更新前的解析、数据、快照、幂等和工作流核心测试。
+- `pnpm test:data`：只检查当前提交的价格、历史、运行日志和快照索引。
+- `pnpm test:ui`：启动本地静态服务器并用真实浏览器测试；CI 没有浏览器会失败，本地没有浏览器会跳过。
+- `pnpm check:live`：只读访问 Apple 和汇率服务并执行校验，不写生产文件。
+- `pnpm update:data`：写入生产数据，只用于明确的手动更新或隔离环境。
 
-本地预览需从仓库根目录启动静态服务器：
+本地预览从仓库根目录启动静态服务器：
 
 ```bash
 python -m http.server 4173
 ```
 
-访问 `http://127.0.0.1:4173/tools/icloud_price_comparison/`。
+然后访问 `http://127.0.0.1:4173/tools/icloud_price_comparison/`。
 
-## 数据来源
+## Apple 页面快照与历史导入
 
-- 价格：[Apple Support](https://support.apple.com/en-us/108047)
-- 中文名称：[Apple 中文支持](https://support.apple.com/zh-cn/108047)
-- 汇率：[ExchangeRate-API](https://www.exchangerate-api.com/docs/overview)，开放接口作为自动回退
+`data/apple-snapshots/` 保存每个 Apple `Published Date` 的 HTML 证据、规范化 JSON 和索引。生产更新和历史导入的文件命名、修订、`firstConfirmedDate`、回滚和完整性要求见 `data/apple-snapshots/README.md`。
 
-人民币金额仅用于横向比较，不代表 Apple 实际结算价。税费、可用性和购买区域限制可能不同。本工具与 Apple Inc. 无关联。
-\n+## Apple 页面快照与历史导入
-
-正式入口：<https://www.linchun.com.cn/tools/icloud_price_comparison/>。
-
-`data/apple-snapshots/` 保存每个 Apple `Published Date` 的 HTML 证据、规范化 JSON 和 `index.json` 索引。`publishedDate` 是 Apple 官方日期；`firstConfirmedDate` 是现有证据能够确认该修订版已经存在的最早北京时间日期。历史页面使用 Wayback 存档时间，项目运行后的页面使用首次成功抓取时间。
-
-同一发布日期且内容指纹相同的页面只保存一次；同一发布日期但价格、容量、地区或其他规范化内容发生变化，会保存为 `YYYY-MM-DD-<hash>.html/json` 新修订版，并正常更新 `history.json`。旧修订版不得覆盖或手工删除。
-
-历史资料使用：
+历史资料导入（命令从本目录执行）：
 
 ```bash
 node scripts/import-apple-archives.mjs --input <包含完整历史快照的目录>
 ```
 
-导入目录必须包含现有历史发布日期（当前 live 日期除外），空目录或不完整目录会拒绝。生产更新和历史导入均在校验完成后才写入；快照、历史或索引写入失败会回滚并保留上一份有效数据。详见 `data/apple-snapshots/README.md`。
+输入目录必须包含索引中除当前 live 日期以外的所有既有发布日期；空目录或不完整目录会拒绝。导入使用隔离临时目录，校验和写入任一环节失败都会恢复原有历史和索引。
 
-## 全链路验证
+这里的“当前 live 日期”是 `data/prices.json.source.publishedDate` 规范化后的日期。
 
-```bash
-pnpm test
-pnpm test:core
-pnpm check:live
-pnpm audit --audit-level low
-```
+## 数据来源与限制
 
-测试覆盖固定 fixture、旧版快照解析、双解析器一致性、发布日期和价格完整性、汇率主备、快照修订去重、失败回滚、工作流触发、真实 Apple 只读抓取和浏览器 UI。`check:live` 不写生产文件；`update:data` 才允许正式写入。
+- 价格和发布日期：[Apple Support](https://support.apple.com/en-us/108047)
+- 中文名称：[Apple 中文支持](https://support.apple.com/zh-cn/108047)
+- 汇率：[ExchangeRate-API](https://www.exchangerate-api.com/docs/overview)，开放接口作为自动回退
+
+人民币金额仅用于横向比较；税费、可用性和购买区域限制以 Apple 对应地区页面及结算结果为准。本工具与 Apple Inc. 无关联。

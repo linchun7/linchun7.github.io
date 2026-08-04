@@ -14,6 +14,10 @@ const CONTENT_TYPES = {
   '.json': 'application/json; charset=utf-8'
 };
 
+async function readFixture(fileName) {
+  return JSON.parse(await readFile(path.join(PROJECT_DIR, 'data', fileName), 'utf8'));
+}
+
 async function findChrome() {
   const candidates = [
     process.env.CHROME_PATH,
@@ -63,8 +67,8 @@ test('renders current prices, sorting, and country history in a real browser', {
     return;
   }
 
-  const expectedData = JSON.parse(await readFile(path.join(PROJECT_DIR, 'data/prices.json'), 'utf8'));
-  const expectedHistory = JSON.parse(await readFile(path.join(PROJECT_DIR, 'data/history.json'), 'utf8'));
+  const expectedData = await readFixture('prices.json');
+  const expectedHistory = await readFixture('history.json');
   const historyCountry = Object.entries(expectedHistory.countries)
     .find(([, record]) => record.events.length > 1)?.[0];
   const server = await startServer();
@@ -325,6 +329,7 @@ test('shows an actionable error and recovers after a temporary price-data outage
     context.skip('Chrome or Chromium is not installed');
     return;
   }
+  const expectedData = await readFixture('prices.json');
   const server = await startServer();
   const { port } = server.address();
   const browser = await chromium.launch({ executablePath: chromePath, headless: true });
@@ -348,7 +353,7 @@ test('shows an actionable error and recovers after a temporary price-data outage
     assert.match(await page.locator('#loadStatusText').textContent(), /加载失败/);
     assert.equal(await page.locator('#retryButton').textContent(), '重新加载');
     await page.locator('#retryButton').click();
-    await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length === 73);
+    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, expectedData.countries.length);
     assert.equal(await page.locator('#loadStatus').isVisible(), false);
     assert.equal(await page.locator('.data-status').evaluate((element) => element.classList.contains('is-error')), false);
     assert.equal(attempts, 2);
@@ -365,6 +370,7 @@ test('keeps current prices usable when optional history data is unavailable or m
     context.skip('Chrome or Chromium is not installed');
     return;
   }
+  const expectedData = await readFixture('prices.json');
   const server = await startServer();
   const { port } = server.address();
   const browser = await chromium.launch({ executablePath: chromePath, headless: true });
@@ -395,9 +401,9 @@ test('keeps current prices usable when optional history data is unavailable or m
       }));
       try {
         await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-        await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length === 73);
+        await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, expectedData.countries.length);
         assert.equal(await page.locator('#loadStatus').isVisible(), false);
-        assert.equal(await page.locator('#marketCount').textContent(), '73');
+        assert.equal(await page.locator('#marketCount').textContent(), String(expectedData.countries.length));
         assert.equal(await page.locator('#publishedDateButton').isVisible(), true);
       } finally {
         await page.close();
@@ -416,7 +422,7 @@ test('rejects malformed price payloads and recovers without a full-page refresh'
     context.skip('Chrome or Chromium is not installed');
     return;
   }
-  const validData = JSON.parse(await readFile(path.join(PROJECT_DIR, 'data/prices.json'), 'utf8'));
+  const validData = await readFixture('prices.json');
   const corruptions = [
     ['duplicate country', (data) => data.countries.push(structuredClone(data.countries[0]))],
     ['invalid USD anchor', (data) => { data.fx.rates.USD = 2; }],
@@ -466,7 +472,7 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
     context.skip('Chrome or Chromium is not installed');
     return;
   }
-  const validData = JSON.parse(await readFile(path.join(PROJECT_DIR, 'data/prices.json'), 'utf8'));
+  const validData = await readFixture('prices.json');
   const scenarios = [
     {
       label: 'old snapshot',
@@ -548,8 +554,8 @@ test('ignores stale history responses after a price retry', { timeout: 30_000 },
     context.skip('Chrome or Chromium is not installed');
     return;
   }
-  const validData = JSON.parse(await readFile(path.join(PROJECT_DIR, 'data/prices.json'), 'utf8'));
-  const validHistory = JSON.parse(await readFile(path.join(PROJECT_DIR, 'data/history.json'), 'utf8'));
+  const validData = await readFixture('prices.json');
+  const validHistory = await readFixture('history.json');
   const staleHistory = structuredClone(validHistory);
   staleHistory.countries.Brazil.events = [staleHistory.countries.Brazil.events[0]];
   const server = await startServer();
@@ -605,8 +611,8 @@ test('keeps history dialog usable when Chart construction fails', { timeout: 30_
     context.skip('Chrome or Chromium is not installed');
     return;
   }
-  const validData = JSON.parse(await readFile(path.join(PROJECT_DIR, 'data/prices.json'), 'utf8'));
-  const validHistory = JSON.parse(await readFile(path.join(PROJECT_DIR, 'data/history.json'), 'utf8'));
+  const validData = await readFixture('prices.json');
+  const validHistory = await readFixture('history.json');
   const server = await startServer();
   const { port } = server.address();
   const browser = await chromium.launch({ executablePath: chromePath, headless: true });
@@ -652,8 +658,8 @@ test('keeps the page bounded at 280px while the price table scrolls', { timeout:
     context.skip('Chrome or Chromium is not installed');
     return;
   }
-  const validData = JSON.parse(await readFile(path.join(PROJECT_DIR, 'data/prices.json'), 'utf8'));
-  const validHistory = JSON.parse(await readFile(path.join(PROJECT_DIR, 'data/history.json'), 'utf8'));
+  const validData = await readFixture('prices.json');
+  const validHistory = await readFixture('history.json');
   const server = await startServer();
   const { port } = server.address();
   const browser = await chromium.launch({ executablePath: chromePath, headless: true });
@@ -698,7 +704,7 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
     return;
   }
 
-  const data = JSON.parse(await readFile(path.join(PROJECT_DIR, 'data/prices.json'), 'utf8'));
+  const data = await readFixture('prices.json');
   const country = data.countries[0];
   const firstTier = data.tiers[0];
   const dayMs = 86_400_000;

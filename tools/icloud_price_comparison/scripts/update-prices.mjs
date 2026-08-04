@@ -1102,14 +1102,14 @@ export async function main({
     const previousData = previousDataState.value;
     const previousHistory = previousHistoryState.value;
     const previousRunLog = previousRunLogState.value;
-  const originalFiles = [
+    const originalFiles = [
       { filePath: currentDataPath, value: structuredClone(previousData), existed: previousDataState.existed },
       { filePath: historyPath, value: structuredClone(previousHistory), existed: previousHistoryState.existed },
       { filePath: runLogPath, value: structuredClone(previousRunLog), existed: previousRunLogState.existed }
-  ];
-  if (!countryNames || Object.keys(countryNames).length < 60) {
-    throw new Error('Chinese country-name mapping is missing or incomplete');
-  }
+    ];
+    if (!countryNames || Object.keys(countryNames).length < 60) {
+      throw new Error('Chinese country-name mapping is missing or incomplete');
+    }
 
   const parsed = parseApplePrices(html);
   if (parsed.parser !== 'cross-checked') {
