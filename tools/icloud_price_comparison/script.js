@@ -2,6 +2,9 @@ const REMOTE_DATA_ROOT = 'https://raw.githubusercontent.com/linchun7/linchun7.gi
 const HOSTED_NAMES = new Set(['linchun7.github.io', 'linchun.com.cn', 'www.linchun.com.cn']);
 const REQUEST_TIMEOUT_MS = 8_000;
 const SLOW_LOADING_MS = 1_500;
+const DEFAULT_SORT_TIER = '200GB';
+const DEFAULT_TIER_COLUMN_COUNT = 5;
+const FIXED_PRICE_TABLE_COLUMN_COUNT = 2;
 const REGION_LABELS = {
   Americas: '美洲',
   'Europe, Middle East & Africa': '欧洲、中东和非洲',
@@ -11,13 +14,13 @@ const REGION_LABELS = {
 const state = {
   data: null,
   history: null,
-  sortTier: new URLSearchParams(location.search).get('tier') || '200GB',
+  sortTier: new URLSearchParams(location.search).get('tier') || DEFAULT_SORT_TIER,
   query: '',
   region: 'all',
   sortKey: 'tier',
   sortDirection: 'asc',
   activeCountry: null,
-  historyTier: '200GB',
+  historyTier: DEFAULT_SORT_TIER,
   minimumPrices: {},
   minimumCountries: {},
   chart: null,
@@ -640,35 +643,35 @@ function renderChart(record) {
   const context = document.querySelector('#historyChart');
   try {
     state.chart = new window.Chart(context, {
-    type: 'line',
-    data: {
-      labels: series.map(({ observedAt }) => formatDate(observedAt)),
-      datasets: [{
-        data: series.map((event) => event.plans[state.historyTier]),
-        borderColor: '#0668d7',
-        backgroundColor: 'rgba(6, 104, 215, 0.1)',
-        pointBackgroundColor: '#ffffff',
-        pointBorderColor: '#0668d7',
-        pointBorderWidth: 2,
-        pointRadius: 4,
-        borderWidth: 2,
-        stepped: 'before',
-        fill: true
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: { duration: 250 },
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: (item) => `${numberFormatter.format(item.raw)} ${currency}` } }
+      type: 'line',
+      data: {
+        labels: series.map(({ observedAt }) => formatDate(observedAt)),
+        datasets: [{
+          data: series.map((event) => event.plans[state.historyTier]),
+          borderColor: '#0668d7',
+          backgroundColor: 'rgba(6, 104, 215, 0.1)',
+          pointBackgroundColor: '#ffffff',
+          pointBorderColor: '#0668d7',
+          pointBorderWidth: 2,
+          pointRadius: 4,
+          borderWidth: 2,
+          stepped: 'before',
+          fill: true
+        }]
       },
-      scales: {
-        x: { grid: { display: false }, ticks: { color: '#687078' } },
-        y: { beginAtZero: false, grid: { color: '#e7e9eb' }, ticks: { color: '#687078', callback: (value) => numberFormatter.format(value) } }
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 250 },
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: (item) => `${numberFormatter.format(item.raw)} ${currency}` } }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: '#687078' } },
+          y: { beginAtZero: false, grid: { color: '#e7e9eb' }, ticks: { color: '#687078', callback: (value) => numberFormatter.format(value) } }
+        }
       }
-    }
     });
   } catch (error) {
     state.chart = null;
@@ -904,7 +907,7 @@ function showLoadError(error) {
   elements.priceRows.replaceChildren();
   const row = document.createElement('tr');
   const cell = createCell('请稍后刷新页面重试', 'empty-cell');
-  cell.colSpan = (state.data?.tiers?.length || 5) + 2;
+  cell.colSpan = (state.data?.tiers?.length || DEFAULT_TIER_COLUMN_COUNT) + FIXED_PRICE_TABLE_COLUMN_COUNT;
   row.append(cell);
   elements.priceRows.append(row);
 }
@@ -940,7 +943,7 @@ async function initialize() {
       });
     state.data = await fetchJson('prices.json');
     if (!state.data.tiers.some(({ id }) => id === state.sortTier)) {
-      state.sortTier = state.data.tiers.find(({ id }) => id === '200GB')?.id || state.data.tiers[0].id;
+      state.sortTier = state.data.tiers.find(({ id }) => id === DEFAULT_SORT_TIER)?.id || state.data.tiers[0].id;
     }
     state.historyTier = state.sortTier;
     calculateMinimumPrices();
