@@ -348,17 +348,65 @@ test('renders current prices, sorting, and country history in a real browser', {
           assert.match(await page.locator('#historyLocalPrice').textContent(), new RegExp(expectedCountry.plans[firstTier].formattedPrice.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
         }
         if (expectedRecord) {
-          const latestEvent = expectedRecord.events.at(-1);
+          const expectedRows = [...expectedRecord.events].reverse().map((event) => [
+            formatUiDate(event.observedAt),
+            event.currency,
+            ...expectedData.tiers.map(({ id }) => Number.isFinite(event.plans[id]) ? uiNumberFormatter.format(event.plans[id]) : '--')
+          ]);
           assert.deepEqual(
-            await page.locator('#historyRows tr').first().locator('td').allTextContents(),
-            [
-              formatUiDate(latestEvent.observedAt),
-              latestEvent.currency,
-              ...expectedData.tiers.map(({ id }) => Number.isFinite(latestEvent.plans[id]) ? uiNumberFormatter.format(latestEvent.plans[id]) : '--')
-            ]
+            await page.locator('#historyRows tr').evaluateAll((rows) => rows.map((row) => (
+              [...row.cells].map((cell) => cell.textContent.trim())
+            ))),
+            expectedRows,
+            'every history row must preserve its exact date, currency, and tier prices'
           );
         }
         if (historyCountry) {
+          if (viewport.name === 'desktop') {
+            for (const [tierIndex, tier] of expectedData.tiers.entries()) {
+              await page.locator(`#historyTierControl button[data-tier="${tier.id}"]`).click();
+              const availableEvents = expectedRecord.events.filter((event) => Number.isFinite(event.plans[tier.id]));
+              const expectedSeries = availableEvents.filter((event, index) => (
+                index === 0
+                || event.currency !== availableEvents[index - 1].currency
+                || event.plans[tier.id] !== availableEvents[index - 1].plans[tier.id]
+              ));
+              const canChart = expectedSeries.length > 1
+                && new Set(expectedSeries.map(({ currency }) => currency)).size === 1;
+              assert.equal(await page.locator('#chartWrap').isVisible(), canChart, `${tier.id} chart visibility must match its history series`);
+              if (!canChart) continue;
+
+              await page.waitForFunction((expectedLength) => {
+                const chart = window.Chart?.getChart?.(document.querySelector('#historyChart'));
+                return chart?.data?.datasets?.[0]?.data?.length === expectedLength;
+              }, expectedSeries.length);
+              const chartData = await page.locator('#historyChart').evaluate((canvas) => {
+                const chart = window.Chart.getChart(canvas);
+                return {
+                  labels: [...chart.data.labels],
+                  prices: [...chart.data.datasets[0].data]
+                };
+              });
+              const tableRows = await page.locator('#historyRows tr').evaluateAll((rows, columnIndex) => rows.map((row) => ({
+                date: row.cells[0].textContent.trim(),
+                currency: row.cells[1].textContent.trim(),
+                price: row.cells[columnIndex].textContent.trim()
+              })), tierIndex + 2);
+              const chronologicalRows = tableRows.reverse()
+                .filter(({ price }) => price !== '--')
+                .map((row) => ({ ...row, price: Number(row.price.replaceAll(',', '')) }));
+              const tableSeries = chronologicalRows.filter((row, index) => (
+                index === 0
+                || row.currency !== chronologicalRows[index - 1].currency
+                || row.price !== chronologicalRows[index - 1].price
+              ));
+
+              assert.deepEqual(chartData.labels, expectedSeries.map(({ observedAt }) => formatUiDate(observedAt)), `${tier.id} chart dates must match the source history`);
+              assert.deepEqual(chartData.prices, expectedSeries.map((event) => event.plans[tier.id]), `${tier.id} chart prices must match the source history`);
+              assert.deepEqual(chartData.labels, tableSeries.map(({ date }) => date), `${tier.id} chart dates must match the compacted table history`);
+              assert.deepEqual(chartData.prices, tableSeries.map(({ price }) => price), `${tier.id} chart prices must match the compacted table history`);
+            }
+          }
           await page.waitForFunction(() => !document.querySelector('#chartWrap')?.hidden);
           await page.waitForFunction(() => {
             const canvas = document.querySelector('#historyChart');
