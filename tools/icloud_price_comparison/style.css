@@ -534,6 +534,7 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--accent-dark
 
 @media (max-width: 360px) {
   .source-history-dialog .history-table-scroll thead {
+    display: block;
     position: absolute;
     width: 1px;
     height: 1px;
@@ -543,9 +544,13 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--accent-dark
     clip-path: inset(50%);
     border: 0;
   }
+  .source-history-dialog .history-table-scroll table,
   .source-history-dialog .history-table-scroll tbody,
   .source-history-dialog .history-table-scroll tr,
   .source-history-dialog .history-table-scroll td { display: block; width: 100%; }
+  .source-history-dialog .history-table-scroll table,
+  .source-history-dialog .history-table-scroll tbody,
+  .source-history-dialog .history-table-scroll tr { overflow-x: hidden; }
   .source-history-dialog .history-table-scroll tbody tr { padding: 11px 0; border-bottom: 1px solid var(--line); }
   .source-history-dialog .history-table-scroll tbody tr:last-child { border-bottom: 0; }
   .source-history-dialog .history-table-scroll td { padding: 0 10px; border-bottom: 0; }
