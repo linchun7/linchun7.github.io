@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -9,6 +9,7 @@ import {
   buildActionSummaryLines,
   buildAppleSnapshotEntry,
   buildAppleSnapshotIndex,
+  defaultUpdateLockPath,
   appleSnapshotContentHash,
   acquireUpdateLock,
   normalizeAppleSnapshotIndex,
@@ -82,6 +83,21 @@ test('rejects malformed Apple snapshot indexes before writing', () => {
       snapshots: [{ publishedDate: '2026-04-06', revisions: [] }]
     }),
     /no revisions/i
+  );
+  assert.throws(
+    () => normalizeAppleSnapshotIndex({
+      schemaVersion: 1,
+      snapshots: [{
+        publishedDate: '2026-04-06',
+        revisions: [{
+          file: '2026-04-06.html',
+          dataFile: '2026-04-06.json',
+          firstConfirmedDate: '2099-01-01',
+          contentHash: 'a'.repeat(64)
+        }]
+      }]
+    }),
+    /invalid revision/i
   );
 });
 
@@ -1562,4 +1578,229 @@ test('initializes the confirmation date before saving a production snapshot', as
   assert.ok(observedAtDeclaration >= 0, 'confirmation date declaration must exist');
   assert.ok(snapshotWrite > observedAtDeclaration, 'production snapshot must only use an initialized confirmation date');
   assert.ok(snapshotWrite > publicationValidation, 'production snapshot must only be written after publication-date validation');
+});
+
+
+test('fails closed when the snapshot index is missing while evidence exists', async () => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const html = await readFile(new URL('../data/apple-snapshots/2026-07-17.html', import.meta.url), 'utf8');
+  const fxPayload = {
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
+    rates: data.fx.rates
+  };
+  const oldHtml = path.join(paths.snapshotsDir, '2024-12-05.html');
+  const oldData = path.join(paths.snapshotsDir, '2024-12-05.json');
+  await mkdir(paths.snapshotsDir, { recursive: true });
+  await writeFile(oldHtml, '<old evidence>', 'utf8');
+  await writeFile(oldData, '{"old":true}', 'utf8');
+  const before = await Promise.all([
+    readFile(paths.currentDataPath, 'utf8'),
+    readFile(paths.historyPath, 'utf8'),
+    readFile(paths.runLogPath, 'utf8')
+  ]);
+  try {
+    await withMockedFetch(
+      { html, fxPayload },
+      () => assert.rejects(
+        main({ dryRun: false, paths, stepSummaryPath: null }),
+        /snapshot index is missing while snapshot evidence exists/
+      )
+    );
+    assert.deepEqual(await Promise.all([
+      readFile(paths.currentDataPath, 'utf8'),
+      readFile(paths.historyPath, 'utf8'),
+      readFile(paths.runLogPath, 'utf8')
+    ]), before);
+    assert.equal(await readFile(oldHtml, 'utf8'), '<old evidence>');
+    assert.equal(await readFile(oldData, 'utf8'), '{"old":true}');
+    await assert.rejects(readFile(paths.snapshotIndexPath, 'utf8'), { code: 'ENOENT' });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('fails closed on an invalid snapshot index without deleting evidence', async () => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const html = await readFile(new URL('../data/apple-snapshots/2026-07-17.html', import.meta.url), 'utf8');
+  const fxPayload = {
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
+    rates: data.fx.rates
+  };
+  const oldHtml = path.join(paths.snapshotsDir, '2024-12-05.html');
+  await mkdir(paths.snapshotsDir, { recursive: true });
+  await writeFile(oldHtml, '<old evidence>', 'utf8');
+  await writeFile(paths.snapshotIndexPath, '{not-json', 'utf8');
+  try {
+    await withMockedFetch(
+      { html, fxPayload },
+      () => assert.rejects(
+        main({ dryRun: false, paths, stepSummaryPath: null }),
+        /Unable to read valid JSON from index\.json/
+      )
+    );
+    assert.equal(await readFile(oldHtml, 'utf8'), '<old evidence>');
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('fails closed on an empty snapshot index without deleting evidence', async () => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const html = await readFile(new URL('../data/apple-snapshots/2026-07-17.html', import.meta.url), 'utf8');
+  const fxPayload = {
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
+    rates: data.fx.rates
+  };
+  const oldHtml = path.join(paths.snapshotsDir, '2024-12-05.html');
+  const oldData = path.join(paths.snapshotsDir, '2024-12-05.json');
+  await mkdir(paths.snapshotsDir, { recursive: true });
+  await writeFile(oldHtml, '<old evidence>', 'utf8');
+  await writeFile(oldData, '{"old":true}', 'utf8');
+  await writeFile(paths.snapshotIndexPath, JSON.stringify({ schemaVersion: 1, snapshots: [] }), 'utf8');
+  try {
+    await withMockedFetch(
+      { html, fxPayload },
+      () => assert.rejects(
+        main({ dryRun: false, paths, stepSummaryPath: null }),
+        /snapshot index does not reference existing evidence/
+      )
+    );
+    assert.equal(await readFile(oldHtml, 'utf8'), '<old evidence>');
+    assert.equal(await readFile(oldData, 'utf8'), '{"old":true}');
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('fails closed when a snapshot index omits existing evidence', async () => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const html = await readFile(new URL('../data/apple-snapshots/2026-07-17.html', import.meta.url), 'utf8');
+  const fxPayload = {
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
+    rates: data.fx.rates
+  };
+  const indexedHtml = path.join(paths.snapshotsDir, '2024-12-05.html');
+  const indexedData = path.join(paths.snapshotsDir, '2024-12-05.json');
+  const unindexedHtml = path.join(paths.snapshotsDir, '2024-12-06.html');
+  const unindexedData = path.join(paths.snapshotsDir, '2024-12-06.json');
+  await mkdir(paths.snapshotsDir, { recursive: true });
+  await Promise.all([
+    writeFile(indexedHtml, '<indexed evidence>', 'utf8'),
+    writeFile(indexedData, '{"indexed":true}', 'utf8'),
+    writeFile(unindexedHtml, '<unindexed evidence>', 'utf8'),
+    writeFile(unindexedData, '{"unindexed":true}', 'utf8')
+  ]);
+  await writeFile(paths.snapshotIndexPath, JSON.stringify({
+    schemaVersion: 1,
+    snapshots: [{
+      publishedDate: '2024-12-05',
+      revisions: [{
+        file: '2024-12-05.html',
+        dataFile: '2024-12-05.json',
+        firstConfirmedDate: '2026-08-01',
+        contentHash: 'a'.repeat(64)
+      }]
+    }]
+  }), 'utf8');
+  try {
+    await withMockedFetch(
+      { html, fxPayload },
+      () => assert.rejects(
+        main({ dryRun: false, paths, stepSummaryPath: null }),
+        /snapshot index does not reference existing evidence: 2024-12-06\.html, 2024-12-06\.json/
+      )
+    );
+    assert.deepEqual(await Promise.all([
+      readFile(indexedHtml, 'utf8'),
+      readFile(indexedData, 'utf8'),
+      readFile(unindexedHtml, 'utf8'),
+      readFile(unindexedData, 'utf8')
+    ]), ['<indexed evidence>', '{"indexed":true}', '<unindexed evidence>', '{"unindexed":true}']);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+test('rejects malformed history countries before any production write', async () => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const html = await readFile(new URL('../data/apple-snapshots/2026-07-17.html', import.meta.url), 'utf8');
+  const fxPayload = {
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
+    rates: data.fx.rates
+  };
+  const malformedHistory = JSON.stringify({ schemaVersion: 2, countries: [], sourcePublishedDates: [] });
+  await writeFile(paths.historyPath, malformedHistory, 'utf8');
+  const before = await Promise.all([
+    readFile(paths.currentDataPath, 'utf8'),
+    readFile(paths.runLogPath, 'utf8')
+  ]);
+  try {
+    await withMockedFetch(
+      { html, fxPayload },
+      () => assert.rejects(
+        main({ dryRun: false, paths, stepSummaryPath: null }),
+        /unsupported countries structure/
+      )
+    );
+    assert.deepEqual(await Promise.all([
+      readFile(paths.currentDataPath, 'utf8'),
+      readFile(paths.runLogPath, 'utf8')
+    ]), before);
+    assert.equal(await readFile(paths.historyPath, 'utf8'), malformedHistory);
+    await assert.rejects(readFile(paths.snapshotIndexPath, 'utf8'), { code: 'ENOENT' });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('fails closed on a fresh malformed updater lock and recovers an old one', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'icloud-lock-malformed-'));
+  const lockPath = path.join(root, '.icloud-price-update.lock');
+  try {
+    await writeFile(lockPath, '{', 'utf8');
+    await assert.rejects(
+      () => acquireUpdateLock(lockPath, { staleAfterMs: 60_000 }),
+      /already running/
+    );
+    const old = new Date(Date.now() - 120_000);
+    await utimes(lockPath, old, old);
+    const release = await acquireUpdateLock(lockPath, { staleAfterMs: 60_000 });
+    await release();
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('derives the project-level lock from custom data paths', () => {
+  const currentDataPath = path.join('C:', 'isolated', 'data', 'prices.json');
+  assert.equal(
+    defaultUpdateLockPath(currentDataPath),
+    path.join('C:', 'isolated', '.icloud-price-update.lock')
+  );
+});
+
+test('rejects future Apple snapshot confirmation dates', () => {
+  assert.throws(
+    () => buildAppleSnapshotEntry('May 12, 2025', {
+      firstConfirmedDate: '2099-01-01',
+      countries: 60,
+      pricePoints: 180,
+      contentHash: 'a'.repeat(64)
+    }),
+    /first confirmation date is invalid or in the future/
+  );
 });

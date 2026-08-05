@@ -11,6 +11,7 @@ import {
   buildSnapshotChanges,
   publicationDateKey,
   normalizeAppleSnapshot,
+  defaultUpdateLockPath,
   updateHistory
 } from './update-prices.mjs';
 import { formatBeijingDate } from './run-context.mjs';
@@ -40,6 +41,9 @@ function archiveMetadata(html) {
   if (!match) throw new Error('Wayback timestamp was not found');
   const stamp = match[1];
   const capturedAtUtc = `${stamp.slice(0, 4)}-${stamp.slice(4, 6)}-${stamp.slice(6, 8)}T${stamp.slice(8, 10)}:${stamp.slice(10, 12)}:${stamp.slice(12, 14)}.000Z`;
+  if (Date.parse(capturedAtUtc) > Date.now()) {
+    throw new Error('Wayback timestamp is in the future');
+  }
   return {
     capturedAtUtc,
     firstConfirmedDate: formatBeijingDate(capturedAtUtc),
@@ -126,9 +130,7 @@ function migrateSnapshotIndex(index) {
 export async function importAppleArchives(inputDir, paths = {}) {
   if (!inputDir) throw new Error('Archive input directory is required');
   const historyPath = paths.historyPath ?? HISTORY_PATH;
-  const lockPath = paths.lockPath ?? (
-    paths.historyPath ? path.join(path.dirname(historyPath), '.icloud-price-update.lock') : path.join(PROJECT_DIR, '.icloud-price-update.lock')
-  );
+  const lockPath = paths.lockPath ?? defaultUpdateLockPath(paths.pricesPath ?? PRICES_PATH);
   const releaseLock = await acquireUpdateLock(lockPath);
   try {
     return await importAppleArchivesUnlocked(inputDir, paths);
