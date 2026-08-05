@@ -791,6 +791,31 @@ test('rejects a publication date that moves backwards', () => {
   );
 });
 
+test('rejects malformed or duplicate existing publication history', () => {
+  const previousData = snapshot({ countries: [country('Alpha')], publishedDate: 'July 17, 2026' });
+  const changes = { addedTiers: [], removedTiers: [], addedCountries: [], removedCountries: [], changedCountries: [] };
+  assert.throws(
+    () => updatePublishedDateHistory({
+      schemaVersion: 2,
+      countries: {},
+      sourcePublishedDates: [{ publishedDate: 'July 17, 2026' }]
+    }, previousData, 'July 17, 2026', '2026-08-01', changes),
+    /invalid entry/
+  );
+  assert.throws(
+    () => updatePublishedDateHistory({
+      schemaVersion: 2,
+      countries: {},
+      sourcePublishedDates: [
+        { publishedDate: 'July 17, 2026', observedAt: '2026-07-31', changes },
+        { publishedDate: 'August 1, 2026', observedAt: '2026-08-02', changes },
+        { publishedDate: 'July 17, 2026', observedAt: '2026-08-03', changes }
+      ]
+    }, previousData, 'August 2, 2026', '2026-08-04', changes),
+    /duplicate date/
+  );
+});
+
 test('does not carry a missing currency from old rates into a successful refresh', async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => new Response(JSON.stringify({
@@ -1065,6 +1090,19 @@ test('rejects a price event whose observation date moves backwards', () => {
     ),
     /observation date moved backwards/
   );
+});
+
+test('rejects unsafe country keys before updating history objects', () => {
+  assert.throws(
+    () => updateHistory(
+      { schemaVersion: 2, countries: {} },
+      [country('__proto__')],
+      '2026-08-01',
+      [TIER_50]
+    ),
+    /Unsafe country key/
+  );
+  assert.equal(Object.prototype.nameZh, undefined);
 });
 
 test('reuses preserved history when a removed country later returns', () => {

@@ -242,6 +242,12 @@ function hasPriceChange(previousEvent, country, tiers) {
   return tiers.some(({ id }) => previousEvent.plans[id] !== country.plans[id].price);
 }
 
+function assertSafeHistoryCountryKey(country) {
+  if (['__proto__', 'prototype', 'constructor'].includes(country)) {
+    throw new Error(`Unsafe country key in price history: ${country}`);
+  }
+}
+
 export function updateHistory(previousHistory, countries, observedAt, tiers, observedAtUtc = null) {
   const history = previousHistory ?? { schemaVersion: 2, countries: {} };
   history.schemaVersion = 2;
@@ -249,7 +255,8 @@ export function updateHistory(previousHistory, countries, observedAt, tiers, obs
   let changedCountries = 0;
 
   for (const country of countries) {
-    const existingRecord = history.countries[country.country];
+    assertSafeHistoryCountryKey(country.country);
+    const existingRecord = Object.hasOwn(history.countries, country.country) ? history.countries[country.country] : null;
     const record = existingRecord ?? {
       nameZh: country.nameZh,
       region: country.region,
@@ -356,9 +363,29 @@ export function buildSnapshotChanges(previousData, countries, tiers) {
 
 export function updatePublishedDateHistory(history, previousData, publishedDate, observedAt, changes, observedAtUtc = null) {
   const entries = [];
-  for (const entry of (Array.isArray(history.sourcePublishedDates) ? history.sourcePublishedDates : [])) {
-    if (!entry || typeof entry.publishedDate !== 'string' || typeof entry.observedAt !== 'string') continue;
-    if (publicationDateKey(entries.at(-1)?.publishedDate) === publicationDateKey(entry.publishedDate)) continue;
+  const existingEntries = history.sourcePublishedDates;
+  if (existingEntries !== undefined && !Array.isArray(existingEntries)) {
+    throw new Error('Apple publication history has an invalid structure');
+  }
+  const seenPublicationDates = new Set();
+  let previousObservedAt = '';
+  for (const entry of (existingEntries ?? [])) {
+    const publishedKey = publicationDateKey(entry?.publishedDate);
+    if (!entry
+      || typeof entry.publishedDate !== 'string'
+      || typeof entry.observedAt !== 'string'
+      || !/^\d{4}-\d{2}-\d{2}$/.test(publishedKey)
+      || !/^\d{4}-\d{2}-\d{2}$/.test(entry.observedAt)) {
+      throw new Error('Apple publication history contains an invalid entry');
+    }
+    if (seenPublicationDates.has(publishedKey)) {
+      throw new Error(`Apple publication history contains a duplicate date: ${entry.publishedDate}`);
+    }
+    if (entry.observedAt < previousObservedAt) {
+      throw new Error('Apple publication history observation dates are not chronological');
+    }
+    seenPublicationDates.add(publishedKey);
+    previousObservedAt = entry.observedAt;
     entries.push({
       ...entry,
       kind: entry.kind || (entries.length ? 'change' : 'initial'),
@@ -697,6 +724,20 @@ async function cleanupUpdaterTemporaryFiles({ currentDataPath, historyPath, runL
       .filter((entry) => entry.isFile() && TEMPORARY_FILE_PATTERN.test(entry.name))
       .map((entry) => unlink(path.join(directory, entry.name))));
   }
+  const snapshotIndex = normalizeAppleSnapshotIndex(await readJson(snapshotIndexPath, { schemaVersion: 1, snapshots: [] }));
+  const indexedSnapshotFiles = new Set(snapshotIndex.snapshots.flatMap(({ revisions }) => (
+    revisions.flatMap(({ file, dataFile }) => [file, dataFile])
+  )));
+  const snapshotEntries = await readdir(snapshotsDir, { withFileTypes: true }).catch((error) => {
+    if (error.code === 'ENOENT') return [];
+    throw error;
+  });
+  await Promise.all(snapshotEntries
+    .filter((entry) => entry.isFile()
+      && entry.name !== 'index.json'
+      && /\.(?:html|json)$/i.test(entry.name)
+      && !indexedSnapshotFiles.has(entry.name))
+    .map((entry) => unlink(path.join(snapshotsDir, entry.name))));
 }
 
 async function restoreProductionFiles(entries) {
