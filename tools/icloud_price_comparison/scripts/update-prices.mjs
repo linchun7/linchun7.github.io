@@ -8,11 +8,13 @@ import {
   validatePriceChangeAnomalies,
   validatePrices
 } from './parse-prices.mjs';
+import { parseLegacyAppleArchive } from './parse-legacy-archive.mjs';
 import { describeTriggerSource, formatBeijingDate, resolveTriggerSource } from './run-context.mjs';
 
 const APPLE_URL = 'https://support.apple.com/en-us/108047';
 const FX_AUTH_URL = 'https://v6.exchangerate-api.com/v6/latest/USD';
 const FX_OPEN_URL = 'https://open.er-api.com/v6/latest/USD';
+const ALLOWED_FX_SOURCE_URLS = new Set([FX_AUTH_URL, FX_OPEN_URL]);
 const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CURRENT_DATA_PATH = path.join(PROJECT_DIR, 'data/prices.json');
 const HISTORY_PATH = path.join(PROJECT_DIR, 'data/history.json');
@@ -748,38 +750,6 @@ async function cleanupUpdaterTemporaryFiles({ currentDataPath, historyPath, runL
       .filter((entry) => entry.isFile() && TEMPORARY_FILE_PATTERN.test(entry.name))
       .map((entry) => unlink(path.join(directory, entry.name))));
   }
-
-  const indexState = await readJsonWithExistence(snapshotIndexPath, null);
-  if (!indexState.existed) {
-    const snapshotEntries = await readdir(snapshotsDir, { withFileTypes: true }).catch((error) => {
-      if (error.code === 'ENOENT') return [];
-      throw error;
-    });
-    const evidenceFiles = snapshotEntries.filter((entry) => entry.isFile()
-      && entry.name !== 'index.json'
-      && /\.(?:html|json)$/i.test(entry.name));
-    if (evidenceFiles.length) {
-      throw new Error('Apple snapshot index is missing while snapshot evidence exists');
-    }
-    return;
-  }
-
-  const snapshotIndex = normalizeAppleSnapshotIndex(indexState.value);
-  const indexedSnapshotFiles = new Set(snapshotIndex.snapshots.flatMap(({ revisions }) => (
-    revisions.flatMap(({ file, dataFile }) => [file, dataFile])
-  )));
-  const snapshotEntries = await readdir(snapshotsDir, { withFileTypes: true }).catch((error) => {
-    if (error.code === 'ENOENT') return [];
-    throw error;
-  });
-  const unindexedEvidence = snapshotEntries.filter((entry) => entry.isFile()
-    && entry.name !== 'index.json'
-    && /\.(?:html|json)$/i.test(entry.name)
-    && !indexedSnapshotFiles.has(entry.name));
-  if (unindexedEvidence.length) {
-    throw new Error('Apple snapshot index does not reference existing evidence: '
-      + unindexedEvidence.map(({ name }) => name).join(', '));
-  }
 }
 async function restoreProductionFiles(entries) {
   const results = await Promise.allSettled(entries.map(({ filePath, value, existed = true }) => (
@@ -863,6 +833,10 @@ export function appleSnapshotContentHash(parsed) {
   return createHash('sha256').update(JSON.stringify(normalizeApplePricing(parsed))).digest('hex');
 }
 
+function snapshotPlanPrice(value) {
+  return Number.isFinite(value) ? value : value?.price;
+}
+
 function normalizeApplePricing(parsed) {
   return {
     tiers: parsed.tiers
@@ -873,7 +847,7 @@ function normalizeApplePricing(parsed) {
       region,
       currency,
       plans: Object.fromEntries(Object.entries(plans)
-        .map(([tier, value]) => [tier, value.price])
+        .map(([tier, value]) => [tier, snapshotPlanPrice(value)])
         .sort(([a], [b]) => a.localeCompare(b)))
     })).sort((a, b) => a.country.localeCompare(b.country))
   };
@@ -967,6 +941,381 @@ export function normalizeAppleSnapshotIndex(index) {
   return { schemaVersion: 1, snapshots };
 }
 
+function isIsoDateTime(value) {
+  return typeof value === 'string'
+    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value)
+    && Number.isFinite(Date.parse(value));
+}
+
+function normalizedSnapshotAsParsed(snapshot) {
+  if (!isPlainObject(snapshot)
+    || snapshot.schemaVersion !== 1
+    || !isIsoDate(snapshot.publishedDate)
+    || !Array.isArray(snapshot.tiers)
+    || !Array.isArray(snapshot.countries)) {
+    throw new Error('Apple normalized snapshot has an unsupported structure');
+  }
+  const tierIds = snapshot.tiers.map(({ id }) => id).sort();
+  const countries = snapshot.countries.map((country) => {
+    if (!isPlainObject(country) || !isPlainObject(country.plans)) {
+      throw new Error('Apple normalized snapshot contains an invalid country entry');
+    }
+    const planIds = Object.keys(country.plans).sort();
+    if (JSON.stringify(planIds) !== JSON.stringify(tierIds)) {
+      throw new Error(`Apple normalized snapshot has incomplete plans for ${country.country ?? 'unknown country'}`);
+    }
+    return {
+      ...country,
+      plans: Object.fromEntries(Object.entries(country.plans).map(([tierId, price]) => [tierId, {
+        price,
+        formattedPrice: String(price)
+      }]))
+    };
+  });
+  const parsed = {
+    sourcePublishedDate: snapshot.publishedDate,
+    tiers: snapshot.tiers,
+    countries
+  };
+  validatePrices(countries, { minCountries: 60, tiers: snapshot.tiers });
+  return parsed;
+}
+
+function parseStoredAppleSnapshot(html, fileName) {
+  try {
+    return parseApplePrices(html);
+  } catch (modernError) {
+    try {
+      return parseLegacyAppleArchive(html);
+    } catch (legacyError) {
+      throw new Error(`Unable to parse indexed Apple snapshot ${fileName}; modern: ${modernError.message}; legacy: ${legacyError.message}`);
+    }
+  }
+}
+
+async function listSnapshotEvidence(snapshotsDir) {
+  return readdir(snapshotsDir, { withFileTypes: true }).catch((error) => {
+    if (error.code === 'ENOENT') return [];
+    throw error;
+  }).then((entries) => entries.filter((entry) => (
+    entry.name !== 'index.json' && /\.(?:html|json)$/i.test(entry.name)
+  )));
+}
+
+export async function validateAppleSnapshotStore({
+  snapshotsDir = APPLE_SNAPSHOTS_DIR,
+  snapshotIndexPath = APPLE_SNAPSHOT_INDEX_PATH,
+  snapshotIndex,
+  snapshotIndexExists = snapshotIndex !== undefined,
+  history = null,
+  currentData = null
+} = {}) {
+  const [indexState, evidenceEntries] = await Promise.all([
+    snapshotIndex === undefined
+      ? readJsonWithExistence(snapshotIndexPath, null)
+      : Promise.resolve({ value: snapshotIndex, existed: snapshotIndexExists }),
+    listSnapshotEvidence(snapshotsDir)
+  ]);
+  const evidenceNames = evidenceEntries.map(({ name }) => name).sort();
+  if (!indexState.existed) {
+    if (evidenceNames.length) {
+      throw new Error('Apple snapshot index is missing while snapshot evidence exists');
+    }
+    return null;
+  }
+
+  const normalizedIndex = normalizeAppleSnapshotIndex(indexState.value);
+  const indexedFiles = new Set(normalizedIndex.snapshots.flatMap(({ revisions }) => (
+    revisions.flatMap(({ file, dataFile }) => [file, dataFile])
+  )));
+  const unindexedEvidence = evidenceNames.filter((name) => !indexedFiles.has(name));
+  if (unindexedEvidence.length) {
+    throw new Error(`Apple snapshot index does not reference existing evidence: ${unindexedEvidence.join(', ')}`);
+  }
+
+  const evidenceByName = new Map(evidenceEntries.map((entry) => [entry.name, entry]));
+  const publicationHistory = new Map((history?.sourcePublishedDates ?? []).map((entry) => (
+    [publicationDateKey(entry.publishedDate), entry]
+  )));
+  for (const snapshot of normalizedIndex.snapshots) {
+    if (snapshot.publishedDate > snapshot.revisions[0].firstConfirmedDate) {
+      throw new Error(`Apple snapshot ${snapshot.publishedDate} predates its publication confirmation`);
+    }
+    const historyEntry = history ? publicationHistory.get(snapshot.publishedDate) : null;
+    if (history && !historyEntry) {
+      throw new Error(`Apple snapshot ${snapshot.publishedDate} is missing publication history`);
+    }
+    if (historyEntry && historyEntry.observedAt !== snapshot.revisions[0].firstConfirmedDate) {
+      throw new Error(`Apple snapshot ${snapshot.publishedDate} has an inconsistent earliest confirmation date`);
+    }
+
+    for (const revision of snapshot.revisions) {
+      if (!Number.isInteger(revision.countries)
+        || revision.countries < 60
+        || !Number.isInteger(revision.pricePoints)
+        || revision.pricePoints <= 0
+        || revision.sourceUrl !== APPLE_URL
+        || (revision.archiveUrl && !revision.archiveUrl.startsWith('https://web.archive.org/web/'))) {
+        throw new Error(`Apple snapshot index has invalid evidence metadata for ${snapshot.publishedDate}`);
+      }
+      for (const fileName of [revision.file, revision.dataFile]) {
+        const entry = evidenceByName.get(fileName);
+        if (!entry) throw new Error(`Apple snapshot index references missing evidence: ${fileName}`);
+        if (!entry.isFile()) throw new Error(`Apple snapshot evidence is not a regular file: ${fileName}`);
+      }
+
+      const htmlPath = path.join(snapshotsDir, revision.file);
+      const dataPath = path.join(snapshotsDir, revision.dataFile);
+      const [html, normalizedSnapshot] = await Promise.all([
+        readFile(htmlPath, 'utf8'),
+        readJson(dataPath)
+      ]);
+      const parsedHtml = parseStoredAppleSnapshot(html, revision.file);
+      validatePrices(parsedHtml.countries, { minCountries: 60, tiers: parsedHtml.tiers });
+      const parsedNormalized = normalizedSnapshotAsParsed(normalizedSnapshot);
+      if (publicationDateKey(parsedHtml.sourcePublishedDate) !== snapshot.publishedDate
+        || normalizedSnapshot.publishedDate !== snapshot.publishedDate) {
+        throw new Error(`Apple snapshot evidence has a publication-date mismatch for ${snapshot.publishedDate}`);
+      }
+      const expectedPricePoints = parsedHtml.countries.length * parsedHtml.tiers.length;
+      const normalizedPricePoints = parsedNormalized.countries.length * parsedNormalized.tiers.length;
+      if (parsedHtml.countries.length !== revision.countries
+        || parsedNormalized.countries.length !== revision.countries
+        || expectedPricePoints !== revision.pricePoints
+        || normalizedPricePoints !== revision.pricePoints) {
+        throw new Error(`Apple snapshot evidence has a count mismatch for ${snapshot.publishedDate}`);
+      }
+      const htmlHash = appleSnapshotContentHash(parsedHtml);
+      const normalizedHash = appleSnapshotContentHash(parsedNormalized);
+      if (htmlHash !== revision.contentHash || normalizedHash !== revision.contentHash) {
+        throw new Error(`Apple snapshot evidence has a content-hash mismatch for ${snapshot.publishedDate}`);
+      }
+      if (JSON.stringify(normalizeApplePricing(parsedHtml)) !== JSON.stringify(normalizeApplePricing(parsedNormalized))) {
+        throw new Error(`Apple snapshot HTML and JSON disagree for ${snapshot.publishedDate}`);
+      }
+    }
+  }
+
+  if (history && publicationHistory.size !== normalizedIndex.snapshots.length) {
+    throw new Error('Apple publication history and snapshot index contain different dates');
+  }
+  if (currentData) {
+    const latestSnapshot = normalizedIndex.snapshots.at(-1);
+    const currentPublishedDate = publicationDateKey(currentData.source?.publishedDate);
+    if (!latestSnapshot || latestSnapshot.publishedDate !== currentPublishedDate) {
+      throw new Error('Apple snapshot index latest date does not match current prices');
+    }
+    if (latestSnapshot.activeContentHash !== appleSnapshotContentHash(currentData)) {
+      throw new Error('Apple snapshot active revision does not match current prices');
+    }
+  }
+  return normalizedIndex;
+}
+
+function validateExistingPrices(data) {
+  if (!isPlainObject(data)
+    || ![1, 2].includes(data.schemaVersion)
+    || !isIsoDateTime(data.generatedAt)
+    || !isPlainObject(data.source)
+    || data.source.url !== APPLE_URL
+    || !isIsoDate(publicationDateKey(data.source.publishedDate))
+    || !isPlainObject(data.fx)
+    || !ALLOWED_FX_SOURCE_URLS.has(data.fx.sourceUrl)
+    || data.fx.base !== 'USD'
+    || !isIsoDateTime(data.fx.fetchedAt)
+    || !isPlainObject(data.fx.rates)
+    || data.fx.rates.USD !== 1
+    || !Number.isFinite(data.fx.rates.CNY)
+    || data.fx.rates.CNY <= 0) {
+    throw new Error('Existing prices.json has an unsupported or unsafe structure');
+  }
+  validatePrices(data.countries, { minCountries: 60, tiers: data.tiers });
+  const missingRates = getMissingExchangeRates(data.countries, data.fx.rates);
+  if (missingRates.length) {
+    throw new Error(`Existing prices.json is missing exchange rates for: ${missingRates.join(', ')}`);
+  }
+  for (const country of data.countries) {
+    if (typeof country.nameZh !== 'string' || !country.nameZh.trim()) {
+      throw new Error(`Existing prices.json is missing a display name for ${country.country}`);
+    }
+    for (const { id } of data.tiers) {
+      if (typeof country.plans[id].formattedPrice !== 'string' || !country.plans[id].formattedPrice.trim()) {
+        throw new Error(`Existing prices.json is missing formatted ${id} pricing for ${country.country}`);
+      }
+    }
+  }
+  if (data.source.parser != null && !/^(cross-checked|document-order|apple-markers-fallback)$/.test(data.source.parser)) {
+    throw new Error('Existing prices.json has an invalid Apple parser status');
+  }
+  const observedAt = data.run?.observedAtBeijing ?? formatBeijingDate(data.generatedAt);
+  if (!isIsoDate(observedAt)) throw new Error('Existing prices.json has an invalid observation date');
+  assertPublicationDateNotFuture(data.source.publishedDate, observedAt);
+  if (data.schemaVersion === 2) {
+    if (!isPlainObject(data.run)
+      || !isIsoDateTime(data.run.startedAtUtc)
+      || !isIsoDateTime(data.run.finishedAtUtc)
+      || !isIsoDateTime(data.run.observedAtUtc)
+      || !isIsoDate(data.run.observedAtBeijing)
+      || data.run.finishedAtUtc < data.run.startedAtUtc
+      || data.generatedAt !== data.run.finishedAtUtc
+      || data.run.observedAtUtc !== data.run.finishedAtUtc
+      || data.run.observedAtBeijing !== formatBeijingDate(data.run.finishedAtUtc)
+      || data.run.countries !== data.countries.length
+      || data.run.pricePoints !== data.countries.length * data.tiers.length) {
+      throw new Error('Existing prices.json has inconsistent run metadata');
+    }
+  }
+}
+
+function validateExistingHistory(history, data) {
+  if (!isPlainObject(history)
+    || ![1, 2].includes(history.schemaVersion)
+    || !isPlainObject(history.countries)
+    || !Array.isArray(history.sourcePublishedDates)
+    || !history.sourcePublishedDates.length
+    || (history.updatedAt != null && !isIsoDateTime(history.updatedAt))) {
+    throw new Error('Existing history.json has an unsupported structure');
+  }
+  for (const [countryName, record] of Object.entries(history.countries)) {
+    assertSafeHistoryCountryKey(countryName);
+    if (!isPlainObject(record)
+      || typeof record.nameZh !== 'string'
+      || !record.nameZh.trim()
+      || typeof record.region !== 'string'
+      || !record.region.trim()
+      || !Array.isArray(record.events)
+      || !record.events.length) {
+      throw new Error(`Existing history.json has an invalid record for ${countryName}`);
+    }
+    let previousObservedAt = '';
+    for (const event of record.events) {
+      if (!isPlainObject(event)
+        || !isIsoDate(event.observedAt)
+        || event.observedAt < previousObservedAt
+        || typeof event.currency !== 'string'
+        || !/^[A-Z]{3}$/.test(event.currency)
+        || !isPlainObject(event.plans)
+        || !Object.keys(event.plans).length
+        || Object.values(event.plans).some((price) => !Number.isFinite(price) || price <= 0)
+        || (event.observedAtUtc != null && !isIsoDateTime(event.observedAtUtc))
+        || (event.observedAtUtc != null && event.observedAtBeijing !== event.observedAt)) {
+        throw new Error(`Existing history.json has an invalid event for ${countryName}`);
+      }
+      previousObservedAt = event.observedAt;
+    }
+  }
+
+  const publicationDates = new Set();
+  let previousPublishedDate = '';
+  let previousObservedAt = '';
+  for (const entry of history.sourcePublishedDates) {
+    const publishedDate = publicationDateKey(entry?.publishedDate);
+    if (!isPlainObject(entry)
+      || !isIsoDate(publishedDate)
+      || publicationDates.has(publishedDate)
+      || publishedDate < previousPublishedDate
+      || !isIsoDate(entry.observedAt)
+      || entry.observedAt < previousObservedAt) {
+      throw new Error('Existing history.json has an invalid publication history');
+    }
+    publicationDates.add(publishedDate);
+    previousPublishedDate = publishedDate;
+    previousObservedAt = entry.observedAt;
+  }
+  if (previousPublishedDate !== publicationDateKey(data.source.publishedDate)) {
+    throw new Error('Existing history.json latest publication date does not match current prices');
+  }
+
+  for (const country of data.countries) {
+    const record = history.countries[country.country];
+    const latestEvent = record?.events?.at(-1);
+    if (!record
+      || record.nameZh !== country.nameZh
+      || record.region !== country.region
+      || latestEvent?.currency !== country.currency
+      || data.tiers.some(({ id }) => latestEvent?.plans?.[id] !== country.plans[id].price)) {
+      throw new Error(`Existing history.json latest values do not match ${country.country}`);
+    }
+  }
+}
+
+function validateExistingRunLog(runLog, data) {
+  if (!isPlainObject(runLog)
+    || runLog.schemaVersion !== 1
+    || !Array.isArray(runLog.runs)
+    || !runLog.runs.length
+    || !Number.isInteger(runLog.retention)
+    || runLog.retention <= 0) {
+    throw new Error('Existing run-log.json has an unsupported structure');
+  }
+  let previousFinishedAt = '';
+  for (const run of runLog.runs) {
+    if (!isPlainObject(run)
+      || run.status !== 'success'
+      || !isIsoDateTime(run.startedAtUtc)
+      || !isIsoDateTime(run.finishedAtUtc)
+      || run.finishedAtUtc < run.startedAtUtc
+      || run.finishedAtUtc < previousFinishedAt) {
+      throw new Error('Existing run-log.json contains an invalid run');
+    }
+    previousFinishedAt = run.finishedAtUtc;
+  }
+  const latestRun = runLog.runs.at(-1);
+  const expectedTierCounts = data.tiers.map(({ id, label }) => ({ id, label }));
+  if (runLog.updatedAtUtc !== latestRun.finishedAtUtc
+    || latestRun.finishedAtUtc !== (data.run?.finishedAtUtc ?? data.generatedAt)
+    || latestRun.source?.appleUrl !== data.source.url
+    || publicationDateKey(latestRun.source?.applePublishedDate) !== publicationDateKey(data.source.publishedDate)
+    || latestRun.counts?.countries !== data.countries.length
+    || latestRun.counts?.pricePoints !== data.countries.length * data.tiers.length
+    || latestRun.counts?.currencies !== new Set(data.countries.map(({ currency }) => currency)).size
+    || JSON.stringify(latestRun.counts?.tiers) !== JSON.stringify(expectedTierCounts)) {
+    throw new Error('Existing run-log.json latest run does not match current prices');
+  }
+}
+
+export async function preflightProductionState({
+  previousDataState,
+  previousHistoryState,
+  previousRunLogState,
+  snapshotsDir = APPLE_SNAPSHOTS_DIR,
+  snapshotIndexPath = APPLE_SNAPSHOT_INDEX_PATH
+}) {
+  const requiredStates = [
+    ['prices.json', previousDataState],
+    ['history.json', previousHistoryState]
+  ];
+  const existingCount = requiredStates.filter(([, state]) => state.existed).length;
+  if (existingCount === 1) {
+    const missing = requiredStates.filter(([, state]) => !state.existed).map(([name]) => name);
+    throw new Error(`Production data state is partial; missing: ${missing.join(', ')}`);
+  }
+  if (existingCount === 0) {
+    if (previousRunLogState.existed) {
+      throw new Error('Production data state is partial; missing: prices.json, history.json');
+    }
+    const snapshotIndex = await validateAppleSnapshotStore({ snapshotsDir, snapshotIndexPath });
+    if (snapshotIndex) throw new Error('Production data state is partial; core JSON files are missing');
+    return { bootstrap: true, snapshotIndex: null };
+  }
+
+  validateExistingPrices(previousDataState.value);
+  validateExistingHistory(previousHistoryState.value, previousDataState.value);
+  if (previousRunLogState.existed) {
+    validateExistingRunLog(previousRunLogState.value, previousDataState.value);
+  }
+  const snapshotIndex = await validateAppleSnapshotStore({
+    snapshotsDir,
+    snapshotIndexPath,
+    history: previousHistoryState.value,
+    currentData: previousDataState.value
+  });
+  if (!snapshotIndex) {
+    throw new Error('Apple snapshot store is missing for the existing production baseline');
+  }
+  return { bootstrap: false, snapshotIndex };
+}
+
 export function buildAppleSnapshotIndex(existing, entry) {
   const snapshots = Array.isArray(existing?.snapshots) ? existing.snapshots : [];
   const byDate = new Map(snapshots.map((item) => [item.publishedDate, item]));
@@ -981,19 +1330,33 @@ export function buildAppleSnapshotIndex(existing, entry) {
     });
   } else {
     const revisions = Array.isArray(current.revisions) ? current.revisions : [current];
-    if (!revisions.some(({ contentHash }) => contentHash === entry.contentHash)) {
-      const orderedRevisions = [...revisions, entry].sort((a, b) => (
-        (a.firstConfirmedDate ?? '').localeCompare(b.firstConfirmedDate ?? '')
-      ));
-      const activeRevision = orderedRevisions.at(-1);
-      byDate.set(entry.publishedDate, {
-        ...current,
-        activeFile: activeRevision.file,
-        activeDataFile: activeRevision.dataFile,
-        activeContentHash: activeRevision.contentHash,
-        revisions: orderedRevisions
-      });
+    const matchingIndex = revisions.findIndex(({ contentHash }) => contentHash === entry.contentHash);
+    const nextRevisions = [...revisions];
+    if (matchingIndex < 0) {
+      nextRevisions.push(entry);
+    } else if (entry.firstConfirmedDate < revisions[matchingIndex].firstConfirmedDate) {
+      nextRevisions[matchingIndex] = {
+        ...revisions[matchingIndex],
+        firstConfirmedDate: entry.firstConfirmedDate,
+        ...(entry.archiveUrl ? { archiveUrl: entry.archiveUrl } : {})
+      };
+    } else {
+      return {
+        schemaVersion: 1,
+        snapshots: [...byDate.values()].sort((a, b) => a.publishedDate.localeCompare(b.publishedDate))
+      };
     }
+    const orderedRevisions = nextRevisions.sort((a, b) => (
+      (a.firstConfirmedDate ?? '').localeCompare(b.firstConfirmedDate ?? '')
+    ));
+    const activeRevision = orderedRevisions.at(-1);
+    byDate.set(entry.publishedDate, {
+      ...current,
+      activeFile: activeRevision.file,
+      activeDataFile: activeRevision.dataFile,
+      activeContentHash: activeRevision.contentHash,
+      revisions: orderedRevisions
+    });
   }
   return {
     schemaVersion: 1,
@@ -1188,16 +1551,19 @@ export async function main({
         snapshotIndexPath
       });
     }
-    const [previousDataState, previousHistoryState, previousRunLogState, countryNames, html] = await Promise.all([
+    const [previousDataState, previousHistoryState, previousRunLogState, countryNames] = await Promise.all([
       readJsonWithExistence(currentDataPath),
       readJsonWithExistence(historyPath),
       readJsonWithExistence(runLogPath, { schemaVersion: 1, retention: 90, runs: [] }),
-      readJson(namesPath, {}),
-      fetchResource(APPLE_URL).then((response) => {
-        lastAppleHtml = response;
-        return response;
-      })
+      readJson(namesPath, {})
     ]);
+    await preflightProductionState({
+      previousDataState,
+      previousHistoryState,
+      previousRunLogState,
+      snapshotsDir,
+      snapshotIndexPath
+    });
     const previousData = previousDataState.value;
     const previousHistory = previousHistoryState.value;
     const previousRunLog = previousRunLogState.value;
@@ -1209,6 +1575,10 @@ export async function main({
     if (!countryNames || Object.keys(countryNames).length < 60) {
       throw new Error('Chinese country-name mapping is missing or incomplete');
     }
+    const html = await fetchResource(APPLE_URL).then((response) => {
+      lastAppleHtml = response;
+      return response;
+    });
 
   const parsed = parseApplePrices(html);
   if (parsed.parser !== 'cross-checked') {

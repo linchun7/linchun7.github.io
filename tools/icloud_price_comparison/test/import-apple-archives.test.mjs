@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { importAppleArchives } from '../scripts/import-apple-archives.mjs';
 import { parseLegacyAppleArchive } from '../scripts/parse-legacy-archive.mjs';
+import { appleSnapshotContentHash, normalizeAppleSnapshot } from '../scripts/update-prices.mjs';
 
 const regions = [
   ['nasalac', 'North America', 'Alpha', 'USD'],
@@ -42,6 +43,54 @@ function currentData(parsed) {
     tiers: parsed.tiers,
     countries: parsed.countries
   };
+}
+
+async function seedSnapshotStore({
+  snapshotsDir,
+  snapshotIndexPath,
+  html,
+  legacyTopLevel = false,
+  omitDataFile = false
+}) {
+  const parsed = parseLegacyAppleArchive(html);
+  const publishedDate = parsed.sourcePublishedDate.replace(/^.*?([A-Za-z]+\s+\d{1,2},\s*\d{4}).*$/, '$1');
+  const publishedDateIso = new Date(`${publishedDate} 00:00:00 UTC`).toISOString().slice(0, 10);
+  const stamp = html.match(/web\/([0-9]{14})\//)[1];
+  const capturedAtUtc = `${stamp.slice(0, 4)}-${stamp.slice(4, 6)}-${stamp.slice(6, 8)}T${stamp.slice(8, 10)}:${stamp.slice(10, 12)}:${stamp.slice(12, 14)}.000Z`;
+  const firstConfirmedDate = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(new Date(capturedAtUtc));
+  const file = `${publishedDateIso}.html`;
+  const dataFile = `${publishedDateIso}.json`;
+  const contentHash = appleSnapshotContentHash(parsed);
+  const revision = {
+    publishedDate: publishedDateIso,
+    file,
+    ...(!omitDataFile ? { dataFile } : {}),
+    ...(legacyTopLevel ? { capturedAtUtc } : { firstConfirmedDate }),
+    sourceUrl: 'https://support.apple.com/en-us/108047',
+    archiveUrl: `https://web.archive.org/web/${stamp}/https://support.apple.com/en-us/108047`,
+    parser: parsed.parser,
+    countries: parsed.countries.length,
+    pricePoints: parsed.countries.length * parsed.tiers.length,
+    contentHash
+  };
+  const snapshot = legacyTopLevel
+    ? revision
+    : {
+      publishedDate: publishedDateIso,
+      activeFile: file,
+      activeDataFile: dataFile,
+      activeContentHash: contentHash,
+      revisions: [revision]
+    };
+  await mkdir(snapshotsDir, { recursive: true });
+  await Promise.all([
+    writeFile(path.join(snapshotsDir, file), html, 'utf8'),
+    writeFile(path.join(snapshotsDir, dataFile), `${JSON.stringify(normalizeAppleSnapshot(parsed), null, 2)}\n`, 'utf8'),
+    writeFile(snapshotIndexPath, `${JSON.stringify({ schemaVersion: 1, snapshots: [snapshot] }, null, 2)}\n`, 'utf8')
+  ]);
+  return { parsed, file, dataFile, contentHash, firstConfirmedDate, capturedAtUtc };
 }
 
 test('keeps same-date archive revisions as separate HTML and JSON evidence', async () => {
@@ -191,6 +240,133 @@ test('keeps separate evidence for different publication dates with identical con
   }
 });
 
+test('migrates a legacy top-level snapshot and records an earlier same-hash confirmation', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'icloud-archive-legacy-earlier-'));
+  const inputDir = path.join(root, 'input');
+  const snapshotsDir = path.join(root, 'snapshots');
+  const historyPath = path.join(root, 'history.json');
+  const pricesPath = path.join(root, 'prices.json');
+  const namesPath = path.join(root, 'names.json');
+  const snapshotIndexPath = path.join(snapshotsDir, 'index.json');
+  const laterHtml = archiveHtml({ stamp: '20250514010000' });
+  const earlierHtml = archiveHtml({ stamp: '20250512010000' });
+  const parsedCurrent = parseLegacyAppleArchive(laterHtml);
+
+  try {
+    await mkdir(inputDir, { recursive: true });
+    const seeded = await seedSnapshotStore({
+      snapshotsDir,
+      snapshotIndexPath,
+      html: laterHtml,
+      legacyTopLevel: true,
+      omitDataFile: true
+    });
+    await Promise.all([
+      writeFile(path.join(inputDir, 'earlier.html'), earlierHtml, 'utf8'),
+      writeFile(historyPath, JSON.stringify({ schemaVersion: 2, countries: {}, sourcePublishedDates: [] }), 'utf8'),
+      writeFile(pricesPath, `${JSON.stringify(currentData(parsedCurrent))}\n`, 'utf8'),
+      writeFile(namesPath, '{}', 'utf8')
+    ]);
+    const filesBefore = (await readdir(snapshotsDir)).sort();
+
+    const result = await importAppleArchives(inputDir, {
+      historyPath,
+      pricesPath,
+      namesPath,
+      snapshotsDir,
+      snapshotIndexPath
+    });
+    const snapshot = result.snapshotIndex.snapshots[0];
+    assert.equal(snapshot.revisions.length, 1);
+    assert.equal(snapshot.revisions[0].file, seeded.file);
+    assert.equal(snapshot.revisions[0].dataFile, seeded.dataFile);
+    assert.equal(snapshot.revisions[0].firstConfirmedDate, '2025-05-12');
+    assert.match(snapshot.revisions[0].archiveUrl, /20250512010000/);
+    assert.equal(snapshot.activeFile, seeded.file);
+    assert.equal(snapshot.activeDataFile, seeded.dataFile);
+    assert.equal(snapshot.activeContentHash, seeded.contentHash);
+    assert.equal('file' in snapshot, false);
+    assert.equal('dataFile' in snapshot, false);
+    assert.equal('capturedAtUtc' in snapshot.revisions[0], false);
+    assert.equal(result.history.sourcePublishedDates[0].observedAt, '2025-05-12');
+    assert.deepEqual((await readdir(snapshotsDir)).sort(), filesBefore);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('rejects indexed-but-missing snapshot evidence before staging', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'icloud-archive-missing-evidence-'));
+  const inputDir = path.join(root, 'input');
+  const snapshotsDir = path.join(root, 'snapshots');
+  const historyPath = path.join(root, 'history.json');
+  const pricesPath = path.join(root, 'prices.json');
+  const namesPath = path.join(root, 'names.json');
+  const snapshotIndexPath = path.join(snapshotsDir, 'index.json');
+  const html = archiveHtml({ stamp: '20250512010000' });
+  const parsed = parseLegacyAppleArchive(html);
+
+  try {
+    await mkdir(inputDir, { recursive: true });
+    const seeded = await seedSnapshotStore({ snapshotsDir, snapshotIndexPath, html });
+    await Promise.all([
+      writeFile(historyPath, JSON.stringify({ schemaVersion: 2, countries: {}, sourcePublishedDates: [] }), 'utf8'),
+      writeFile(pricesPath, `${JSON.stringify(currentData(parsed))}\n`, 'utf8'),
+      writeFile(namesPath, '{}', 'utf8'),
+      rm(path.join(snapshotsDir, seeded.dataFile))
+    ]);
+    const before = await Promise.all([
+      readFile(historyPath, 'utf8'),
+      readFile(snapshotIndexPath, 'utf8'),
+      readFile(path.join(snapshotsDir, seeded.file), 'utf8')
+    ]);
+
+    await assert.rejects(
+      importAppleArchives(inputDir, { historyPath, pricesPath, namesPath, snapshotsDir, snapshotIndexPath }),
+      new RegExp(`snapshot index references missing evidence: ${seeded.dataFile.replace('.', '\\.')}`, 'i')
+    );
+    assert.deepEqual(await Promise.all([
+      readFile(historyPath, 'utf8'),
+      readFile(snapshotIndexPath, 'utf8'),
+      readFile(path.join(snapshotsDir, seeded.file), 'utf8')
+    ]), before);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('rejects snapshot evidence when the index is missing', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'icloud-archive-missing-index-'));
+  const inputDir = path.join(root, 'input');
+  const snapshotsDir = path.join(root, 'snapshots');
+  const historyPath = path.join(root, 'history.json');
+  const pricesPath = path.join(root, 'prices.json');
+  const namesPath = path.join(root, 'names.json');
+  const snapshotIndexPath = path.join(snapshotsDir, 'index.json');
+  const html = archiveHtml({ stamp: '20250512010000' });
+  const parsed = parseLegacyAppleArchive(html);
+
+  try {
+    await Promise.all([mkdir(inputDir, { recursive: true }), mkdir(snapshotsDir, { recursive: true })]);
+    await Promise.all([
+      writeFile(path.join(snapshotsDir, '2025-05-12.html'), html, 'utf8'),
+      writeFile(historyPath, JSON.stringify({ schemaVersion: 2, countries: {}, sourcePublishedDates: [] }), 'utf8'),
+      writeFile(pricesPath, `${JSON.stringify(currentData(parsed))}\n`, 'utf8'),
+      writeFile(namesPath, '{}', 'utf8')
+    ]);
+    const historyBefore = await readFile(historyPath, 'utf8');
+
+    await assert.rejects(
+      importAppleArchives(inputDir, { historyPath, pricesPath, namesPath, snapshotsDir, snapshotIndexPath }),
+      /snapshot index is missing while snapshot evidence exists/i
+    );
+    assert.equal(await readFile(historyPath, 'utf8'), historyBefore);
+    await assert.rejects(readFile(snapshotIndexPath, 'utf8'), { code: 'ENOENT' });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('rejects archives whose publication date is after the Wayback confirmation date', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'icloud-archive-future-published-'));
   const inputDir = path.join(root, 'input');
@@ -230,31 +406,15 @@ test('rejects empty or incomplete archive inputs without rewriting history', asy
   const snapshotIndexPath = path.join(snapshotsDir, 'index.json');
   const html = archiveHtml({ stamp: '20250513010000', alphaPrice: '1.99' });
   const parsed = parseLegacyAppleArchive(html);
+  const existingHtml = archiveHtml({ date: 'April 1, 2025', stamp: '20250402010000' });
   const originalHistory = JSON.stringify({ schemaVersion: 2, countries: { Preserved: { events: [] } }, sourcePublishedDates: [] });
 
   try {
     await mkdir(inputDir, { recursive: true });
-    await mkdir(snapshotsDir, { recursive: true });
     await Promise.all([
       writeFile(historyPath, originalHistory, 'utf8'),
       writeFile(pricesPath, `${JSON.stringify(currentData(parsed))}\n`, 'utf8'),
-      writeFile(namesPath, '{}', 'utf8'),
-      writeFile(snapshotIndexPath, JSON.stringify({
-        schemaVersion: 1,
-        snapshots: [{
-          publishedDate: '2025-04-01',
-          activeFile: '2025-04-01.html',
-          activeDataFile: '2025-04-01.json',
-          activeContentHash: 'a'.repeat(64),
-          revisions: [{
-            publishedDate: '2025-04-01',
-            file: '2025-04-01.html',
-            dataFile: '2025-04-01.json',
-            firstConfirmedDate: '2025-04-02',
-            contentHash: 'a'.repeat(64)
-          }]
-        }]
-      }), 'utf8')
+      writeFile(namesPath, '{}', 'utf8')
     ]);
 
     await assert.rejects(
@@ -263,6 +423,7 @@ test('rejects empty or incomplete archive inputs without rewriting history', asy
     );
     assert.equal(await readFile(historyPath, 'utf8'), originalHistory);
 
+    await seedSnapshotStore({ snapshotsDir, snapshotIndexPath, html: existingHtml });
     await writeFile(path.join(inputDir, 'may.html'), html, 'utf8');
     await assert.rejects(
       importAppleArchives(inputDir, { historyPath, pricesPath, namesPath, snapshotsDir, snapshotIndexPath }),
@@ -335,9 +496,11 @@ test('does not overwrite unindexed snapshot evidence during import', async () =>
 
     await assert.rejects(
       importAppleArchives(inputDir, { historyPath, pricesPath, namesPath, snapshotsDir, snapshotIndexPath }),
-      /Apple archive import was not committed/
+      /snapshot index does not reference existing evidence: 2025-05-12\.html/i
     );
     assert.equal(await readFile(path.join(snapshotsDir, '2025-05-12.html'), 'utf8'), preservedHtml);
+    assert.deepEqual(JSON.parse(await readFile(snapshotIndexPath, 'utf8')), { schemaVersion: 1, snapshots: [] });
+    assert.deepEqual(JSON.parse(await readFile(historyPath, 'utf8')), { schemaVersion: 2, countries: {}, sourcePublishedDates: [] });
   } finally {
     await rm(root, { recursive: true, force: true });
   }
