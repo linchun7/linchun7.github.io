@@ -11,7 +11,7 @@
 - 展示 Apple 页面解析出的地区、分区、币种、容量和当地月费，并计算人民币参考价。
 - 汇总每个容量的最低价和对应地区，支持地区搜索、分区筛选、容量排序。
 - 点击地区查看当地月费、人民币参考价、价格历史和涨跌比例。
-- 展示 Apple `Published Date`，并在发布日期变化时记录容量、地区、分区、币种和价格差异。
+- 展示 Apple `Published Date`，并在发布日期变化时记录容量、地区、分区、币种和价格差异；发布日期历史在移动端自适应显示，无需左右滑动。
 - 记录新增或移除的地区和容量；地区恢复后继续使用原有历史。
 - 使用 Apple 中文支持页面的名称映射；没有映射时保留 Apple 官方英文名。
 - 提供加载、慢网络、重试、旧数据和旧汇率状态；适配桌面、平板和手机，支持键盘和减弱动画。
@@ -37,7 +37,7 @@ Secret 只配置在仓库 **Settings > Secrets and variables > Actions**。密�
 1. 安装锁定依赖，运行 `pnpm test:core`。
 2. 抓取 Apple 页面，由 `document-order` 和 `apple-markers` 两条路径独立解析。
 3. 校验发布日期、地区、分区、容量、价格、汇率和异常调价。
-4. 写入当前价格、历史、运行日志和 Apple 快照；随后运行 `pnpm test:data` 和真实 Chrome UI 测试。
+4. 写入当前价格、历史、运行日志和 Apple 快照；随后运行 `pnpm test:data`、真实 Chrome UI 和 WebKit UI 测试。
 5. 上传诊断附件（保留 14 天），提交 `data/` 变更并先 `git pull --rebase`；变基后重新安装锁定依赖并复跑核心、数据测试，再推送。
 
 UI 测试失败只产生警告，不阻断已经通过抓取和核心数据校验的数据；抓取、解析、数据校验或生产写入失败会停止更新，并恢复上一份有效数据。
@@ -77,28 +77,38 @@ UI 测试失败只产生警告，不阻断已经通过抓取和核心数据校�
 
 容量预警阈值为 Git 历史 500 MiB、800 MiB，或 `history.json` 2 MiB；工作流不会自动清理 Git 历史。恢复数据时使用 Git 历史中的完整 `data/` 文件，不要手工拼接 JSON。
 
+## 官方 Action 自动升级
+
+- Dependabot 每周检查 GitHub Actions，只为 GitHub 官方 `actions/*` 创建分组升级 PR，包括主版本升级。
+- Action 引用始终使用完整 40 位提交 SHA，并保留版本注释。
+- PR 必须通过只读的核心、Chrome、WebKit 和依赖审计；自动合并任务还会核对 Dependabot 身份、默认分支、已测试的 base/head SHA 和逐行差异。
+- 只有 `.github/workflows/*.yml|yaml` 中 `actions/*@完整SHA # v…` 的一对一替换可自动合并；第三方 Action、业务文件、可变标签或额外 YAML 改动都会停止自动合并。
+
 ## 本地验证
 
-以下命令从 `tools/icloud_price_comparison/` 执行，需要 Node.js 22+、pnpm 和 Chrome/Chromium：
+以下命令从 `tools/icloud_price_comparison/` 执行，需要 Node.js 22+、pnpm、Chrome/Chromium，并先安装 Playwright WebKit：
 
 ```bash
 pnpm install --frozen-lockfile
+pnpm exec playwright install webkit
 pnpm test
 pnpm test:core
 pnpm test:data
 pnpm test:ui
+pnpm test:webkit
 pnpm check:live
 pnpm audit --audit-level low
 ```
 
-- `pnpm test`：运行全部 Node 测试（包含离线 fixture、数据、工作流、快照和 UI 测试）。
+- `pnpm test`：依次运行核心、真实 Chrome 和 WebKit 测试。
 - `pnpm test:core`：运行更新前的解析、数据、快照、幂等和工作流核心测试。
 - `pnpm test:data`：只检查当前提交的价格、历史、运行日志和快照索引。
-- `pnpm test:ui`：启动本地静态服务器并用真实浏览器测试；CI 没有浏览器会失败，本地没有浏览器会跳过。
+- `pnpm test:ui`：启动本地静态服务器并用真实 Chrome/Chromium 测试；CI 没有浏览器会失败，本地没有浏览器会跳过。
+- `pnpm test:webkit`：使用 Playwright WebKit 运行同一套 UI 验收，用于覆盖 Safari/WebKit 兼容性。
 - `pnpm check:live`：只读访问 Apple 和汇率服务并执行校验，不写生产文件。
 - `pnpm update:data`：写入生产数据，只用于明确的手动更新或隔离环境。
 
-`.github/workflows/validate-icloud-price-comparison.yml` 会在 PR、`main` 推送和手动触发时以只读权限运行核心、数据、真实浏览器和依赖漏洞检查；全部第三方 Action 固定到完整提交 SHA。
+`.github/workflows/validate-icloud-price-comparison.yml` 会在 PR、`main` 推送和手动触发时以只读权限运行核心、Chrome、WebKit 和依赖漏洞检查；仓库使用的 Action 全部固定到完整提交 SHA。
 
 本地预览从仓库根目录启动静态服务器：
 

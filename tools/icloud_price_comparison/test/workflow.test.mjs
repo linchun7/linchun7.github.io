@@ -4,6 +4,8 @@ import test from 'node:test';
 
 const workflowUrl = new URL('../../../.github/workflows/update-icloud-prices.yml', import.meta.url);
 const ciWorkflowUrl = new URL('../../../.github/workflows/validate-icloud-price-comparison.yml', import.meta.url);
+const autoMergeWorkflowUrl = new URL('../../../.github/workflows/auto-merge-official-actions.yml', import.meta.url);
+const dependabotUrl = new URL('../../../.github/dependabot.yml', import.meta.url);
 
 test('keeps the scheduled update workflow guarded and ordered', async () => {
   const workflow = await readFile(workflowUrl, 'utf8');
@@ -25,7 +27,7 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /update:[\s\S]*?permissions:\s+contents: write/, 'only the update job may write committed data');
   assert.match(workflow, /pnpm install --frozen-lockfile/);
   assert.match(workflow, /name: 运行解析与数据安全测试\s+run: pnpm test:core/);
-  assert.match(workflow, /name: 验证更新后的页面[\s\S]*?id: ui_after[\s\S]*?if pnpm test:ui; then[\s\S]*?ui_failed=false[\s\S]*?ui_failed=true/);
+  assert.match(workflow, /name: 验证更新后的页面[\s\S]*?id: ui_after[\s\S]*?ui_failed=false[\s\S]*?pnpm test:ui \|\| ui_failed=true[\s\S]*?if pnpm exec playwright install --with-deps webkit; then[\s\S]*?pnpm test:webkit \|\| ui_failed=true[\s\S]*?ui_failed=\$ui_failed/);
   assert.doesNotMatch(workflow, /name: 验证更新后的页面[\s\S]*?continue-on-error: true[\s\S]*?run: pnpm test:ui/);
   assert.doesNotMatch(workflow, /ui_before|运行浏览器界面测试（更新前）/, 'the workflow must not repeat UI tests before fetching data');
   assert.match(workflow, /name: 验证更新后的价格数据\s+run: pnpm test:data/);
@@ -51,15 +53,19 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   const duplicateCoreTest = workflow.indexOf('run: pnpm test:core', firstCoreTest + 1);
   const update = workflow.indexOf('run: pnpm update:data');
   const dataTest = workflow.indexOf('run: pnpm test:data');
-  const uiTest = workflow.indexOf('if pnpm test:ui; then');
-  const duplicateUiTest = workflow.indexOf('pnpm test:ui', uiTest + 'if pnpm test:ui; then'.length);
+  const uiTest = workflow.indexOf('pnpm test:ui || ui_failed=true');
+  const webkitTest = workflow.indexOf('pnpm test:webkit || ui_failed=true');
+  const duplicateUiTest = workflow.indexOf('pnpm test:ui', uiTest + 'pnpm test:ui'.length);
+  const duplicateWebkitTest = workflow.indexOf('pnpm test:webkit', webkitTest + 'pnpm test:webkit'.length);
   const commit = workflow.indexOf('name: 提交价格数据变更');
   assert.ok(firstCoreTest >= 0 && firstCoreTest < update, 'core tests must run before the live update');
   assert.equal(duplicateCoreTest, -1, 'the workflow must not repeat unchanged fixture and workflow tests after the update');
   assert.ok(update < dataTest, 'the updated snapshot must pass data validation');
   assert.ok(dataTest < uiTest, 'updated data must pass before the UI test');
+  assert.ok(uiTest < webkitTest, 'Chrome must be followed by WebKit');
   assert.equal(duplicateUiTest, -1, 'the workflow must run the real-browser UI suite only once');
-  assert.ok(uiTest < commit, 'the updated UI test must finish before commit');
+  assert.equal(duplicateWebkitTest, -1, 'the workflow must run the WebKit suite only once');
+  assert.ok(webkitTest < commit, 'the updated browser tests must finish before commit');
 
   const uiGate = workflow.indexOf('name: 记录浏览器界面测试警告');
   assert.ok(commit < uiGate, 'UI failures must be reported only after the data commit step');
@@ -74,20 +80,46 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
 });
 
 test('keeps pull-request validation read-only, complete, and SHA-pinned', async () => {
-  const [updateWorkflow, ciWorkflow] = await Promise.all([
+  const [updateWorkflow, ciWorkflow, autoMergeWorkflow] = await Promise.all([
     readFile(workflowUrl, 'utf8'),
-    readFile(ciWorkflowUrl, 'utf8')
+    readFile(ciWorkflowUrl, 'utf8'),
+    readFile(autoMergeWorkflowUrl, 'utf8'),
   ]);
-  const workflows = `${updateWorkflow}\n${ciWorkflow}`;
+  const workflows = `${updateWorkflow}\n${ciWorkflow}\n${autoMergeWorkflow}`;
   const actionReferences = [...workflows.matchAll(/uses:\s*[^@\s]+@([^\s#]+)/g)].map(([, reference]) => reference);
   assert.ok(actionReferences.length >= 5);
   assert.ok(actionReferences.every((reference) => /^[a-f0-9]{40}$/.test(reference)), 'all third-party actions must use full commit SHAs');
 
-  assert.match(ciWorkflow, /pull_request:[\s\S]*?push:[\s\S]*?workflow_dispatch:/);
+  assert.match(ciWorkflow, /pull_request:[\s\S]*?\.github\/dependabot\.yml[\s\S]*?push:[\s\S]*?\.github\/dependabot\.yml[\s\S]*?workflow_dispatch:/);
   assert.match(ciWorkflow, /permissions:\s+contents: read/);
   assert.doesNotMatch(ciWorkflow, /contents: write|secrets\./);
   assert.match(ciWorkflow, /pnpm install --frozen-lockfile/);
+  assert.match(ciWorkflow, /pnpm exec playwright install --with-deps webkit/);
   assert.match(ciWorkflow, /run: pnpm test:core/);
   assert.match(ciWorkflow, /run: pnpm test:ui/);
+  assert.match(ciWorkflow, /run: pnpm test:webkit/);
   assert.match(ciWorkflow, /run: pnpm audit --audit-level low/);
+});
+
+test('automates only official GitHub Actions updates after exact-SHA validation', async () => {
+  const [autoMergeWorkflow, dependabot] = await Promise.all([
+    readFile(autoMergeWorkflowUrl, 'utf8'),
+    readFile(dependabotUrl, 'utf8'),
+  ]);
+
+  assert.match(dependabot, /package-ecosystem: github-actions/);
+  assert.match(dependabot, /interval: weekly/);
+  assert.match(dependabot, /allow:[\s\S]*?dependency-name: ["']actions\/\*["']/);
+  assert.match(dependabot, /groups:[\s\S]*?official-github-actions:[\s\S]*?patterns:[\s\S]*?["']actions\/\*["']/);
+  assert.doesNotMatch(dependabot, /npm|pip|docker/);
+
+  assert.match(autoMergeWorkflow, /workflow_run:[\s\S]*?Validate iCloud price comparison[\s\S]*?completed/);
+  assert.match(autoMergeWorkflow, /workflow_run\.conclusion == 'success'[\s\S]*?workflow_run\.event == 'pull_request'[\s\S]*?workflow_run\.actor\.login == 'dependabot\[bot\]'[\s\S]*?startsWith\(github\.event\.workflow_run\.head_branch, 'dependabot\/github_actions\/'\)[\s\S]*?pull_requests\[0\]\.number > 0/);
+  assert.match(autoMergeWorkflow, /permissions:\s+contents: write\s+pull-requests: write/);
+  assert.doesNotMatch(autoMergeWorkflow, /pull_request_target|secrets\.(?!GITHUB_TOKEN)/);
+  assert.match(autoMergeWorkflow, /ref: \$\{\{ github\.event\.repository\.default_branch \}\}[\s\S]*?persist-credentials: false/);
+  assert.match(autoMergeWorkflow, /actions\/setup-node@[a-f0-9]{40} # v\d+[\s\S]*?node-version: 22/);
+  assert.match(autoMergeWorkflow, /RUN_BASE_SHA: \$\{\{ github\.event\.workflow_run\.pull_requests\[0\]\.base\.sha \}\}/);
+  assert.match(autoMergeWorkflow, /RUN_HEAD_SHA: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/);
+  assert.match(autoMergeWorkflow, /node tools\/icloud_price_comparison\/scripts\/auto-merge-official-actions\.mjs/);
 });
