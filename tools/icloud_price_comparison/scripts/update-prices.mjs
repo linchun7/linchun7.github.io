@@ -30,6 +30,10 @@ const DRY_RUN = process.argv.includes('--dry-run');
 let lastAppleHtml = null;
 let runStartedAt = new Date();
 
+export function defaultUpdateLockPath(currentDataPath = CURRENT_DATA_PATH) {
+  return path.join(path.dirname(path.dirname(currentDataPath)), '.icloud-price-update.lock');
+}
+
 async function fetchResource(url, {
   json = false,
   attempts = RETRY_DELAYS_MS.length,
@@ -248,8 +252,17 @@ function assertSafeHistoryCountryKey(country) {
   }
 }
 
+function isPlainObject(value) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
 export function updateHistory(previousHistory, countries, observedAt, tiers, observedAtUtc = null) {
   const history = previousHistory ?? { schemaVersion: 2, countries: {} };
+  if (!isPlainObject(history) || !isPlainObject(history.countries)) {
+    throw new Error('Price history has an unsupported countries structure');
+  }
   history.schemaVersion = 2;
   history.updatedAt = new Date().toISOString();
   let changedCountries = 0;
@@ -659,7 +672,7 @@ async function isStaleUpdateLock(lockPath, contents, staleAfterMs) {
     : Date.now() - fileStat.mtimeMs;
   if (ageMs > staleAfterMs) return true;
   if (metadata?.pid && !isProcessAlive(Number(metadata.pid))) return true;
-  return !metadata;
+  return false;
 }
 
 export async function acquireUpdateLock(lockPath, {
@@ -724,7 +737,23 @@ async function cleanupUpdaterTemporaryFiles({ currentDataPath, historyPath, runL
       .filter((entry) => entry.isFile() && TEMPORARY_FILE_PATTERN.test(entry.name))
       .map((entry) => unlink(path.join(directory, entry.name))));
   }
-  const snapshotIndex = normalizeAppleSnapshotIndex(await readJson(snapshotIndexPath, { schemaVersion: 1, snapshots: [] }));
+
+  const indexState = await readJsonWithExistence(snapshotIndexPath, null);
+  if (!indexState.existed) {
+    const snapshotEntries = await readdir(snapshotsDir, { withFileTypes: true }).catch((error) => {
+      if (error.code === 'ENOENT') return [];
+      throw error;
+    });
+    const evidenceFiles = snapshotEntries.filter((entry) => entry.isFile()
+      && entry.name !== 'index.json'
+      && /\.(?:html|json)$/i.test(entry.name));
+    if (evidenceFiles.length) {
+      throw new Error('Apple snapshot index is missing while snapshot evidence exists');
+    }
+    return;
+  }
+
+  const snapshotIndex = normalizeAppleSnapshotIndex(indexState.value);
   const indexedSnapshotFiles = new Set(snapshotIndex.snapshots.flatMap(({ revisions }) => (
     revisions.flatMap(({ file, dataFile }) => [file, dataFile])
   )));
@@ -732,14 +761,15 @@ async function cleanupUpdaterTemporaryFiles({ currentDataPath, historyPath, runL
     if (error.code === 'ENOENT') return [];
     throw error;
   });
-  await Promise.all(snapshotEntries
-    .filter((entry) => entry.isFile()
-      && entry.name !== 'index.json'
-      && /\.(?:html|json)$/i.test(entry.name)
-      && !indexedSnapshotFiles.has(entry.name))
-    .map((entry) => unlink(path.join(snapshotsDir, entry.name))));
+  const unindexedEvidence = snapshotEntries.filter((entry) => entry.isFile()
+    && entry.name !== 'index.json'
+    && /\.(?:html|json)$/i.test(entry.name)
+    && !indexedSnapshotFiles.has(entry.name));
+  if (unindexedEvidence.length) {
+    throw new Error('Apple snapshot index does not reference existing evidence: '
+      + unindexedEvidence.map(({ name }) => name).join(', '));
+  }
 }
-
 async function restoreProductionFiles(entries) {
   const results = await Promise.allSettled(entries.map(({ filePath, value, existed = true }) => (
     existed ? writeJsonAtomic(filePath, value) : unlinkIfExists(filePath)
@@ -801,6 +831,9 @@ export function buildAppleSnapshotEntry(publishedDate, {
 } = {}) {
   const publishedDateIso = publicationDateKey(publishedDate);
   if (!publishedDateIso) throw new Error('Apple snapshot published date is invalid');
+  if (!isFirstConfirmedDateAllowed(firstConfirmedDate)) {
+    throw new Error('Apple snapshot first confirmation date is invalid or in the future');
+  }
   return {
     publishedDate: publishedDateIso,
     file: `${publishedDateIso}.html`,
@@ -847,6 +880,10 @@ function isIsoDate(value) {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && publicationDateKey(value) === value;
 }
 
+function isFirstConfirmedDateAllowed(value) {
+  return isIsoDate(value) && value <= formatBeijingDate(new Date());
+}
+
 function validateSnapshotFileName(value, extension) {
   return typeof value === 'string'
     && path.basename(value) === value
@@ -878,7 +915,7 @@ export function normalizeAppleSnapshotIndex(index) {
         dataFile: revision.dataFile ?? revision.file?.replace(/\.html$/, '.json')
       };
       if (normalized.publishedDate !== publishedDate
-        || !isIsoDate(normalized.firstConfirmedDate)
+        || !isFirstConfirmedDateAllowed(normalized.firstConfirmedDate)
         || !validateSnapshotFileName(normalized.file, '.html')
         || !validateSnapshotFileName(normalized.dataFile, '.json')
         || !/^[a-f0-9]{64}$/.test(normalized.contentHash ?? '')
@@ -1116,7 +1153,7 @@ export async function main({
   const namesPath = paths.namesPath ?? NAMES_PATH;
   const snapshotsDir = paths.snapshotsDir ?? APPLE_SNAPSHOTS_DIR;
   const snapshotIndexPath = paths.snapshotIndexPath ?? APPLE_SNAPSHOT_INDEX_PATH;
-  const lockPath = paths.lockPath ?? path.join(path.dirname(path.dirname(currentDataPath)), '.icloud-price-update.lock');
+  const lockPath = paths.lockPath ?? defaultUpdateLockPath(currentDataPath);
   const releaseLock = dryRun ? null : await acquireUpdateLock(lockPath);
   try {
     runStartedAt = new Date();

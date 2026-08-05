@@ -980,3 +980,134 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
     await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }
 });
+
+test('resets a removed region filter after a successful price retry', { timeout: 30_000 }, async (context) => {
+  const chromePath = await findChrome();
+  if (!chromePath) {
+    if (process.env.CI) assert.fail('Chrome or Chromium is required for the removed-region retry test');
+    context.skip('Chrome or Chromium is not installed');
+    return;
+  }
+  const fullData = await readFixture('prices.json');
+  const replacement = structuredClone(fullData);
+  const removedRegion = fullData.countries[0].region;
+  replacement.countries = replacement.countries.filter(({ region }) => region !== removedRegion);
+  replacement.run.pricePoints = replacement.countries.length * replacement.tiers.length;
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await chromium.launch({ executablePath: chromePath, headless: true });
+  let priceCalls = 0;
+  try {
+    const page = await browser.newPage({ viewport: { width: 1365, height: 900 } });
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    page.on('console', (message) => {
+      if (message.type() === 'error' && !message.text().startsWith('Failed to load resource:')) errors.push(message.text());
+    });
+    await page.route('https://**/*', (route) => route.abort());
+    await page.route('**/data/prices.json*', (route) => {
+      priceCalls += 1;
+      const body = JSON.stringify(priceCalls === 1 ? fullData : replacement);
+      return route.fulfill({ status: 200, contentType: 'application/json', body });
+    });
+    try {
+      await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+      await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, fullData.countries.length);
+      await page.locator('#regionSelect').selectOption(removedRegion);
+      assert.equal(await page.locator('#priceRows tr[data-country]').count(), fullData.countries.filter(({ region }) => region === removedRegion).length);
+      await page.locator('#retryButton').dispatchEvent('click');
+      await page.waitForFunction((count) => document.querySelector('#marketCount')?.textContent === String(count), replacement.countries.length);
+      await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, replacement.countries.length);
+      assert.equal(await page.locator('#regionSelect').inputValue(), 'all');
+      assert.equal(priceCalls, 2);
+      assert.deepEqual(errors, []);
+    } finally {
+      await page.close();
+    }
+  } finally {
+    await browser.close();
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test('rebinds or closes an open history dialog after country replacement', { timeout: 30_000 }, async (context) => {
+  const chromePath = await findChrome();
+  if (!chromePath) {
+    if (process.env.CI) assert.fail('Chrome or Chromium is required for the active-country retry test');
+    context.skip('Chrome or Chromium is not installed');
+    return;
+  }
+  const fullData = await readFixture('prices.json');
+  const fullHistory = await readFixture('history.json');
+  const activeCountry = fullData.countries[0];
+  const changedData = structuredClone(fullData);
+  const changedCountry = changedData.countries.find(({ country }) => country === activeCountry.country);
+  changedCountry.nameZh = `${activeCountry.nameZh} 新版`;
+  changedCountry.region = activeCountry.region === 'Americas' ? 'Asia Pacific' : 'Americas';
+  changedCountry.currency = activeCountry.currency === 'USD' ? 'CNY' : 'USD';
+  for (const tier of changedData.tiers) {
+    const plan = changedCountry.plans[tier.id];
+    plan.price += 1;
+    plan.formattedPrice = `${changedCountry.currency} ${plan.price.toFixed(2)}`;
+  }
+  changedData.run.pricePoints = changedData.countries.length * changedData.tiers.length;
+  const removedData = structuredClone(changedData);
+  removedData.countries = removedData.countries.filter(({ country }) => country !== activeCountry.country);
+  removedData.run.pricePoints = removedData.countries.length * removedData.tiers.length;
+  const scenarios = [
+    { label: 'updated country', replacement: changedData, expectedOpen: true, expectedTitle: changedCountry.nameZh },
+    { label: 'removed country', replacement: removedData, expectedOpen: false, expectedTitle: activeCountry.nameZh }
+  ];
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await chromium.launch({ executablePath: chromePath, headless: true });
+  try {
+    for (const scenario of scenarios) {
+      const page = await browser.newPage({ viewport: { width: 1365, height: 900 } });
+      let priceCalls = 0;
+      let historyCalls = 0;
+      let releaseSecondHistory;
+      const secondHistoryReady = new Promise((resolve) => { releaseSecondHistory = resolve; });
+      const errors = [];
+      page.on('pageerror', (error) => errors.push(error.message));
+      page.on('console', (message) => {
+        if (message.type() === 'error' && !message.text().startsWith('Failed to load resource:')) errors.push(message.text());
+      });
+      await page.route('https://**/*', (route) => route.abort());
+      await page.route('**/data/prices.json*', (route) => {
+        priceCalls += 1;
+        const body = JSON.stringify(priceCalls === 1 ? fullData : scenario.replacement);
+        return route.fulfill({ status: 200, contentType: 'application/json', body });
+      });
+      await page.route('**/data/history.json*', async (route) => {
+        historyCalls += 1;
+        if (!scenario.expectedOpen && historyCalls > 1) await secondHistoryReady;
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(fullHistory) });
+      });
+      try {
+        await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+        await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, fullData.countries.length);
+        await page.locator(`#priceRows tr[data-country="${activeCountry.country}"]`).click();
+        await page.waitForFunction(() => document.querySelector('#historyDialog')?.open === true);
+        await page.locator('#retryButton').dispatchEvent('click');
+        await page.waitForFunction((count) => document.querySelector('#marketCount')?.textContent === String(count), scenario.replacement.countries.length);
+        if (scenario.expectedOpen) {
+          await page.waitForFunction((title) => document.querySelector('#historyTitle')?.textContent === title, scenario.expectedTitle);
+        } else {
+          assert.equal(await page.locator('#historyDialog').evaluate((dialog) => dialog.open), false, scenario.label);
+          releaseSecondHistory();
+          await page.waitForTimeout(100);
+          assert.equal(await page.locator('#historyDialog').evaluate((dialog) => dialog.open), false, `${scenario.label} must stay closed after the old history response resolves`);
+        }
+        assert.equal(priceCalls, 2, scenario.label);
+        assert.deepEqual(errors, [], scenario.label);
+      } finally {
+        releaseSecondHistory();
+        await page.close();
+      }
+    }
+  } finally {
+    await browser.close();
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
