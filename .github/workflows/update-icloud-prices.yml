@@ -118,11 +118,14 @@ jobs:
         id: ui_after
         shell: bash
         run: |
-          if pnpm test:ui; then
-            echo "ui_failed=false" >> "$GITHUB_OUTPUT"
+          ui_failed=false
+          pnpm test:ui || ui_failed=true
+          if pnpm exec playwright install --with-deps webkit; then
+            pnpm test:webkit || ui_failed=true
           else
-            echo "ui_failed=true" >> "$GITHUB_OUTPUT"
+            ui_failed=true
           fi
+          echo "ui_failed=$ui_failed" >> "$GITHUB_OUTPUT"
 
       - name: 上传诊断信息和 Apple 页面快照
         if: always()
