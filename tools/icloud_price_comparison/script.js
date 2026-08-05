@@ -174,6 +174,19 @@ function isValidPublishedDate(value) {
   return date.getUTCFullYear() === year && date.getUTCMonth() === month && date.getUTCDate() === day;
 }
 
+function publicationDateKey(value) {
+  const text = String(value ?? '').trim().replace(/^published\s+date\s*:?\s*/i, '');
+  if (isValidDateOnly(text)) return text;
+  const match = text.match(/^([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})$/);
+  if (match) {
+    const months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+    const month = months.indexOf(match[1].toLowerCase());
+    if (month >= 0) return `${match[3]}-${String(month + 1).padStart(2, '0')}-${String(Number(match[2])).padStart(2, '0')}`;
+  }
+  const date = new Date(text);
+  return Number.isNaN(date.getTime()) ? text : date.toISOString().slice(0, 10);
+}
+
 function isValidPublicationChanges(changes) {
   if (changes === undefined || changes === null) return true;
   if (typeof changes !== 'object' || Array.isArray(changes)) return false;
@@ -189,6 +202,16 @@ function isValidPublicationChanges(changes) {
     && (country.tiers === undefined || (Array.isArray(country.tiers) && country.tiers.every((tier) => validTier(tier)))));
 }
 
+function isChronological(entries, getDate) {
+  let previous = '';
+  for (const entry of entries) {
+    const date = getDate(entry);
+    if (date < previous) return false;
+    previous = date;
+  }
+  return true;
+}
+
 function validatePayload(fileName, payload) {
   if (fileName === 'history.json') {
     if (![1, 2].includes(payload?.schemaVersion) || !payload.countries || typeof payload.countries !== 'object' || Array.isArray(payload.countries)) {
@@ -196,6 +219,7 @@ function validatePayload(fileName, payload) {
     }
     for (const record of Object.values(payload.countries)) {
       if (!Array.isArray(record?.events) || !record.events.length) throw new Error('价格历史记录不完整');
+      if (!isChronological(record.events, (event) => event.observedAt)) throw new Error('Price history events are not chronological');
       for (const event of record.events) {
         const validEvent = isValidDateOnly(event?.observedAt)
           && typeof event.currency === 'string' && event.currency.trim()
@@ -207,6 +231,7 @@ function validatePayload(fileName, payload) {
     }
     if (payload.sourcePublishedDates !== undefined
       && (!Array.isArray(payload.sourcePublishedDates)
+        || !isChronological(payload.sourcePublishedDates, (entry) => entry.observedAt)
         || payload.sourcePublishedDates.some((entry) => !entry
           || !isValidPublishedDate(entry.publishedDate)
           || !isValidDateOnly(entry.observedAt)
@@ -352,6 +377,7 @@ function createTierButtons(container, selectedTier, handler) {
 }
 
 function populateFilters() {
+  elements.regionSelect.querySelectorAll('option:not([value="all"])').forEach((option) => option.remove());
   const regions = [...new Set(state.data.countries.map(({ region }) => region))];
 
   for (const region of regions) {
@@ -363,12 +389,13 @@ function populateFilters() {
 }
 
 function renderTierHeaders() {
-  const placeholder = document.querySelector('#tierHeaderPlaceholder');
-  if (!placeholder) return;
-  const row = placeholder.closest('tr');
-  placeholder.remove();
+  const row = document.querySelector('.price-table thead tr');
+  if (!row) return;
+  document.querySelector('#tierHeaderPlaceholder')?.remove();
+  row.querySelectorAll('th[data-tier-header]').forEach((header) => header.remove());
   for (const tier of state.data.tiers) {
     const header = document.createElement('th');
+    header.dataset.tierHeader = 'true';
     header.scope = 'col';
     header.setAttribute('aria-sort', 'none');
     const button = document.createElement('button');
@@ -386,12 +413,14 @@ function renderTierHeaders() {
 }
 
 function renderHistoryHeaders() {
-  const placeholder = document.querySelector('#historyTierHeaderPlaceholder');
-  if (!placeholder) return;
-  const row = placeholder.closest('tr');
-  placeholder.remove();
+  const row = elements.historyRows.closest('table')?.querySelector('thead tr');
+  if (!row) return;
+  document.querySelector('#historyTierHeaderPlaceholder')?.remove();
+  row.querySelectorAll('th[data-history-tier-header]').forEach((header) => header.remove());
   for (const tier of state.data.tiers) {
     const header = document.createElement('th');
+    header.dataset.historyTierHeader = 'true';
+    header.scope = 'col';
     header.textContent = tier.label;
     row.append(header);
   }
@@ -724,14 +753,16 @@ function getHistoryRecord(country) {
 
 function getPublishedDateHistory() {
   const entries = state.history?.sourcePublishedDates;
-  if (Array.isArray(entries) && entries.length) return entries;
-  if (state.data?.source?.publishedDate) {
-    return [{
-      publishedDate: state.data.source.publishedDate,
-      observedAt: formatBeijingDate(state.data.generatedAt)
-    }];
-  }
-  return [];
+  const historyEntries = Array.isArray(entries) ? [...entries] : [];
+  if (!state.data?.source?.publishedDate) return historyEntries;
+  const currentEntry = {
+    publishedDate: state.data.source.publishedDate,
+    observedAt: state.data.run?.observedAtBeijing ?? formatBeijingDate(state.data.generatedAt)
+  };
+  if (!historyEntries.length) return [currentEntry];
+  const currentKey = publicationDateKey(currentEntry.publishedDate);
+  const latestHistoryKey = publicationDateKey(historyEntries.at(-1).publishedDate);
+  return latestHistoryKey === currentKey ? historyEntries : [...historyEntries, currentEntry];
 }
 
 function countryDisplayName(entry) {
@@ -810,7 +841,7 @@ function createPublishedDateChangesCell(changes, isInitial = false) {
 function renderPublishedDateHistory() {
   if (!state.data || !elements.applePublishedDate) return;
   const entries = getPublishedDateHistory();
-  const latest = entries.at(-1)?.publishedDate ?? state.data.source.publishedDate;
+  const latest = state.data.source.publishedDate;
   elements.applePublishedDate.textContent = formatPublishedDate(latest);
   elements.publishedDateDialogCurrent.textContent = formatPublishedDate(latest);
   elements.publishedDateRows.replaceChildren();
