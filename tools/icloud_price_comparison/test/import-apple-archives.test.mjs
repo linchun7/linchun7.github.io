@@ -309,3 +309,36 @@ test('rejects archives whose Wayback capture time is in the future', async () =>
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test('does not overwrite unindexed snapshot evidence during import', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'icloud-archive-collision-'));
+  const inputDir = path.join(root, 'input');
+  const snapshotsDir = path.join(root, 'snapshots');
+  const historyPath = path.join(root, 'history.json');
+  const pricesPath = path.join(root, 'prices.json');
+  const namesPath = path.join(root, 'names.json');
+  const snapshotIndexPath = path.join(snapshotsDir, 'index.json');
+  const html = archiveHtml({ stamp: '20250512010000' });
+  const parsed = parseLegacyAppleArchive(html);
+  const preservedHtml = '<preserved evidence>';
+
+  try {
+    await Promise.all([mkdir(inputDir, { recursive: true }), mkdir(snapshotsDir, { recursive: true })]);
+    await Promise.all([
+      writeFile(path.join(inputDir, 'archive.html'), html, 'utf8'),
+      writeFile(path.join(snapshotsDir, '2025-05-12.html'), preservedHtml, 'utf8'),
+      writeFile(snapshotIndexPath, JSON.stringify({ schemaVersion: 1, snapshots: [] }), 'utf8'),
+      writeFile(historyPath, JSON.stringify({ schemaVersion: 2, countries: {}, sourcePublishedDates: [] }), 'utf8'),
+      writeFile(pricesPath, `${JSON.stringify(currentData(parsed))}\n`, 'utf8'),
+      writeFile(namesPath, '{}', 'utf8')
+    ]);
+
+    await assert.rejects(
+      importAppleArchives(inputDir, { historyPath, pricesPath, namesPath, snapshotsDir, snapshotIndexPath }),
+      /Apple archive import was not committed/
+    );
+    assert.equal(await readFile(path.join(snapshotsDir, '2025-05-12.html'), 'utf8'), preservedHtml);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

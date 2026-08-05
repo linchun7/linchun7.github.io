@@ -4,7 +4,7 @@
     {
       "publishedDate": "2024-12-05",
       "activeFile": "2024-12-05.html",
-      "activeContentHash": "ec83bc8f0580563e3d73e2e1eb776565a4305b38a7124d934b7b9ec24f83df06",
+      "activeContentHash": "192d9e5797b0a4b43cb7511776a096c3f57d8e199203820ab9a4b647efae58d9",
       "revisions": [
         {
           "publishedDate": "2024-12-05",
@@ -12,9 +12,9 @@
           "sourceUrl": "https://support.apple.com/en-us/108047",
           "archiveUrl": "https://web.archive.org/web/20250518125256/https://support.apple.com/en-us/108047",
           "parser": "legacy-archive-cross-checked",
-          "countries": 68,
-          "pricePoints": 340,
-          "contentHash": "ec83bc8f0580563e3d73e2e1eb776565a4305b38a7124d934b7b9ec24f83df06",
+          "countries": 69,
+          "pricePoints": 345,
+          "contentHash": "192d9e5797b0a4b43cb7511776a096c3f57d8e199203820ab9a4b647efae58d9",
           "dataFile": "2024-12-05.json",
           "firstConfirmedDate": "2025-05-18"
         }
