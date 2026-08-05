@@ -10,7 +10,7 @@ const CURRENCY_ALIASES = { Euro: 'EUR' };
 const COUNTRY_ALIASES = { Euro: 'Euro Zone' };
 const PRICE_CURRENCY_MARKERS = new Set([
   '$', '€', '£', '¥', '₪', '₩', '₸', '₦', '₱', '฿', '₫', '﷼',
-  'AED', 'CHF', 'Euro', 'HK$', 'R$', 'RM', 'Rp', 'Rs', 'S$', 'S/.', 'NT$', 'TSh', 'TL', 'Ft', 'Kč', 'kr', 'lei', 'p.', 'zł', 'R'
+  'AED', 'CHF', 'Euro', 'HK$', 'R$', 'RM', 'Rp', 'Rs', 'S$', 'S/.', 'NT$', 'TSh', 'TL', 'Ft', 'Kč', 'kr', 'lei', 'p.', 'zł', 'лв', 'R'
 ]);
 
 function cleanText(value) {
@@ -77,15 +77,31 @@ function parsePrice(value) {
   return parseNumericToken(token);
 }
 
-function parseCountryLabel($, node) {
+function isFollowedByPriceParagraph($, node) {
+  let next = $(node).next();
+  while (next.length && !next.is('p') && !REGIONS[next.attr('id')]) next = next.next();
+  if (!next.is('p')) return false;
+  const labelNode = next.find('b, strong').first();
+  return Boolean(labelNode.length && parseTier(cleanText(labelNode.text()).replace(/:\s*$/, '')));
+}
+
+function parseCountryLabel($, node, fallbackCurrency = null) {
   const clone = $(node).clone();
   clone.find('sup').remove();
-  const match = cleanText(clone.text()).match(/^(.*?)\s*\(([^)]+)\)\s*$/);
-  if (!match) return null;
-  const country = COUNTRY_ALIASES[match[1]] ?? match[1];
-  const currency = /^[A-Z]{3}$/.test(match[2]) ? match[2] : CURRENCY_ALIASES[match[2]];
-  if (!currency) return null;
-  return { country, currency };
+  const text = cleanText(clone.text());
+  const match = text.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+  if (match) {
+    const country = COUNTRY_ALIASES[match[1]] ?? match[1];
+    const currency = /^[A-Z]{3}$/.test(match[2]) ? match[2] : CURRENCY_ALIASES[match[2]];
+    if (!currency) return null;
+    return { country, currency };
+  }
+  if (!fallbackCurrency
+    || !isFollowedByPriceParagraph($, node)
+    || !/^[\p{L}][\p{L}\p{M} .,'’&-]{1,80}$/u.test(text)) {
+    return null;
+  }
+  return { country: COUNTRY_ALIASES[text] ?? text, currency: fallbackCurrency };
 }
 
 function parsePriceParagraph($, node) {
@@ -149,7 +165,7 @@ function parseByFlatDocumentOrder($) {
       continue;
     }
     if (!region || !$(node).is('p')) continue;
-    const country = parseCountryLabel($, node);
+    const country = parseCountryLabel($, node, current?.currency ?? null);
     if (country) {
       current = { ...country, region, plans: {} };
       countries.push(current);
@@ -173,7 +189,7 @@ function parseByRegionMarkers($) {
     let current = null;
     while (node.length && !REGIONS[node.attr('id')]) {
       if (node.is('p')) {
-        const country = parseCountryLabel($, node[0]);
+        const country = parseCountryLabel($, node[0], current?.currency ?? null);
         if (country) {
           current = { ...country, region, plans: {} };
           countries.push(current);

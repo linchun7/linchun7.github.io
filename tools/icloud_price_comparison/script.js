@@ -26,6 +26,7 @@ const state = {
   chart: null,
   eventsBound: false,
   loading: false,
+  historyStatus: 'loading',
   historyRequestId: 0
 };
 
@@ -848,6 +849,18 @@ function renderPublishedDateHistory() {
   elements.publishedDateDialogCurrent.textContent = formatPublishedDate(latest);
   elements.publishedDateRows.replaceChildren();
 
+  if (state.historyStatus !== 'ready') {
+    const row = document.createElement('tr');
+    const message = state.historyStatus === 'loading'
+      ? '发布日期历史正在加载'
+      : '历史数据暂不可用，仅显示当前发布日期';
+    const cell = createCell(message, 'empty-cell');
+    cell.colSpan = 2;
+    row.append(cell);
+    elements.publishedDateRows.append(row);
+    return;
+  }
+
   if (!entries.length) {
     const row = document.createElement('tr');
     const cell = createCell('暂无发布日期记录', 'empty-cell');
@@ -874,7 +887,12 @@ function openPublishedDateHistory() {
 }
 
 function renderHistorySubtitle(country, record) {
-  elements.historySubtitle.textContent = `${country.country} · ${REGION_LABELS[country.region] || country.region} · 记录始于 ${formatDate(record.events[0].observedAt)}`;
+  const historyState = state.historyStatus === 'loading'
+    ? ' · 历史数据正在加载，仅临时显示当前价格'
+    : state.historyStatus === 'unavailable'
+      ? ' · 历史数据暂不可用，仅显示当前价格'
+      : '';
+  elements.historySubtitle.textContent = `${country.country} · ${REGION_LABELS[country.region] || country.region} · 记录始于 ${formatDate(record.events[0].observedAt)}${historyState}`;
 }
 
 function renderHistoryContent() {
@@ -977,11 +995,13 @@ async function initialize() {
   try {
     const historyRequestId = state.historyRequestId + 1;
     state.historyRequestId = historyRequestId;
+    state.historyStatus = 'loading';
     state.history = { schemaVersion: 1, countries: {} };
     fetchJson('history.json')
       .then((historyData) => {
         if (historyRequestId !== state.historyRequestId) return;
         state.history = historyData;
+        state.historyStatus = 'ready';
         renderPublishedDateHistory();
         if (state.activeCountry && elements.historyDialog.open) {
           renderHistorySubtitle(state.activeCountry, getHistoryRecord(state.activeCountry));
@@ -990,7 +1010,13 @@ async function initialize() {
       })
       .catch((error) => {
         if (historyRequestId === state.historyRequestId) {
+          state.historyStatus = 'unavailable';
           console.warn(`价格历史加载失败，使用当前价格作为临时记录：${error.message}`);
+          renderPublishedDateHistory();
+          if (state.activeCountry && elements.historyDialog.open) {
+            renderHistorySubtitle(state.activeCountry, getHistoryRecord(state.activeCountry));
+            renderHistoryContent();
+          }
         }
       });
     state.data = await fetchJson('prices.json');

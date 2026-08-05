@@ -40,6 +40,14 @@ test('cross-checks the legacy flat paragraph layout', () => {
   assert.equal(parsed.sourcePublishedDate, 'May 12, 2025');
 });
 
+test('parses inherited legacy currencies and Bulgarian lev markers', () => {
+  const inherited = parseLegacyAppleArchive(fixture().replace('Alpha 2 (USD)', 'Armenia'));
+  assert.equal(inherited.countries.find(({ country }) => country === 'Armenia').currency, 'USD');
+
+  const levPrices = parseLegacyAppleArchive(fixture().replaceAll('$0.99', '0.99 лв'));
+  assert.equal(levPrices.countries.length, 60);
+});
+
 test('rejects legacy archives missing an Apple region even when country counts are high', () => {
   assert.throws(
     () => parseLegacyAppleArchive(fixtureWithoutAsiaPacific()),

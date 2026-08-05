@@ -1,3 +1,4 @@
+import { constants } from 'node:fs';
 import { copyFile, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,6 +12,7 @@ import {
   buildSnapshotChanges,
   publicationDateKey,
   normalizeAppleSnapshot,
+  normalizeAppleSnapshotIndex,
   defaultUpdateLockPath,
   updateHistory
 } from './update-prices.mjs';
@@ -178,7 +180,7 @@ async function importAppleArchivesUnlocked(inputDir, paths = {}) {
 
   const rebuilt = { schemaVersion: 2, updatedAt: new Date().toISOString(), countries: {}, sourcePublishedDates: [] };
   let previousData = null;
-  let snapshotIndex = migrateSnapshotIndex(existingSnapshotIndex);
+  let snapshotIndex = normalizeAppleSnapshotIndex(migrateSnapshotIndex(existingSnapshotIndex));
   const currentPublishedDate = publicationDateKey(currentData.source.publishedDate);
   if (!archives.length) throw new Error('No validated Apple archives were found in the input directory');
   const archiveDates = new Set(archives.map(({ publishedDate }) => publishedDate));
@@ -272,7 +274,7 @@ async function importAppleArchivesUnlocked(inputDir, paths = {}) {
   try {
     for (const { file, dataFile } of stagedFiles) {
       for (const name of [file, dataFile]) {
-        await copyFile(path.join(stagingDir, name), path.join(snapshotsDir, name));
+        await copyFile(path.join(stagingDir, name), path.join(snapshotsDir, name), constants.COPYFILE_EXCL);
         createdSnapshotFiles.push(path.join(snapshotsDir, name));
       }
     }

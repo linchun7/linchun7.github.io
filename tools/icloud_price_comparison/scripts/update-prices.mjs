@@ -210,6 +210,17 @@ export async function getExchangeRates(previousData, {
   if (previousUsd !== 1 || !Number.isFinite(previousCny) || previousCny <= 0) {
     throw new Error(failureMessage || 'Exchange-rate update failed');
   }
+  try {
+    validateExchangeRateFreshness(previousData.fx.fetchedAt);
+  } catch (error) {
+    throw new Error(`${failureMessage}; previous exchange rates are unusable: ${error.message}`, { cause: error });
+  }
+  const missingPreviousRates = requiredCurrencies.filter(
+    (currency) => !Number.isFinite(previousData.fx.rates[currency]) || previousData.fx.rates[currency] <= 0
+  );
+  if (missingPreviousRates.length) {
+    throw new Error(`${failureMessage}; previous exchange rates are missing for: ${missingPreviousRates.join(', ')}`);
+  }
   console.warn(`Exchange-rate update failed; keeping previous rates: ${failureMessage}`);
   return {
     ...previousData.fx,
@@ -830,7 +841,7 @@ export function buildAppleSnapshotEntry(publishedDate, {
   contentHash
 } = {}) {
   const publishedDateIso = publicationDateKey(publishedDate);
-  if (!publishedDateIso) throw new Error('Apple snapshot published date is invalid');
+  if (!isIsoDate(publishedDateIso)) throw new Error('Apple snapshot published date is invalid');
   if (!isFirstConfirmedDateAllowed(firstConfirmedDate)) {
     throw new Error('Apple snapshot first confirmation date is invalid or in the future');
   }
@@ -896,6 +907,7 @@ export function normalizeAppleSnapshotIndex(index) {
     throw new Error('Apple snapshot index has an unsupported structure');
   }
   const dates = new Set();
+  const allFiles = new Set();
   const snapshots = index.snapshots.map((snapshot) => {
     const publishedDate = snapshot?.publishedDate;
     if (!isIsoDate(publishedDate) || dates.has(publishedDate)) {
@@ -908,6 +920,8 @@ export function normalizeAppleSnapshotIndex(index) {
     if (!revisions?.length) throw new Error(`Apple snapshot index has no revisions for ${publishedDate}`);
     const hashes = new Set();
     const files = new Set();
+    const htmlFilePattern = new RegExp(`^${publishedDate}(?:-[a-f0-9]{12})?\\.html$`);
+    const dataFilePattern = new RegExp(`^${publishedDate}(?:-[a-f0-9]{12})?\\.json$`);
     const normalizedRevisions = revisions.map((revision) => {
       const normalized = {
         ...revision,
@@ -918,15 +932,21 @@ export function normalizeAppleSnapshotIndex(index) {
         || !isFirstConfirmedDateAllowed(normalized.firstConfirmedDate)
         || !validateSnapshotFileName(normalized.file, '.html')
         || !validateSnapshotFileName(normalized.dataFile, '.json')
+        || !htmlFilePattern.test(normalized.file)
+        || !dataFilePattern.test(normalized.dataFile)
         || !/^[a-f0-9]{64}$/.test(normalized.contentHash ?? '')
         || hashes.has(normalized.contentHash)
         || files.has(normalized.file)
-        || files.has(normalized.dataFile)) {
+        || files.has(normalized.dataFile)
+        || allFiles.has(normalized.file)
+        || allFiles.has(normalized.dataFile)) {
         throw new Error(`Apple snapshot index has an invalid revision for ${publishedDate}`);
       }
       hashes.add(normalized.contentHash);
       files.add(normalized.file);
       files.add(normalized.dataFile);
+      allFiles.add(normalized.file);
+      allFiles.add(normalized.dataFile);
       return normalized;
     }).sort((a, b) => a.firstConfirmedDate.localeCompare(b.firstConfirmedDate));
     const active = normalizedRevisions.at(-1);
@@ -1001,13 +1021,14 @@ export async function savePublishedAppleSnapshot(html, parsed, firstConfirmedDat
   });
   entry.file = file;
   entry.dataFile = file.replace(/\.html$/, '.json');
+  const updatedIndex = normalizeAppleSnapshotIndex(buildAppleSnapshotIndex(index, entry));
   const snapshotPath = path.join(snapshotsDir, entry.file);
   const dataPath = path.join(snapshotsDir, entry.dataFile);
   try {
     await mkdir(snapshotsDir, { recursive: true });
-    await writeFile(snapshotPath, html, 'utf8');
+    await writeFile(snapshotPath, html, { encoding: 'utf8', flag: 'wx' });
     await writeJsonAtomic(dataPath, normalizeAppleSnapshot(parsed));
-    await writeJsonAtomic(indexPath, buildAppleSnapshotIndex(index, entry));
+    await writeJsonAtomic(indexPath, updatedIndex);
   } catch (error) {
     await Promise.allSettled([
       unlink(snapshotPath),

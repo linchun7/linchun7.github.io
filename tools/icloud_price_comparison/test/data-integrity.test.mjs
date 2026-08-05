@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { access, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { publicationDateKey } from '../scripts/update-prices.mjs';
+import { parseLegacyAppleArchive } from '../scripts/parse-legacy-archive.mjs';
+import { parseApplePrices } from '../scripts/parse-prices.mjs';
+import { appleSnapshotContentHash, publicationDateKey } from '../scripts/update-prices.mjs';
 
 async function readJson(relativePath) {
   return JSON.parse(await readFile(new URL(relativePath, import.meta.url), 'utf8'));
@@ -21,6 +23,14 @@ function snapshotContentHash(snapshot) {
     })).sort((a, b) => a.country.localeCompare(b.country))
   };
   return createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
+}
+
+function parseSnapshotHtml(html) {
+  try {
+    return parseApplePrices(html);
+  } catch {
+    return parseLegacyAppleArchive(html);
+  }
 }
 
 test('committed prices and history form a complete usable snapshot', async () => {
@@ -102,6 +112,8 @@ test('committed prices and history form a complete usable snapshot', async () =>
 
     const record = history.countries[country.country];
     assert.ok(record?.events?.length, `missing history: ${country.country}`);
+    assert.equal(record.nameZh, country.nameZh, `history name mismatch: ${country.country}`);
+    assert.equal(record.region, country.region, `history region mismatch: ${country.country}`);
     let previousDate = '';
     for (const event of record.events) {
       assert.match(event.observedAt, /^\d{4}-\d{2}-\d{2}$/);
@@ -117,9 +129,11 @@ test('committed prices and history form a complete usable snapshot', async () =>
       }
     }
     const latestEvent = record.events.at(-1);
+    assert.equal(latestEvent.currency, country.currency, `latest history currency mismatch: ${country.country}`);
     for (const { id } of data.tiers) {
       assert.ok(Number.isFinite(latestEvent.plans[id]) && latestEvent.plans[id] > 0,
         `latest history is missing ${id}: ${country.country}`);
+      assert.equal(latestEvent.plans[id], country.plans[id].price, `latest history price mismatch: ${country.country} ${id}`);
     }
   }
 });
@@ -152,13 +166,20 @@ test('committed Apple snapshot index has unique dates and existing revision file
       assert.match(revision.contentHash, /^[a-f0-9]{64}$/);
       assert.match(revision.firstConfirmedDate, /^\d{4}-\d{2}-\d{2}$/);
       assert.equal('capturedAtUtc' in revision, false);
-      await access(new URL(`../data/apple-snapshots/${revision.file}`, import.meta.url));
-      const normalized = await readJson(`../data/apple-snapshots/${revision.dataFile}`);
+      const [html, normalized] = await Promise.all([
+        readFile(new URL(`../data/apple-snapshots/${revision.file}`, import.meta.url), 'utf8'),
+        readJson(`../data/apple-snapshots/${revision.dataFile}`)
+      ]);
       assert.equal(normalized.schemaVersion, 1);
       assert.equal(normalized.publishedDate, snapshot.publishedDate);
       assert.equal(normalized.countries.length, revision.countries);
       assert.equal(normalized.countries.length * normalized.tiers.length, revision.pricePoints);
       assert.equal(snapshotContentHash(normalized), revision.contentHash);
+      const parsed = parseSnapshotHtml(html);
+      assert.equal(publicationDateKey(parsed.sourcePublishedDate), snapshot.publishedDate);
+      assert.equal(parsed.countries.length, revision.countries);
+      assert.equal(parsed.countries.length * parsed.tiers.length, revision.pricePoints);
+      assert.equal(appleSnapshotContentHash(parsed), revision.contentHash);
     }
   }
 });
