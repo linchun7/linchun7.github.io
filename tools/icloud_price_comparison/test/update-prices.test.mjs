@@ -74,6 +74,15 @@ test('Apple snapshot semantic hash ignores formatted price text', () => {
 
 test('rejects malformed Apple snapshot indexes before writing', () => {
   assert.throws(
+    () => buildAppleSnapshotEntry('not-a-date', {
+      firstConfirmedDate: '2026-08-05',
+      countries: 70,
+      pricePoints: 350,
+      contentHash: 'a'.repeat(64)
+    }),
+    /published date is invalid/i
+  );
+  assert.throws(
     () => normalizeAppleSnapshotIndex({ schemaVersion: 1, snapshots: [{ publishedDate: 'not-a-date', revisions: [] }] }),
     /snapshot index/i
   );
@@ -96,6 +105,32 @@ test('rejects malformed Apple snapshot indexes before writing', () => {
           contentHash: 'a'.repeat(64)
         }]
       }]
+    }),
+    /invalid revision/i
+  );
+  assert.throws(
+    () => normalizeAppleSnapshotIndex({
+      schemaVersion: 1,
+      snapshots: [
+        {
+          publishedDate: '2026-04-06',
+          revisions: [{
+            file: '2026-04-06.html',
+            dataFile: '2026-04-06.json',
+            firstConfirmedDate: '2026-04-07',
+            contentHash: 'a'.repeat(64)
+          }]
+        },
+        {
+          publishedDate: '2026-05-12',
+          revisions: [{
+            file: '2026-04-06.html',
+            dataFile: '2026-04-06.json',
+            firstConfirmedDate: '2026-05-13',
+            contentHash: 'b'.repeat(64)
+          }]
+        }
+      ]
     }),
     /invalid revision/i
   );
@@ -975,19 +1010,52 @@ test('keeps the previous exchange rates when the refresh fails', async () => {
   const originalSetTimeout = globalThis.setTimeout;
   globalThis.fetch = async () => { throw new Error('temporary outage'); };
   globalThis.setTimeout = (callback, _delay, ...args) => originalSetTimeout(callback, 0, ...args);
+  const fetchedAt = new Date().toISOString();
   try {
     const fx = await getExchangeRates({
       fx: {
         sourceUrl: 'https://example.test/rates',
         base: 'USD',
-        fetchedAt: '2026-07-30T00:00:00.000Z',
+        fetchedAt,
         rates: { USD: 1, CNY: 7.1, JPY: 150 }
       }
     });
     assert.equal(fx.stale, true);
     assert.equal(fx.apiKeyStatus, 'not-configured');
-    assert.equal(fx.fetchedAt, '2026-07-30T00:00:00.000Z');
+    assert.equal(fx.fetchedAt, fetchedAt);
     assert.equal(fx.rates.JPY, 150);
+  } finally {
+    globalThis.fetch = originalFetch;
+    globalThis.setTimeout = originalSetTimeout;
+  }
+});
+
+test('rejects expired or incomplete previous rates when both online sources fail', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalSetTimeout = globalThis.setTimeout;
+  globalThis.fetch = async () => { throw new Error('temporary outage'); };
+  globalThis.setTimeout = (callback, _delay, ...args) => originalSetTimeout(callback, 0, ...args);
+  try {
+    await assert.rejects(
+      () => getExchangeRates({
+        fx: {
+          base: 'USD',
+          fetchedAt: new Date(Date.now() - (37 * 60 * 60 * 1000)).toISOString(),
+          rates: { USD: 1, CNY: 7.1, JPY: 150 }
+        }
+      }, { requiredCurrencies: ['USD', 'CNY', 'JPY'] }),
+      /previous exchange rates are unusable: Exchange-rate response is too old/
+    );
+    await assert.rejects(
+      () => getExchangeRates({
+        fx: {
+          base: 'USD',
+          fetchedAt: new Date().toISOString(),
+          rates: { USD: 1, CNY: 7.1 }
+        }
+      }, { requiredCurrencies: ['USD', 'CNY', 'JPY'] }),
+      /previous exchange rates are missing for: JPY/
+    );
   } finally {
     globalThis.fetch = originalFetch;
     globalThis.setTimeout = originalSetTimeout;

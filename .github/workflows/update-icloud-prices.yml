@@ -33,10 +33,10 @@ jobs:
       automatic_run_date_beijing: ${{ steps.daily_guard.outputs.automatic_run_date_beijing }}
     steps:
       - name: 检出仓库
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: 配置 Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 22
 
@@ -60,7 +60,7 @@ jobs:
         working-directory: tools/icloud_price_comparison
     steps:
       - name: 检出仓库
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
 
@@ -90,7 +90,7 @@ jobs:
           fi
 
       - name: 配置 Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 22
 
@@ -127,7 +127,7 @@ jobs:
       - name: 上传诊断信息和 Apple 页面快照
         if: always()
         continue-on-error: true
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: icloud-price-diagnostics-${{ github.run_id }}
           path: tools/icloud_price_comparison/artifacts
@@ -157,6 +157,9 @@ jobs:
           git add tools/icloud_price_comparison/data
           git commit -m "chore: update iCloud prices"
           git pull --rebase origin main
+          pnpm --dir tools/icloud_price_comparison install --frozen-lockfile
+          pnpm --dir tools/icloud_price_comparison run test:core
+          pnpm --dir tools/icloud_price_comparison run test:data
           git push origin HEAD:main
 
       - name: 记录浏览器界面测试警告

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "updatedAt": "2026-08-05T02:42:43.470Z",
+  "updatedAt": "2026-08-05T06:09:43.309Z",
   "countries": {
     "Bahamas": {
       "nameZh": "巴哈马",
@@ -211,17 +211,6 @@
       "events": [
         {
           "observedAt": "2024-12-05",
-          "currency": "USD",
-          "plans": {
-            "50GB": 1.19,
-            "200GB": 3.49,
-            "2TB": 11.99,
-            "6TB": 34.99,
-            "12TB": 69.99
-          }
-        },
-        {
-          "observedAt": "2025-05-22",
           "currency": "USD",
           "plans": {
             "50GB": 1.19,
@@ -1306,7 +1295,7 @@
       "region": "Europe, Middle East & Africa",
       "events": [
         {
-          "observedAt": "2025-05-22",
+          "observedAt": "2024-12-05",
           "currency": "USD",
           "plans": {
             "50GB": 1.19,
@@ -1408,10 +1397,6 @@
         "addedTiers": [],
         "removedTiers": [],
         "addedCountries": [
-          {
-            "country": "Armenia",
-            "nameZh": "亚美尼亚"
-          },
           {
             "country": "Azerbaijan",
             "nameZh": "阿塞拜疆"
@@ -1521,21 +1506,6 @@
                 "id": "12TB",
                 "from": 199.9,
                 "to": 259.9
-              }
-            ]
-          },
-          {
-            "country": "Albania",
-            "nameZh": "阿尔巴尼亚",
-            "fromCurrency": "USD",
-            "toCurrency": "USD",
-            "fromRegion": "Europe, Middle East & Africa",
-            "toRegion": "Europe, Middle East & Africa",
-            "tiers": [
-              {
-                "id": "200GB",
-                "from": 3.49,
-                "to": 3.59
               }
             ]
           }

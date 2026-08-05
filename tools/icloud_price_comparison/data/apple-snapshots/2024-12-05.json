@@ -35,6 +35,18 @@
       "currency": "USD",
       "plans": {
         "12TB": 69.99,
+        "200GB": 3.59,
+        "2TB": 11.99,
+        "50GB": 1.19,
+        "6TB": 34.99
+      }
+    },
+    {
+      "country": "Armenia",
+      "region": "Europe, Middle East & Africa",
+      "currency": "USD",
+      "plans": {
+        "12TB": 69.99,
         "200GB": 3.49,
         "2TB": 11.99,
         "50GB": 1.19,
