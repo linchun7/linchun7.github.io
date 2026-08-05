@@ -736,7 +736,7 @@ test('keeps history dialog usable when Chart construction fails', { timeout: 30_
   }
 });
 
-test('keeps the page bounded at 280px while the price table scrolls', { timeout: 30_000 }, async (context) => {
+test('keeps the page and publication history bounded at 280px while the price table scrolls', { timeout: 30_000 }, async (context) => {
   const browserConfig = await resolveBrowser(context, 'the 280px UI test');
   if (!browserConfig) return;
   const validData = await readFixture('prices.json');
@@ -770,6 +770,20 @@ test('keeps the page bounded at 280px while the price table scrolls', { timeout:
     });
     assert.ok(layout.documentWidth <= layout.viewportWidth + 1);
     assert.ok(layout.tableWidth > layout.tableClientWidth);
+
+    await page.locator('#publishedDateButton').click();
+    await page.waitForFunction(() => document.querySelector('#publishedDateDialog')?.open === true);
+    const publicationLayout = await page.locator('#publishedDateDialog').evaluate((dialog) => {
+      const scroller = dialog.querySelector('.history-table-scroll');
+      const cells = [...dialog.querySelector('#publishedDateRows tr').cells].map((cell) => cell.getBoundingClientRect());
+      return {
+        clientWidth: scroller.clientWidth,
+        scrollWidth: scroller.scrollWidth,
+        stacked: cells[1].top >= cells[0].bottom - 1
+      };
+    });
+    assert.ok(publicationLayout.scrollWidth <= publicationLayout.clientWidth + 1, 'production publication history must not scroll horizontally at 280px');
+    assert.equal(publicationLayout.stacked, true, 'production publication history must stack date above details at 280px');
   } finally {
     await page.close();
     await browser.close();
