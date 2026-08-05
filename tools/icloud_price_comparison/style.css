@@ -530,9 +530,7 @@ th[aria-sort="ascending"], th[aria-sort="descending"] { color: var(--accent-dark
   .segmented { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .segmented button { padding-inline: 3px; font-size: 11px; }
   .chart-wrap { height: 230px; }
-}
 
-@media (max-width: 360px) {
   .source-history-dialog .history-table-scroll thead {
     display: block;
     position: absolute;

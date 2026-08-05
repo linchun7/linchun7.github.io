@@ -736,8 +736,8 @@ test('keeps history dialog usable when Chart construction fails', { timeout: 30_
   }
 });
 
-test('keeps the page and publication history bounded at 280px while the price table scrolls', { timeout: 30_000 }, async (context) => {
-  const browserConfig = await resolveBrowser(context, 'the 280px UI test');
+test('keeps the page and publication history bounded on narrow mobile screens while the price table scrolls', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the narrow mobile UI test');
   if (!browserConfig) return;
   const validData = await readFixture('prices.json');
   const validHistory = await readFixture('history.json');
@@ -784,6 +784,19 @@ test('keeps the page and publication history bounded at 280px while the price ta
     });
     assert.ok(publicationLayout.scrollWidth <= publicationLayout.clientWidth + 1, 'production publication history must not scroll horizontally at 280px');
     assert.equal(publicationLayout.stacked, true, 'production publication history must stack date above details at 280px');
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const mobilePublicationLayout = await page.locator('#publishedDateDialog').evaluate((dialog) => {
+      const scroller = dialog.querySelector('.history-table-scroll');
+      const cells = [...dialog.querySelector('#publishedDateRows tr').cells].map((cell) => cell.getBoundingClientRect());
+      return {
+        clientWidth: scroller.clientWidth,
+        scrollWidth: scroller.scrollWidth,
+        stacked: cells[1].top >= cells[0].bottom - 1
+      };
+    });
+    assert.ok(mobilePublicationLayout.scrollWidth <= mobilePublicationLayout.clientWidth + 1, 'production publication history must not scroll horizontally at 390px');
+    assert.equal(mobilePublicationLayout.stacked, true, 'production publication history must stack date above details at 390px');
   } finally {
     await page.close();
     await browser.close();
@@ -966,8 +979,12 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
         assert.equal(publicationHeaders[0].overflowWrap, 'normal', 'Apple publication-date header must not split individual date characters');
         assert.equal(publicationHeaders[0].wordBreak, 'keep-all', 'Apple publication-date header must keep the Chinese date label together');
         assert.equal(publicationHeaders[0].position, 'static', 'publication history header cells must not overlap the sticky dialog header');
-        if (viewport.width <= 360) {
-          assert.equal(publicationHeaders[0].containerPosition, 'absolute', 'extreme mobile widths must visually hide the table header without removing it');
+        if (viewport.width <= 640) {
+          assert.equal(publicationHeaders[0].containerPosition, 'absolute', 'mobile widths must visually hide the table header without removing it');
+          const mobileLabels = await page.locator('#publishedDateRows tr').first().locator('td').evaluateAll((cells) => (
+            cells.map((cell) => getComputedStyle(cell, '::before').content)
+          ));
+          assert.deepEqual(mobileLabels, ['"发布日期"', '"本次内容变化"'], 'stacked mobile records must retain visible field labels');
         } else {
           assert.equal(publicationHeaders[0].containerPosition, 'static', 'publication history header must remain visible above two-column records');
           assert.ok(publicationHeaders[0].scrollWidth <= publicationHeaders[0].clientWidth + 1, 'Apple publication-date header must not clip horizontally');
@@ -1007,9 +1024,9 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
         if (viewport.width <= 640) {
           assert.equal(await verboseCell.evaluate((element) => getComputedStyle(element).textAlign), 'left', 'mobile publication details must remain easy to scan');
         }
-        if (viewport.width <= 360) {
+        if (viewport.width <= 640) {
           const stackedCells = await page.locator('#publishedDateRows tr').first().locator('td').evaluateAll((cells) => cells.map((cell) => cell.getBoundingClientRect()));
-          assert.ok(stackedCells[1].top >= stackedCells[0].bottom - 1, 'extreme mobile publication records must stack date above details');
+          assert.ok(stackedCells[1].top >= stackedCells[0].bottom - 1, 'mobile publication records must stack date above details');
         }
         if (process.env.SCREENSHOT_DIR) {
           await verboseCell.scrollIntoViewIfNeeded();
