@@ -273,3 +273,39 @@ test('rejects empty or incomplete archive inputs without rewriting history', asy
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test('rejects archives whose Wayback capture time is in the future', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'icloud-archive-future-capture-'));
+  const inputDir = path.join(root, 'input');
+  const snapshotsDir = path.join(root, 'snapshots');
+  const historyPath = path.join(root, 'history.json');
+  const pricesPath = path.join(root, 'prices.json');
+  const namesPath = path.join(root, 'names.json');
+  const snapshotIndexPath = path.join(snapshotsDir, 'index.json');
+  const currentHtml = archiveHtml({ stamp: '20250512010000' });
+  const futureHtml = archiveHtml({ stamp: '20990101000000' });
+  const parsedCurrent = parseLegacyAppleArchive(currentHtml);
+
+  try {
+    await mkdir(inputDir, { recursive: true });
+    await Promise.all([
+      writeFile(path.join(inputDir, 'future.html'), futureHtml, 'utf8'),
+      writeFile(historyPath, JSON.stringify({ schemaVersion: 2, countries: {}, sourcePublishedDates: [] }), 'utf8'),
+      writeFile(pricesPath, `${JSON.stringify(currentData(parsedCurrent))}\n`, 'utf8'),
+      writeFile(namesPath, '{}', 'utf8')
+    ]);
+    await assert.rejects(
+      importAppleArchives(inputDir, {
+        historyPath,
+        pricesPath,
+        namesPath,
+        snapshotsDir,
+        snapshotIndexPath
+      }),
+      /Wayback timestamp is in the future/
+    );
+    await assert.rejects(readdir(snapshotsDir), { code: 'ENOENT' });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

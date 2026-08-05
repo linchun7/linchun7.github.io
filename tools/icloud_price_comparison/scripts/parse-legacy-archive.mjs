@@ -8,6 +8,10 @@ const REGIONS = {
 
 const CURRENCY_ALIASES = { Euro: 'EUR' };
 const COUNTRY_ALIASES = { Euro: 'Euro Zone' };
+const PRICE_CURRENCY_MARKERS = new Set([
+  '$', '€', '£', '¥', '₪', '₩', '₸', '₦', '₱', '฿', '₫', '﷼',
+  'AED', 'CHF', 'Euro', 'HK$', 'R$', 'RM', 'Rp', 'Rs', 'S$', 'S/.', 'NT$', 'TSh', 'TL', 'Ft', 'Kč', 'kr', 'lei', 'p.', 'zł', 'R'
+]);
 
 function cleanText(value) {
   return value.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
@@ -18,30 +22,59 @@ function parseTier(value) {
   if (!match) return null;
   const amount = Number(match[1]);
   const unit = match[2].toUpperCase();
+  const capacityGb = amount * (unit === 'TB' ? 1024 : 1);
+  if (!Number.isFinite(amount) || amount <= 0 || !Number.isFinite(capacityGb) || capacityGb <= 0) return null;
   return {
     id: `${amount}${unit}`,
     label: `${amount} ${unit}`,
-    capacityGb: amount * (unit === 'TB' ? 1024 : 1)
+    capacityGb
   };
 }
 
+function isCurrencyDecoration(value) {
+  const normalized = cleanText(value).replace(/\s+/g, '');
+  if (!normalized) return true;
+  return PRICE_CURRENCY_MARKERS.has(normalized)
+    || /^[A-Z]{3}$/.test(normalized);
+}
+
+function parseNumericToken(token) {
+  const normalized = token
+    .replace(/[\u00a0\u202f]/g, ' ')
+    .replace(/’/g, "'")
+    .trim();
+  const groupedInteger = /[1-9]\d{0,2}(?:[.,' ]\d{3})+/;
+  const decimal = new RegExp('^(?:' + groupedInteger.source + '|\\d+)[.,]\\d{1,2}$');
+  const grouped = new RegExp('^' + groupedInteger.source + '$');
+  const plain = /^\d+$/;
+  if (!decimal.test(normalized) && !grouped.test(normalized) && !plain.test(normalized)) return Number.NaN;
+  if (decimal.test(normalized)) {
+    const decimalIndex = Math.max(normalized.lastIndexOf(','), normalized.lastIndexOf('.'));
+    if (normalized.slice(0, decimalIndex).includes(normalized[decimalIndex])) return Number.NaN;
+    const integerPart = normalized.slice(0, decimalIndex).replace(/[.,' ]/g, '');
+    const fractionPart = normalized.slice(decimalIndex + 1);
+    return Number(integerPart + '.' + fractionPart);
+  }
+  return Number(normalized.replace(/[.,' ]/g, ''));
+}
+
 function parsePrice(value) {
-  if (/[−-]/.test(value)) return Number.NaN;
-  const match = value.match(/[0-9][0-9.,\s']*/);
-  if (!match) return Number.NaN;
-  const compact = match[0].replace(/[\s']/g, '');
-  const comma = compact.lastIndexOf(',');
-  const dot = compact.lastIndexOf('.');
-  if (comma >= 0 && dot >= 0) {
-    const decimal = comma > dot ? ',' : '.';
-    const grouping = decimal === ',' ? '.' : ',';
-    return Number(compact.replaceAll(grouping, '').replace(decimal, '.'));
-  }
-  if (comma >= 0) {
-    const groups = compact.split(',');
-    return Number(groups.length === 2 && groups[1].length <= 2 ? groups.join('.') : groups.join(''));
-  }
-  return Number(compact);
+  const text = cleanText(value);
+  const firstDigit = text.search(/\d/);
+  const sign = text.search(/[+−-]/);
+  if (sign >= 0 && (firstDigit < 0 || sign < firstDigit)) return Number.NaN;
+  if (/[()]/.test(text)) return Number.NaN;
+  const matches = [...text.matchAll(/[0-9][0-9.,\s'’]*/g)];
+  if (matches.length !== 1) return Number.NaN;
+  const match = matches[0];
+  const rawToken = match[0];
+  const token = rawToken.trim();
+  const tokenStart = match.index + rawToken.search(/\S/);
+  const tokenEnd = tokenStart + token.length;
+  const prefix = text.slice(0, tokenStart).trim();
+  const suffix = text.slice(tokenEnd).trim();
+  if (!isCurrencyDecoration(prefix) || !isCurrencyDecoration(suffix)) return Number.NaN;
+  return parseNumericToken(token);
 }
 
 function parseCountryLabel($, node) {
@@ -79,6 +112,17 @@ function extractPublishedDate($) {
 function finalize(countries, tiers, sourcePublishedDate) {
   if (countries.length < 60) throw new Error(`Only ${countries.length} archived countries were parsed`);
   if (tiers.size < 3) throw new Error('Archived storage tiers are incomplete');
+  const capacities = new Map();
+  for (const tier of tiers.values()) {
+    if (!Number.isFinite(tier.capacityGb) || tier.capacityGb <= 0) {
+      throw new Error(`Invalid archived storage capacity: ${tier.label}`);
+    }
+    const existing = capacities.get(tier.capacityGb);
+    if (existing && existing.id !== tier.id) {
+      throw new Error(`Duplicate archived storage capacity ${tier.capacityGb} GB`);
+    }
+    capacities.set(tier.capacityGb, tier);
+  }
   const parsedRegions = new Set(countries.map(({ region }) => region));
   const missingRegions = Object.values(REGIONS).filter((region) => !parsedRegions.has(region));
   if (missingRegions.length) {

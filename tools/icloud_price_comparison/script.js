@@ -379,6 +379,7 @@ function createTierButtons(container, selectedTier, handler) {
 function populateFilters() {
   elements.regionSelect.querySelectorAll('option:not([value="all"])').forEach((option) => option.remove());
   const regions = [...new Set(state.data.countries.map(({ region }) => region))];
+  if (state.region !== 'all' && !regions.includes(state.region)) state.region = 'all';
 
   for (const region of regions) {
     const option = document.createElement('option');
@@ -386,6 +387,7 @@ function populateFilters() {
     option.textContent = REGION_LABELS[region] || region;
     elements.regionSelect.append(option);
   }
+  elements.regionSelect.value = state.region;
 }
 
 function renderTierHeaders() {
@@ -906,6 +908,25 @@ function openHistory(country) {
   refreshIcons();
 }
 
+function syncActiveHistoryCountry() {
+  const activeCountryId = state.activeCountry?.country;
+  if (!activeCountryId) return;
+  const currentCountry = state.data.countries.find(({ country }) => country === activeCountryId);
+  if (!currentCountry) {
+    state.activeCountry = null;
+    if (elements.historyDialog.open) elements.historyDialog.close();
+    return;
+  }
+
+  state.activeCountry = currentCountry;
+  if (!elements.historyDialog.open) return;
+  elements.historyTitle.textContent = currentCountry.nameZh || currentCountry.country;
+  const record = getHistoryRecord(currentCountry);
+  renderHistorySubtitle(currentCountry, record);
+  renderHistoryTierButtons();
+  renderHistoryContent();
+}
+
 function bindEvents() {
   if (state.eventsBound) return;
   state.eventsBound = true;
@@ -977,6 +998,7 @@ async function initialize() {
       state.sortTier = state.data.tiers.find(({ id }) => id === DEFAULT_SORT_TIER)?.id || state.data.tiers[0].id;
     }
     state.historyTier = state.sortTier;
+    syncActiveHistoryCountry();
     calculateMinimumPrices();
     populateFilters();
     bindEvents();
