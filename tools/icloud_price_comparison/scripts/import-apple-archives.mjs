@@ -1,10 +1,11 @@
-import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseLegacyAppleArchive } from './parse-legacy-archive.mjs';
 import { parseApplePrices, validatePrices } from './parse-prices.mjs';
 import {
   appleSnapshotContentHash,
+  acquireUpdateLock,
   buildAppleSnapshotEntry,
   buildAppleSnapshotIndex,
   buildSnapshotChanges,
@@ -21,6 +22,18 @@ const NAMES_PATH = path.join(PROJECT_DIR, 'scripts/country-names.zh.json');
 const SNAPSHOTS_DIR = path.join(PROJECT_DIR, 'data/apple-snapshots');
 const SNAPSHOT_INDEX_PATH = path.join(SNAPSHOTS_DIR, 'index.json');
 const APPLE_URL = 'https://support.apple.com/en-us/108047';
+
+async function writeTextAtomic(filePath, text) {
+  await mkdir(path.dirname(filePath), { recursive: true });
+  const temporaryPath = `${filePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  try {
+    await writeFile(temporaryPath, text, 'utf8');
+    await rename(temporaryPath, filePath);
+  } catch (error) {
+    await rm(temporaryPath, { force: true });
+    throw error;
+  }
+}
 
 function archiveMetadata(html) {
   const match = html.match(/web\/([0-9]{14})\/https:\/\/support\.apple\.com\/en-us\/108047/);
@@ -113,6 +126,19 @@ function migrateSnapshotIndex(index) {
 export async function importAppleArchives(inputDir, paths = {}) {
   if (!inputDir) throw new Error('Archive input directory is required');
   const historyPath = paths.historyPath ?? HISTORY_PATH;
+  const lockPath = paths.lockPath ?? (
+    paths.historyPath ? path.join(path.dirname(historyPath), '.icloud-price-update.lock') : path.join(PROJECT_DIR, '.icloud-price-update.lock')
+  );
+  const releaseLock = await acquireUpdateLock(lockPath);
+  try {
+    return await importAppleArchivesUnlocked(inputDir, paths);
+  } finally {
+    await releaseLock();
+  }
+}
+
+async function importAppleArchivesUnlocked(inputDir, paths = {}) {
+  const historyPath = paths.historyPath ?? HISTORY_PATH;
   const pricesPath = paths.pricesPath ?? PRICES_PATH;
   const namesPath = paths.namesPath ?? NAMES_PATH;
   const snapshotsDir = paths.snapshotsDir ?? SNAPSHOTS_DIR;
@@ -136,7 +162,11 @@ export async function importAppleArchives(inputDir, paths = {}) {
     validatePrices(parsed.countries, { tiers: parsed.tiers, minCountries: 60 });
     const publishedDate = publicationDateKey(parsed.sourcePublishedDate);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(publishedDate)) throw new Error(`Invalid publication date in ${fileName}`);
-    archives.push({ fileName, filePath, html, parsed, publishedDate, ...archiveMetadata(html) });
+    const metadata = archiveMetadata(html);
+    if (publishedDate > metadata.firstConfirmedDate) {
+      throw new Error(`Archive ${fileName} has a publication date after its Wayback confirmation date`);
+    }
+    archives.push({ fileName, filePath, html, parsed, publishedDate, ...metadata });
   }
   archives.sort((a, b) => (
     a.publishedDate.localeCompare(b.publishedDate)
@@ -159,7 +189,7 @@ export async function importAppleArchives(inputDir, paths = {}) {
   await mkdir(snapshotsDir, { recursive: true });
   const stagingDir = await mkdtemp(path.join(path.dirname(snapshotsDir), '.apple-snapshot-import-'));
   const createdSnapshotFiles = [];
-  const stagedFiles = new Map();
+  const stagedFiles = [];
   const originalHistoryText = await readFile(historyPath, 'utf8');
   const originalIndexText = await readFile(snapshotIndexPath, 'utf8').catch((error) => {
     if (error.code === 'ENOENT') return null;
@@ -199,7 +229,7 @@ export async function importAppleArchives(inputDir, paths = {}) {
         await rm(stagingDir, { recursive: true, force: true });
         throw new Error(`Apple archive staging failed: ${error.message}`, { cause: error });
       }
-      stagedFiles.set(contentHash, { file: entry.file, dataFile: entry.dataFile });
+      stagedFiles.push({ file: entry.file, dataFile: entry.dataFile });
     }
     updateHistory(rebuilt, archive.parsed.countries, archive.publishedDate, archive.parsed.tiers);
     const changes = previousData ? buildSnapshotChanges(previousData, archive.parsed.countries, archive.parsed.tiers) : emptyChanges();
@@ -238,21 +268,21 @@ export async function importAppleArchives(inputDir, paths = {}) {
   }
 
   try {
-    for (const { file, dataFile } of stagedFiles.values()) {
+    for (const { file, dataFile } of stagedFiles) {
       for (const name of [file, dataFile]) {
         await copyFile(path.join(stagingDir, name), path.join(snapshotsDir, name));
         createdSnapshotFiles.push(path.join(snapshotsDir, name));
       }
     }
-    await writeFile(historyPath, `${JSON.stringify(rebuilt, null, 2)}\n`, 'utf8');
-    await writeFile(snapshotIndexPath, `${JSON.stringify(snapshotIndex, null, 2)}\n`, 'utf8');
+    await writeTextAtomic(historyPath, `${JSON.stringify(rebuilt, null, 2)}\n`);
+    await writeTextAtomic(snapshotIndexPath, `${JSON.stringify(snapshotIndex, null, 2)}\n`);
     await rm(stagingDir, { recursive: true, force: true });
     return { archives, history: rebuilt, snapshotIndex };
   } catch (error) {
     await Promise.all(createdSnapshotFiles.map((file) => rm(file, { force: true })));
-    await writeFile(historyPath, originalHistoryText, 'utf8');
+    await writeTextAtomic(historyPath, originalHistoryText);
     if (originalIndexText === null) await rm(snapshotIndexPath, { force: true });
-    else await writeFile(snapshotIndexPath, originalIndexText, 'utf8');
+    else await writeTextAtomic(snapshotIndexPath, originalIndexText);
     await rm(stagingDir, { recursive: true, force: true });
     throw new Error(`Apple archive import was not committed: ${error.message}`, { cause: error });
   }

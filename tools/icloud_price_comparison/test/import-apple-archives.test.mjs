@@ -151,6 +151,75 @@ test('uses the Beijing calendar date for Wayback confirmation dates', async () =
   }
 });
 
+test('keeps separate evidence for different publication dates with identical content', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'icloud-archive-identical-dates-'));
+  const inputDir = path.join(root, 'input');
+  const snapshotsDir = path.join(root, 'snapshots');
+  const historyPath = path.join(root, 'history.json');
+  const pricesPath = path.join(root, 'prices.json');
+  const namesPath = path.join(root, 'names.json');
+  const snapshotIndexPath = path.join(snapshotsDir, 'index.json');
+  const firstHtml = archiveHtml({ date: 'May 12, 2025', stamp: '20250512010000' });
+  const secondHtml = archiveHtml({ date: 'May 13, 2025', stamp: '20250513010000' });
+  const parsedCurrent = parseLegacyAppleArchive(secondHtml);
+
+  try {
+    await mkdir(inputDir, { recursive: true });
+    await Promise.all([
+      writeFile(path.join(inputDir, 'first.html'), firstHtml, 'utf8'),
+      writeFile(path.join(inputDir, 'second.html'), secondHtml, 'utf8'),
+      writeFile(historyPath, JSON.stringify({ schemaVersion: 2, countries: {}, sourcePublishedDates: [] }), 'utf8'),
+      writeFile(pricesPath, `${JSON.stringify(currentData(parsedCurrent))}\n`, 'utf8'),
+      writeFile(namesPath, '{}', 'utf8')
+    ]);
+
+    const result = await importAppleArchives(inputDir, {
+      historyPath,
+      pricesPath,
+      namesPath,
+      snapshotsDir,
+      snapshotIndexPath
+    });
+    assert.equal(result.snapshotIndex.snapshots.length, 2);
+    for (const snapshot of result.snapshotIndex.snapshots) {
+      const revision = snapshot.revisions[0];
+      await access(path.join(snapshotsDir, revision.file));
+      await access(path.join(snapshotsDir, revision.dataFile));
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('rejects archives whose publication date is after the Wayback confirmation date', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'icloud-archive-future-published-'));
+  const inputDir = path.join(root, 'input');
+  const snapshotsDir = path.join(root, 'snapshots');
+  const historyPath = path.join(root, 'history.json');
+  const pricesPath = path.join(root, 'prices.json');
+  const namesPath = path.join(root, 'names.json');
+  const snapshotIndexPath = path.join(snapshotsDir, 'index.json');
+  const html = archiveHtml({ date: 'December 31, 2030', stamp: '20200101000000' });
+  const parsed = parseLegacyAppleArchive(html);
+
+  try {
+    await mkdir(inputDir, { recursive: true });
+    await Promise.all([
+      writeFile(path.join(inputDir, 'future.html'), html, 'utf8'),
+      writeFile(historyPath, JSON.stringify({ schemaVersion: 2, countries: {}, sourcePublishedDates: [] }), 'utf8'),
+      writeFile(pricesPath, `${JSON.stringify(currentData(parsed))}\n`, 'utf8'),
+      writeFile(namesPath, '{}', 'utf8')
+    ]);
+
+    await assert.rejects(
+      importAppleArchives(inputDir, { historyPath, pricesPath, namesPath, snapshotsDir, snapshotIndexPath }),
+      /publication date after its Wayback confirmation date/
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('rejects empty or incomplete archive inputs without rewriting history', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'icloud-archive-guard-'));
   const inputDir = path.join(root, 'input');
