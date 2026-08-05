@@ -45,8 +45,8 @@ jobs:
       - name: 安装项目依赖
         run: pnpm install --frozen-lockfile
 
-      - name: 安装 WebKit
-        run: pnpm exec playwright install --with-deps webkit
+      - name: 安装 Chromium 与 WebKit
+        run: pnpm exec playwright install --with-deps chromium webkit
 
       - name: 运行核心与数据测试
         run: pnpm test:core

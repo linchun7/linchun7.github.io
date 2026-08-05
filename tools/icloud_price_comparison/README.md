@@ -86,11 +86,11 @@ UI 测试失败只产生警告，不阻断已经通过抓取和核心数据校�
 
 ## 本地验证
 
-以下命令从 `tools/icloud_price_comparison/` 执行，需要 Node.js 22+、pnpm、Chrome/Chromium，并先安装 Playwright WebKit：
+以下命令从 `tools/icloud_price_comparison/` 执行，需要 Node.js 22+、pnpm，并先安装 Playwright Chromium 与 WebKit：
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm exec playwright install webkit
+pnpm exec playwright install chromium webkit
 pnpm test
 pnpm test:core
 pnpm test:data
@@ -103,7 +103,7 @@ pnpm audit --audit-level low
 - `pnpm test`：依次运行核心、真实 Chrome 和 WebKit 测试。
 - `pnpm test:core`：运行更新前的解析、数据、快照、幂等和工作流核心测试。
 - `pnpm test:data`：只检查当前提交的价格、历史、运行日志和快照索引。
-- `pnpm test:ui`：启动本地静态服务器并用真实 Chrome/Chromium 测试；CI 没有浏览器会失败，本地没有浏览器会跳过。
+- `pnpm test:ui`：启动本地静态服务器并优先使用 Playwright Chromium；未安装时回退系统 Chrome/Chromium，CI 没有浏览器会失败，本地没有浏览器会跳过。
 - `pnpm test:webkit`：使用 Playwright WebKit 运行同一套 UI 验收，用于覆盖 Safari/WebKit 兼容性。
 - `pnpm check:live`：只读访问 Apple 和汇率服务并执行校验，不写生产文件。
 - `pnpm update:data`：写入生产数据，只用于明确的手动更新或隔离环境。

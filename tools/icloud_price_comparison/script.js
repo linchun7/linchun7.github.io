@@ -27,7 +27,9 @@ const state = {
   eventsBound: false,
   loading: false,
   historyStatus: 'loading',
-  historyRequestId: 0
+  historyRequestId: 0,
+  historyReturnFocus: null,
+  publishedDateReturnFocus: null
 };
 
 const elements = {
@@ -366,6 +368,7 @@ function formatConverted(value, symbol) {
 
 function createTierButtons(container, selectedTier, handler) {
   container.replaceChildren();
+  container.style.setProperty('--tier-count', String(state.data.tiers.length));
   for (const tier of state.data.tiers) {
     const button = document.createElement('button');
     button.type = 'button';
@@ -407,6 +410,7 @@ function renderTierHeaders() {
     button.textContent = `${tier.label} / 月 `;
     const icon = document.createElement('i');
     icon.dataset.lucide = 'arrow-up-down';
+    icon.setAttribute('aria-hidden', 'true');
     button.append(icon);
     header.append(button);
     row.append(header);
@@ -532,33 +536,37 @@ function renderTable() {
   countries.forEach((country, index) => {
     const row = document.createElement('tr');
     row.dataset.country = country.country;
-    row.tabIndex = 0;
-    row.setAttribute('aria-label', `查看 ${country.nameZh || country.country} 价格历史`);
 
     const rank = createCell(String(index + 1), index < 3 && state.sortKey === 'tier' && state.sortDirection === 'asc' ? 'rank-top' : '');
     const nameCell = document.createElement('td');
+    const historyButton = document.createElement('button');
+    historyButton.type = 'button';
+    historyButton.className = 'country-history-button';
+    historyButton.setAttribute('aria-label', `查看 ${country.nameZh || country.country} 价格历史`);
     const name = document.createElement('span');
     name.className = 'country-name';
     name.textContent = country.nameZh || country.country;
-    nameCell.append(name);
+    historyButton.append(name);
     if (country.nameZh && country.nameZh !== country.country) {
       const nameEn = document.createElement('span');
       nameEn.className = 'country-name-en';
       nameEn.textContent = `${country.country} · ${country.currency}`;
-      nameCell.append(nameEn);
+      historyButton.append(nameEn);
     }
+    nameCell.append(historyButton);
 
     row.append(
       rank,
       nameCell,
       ...state.data.tiers.map(({ id }) => createPriceCell(country, id))
     );
-    row.addEventListener('click', () => openHistory(country));
-    row.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        openHistory(country);
-      }
+    historyButton.addEventListener('click', (event) => {
+      event.stopPropagation();
+      openHistory(country, historyButton);
+    });
+    row.addEventListener('click', (event) => {
+      if (event.target.closest('button, a, input, select')) return;
+      openHistory(country, historyButton);
     });
     elements.priceRows.append(row);
   });
@@ -576,6 +584,7 @@ function renderSortHeaders() {
     if (icon) {
       const replacement = document.createElement('i');
       replacement.dataset.lucide = active ? (state.sortDirection === 'asc' ? 'arrow-up' : 'arrow-down') : 'arrow-up-down';
+      replacement.setAttribute('aria-hidden', 'true');
       icon.replaceWith(replacement);
     }
   });
@@ -881,6 +890,7 @@ function renderPublishedDateHistory() {
 }
 
 function openPublishedDateHistory() {
+  state.publishedDateReturnFocus = elements.publishedDateButton;
   renderPublishedDateHistory();
   elements.publishedDateDialog.showModal();
   refreshIcons();
@@ -914,9 +924,10 @@ function renderHistoryContent() {
   renderHistoryRows(record);
 }
 
-function openHistory(country) {
+function openHistory(country, returnFocus = null) {
   const record = getHistoryRecord(country);
   state.activeCountry = country;
+  state.historyReturnFocus = returnFocus;
   state.historyTier = state.sortTier;
   elements.historyTitle.textContent = country.nameZh || country.country;
   renderHistorySubtitle(country, record);
@@ -963,6 +974,14 @@ function bindEvents() {
   });
   elements.historyDialog.addEventListener('close', () => {
     destroyChart();
+    const returnFocus = state.historyReturnFocus;
+    state.historyReturnFocus = null;
+    if (returnFocus?.isConnected) requestAnimationFrame(() => returnFocus.focus());
+  });
+  elements.publishedDateDialog.addEventListener('close', () => {
+    const returnFocus = state.publishedDateReturnFocus;
+    state.publishedDateReturnFocus = null;
+    if (returnFocus?.isConnected) requestAnimationFrame(() => returnFocus.focus());
   });
 }
 

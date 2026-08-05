@@ -11,6 +11,27 @@ import {
 const fixtureUrl = new URL('./fixtures/apple-prices.html', import.meta.url);
 const priceHistoryFixtureUrl = new URL('./fixtures/global-price-adjustments.json', import.meta.url);
 
+function testTier(id) {
+  const match = id.match(/^(\d+(?:\.\d+)?)(GB|TB)$/);
+  const amount = Number(match?.[1]);
+  const unit = match?.[2];
+  return {
+    id,
+    label: `${amount} ${unit}`,
+    capacityGb: amount * (unit === 'TB' ? 1024 : 1)
+  };
+}
+
+function testCountry(plans, overrides = {}) {
+  return {
+    country: 'Example',
+    region: 'Americas',
+    currency: 'USD',
+    plans,
+    ...overrides
+  };
+}
+
 test('parses footnotes, currencies, and all storage tiers', async () => {
   const result = parseApplePrices(await readFile(fixtureUrl, 'utf8'));
   assert.equal(result.parser, 'cross-checked');
@@ -225,20 +246,20 @@ test('does not mistake an unrelated time element for the Apple publication date'
 
 test('rejects incomplete pricing data', () => {
   assert.throws(
-    () => validatePrices([{ country: 'Example', currency: 'USD', plans: {} }], { minCountries: 1 }),
+    () => validatePrices([testCountry({})], { minCountries: 1 }),
     /Invalid 50GB price/
   );
 });
 
 test('rejects zero, negative, non-finite, and duplicate Apple prices', () => {
-  const tiers = [{ id: '50GB' }];
+  const tiers = [testTier('50GB')];
   for (const price of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
     assert.throws(
-      () => validatePrices([{ country: 'Example', currency: 'USD', plans: { '50GB': { price } } }], { minCountries: 1, tiers }),
+      () => validatePrices([testCountry({ '50GB': { price } })], { minCountries: 1, tiers }),
       /Invalid 50GB price/
     );
   }
-  const valid = { country: 'Example', currency: 'USD', plans: { '50GB': { price: 1 } } };
+  const valid = testCountry({ '50GB': { price: 1 } });
   assert.throws(
     () => validatePrices([valid, structuredClone(valid)], { minCountries: 1, tiers }),
     /Duplicate country entry/
@@ -263,10 +284,10 @@ test('rejects implausible changes against the last valid snapshot', async () => 
 });
 
 test('allows exact tenfold hard-limit boundaries but rejects either side', () => {
-  const tiers = [{ id: '50GB' }];
-  const previousCountries = [{ country: 'Example', currency: 'USD', plans: { '50GB': { price: 10 } } }];
-  const atLowerBoundary = [{ country: 'Example', currency: 'USD', plans: { '50GB': { price: 1 } } }];
-  const atUpperBoundary = [{ country: 'Example', currency: 'USD', plans: { '50GB': { price: 100 } } }];
+  const tiers = [testTier('50GB')];
+  const previousCountries = [testCountry({ '50GB': { price: 10 } })];
+  const atLowerBoundary = [testCountry({ '50GB': { price: 1 } })];
+  const atUpperBoundary = [testCountry({ '50GB': { price: 100 } })];
   assert.equal(validatePrices(atLowerBoundary, { minCountries: 1, previousCountries, tiers }), true);
   assert.equal(validatePrices(atUpperBoundary, { minCountries: 1, previousCountries, tiers }), true);
   assert.throws(
@@ -389,9 +410,10 @@ test('accepts documented global iCloud+ adjustments below the extreme-change thr
     for (const adjustment of batch.adjustments) {
       const tierIds = Object.keys(adjustment.previous);
       assert.deepEqual(Object.keys(adjustment.current), tierIds, `${batch.label}: ${adjustment.country}`);
-      const tiers = tierIds.map((id) => ({ id }));
+      const tiers = tierIds.map(testTier);
       const toCountry = (plans) => ({
         country: adjustment.country,
+        region: 'Americas',
         currency: adjustment.currency,
         plans: Object.fromEntries(Object.entries(plans).map(([id, price]) => [id, { price }]))
       });
@@ -463,6 +485,40 @@ test('rejects duplicate countries and an excessive country-count drop', async ()
       previousCountries: parsed.countries
     }),
     /Country count dropped/
+  );
+});
+
+test('rejects a country heading without a country name', async () => {
+  const fixture = await readFile(fixtureUrl, 'utf8');
+  const adjusted = fixture.replace('United States<sup>4</sup> (USD)', '<sup>4</sup> (USD)');
+  assert.throws(
+    () => parseApplePrices(adjusted),
+    /missing a country name|Both Apple parsers failed/
+  );
+});
+
+test('rejects a large regional drop even when the global country count is unchanged', async () => {
+  const parsed = parseApplePrices(await readFile(fixtureUrl, 'utf8'));
+  const previousCountries = Array.from({ length: 12 }, (_, index) => ({
+    ...structuredClone(parsed.countries[index % parsed.countries.length]),
+    country: `Previous ${index + 1}`,
+    region: index < 6 ? 'Americas' : index < 9 ? 'Europe, Middle East & Africa' : 'Asia Pacific'
+  }));
+  const currentCountries = previousCountries.map((country, index) => ({
+    ...structuredClone(country),
+    region: index < 4 ? 'Americas' : index < 9 ? 'Europe, Middle East & Africa' : 'Asia Pacific'
+  }));
+  currentCountries[0].region = 'Europe, Middle East & Africa';
+  currentCountries[1].region = 'Europe, Middle East & Africa';
+
+  assert.equal(currentCountries.length, previousCountries.length);
+  assert.throws(
+    () => validatePrices(currentCountries, {
+      minCountries: 1,
+      previousCountries,
+      tiers: parsed.tiers
+    }),
+    /Country count for Americas dropped from 6 to 2/
   );
 });
 
