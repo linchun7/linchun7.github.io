@@ -100,7 +100,7 @@
           <thead>
             <tr>
               <th class="rank-column" scope="col">#</th>
-              <th scope="col" aria-sort="none"><button type="button" data-sort="country">国家/地区 <i data-lucide="arrow-up-down"></i></button></th>
+              <th scope="col" aria-sort="none"><button type="button" data-sort="country">国家/地区 <i data-lucide="arrow-up-down" aria-hidden="true"></i></button></th>
               <th id="tierHeaderPlaceholder" scope="col" colspan="5">容量</th>
             </tr>
           </thead>
@@ -113,7 +113,7 @@
       <div class="workspace-footer">
         <div class="source-links" id="sourceLinks" aria-label="数据来源与更新时间">
           <div class="source-group">
-            <a class="source-item" href="https://support.apple.com/en-us/108047" target="_blank" rel="noreferrer"><i data-lucide="badge-check"></i>Apple iCloud+价格</a>
+            <a class="source-item" href="https://support.apple.com/en-us/108047" target="_blank" rel="noreferrer"><i data-lucide="badge-check" aria-hidden="true"></i>Apple iCloud+价格</a>
             <button class="source-meta-button" id="publishedDateButton" type="button" title="查看 Apple 官网发布日期变更记录" aria-label="查看 Apple 官网发布日期变更记录">
               <i data-lucide="calendar-days" aria-hidden="true"></i>
               <span>页面发布日期：<strong id="applePublishedDate">--</strong></span>
@@ -121,7 +121,7 @@
           </div>
           <span class="source-separator"></span>
           <div class="source-group">
-            <a class="source-item" href="https://www.exchangerate-api.com/docs/overview" target="_blank" rel="noreferrer"><i data-lucide="landmark"></i>人民币参考汇率</a>
+            <a class="source-item" href="https://www.exchangerate-api.com/docs/overview" target="_blank" rel="noreferrer"><i data-lucide="landmark" aria-hidden="true"></i>人民币参考汇率</a>
             <span class="source-status"><i data-lucide="clock-3" aria-hidden="true"></i><span id="fxStatus">更新时间：--</span></span>
           </div>
         </div>
@@ -137,7 +137,7 @@
         <h2 id="historyTitle"></h2>
         <p id="historySubtitle"></p>
       </div>
-      <button class="icon-button" id="closeHistory" type="button" aria-label="关闭价格历史" title="关闭"><i data-lucide="x"></i></button>
+      <button class="icon-button" id="closeHistory" type="button" aria-label="关闭价格历史" title="关闭"><i data-lucide="x" aria-hidden="true"></i></button>
     </div>
 
     <div class="history-current">
@@ -154,7 +154,7 @@
     <section class="chart-section" aria-labelledby="chartTitle">
       <div class="section-heading"><h3 id="chartTitle">价格变化</h3><span id="chartCurrency"></span></div>
       <div class="chart-wrap" id="chartWrap"><canvas id="historyChart"></canvas></div>
-      <div class="empty-history" id="emptyHistory" hidden><i data-lucide="calendar-clock"></i><p>当前只有初始记录，尚未检测到价格变化。</p></div>
+      <div class="empty-history" id="emptyHistory" hidden><i data-lucide="calendar-clock" aria-hidden="true"></i><p>当前只有初始记录，尚未检测到价格变化。</p></div>
     </section>
 
     <section class="history-list" aria-labelledby="historyListTitle">
@@ -175,7 +175,7 @@
         <h2 id="publishedDateDialogTitle">发布日期变更</h2>
         <p>仅在 Apple Support 页面发布日期发生变化时记录。</p>
       </div>
-      <button class="icon-button" id="closePublishedDate" type="button" aria-label="关闭发布日期记录" title="关闭"><i data-lucide="x"></i></button>
+      <button class="icon-button" id="closePublishedDate" type="button" aria-label="关闭发布日期记录" title="关闭"><i data-lucide="x" aria-hidden="true"></i></button>
     </div>
 
     <div class="published-date-current">

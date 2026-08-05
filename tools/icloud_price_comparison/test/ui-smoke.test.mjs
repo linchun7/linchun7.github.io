@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium, webkit } from 'playwright';
 
 const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const REPOSITORY_DIR = path.resolve(PROJECT_DIR, '../..');
 const CONTENT_TYPES = {
   '.css': 'text/css; charset=utf-8',
   '.html': 'text/html; charset=utf-8',
@@ -22,6 +23,18 @@ if (!['chromium', 'webkit'].includes(BROWSER_UNDER_TEST)) {
 async function readFixture(fileName) {
   return JSON.parse(await readFile(path.join(PROJECT_DIR, 'data', fileName), 'utf8'));
 }
+
+function formatUiDate(value) {
+  const text = String(value).trim().replace(/^published\s+date\s*:?\s*/i, '');
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(text)
+    ? new Date(`${text}T00:00:00Z`)
+    : new Date(`${text} 00:00:00 UTC`);
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'UTC'
+  }).format(date);
+}
+
+const uiNumberFormatter = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 });
 
 async function findChrome() {
   const candidates = [
@@ -55,6 +68,12 @@ async function resolveBrowser(context, purpose) {
     return { browserType: webkit, launchOptions: { headless: true } };
   }
 
+  try {
+    await access(chromium.executablePath());
+    return { browserType: chromium, launchOptions: { headless: true } };
+  } catch {
+    // Fall back to a system browser when Playwright Chromium is not installed.
+  }
   const executablePath = await findChrome();
   if (!executablePath) {
     if (process.env.CI) assert.fail(`Chrome or Chromium is required for ${purpose}`);
@@ -68,8 +87,9 @@ async function startServer() {
   const server = http.createServer(async (request, response) => {
     try {
       const pathname = decodeURIComponent(new URL(request.url, 'http://127.0.0.1').pathname);
-      const requestedPath = path.resolve(PROJECT_DIR, `.${pathname === '/' ? '/index.html' : pathname}`);
-      if (!requestedPath.startsWith(`${PROJECT_DIR}${path.sep}`)) {
+      const publicRoot = pathname.startsWith('/images/') ? REPOSITORY_DIR : PROJECT_DIR;
+      const requestedPath = path.resolve(publicRoot, `.${pathname === '/' ? '/index.html' : pathname}`);
+      if (!requestedPath.startsWith(`${publicRoot}${path.sep}`)) {
         response.writeHead(403).end();
         return;
       }
@@ -111,19 +131,20 @@ test('renders current prices, sorting, and country history in a real browser', {
       const errors = [];
       page.on('pageerror', (error) => errors.push(error.message));
       page.on('console', (message) => {
-        if (message.type() === 'error' && !message.text().startsWith('Failed to load resource:')) errors.push(message.text());
+        if (message.type() === 'error') errors.push(message.text());
       });
       page.on('response', (response) => {
-        const resourceType = response.request().resourceType();
-        const pathname = new URL(response.url()).pathname;
         if (response.url().startsWith(baseUrl)
-          && response.status() >= 400
-          && resourceType !== 'image'
-          && !pathname.startsWith('/images/')) {
+          && response.status() >= 400) {
           errors.push(`${response.status()} ${response.url()}`);
         }
       });
-      await page.route('https://**/*', (route) => route.abort());
+      await page.route('https://**/*', (route) => {
+        if (route.request().url().startsWith('https://www.googletagmanager.com/')) {
+          return route.fulfill({ status: 200, contentType: 'text/javascript', body: '' });
+        }
+        return route.abort();
+      });
       let releasePriceRequest;
       const priceRequestReleased = new Promise((resolve) => {
         releasePriceRequest = resolve;
@@ -250,12 +271,22 @@ test('renders current prices, sorting, and country history in a real browser', {
           await page.screenshot({ path: path.join(process.env.SCREENSHOT_DIR, `${viewport.name}.png`) });
         }
 
-        const firstCountry = expectedData.countries[0].country;
-        await page.locator('#searchInput').fill(firstCountry);
+        const searchableCountry = expectedData.countries.find(({ nameZh, country }) => nameZh && nameZh !== country) ?? expectedData.countries[0];
+        const firstCountry = searchableCountry.country;
+        const firstTier = expectedData.tiers[0].id;
+        await page.locator('#searchInput').fill(searchableCountry.nameZh || firstCountry);
         await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length === 1);
+        await page.locator('#searchInput').fill('不存在的国家或币种');
+        await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length === 0);
+        assert.match(await page.locator('#priceRows .empty-cell').textContent(), /没有符合当前条件的结果/);
         await page.locator('#searchInput').fill('');
-        await page.locator('#regionSelect').selectOption(expectedData.countries[0].region);
-        await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length > 0);
+        await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, expectedData.countries.length);
+        await page.locator('#regionSelect').selectOption(searchableCountry.region);
+        await page.locator('#searchInput').fill(searchableCountry.nameZh || firstCountry);
+        await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length === 1);
+        await page.locator(`button[data-sort-tier="${firstTier}"]`).click();
+        assert.equal(await page.locator('#priceRows tr[data-country]').count(), 1, 'combined search, region, and tier sorting should retain the matching country');
+        await page.locator('#searchInput').fill('');
         await page.locator('#regionSelect').selectOption('all');
 
         await page.locator('button[data-sort="country"]').click();
@@ -263,7 +294,6 @@ test('renders current prices, sorting, and country history in a real browser', {
         await page.locator('button[data-sort="country"]').click();
         assert.equal(await page.locator('button[data-sort="country"]').locator('xpath=ancestor::th').getAttribute('aria-sort'), 'descending');
 
-        const firstTier = expectedData.tiers[0].id;
         await page.locator(`button[data-sort-tier="${firstTier}"]`).click();
         assert.equal(
           await page.locator(`button[data-sort-tier="${firstTier}"]`).locator('xpath=ancestor::th').getAttribute('aria-sort'),
@@ -274,6 +304,9 @@ test('renders current prices, sorting, and country history in a real browser', {
         await page.locator('#searchInput').fill(historySearch);
         await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length === 1);
         const historyRow = page.locator('#priceRows tr[data-country]').first();
+        const historyButton = historyRow.locator('button.country-history-button');
+        assert.equal(await historyRow.getAttribute('tabindex'), null, 'table rows should not masquerade as interactive controls');
+        assert.equal(await historyButton.count(), 1, 'each country should expose a real history button');
         if (viewport.name === 'desktop') {
           await page.evaluate(() => {
             document.body.tabIndex = -1;
@@ -288,10 +321,10 @@ test('renders current prices, sorting, and country history in a real browser', {
           assert.equal(await page.locator('.skip-link').evaluate((element) => document.activeElement === element), true, 'skip link must be the first keyboard stop');
           await page.keyboard.press('Enter');
           assert.equal(await page.locator('#priceWorkspace').evaluate((element) => document.activeElement === element), true, 'skip link must move focus to the price workspace');
-          await historyRow.focus();
+          await historyButton.focus();
           await page.keyboard.press('Enter');
         } else {
-          await historyRow.click();
+          await historyRow.locator('.price-cell').first().click();
         }
         await page.waitForFunction(() => document.querySelector('#historyDialog')?.open === true);
         const expectedDialogName = expectedData.countries.find(({ country }) => country === historySearch)?.nameZh || historySearch;
@@ -303,6 +336,28 @@ test('renders current prices, sorting, and country history in a real browser', {
           'all generated history headers need column scope'
         );
         assert.equal(await page.locator('#historyTierControl button').count(), expectedData.tiers.length);
+        const tierLayout = await page.locator('#historyTierControl').evaluate((control) => ({
+          declaredCount: control.style.getPropertyValue('--tier-count'),
+          renderedColumns: getComputedStyle(control).gridTemplateColumns.trim().split(/\s+/).filter(Boolean).length
+        }));
+        assert.equal(tierLayout.declaredCount, String(expectedData.tiers.length));
+        assert.equal(tierLayout.renderedColumns, expectedData.tiers.length);
+        const expectedCountry = expectedData.countries.find(({ country }) => country === historySearch);
+        const expectedRecord = expectedHistory.countries[historySearch];
+        if (expectedCountry) {
+          assert.match(await page.locator('#historyLocalPrice').textContent(), new RegExp(expectedCountry.plans[firstTier].formattedPrice.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+        }
+        if (expectedRecord) {
+          const latestEvent = expectedRecord.events.at(-1);
+          assert.deepEqual(
+            await page.locator('#historyRows tr').first().locator('td').allTextContents(),
+            [
+              formatUiDate(latestEvent.observedAt),
+              latestEvent.currency,
+              ...expectedData.tiers.map(({ id }) => Number.isFinite(latestEvent.plans[id]) ? uiNumberFormatter.format(latestEvent.plans[id]) : '--')
+            ]
+          );
+        }
         if (historyCountry) {
           await page.waitForFunction(() => !document.querySelector('#chartWrap')?.hidden);
           await page.waitForFunction(() => {
@@ -330,9 +385,8 @@ test('renders current prices, sorting, and country history in a real browser', {
         if (viewport.name === 'desktop') await page.keyboard.press('Escape');
         else await page.locator('#closeHistory').click();
         await page.waitForFunction(() => document.querySelector('#historyDialog')?.open === false);
-        if (viewport.name === 'desktop') {
-          assert.equal(await historyRow.evaluate((element) => document.activeElement === element), true, 'closing history with Escape must restore row focus');
-        }
+        await page.waitForFunction(() => document.activeElement?.classList?.contains('country-history-button'));
+        assert.equal(await historyButton.evaluate((element) => document.activeElement === element), true, 'closing history must restore the real history button focus');
 
         const publishedDateAffordance = await page.locator('#publishedDateButton').evaluate((button) => ({
           cursor: getComputedStyle(button).cursor,
@@ -343,12 +397,18 @@ test('renders current prices, sorting, and country history in a real browser', {
         assert.match(publishedDateAffordance.dateDecoration, /underline/);
         assert.equal(publishedDateAffordance.iconCount, 1, 'publication-date control should only keep the leading calendar icon');
 
+        await page.locator('#publishedDateButton').focus();
         await page.locator('#publishedDateButton').click();
         await page.waitForFunction(() => document.querySelector('#publishedDateDialog')?.open === true);
         assert.equal(await page.getByRole('dialog', { name: '发布日期变更' }).count(), 1, 'publication-date dialog must have an accessible name');
-        assert.ok(await page.locator('#publishedDateRows tr').count() > 0);
-        await page.locator('#closePublishedDate').click();
+        assert.equal(await page.locator('#publishedDateRows tr').count(), expectedHistory.sourcePublishedDates.length);
+        assert.equal(
+          (await page.locator('#publishedDateRows tr').first().locator('td').first().textContent()).trim(),
+          formatUiDate(expectedHistory.sourcePublishedDates.at(-1).publishedDate)
+        );
+        await page.keyboard.press('Escape');
         await page.waitForFunction(() => document.querySelector('#publishedDateDialog')?.open === false);
+        await page.waitForFunction(() => document.activeElement?.id === 'publishedDateButton');
 
         assert.deepEqual(errors, []);
       } finally {
@@ -356,6 +416,48 @@ test('renders current prices, sorting, and country history in a real browser', {
         await page.close();
       }
     }
+  } finally {
+    await browser.close();
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test('adapts table and history controls to a different tier count', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the dynamic-tier UI test');
+  if (!browserConfig) return;
+  const expectedData = await readFixture('prices.json');
+  const threeTierData = structuredClone(expectedData);
+  threeTierData.tiers = threeTierData.tiers.slice(0, 3);
+  threeTierData.run.pricePoints = threeTierData.countries.length * threeTierData.tiers.length;
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  try {
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await page.route('https://**/*', (route) => {
+      if (route.request().url().startsWith('https://www.googletagmanager.com/')) {
+        return route.fulfill({ status: 200, contentType: 'text/javascript', body: '' });
+      }
+      return route.abort();
+    });
+    await page.route('**/data/prices.json*', (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(threeTierData)
+    }));
+    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
+    assert.equal(await page.locator('th[data-tier-header]').count(), 3);
+    await page.locator('button.country-history-button').first().click();
+    await page.waitForFunction(() => document.querySelector('#historyDialog')?.open === true);
+    const layout = await page.locator('#historyTierControl').evaluate((control) => ({
+      buttons: control.querySelectorAll('button').length,
+      declaredCount: control.style.getPropertyValue('--tier-count'),
+      renderedColumns: getComputedStyle(control).gridTemplateColumns.trim().split(/\s+/).filter(Boolean).length
+    }));
+    assert.deepEqual(layout, { buttons: 3, declaredCount: '3', renderedColumns: 3 });
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1));
+    await page.close();
   } finally {
     await browser.close();
     await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));

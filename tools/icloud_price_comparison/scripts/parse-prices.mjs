@@ -13,6 +13,7 @@ const REGIONS = {
   emea: 'Europe, Middle East & Africa',
   ap: 'Asia Pacific'
 };
+const EXPECTED_REGIONS = new Set(Object.values(REGIONS));
 
 const CURRENCY_ALIASES = {
   Euro: 'EUR'
@@ -222,7 +223,9 @@ function parseCountryHeading($, heading) {
   if (!titleMatch) throw new Error(`Unable to parse country heading: ${title}`);
 
   const [, countryLabel, currencyLabel] = titleMatch;
-  const country = COUNTRY_ALIASES[countryLabel] ?? countryLabel;
+  const normalizedCountryLabel = cleanText(countryLabel);
+  if (!normalizedCountryLabel) throw new Error(`Country heading is missing a country name: ${title}`);
+  const country = COUNTRY_ALIASES[normalizedCountryLabel] ?? normalizedCountryLabel;
   const currency = /^[A-Z]{3}$/.test(currencyLabel)
     ? currencyLabel
     : CURRENCY_ALIASES[currencyLabel];
@@ -450,12 +453,46 @@ export function parseApplePrices(html) {
 }
 
 export function validatePrices(countries, { minCountries = 60, previousCountries = [], tiers = TIERS } = {}) {
+  if (!Array.isArray(countries)) throw new Error('Apple pricing countries have an unsupported structure');
+  if (!Array.isArray(tiers) || !tiers.length) throw new Error('Apple pricing tiers have an unsupported structure');
+
+  const tierIds = new Set();
+  const tierCapacities = new Set();
+  for (const tier of tiers) {
+    if (!tier
+      || typeof tier.id !== 'string'
+      || !tier.id.trim()
+      || typeof tier.label !== 'string'
+      || !tier.label.trim()
+      || !Number.isFinite(tier.capacityGb)
+      || tier.capacityGb <= 0
+      || tierIds.has(tier.id)
+      || tierCapacities.has(tier.capacityGb)) {
+      throw new Error('Apple pricing tiers contain an invalid or duplicate entry');
+    }
+    tierIds.add(tier.id);
+    tierCapacities.add(tier.capacityGb);
+  }
+
   if (countries.length < minCountries) {
     throw new Error(`Only ${countries.length} countries were parsed; expected at least ${minCountries}`);
   }
 
   const seen = new Set();
   for (const entry of countries) {
+    if (!entry
+      || typeof entry.country !== 'string'
+      || !entry.country.trim()
+      || typeof entry.region !== 'string'
+      || !entry.region.trim()
+      || !EXPECTED_REGIONS.has(entry.region)
+      || typeof entry.currency !== 'string'
+      || !/^[A-Z]{3}$/.test(entry.currency)
+      || !entry.plans
+      || typeof entry.plans !== 'object'
+      || Array.isArray(entry.plans)) {
+      throw new Error('Apple pricing contains an invalid country, region, currency, or plans entry');
+    }
     const key = entry.country;
     if (seen.has(key)) throw new Error(`Duplicate country entry: ${key}`);
     seen.add(key);
@@ -470,6 +507,22 @@ export function validatePrices(countries, { minCountries = 60, previousCountries
 
   if (previousCountries.length && countries.length < previousCountries.length - 3) {
     throw new Error(`Country count dropped from ${previousCountries.length} to ${countries.length}`);
+  }
+
+  if (previousCountries.length) {
+    const countByRegion = (entries) => entries.reduce((counts, entry) => {
+      counts.set(entry.region, (counts.get(entry.region) ?? 0) + 1);
+      return counts;
+    }, new Map());
+    const previousRegionCounts = countByRegion(previousCountries);
+    const currentRegionCounts = countByRegion(countries);
+    for (const region of EXPECTED_REGIONS) {
+      const previousCount = previousRegionCounts.get(region) ?? 0;
+      const currentCount = currentRegionCounts.get(region) ?? 0;
+      if (currentCount < previousCount - 3) {
+        throw new Error(`Country count for ${region} dropped from ${previousCount} to ${currentCount}`);
+      }
+    }
   }
 
   const previousByCountry = new Map(previousCountries.map((entry) => [entry.country, entry]));

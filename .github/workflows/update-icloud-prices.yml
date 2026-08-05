@@ -119,8 +119,8 @@ jobs:
         shell: bash
         run: |
           ui_failed=false
-          pnpm test:ui || ui_failed=true
-          if pnpm exec playwright install --with-deps webkit; then
+          if pnpm exec playwright install --with-deps chromium webkit; then
+            pnpm test:ui || ui_failed=true
             pnpm test:webkit || ui_failed=true
           else
             ui_failed=true

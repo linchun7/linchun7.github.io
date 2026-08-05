@@ -37,6 +37,19 @@ test('builds a deduplicated Apple snapshot index by published date', () => {
   assert.equal(first.dataFile, '2026-04-06.json');
   const duplicate = buildAppleSnapshotIndex(index, { ...first, firstConfirmedDate: '2026-08-02' });
   assert.deepEqual(duplicate, index);
+  const earlierDuplicate = buildAppleSnapshotIndex(index, {
+    ...first,
+    file: '2026-04-06-ignored.html',
+    dataFile: '2026-04-06-ignored.json',
+    firstConfirmedDate: '2026-07-01',
+    archiveUrl: 'https://web.archive.org/web/20260701000000/https://support.apple.com/en-us/108047'
+  });
+  assert.equal(earlierDuplicate.snapshots[0].revisions.length, 1);
+  assert.equal(earlierDuplicate.snapshots[0].revisions[0].firstConfirmedDate, '2026-07-01');
+  assert.equal(earlierDuplicate.snapshots[0].revisions[0].file, first.file);
+  assert.equal(earlierDuplicate.snapshots[0].revisions[0].dataFile, first.dataFile);
+  assert.match(earlierDuplicate.snapshots[0].revisions[0].archiveUrl, /20260701000000/);
+  assert.equal(earlierDuplicate.snapshots[0].activeFile, first.file);
   const revised = buildAppleSnapshotIndex(index, {
     ...first,
     file: '2026-04-06-different.html',
@@ -260,6 +273,7 @@ const pricesUrl = new URL('../data/prices.json', import.meta.url);
 const historyUrl = new URL('../data/history.json', import.meta.url);
 const runLogUrl = new URL('../data/run-log.json', import.meta.url);
 const namesUrl = new URL('../scripts/country-names.zh.json', import.meta.url);
+const snapshotIndexUrl = new URL('../data/apple-snapshots/index.json', import.meta.url);
 
 function recentFxTimestamp() {
   return Math.floor(Date.now() / 1000);
@@ -347,7 +361,22 @@ async function withMockedFetch({ html, fxPayload }, callback) {
   }
 }
 
-async function createTemporaryProductionPaths() {
+async function assertRejectsBeforeFetch(callback, expected) {
+  const originalFetch = globalThis.fetch;
+  let fetched = false;
+  globalThis.fetch = async () => {
+    fetched = true;
+    throw new Error('preflight must run before network fetches');
+  };
+  try {
+    await assert.rejects(callback, expected);
+    assert.equal(fetched, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+}
+
+async function createTemporaryProductionPaths({ copySnapshots = true } = {}) {
   const root = await mkdtemp(path.join(tmpdir(), 'icloud-production-'));
   const dataDir = path.join(root, 'data');
   const paths = {
@@ -365,7 +394,28 @@ async function createTemporaryProductionPaths() {
     copyFile(runLogUrl, paths.runLogPath),
     copyFile(namesUrl, paths.namesPath)
   ]);
+  if (copySnapshots) await copyCommittedSnapshotStore(paths);
   return { root, paths };
+}
+
+async function copyCommittedSnapshotStore(paths) {
+  const index = JSON.parse(await readFile(snapshotIndexUrl, 'utf8'));
+  await mkdir(paths.snapshotsDir, { recursive: true });
+  await Promise.all([
+    copyFile(snapshotIndexUrl, paths.snapshotIndexPath),
+    ...index.snapshots.flatMap(({ revisions }) => revisions.flatMap(({ file, dataFile }) => [
+      copyFile(new URL(`../data/apple-snapshots/${file}`, import.meta.url), path.join(paths.snapshotsDir, file)),
+      copyFile(new URL(`../data/apple-snapshots/${dataFile}`, import.meta.url), path.join(paths.snapshotsDir, dataFile))
+    ]))
+  ]);
+  return index;
+}
+
+async function readSnapshotStoreState(paths) {
+  return {
+    index: await readFile(paths.snapshotIndexPath, 'utf8'),
+    files: (await readdir(paths.snapshotsDir)).sort()
+  };
 }
 
 test('runs the production write path against isolated files', async () => {
@@ -380,6 +430,7 @@ test('runs the production write path against isolated files', async () => {
     time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
     rates: data.fx.rates
   };
+  const snapshotStoreBefore = await readSnapshotStoreState(paths);
   try {
     await withMockedFetch(
       { html: buildAppleHtml(data), fxPayload },
@@ -390,11 +441,15 @@ test('runs the production write path against isolated files', async () => {
       readFile(paths.snapshotIndexPath, 'utf8').then(JSON.parse)
     ]);
     const snapshot = index.snapshots.find(({ publishedDate }) => publishedDate === '2026-07-17');
-    assert.ok(snapshot, 'production run must write the current Apple snapshot');
+    assert.ok(snapshot, 'production run must retain the current Apple snapshot');
     assert.equal(snapshot.revisions.length, 1);
-    assert.equal(snapshot.revisions[0].firstConfirmedDate, writtenData.run.observedAtBeijing);
+    assert.equal(
+      snapshot.revisions[0].firstConfirmedDate,
+      JSON.parse(snapshotStoreBefore.index).snapshots.at(-1).revisions[0].firstConfirmedDate
+    );
     assert.equal(writtenData.source.publishedDate, data.source.publishedDate);
     assert.equal(writtenData.countries.length, data.countries.length);
+    assert.deepEqual(await readSnapshotStoreState(paths), snapshotStoreBefore);
     await assert.rejects(readFile(summaryPath, 'utf8'), { code: 'ENOENT' });
   } finally {
     if (originalSummary === undefined) delete process.env.GITHUB_STEP_SUMMARY;
@@ -470,6 +525,7 @@ test('rejects a future Apple publication date before dry-run or production write
   );
 
   const { root, paths } = await createTemporaryProductionPaths();
+  const snapshotStoreBefore = await readSnapshotStoreState(paths);
   try {
     await withMockedFetch(
       { html: buildAppleHtml(data, 'January 1, 2099'), fxPayload },
@@ -478,7 +534,7 @@ test('rejects a future Apple publication date before dry-run or production write
         /Apple published date is in the future/
       )
     );
-    await assert.rejects(readFile(paths.snapshotIndexPath, 'utf8'), { code: 'ENOENT' });
+    assert.deepEqual(await readSnapshotStoreState(paths), snapshotStoreBefore);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -498,6 +554,7 @@ test('does not write a snapshot when publication-date validation fails', async (
     readFile(paths.historyPath, 'utf8'),
     readFile(paths.runLogPath, 'utf8')
   ]);
+  const snapshotStoreBefore = await readSnapshotStoreState(paths);
   try {
     await withMockedFetch(
       { html: buildAppleHtml(data, 'July 1, 2026'), fxPayload },
@@ -512,7 +569,7 @@ test('does not write a snapshot when publication-date validation fails', async (
       readFile(paths.runLogPath, 'utf8')
     ]);
     assert.deepEqual(after, before);
-    await assert.rejects(readFile(paths.snapshotIndexPath, 'utf8'), { code: 'ENOENT' });
+    assert.deepEqual(await readSnapshotStoreState(paths), snapshotStoreBefore);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -529,50 +586,95 @@ test('validates the run-log schema before persisting snapshots', async () => {
   };
   await mkdir(paths.snapshotsDir, { recursive: true });
   await writeFile(paths.runLogPath, JSON.stringify({ schemaVersion: 1, retention: 90, runs: {} }), 'utf8');
+  const snapshotStoreBefore = await readSnapshotStoreState(paths);
   try {
     await withMockedFetch(
       { html: buildAppleHtml(data), fxPayload },
       () => assert.rejects(
         main({ dryRun: false, paths, stepSummaryPath: null }),
-        /Run log has an unsupported structure/
+        /run-log\.json has an unsupported structure/i
       )
     );
-    await assert.rejects(readFile(paths.snapshotIndexPath, 'utf8'), { code: 'ENOENT' });
-    assert.deepEqual(await readdir(paths.snapshotsDir), []);
+    assert.deepEqual(await readSnapshotStoreState(paths), snapshotStoreBefore);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
 });
 
-test('preserves missing prices and history files during rollback', async () => {
+test('recreates a missing run log after a valid production update', async () => {
   const { root, paths } = await createTemporaryProductionPaths();
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
   const fxPayload = {
     result: 'success',
     base_code: 'USD',
-    time_last_update_unix: recentFxTimestamp(),
+    time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
     rates: data.fx.rates
   };
-  await rm(paths.currentDataPath);
-  await rm(paths.historyPath);
-  const runLogBefore = await readFile(paths.runLogPath, 'utf8');
-  let writes = 0;
-  const failSecondWrite = async (filePath, value) => {
-    writes += 1;
-    if (writes === 2) throw new Error('simulated history write failure');
-    await writeJsonAtomic(filePath, value);
-  };
+  await rm(paths.runLogPath);
+  const snapshotStoreBefore = await readSnapshotStoreState(paths);
   try {
     await withMockedFetch(
       { html: buildAppleHtml(data), fxPayload },
-      () => assert.rejects(
-        main({ dryRun: false, paths, stepSummaryPath: null, writeJson: failSecondWrite }),
-        /simulated history write failure/
-      )
+      () => main({ dryRun: false, paths, stepSummaryPath: null })
     );
+    const [writtenData, runLog] = await Promise.all([
+      readFile(paths.currentDataPath, 'utf8').then(JSON.parse),
+      readFile(paths.runLogPath, 'utf8').then(JSON.parse)
+    ]);
+    assert.equal(runLog.schemaVersion, 1);
+    assert.equal(runLog.retention, 90);
+    assert.equal(runLog.runs.length, 1);
+    assert.equal(runLog.runs[0].status, 'success');
+    assert.equal(runLog.runs[0].finishedAtUtc, writtenData.generatedAt);
+    assert.deepEqual(await readSnapshotStoreState(paths), snapshotStoreBefore);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('rejects a partial production baseline before any write', async () => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  await rm(paths.currentDataPath);
+  await rm(paths.historyPath);
+  const runLogBefore = await readFile(paths.runLogPath, 'utf8');
+  const snapshotStoreBefore = await readSnapshotStoreState(paths);
+  let writes = 0;
+  const countWrites = async (filePath, value) => {
+    writes += 1;
+    await writeJsonAtomic(filePath, value);
+  };
+  try {
+    await assertRejectsBeforeFetch(
+      () => main({ dryRun: false, paths, stepSummaryPath: null, writeJson: countWrites }),
+      /Production data state is partial; missing: prices\.json, history\.json/
+    );
+    assert.equal(writes, 0);
     await assert.rejects(readFile(paths.currentDataPath, 'utf8'), { code: 'ENOENT' });
     await assert.rejects(readFile(paths.historyPath, 'utf8'), { code: 'ENOENT' });
     assert.deepEqual(JSON.parse(await readFile(paths.runLogPath, 'utf8')), JSON.parse(runLogBefore));
+    assert.deepEqual(await readSnapshotStoreState(paths), snapshotStoreBefore);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('rejects an existing production baseline when the snapshot store is missing', async () => {
+  const { root, paths } = await createTemporaryProductionPaths({ copySnapshots: false });
+  const before = await Promise.all([
+    readFile(paths.currentDataPath, 'utf8'),
+    readFile(paths.historyPath, 'utf8'),
+    readFile(paths.runLogPath, 'utf8')
+  ]);
+  try {
+    await assertRejectsBeforeFetch(
+      () => main({ dryRun: false, paths, stepSummaryPath: null }),
+      /Apple snapshot store is missing for the existing production baseline/i
+    );
+    assert.deepEqual(await Promise.all([
+      readFile(paths.currentDataPath, 'utf8'),
+      readFile(paths.historyPath, 'utf8'),
+      readFile(paths.runLogPath, 'utf8')
+    ]), before);
     await assert.rejects(readFile(paths.snapshotIndexPath, 'utf8'), { code: 'ENOENT' });
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -582,6 +684,11 @@ test('preserves missing prices and history files during rollback', async () => {
 test('rolls back prices, history, logs, and snapshots when a production write fails midway', async () => {
   const { root, paths } = await createTemporaryProductionPaths();
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const changed = structuredClone(data);
+  const changedCountry = changed.countries.find(({ currency }) => currency === 'USD');
+  const changedTier = changed.tiers[0].id;
+  changedCountry.plans[changedTier].price += 0.1;
+  changedCountry.plans[changedTier].formattedPrice = `$${changedCountry.plans[changedTier].price.toFixed(2)}`;
   const fxPayload = {
     result: 'success',
     base_code: 'USD',
@@ -593,6 +700,7 @@ test('rolls back prices, history, logs, and snapshots when a production write fa
     readFile(paths.historyPath, 'utf8'),
     readFile(paths.runLogPath, 'utf8')
   ]);
+  const snapshotStoreBefore = await readSnapshotStoreState(paths);
   let writes = 0;
   const failSecondWrite = async (filePath, value) => {
     writes += 1;
@@ -602,7 +710,7 @@ test('rolls back prices, history, logs, and snapshots when a production write fa
 
   try {
     await withMockedFetch(
-      { html: buildAppleHtml(data), fxPayload },
+      { html: buildAppleHtml(changed), fxPayload },
       () => assert.rejects(
         main({ dryRun: false, paths, stepSummaryPath: null, writeJson: failSecondWrite }),
         /simulated history write failure/
@@ -614,8 +722,7 @@ test('rolls back prices, history, logs, and snapshots when a production write fa
       readFile(paths.runLogPath, 'utf8')
     ]);
     assert.deepEqual(after.map(JSON.parse), before.map(JSON.parse));
-    await assert.rejects(readFile(paths.snapshotIndexPath, 'utf8'), { code: 'ENOENT' });
-    assert.deepEqual(await readdir(paths.snapshotsDir), []);
+    assert.deepEqual(await readSnapshotStoreState(paths), snapshotStoreBefore);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -684,12 +791,12 @@ test('captures the current Apple response for failure diagnostics', async () => 
   const { root, paths } = await createTemporaryProductionPaths();
   const diagnosticsDir = path.join(root, 'diagnostics');
   const invalidData = structuredClone(data);
-  invalidData.fx.rates = { USD: 1 };
+  invalidData.fx.fetchedAt = '2020-01-01T00:00:00.000Z';
   await writeFile(paths.currentDataPath, JSON.stringify(invalidData), 'utf8');
   try {
     await withMockedFetch(
       { html: buildAppleHtml(data), fxPayload: { result: 'error', 'error-type': 'quota-reached' } },
-      () => assert.rejects(main({ dryRun: true, paths }), /Exchange-rate service returned quota-reached/)
+      () => assert.rejects(main({ dryRun: true, paths }), /quota-reached.*previous exchange rates are unusable/i)
     );
     await writeFailureDiagnostics(new Error('rate refresh failed'), {
       diagnosticsDir,
@@ -724,6 +831,7 @@ test('does not write production files when a price anomaly is rejected', async (
     readFile(paths.historyPath, 'utf8'),
     readFile(paths.runLogPath, 'utf8')
   ]);
+  const snapshotStoreBefore = await readSnapshotStoreState(paths);
   try {
     await withMockedFetch(
       { html: buildAppleHtml(changed), fxPayload },
@@ -735,37 +843,30 @@ test('does not write production files when a price anomaly is rejected', async (
       readFile(paths.runLogPath, 'utf8')
     ]);
     assert.deepEqual(after, before);
-    await assert.rejects(readFile(paths.snapshotIndexPath, 'utf8'), { code: 'ENOENT' });
+    assert.deepEqual(await readSnapshotStoreState(paths), snapshotStoreBefore);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
 });
 
-test('does not write production files when required exchange rates are missing', async () => {
+test('rejects a production baseline with missing required exchange rates before fetch', async () => {
   const { root, paths } = await createTemporaryProductionPaths();
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
   const missingCurrency = data.countries.find(({ currency }) => currency !== 'USD')?.currency;
   assert.ok(missingCurrency, 'fixture must contain a non-USD currency');
-  const rates = { ...data.fx.rates };
-  delete rates[missingCurrency];
   const previousData = structuredClone(data);
   delete previousData.fx.rates[missingCurrency];
   await writeFile(paths.currentDataPath, `${JSON.stringify(previousData, null, 2)}\n`, 'utf8');
-  const fxPayload = {
-    result: 'success',
-    base_code: 'USD',
-    time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
-    rates
-  };
   const before = await Promise.all([
     readFile(paths.currentDataPath, 'utf8'),
     readFile(paths.historyPath, 'utf8'),
     readFile(paths.runLogPath, 'utf8')
   ]);
+  const snapshotStoreBefore = await readSnapshotStoreState(paths);
   try {
-    await withMockedFetch(
-      { html: buildAppleHtml(data), fxPayload },
-      () => assert.rejects(main({ dryRun: false, paths }), /missing|缺少|currency/i)
+    await assertRejectsBeforeFetch(
+      () => main({ dryRun: false, paths }),
+      new RegExp(`Existing prices\\.json is missing exchange rates for: ${missingCurrency}`, 'i')
     );
     const after = await Promise.all([
       readFile(paths.currentDataPath, 'utf8'),
@@ -773,7 +874,7 @@ test('does not write production files when required exchange rates are missing',
       readFile(paths.runLogPath, 'utf8')
     ]);
     assert.deepEqual(after, before);
-    await assert.rejects(readFile(paths.snapshotIndexPath, 'utf8'), { code: 'ENOENT' });
+    assert.deepEqual(await readSnapshotStoreState(paths), snapshotStoreBefore);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -1650,7 +1751,7 @@ test('initializes the confirmation date before saving a production snapshot', as
 
 
 test('fails closed when the snapshot index is missing while evidence exists', async () => {
-  const { root, paths } = await createTemporaryProductionPaths();
+  const { root, paths } = await createTemporaryProductionPaths({ copySnapshots: false });
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
   const html = await readFile(new URL('../data/apple-snapshots/2026-07-17.html', import.meta.url), 'utf8');
   const fxPayload = {
@@ -1691,7 +1792,7 @@ test('fails closed when the snapshot index is missing while evidence exists', as
 });
 
 test('fails closed on an invalid snapshot index without deleting evidence', async () => {
-  const { root, paths } = await createTemporaryProductionPaths();
+  const { root, paths } = await createTemporaryProductionPaths({ copySnapshots: false });
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
   const html = await readFile(new URL('../data/apple-snapshots/2026-07-17.html', import.meta.url), 'utf8');
   const fxPayload = {
@@ -1719,7 +1820,7 @@ test('fails closed on an invalid snapshot index without deleting evidence', asyn
 });
 
 test('fails closed on an empty snapshot index without deleting evidence', async () => {
-  const { root, paths } = await createTemporaryProductionPaths();
+  const { root, paths } = await createTemporaryProductionPaths({ copySnapshots: false });
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
   const html = await readFile(new URL('../data/apple-snapshots/2026-07-17.html', import.meta.url), 'utf8');
   const fxPayload = {
@@ -1750,56 +1851,273 @@ test('fails closed on an empty snapshot index without deleting evidence', async 
 });
 
 test('fails closed when a snapshot index omits existing evidence', async () => {
-  const { root, paths } = await createTemporaryProductionPaths();
-  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
-  const html = await readFile(new URL('../data/apple-snapshots/2026-07-17.html', import.meta.url), 'utf8');
-  const fxPayload = {
-    result: 'success',
-    base_code: 'USD',
-    time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
-    rates: data.fx.rates
-  };
-  const indexedHtml = path.join(paths.snapshotsDir, '2024-12-05.html');
-  const indexedData = path.join(paths.snapshotsDir, '2024-12-05.json');
-  const unindexedHtml = path.join(paths.snapshotsDir, '2024-12-06.html');
-  const unindexedData = path.join(paths.snapshotsDir, '2024-12-06.json');
-  await mkdir(paths.snapshotsDir, { recursive: true });
-  await Promise.all([
-    writeFile(indexedHtml, '<indexed evidence>', 'utf8'),
-    writeFile(indexedData, '{"indexed":true}', 'utf8'),
-    writeFile(unindexedHtml, '<unindexed evidence>', 'utf8'),
-    writeFile(unindexedData, '{"unindexed":true}', 'utf8')
+  for (const extension of ['html', 'json']) {
+    const { root, paths } = await createTemporaryProductionPaths({ copySnapshots: false });
+    await copyCommittedSnapshotStore(paths);
+    const orphanName = `orphan-evidence.${extension}`;
+    const orphanPath = path.join(paths.snapshotsDir, orphanName);
+    await writeFile(orphanPath, extension === 'html' ? '<orphan evidence>' : '{"orphan":true}', 'utf8');
+    const before = await Promise.all([
+      readFile(paths.currentDataPath, 'utf8'),
+      readFile(paths.historyPath, 'utf8'),
+      readFile(paths.runLogPath, 'utf8'),
+      readFile(paths.snapshotIndexPath, 'utf8')
+    ]);
+    try {
+      await assertRejectsBeforeFetch(
+        () => main({ dryRun: false, paths, stepSummaryPath: null }),
+        new RegExp(`snapshot index does not reference existing evidence: ${orphanName.replace('.', '\\.')}`, 'i')
+      );
+      assert.equal(
+        await readFile(orphanPath, 'utf8'),
+        extension === 'html' ? '<orphan evidence>' : '{"orphan":true}'
+      );
+      assert.deepEqual(await Promise.all([
+        readFile(paths.currentDataPath, 'utf8'),
+        readFile(paths.historyPath, 'utf8'),
+        readFile(paths.runLogPath, 'utf8'),
+        readFile(paths.snapshotIndexPath, 'utf8')
+      ]), before);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test('fails closed when indexed snapshot evidence is missing', async () => {
+  for (const field of ['file', 'dataFile']) {
+    const { root, paths } = await createTemporaryProductionPaths({ copySnapshots: false });
+    const index = await copyCommittedSnapshotStore(paths);
+    const missingFile = index.snapshots[0].revisions[0][field];
+    await rm(path.join(paths.snapshotsDir, missingFile));
+    const before = await Promise.all([
+      readFile(paths.currentDataPath, 'utf8'),
+      readFile(paths.historyPath, 'utf8'),
+      readFile(paths.runLogPath, 'utf8'),
+      readFile(paths.snapshotIndexPath, 'utf8')
+    ]);
+    try {
+      await assertRejectsBeforeFetch(
+        () => main({ dryRun: false, paths, stepSummaryPath: null }),
+        new RegExp(`snapshot index references missing evidence: ${missingFile.replace('.', '\\.')}`, 'i')
+      );
+      assert.deepEqual(await Promise.all([
+        readFile(paths.currentDataPath, 'utf8'),
+        readFile(paths.historyPath, 'utf8'),
+        readFile(paths.runLogPath, 'utf8'),
+        readFile(paths.snapshotIndexPath, 'utf8')
+      ]), before);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test('fails closed when normalized snapshot content does not match its hash', async () => {
+  const { root, paths } = await createTemporaryProductionPaths({ copySnapshots: false });
+  const index = await copyCommittedSnapshotStore(paths);
+  const revision = index.snapshots[0].revisions[0];
+  const dataPath = path.join(paths.snapshotsDir, revision.dataFile);
+  const normalized = JSON.parse(await readFile(dataPath, 'utf8'));
+  const firstCountry = normalized.countries[0];
+  const firstTier = normalized.tiers[0].id;
+  firstCountry.plans[firstTier] += 1;
+  await writeFile(dataPath, `${JSON.stringify(normalized, null, 2)}\n`, 'utf8');
+  const corruptedEvidence = await readFile(dataPath, 'utf8');
+  const before = await Promise.all([
+    readFile(paths.currentDataPath, 'utf8'),
+    readFile(paths.historyPath, 'utf8'),
+    readFile(paths.runLogPath, 'utf8'),
+    readFile(paths.snapshotIndexPath, 'utf8')
   ]);
-  await writeFile(paths.snapshotIndexPath, JSON.stringify({
-    schemaVersion: 1,
-    snapshots: [{
-      publishedDate: '2024-12-05',
-      revisions: [{
-        file: '2024-12-05.html',
-        dataFile: '2024-12-05.json',
-        firstConfirmedDate: '2026-08-01',
-        contentHash: 'a'.repeat(64)
-      }]
-    }]
-  }), 'utf8');
+  const originalFetch = globalThis.fetch;
+  let fetched = false;
+  globalThis.fetch = async () => {
+    fetched = true;
+    throw new Error('preflight must run before network fetches');
+  };
   try {
-    await withMockedFetch(
-      { html, fxPayload },
-      () => assert.rejects(
-        main({ dryRun: false, paths, stepSummaryPath: null }),
-        /snapshot index does not reference existing evidence: 2024-12-06\.html, 2024-12-06\.json/
-      )
+    await assert.rejects(
+      main({ dryRun: false, paths, stepSummaryPath: null }),
+      /snapshot evidence has a content-hash mismatch/i
+    );
+    assert.equal(fetched, false);
+    assert.equal(await readFile(dataPath, 'utf8'), corruptedEvidence);
+    assert.deepEqual(await Promise.all([
+      readFile(paths.currentDataPath, 'utf8'),
+      readFile(paths.historyPath, 'utf8'),
+      readFile(paths.runLogPath, 'utf8'),
+      readFile(paths.snapshotIndexPath, 'utf8')
+    ]), before);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('rejects syntactically valid but corrupt prices and history baselines', async () => {
+  const corruptions = [
+    {
+      file: 'prices',
+      mutate(value) { value.countries = []; },
+      error: /Only 0 countries were parsed/
+    },
+    {
+      file: 'prices',
+      mutate(value) { value.fx.sourceUrl = 'https://example.invalid/rates?key=secret'; },
+      error: /prices\.json has an unsupported or unsafe structure/i
+    },
+    {
+      file: 'history',
+      mutate(value) { value.countries = {}; value.sourcePublishedDates = []; },
+      error: /history\.json has an unsupported structure/i
+    }
+  ];
+
+  for (const corruption of corruptions) {
+    const { root, paths } = await createTemporaryProductionPaths();
+    const targetPath = corruption.file === 'prices' ? paths.currentDataPath : paths.historyPath;
+    const value = JSON.parse(await readFile(targetPath, 'utf8'));
+    corruption.mutate(value);
+    await writeFile(targetPath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+    const before = await Promise.all([
+      readFile(paths.currentDataPath, 'utf8'),
+      readFile(paths.historyPath, 'utf8'),
+      readFile(paths.runLogPath, 'utf8')
+    ]);
+    const originalFetch = globalThis.fetch;
+    let fetched = false;
+    globalThis.fetch = async () => {
+      fetched = true;
+      throw new Error('preflight must run before network fetches');
+    };
+    try {
+      await assert.rejects(main({ dryRun: false, paths, stepSummaryPath: null }), corruption.error);
+      assert.equal(fetched, false);
+      assert.deepEqual(await Promise.all([
+        readFile(paths.currentDataPath, 'utf8'),
+        readFile(paths.historyPath, 'utf8'),
+        readFile(paths.runLogPath, 'utf8')
+      ]), before);
+    } finally {
+      globalThis.fetch = originalFetch;
+      await rm(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test('rejects structurally valid cross-file production mismatches', async (t) => {
+  const cases = [
+    {
+      name: 'prices differ from latest history values',
+      target: 'prices',
+      mutate({ prices }) {
+        const country = prices.countries[0];
+        const tierId = prices.tiers[0].id;
+        country.plans[tierId].price += 1;
+      },
+      error: /Existing history\.json latest values do not match/i
+    },
+    {
+      name: 'latest history values differ from current prices',
+      target: 'history',
+      mutate({ prices, history }) {
+        const country = prices.countries[0];
+        const tierId = prices.tiers[0].id;
+        history.countries[country.country].events.at(-1).plans[tierId] += 1;
+      },
+      error: /Existing history\.json latest values do not match/i
+    },
+    {
+      name: 'latest run counts differ from current prices',
+      target: 'runLog',
+      mutate({ runLog }) {
+        runLog.runs.at(-1).counts.countries += 1;
+      },
+      error: /Existing run-log\.json latest run does not match current prices/i
+    },
+    {
+      name: 'latest run publication date differs from current prices',
+      target: 'runLog',
+      mutate({ runLog }) {
+        runLog.runs.at(-1).source.applePublishedDate = 'April 06, 2026';
+      },
+      error: /Existing run-log\.json latest run does not match current prices/i
+    }
+  ];
+
+  for (const testCase of cases) {
+    await t.test(testCase.name, async () => {
+      const { root, paths } = await createTemporaryProductionPaths();
+      const values = {
+        prices: JSON.parse(await readFile(paths.currentDataPath, 'utf8')),
+        history: JSON.parse(await readFile(paths.historyPath, 'utf8')),
+        runLog: JSON.parse(await readFile(paths.runLogPath, 'utf8'))
+      };
+      testCase.mutate(values);
+      const targetPath = {
+        prices: paths.currentDataPath,
+        history: paths.historyPath,
+        runLog: paths.runLogPath
+      }[testCase.target];
+      await writeFile(targetPath, `${JSON.stringify(values[testCase.target], null, 2)}\n`, 'utf8');
+      const before = await Promise.all([
+        readFile(paths.currentDataPath, 'utf8'),
+        readFile(paths.historyPath, 'utf8'),
+        readFile(paths.runLogPath, 'utf8')
+      ]);
+      try {
+        await assertRejectsBeforeFetch(
+          () => main({ dryRun: false, paths, stepSummaryPath: null }),
+          testCase.error
+        );
+        assert.deepEqual(await Promise.all([
+          readFile(paths.currentDataPath, 'utf8'),
+          readFile(paths.historyPath, 'utf8'),
+          readFile(paths.runLogPath, 'utf8')
+        ]), before);
+      } finally {
+        await rm(root, { recursive: true, force: true });
+      }
+    });
+  }
+});
+
+test('rejects current prices that disagree with the active snapshot evidence', async () => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  const prices = JSON.parse(await readFile(paths.currentDataPath, 'utf8'));
+  const history = JSON.parse(await readFile(paths.historyPath, 'utf8'));
+  const country = prices.countries[0];
+  const tierId = prices.tiers[0].id;
+  const changedPrice = country.plans[tierId].price + 1;
+  country.plans[tierId].price = changedPrice;
+  history.countries[country.country].events.at(-1).plans[tierId] = changedPrice;
+  await Promise.all([
+    writeFile(paths.currentDataPath, `${JSON.stringify(prices, null, 2)}\n`, 'utf8'),
+    writeFile(paths.historyPath, `${JSON.stringify(history, null, 2)}\n`, 'utf8')
+  ]);
+  const before = await Promise.all([
+    readFile(paths.currentDataPath, 'utf8'),
+    readFile(paths.historyPath, 'utf8'),
+    readFile(paths.runLogPath, 'utf8')
+  ]);
+  const snapshotStoreBefore = await readSnapshotStoreState(paths);
+  try {
+    await assertRejectsBeforeFetch(
+      () => main({ dryRun: false, paths, stepSummaryPath: null }),
+      /Apple snapshot active revision does not match current prices/i
     );
     assert.deepEqual(await Promise.all([
-      readFile(indexedHtml, 'utf8'),
-      readFile(indexedData, 'utf8'),
-      readFile(unindexedHtml, 'utf8'),
-      readFile(unindexedData, 'utf8')
-    ]), ['<indexed evidence>', '{"indexed":true}', '<unindexed evidence>', '{"unindexed":true}']);
+      readFile(paths.currentDataPath, 'utf8'),
+      readFile(paths.historyPath, 'utf8'),
+      readFile(paths.runLogPath, 'utf8')
+    ]), before);
+    assert.deepEqual(await readSnapshotStoreState(paths), snapshotStoreBefore);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
 });
+
 test('rejects malformed history countries before any production write', async () => {
   const { root, paths } = await createTemporaryProductionPaths();
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
@@ -1816,12 +2134,13 @@ test('rejects malformed history countries before any production write', async ()
     readFile(paths.currentDataPath, 'utf8'),
     readFile(paths.runLogPath, 'utf8')
   ]);
+  const snapshotStoreBefore = await readSnapshotStoreState(paths);
   try {
     await withMockedFetch(
       { html, fxPayload },
       () => assert.rejects(
         main({ dryRun: false, paths, stepSummaryPath: null }),
-        /unsupported countries structure/
+        /history\.json has an unsupported structure/i
       )
     );
     assert.deepEqual(await Promise.all([
@@ -1829,7 +2148,7 @@ test('rejects malformed history countries before any production write', async ()
       readFile(paths.runLogPath, 'utf8')
     ]), before);
     assert.equal(await readFile(paths.historyPath, 'utf8'), malformedHistory);
-    await assert.rejects(readFile(paths.snapshotIndexPath, 'utf8'), { code: 'ENOENT' });
+    assert.deepEqual(await readSnapshotStoreState(paths), snapshotStoreBefore);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

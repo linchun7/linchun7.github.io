@@ -13,6 +13,7 @@ import {
   publicationDateKey,
   normalizeAppleSnapshot,
   normalizeAppleSnapshotIndex,
+  validateAppleSnapshotStore,
   defaultUpdateLockPath,
   updateHistory
 } from './update-prices.mjs';
@@ -114,15 +115,36 @@ function migrateSnapshotIndex(index) {
   return {
     schemaVersion: 1,
     snapshots: (index.snapshots ?? []).map((snapshot) => {
-      const revisions = (snapshot.revisions ?? []).map((revision) => {
-        const dataFile = revision.dataFile ?? revision.file.replace(/\.html$/, '.json');
-        const firstConfirmedDate = revision.firstConfirmedDate ?? revision.capturedAtUtc?.slice(0, 10);
+      const sourceRevisions = Array.isArray(snapshot.revisions)
+        ? snapshot.revisions
+        : snapshot.file ? [{ ...snapshot }] : [];
+      const revisions = sourceRevisions.map((revision) => {
+        const dataFile = revision.dataFile ?? revision.file?.replace(/\.html$/, '.json');
+        const firstConfirmedDate = revision.firstConfirmedDate
+          ?? (revision.capturedAtUtc ? formatBeijingDate(revision.capturedAtUtc) : undefined);
         const { capturedAtUtc, ...rest } = revision;
         return { ...rest, dataFile, firstConfirmedDate };
-      });
+      }).sort((a, b) => (a.firstConfirmedDate ?? '').localeCompare(b.firstConfirmedDate ?? ''));
+      const active = revisions.at(-1);
+      const {
+        file,
+        dataFile,
+        firstConfirmedDate,
+        capturedAtUtc,
+        sourceUrl,
+        archiveUrl,
+        parser,
+        countries,
+        pricePoints,
+        contentHash,
+        revisions: ignoredRevisions,
+        ...container
+      } = snapshot;
       return {
-        ...snapshot,
-        activeDataFile: revisions.at(-1)?.dataFile,
+        ...container,
+        activeFile: active?.file,
+        activeDataFile: active?.dataFile,
+        activeContentHash: active?.contentHash,
         revisions
       };
     })
@@ -147,16 +169,23 @@ async function importAppleArchivesUnlocked(inputDir, paths = {}) {
   const namesPath = paths.namesPath ?? NAMES_PATH;
   const snapshotsDir = paths.snapshotsDir ?? SNAPSHOTS_DIR;
   const snapshotIndexPath = paths.snapshotIndexPath ?? SNAPSHOT_INDEX_PATH;
-  const [, currentData, names, fileNames, existingSnapshotIndex] = await Promise.all([
+  const [, currentData, names, fileNames, existingSnapshotIndexState] = await Promise.all([
     readFile(historyPath, 'utf8').then(JSON.parse),
     readFile(pricesPath, 'utf8').then(JSON.parse),
     readFile(namesPath, 'utf8').then(JSON.parse),
     readdir(inputDir),
-    readFile(snapshotIndexPath, 'utf8').then(JSON.parse).catch((error) => {
-      if (error.code === 'ENOENT') return { schemaVersion: 1, snapshots: [] };
+    readFile(snapshotIndexPath, 'utf8').then((text) => ({ value: JSON.parse(text), existed: true })).catch((error) => {
+      if (error.code === 'ENOENT') return { value: { schemaVersion: 1, snapshots: [] }, existed: false };
       throw error;
     })
   ]);
+  const migratedSnapshotIndex = migrateSnapshotIndex(existingSnapshotIndexState.value);
+  await validateAppleSnapshotStore({
+    snapshotsDir,
+    snapshotIndexPath,
+    snapshotIndex: migratedSnapshotIndex,
+    snapshotIndexExists: existingSnapshotIndexState.existed
+  });
 
   const archives = [];
   for (const fileName of fileNames.filter((name) => name.toLowerCase().endsWith('.html'))) {
@@ -180,7 +209,7 @@ async function importAppleArchivesUnlocked(inputDir, paths = {}) {
 
   const rebuilt = { schemaVersion: 2, updatedAt: new Date().toISOString(), countries: {}, sourcePublishedDates: [] };
   let previousData = null;
-  let snapshotIndex = normalizeAppleSnapshotIndex(migrateSnapshotIndex(existingSnapshotIndex));
+  let snapshotIndex = normalizeAppleSnapshotIndex(migratedSnapshotIndex);
   const currentPublishedDate = publicationDateKey(currentData.source.publishedDate);
   if (!archives.length) throw new Error('No validated Apple archives were found in the input directory');
   const archiveDates = new Set(archives.map(({ publishedDate }) => publishedDate));
@@ -246,7 +275,15 @@ async function importAppleArchivesUnlocked(inputDir, paths = {}) {
     const previousSourceEntry = rebuilt.sourcePublishedDates.at(-1);
     if (publicationDateKey(previousSourceEntry?.publishedDate) === archive.publishedDate) {
       previousSourceEntry.changes = mergeSnapshotChanges(previousSourceEntry.changes, changes);
+      previousSourceEntry.observedAt = [previousSourceEntry.observedAt, snapshotIndex.snapshots
+        .find(({ publishedDate }) => publishedDate === archive.publishedDate)
+        ?.revisions?.[0]?.firstConfirmedDate]
+        .filter(Boolean)
+        .sort()[0];
     } else {
+      sourceEntry.observedAt = snapshotIndex.snapshots
+        .find(({ publishedDate }) => publishedDate === archive.publishedDate)
+        ?.revisions?.[0]?.firstConfirmedDate ?? sourceEntry.observedAt;
       rebuilt.sourcePublishedDates.push(sourceEntry);
     }
     previousData = archive.parsed;
@@ -278,6 +315,12 @@ async function importAppleArchivesUnlocked(inputDir, paths = {}) {
         createdSnapshotFiles.push(path.join(snapshotsDir, name));
       }
     }
+    snapshotIndex = await validateAppleSnapshotStore({
+      snapshotsDir,
+      snapshotIndexPath,
+      snapshotIndex,
+      snapshotIndexExists: true
+    });
     await writeTextAtomic(historyPath, `${JSON.stringify(rebuilt, null, 2)}\n`);
     await writeTextAtomic(snapshotIndexPath, `${JSON.stringify(snapshotIndex, null, 2)}\n`);
     await rm(stagingDir, { recursive: true, force: true });

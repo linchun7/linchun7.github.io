@@ -27,7 +27,7 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /update:[\s\S]*?permissions:\s+contents: write/, 'only the update job may write committed data');
   assert.match(workflow, /pnpm install --frozen-lockfile/);
   assert.match(workflow, /name: 运行解析与数据安全测试\s+run: pnpm test:core/);
-  assert.match(workflow, /name: 验证更新后的页面[\s\S]*?id: ui_after[\s\S]*?ui_failed=false[\s\S]*?pnpm test:ui \|\| ui_failed=true[\s\S]*?if pnpm exec playwright install --with-deps webkit; then[\s\S]*?pnpm test:webkit \|\| ui_failed=true[\s\S]*?ui_failed=\$ui_failed/);
+  assert.match(workflow, /name: 验证更新后的页面[\s\S]*?id: ui_after[\s\S]*?ui_failed=false[\s\S]*?if pnpm exec playwright install --with-deps chromium webkit; then[\s\S]*?pnpm test:ui \|\| ui_failed=true[\s\S]*?pnpm test:webkit \|\| ui_failed=true[\s\S]*?ui_failed=\$ui_failed/);
   assert.doesNotMatch(workflow, /name: 验证更新后的页面[\s\S]*?continue-on-error: true[\s\S]*?run: pnpm test:ui/);
   assert.doesNotMatch(workflow, /ui_before|运行浏览器界面测试（更新前）/, 'the workflow must not repeat UI tests before fetching data');
   assert.match(workflow, /name: 验证更新后的价格数据\s+run: pnpm test:data/);
@@ -94,7 +94,7 @@ test('keeps pull-request validation read-only, complete, and SHA-pinned', async 
   assert.match(ciWorkflow, /permissions:\s+contents: read/);
   assert.doesNotMatch(ciWorkflow, /contents: write|secrets\./);
   assert.match(ciWorkflow, /pnpm install --frozen-lockfile/);
-  assert.match(ciWorkflow, /pnpm exec playwright install --with-deps webkit/);
+  assert.match(ciWorkflow, /pnpm exec playwright install --with-deps chromium webkit/);
   assert.match(ciWorkflow, /run: pnpm test:core/);
   assert.match(ciWorkflow, /run: pnpm test:ui/);
   assert.match(ciWorkflow, /run: pnpm test:webkit/);
