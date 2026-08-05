@@ -26,6 +26,7 @@ function parseTier(value) {
 }
 
 function parsePrice(value) {
+  if (/[−-]/.test(value)) return Number.NaN;
   const match = value.match(/[0-9][0-9.,\s']*/);
   if (!match) return Number.NaN;
   const compact = match[0].replace(/[\s']/g, '');
@@ -78,6 +79,11 @@ function extractPublishedDate($) {
 function finalize(countries, tiers, sourcePublishedDate) {
   if (countries.length < 60) throw new Error(`Only ${countries.length} archived countries were parsed`);
   if (tiers.size < 3) throw new Error('Archived storage tiers are incomplete');
+  const parsedRegions = new Set(countries.map(({ region }) => region));
+  const missingRegions = Object.values(REGIONS).filter((region) => !parsedRegions.has(region));
+  if (missingRegions.length) {
+    throw new Error(`Archived Apple regions are incomplete: ${missingRegions.join(', ')}`);
+  }
   return {
     countries,
     tiers: [...tiers.values()].sort((a, b) => a.capacityGb - b.capacityGb),
@@ -107,6 +113,7 @@ function parseByFlatDocumentOrder($) {
     }
     const plan = parsePriceParagraph($, node);
     if (current && plan) {
+      if (current.plans[plan.tier.id]) throw new Error(`Duplicate archived tier ${plan.tier.id} for ${current.country}`);
       current.plans[plan.tier.id] = plan.value;
       tiers.set(plan.tier.id, plan.tier);
     }
@@ -129,6 +136,7 @@ function parseByRegionMarkers($) {
         } else {
           const plan = parsePriceParagraph($, node[0]);
           if (current && plan) {
+            if (current.plans[plan.tier.id]) throw new Error(`Duplicate archived tier ${plan.tier.id} for ${current.country}`);
             current.plans[plan.tier.id] = plan.value;
             tiers.set(plan.tier.id, plan.tier);
           }

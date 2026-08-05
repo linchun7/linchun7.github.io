@@ -1,10 +1,26 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { access, readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { publicationDateKey } from '../scripts/update-prices.mjs';
 
 async function readJson(relativePath) {
   return JSON.parse(await readFile(new URL(relativePath, import.meta.url), 'utf8'));
+}
+
+function snapshotContentHash(snapshot) {
+  const normalized = {
+    tiers: snapshot.tiers
+      .map(({ id, label, capacityGb }) => ({ id, label, capacityGb }))
+      .sort((a, b) => a.capacityGb - b.capacityGb),
+    countries: snapshot.countries.map(({ country, region, currency, plans }) => ({
+      country,
+      region,
+      currency,
+      plans: Object.fromEntries(Object.entries(plans).sort(([a], [b]) => a.localeCompare(b)))
+    })).sort((a, b) => a.country.localeCompare(b.country))
+  };
+  return createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
 }
 
 test('committed prices and history form a complete usable snapshot', async () => {
@@ -141,6 +157,8 @@ test('committed Apple snapshot index has unique dates and existing revision file
       assert.equal(normalized.schemaVersion, 1);
       assert.equal(normalized.publishedDate, snapshot.publishedDate);
       assert.equal(normalized.countries.length, revision.countries);
+      assert.equal(normalized.countries.length * normalized.tiers.length, revision.pricePoints);
+      assert.equal(snapshotContentHash(normalized), revision.contentHash);
     }
   }
 });

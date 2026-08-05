@@ -271,6 +271,11 @@ test('renders current prices, sorting, and country history in a real browser', {
         const expectedDialogName = expectedData.countries.find(({ country }) => country === historySearch)?.nameZh || historySearch;
         assert.equal(await page.getByRole('dialog', { name: expectedDialogName }).count(), 1, 'history dialog must have an accessible name');
         assert.ok(await page.locator('#historyRows tr').count() > 0);
+        assert.deepEqual(
+          await page.locator('#historyDialog thead th').evaluateAll((headers) => headers.map((header) => header.getAttribute('scope'))),
+          Array.from({ length: expectedData.tiers.length + 2 }, () => 'col'),
+          'all generated history headers need column scope'
+        );
         assert.equal(await page.locator('#historyTierControl button').count(), expectedData.tiers.length);
         if (historyCountry) {
           await page.waitForFunction(() => !document.querySelector('#chartWrap')?.hidden);
@@ -371,6 +376,12 @@ test('keeps current prices usable when optional history data is unavailable or m
     return;
   }
   const expectedData = await readFixture('prices.json');
+  const validHistory = await readFixture('history.json');
+  const staleHistory = structuredClone(validHistory);
+  staleHistory.sourcePublishedDates = staleHistory.sourcePublishedDates.slice(0, 1);
+  const reversedHistory = structuredClone(validHistory);
+  const reversibleRecord = Object.values(reversedHistory.countries).find((record) => record.events.length > 1);
+  reversibleRecord.events.reverse();
   const server = await startServer();
   const { port } = server.address();
   const browser = await chromium.launch({ executablePath: chromePath, headless: true });
@@ -389,6 +400,15 @@ test('keeps current prices usable when optional history data is unavailable or m
             changes: { addedCountries: 'not-an-array' }
           }]
         })
+      },
+      {
+        status: 200,
+        body: JSON.stringify(staleHistory),
+        expectedPublishedDate: '2026/07/17'
+      },
+      {
+        status: 200,
+        body: JSON.stringify(reversedHistory)
       }
     ];
     for (const scenario of scenarios) {
@@ -405,6 +425,9 @@ test('keeps current prices usable when optional history data is unavailable or m
         assert.equal(await page.locator('#loadStatus').isVisible(), false);
         assert.equal(await page.locator('#marketCount').textContent(), String(expectedData.countries.length));
         assert.equal(await page.locator('#publishedDateButton').isVisible(), true);
+        if (scenario.expectedPublishedDate) {
+          assert.equal(await page.locator('#applePublishedDate').textContent(), scenario.expectedPublishedDate);
+        }
       } finally {
         await page.close();
       }
@@ -458,6 +481,51 @@ test('rejects malformed price payloads and recovers without a full-page refresh'
       } finally {
         await page.close();
       }
+    }
+  } finally {
+    await browser.close();
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test('rebuilds tier headers and filters after a successful retry with changed tiers', { timeout: 30_000 }, async (context) => {
+  const chromePath = await findChrome();
+  if (!chromePath) {
+    if (process.env.CI) assert.fail('Chrome or Chromium is required for the changed-tier retry test');
+    context.skip('Chrome or Chromium is not installed');
+    return;
+  }
+  const fullData = await readFixture('prices.json');
+  const reducedData = structuredClone(fullData);
+  const removedTier = reducedData.tiers.pop();
+  for (const country of reducedData.countries) delete country.plans[removedTier.id];
+  reducedData.run.pricePoints = reducedData.countries.length * reducedData.tiers.length;
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await chromium.launch({ executablePath: chromePath, headless: true });
+  let priceCalls = 0;
+  try {
+    const page = await browser.newPage({ viewport: { width: 1365, height: 900 } });
+    await page.route('https://**/*', (route) => route.abort());
+    await page.route('**/data/prices.json*', (route) => {
+      priceCalls += 1;
+      const body = JSON.stringify(priceCalls === 1 ? fullData : reducedData);
+      return route.fulfill({ status: 200, contentType: 'application/json', body });
+    });
+    try {
+      await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+      await page.waitForFunction((count) => document.querySelector('#tierCount')?.textContent === String(count), fullData.tiers.length);
+      await page.locator('#retryButton').dispatchEvent('click');
+      await page.waitForFunction((count) => document.querySelector('#tierCount')?.textContent === String(count), reducedData.tiers.length);
+      assert.equal(await page.locator('.price-table thead th').count(), reducedData.tiers.length + 2);
+      assert.equal(await page.locator('#priceRows tr[data-country]').first().locator('td').count(), reducedData.tiers.length + 2);
+      assert.deepEqual(
+        await page.locator('.price-table thead button[data-sort-tier]').evaluateAll((buttons) => buttons.map((button) => button.dataset.sortTier)),
+        reducedData.tiers.map(({ id }) => id)
+      );
+      assert.equal(await page.locator('#regionSelect option').count(), new Set(reducedData.countries.map(({ region }) => region)).size + 1);
+    } finally {
+      await page.close();
     }
   } finally {
     await browser.close();
