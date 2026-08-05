@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const workflowUrl = new URL('../../../.github/workflows/update-icloud-prices.yml', import.meta.url);
+const ciWorkflowUrl = new URL('../../../.github/workflows/validate-icloud-price-comparison.yml', import.meta.url);
 
 test('keeps the scheduled update workflow guarded and ordered', async () => {
   const workflow = await readFile(workflowUrl, 'utf8');
@@ -30,9 +31,10 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /name: 验证更新后的价格数据\s+run: pnpm test:data/);
   assert.match(workflow, /name: 抓取并校验 Apple 价格[\s\S]*?id: update_data[\s\S]*?EXCHANGE_RATE_API_KEY:\s*\$\{\{ secrets\.EXCHANGE_RATE_API_KEY \}\}[\s\S]*?run: pnpm update:data/);
   assert.doesNotMatch(workflow, /v6\/\$\{\{ secrets\.EXCHANGE_RATE_API_KEY \}\}/, 'the API key must not be placed in a request URL');
-  assert.match(workflow, /actions\/upload-artifact@v7/);
+  assert.match(workflow, /actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7/);
   assert.match(workflow, /retention-days:\s*14/);
   assert.match(workflow, /git pull --rebase origin main/);
+  assert.match(workflow, /git pull --rebase origin main[\s\S]*?pnpm --dir tools\/icloud_price_comparison install --frozen-lockfile[\s\S]*?pnpm --dir tools\/icloud_price_comparison run test:core[\s\S]*?pnpm --dir tools\/icloud_price_comparison run test:data[\s\S]*?git push origin HEAD:main/);
   assert.doesNotMatch(workflow, /git push --force/);
   assert.match(workflow, /name: 记录浏览器界面测试警告[\s\S]*?steps\.ui_after\.outputs\.ui_failed == 'true'/);
   assert.match(workflow, /::warning title=浏览器界面测试未通过/);
@@ -69,4 +71,23 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
 
   const summaryAppend = workflow.indexOf('name: 追加仓库容量摘要');
   assert.ok(uiTest < summaryAppend, 'the main update summary must be written before capacity details');
+});
+
+test('keeps pull-request validation read-only, complete, and SHA-pinned', async () => {
+  const [updateWorkflow, ciWorkflow] = await Promise.all([
+    readFile(workflowUrl, 'utf8'),
+    readFile(ciWorkflowUrl, 'utf8')
+  ]);
+  const workflows = `${updateWorkflow}\n${ciWorkflow}`;
+  const actionReferences = [...workflows.matchAll(/uses:\s*[^@\s]+@([^\s#]+)/g)].map(([, reference]) => reference);
+  assert.ok(actionReferences.length >= 5);
+  assert.ok(actionReferences.every((reference) => /^[a-f0-9]{40}$/.test(reference)), 'all third-party actions must use full commit SHAs');
+
+  assert.match(ciWorkflow, /pull_request:[\s\S]*?push:[\s\S]*?workflow_dispatch:/);
+  assert.match(ciWorkflow, /permissions:\s+contents: read/);
+  assert.doesNotMatch(ciWorkflow, /contents: write|secrets\./);
+  assert.match(ciWorkflow, /pnpm install --frozen-lockfile/);
+  assert.match(ciWorkflow, /run: pnpm test:core/);
+  assert.match(ciWorkflow, /run: pnpm test:ui/);
+  assert.match(ciWorkflow, /run: pnpm audit --audit-level low/);
 });

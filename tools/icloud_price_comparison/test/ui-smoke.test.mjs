@@ -387,7 +387,7 @@ test('keeps current prices usable when optional history data is unavailable or m
   const browser = await chromium.launch({ executablePath: chromePath, headless: true });
   try {
     const scenarios = [
-      { status: 503, body: '{"error":"history temporarily unavailable"}' },
+      { status: 503, body: '{"error":"history temporarily unavailable"}', unavailable: true },
       {
         status: 200,
         body: JSON.stringify({
@@ -399,7 +399,8 @@ test('keeps current prices usable when optional history data is unavailable or m
             kind: 'change',
             changes: { addedCountries: 'not-an-array' }
           }]
-        })
+        }),
+        unavailable: true
       },
       {
         status: 200,
@@ -408,7 +409,8 @@ test('keeps current prices usable when optional history data is unavailable or m
       },
       {
         status: 200,
-        body: JSON.stringify(reversedHistory)
+        body: JSON.stringify(reversedHistory),
+        unavailable: true
       }
     ];
     for (const scenario of scenarios) {
@@ -427,6 +429,14 @@ test('keeps current prices usable when optional history data is unavailable or m
         assert.equal(await page.locator('#publishedDateButton').isVisible(), true);
         if (scenario.expectedPublishedDate) {
           assert.equal(await page.locator('#applePublishedDate').textContent(), scenario.expectedPublishedDate);
+        }
+        if (scenario.unavailable) {
+          await page.locator('#priceRows tr[data-country]').first().click();
+          await page.waitForFunction(() => document.querySelector('#historySubtitle')?.textContent.includes('历史数据暂不可用'));
+          await page.locator('#closeHistory').click();
+          await page.locator('#publishedDateButton').click();
+          await page.waitForFunction(() => document.querySelector('#publishedDateRows')?.textContent.includes('历史数据暂不可用'));
+          await page.locator('#closePublishedDate').click();
         }
       } finally {
         await page.close();
