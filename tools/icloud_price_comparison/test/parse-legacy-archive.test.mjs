@@ -60,3 +60,21 @@ test('rejects negative and duplicate legacy archive prices', () => {
     /Duplicate archived tier 50GB/
   );
 });
+
+test('rejects trailing garbage after an archived price token', () => {
+  assert.throws(
+    () => parseLegacyAppleArchive(fixture().replace('$0.99', '$0.99 garbage')),
+    /Unable to parse archived price/
+  );
+});
+
+test('rejects non-positive and duplicate archived storage capacities', () => {
+  assert.throws(
+    () => parseLegacyAppleArchive(fixture().replaceAll('50GB', '0GB')),
+    /Archived storage tiers are incomplete/
+  );
+  assert.throws(
+    () => parseLegacyAppleArchive(fixture().replace('<p><b>200GB</b>: $2.99</p>', '<p><b>0.1953125TB</b>: $2.99</p>')),
+    /Duplicate archived storage capacity/
+  );
+});
