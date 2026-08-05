@@ -36,6 +36,19 @@ function formatUiDate(value) {
 
 const uiNumberFormatter = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 });
 
+function compactExpectedSeries(events, tier) {
+  const availableEvents = events.filter((event) => Number.isFinite(event.plans[tier]));
+  return availableEvents.filter((event, index) => (
+    index === 0
+    || event.currency !== availableEvents[index - 1].currency
+    || event.plans[tier] !== availableEvents[index - 1].plans[tier]
+  ));
+}
+
+function canRenderExpectedChart(series) {
+  return series.length > 1 && new Set(series.map(({ currency }) => currency)).size === 1;
+}
+
 async function findChrome() {
   const candidates = [
     process.env.CHROME_PATH,
@@ -112,7 +125,9 @@ test('renders current prices, sorting, and country history in a real browser', {
   const expectedData = await readFixture('prices.json');
   const expectedHistory = await readFixture('history.json');
   const historyCountry = Object.entries(expectedHistory.countries)
-    .find(([, record]) => record.events.length > 1)?.[0];
+    .find(([, record]) => expectedData.tiers.some(({ id }) => (
+      canRenderExpectedChart(compactExpectedSeries(record.events, id))
+    )))?.[0];
   const server = await startServer();
   const { port } = server.address();
   const baseUrl = `http://127.0.0.1:${port}`;
@@ -362,17 +377,15 @@ test('renders current prices, sorting, and country history in a real browser', {
           );
         }
         if (historyCountry) {
+          const chartableTier = expectedData.tiers.find(({ id }) => (
+            canRenderExpectedChart(compactExpectedSeries(expectedRecord.events, id))
+          ));
+          assert.ok(chartableTier, `${historyCountry} must retain a chartable tier for the chart assertions`);
           if (viewport.name === 'desktop') {
             for (const [tierIndex, tier] of expectedData.tiers.entries()) {
               await page.locator(`#historyTierControl button[data-tier="${tier.id}"]`).click();
-              const availableEvents = expectedRecord.events.filter((event) => Number.isFinite(event.plans[tier.id]));
-              const expectedSeries = availableEvents.filter((event, index) => (
-                index === 0
-                || event.currency !== availableEvents[index - 1].currency
-                || event.plans[tier.id] !== availableEvents[index - 1].plans[tier.id]
-              ));
-              const canChart = expectedSeries.length > 1
-                && new Set(expectedSeries.map(({ currency }) => currency)).size === 1;
+              const expectedSeries = compactExpectedSeries(expectedRecord.events, tier.id);
+              const canChart = canRenderExpectedChart(expectedSeries);
               assert.equal(await page.locator('#chartWrap').isVisible(), canChart, `${tier.id} chart visibility must match its history series`);
               if (!canChart) continue;
 
@@ -407,6 +420,7 @@ test('renders current prices, sorting, and country history in a real browser', {
               assert.deepEqual(chartData.prices, tableSeries.map(({ price }) => price), `${tier.id} chart prices must match the compacted table history`);
             }
           }
+          await page.locator(`#historyTierControl button[data-tier="${chartableTier.id}"]`).click();
           await page.waitForFunction(() => !document.querySelector('#chartWrap')?.hidden);
           await page.waitForFunction(() => {
             const canvas = document.querySelector('#historyChart');
