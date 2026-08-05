@@ -4,7 +4,7 @@ import http from 'node:http';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { chromium } from 'playwright-core';
+import { chromium, webkit } from 'playwright';
 
 const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CONTENT_TYPES = {
@@ -13,6 +13,11 @@ const CONTENT_TYPES = {
   '.js': 'text/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8'
 };
+const BROWSER_UNDER_TEST = process.env.PLAYWRIGHT_BROWSER || 'chromium';
+
+if (!['chromium', 'webkit'].includes(BROWSER_UNDER_TEST)) {
+  throw new Error(`Unsupported Playwright browser: ${BROWSER_UNDER_TEST}`);
+}
 
 async function readFixture(fileName) {
   return JSON.parse(await readFile(path.join(PROJECT_DIR, 'data', fileName), 'utf8'));
@@ -38,6 +43,27 @@ async function findChrome() {
   return null;
 }
 
+async function resolveBrowser(context, purpose) {
+  if (BROWSER_UNDER_TEST === 'webkit') {
+    try {
+      await access(webkit.executablePath());
+    } catch {
+      if (process.env.CI) assert.fail(`Playwright WebKit is required for ${purpose}`);
+      context.skip('Playwright WebKit is not installed');
+      return null;
+    }
+    return { browserType: webkit, launchOptions: { headless: true } };
+  }
+
+  const executablePath = await findChrome();
+  if (!executablePath) {
+    if (process.env.CI) assert.fail(`Chrome or Chromium is required for ${purpose}`);
+    context.skip('Chrome or Chromium is not installed');
+    return null;
+  }
+  return { browserType: chromium, launchOptions: { executablePath, headless: true } };
+}
+
 async function startServer() {
   const server = http.createServer(async (request, response) => {
     try {
@@ -60,12 +86,8 @@ async function startServer() {
 }
 
 test('renders current prices, sorting, and country history in a real browser', { timeout: 30_000 }, async (context) => {
-  const chromePath = await findChrome();
-  if (!chromePath) {
-    if (process.env.CI) assert.fail('Chrome or Chromium is required for the UI smoke test');
-    context.skip('Chrome or Chromium is not installed');
-    return;
-  }
+  const browserConfig = await resolveBrowser(context, 'the UI smoke test');
+  if (!browserConfig) return;
 
   const expectedData = await readFixture('prices.json');
   const expectedHistory = await readFixture('history.json');
@@ -74,7 +96,7 @@ test('renders current prices, sorting, and country history in a real browser', {
   const server = await startServer();
   const { port } = server.address();
   const baseUrl = `http://127.0.0.1:${port}`;
-  const browser = await chromium.launch({ executablePath: chromePath, headless: true });
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
 
   try {
     for (const viewport of [
@@ -258,7 +280,11 @@ test('renders current prices, sorting, and country history in a real browser', {
             document.body.focus();
             document.body.removeAttribute('tabindex');
           });
-          await page.keyboard.press('Tab');
+          if (BROWSER_UNDER_TEST === 'webkit') {
+            await page.locator('.skip-link').focus();
+          } else {
+            await page.keyboard.press('Tab');
+          }
           assert.equal(await page.locator('.skip-link').evaluate((element) => document.activeElement === element), true, 'skip link must be the first keyboard stop');
           await page.keyboard.press('Enter');
           assert.equal(await page.locator('#priceWorkspace').evaluate((element) => document.activeElement === element), true, 'skip link must move focus to the price workspace');
@@ -308,6 +334,15 @@ test('renders current prices, sorting, and country history in a real browser', {
           assert.equal(await historyRow.evaluate((element) => document.activeElement === element), true, 'closing history with Escape must restore row focus');
         }
 
+        const publishedDateAffordance = await page.locator('#publishedDateButton').evaluate((button) => ({
+          cursor: getComputedStyle(button).cursor,
+          dateDecoration: getComputedStyle(button.querySelector('strong')).textDecorationLine,
+          iconCount: button.querySelectorAll('svg').length
+        }));
+        assert.equal(publishedDateAffordance.cursor, 'pointer');
+        assert.match(publishedDateAffordance.dateDecoration, /underline/);
+        assert.equal(publishedDateAffordance.iconCount, 1, 'publication-date control should only keep the leading calendar icon');
+
         await page.locator('#publishedDateButton').click();
         await page.waitForFunction(() => document.querySelector('#publishedDateDialog')?.open === true);
         assert.equal(await page.getByRole('dialog', { name: '发布日期变更' }).count(), 1, 'publication-date dialog must have an accessible name');
@@ -328,16 +363,12 @@ test('renders current prices, sorting, and country history in a real browser', {
 });
 
 test('shows an actionable error and recovers after a temporary price-data outage', { timeout: 30_000 }, async (context) => {
-  const chromePath = await findChrome();
-  if (!chromePath) {
-    if (process.env.CI) assert.fail('Chrome or Chromium is required for the UI error-state test');
-    context.skip('Chrome or Chromium is not installed');
-    return;
-  }
+  const browserConfig = await resolveBrowser(context, 'the UI error-state test');
+  if (!browserConfig) return;
   const expectedData = await readFixture('prices.json');
   const server = await startServer();
   const { port } = server.address();
-  const browser = await chromium.launch({ executablePath: chromePath, headless: true });
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
   let attempts = 0;
   try {
     const page = await browser.newPage({ viewport: { width: 1365, height: 900 } });
@@ -369,12 +400,8 @@ test('shows an actionable error and recovers after a temporary price-data outage
 });
 
 test('keeps current prices usable when optional history data is unavailable or malformed', { timeout: 30_000 }, async (context) => {
-  const chromePath = await findChrome();
-  if (!chromePath) {
-    if (process.env.CI) assert.fail('Chrome or Chromium is required for the history fallback test');
-    context.skip('Chrome or Chromium is not installed');
-    return;
-  }
+  const browserConfig = await resolveBrowser(context, 'the history fallback test');
+  if (!browserConfig) return;
   const expectedData = await readFixture('prices.json');
   const validHistory = await readFixture('history.json');
   const staleHistory = structuredClone(validHistory);
@@ -384,7 +411,7 @@ test('keeps current prices usable when optional history data is unavailable or m
   reversibleRecord.events.reverse();
   const server = await startServer();
   const { port } = server.address();
-  const browser = await chromium.launch({ executablePath: chromePath, headless: true });
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
   try {
     const scenarios = [
       { status: 503, body: '{"error":"history temporarily unavailable"}', unavailable: true },
@@ -449,12 +476,8 @@ test('keeps current prices usable when optional history data is unavailable or m
 });
 
 test('rejects malformed price payloads and recovers without a full-page refresh', { timeout: 30_000 }, async (context) => {
-  const chromePath = await findChrome();
-  if (!chromePath) {
-    if (process.env.CI) assert.fail('Chrome or Chromium is required for the malformed-data UI test');
-    context.skip('Chrome or Chromium is not installed');
-    return;
-  }
+  const browserConfig = await resolveBrowser(context, 'the malformed-data UI test');
+  if (!browserConfig) return;
   const validData = await readFixture('prices.json');
   const corruptions = [
     ['duplicate country', (data) => data.countries.push(structuredClone(data.countries[0]))],
@@ -467,7 +490,7 @@ test('rejects malformed price payloads and recovers without a full-page refresh'
   ];
   const server = await startServer();
   const { port } = server.address();
-  const browser = await chromium.launch({ executablePath: chromePath, headless: true });
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
   try {
     for (const [label, corrupt] of corruptions) {
       const page = await browser.newPage({ viewport: { width: 1365, height: 900 } });
@@ -499,12 +522,8 @@ test('rejects malformed price payloads and recovers without a full-page refresh'
 });
 
 test('rebuilds tier headers and filters after a successful retry with changed tiers', { timeout: 30_000 }, async (context) => {
-  const chromePath = await findChrome();
-  if (!chromePath) {
-    if (process.env.CI) assert.fail('Chrome or Chromium is required for the changed-tier retry test');
-    context.skip('Chrome or Chromium is not installed');
-    return;
-  }
+  const browserConfig = await resolveBrowser(context, 'the changed-tier retry test');
+  if (!browserConfig) return;
   const fullData = await readFixture('prices.json');
   const reducedData = structuredClone(fullData);
   const removedTier = reducedData.tiers.pop();
@@ -512,7 +531,7 @@ test('rebuilds tier headers and filters after a successful retry with changed ti
   reducedData.run.pricePoints = reducedData.countries.length * reducedData.tiers.length;
   const server = await startServer();
   const { port } = server.address();
-  const browser = await chromium.launch({ executablePath: chromePath, headless: true });
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
   let priceCalls = 0;
   try {
     const page = await browser.newPage({ viewport: { width: 1365, height: 900 } });
@@ -544,12 +563,8 @@ test('rebuilds tier headers and filters after a successful retry with changed ti
 });
 
 test('marks stale data clearly and falls back from an invalid tier query', { timeout: 30_000 }, async (context) => {
-  const chromePath = await findChrome();
-  if (!chromePath) {
-    if (process.env.CI) assert.fail('Chrome or Chromium is required for the stale-data UI test');
-    context.skip('Chrome or Chromium is not installed');
-    return;
-  }
+  const browserConfig = await resolveBrowser(context, 'the stale-data UI test');
+  if (!browserConfig) return;
   const validData = await readFixture('prices.json');
   const scenarios = [
     {
@@ -580,7 +595,7 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
   ];
   const server = await startServer();
   const { port } = server.address();
-  const browser = await chromium.launch({ executablePath: chromePath, headless: true });
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
   try {
     for (const { label, mutate, expected, expectedPublishedDate } of scenarios) {
       const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
@@ -626,19 +641,15 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
 });
 
 test('ignores stale history responses after a price retry', { timeout: 30_000 }, async (context) => {
-  const chromePath = await findChrome();
-  if (!chromePath) {
-    if (process.env.CI) assert.fail('Chrome or Chromium is required for the history-race UI test');
-    context.skip('Chrome or Chromium is not installed');
-    return;
-  }
+  const browserConfig = await resolveBrowser(context, 'the history-race UI test');
+  if (!browserConfig) return;
   const validData = await readFixture('prices.json');
   const validHistory = await readFixture('history.json');
   const staleHistory = structuredClone(validHistory);
   staleHistory.countries.Brazil.events = [staleHistory.countries.Brazil.events[0]];
   const server = await startServer();
   const { port } = server.address();
-  const browser = await chromium.launch({ executablePath: chromePath, headless: true });
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
   const page = await browser.newPage({ viewport: { width: 1365, height: 900 } });
   let priceCalls = 0;
   let historyCalls = 0;
@@ -683,17 +694,13 @@ test('ignores stale history responses after a price retry', { timeout: 30_000 },
 });
 
 test('keeps history dialog usable when Chart construction fails', { timeout: 30_000 }, async (context) => {
-  const chromePath = await findChrome();
-  if (!chromePath) {
-    if (process.env.CI) assert.fail('Chrome or Chromium is required for the Chart-failure UI test');
-    context.skip('Chrome or Chromium is not installed');
-    return;
-  }
+  const browserConfig = await resolveBrowser(context, 'the Chart-failure UI test');
+  if (!browserConfig) return;
   const validData = await readFixture('prices.json');
   const validHistory = await readFixture('history.json');
   const server = await startServer();
   const { port } = server.address();
-  const browser = await chromium.launch({ executablePath: chromePath, headless: true });
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
   const page = await browser.newPage({ viewport: { width: 1365, height: 900 } });
   const pageErrors = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
@@ -730,17 +737,13 @@ test('keeps history dialog usable when Chart construction fails', { timeout: 30_
 });
 
 test('keeps the page bounded at 280px while the price table scrolls', { timeout: 30_000 }, async (context) => {
-  const chromePath = await findChrome();
-  if (!chromePath) {
-    if (process.env.CI) assert.fail('Chrome or Chromium is required for the 280px UI test');
-    context.skip('Chrome or Chromium is not installed');
-    return;
-  }
+  const browserConfig = await resolveBrowser(context, 'the 280px UI test');
+  if (!browserConfig) return;
   const validData = await readFixture('prices.json');
   const validHistory = await readFixture('history.json');
   const server = await startServer();
   const { port } = server.address();
-  const browser = await chromium.launch({ executablePath: chromePath, headless: true });
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
   const page = await browser.newPage({ viewport: { width: 280, height: 844 } });
   await page.route('https://**/*', (route) => route.abort());
   await page.route('**/data/prices.json*', (route) => route.fulfill({
@@ -775,12 +778,8 @@ test('keeps the page bounded at 280px while the price table scrolls', { timeout:
 });
 
 test('keeps 100 price and publication history records inside scrollable dialogs', { timeout: 30_000 }, async (context) => {
-  const chromePath = await findChrome();
-  if (!chromePath) {
-    if (process.env.CI) assert.fail('Chrome or Chromium is required for the long-history UI test');
-    context.skip('Chrome or Chromium is not installed');
-    return;
-  }
+  const browserConfig = await resolveBrowser(context, 'the long-history UI test');
+  if (!browserConfig) return;
 
   const data = await readFixture('prices.json');
   const country = data.countries[0];
@@ -851,7 +850,7 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
   };
   const server = await startServer();
   const { port } = server.address();
-  const browser = await chromium.launch({ executablePath: chromePath, headless: true });
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
 
   const assertScrollableDialog = async (page, dialogSelector, closeSelector, label) => {
     const dialog = page.locator(dialogSelector);
@@ -901,7 +900,9 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
   try {
     for (const viewport of [
       { name: 'desktop', width: 1365, height: 900 },
-      { name: 'narrow-mobile', width: 320, height: 720 }
+      { name: 'mobile', width: 390, height: 844 },
+      { name: 'narrow-mobile', width: 320, height: 720 },
+      { name: 'compact-mobile', width: 280, height: 720 }
     ]) {
       const page = await browser.newPage({ viewport: { width: viewport.width, height: viewport.height } });
       await page.route('https://**/*', (route) => route.abort());
@@ -920,7 +921,7 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
         await page.waitForFunction(() => document.querySelectorAll('#historyRows tr').length === 100);
         await assertScrollableDialog(page, '#historyDialog', '#closeHistory', `${viewport.name} price history`);
         const priceTableScroller = page.locator('#historyDialog .history-table-scroll');
-        if (viewport.name === 'narrow-mobile') {
+        if (viewport.width <= 640) {
           assert.ok(await priceTableScroller.evaluate((element) => element.scrollWidth > element.clientWidth), 'mobile price history must use its own horizontal scroller');
         } else {
           assert.ok(await priceTableScroller.evaluate((element) => element.scrollWidth <= element.clientWidth + 1), 'desktop price history must not scroll horizontally');
@@ -938,15 +939,32 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
           clientWidth: header.clientWidth,
           scrollWidth: header.scrollWidth,
           whiteSpace: getComputedStyle(header).whiteSpace,
-          position: getComputedStyle(header).position
+          overflowWrap: getComputedStyle(header).overflowWrap,
+          wordBreak: getComputedStyle(header).wordBreak,
+          position: getComputedStyle(header).position,
+          containerPosition: getComputedStyle(header.closest('thead')).position
         })));
         assert.equal(publicationHeaders[0].text, 'Apple 页面发布日期');
         assert.equal(publicationHeaders[1].text, '本次内容变化');
         assert.equal(publicationHeaders.length, 2, 'internal confirmation dates must not be shown to end users');
         assert.equal(await page.locator('#publishedDateRows tr').first().locator('td').count(), 2, 'publication rows must omit the internal confirmation date');
         assert.equal(publicationHeaders[0].whiteSpace, 'normal', 'Apple publication-date header must be allowed to wrap');
-        assert.equal(publicationHeaders[0].position, 'static', 'publication history header must not overlap the sticky dialog header');
-        assert.ok(publicationHeaders[0].scrollWidth <= publicationHeaders[0].clientWidth + 1, 'Apple publication-date header must not clip horizontally');
+        assert.equal(publicationHeaders[0].overflowWrap, 'normal', 'Apple publication-date header must not split individual date characters');
+        assert.equal(publicationHeaders[0].wordBreak, 'keep-all', 'Apple publication-date header must keep the Chinese date label together');
+        assert.equal(publicationHeaders[0].position, 'static', 'publication history header cells must not overlap the sticky dialog header');
+        if (viewport.width <= 360) {
+          assert.equal(publicationHeaders[0].containerPosition, 'absolute', 'extreme mobile widths must visually hide the table header without removing it');
+        } else {
+          assert.equal(publicationHeaders[0].containerPosition, 'static', 'publication history header must remain visible above two-column records');
+          assert.ok(publicationHeaders[0].scrollWidth <= publicationHeaders[0].clientWidth + 1, 'Apple publication-date header must not clip horizontally');
+        }
+        const publicationDateCell = await page.locator('#publishedDateRows tr').first().locator('td').first().evaluate((cell) => ({
+          clientWidth: cell.clientWidth,
+          scrollWidth: cell.scrollWidth,
+          whiteSpace: getComputedStyle(cell).whiteSpace
+        }));
+        assert.equal(publicationDateCell.whiteSpace, 'nowrap', 'publication dates must stay on one line');
+        assert.ok(publicationDateCell.scrollWidth <= publicationDateCell.clientWidth + 1, 'publication dates must fit their column without clipping');
         const tableScroller = page.locator('#publishedDateDialog .history-table-scroll');
         const verboseCell = page.locator('#publishedDateRows .published-change-cell').first();
         const verboseMetrics = await verboseCell.evaluate((element) => ({
@@ -970,11 +988,14 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
         assert.equal(verboseMetrics.boldAddedCountries, 0, 'added country names must remain regular weight');
         assert.equal(verboseMetrics.groupsFitCell, true, 'long change groups must stay inside their cell');
         assert.ok(verboseMetrics.height > verboseMetrics.lineHeight * 5, 'long change text must use multiple lines');
-        if (viewport.name === 'narrow-mobile') {
-          assert.ok(await tableScroller.evaluate((element) => element.scrollWidth > element.clientWidth), 'mobile publication table must use its own horizontal scroller');
-        } else {
-          const tableWidths = await tableScroller.evaluate((element) => ({ clientWidth: element.clientWidth, scrollWidth: element.scrollWidth }));
-          assert.ok(tableWidths.scrollWidth <= tableWidths.clientWidth + 1, `desktop publication table must not gain horizontal overflow from long text (${tableWidths.scrollWidth}/${tableWidths.clientWidth})`);
+        const tableWidths = await tableScroller.evaluate((element) => ({ clientWidth: element.clientWidth, scrollWidth: element.scrollWidth }));
+        assert.ok(tableWidths.scrollWidth <= tableWidths.clientWidth + 1, `${viewport.name} publication table must show both columns without horizontal scrolling (${tableWidths.scrollWidth}/${tableWidths.clientWidth})`);
+        if (viewport.width <= 640) {
+          assert.equal(await verboseCell.evaluate((element) => getComputedStyle(element).textAlign), 'left', 'mobile publication details must remain easy to scan');
+        }
+        if (viewport.width <= 360) {
+          const stackedCells = await page.locator('#publishedDateRows tr').first().locator('td').evaluateAll((cells) => cells.map((cell) => cell.getBoundingClientRect()));
+          assert.ok(stackedCells[1].top >= stackedCells[0].bottom - 1, 'extreme mobile publication records must stack date above details');
         }
         if (process.env.SCREENSHOT_DIR) {
           await verboseCell.scrollIntoViewIfNeeded();
@@ -992,12 +1013,8 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
 });
 
 test('resets a removed region filter after a successful price retry', { timeout: 30_000 }, async (context) => {
-  const chromePath = await findChrome();
-  if (!chromePath) {
-    if (process.env.CI) assert.fail('Chrome or Chromium is required for the removed-region retry test');
-    context.skip('Chrome or Chromium is not installed');
-    return;
-  }
+  const browserConfig = await resolveBrowser(context, 'the removed-region retry test');
+  if (!browserConfig) return;
   const fullData = await readFixture('prices.json');
   const replacement = structuredClone(fullData);
   const removedRegion = fullData.countries[0].region;
@@ -1005,7 +1022,7 @@ test('resets a removed region filter after a successful price retry', { timeout:
   replacement.run.pricePoints = replacement.countries.length * replacement.tiers.length;
   const server = await startServer();
   const { port } = server.address();
-  const browser = await chromium.launch({ executablePath: chromePath, headless: true });
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
   let priceCalls = 0;
   try {
     const page = await browser.newPage({ viewport: { width: 1365, height: 900 } });
@@ -1041,12 +1058,8 @@ test('resets a removed region filter after a successful price retry', { timeout:
 });
 
 test('rebinds or closes an open history dialog after country replacement', { timeout: 30_000 }, async (context) => {
-  const chromePath = await findChrome();
-  if (!chromePath) {
-    if (process.env.CI) assert.fail('Chrome or Chromium is required for the active-country retry test');
-    context.skip('Chrome or Chromium is not installed');
-    return;
-  }
+  const browserConfig = await resolveBrowser(context, 'the active-country retry test');
+  if (!browserConfig) return;
   const fullData = await readFixture('prices.json');
   const fullHistory = await readFixture('history.json');
   const activeCountry = fullData.countries[0];
@@ -1070,7 +1083,7 @@ test('rebinds or closes an open history dialog after country replacement', { tim
   ];
   const server = await startServer();
   const { port } = server.address();
-  const browser = await chromium.launch({ executablePath: chromePath, headless: true });
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
   try {
     for (const scenario of scenarios) {
       const page = await browser.newPage({ viewport: { width: 1365, height: 900 } });

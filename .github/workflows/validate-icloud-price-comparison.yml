@@ -3,12 +3,14 @@ name: Validate iCloud price comparison
 on:
   pull_request:
     paths:
+      - '.github/dependabot.yml'
       - '.github/workflows/**'
       - 'tools/icloud_price_comparison/**'
   push:
     branches:
       - main
     paths:
+      - '.github/dependabot.yml'
       - '.github/workflows/**'
       - 'tools/icloud_price_comparison/**'
   workflow_dispatch:
@@ -22,7 +24,7 @@ concurrency:
 
 jobs:
   test:
-    name: 核心、数据与浏览器测试
+    name: 核心、Chrome 与 WebKit 测试
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -43,11 +45,17 @@ jobs:
       - name: 安装项目依赖
         run: pnpm install --frozen-lockfile
 
+      - name: 安装 WebKit
+        run: pnpm exec playwright install --with-deps webkit
+
       - name: 运行核心与数据测试
         run: pnpm test:core
 
-      - name: 运行真实浏览器测试
+      - name: 运行真实 Chrome 测试
         run: pnpm test:ui
+
+      - name: 运行 WebKit 测试
+        run: pnpm test:webkit
 
       - name: 检查依赖漏洞
         run: pnpm audit --audit-level low
