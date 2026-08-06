@@ -15,6 +15,8 @@ import {
   normalizeAppleSnapshotIndex,
   savePublishedAppleSnapshot,
   createRunLogEntry,
+  createNetworkBudget,
+  fetchResource,
   getExchangeRates,
   main,
   publicationDateKey,
@@ -683,6 +685,8 @@ test('rejects an existing production baseline when the snapshot store is missing
 
 test('rolls back prices, history, logs, and snapshots when a production write fails midway', async () => {
   const { root, paths } = await createTemporaryProductionPaths();
+  const snapshotIndexText = await readFile(paths.snapshotIndexPath, 'utf8');
+  await writeFile(paths.snapshotIndexPath, snapshotIndexText.replace(/\r?\n/g, '\r\n'), 'utf8');
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
   const changed = structuredClone(data);
   const changedCountry = changed.countries.find(({ currency }) => currency === 'USD');
@@ -746,6 +750,33 @@ test('cleans up snapshot files when index writing fails', async () => {
       })
     );
     assert.deepEqual(await readdir(snapshotsDir), ['blocked-index']);
+  } finally {
+    await rm(snapshotsDir, { recursive: true, force: true });
+  }
+});
+
+test('preserves pre-existing snapshot evidence when exclusive creation fails', async () => {
+  const snapshotsDir = await mkdtemp(path.join(tmpdir(), 'icloud-snapshot-collision-'));
+  const indexPath = path.join(snapshotsDir, 'index.json');
+  const snapshotPath = path.join(snapshotsDir, '2026-04-06.html');
+  const preserved = '<html>preserved evidence</html>';
+  const parsed = {
+    sourcePublishedDate: 'Published Date: April 06, 2026',
+    parser: 'cross-checked',
+    tiers: [TIER_50],
+    countries: [country('Alpha', { prices: { '50GB': 1 } })]
+  };
+  try {
+    await writeFile(snapshotPath, preserved, 'utf8');
+    await assert.rejects(
+      savePublishedAppleSnapshot('<html>new evidence</html>', parsed, '2026-08-02', {
+        snapshotsDir,
+        indexPath
+      }),
+      { code: 'EEXIST' }
+    );
+    assert.equal(await readFile(snapshotPath, 'utf8'), preserved);
+    assert.deepEqual(await readdir(snapshotsDir), ['2026-04-06.html']);
   } finally {
     await rm(snapshotsDir, { recursive: true, force: true });
   }
@@ -1102,6 +1133,91 @@ test('does not expose the exchange-rate key when both online sources fail', asyn
   } finally {
     globalThis.fetch = originalFetch;
     globalThis.setTimeout = originalSetTimeout;
+    console.warn = originalWarn;
+  }
+});
+
+test('caps retry delays and request timeouts by the shared network deadline', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalWarn = console.warn;
+  let now = 0;
+  let requests = 0;
+  const sleeps = [];
+  const requestTimeouts = [];
+  globalThis.fetch = async () => {
+    requests += 1;
+    now += 30;
+    throw new Error('simulated outage');
+  };
+  console.warn = () => {};
+  const networkBudget = createNetworkBudget({
+    budgetMs: 100,
+    now: () => now,
+    sleep: async (delayMs) => {
+      sleeps.push(delayMs);
+      now += delayMs;
+    },
+    createTimeoutSignal: (timeoutMs) => {
+      requestTimeouts.push(timeoutMs);
+      return new AbortController().signal;
+    }
+  });
+  try {
+    await assert.rejects(
+      fetchResource('https://example.test/resource', {
+        attempts: 5,
+        retryDelaysMs: [0, 50, 50, 50, 50],
+        requestTimeoutMs: 45,
+        resourceName: 'test resource',
+        networkBudget
+      }),
+      /Network deadline exceeded while fetching test resource/
+    );
+    assert.equal(requests, 2);
+    assert.deepEqual(sleeps, [50]);
+    assert.deepEqual(requestTimeouts, [45, 20]);
+  } finally {
+    globalThis.fetch = originalFetch;
+    console.warn = originalWarn;
+  }
+});
+
+test('keeps previous exchange rates when the shared network deadline expires', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalWarn = console.warn;
+  let now = 0;
+  let requests = 0;
+  globalThis.fetch = async () => {
+    requests += 1;
+    now += 2;
+    throw new Error('simulated outage');
+  };
+  console.warn = () => {};
+  const networkBudget = createNetworkBudget({
+    budgetMs: 1,
+    now: () => now,
+    sleep: async (delayMs) => { now += delayMs; },
+    createTimeoutSignal: () => new AbortController().signal
+  });
+  const fetchedAt = new Date().toISOString();
+  try {
+    const fx = await getExchangeRates({
+      fx: {
+        sourceUrl: 'https://open.er-api.com/v6/latest/USD',
+        base: 'USD',
+        fetchedAt,
+        rates: { USD: 1, CNY: 7.1, JPY: 150 }
+      }
+    }, {
+      apiKey: '',
+      requiredCurrencies: ['USD', 'CNY', 'JPY'],
+      networkBudget
+    });
+    assert.equal(requests, 1);
+    assert.equal(fx.stale, true);
+    assert.equal(fx.fetchedAt, fetchedAt);
+  } finally {
+    globalThis.fetch = originalFetch;
     console.warn = originalWarn;
   }
 });

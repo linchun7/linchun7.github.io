@@ -13,6 +13,7 @@ import {
   publicationDateKey,
   normalizeAppleSnapshot,
   normalizeAppleSnapshotIndex,
+  snapshotFileSha256,
   validateAppleSnapshotStore,
   defaultUpdateLockPath,
   updateHistory
@@ -36,6 +37,33 @@ async function writeTextAtomic(filePath, text) {
   } catch (error) {
     await rm(temporaryPath, { force: true });
     throw error;
+  }
+}
+
+export async function rollbackAppleArchiveImport({
+  createdSnapshotFiles,
+  historyPath,
+  originalHistoryText,
+  snapshotIndexPath,
+  originalIndexText,
+  stagingDir,
+  remove = rm,
+  writeText = writeTextAtomic
+}) {
+  const operations = [
+    ...createdSnapshotFiles.map((filePath) => () => remove(filePath, { force: true })),
+    () => writeText(historyPath, originalHistoryText),
+    () => originalIndexText === null
+      ? remove(snapshotIndexPath, { force: true })
+      : writeText(snapshotIndexPath, originalIndexText),
+    () => remove(stagingDir, { recursive: true, force: true })
+  ];
+  const results = await Promise.allSettled(operations.map((operation) => operation()));
+  const failures = results
+    .filter(({ status }) => status === 'rejected')
+    .map(({ reason }) => reason);
+  if (failures.length) {
+    throw new AggregateError(failures, 'Apple archive import rollback was incomplete');
   }
 }
 
@@ -179,18 +207,20 @@ async function importAppleArchivesUnlocked(inputDir, paths = {}) {
       throw error;
     })
   ]);
-  const migratedSnapshotIndex = migrateSnapshotIndex(existingSnapshotIndexState.value);
-  await validateAppleSnapshotStore({
+  let migratedSnapshotIndex = migrateSnapshotIndex(existingSnapshotIndexState.value);
+  const validatedSnapshotIndex = await validateAppleSnapshotStore({
     snapshotsDir,
     snapshotIndexPath,
     snapshotIndex: migratedSnapshotIndex,
     snapshotIndexExists: existingSnapshotIndexState.existed
   });
+  if (validatedSnapshotIndex) migratedSnapshotIndex = validatedSnapshotIndex;
 
   const archives = [];
   for (const fileName of fileNames.filter((name) => name.toLowerCase().endsWith('.html'))) {
     const filePath = path.join(inputDir, fileName);
-    const html = await readFile(filePath, 'utf8');
+    const htmlBuffer = await readFile(filePath);
+    const html = htmlBuffer.toString('utf8');
     const parsed = withNames(parseArchive(html), names);
     validatePrices(parsed.countries, { tiers: parsed.tiers, minCountries: 60 });
     const publishedDate = publicationDateKey(parsed.sourcePublishedDate);
@@ -199,7 +229,7 @@ async function importAppleArchivesUnlocked(inputDir, paths = {}) {
     if (publishedDate > metadata.firstConfirmedDate) {
       throw new Error(`Archive ${fileName} has a publication date after its Wayback confirmation date`);
     }
-    archives.push({ fileName, filePath, html, parsed, publishedDate, ...metadata });
+    archives.push({ fileName, filePath, html, htmlBuffer, parsed, publishedDate, ...metadata });
   }
   archives.sort((a, b) => (
     a.publishedDate.localeCompare(b.publishedDate)
@@ -231,6 +261,7 @@ async function importAppleArchivesUnlocked(inputDir, paths = {}) {
 
   for (const archive of archives) {
     const contentHash = appleSnapshotContentHash(archive.parsed);
+    const normalizedSnapshotText = `${JSON.stringify(normalizeAppleSnapshot(archive.parsed), null, 2)}\n`;
     const existingSnapshot = snapshotIndex.snapshots.find(({ publishedDate }) => publishedDate === archive.publishedDate);
     const existingRevision = existingSnapshot?.revisions?.find(({ contentHash: existingHash }) => existingHash === contentHash);
     const entry = buildAppleSnapshotEntry(archive.publishedDate, {
@@ -240,7 +271,9 @@ async function importAppleArchivesUnlocked(inputDir, paths = {}) {
       parser: archive.parsed.parser,
       countries: archive.parsed.countries.length,
       pricePoints: archive.parsed.countries.length * archive.parsed.tiers.length,
-      contentHash
+      contentHash,
+      htmlSha256: snapshotFileSha256(archive.htmlBuffer),
+      dataSha256: snapshotFileSha256(normalizedSnapshotText)
     });
     if (existingRevision) {
       entry.file = existingRevision.file;
@@ -255,7 +288,7 @@ async function importAppleArchivesUnlocked(inputDir, paths = {}) {
         await copyFile(archive.filePath, path.join(stagingDir, entry.file));
         await writeFile(
           path.join(stagingDir, entry.dataFile),
-          `${JSON.stringify(normalizeAppleSnapshot(archive.parsed), null, 2)}\n`,
+          normalizedSnapshotText,
           'utf8'
         );
       } catch (error) {
@@ -319,18 +352,30 @@ async function importAppleArchivesUnlocked(inputDir, paths = {}) {
       snapshotsDir,
       snapshotIndexPath,
       snapshotIndex,
-      snapshotIndexExists: true
+      snapshotIndexExists: true,
+      deep: true
     });
     await writeTextAtomic(historyPath, `${JSON.stringify(rebuilt, null, 2)}\n`);
     await writeTextAtomic(snapshotIndexPath, `${JSON.stringify(snapshotIndex, null, 2)}\n`);
     await rm(stagingDir, { recursive: true, force: true });
     return { archives, history: rebuilt, snapshotIndex };
   } catch (error) {
-    await Promise.all(createdSnapshotFiles.map((file) => rm(file, { force: true })));
-    await writeTextAtomic(historyPath, originalHistoryText);
-    if (originalIndexText === null) await rm(snapshotIndexPath, { force: true });
-    else await writeTextAtomic(snapshotIndexPath, originalIndexText);
-    await rm(stagingDir, { recursive: true, force: true });
+    try {
+      await rollbackAppleArchiveImport({
+        createdSnapshotFiles,
+        historyPath,
+        originalHistoryText,
+        snapshotIndexPath,
+        originalIndexText,
+        stagingDir
+      });
+    } catch (rollbackError) {
+      throw new AggregateError(
+        [error, ...(rollbackError.errors ?? [rollbackError])],
+        `Apple archive import was not committed and rollback was incomplete: ${error.message}`,
+        { cause: error }
+      );
+    }
     throw new Error(`Apple archive import was not committed: ${error.message}`, { cause: error });
   }
 }

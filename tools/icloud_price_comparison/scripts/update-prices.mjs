@@ -1,4 +1,4 @@
-import { appendFile, mkdir, readFile, readdir, rename, stat, unlink, writeFile } from 'node:fs/promises';
+import { appendFile, link, mkdir, readFile, readdir, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,6 +8,7 @@ import {
   validatePriceChangeAnomalies,
   validatePrices
 } from './parse-prices.mjs';
+import { validateHistoryPayload, validatePricePayload } from '../data-contract.js';
 import { parseLegacyAppleArchive } from './parse-legacy-archive.mjs';
 import { describeTriggerSource, formatBeijingDate, resolveTriggerSource } from './run-context.mjs';
 
@@ -24,6 +25,8 @@ const APPLE_SNAPSHOT_INDEX_PATH = path.join(APPLE_SNAPSHOTS_DIR, 'index.json');
 const NAMES_PATH = path.join(PROJECT_DIR, 'scripts/country-names.zh.json');
 const DIAGNOSTICS_DIR = path.join(PROJECT_DIR, 'artifacts');
 const RETRY_DELAYS_MS = [0, 2_000, 5_000, 15_000, 30_000];
+const REQUEST_TIMEOUT_MS = 45_000;
+const NETWORK_BUDGET_MS = 5 * 60 * 1_000;
 const FX_MAX_AGE_MS = 36 * 60 * 60 * 1_000;
 const FX_MAX_FUTURE_SKEW_MS = 5 * 60 * 1_000;
 const UPDATE_LOCK_STALE_MS = 30 * 60 * 1_000;
@@ -36,17 +39,57 @@ export function defaultUpdateLockPath(currentDataPath = CURRENT_DATA_PATH) {
   return path.join(path.dirname(path.dirname(currentDataPath)), '.icloud-price-update.lock');
 }
 
-async function fetchResource(url, {
+export function createNetworkBudget({
+  budgetMs = NETWORK_BUDGET_MS,
+  now = Date.now,
+  sleep = (delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs)),
+  createTimeoutSignal = (timeoutMs) => AbortSignal.timeout(timeoutMs)
+} = {}) {
+  if (!Number.isFinite(budgetMs) || budgetMs <= 0) throw new Error('Network budget must be a positive duration');
+  if (typeof now !== 'function' || typeof sleep !== 'function' || typeof createTimeoutSignal !== 'function') {
+    throw new Error('Network budget dependencies are invalid');
+  }
+  return { deadlineAt: now() + budgetMs, now, sleep, createTimeoutSignal };
+}
+
+function networkDeadlineError(resourceName) {
+  const error = new Error(`Network deadline exceeded while fetching ${resourceName}`);
+  error.code = 'NETWORK_DEADLINE_EXCEEDED';
+  return error;
+}
+
+function remainingNetworkBudget(networkBudget) {
+  return Math.max(0, networkBudget.deadlineAt - networkBudget.now());
+}
+
+export async function fetchResource(url, {
   json = false,
   attempts = RETRY_DELAYS_MS.length,
   headers = {},
-  resourceName = url
+  resourceName = url,
+  retryDelaysMs = RETRY_DELAYS_MS,
+  requestTimeoutMs = REQUEST_TIMEOUT_MS,
+  networkBudget = createNetworkBudget()
 } = {}) {
   let lastError;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    const delay = RETRY_DELAYS_MS[attempt - 1] ?? RETRY_DELAYS_MS.at(-1);
-    if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
+    let remainingMs = remainingNetworkBudget(networkBudget);
+    if (remainingMs <= 0) {
+      lastError = networkDeadlineError(resourceName);
+      break;
+    }
+    const delay = retryDelaysMs[attempt - 1] ?? retryDelaysMs.at(-1) ?? 0;
+    if (delay) {
+      const boundedDelay = Math.min(delay, remainingMs);
+      await networkBudget.sleep(boundedDelay);
+      remainingMs = remainingNetworkBudget(networkBudget);
+      if (boundedDelay < delay || remainingMs <= 0) {
+        lastError = networkDeadlineError(resourceName);
+        break;
+      }
+    }
     try {
+      const timeoutMs = Math.max(1, Math.min(requestTimeoutMs, remainingMs));
       const response = await fetch(url, {
         headers: {
           accept: json ? 'application/json' : 'text/html,application/xhtml+xml',
@@ -56,7 +99,7 @@ async function fetchResource(url, {
           ...headers
         },
         redirect: 'follow',
-        signal: AbortSignal.timeout(45_000)
+        signal: networkBudget.createTimeoutSignal(timeoutMs)
       });
       if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
       const body = await response.text();
@@ -67,8 +110,13 @@ async function fetchResource(url, {
     } catch (error) {
       lastError = error;
       console.warn(`Fetch attempt ${attempt}/${attempts} failed for ${resourceName}: ${error.message}`);
+      if (remainingNetworkBudget(networkBudget) <= 0) {
+        lastError = networkDeadlineError(resourceName);
+        break;
+      }
     }
   }
+  if (lastError?.code === 'NETWORK_DEADLINE_EXCEEDED') throw lastError;
   throw new Error(`Failed to fetch ${resourceName}: ${lastError?.message}`);
 }
 
@@ -126,16 +174,18 @@ function validateExchangeRateFreshness(fetchedAt, now = new Date()) {
 
 async function readJsonWithExistence(filePath, fallback = null) {
   try {
-    return { value: JSON.parse(await readFile(filePath, 'utf8')), existed: true };
+    const text = await readFile(filePath, 'utf8');
+    return { value: JSON.parse(text), existed: true, text };
   } catch (error) {
-    if (error.code === 'ENOENT') return { value: fallback, existed: false };
+    if (error.code === 'ENOENT') return { value: fallback, existed: false, text: null };
     throw new Error(`Unable to read valid JSON from ${path.basename(filePath)}: ${error.message}`);
   }
 }
 
 export async function getExchangeRates(previousData, {
   apiKey = process.env.EXCHANGE_RATE_API_KEY,
-  requiredCurrencies = []
+  requiredCurrencies = [],
+  networkBudget = createNetworkBudget()
 } = {}) {
   const normalizedApiKey = typeof apiKey === 'string' ? apiKey.trim() : '';
   const sources = [];
@@ -165,7 +215,8 @@ export async function getExchangeRates(previousData, {
         json: true,
         attempts: source.attempts,
         headers: source.headers,
-        resourceName: source.resourceName
+        resourceName: source.resourceName,
+        networkBudget
       });
       const parsed = parseExchangeRatePayload(payload, source.ratesField);
       validateExchangeRateFreshness(parsed.fetchedAt);
@@ -458,15 +509,38 @@ export function updatePublishedDateHistory(history, previousData, publishedDate,
   return { entries, changed };
 }
 
-export async function writeJsonAtomic(filePath, value) {
+async function writeTextAtomic(filePath, text) {
   await mkdir(path.dirname(filePath), { recursive: true });
   const temporaryPath = `${filePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   try {
-    await writeFile(temporaryPath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+    await writeFile(temporaryPath, text, 'utf8');
     await rename(temporaryPath, filePath);
   } catch (error) {
     await unlinkIfExists(temporaryPath);
     throw error;
+  }
+}
+
+export async function writeJsonAtomic(filePath, value) {
+  await writeTextAtomic(filePath, serializeJson(value));
+}
+
+function serializeJson(value) {
+  return `${JSON.stringify(value, null, 2)}\n`;
+}
+
+export function snapshotFileSha256(value) {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+async function writeTextExclusiveAtomic(filePath, text) {
+  await mkdir(path.dirname(filePath), { recursive: true });
+  const temporaryPath = `${filePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  try {
+    await writeFile(temporaryPath, text, { encoding: 'utf8', flag: 'wx' });
+    await link(temporaryPath, filePath);
+  } finally {
+    await unlinkIfExists(temporaryPath);
   }
 }
 
@@ -761,12 +835,12 @@ async function restoreProductionFiles(entries) {
   }
 }
 
-async function restorePublishedSnapshot({ snapshotsDir, snapshotIndexPath, originalSnapshotIndex, file }) {
+async function restorePublishedSnapshot({ snapshotsDir, snapshotIndexPath, originalSnapshotIndexText, file }) {
   const results = await Promise.allSettled([
     unlinkIfExists(path.join(snapshotsDir, file)),
     unlinkIfExists(path.join(snapshotsDir, file.replace(/\.html$/, '.json'))),
-    originalSnapshotIndex
-      ? writeJsonAtomic(snapshotIndexPath, originalSnapshotIndex)
+    originalSnapshotIndexText !== null
+      ? writeTextAtomic(snapshotIndexPath, originalSnapshotIndexText)
       : unlinkIfExists(snapshotIndexPath)
   ]);
   const failures = results.filter(({ status }) => status === 'rejected');
@@ -808,7 +882,9 @@ export function buildAppleSnapshotEntry(publishedDate, {
   parser = 'cross-checked',
   countries,
   pricePoints,
-  contentHash
+  contentHash,
+  htmlSha256,
+  dataSha256
 } = {}) {
   const publishedDateIso = publicationDateKey(publishedDate);
   if (!isIsoDate(publishedDateIso)) throw new Error('Apple snapshot published date is invalid');
@@ -825,7 +901,9 @@ export function buildAppleSnapshotEntry(publishedDate, {
     parser,
     countries,
     pricePoints,
-    contentHash
+    contentHash,
+    ...(htmlSha256 ? { htmlSha256 } : {}),
+    ...(dataSha256 ? { dataSha256 } : {})
   };
 }
 
@@ -902,6 +980,8 @@ export function normalizeAppleSnapshotIndex(index) {
         publishedDate: revision.publishedDate ?? publishedDate,
         dataFile: revision.dataFile ?? revision.file?.replace(/\.html$/, '.json')
       };
+      const hasHtmlSha256 = normalized.htmlSha256 !== undefined;
+      const hasDataSha256 = normalized.dataSha256 !== undefined;
       if (normalized.publishedDate !== publishedDate
         || !isFirstConfirmedDateAllowed(normalized.firstConfirmedDate)
         || !validateSnapshotFileName(normalized.file, '.html')
@@ -909,6 +989,9 @@ export function normalizeAppleSnapshotIndex(index) {
         || !htmlFilePattern.test(normalized.file)
         || !dataFilePattern.test(normalized.dataFile)
         || !/^[a-f0-9]{64}$/.test(normalized.contentHash ?? '')
+        || hasHtmlSha256 !== hasDataSha256
+        || (hasHtmlSha256 && !/^[a-f0-9]{64}$/.test(normalized.htmlSha256))
+        || (hasDataSha256 && !/^[a-f0-9]{64}$/.test(normalized.dataSha256))
         || hashes.has(normalized.contentHash)
         || files.has(normalized.file)
         || files.has(normalized.dataFile)
@@ -942,9 +1025,9 @@ export function normalizeAppleSnapshotIndex(index) {
 }
 
 function isIsoDateTime(value) {
-  return typeof value === 'string'
-    && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value)
-    && Number.isFinite(Date.parse(value));
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) return false;
+  const date = new Date(value);
+  return !Number.isNaN(date.getTime()) && date.toISOString() === value;
 }
 
 function normalizedSnapshotAsParsed(snapshot) {
@@ -1008,7 +1091,8 @@ export async function validateAppleSnapshotStore({
   snapshotIndex,
   snapshotIndexExists = snapshotIndex !== undefined,
   history = null,
-  currentData = null
+  currentData = null,
+  deep = false
 } = {}) {
   const [indexState, evidenceEntries] = await Promise.all([
     snapshotIndex === undefined
@@ -1037,6 +1121,7 @@ export async function validateAppleSnapshotStore({
   const publicationHistory = new Map((history?.sourcePublishedDates ?? []).map((entry) => (
     [publicationDateKey(entry.publishedDate), entry]
   )));
+  const latestSnapshot = normalizedIndex.snapshots.at(-1);
   for (const snapshot of normalizedIndex.snapshots) {
     if (snapshot.publishedDate > snapshot.revisions[0].firstConfirmedDate) {
       throw new Error(`Apple snapshot ${snapshot.publishedDate} predates its publication confirmation`);
@@ -1066,10 +1151,29 @@ export async function validateAppleSnapshotStore({
 
       const htmlPath = path.join(snapshotsDir, revision.file);
       const dataPath = path.join(snapshotsDir, revision.dataFile);
-      const [html, normalizedSnapshot] = await Promise.all([
-        readFile(htmlPath, 'utf8'),
-        readJson(dataPath)
+      const hadRawHashes = Boolean(revision.htmlSha256 && revision.dataSha256);
+      const [htmlBuffer, dataBuffer] = await Promise.all([
+        readFile(htmlPath),
+        readFile(dataPath)
       ]);
+      const htmlSha256 = snapshotFileSha256(htmlBuffer);
+      const dataSha256 = snapshotFileSha256(dataBuffer);
+      if ((revision.htmlSha256 && revision.htmlSha256 !== htmlSha256)
+        || (revision.dataSha256 && revision.dataSha256 !== dataSha256)) {
+        throw new Error(`Apple snapshot evidence has a content-hash mismatch in raw bytes for ${snapshot.publishedDate}`);
+      }
+      revision.htmlSha256 = htmlSha256;
+      revision.dataSha256 = dataSha256;
+      const isLatestActiveRevision = snapshot === latestSnapshot && revision.file === snapshot.activeFile;
+      if (!deep && hadRawHashes && !isLatestActiveRevision) continue;
+
+      const html = htmlBuffer.toString('utf8');
+      let normalizedSnapshot;
+      try {
+        normalizedSnapshot = JSON.parse(dataBuffer.toString('utf8'));
+      } catch (error) {
+        throw new Error(`Unable to read valid JSON from ${revision.dataFile}: ${error.message}`);
+      }
       const parsedHtml = parseStoredAppleSnapshot(html, revision.file);
       validatePrices(parsedHtml.countries, { minCountries: 60, tiers: parsedHtml.tiers });
       const parsedNormalized = normalizedSnapshotAsParsed(normalizedSnapshot);
@@ -1112,7 +1216,7 @@ export async function validateAppleSnapshotStore({
   return normalizedIndex;
 }
 
-function validateExistingPrices(data) {
+export function validateExistingPrices(data) {
   if (!isPlainObject(data)
     || ![1, 2].includes(data.schemaVersion)
     || !isIsoDateTime(data.generatedAt)
@@ -1165,9 +1269,10 @@ function validateExistingPrices(data) {
       throw new Error('Existing prices.json has inconsistent run metadata');
     }
   }
+  validatePricePayload(data, { minCountries: 60 });
 }
 
-function validateExistingHistory(history, data) {
+export function validateExistingHistory(history, data) {
   if (!isPlainObject(history)
     || ![1, 2].includes(history.schemaVersion)
     || !isPlainObject(history.countries)
@@ -1237,6 +1342,7 @@ function validateExistingHistory(history, data) {
       throw new Error(`Existing history.json latest values do not match ${country.country}`);
     }
   }
+  validateHistoryPayload(history);
 }
 
 function validateExistingRunLog(runLog, data) {
@@ -1370,6 +1476,8 @@ export async function savePublishedAppleSnapshot(html, parsed, firstConfirmedDat
 } = {}) {
   const publishedDate = publicationDateKey(parsed.sourcePublishedDate);
   const contentHash = appleSnapshotContentHash(parsed);
+  const normalizedSnapshot = normalizeAppleSnapshot(parsed);
+  const normalizedSnapshotText = serializeJson(normalizedSnapshot);
   const index = normalizeAppleSnapshotIndex(await readJson(indexPath, { schemaVersion: 1, snapshots: [] }));
   const existing = index.snapshots?.find((item) => item.publishedDate === publishedDate);
   const revisions = Array.isArray(existing?.revisions) ? existing.revisions : existing ? [existing] : [];
@@ -1380,22 +1488,26 @@ export async function savePublishedAppleSnapshot(html, parsed, firstConfirmedDat
     parser: parsed.parser,
     countries: parsed.countries.length,
     pricePoints: parsed.countries.length * parsed.tiers.length,
-    contentHash
+    contentHash,
+    htmlSha256: snapshotFileSha256(html),
+    dataSha256: snapshotFileSha256(normalizedSnapshotText)
   });
   entry.file = file;
   entry.dataFile = file.replace(/\.html$/, '.json');
   const updatedIndex = normalizeAppleSnapshotIndex(buildAppleSnapshotIndex(index, entry));
   const snapshotPath = path.join(snapshotsDir, entry.file);
   const dataPath = path.join(snapshotsDir, entry.dataFile);
+  const createdPaths = [];
   try {
     await mkdir(snapshotsDir, { recursive: true });
     await writeFile(snapshotPath, html, { encoding: 'utf8', flag: 'wx' });
-    await writeJsonAtomic(dataPath, normalizeAppleSnapshot(parsed));
+    createdPaths.push(snapshotPath);
+    await writeTextExclusiveAtomic(dataPath, normalizedSnapshotText);
+    createdPaths.push(dataPath);
     await writeJsonAtomic(indexPath, updatedIndex);
   } catch (error) {
     await Promise.allSettled([
-      unlink(snapshotPath),
-      unlink(dataPath),
+      ...createdPaths.map((filePath) => unlink(filePath)),
       unlink(`${indexPath}.tmp`)
     ]);
     throw error;
@@ -1529,7 +1641,8 @@ export async function main({
   dryRun = DRY_RUN,
   paths = {},
   stepSummaryPath = process.env.GITHUB_STEP_SUMMARY,
-  writeJson = writeJsonAtomic
+  writeJson = writeJsonAtomic,
+  networkBudget = createNetworkBudget()
 } = {}) {
   const currentDataPath = paths.currentDataPath ?? CURRENT_DATA_PATH;
   const historyPath = paths.historyPath ?? HISTORY_PATH;
@@ -1575,7 +1688,7 @@ export async function main({
     if (!countryNames || Object.keys(countryNames).length < 60) {
       throw new Error('Chinese country-name mapping is missing or incomplete');
     }
-    const html = await fetchResource(APPLE_URL).then((response) => {
+    const html = await fetchResource(APPLE_URL, { networkBudget }).then((response) => {
       lastAppleHtml = response;
       return response;
     });
@@ -1590,17 +1703,15 @@ export async function main({
   if (!parsed.sourcePublishedDate || !/^\d{4}-\d{2}-\d{2}$/.test(publicationDateKey(parsed.sourcePublishedDate))) {
     throw new Error('Apple published date was not found or has an unsupported format');
   }
-  validatePrices(parsed.countries, {
-    tiers: parsed.tiers,
-    previousCountries: previousData?.countries ?? []
-  });
+  validatePrices(parsed.countries, { tiers: parsed.tiers });
   const countries = parsed.countries.map((country) => ({
     ...country,
     nameZh: countryNames[country.country] ?? country.country
   }));
 
   const fx = await getExchangeRates(previousData, {
-    requiredCurrencies: [...new Set(countries.map(({ currency }) => currency))]
+    requiredCurrencies: [...new Set(countries.map(({ currency }) => currency))],
+    networkBudget
   });
   if (process.env.GITHUB_ACTIONS === 'true' && fx.apiKeyStatus === 'not-configured') {
     console.log('::notice title=未配置汇率 API Key::已直接使用开放接口，价格更新继续执行。');
@@ -1615,6 +1726,12 @@ export async function main({
   if (missingRates.length) {
     throw new Error(`Exchange rates are missing for: ${missingRates.join(', ')}`);
   }
+  validatePrices(countries, {
+    tiers: parsed.tiers,
+    previousCountries: previousData?.countries ?? [],
+    previousRates: previousData?.fx?.rates,
+    currentRates: fx.rates
+  });
   validatePriceChangeAnomalies(countries, {
     previousData,
     currentRates: fx.rates,
@@ -1662,7 +1779,10 @@ export async function main({
   };
   const run = createRunLogEntry(data, summary, runStartedAt, finishedAt);
   const runLog = buildRunLog(previousRunLog, run);
-  const originalSnapshotIndex = dryRun ? null : await readJson(snapshotIndexPath, null);
+  const originalSnapshotIndexState = dryRun
+    ? { value: null, text: null }
+    : await readJsonWithExistence(snapshotIndexPath, null);
+  const originalSnapshotIndex = originalSnapshotIndexState.value;
   let snapshotSaved = false;
   if (!dryRun) {
     snapshotSaved = await savePublishedAppleSnapshot(html, parsed, observedAt, {
@@ -1688,7 +1808,7 @@ export async function main({
         rollbackTasks.push(restorePublishedSnapshot({
           snapshotsDir,
           snapshotIndexPath,
-          originalSnapshotIndex,
+          originalSnapshotIndexText: originalSnapshotIndexState.text,
           file
         }));
       }

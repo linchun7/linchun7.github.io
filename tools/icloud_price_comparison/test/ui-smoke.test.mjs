@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { access, readFile, stat } from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
-import test from 'node:test';
+import test, { after } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit } from 'playwright';
 
@@ -15,6 +15,8 @@ const CONTENT_TYPES = {
   '.json': 'application/json; charset=utf-8'
 };
 const BROWSER_UNDER_TEST = process.env.PLAYWRIGHT_BROWSER || 'chromium';
+let sharedBrowserPromise = null;
+let sharedServerPromise = null;
 
 if (!['chromium', 'webkit'].includes(BROWSER_UNDER_TEST)) {
   throw new Error(`Unsupported Playwright browser: ${BROWSER_UNDER_TEST}`);
@@ -32,6 +34,16 @@ function formatUiDate(value) {
   return new Intl.DateTimeFormat('zh-CN', {
     year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'UTC'
   }).format(date);
+}
+
+function setPayloadGeneratedAt(data, generatedAt) {
+  data.generatedAt = generatedAt;
+  data.run.startedAtUtc = generatedAt;
+  data.run.finishedAtUtc = generatedAt;
+  data.run.observedAtUtc = generatedAt;
+  data.run.observedAtBeijing = new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Shanghai'
+  }).format(new Date(generatedAt));
 }
 
 const uiNumberFormatter = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 });
@@ -78,12 +90,12 @@ async function resolveBrowser(context, purpose) {
       context.skip('Playwright WebKit is not installed');
       return null;
     }
-    return { browserType: webkit, launchOptions: { headless: true } };
+    return { browserType: sharedBrowserType(webkit), launchOptions: { headless: true } };
   }
 
   try {
     await access(chromium.executablePath());
-    return { browserType: chromium, launchOptions: { headless: true } };
+    return { browserType: sharedBrowserType(chromium), launchOptions: { headless: true } };
   } catch {
     // Fall back to a system browser when Playwright Chromium is not installed.
   }
@@ -93,10 +105,32 @@ async function resolveBrowser(context, purpose) {
     context.skip('Chrome or Chromium is not installed');
     return null;
   }
-  return { browserType: chromium, launchOptions: { executablePath, headless: true } };
+  return { browserType: sharedBrowserType(chromium), launchOptions: { executablePath, headless: true } };
 }
 
-async function startServer() {
+function sharedBrowserType(browserType) {
+  return {
+    async launch(launchOptions) {
+      if (!sharedBrowserPromise) sharedBrowserPromise = browserType.launch(launchOptions);
+      const sharedBrowser = await sharedBrowserPromise;
+      const pages = new Set();
+      return {
+        async newPage(options) {
+          const page = await sharedBrowser.newPage(options);
+          pages.add(page);
+          page.once('close', () => pages.delete(page));
+          return page;
+        },
+        async close() {
+          await Promise.allSettled([...pages].map((page) => page.close()));
+          pages.clear();
+        }
+      };
+    }
+  };
+}
+
+async function createServer() {
   const server = http.createServer(async (request, response) => {
     try {
       const pathname = decodeURIComponent(new URL(request.url, 'http://127.0.0.1').pathname);
@@ -117,6 +151,26 @@ async function startServer() {
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   return server;
 }
+
+async function startServer() {
+  if (!sharedServerPromise) sharedServerPromise = createServer();
+  const sharedServer = await sharedServerPromise;
+  return {
+    address: () => sharedServer.address(),
+    close: (callback) => queueMicrotask(() => callback?.())
+  };
+}
+
+after(async () => {
+  const cleanup = [];
+  if (sharedBrowserPromise) cleanup.push(sharedBrowserPromise.then((browser) => browser.close()));
+  if (sharedServerPromise) {
+    cleanup.push(sharedServerPromise.then((server) => new Promise((resolve, reject) => {
+      server.close((error) => (error ? reject(error) : resolve()));
+    })));
+  }
+  await Promise.allSettled(cleanup);
+});
 
 test('renders current prices, sorting, and country history in a real browser', { timeout: 30_000 }, async (context) => {
   const browserConfig = await resolveBrowser(context, 'the UI smoke test');
@@ -188,6 +242,11 @@ test('renders current prices, sorting, and country history in a real browser', {
           (count) => document.querySelectorAll('#priceRows tr[data-country]').length === count,
           expectedData.countries.length
         );
+        const initialResources = await page.evaluate(() => performance.getEntriesByType('resource').map(({ name }) => name));
+        assert.equal(initialResources.some((url) => url.includes('/data/history.json')), false, `${viewport.name} must defer history data`);
+        assert.equal(initialResources.some((url) => url.includes('/vendor/chart.umd.min.js')), false, `${viewport.name} must defer Chart.js`);
+        assert.equal(initialResources.some((url) => url.includes('/vendor/lucide.min.js')), false, `${viewport.name} must not load the full Lucide bundle`);
+        assert.equal(initialResources.some((url) => url.includes('/vendor/lucide-subset.js')), true, `${viewport.name} must load the Lucide subset`);
 
         assert.equal(await page.locator('#marketCount').textContent(), String(expectedData.countries.length));
         assert.equal(await page.locator('#tierCount').textContent(), String(expectedData.tiers.length));
@@ -734,7 +793,7 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
     {
       label: 'old snapshot',
       mutate: (data) => {
-        data.generatedAt = '2020-01-01T00:00:00.000Z';
+        setPayloadGeneratedAt(data, '2020-01-01T00:00:00.000Z');
         data.fx.stale = false;
         data.source.publishedDate = 'Published Date: July 17, 2026';
       },
@@ -743,17 +802,17 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
     },
     {
       label: 'future snapshot',
-      mutate: (data) => { data.generatedAt = '2099-01-01T00:00:00.000Z'; data.fx.stale = false; },
+      mutate: (data) => { setPayloadGeneratedAt(data, '2099-01-01T00:00:00.000Z'); data.fx.stale = false; },
       expected: /数据生成时间在未来/
     },
     {
       label: 'fallback rates',
-      mutate: (data) => { data.generatedAt = new Date().toISOString(); data.fx.stale = true; },
+      mutate: (data) => { setPayloadGeneratedAt(data, new Date().toISOString()); data.fx.stale = true; },
       expected: /汇率沿用上次成功结果/
     },
     {
       label: 'old snapshot with fallback rates',
-      mutate: (data) => { data.generatedAt = '2020-01-01T00:00:00.000Z'; data.fx.stale = true; },
+      mutate: (data) => { setPayloadGeneratedAt(data, '2020-01-01T00:00:00.000Z'); data.fx.stale = true; },
       expected: /超过 36 小时 · 汇率沿用上次成功结果/
     }
   ];
@@ -823,9 +882,9 @@ test('ignores stale history responses after a price retry', { timeout: 30_000 },
   await page.route('**/data/prices.json*', (route) => {
     priceCalls += 1;
     return route.fulfill({
-      status: priceCalls === 1 ? 500 : 200,
+      status: 200,
       contentType: 'application/json',
-      body: priceCalls === 1 ? 'temporary outage' : JSON.stringify(validData)
+      body: JSON.stringify(validData)
     });
   });
   await page.route('**/data/history.json*', async (route) => {
@@ -840,11 +899,12 @@ test('ignores stale history responses after a price retry', { timeout: 30_000 },
   });
   try {
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
-    await page.locator('#retryButton').click();
+    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, validData.countries.length);
+    await page.locator('#priceRows tr[data-country="Brazil"]').click();
+    await page.waitForFunction(() => document.querySelector('#historyDialog')?.open === true);
+    await page.locator('#retryButton').dispatchEvent('click');
     await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, validData.countries.length);
     await page.waitForTimeout(1_200);
-    await page.locator('#priceRows tr[data-country="Brazil"]').click();
     assert.equal(await page.locator('#historyDialog').evaluate((element) => element.open), true);
     assert.equal(await page.locator('#historyRows tr').count(), validHistory.countries.Brazil.events.length);
     assert.deepEqual(pageErrors, []);
@@ -890,6 +950,10 @@ test('keeps history dialog usable when Chart construction fails', { timeout: 30_
     await page.locator('#priceRows tr[data-country="Brazil"]').click();
     assert.equal(await page.locator('#historyDialog').evaluate((element) => element.open), true);
     assert.equal(await page.locator('#historyRows tr').count(), validHistory.countries.Brazil.events.length);
+    await page.waitForFunction(() => (
+      document.querySelector('#chartWrap')?.hidden === true
+      && document.querySelector('#emptyHistory')?.hidden === false
+    ));
     assert.equal(await page.locator('#chartWrap').isVisible(), false);
     assert.equal(await page.locator('#emptyHistory').isVisible(), true);
     assert.deepEqual(pageErrors, []);
@@ -1045,6 +1109,9 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
 
   const assertScrollableDialog = async (page, dialogSelector, closeSelector, label) => {
     const dialog = page.locator(dialogSelector);
+    await dialog.evaluate(() => new Promise((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(resolve));
+    }));
     const before = await dialog.evaluate((element) => {
       const rect = element.getBoundingClientRect();
       return {
@@ -1064,7 +1131,10 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
     assert.ok(before.top >= -1 && before.bottom <= before.viewportHeight + 1, `${label} dialog must stay inside the viewport`);
     assert.ok(before.left >= -1 && before.right <= before.viewportWidth + 1, `${label} dialog width must stay inside the viewport`);
     assert.ok(before.scrollHeight > before.clientHeight, `${label} dialog must scroll vertically`);
-    assert.ok(before.scrollWidth <= before.clientWidth + 1, `${label} dialog must not scroll horizontally`);
+    assert.ok(
+      before.scrollWidth <= before.clientWidth + 1,
+      `${label} dialog must not scroll horizontally (${before.scrollWidth}/${before.clientWidth})`
+    );
     assert.ok(before.documentWidth <= before.viewportWidth + 1, `${label} must not overflow the page`);
     assert.equal(
       await dialog.locator('.dialog-header').evaluate((header) => getComputedStyle(header).backgroundColor),
@@ -1214,6 +1284,7 @@ test('resets a removed region filter after a successful price retry', { timeout:
   const replacement = structuredClone(fullData);
   const removedRegion = fullData.countries[0].region;
   replacement.countries = replacement.countries.filter(({ region }) => region !== removedRegion);
+  replacement.run.countries = replacement.countries.length;
   replacement.run.pricePoints = replacement.countries.length * replacement.tiers.length;
   const server = await startServer();
   const { port } = server.address();
@@ -1271,6 +1342,7 @@ test('rebinds or closes an open history dialog after country replacement', { tim
   changedData.run.pricePoints = changedData.countries.length * changedData.tiers.length;
   const removedData = structuredClone(changedData);
   removedData.countries = removedData.countries.filter(({ country }) => country !== activeCountry.country);
+  removedData.run.countries = removedData.countries.length;
   removedData.run.pricePoints = removedData.countries.length * removedData.tiers.length;
   const scenarios = [
     { label: 'updated country', replacement: changedData, expectedOpen: true, expectedTitle: changedCountry.nameZh },

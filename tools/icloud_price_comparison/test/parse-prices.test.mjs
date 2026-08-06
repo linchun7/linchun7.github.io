@@ -300,6 +300,30 @@ test('allows exact tenfold hard-limit boundaries but rejects either side', () =>
   );
 });
 
+test('validates hard limits across currency changes using old and new exchange rates', () => {
+  const tiers = [testTier('50GB')];
+  const previousCountries = [testCountry({ '50GB': { price: 10 } })];
+  const changedCurrency = [testCountry(
+    { '50GB': { price: 1_000_000_000 } },
+    { currency: 'JPY' }
+  )];
+
+  assert.throws(
+    () => validatePrices(changedCurrency, {
+      minCountries: 1,
+      previousCountries,
+      previousRates: { USD: 1, CNY: 7 },
+      currentRates: { JPY: 150, CNY: 7 },
+      tiers
+    }),
+    /Suspicious 50GB price change/
+  );
+  assert.throws(
+    () => validatePrices(changedCurrency, { minCountries: 1, previousCountries, tiers }),
+    /exchange rate is missing/
+  );
+});
+
 test('rejects a change only when local and exchange-rate-isolated thresholds all agree', async () => {
   const parsed = parseApplePrices(await readFile(fixtureUrl, 'utf8'));
   const previousData = {
@@ -454,6 +478,23 @@ test('still rejects a very large price move when exchange rates do not explain i
       tiers: [{ id: '50GB' }]
     }),
     /fixed-rate CNY 175.00\/35.00, market-adjusted CNY 175.00\/35.00/
+  );
+});
+
+test('rejects a cross-currency price change when its converted value is implausible', () => {
+  const previousData = {
+    countries: [{ country: 'Example', currency: 'USD', plans: { '50GB': { price: 1 } } }],
+    fx: { rates: { USD: 1, CNY: 7 } }
+  };
+  const changed = [{ country: 'Example', currency: 'JPY', plans: { '50GB': { price: 1_000_000_000 } } }];
+
+  assert.throws(
+    () => validatePriceChangeAnomalies(changed, {
+      previousData,
+      currentRates: { JPY: 150, CNY: 7 },
+      tiers: [{ id: '50GB' }]
+    }),
+    /Suspicious combined 50GB price change.*USD to JPY/
   );
 });
 

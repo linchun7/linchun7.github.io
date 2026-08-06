@@ -14,6 +14,8 @@ on:
       - '.github/workflows/**'
       - 'tools/icloud_price_comparison/**'
   workflow_dispatch:
+  schedule:
+    - cron: '35 1 * * 1'
 
 permissions:
   contents: read
@@ -51,11 +53,12 @@ jobs:
       - name: 运行核心与数据测试
         run: pnpm test:core
 
-      - name: 运行真实 Chrome 测试
-        run: pnpm test:ui
+      - name: 深度审计全部 Apple 快照
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: pnpm validate:snapshots
 
-      - name: 运行 WebKit 测试
-        run: pnpm test:webkit
+      - name: 并行运行 Chromium 与 WebKit 测试
+        run: pnpm test:browsers
 
       - name: 检查依赖漏洞
         run: pnpm audit --audit-level low

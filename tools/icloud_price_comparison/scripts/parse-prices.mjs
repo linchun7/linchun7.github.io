@@ -452,7 +452,13 @@ export function parseApplePrices(html) {
   throw new Error(`Both Apple parsers failed; document-order: ${documentOrderError?.message}; apple-markers: ${appleMarkerError?.message}`);
 }
 
-export function validatePrices(countries, { minCountries = 60, previousCountries = [], tiers = TIERS } = {}) {
+export function validatePrices(countries, {
+  minCountries = 60,
+  previousCountries = [],
+  previousRates,
+  currentRates,
+  tiers = TIERS
+} = {}) {
   if (!Array.isArray(countries)) throw new Error('Apple pricing countries have an unsupported structure');
   if (!Array.isArray(tiers) || !tiers.length) throw new Error('Apple pricing tiers have an unsupported structure');
 
@@ -528,10 +534,20 @@ export function validatePrices(countries, { minCountries = 60, previousCountries
   const previousByCountry = new Map(previousCountries.map((entry) => [entry.country, entry]));
   for (const entry of countries) {
     const previous = previousByCountry.get(entry.country);
-    if (!previous || previous.currency !== entry.currency) continue;
+    if (!previous) continue;
     for (const tier of tiers) {
       if (!previous.plans[tier.id]) continue;
-      const ratio = entry.plans[tier.id].price / previous.plans[tier.id].price;
+      let ratio;
+      if (previous.currency === entry.currency) {
+        ratio = entry.plans[tier.id].price / previous.plans[tier.id].price;
+      } else {
+        const previousCny = convertToCny(previous.plans[tier.id].price, previous.currency, previousRates);
+        const currentCny = convertToCny(entry.plans[tier.id].price, entry.currency, currentRates);
+        if (previousCny == null || currentCny == null) {
+          throw new Error(`Cannot validate ${tier.id} currency change for ${entry.country}: exchange rate is missing`);
+        }
+        ratio = currentCny / previousCny;
+      }
       if (ratio < 0.1 || ratio > 10) {
         throw new Error(`Suspicious ${tier.id} price change for ${entry.country}: ratio ${ratio.toFixed(2)}`);
       }
@@ -563,22 +579,16 @@ export function validatePriceChangeAnomalies(countries, {
 
   for (const entry of countries) {
     const previous = previousByCountry.get(entry.country);
-    if (!previous || previous.currency !== entry.currency) continue;
+    if (!previous) continue;
     for (const tier of tiers) {
       const currentPlan = entry.plans[tier.id];
       const previousPlan = previous.plans[tier.id];
-      if (!currentPlan || !previousPlan || currentPlan.price === previousPlan.price) continue;
+      const currencyChanged = previous.currency !== entry.currency;
+      if (!currentPlan || !previousPlan || (!currencyChanged && currentPlan.price === previousPlan.price)) continue;
 
-      const localDelta = Math.abs(currentPlan.price - previousPlan.price);
-      const percentageDelta = localDelta / previousPlan.price;
       const previousCnyAtPreviousRate = convertToCny(
         previousPlan.price,
-        entry.currency,
-        previousData.fx.rates
-      );
-      const currentCnyAtPreviousRate = convertToCny(
-        currentPlan.price,
-        entry.currency,
+        previous.currency,
         previousData.fx.rates
       );
       const currentCnyAtCurrentRate = convertToCny(
@@ -586,11 +596,41 @@ export function validatePriceChangeAnomalies(countries, {
         entry.currency,
         currentRates
       );
-      if ([
-        previousCnyAtPreviousRate,
-        currentCnyAtPreviousRate,
-        currentCnyAtCurrentRate
-      ].some((value) => value == null)) continue;
+      if (previousCnyAtPreviousRate == null || currentCnyAtCurrentRate == null) {
+        throw new Error(`Cannot validate combined ${tier.id} currency change for ${entry.country}: exchange rate is missing`);
+      }
+
+      if (currencyChanged) {
+        const cnyDelta = Math.abs(currentCnyAtCurrentRate - previousCnyAtPreviousRate);
+        const percentageDelta = cnyDelta / previousCnyAtPreviousRate;
+        const fixedRateThreshold = Math.max(
+          thresholds.cnyMinimum,
+          previousCnyAtPreviousRate * (thresholds.cnyRelative ?? PRICE_CHANGE_THRESHOLDS.cnyRelative)
+        );
+        const marketAdjustedThreshold = Math.max(
+          thresholds.cnyMinimum,
+          previousCnyAtPreviousRate * (thresholds.marketRelative ?? PRICE_CHANGE_THRESHOLDS.marketRelative)
+        );
+        if (percentageDelta >= thresholds.percentage
+          && cnyDelta >= fixedRateThreshold
+          && cnyDelta >= marketAdjustedThreshold) {
+          throw new Error(
+            `Suspicious combined ${tier.id} price change for ${entry.country}: `
+            + `${previous.currency} to ${entry.currency}, ${(percentageDelta * 100).toFixed(1)}%, `
+            + `CNY ${cnyDelta.toFixed(2)}/${Math.max(fixedRateThreshold, marketAdjustedThreshold).toFixed(2)}`
+          );
+        }
+        continue;
+      }
+
+      const localDelta = Math.abs(currentPlan.price - previousPlan.price);
+      const percentageDelta = localDelta / previousPlan.price;
+      const currentCnyAtPreviousRate = convertToCny(
+        currentPlan.price,
+        entry.currency,
+        previousData.fx.rates
+      );
+      if (currentCnyAtPreviousRate == null) continue;
 
       const fixedRateCnyDelta = Math.abs(currentCnyAtPreviousRate - previousCnyAtPreviousRate);
       const marketAdjustedCnyDelta = Math.abs(currentCnyAtCurrentRate - previousCnyAtPreviousRate);
