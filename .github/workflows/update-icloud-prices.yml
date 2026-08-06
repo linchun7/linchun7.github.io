@@ -120,8 +120,7 @@ jobs:
         run: |
           ui_failed=false
           if pnpm exec playwright install --with-deps chromium webkit; then
-            pnpm test:ui || ui_failed=true
-            pnpm test:webkit || ui_failed=true
+            pnpm test:browsers || ui_failed=true
           else
             ui_failed=true
           fi

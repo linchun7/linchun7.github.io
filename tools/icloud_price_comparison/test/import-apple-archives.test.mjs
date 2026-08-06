@@ -3,7 +3,7 @@ import { access, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:f
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { importAppleArchives } from '../scripts/import-apple-archives.mjs';
+import { importAppleArchives, rollbackAppleArchiveImport } from '../scripts/import-apple-archives.mjs';
 import { parseLegacyAppleArchive } from '../scripts/parse-legacy-archive.mjs';
 import { appleSnapshotContentHash, normalizeAppleSnapshot } from '../scripts/update-prices.mjs';
 
@@ -504,4 +504,37 @@ test('does not overwrite unindexed snapshot evidence during import', async () =>
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test('attempts every archive rollback action when one cleanup fails', async () => {
+  const calls = [];
+  const remove = async (filePath, options) => {
+    calls.push(['remove', filePath, options]);
+    if (filePath === 'snapshot-a.html') throw new Error('simulated snapshot cleanup failure');
+  };
+  const writeText = async (filePath, text) => {
+    calls.push(['write', filePath, text]);
+  };
+
+  await assert.rejects(
+    rollbackAppleArchiveImport({
+      createdSnapshotFiles: ['snapshot-a.html', 'snapshot-a.json'],
+      historyPath: 'history.json',
+      originalHistoryText: 'history-before',
+      snapshotIndexPath: 'index.json',
+      originalIndexText: 'index-before',
+      stagingDir: 'staging',
+      remove,
+      writeText
+    }),
+    (error) => error instanceof AggregateError
+      && error.errors.some(({ message }) => message === 'simulated snapshot cleanup failure')
+  );
+  assert.deepEqual(calls, [
+    ['remove', 'snapshot-a.html', { force: true }],
+    ['remove', 'snapshot-a.json', { force: true }],
+    ['write', 'history.json', 'history-before'],
+    ['write', 'index.json', 'index-before'],
+    ['remove', 'staging', { recursive: true, force: true }]
+  ]);
 });

@@ -37,7 +37,7 @@ Secret 只配置在仓库 **Settings > Secrets and variables > Actions**。密�
 1. 安装锁定依赖，运行 `pnpm test:core`。
 2. 抓取 Apple 页面，由 `document-order` 和 `apple-markers` 两条路径独立解析。
 3. 校验发布日期、地区、分区、容量、价格、汇率和异常调价。
-4. 写入当前价格、历史、运行日志和 Apple 快照；随后运行 `pnpm test:data`、真实 Chrome UI 和 WebKit UI 测试。
+4. 写入当前价格、历史、运行日志和 Apple 快照；随后运行 `pnpm test:data` 和并行的 Chromium、WebKit UI 测试。
 5. 上传诊断附件（保留 14 天），提交 `data/` 变更并先 `git pull --rebase`；变基后重新安装锁定依赖并复跑核心、数据测试，再推送。
 
 UI 测试失败只产生警告，不阻断已经通过抓取和核心数据校验的数据；抓取、解析、数据校验或生产写入失败会停止更新，并恢复上一份有效数据。
@@ -62,9 +62,11 @@ UI 测试失败只产生警告，不阻断已经通过抓取和核心数据校�
 - Apple 发布日期缺失、格式无效、倒退或晚于本次观测日期时拒绝更新。
 - 拒绝重复地区、关键分区缺失、价格容量不完整，以及地区数比上一份有效数据下降超过 3 个。
 - 同一币种的单项价格超过旧价 10 倍或低于旧价 1/10 时拒绝更新。
+- 币种变化时使用新旧汇率分别折算人民币，同样执行 10 倍硬限制和联合异常校验，不能通过换币种绕过检查。
 - 联合异常需同时达到至少 200% 的涨幅、当地金额门槛、按旧汇率计算的人民币门槛和按当前汇率计算的人民币门槛；人民币门槛为 `max(15 元, 上次人民币价值 × 50%)`。
 - Key 接口和开放接口执行相同的响应、时间戳和所需币种校验；汇率过旧或在未来时也会失败。
 - 上一份回退汇率也执行 36 小时新鲜度和生产币种完整性校验。
+- Apple 与汇率请求共享 5 分钟网络预算；每次超时和重试等待都受剩余预算限制，Apple 超时停止更新，汇率超时可沿用上一份有效数据。
 - 生产 JSON 使用原子写入；快照、历史或索引写入失败时清理本次文件并回滚上一份有效数据，历史导入不会覆盖未入索引的既有证据。
 
 ## 日常维护
@@ -94,21 +96,25 @@ pnpm exec playwright install chromium webkit
 pnpm test
 pnpm test:core
 pnpm test:data
+pnpm test:browsers
 pnpm test:ui
 pnpm test:webkit
+pnpm validate:snapshots
 pnpm check:live
 pnpm audit --audit-level low
 ```
 
-- `pnpm test`：依次运行核心、真实 Chrome 和 WebKit 测试。
-- `pnpm test:core`：运行更新前的解析、数据、快照、幂等和工作流核心测试。
+- `pnpm test`：先运行核心测试，再并行运行 Chromium 和 WebKit 验收。
+- `pnpm test:core`：运行更新前的解析、数据契约、快照哈希、幂等和工作流核心测试。
 - `pnpm test:data`：只检查当前提交的价格、历史、运行日志和快照索引。
+- `pnpm test:browsers`：在独立进程中并行运行 Chromium 和 WebKit 的同一套 UI 验收。
 - `pnpm test:ui`：启动本地静态服务器并优先使用 Playwright Chromium；未安装时回退系统 Chrome/Chromium，CI 没有浏览器会失败，本地没有浏览器会跳过。
 - `pnpm test:webkit`：使用 Playwright WebKit 运行同一套 UI 验收，用于覆盖 Safari/WebKit 兼容性。
+- `pnpm validate:snapshots`：深度解析全部 Apple HTML/JSON 快照；日常核心测试只核对全部原始哈希并深度解析最新活动修订。
 - `pnpm check:live`：只读访问 Apple 和汇率服务并执行校验，不写生产文件。
 - `pnpm update:data`：写入生产数据，只用于明确的手动更新或隔离环境。
 
-`.github/workflows/validate-icloud-price-comparison.yml` 会在 PR、`main` 推送和手动触发时以只读权限运行核心、Chrome、WebKit 和依赖漏洞检查；仓库使用的 Action 全部固定到完整提交 SHA。
+`.github/workflows/validate-icloud-price-comparison.yml` 会在 PR、`main` 推送和手动触发时以只读权限运行核心、并行浏览器和依赖漏洞检查；手动及每周计划任务还会深度审计全部 Apple 快照。仓库使用的 Action 全部固定到完整提交 SHA。
 
 本地预览从仓库根目录启动静态服务器：
 
