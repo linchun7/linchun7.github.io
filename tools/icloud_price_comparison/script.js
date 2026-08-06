@@ -1,6 +1,10 @@
+import { publicationDateKey, validatePayload } from './data-contract.js';
+import { createIcons } from './vendor/lucide-subset.js';
+
 const REMOTE_DATA_ROOT = 'https://raw.githubusercontent.com/linchun7/linchun7.github.io/main/tools/icloud_price_comparison/data';
 const HOSTED_NAMES = new Set(['linchun7.github.io', 'linchun.com.cn', 'www.linchun.com.cn']);
 const REQUEST_TIMEOUT_MS = 8_000;
+const CHART_SCRIPT_URL = './vendor/chart.umd.min.js';
 const SLOW_LOADING_MS = 1_500;
 const DEFAULT_SORT_TIER = '200GB';
 const DEFAULT_TIER_COLUMN_COUNT = 5;
@@ -26,8 +30,10 @@ const state = {
   chart: null,
   eventsBound: false,
   loading: false,
-  historyStatus: 'loading',
+  historyStatus: 'idle',
   historyRequestId: 0,
+  historyPromise: null,
+  chartRequestId: 0,
   historyReturnFocus: null,
   publishedDateReturnFocus: null
 };
@@ -72,10 +78,11 @@ const moneyFormatter = new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2
 const percentFormatter = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 });
 const collator = new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base' });
 let slowLoadingTimer = null;
+let chartLibraryPromise = null;
 
 function refreshIcons() {
   try {
-    window.lucide?.createIcons({ attrs: { 'stroke-width': 1.8 } });
+    createIcons({ attrs: { 'stroke-width': 1.8 } });
   } catch (error) {
     console.warn(`图标加载失败：${error.message}`);
   }
@@ -151,149 +158,10 @@ function formatPublishedDate(value) {
   }).format(date);
 }
 
-function isValidDateOnly(value) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value ?? '')) return false;
-  const date = new Date(`${value}T00:00:00Z`);
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
-}
-
-function isValidIsoTimestamp(value) {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) return false;
-  const date = new Date(value);
-  return !Number.isNaN(date.getTime()) && date.toISOString() === value;
-}
-
-function isValidPublishedDate(value) {
-  const text = String(value ?? '').trim().replace(/^published\s+date\s*:?\s*/i, '');
-  if (isValidDateOnly(text)) return true;
-  const match = text.match(/^([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})$/);
-  if (!match) return false;
-  const months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
-  const month = months.indexOf(match[1].toLowerCase());
-  if (month < 0) return false;
-  const year = Number(match[3]);
-  const day = Number(match[2]);
-  const date = new Date(Date.UTC(year, month, day));
-  return date.getUTCFullYear() === year && date.getUTCMonth() === month && date.getUTCDate() === day;
-}
-
-function publicationDateKey(value) {
-  const text = String(value ?? '').trim().replace(/^published\s+date\s*:?\s*/i, '');
-  if (isValidDateOnly(text)) return text;
-  const match = text.match(/^([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})$/);
-  if (match) {
-    const months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
-    const month = months.indexOf(match[1].toLowerCase());
-    if (month >= 0) return `${match[3]}-${String(month + 1).padStart(2, '0')}-${String(Number(match[2])).padStart(2, '0')}`;
-  }
-  const date = new Date(text);
-  return Number.isNaN(date.getTime()) ? text : date.toISOString().slice(0, 10);
-}
-
-function isValidPublicationChanges(changes) {
-  if (changes === undefined || changes === null) return true;
-  if (typeof changes !== 'object' || Array.isArray(changes)) return false;
-  const arrays = ['addedTiers', 'removedTiers', 'addedCountries', 'removedCountries', 'changedCountries'];
-  if (arrays.some((key) => changes[key] !== undefined && !Array.isArray(changes[key]))) return false;
-  const validTier = (tier) => tier && typeof tier.id === 'string' && tier.id.trim();
-  const validCountry = (country) => country && typeof country.country === 'string' && country.country.trim();
-  if ((changes.addedTiers ?? []).some((tier) => !validTier(tier))) return false;
-  if ((changes.removedTiers ?? []).some((tier) => !validTier(tier))) return false;
-  if ((changes.addedCountries ?? []).some((country) => !validCountry(country))) return false;
-  if ((changes.removedCountries ?? []).some((country) => !validCountry(country))) return false;
-  return (changes.changedCountries ?? []).every((country) => validCountry(country)
-    && (country.tiers === undefined || (Array.isArray(country.tiers) && country.tiers.every((tier) => validTier(tier)))));
-}
-
-function isChronological(entries, getDate) {
-  let previous = '';
-  for (const entry of entries) {
-    const date = getDate(entry);
-    if (date < previous) return false;
-    previous = date;
-  }
-  return true;
-}
-
-function validatePayload(fileName, payload) {
-  if (fileName === 'history.json') {
-    if (![1, 2].includes(payload?.schemaVersion) || !payload.countries || typeof payload.countries !== 'object' || Array.isArray(payload.countries)) {
-      throw new Error('价格历史数据结构无效');
-    }
-    for (const record of Object.values(payload.countries)) {
-      if (!Array.isArray(record?.events) || !record.events.length) throw new Error('价格历史记录不完整');
-      if (!isChronological(record.events, (event) => event.observedAt)) throw new Error('Price history events are not chronological');
-      for (const event of record.events) {
-        const validEvent = isValidDateOnly(event?.observedAt)
-          && typeof event.currency === 'string' && event.currency.trim()
-          && event.plans && typeof event.plans === 'object' && !Array.isArray(event.plans)
-          && Object.values(event.plans).length > 0
-          && Object.values(event.plans).every((price) => Number.isFinite(price) && price > 0);
-        if (!validEvent) throw new Error('价格历史事件无效');
-      }
-    }
-    if (payload.sourcePublishedDates !== undefined
-      && (!Array.isArray(payload.sourcePublishedDates)
-        || !isChronological(payload.sourcePublishedDates, (entry) => entry.observedAt)
-        || payload.sourcePublishedDates.some((entry) => !entry
-          || !isValidPublishedDate(entry.publishedDate)
-          || !isValidDateOnly(entry.observedAt)
-          || (entry.kind !== undefined && !['initial', 'change'].includes(entry.kind))
-          || !isValidPublicationChanges(entry.changes)))) {
-      throw new Error('Apple 发布日期历史结构无效');
-    }
-    return payload;
-  }
-
-  if (![1, 2].includes(payload?.schemaVersion)
-    || !Array.isArray(payload.tiers)
-    || !Array.isArray(payload.countries)
-    || !isValidIsoTimestamp(payload.generatedAt)
-    || !isValidPublishedDate(payload.source?.publishedDate)
-    || payload.fx?.base !== 'USD'
-    || typeof payload.fx?.stale !== 'boolean'
-    || !isValidIsoTimestamp(payload.fx?.fetchedAt)
-    || payload.fx?.rates?.USD !== 1
-    || !Number.isFinite(payload.fx?.rates?.CNY)
-    || payload.fx.rates.CNY <= 0) {
-    throw new Error('价格数据结构无效');
-  }
-  const tierIds = payload.tiers.map(({ id }) => id);
-  if (!tierIds.length
-    || new Set(tierIds).size !== tierIds.length
-    || payload.tiers.some((tier) => typeof tier?.id !== 'string' || !tier.id.trim()
-      || typeof tier.label !== 'string' || !tier.label.trim()
-      || !Number.isFinite(tier.capacityGb) || tier.capacityGb <= 0)
-    || !payload.countries.length) {
-    throw new Error('价格容量或地区数据不完整');
-  }
-  const countryNames = new Set();
-  for (const country of payload.countries) {
-    if (typeof country?.country !== 'string' || !country.country.trim()
-      || typeof country.region !== 'string' || !country.region.trim()
-      || typeof country.currency !== 'string' || !country.currency.trim()
-      || !country.plans || typeof country.plans !== 'object' || Array.isArray(country.plans)) {
-      throw new Error('地区价格数据不完整');
-    }
-    if (countryNames.has(country.country)) throw new Error(`地区重复：${country.country}`);
-    countryNames.add(country.country);
-    const currencyRate = payload.fx.rates[country.currency];
-    if (!Number.isFinite(currencyRate) || currencyRate <= 0) throw new Error(`${country.currency} 汇率无效`);
-    for (const tierId of tierIds) {
-      const plan = country.plans[tierId];
-      if (!plan || !Number.isFinite(plan.price) || plan.price <= 0 || typeof plan.formattedPrice !== 'string' || !plan.formattedPrice.trim()) {
-        throw new Error(`${country.country} 的 ${tierId} 价格无效`);
-      }
-    }
-  }
-  return payload;
-}
-
 async function fetchJson(fileName) {
-  const cacheKey = Date.now();
-  const localUrl = `./data/${fileName}?v=${cacheKey}`;
+  const localUrl = `./data/${fileName}`;
   const urls = HOSTED_NAMES.has(location.hostname)
-    ? [localUrl, `${REMOTE_DATA_ROOT}/${fileName}?v=${cacheKey}`]
+    ? [localUrl, `${REMOTE_DATA_ROOT}/${fileName}`]
     : [localUrl];
 
   let lastError;
@@ -301,7 +169,7 @@ async function fetchJson(fileName) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
-      const response = await fetch(url, { cache: 'no-store', signal: controller.signal });
+      const response = await fetch(url, { cache: 'no-cache', signal: controller.signal });
       if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
       return validatePayload(fileName, await response.json());
     } catch (error) {
@@ -662,11 +530,32 @@ function renderLocalPriceWithTrend(plan, country, changedSeries) {
   elements.historyLocalPrice.append(trend);
 }
 
-function renderChart(record) {
+function loadChartLibrary() {
+  if (window.Chart) return Promise.resolve(window.Chart);
+  if (chartLibraryPromise) return chartLibraryPromise;
+  chartLibraryPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = CHART_SCRIPT_URL;
+    script.async = true;
+    script.addEventListener('load', () => {
+      if (window.Chart) resolve(window.Chart);
+      else reject(new Error('Chart.js loaded without exposing Chart'));
+    }, { once: true });
+    script.addEventListener('error', () => reject(new Error('Chart.js request failed')), { once: true });
+    document.head.append(script);
+  }).catch((error) => {
+    chartLibraryPromise = null;
+    throw error;
+  });
+  return chartLibraryPromise;
+}
+
+async function renderChart(record) {
   destroyChart();
+  const requestId = ++state.chartRequestId;
   const series = compactHistorySeries(record.events, state.historyTier);
   const currencies = new Set(series.map(({ currency }) => currency));
-  const canChart = series.length > 1 && currencies.size === 1 && window.Chart;
+  const canChart = series.length > 1 && currencies.size === 1;
   elements.chartWrap.hidden = !canChart;
   elements.emptyHistory.hidden = canChart;
 
@@ -683,7 +572,9 @@ function renderChart(record) {
   elements.chartCurrency.textContent = currency;
   const context = document.querySelector('#historyChart');
   try {
-    state.chart = new window.Chart(context, {
+    const Chart = await loadChartLibrary();
+    if (requestId !== state.chartRequestId || !elements.historyDialog.open) return;
+    state.chart = new Chart(context, {
       type: 'line',
       data: {
         labels: series.map(({ observedAt }) => formatDate(observedAt)),
@@ -715,6 +606,7 @@ function renderChart(record) {
       }
     });
   } catch (error) {
+    if (requestId !== state.chartRequestId) return;
     state.chart = null;
     elements.chartWrap.hidden = true;
     elements.emptyHistory.hidden = false;
@@ -725,6 +617,7 @@ function renderChart(record) {
 }
 
 function destroyChart() {
+  state.chartRequestId += 1;
   if (!state.chart) return;
   try {
     state.chart.destroy?.();
@@ -761,6 +654,44 @@ function getHistoryRecord(country) {
       plans: Object.fromEntries(state.data.tiers.map(({ id }) => [id, country.plans[id].price]))
     }]
   };
+}
+
+function refreshOpenHistoryViews() {
+  renderPublishedDateHistory();
+  if (state.activeCountry && elements.historyDialog.open) {
+    renderHistorySubtitle(state.activeCountry, getHistoryRecord(state.activeCountry));
+    renderHistoryContent();
+  }
+}
+
+function ensureHistoryLoaded() {
+  if (state.historyStatus === 'ready') return Promise.resolve(state.history);
+  if (state.historyStatus === 'loading' && state.historyPromise) return state.historyPromise;
+  const requestId = state.historyRequestId + 1;
+  state.historyRequestId = requestId;
+  state.historyStatus = 'loading';
+  refreshOpenHistoryViews();
+  const request = fetchJson('history.json')
+    .then((historyData) => {
+      if (requestId !== state.historyRequestId) return null;
+      state.history = historyData;
+      state.historyStatus = 'ready';
+      refreshOpenHistoryViews();
+      return historyData;
+    })
+    .catch((error) => {
+      if (requestId !== state.historyRequestId) return null;
+      state.history = null;
+      state.historyStatus = 'unavailable';
+      console.warn(`价格历史加载失败，使用当前价格作为临时记录：${error.message}`);
+      refreshOpenHistoryViews();
+      return null;
+    })
+    .finally(() => {
+      if (requestId === state.historyRequestId) state.historyPromise = null;
+    });
+  state.historyPromise = request;
+  return request;
 }
 
 function getPublishedDateHistory() {
@@ -891,6 +822,7 @@ function renderPublishedDateHistory() {
 
 function openPublishedDateHistory() {
   state.publishedDateReturnFocus = elements.publishedDateButton;
+  void ensureHistoryLoaded();
   renderPublishedDateHistory();
   elements.publishedDateDialog.showModal();
   refreshIcons();
@@ -925,6 +857,7 @@ function renderHistoryContent() {
 }
 
 function openHistory(country, returnFocus = null) {
+  void ensureHistoryLoaded();
   const record = getHistoryRecord(country);
   state.activeCountry = country;
   state.historyReturnFocus = returnFocus;
@@ -1004,6 +937,10 @@ function showLoadError(error) {
 async function initialize() {
   if (state.loading) return;
   state.loading = true;
+  state.historyRequestId += 1;
+  state.history = null;
+  state.historyStatus = 'idle';
+  state.historyPromise = null;
   clearTimeout(slowLoadingTimer);
   setLoadStatus('正在加载价格数据，请稍候…');
   setFiltersDisabled(true);
@@ -1012,38 +949,13 @@ async function initialize() {
   }, SLOW_LOADING_MS);
   elements.dataStatus.classList.remove('is-error', 'is-stale');
   try {
-    const historyRequestId = state.historyRequestId + 1;
-    state.historyRequestId = historyRequestId;
-    state.historyStatus = 'loading';
-    state.history = { schemaVersion: 1, countries: {} };
-    fetchJson('history.json')
-      .then((historyData) => {
-        if (historyRequestId !== state.historyRequestId) return;
-        state.history = historyData;
-        state.historyStatus = 'ready';
-        renderPublishedDateHistory();
-        if (state.activeCountry && elements.historyDialog.open) {
-          renderHistorySubtitle(state.activeCountry, getHistoryRecord(state.activeCountry));
-          renderHistoryContent();
-        }
-      })
-      .catch((error) => {
-        if (historyRequestId === state.historyRequestId) {
-          state.historyStatus = 'unavailable';
-          console.warn(`价格历史加载失败，使用当前价格作为临时记录：${error.message}`);
-          renderPublishedDateHistory();
-          if (state.activeCountry && elements.historyDialog.open) {
-            renderHistorySubtitle(state.activeCountry, getHistoryRecord(state.activeCountry));
-            renderHistoryContent();
-          }
-        }
-      });
     state.data = await fetchJson('prices.json');
     if (!state.data.tiers.some(({ id }) => id === state.sortTier)) {
       state.sortTier = state.data.tiers.find(({ id }) => id === DEFAULT_SORT_TIER)?.id || state.data.tiers[0].id;
     }
     state.historyTier = state.sortTier;
     syncActiveHistoryCountry();
+    if (elements.historyDialog.open || elements.publishedDateDialog.open) void ensureHistoryLoaded();
     calculateMinimumPrices();
     populateFilters();
     bindEvents();

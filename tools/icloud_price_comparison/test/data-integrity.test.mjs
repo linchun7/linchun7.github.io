@@ -1,36 +1,10 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { parseLegacyAppleArchive } from '../scripts/parse-legacy-archive.mjs';
-import { parseApplePrices } from '../scripts/parse-prices.mjs';
-import { appleSnapshotContentHash, publicationDateKey } from '../scripts/update-prices.mjs';
+import { publicationDateKey, snapshotFileSha256 } from '../scripts/update-prices.mjs';
 
 async function readJson(relativePath) {
   return JSON.parse(await readFile(new URL(relativePath, import.meta.url), 'utf8'));
-}
-
-function snapshotContentHash(snapshot) {
-  const normalized = {
-    tiers: snapshot.tiers
-      .map(({ id, label, capacityGb }) => ({ id, label, capacityGb }))
-      .sort((a, b) => a.capacityGb - b.capacityGb),
-    countries: snapshot.countries.map(({ country, region, currency, plans }) => ({
-      country,
-      region,
-      currency,
-      plans: Object.fromEntries(Object.entries(plans).sort(([a], [b]) => a.localeCompare(b)))
-    })).sort((a, b) => a.country.localeCompare(b.country))
-  };
-  return createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
-}
-
-function parseSnapshotHtml(html) {
-  try {
-    return parseApplePrices(html);
-  } catch {
-    return parseLegacyAppleArchive(html);
-  }
 }
 
 test('committed prices and history form a complete usable snapshot', async () => {
@@ -164,22 +138,16 @@ test('committed Apple snapshot index has unique dates and existing revision file
     );
     for (const revision of snapshot.revisions) {
       assert.match(revision.contentHash, /^[a-f0-9]{64}$/);
+      assert.match(revision.htmlSha256, /^[a-f0-9]{64}$/);
+      assert.match(revision.dataSha256, /^[a-f0-9]{64}$/);
       assert.match(revision.firstConfirmedDate, /^\d{4}-\d{2}-\d{2}$/);
       assert.equal('capturedAtUtc' in revision, false);
       const [html, normalized] = await Promise.all([
-        readFile(new URL(`../data/apple-snapshots/${revision.file}`, import.meta.url), 'utf8'),
-        readJson(`../data/apple-snapshots/${revision.dataFile}`)
+        readFile(new URL(`../data/apple-snapshots/${revision.file}`, import.meta.url)),
+        readFile(new URL(`../data/apple-snapshots/${revision.dataFile}`, import.meta.url))
       ]);
-      assert.equal(normalized.schemaVersion, 1);
-      assert.equal(normalized.publishedDate, snapshot.publishedDate);
-      assert.equal(normalized.countries.length, revision.countries);
-      assert.equal(normalized.countries.length * normalized.tiers.length, revision.pricePoints);
-      assert.equal(snapshotContentHash(normalized), revision.contentHash);
-      const parsed = parseSnapshotHtml(html);
-      assert.equal(publicationDateKey(parsed.sourcePublishedDate), snapshot.publishedDate);
-      assert.equal(parsed.countries.length, revision.countries);
-      assert.equal(parsed.countries.length * parsed.tiers.length, revision.pricePoints);
-      assert.equal(appleSnapshotContentHash(parsed), revision.contentHash);
+      assert.equal(snapshotFileSha256(html), revision.htmlSha256);
+      assert.equal(snapshotFileSha256(normalized), revision.dataSha256);
     }
   }
 });
