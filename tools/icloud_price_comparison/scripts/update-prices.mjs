@@ -1,6 +1,7 @@
 import { appendFile, link, mkdir, readFile, readdir, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
+import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
 import {
   getMissingExchangeRates,
@@ -41,7 +42,7 @@ export function defaultUpdateLockPath(currentDataPath = CURRENT_DATA_PATH) {
 
 export function createNetworkBudget({
   budgetMs = NETWORK_BUDGET_MS,
-  now = Date.now,
+  now = () => performance.now(),
   sleep = (delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs)),
   createTimeoutSignal = (timeoutMs) => AbortSignal.timeout(timeoutMs)
 } = {}) {
@@ -533,12 +534,14 @@ export function snapshotFileSha256(value) {
   return createHash('sha256').update(value).digest('hex');
 }
 
-async function writeTextExclusiveAtomic(filePath, text) {
+async function writeTextExclusiveAtomic(filePath, text, onCreated = null) {
   await mkdir(path.dirname(filePath), { recursive: true });
   const temporaryPath = `${filePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   try {
     await writeFile(temporaryPath, text, { encoding: 'utf8', flag: 'wx' });
+    onCreated?.(temporaryPath);
     await link(temporaryPath, filePath);
+    onCreated?.(filePath);
   } finally {
     await unlinkIfExists(temporaryPath);
   }
@@ -1502,14 +1505,20 @@ export async function savePublishedAppleSnapshot(html, parsed, firstConfirmedDat
     await mkdir(snapshotsDir, { recursive: true });
     await writeFile(snapshotPath, html, { encoding: 'utf8', flag: 'wx' });
     createdPaths.push(snapshotPath);
-    await writeTextExclusiveAtomic(dataPath, normalizedSnapshotText);
-    createdPaths.push(dataPath);
+    await writeTextExclusiveAtomic(dataPath, normalizedSnapshotText, (filePath) => createdPaths.push(filePath));
     await writeJsonAtomic(indexPath, updatedIndex);
   } catch (error) {
-    await Promise.allSettled([
-      ...createdPaths.map((filePath) => unlink(filePath)),
-      unlink(`${indexPath}.tmp`)
-    ]);
+    const cleanupResults = await Promise.allSettled(createdPaths.map((filePath) => unlinkIfExists(filePath)));
+    const cleanupFailures = cleanupResults
+      .filter(({ status }) => status === 'rejected')
+      .map(({ reason }) => reason);
+    if (cleanupFailures.length) {
+      throw new AggregateError(
+        [error, ...cleanupFailures],
+        `Apple snapshot write failed and cleanup was incomplete: ${error.message}`,
+        { cause: error }
+      );
+    }
     throw error;
   }
   return true;

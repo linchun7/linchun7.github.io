@@ -732,9 +732,10 @@ test('rolls back prices, history, logs, and snapshots when a production write fa
   }
 });
 
-test('cleans up snapshot files when index writing fails', async () => {
+test('cleans up only created snapshot files when index writing fails', async () => {
   const snapshotsDir = await mkdtemp(path.join(tmpdir(), 'icloud-snapshot-failure-'));
   const indexPath = path.join(snapshotsDir, 'blocked-index');
+  const unrelatedTemporaryPath = `${indexPath}.tmp`;
   const base = {
     sourcePublishedDate: 'Published Date: April 06, 2026',
     parser: 'cross-checked',
@@ -743,13 +744,15 @@ test('cleans up snapshot files when index writing fails', async () => {
   };
   try {
     await mkdir(indexPath);
+    await writeFile(unrelatedTemporaryPath, 'preserved temporary file', 'utf8');
     await assert.rejects(
       savePublishedAppleSnapshot('<html>failed</html>', base, '2026-08-02', {
         snapshotsDir,
         indexPath
       })
     );
-    assert.deepEqual(await readdir(snapshotsDir), ['blocked-index']);
+    assert.equal(await readFile(unrelatedTemporaryPath, 'utf8'), 'preserved temporary file');
+    assert.deepEqual((await readdir(snapshotsDir)).sort(), ['blocked-index', 'blocked-index.tmp']);
   } finally {
     await rm(snapshotsDir, { recursive: true, force: true });
   }
@@ -1134,6 +1137,18 @@ test('does not expose the exchange-rate key when both online sources fail', asyn
     globalThis.fetch = originalFetch;
     globalThis.setTimeout = originalSetTimeout;
     console.warn = originalWarn;
+  }
+});
+
+test('uses a monotonic clock for the default network budget', () => {
+  const originalDateNow = Date.now;
+  Date.now = () => { throw new Error('wall clock must not be used'); };
+  try {
+    const networkBudget = createNetworkBudget({ budgetMs: 100 });
+    const remainingMs = networkBudget.deadlineAt - networkBudget.now();
+    assert.ok(remainingMs > 0 && remainingMs <= 100);
+  } finally {
+    Date.now = originalDateNow;
   }
 });
 

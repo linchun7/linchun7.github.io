@@ -10,6 +10,12 @@ const MONTHS = [
   'january', 'february', 'march', 'april', 'may', 'june',
   'july', 'august', 'september', 'october', 'november', 'december'
 ];
+const BEIJING_DATE_FORMATTER = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Shanghai',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit'
+});
 
 export function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -64,14 +70,19 @@ export function isValidPublicationChanges(changes) {
 }
 
 function formatBeijingDate(value) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Shanghai',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  }).formatToParts(new Date(value));
+  const parts = BEIJING_DATE_FORMATTER.formatToParts(new Date(value));
   const part = (type) => parts.find((entry) => entry.type === type)?.value;
   return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
+function isValidObservationMetadata(value) {
+  const hasUtc = value.observedAtUtc != null;
+  const hasBeijing = value.observedAtBeijing != null;
+  return hasUtc === hasBeijing && (!hasUtc || (
+    isValidIsoTimestamp(value.observedAtUtc)
+    && value.observedAtBeijing === value.observedAt
+    && formatBeijingDate(value.observedAtUtc) === value.observedAt
+  ));
 }
 
 export function validatePricePayload(payload, { minCountries = 1 } = {}) {
@@ -115,6 +126,11 @@ export function validatePricePayload(payload, { minCountries = 1 } = {}) {
   }
   if (!tierIds.size || payload.countries.length < minCountries) {
     throw new Error('prices.json has incomplete tiers or countries');
+  }
+  const publishedDate = publicationDateKey(payload.source.publishedDate);
+  const observedAt = payload.run?.observedAtBeijing ?? formatBeijingDate(payload.generatedAt);
+  if (!isValidDateOnly(observedAt) || publishedDate > observedAt) {
+    throw new Error('prices.json has an impossible publication date');
   }
 
   const countryNames = new Set();
@@ -200,8 +216,7 @@ export function validateHistoryPayload(payload) {
         || !isPlainObject(event.plans)
         || !Object.keys(event.plans).length
         || Object.values(event.plans).some((price) => !Number.isFinite(price) || price <= 0)
-        || (event.observedAtUtc != null && !isValidIsoTimestamp(event.observedAtUtc))
-        || (event.observedAtUtc != null && event.observedAtBeijing !== event.observedAt)) {
+        || !isValidObservationMetadata(event)) {
         throw new Error(`history.json has an invalid event for ${countryName}`);
       }
       previousObservedAt = event.observedAt;
@@ -218,7 +233,9 @@ export function validateHistoryPayload(payload) {
       || publishedDates.has(publishedDate)
       || publishedDate < previousPublishedDate
       || !isValidDateOnly(entry.observedAt)
+      || publishedDate > entry.observedAt
       || entry.observedAt < previousObservedAt
+      || !isValidObservationMetadata(entry)
       || (entry.kind !== undefined && !['initial', 'change'].includes(entry.kind))
       || !isValidPublicationChanges(entry.changes)) {
       throw new Error('history.json has an invalid publication history');
