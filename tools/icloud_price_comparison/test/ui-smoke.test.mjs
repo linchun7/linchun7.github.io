@@ -795,10 +795,10 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
       mutate: (data) => {
         setPayloadGeneratedAt(data, '2020-01-01T00:00:00.000Z');
         data.fx.stale = false;
-        data.source.publishedDate = 'Published Date: July 17, 2026';
+        data.source.publishedDate = 'Published Date: December 17, 2019';
       },
       expected: /超过 36 小时/,
-      expectedPublishedDate: '2026/07/17'
+      expectedPublishedDate: '2019/12/17'
     },
     {
       label: 'future snapshot',
@@ -812,7 +812,11 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
     },
     {
       label: 'old snapshot with fallback rates',
-      mutate: (data) => { setPayloadGeneratedAt(data, '2020-01-01T00:00:00.000Z'); data.fx.stale = true; },
+      mutate: (data) => {
+        setPayloadGeneratedAt(data, '2020-01-01T00:00:00.000Z');
+        data.fx.stale = true;
+        data.source.publishedDate = 'Published Date: December 17, 2019';
+      },
       expected: /超过 36 小时 · 汇率沿用上次成功结果/
     }
   ];
