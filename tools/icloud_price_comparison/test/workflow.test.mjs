@@ -19,6 +19,8 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.doesNotMatch(workflow, /cron:\s*['"]5 0 \* \* \*['"]/, 'Cloudflare owns the 08:05 primary trigger');
   assert.match(workflow, /workflow_dispatch:[\s\S]*?trigger_source:[\s\S]*?default: manual[\s\S]*?options:[\s\S]*?- manual[\s\S]*?- cloudflare/);
   assert.match(workflow, /name: 检查每日幂等状态[\s\S]*?id: daily_guard[\s\S]*?node scripts\/daily-run-guard\.mjs/);
+  assert.match(workflow, /git show origin\/main:tools\/icloud_price_comparison\/data\/run-log\.json/);
+  assert.match(workflow, /ICLOUD_RUN_LOG_PATH:\s*\$\{\{ runner\.temp \}\}\/icloud-run-log\.json/);
   assert.match(workflow, /update:[\s\S]*?needs: prepare[\s\S]*?if: needs\.prepare\.outputs\.should_run == 'true'/);
   assert.match(workflow, /ICLOUD_TRIGGER_SOURCE:\s*\$\{\{ needs\.prepare\.outputs\.trigger_source \}\}/);
   assert.match(workflow, /ICLOUD_AUTOMATIC_RUN_DATE_BEIJING:\s*\$\{\{ needs\.prepare\.outputs\.automatic_run_date_beijing \}\}/);
@@ -35,8 +37,12 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.doesNotMatch(workflow, /v6\/\$\{\{ secrets\.EXCHANGE_RATE_API_KEY \}\}/, 'the API key must not be placed in a request URL');
   assert.match(workflow, /actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7/);
   assert.match(workflow, /retention-days:\s*14/);
-  assert.match(workflow, /git pull --rebase origin main/);
-  assert.match(workflow, /git pull --rebase origin main[\s\S]*?pnpm --dir tools\/icloud_price_comparison install --frozen-lockfile[\s\S]*?pnpm --dir tools\/icloud_price_comparison run test:core[\s\S]*?pnpm --dir tools\/icloud_price_comparison run test:data[\s\S]*?git push origin HEAD:main/);
+  assert.match(workflow, /GENERATION_BASE_SHA/);
+  assert.match(
+    workflow,
+    /git rev-parse origin\/main[\s\S]*?GENERATION_BASE_SHA[\s\S]*?git push origin HEAD:main/,
+  );
+  assert.doesNotMatch(workflow, /git pull --rebase origin main/);
   assert.doesNotMatch(workflow, /git push --force/);
   assert.match(workflow, /name: 记录浏览器界面测试警告[\s\S]*?steps\.ui_after\.outputs\.ui_failed == 'true'/);
   assert.match(workflow, /::warning title=浏览器界面测试未通过/);
@@ -94,6 +100,8 @@ test('keeps pull-request validation read-only, complete, and SHA-pinned', async 
   assert.match(ciWorkflow, /run: pnpm test:core/);
   assert.match(ciWorkflow, /schedule:[\s\S]*?cron:\s*['"]5 22 \* \* 0['"]/);
   assert.match(ciWorkflow, /run: pnpm validate:snapshots/);
+  assert.doesNotMatch(ciWorkflow, /if: github.event_name == 'schedule' \\|\\| github.event_name == 'workflow_dispatch'/);
+  assert.match(ciWorkflow, /cancel-in-progress: false/);
   assert.match(ciWorkflow, /run: pnpm test:browsers/);
   assert.match(ciWorkflow, /run: pnpm audit --audit-level low/);
 });

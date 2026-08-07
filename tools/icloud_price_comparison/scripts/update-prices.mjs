@@ -9,7 +9,7 @@ import {
   validatePriceChangeAnomalies,
   validatePrices
 } from './parse-prices.mjs';
-import { validateHistoryPayload, validatePricePayload } from '../data-contract.js';
+import { validateHistoryPayload, validatePriceHistoryConsistency, validatePricePayload } from '../data-contract.js';
 import { parseLegacyAppleArchive } from './parse-legacy-archive.mjs';
 import { describeTriggerSource, formatBeijingDate, resolveTriggerSource } from './run-context.mjs';
 
@@ -38,6 +38,10 @@ let runStartedAt = new Date();
 
 export function defaultUpdateLockPath(currentDataPath = CURRENT_DATA_PATH) {
   return path.join(path.dirname(path.dirname(currentDataPath)), '.icloud-price-update.lock');
+}
+
+export function defaultUpdateTransactionPath(currentDataPath = CURRENT_DATA_PATH) {
+  return path.join(path.dirname(currentDataPath), '.icloud-price-update-transaction.json');
 }
 
 export function createNetworkBudget({
@@ -308,6 +312,10 @@ function snapshotPlans(country, tiers) {
 
 function hasPriceChange(previousEvent, country, tiers) {
   if (!previousEvent || previousEvent.currency !== country.currency) return true;
+  const currentTierIds = tiers.map(({ id }) => id).sort();
+  const previousTierIds = Object.keys(previousEvent.plans).sort();
+  if (currentTierIds.length !== previousTierIds.length
+    || currentTierIds.some((id, index) => id !== previousTierIds[index])) return true;
   return tiers.some(({ id }) => previousEvent.plans[id] !== country.plans[id].price);
 }
 
@@ -638,6 +646,16 @@ async function unlinkIfExists(filePath) {
   }
 }
 
+async function pathExists(filePath) {
+  try {
+    await stat(filePath);
+    return true;
+  } catch (error) {
+    if (error.code === 'ENOENT') return false;
+    throw error;
+  }
+}
+
 function isProcessAlive(pid) {
   if (!Number.isInteger(pid) || pid <= 0) return false;
   try {
@@ -828,9 +846,10 @@ async function cleanupUpdaterTemporaryFiles({ currentDataPath, historyPath, runL
       .map((entry) => unlink(path.join(directory, entry.name))));
   }
 }
+
 async function restoreProductionFiles(entries) {
-  const results = await Promise.allSettled(entries.map(({ filePath, value, existed = true }) => (
-    existed ? writeJsonAtomic(filePath, value) : unlinkIfExists(filePath)
+  const results = await Promise.allSettled(entries.map(({ filePath, text, value, existed = true }) => (
+    existed ? (typeof text === 'string' ? writeTextAtomic(filePath, text) : writeJsonAtomic(filePath, value)) : unlinkIfExists(filePath)
   )));
   const failures = results.filter(({ status }) => status === 'rejected');
   if (failures.length) {
@@ -838,16 +857,70 @@ async function restoreProductionFiles(entries) {
   }
 }
 
-async function restorePublishedSnapshot({ snapshotsDir, snapshotIndexPath, originalSnapshotIndexText, file }) {
-  const results = await Promise.allSettled([
-    unlinkIfExists(path.join(snapshotsDir, file)),
-    unlinkIfExists(path.join(snapshotsDir, file.replace(/\.html$/, '.json'))),
-    originalSnapshotIndexText !== null
-      ? writeTextAtomic(snapshotIndexPath, originalSnapshotIndexText)
-      : unlinkIfExists(snapshotIndexPath)
-  ]);
+async function recoverUpdateTransaction(transactionPath, {
+  productionPaths,
+  snapshotsDir,
+  snapshotIndexPath
+}) {
+  const state = await readJsonWithExistence(transactionPath, null);
+  if (!state.existed) return false;
+  const transaction = state.value;
+  const allowedProductionPaths = new Set(productionPaths.map((filePath) => path.resolve(filePath)));
+  const originalFilePaths = new Set();
+  const originalFilesAreSafe = Array.isArray(transaction?.originalFiles)
+    && transaction.originalFiles.length === allowedProductionPaths.size
+    && transaction.originalFiles.every((entry) => {
+      if (!isPlainObject(entry) || typeof entry.filePath !== 'string' || typeof entry.existed !== 'boolean') return false;
+      const resolved = path.resolve(entry.filePath);
+      if (!allowedProductionPaths.has(resolved) || originalFilePaths.has(resolved)) return false;
+      if (entry.existed ? typeof entry.text !== 'string' : entry.text !== null) return false;
+      originalFilePaths.add(resolved);
+      return true;
+    });
+  if (!isPlainObject(transaction)
+    || transaction.schemaVersion !== 1
+    || !['writing', 'committed'].includes(transaction.phase)
+    || !originalFilesAreSafe
+    || originalFilePaths.size !== allowedProductionPaths.size
+    || !(transaction.originalSnapshotIndexText === null || typeof transaction.originalSnapshotIndexText === 'string')) {
+    throw new Error('Unsafe or unsupported iCloud price update recovery transaction');
+  }
+
+  const snapshotRoot = path.resolve(snapshotsDir);
+  const createdSnapshotFiles = transaction.createdSnapshotFiles;
+  const createdSnapshotPaths = new Set();
+  if (!Array.isArray(createdSnapshotFiles) || createdSnapshotFiles.some((filePath) => {
+    if (typeof filePath !== 'string') return true;
+    const resolved = path.resolve(filePath);
+    const fileName = path.basename(resolved);
+    if (path.dirname(resolved) !== snapshotRoot
+      || !/^\d{4}-\d{2}-\d{2}(?:-[a-f0-9]{12})?\.(?:html|json)$/.test(fileName)
+      || createdSnapshotPaths.has(resolved)) return true;
+    createdSnapshotPaths.add(resolved);
+    return false;
+  })) {
+    throw new Error('Unsafe Apple snapshot path in update recovery transaction');
+  }
+
+  if (transaction.phase === 'committed') {
+    await unlinkIfExists(transactionPath);
+    return true;
+  }
+
+  const operations = [
+    restoreProductionFiles(transaction.originalFiles),
+    transaction.originalSnapshotIndexText === null
+      ? unlinkIfExists(snapshotIndexPath)
+      : writeTextAtomic(snapshotIndexPath, transaction.originalSnapshotIndexText),
+    ...createdSnapshotFiles.map((filePath) => unlinkIfExists(filePath))
+  ];
+  const results = await Promise.allSettled(operations);
   const failures = results.filter(({ status }) => status === 'rejected');
-  if (failures.length) throw new Error(`Unable to restore Apple snapshot files after a failed update`);
+  if (failures.length) {
+    throw new AggregateError(failures.map(({ reason }) => reason), 'Unable to recover an interrupted iCloud price update');
+  }
+  await unlinkIfExists(transactionPath);
+  return true;
 }
 
 function failureRunLogEntry(error, startedAt, finishedAt, appleResponseCaptured = Boolean(lastAppleHtml)) {
@@ -1334,18 +1407,7 @@ export function validateExistingHistory(history, data) {
     throw new Error('Existing history.json latest publication date does not match current prices');
   }
 
-  for (const country of data.countries) {
-    const record = history.countries[country.country];
-    const latestEvent = record?.events?.at(-1);
-    if (!record
-      || record.nameZh !== country.nameZh
-      || record.region !== country.region
-      || latestEvent?.currency !== country.currency
-      || data.tiers.some(({ id }) => latestEvent?.plans?.[id] !== country.plans[id].price)) {
-      throw new Error(`Existing history.json latest values do not match ${country.country}`);
-    }
-  }
-  validateHistoryPayload(history);
+  validatePriceHistoryConsistency(data, history);
 }
 
 function validateExistingRunLog(runLog, data) {
@@ -1660,11 +1722,17 @@ export async function main({
   const snapshotsDir = paths.snapshotsDir ?? APPLE_SNAPSHOTS_DIR;
   const snapshotIndexPath = paths.snapshotIndexPath ?? APPLE_SNAPSHOT_INDEX_PATH;
   const lockPath = paths.lockPath ?? defaultUpdateLockPath(currentDataPath);
+  const transactionPath = paths.transactionPath ?? defaultUpdateTransactionPath(currentDataPath);
   const releaseLock = dryRun ? null : await acquireUpdateLock(lockPath);
   try {
     runStartedAt = new Date();
     lastAppleHtml = null;
     if (!dryRun) {
+      await recoverUpdateTransaction(transactionPath, {
+        productionPaths: [currentDataPath, historyPath, runLogPath],
+        snapshotsDir,
+        snapshotIndexPath
+      });
       await cleanupUpdaterTemporaryFiles({
         currentDataPath,
         historyPath,
@@ -1690,9 +1758,9 @@ export async function main({
     const previousHistory = previousHistoryState.value;
     const previousRunLog = previousRunLogState.value;
     const originalFiles = [
-      { filePath: currentDataPath, value: structuredClone(previousData), existed: previousDataState.existed },
-      { filePath: historyPath, value: structuredClone(previousHistory), existed: previousHistoryState.existed },
-      { filePath: runLogPath, value: structuredClone(previousRunLog), existed: previousRunLogState.existed }
+      { filePath: currentDataPath, value: structuredClone(previousData), text: previousDataState.text, existed: previousDataState.existed },
+      { filePath: historyPath, value: structuredClone(previousHistory), text: previousHistoryState.text, existed: previousHistoryState.existed },
+      { filePath: runLogPath, value: structuredClone(previousRunLog), text: previousRunLogState.text, existed: previousRunLogState.existed }
     ];
     if (!countryNames || Object.keys(countryNames).length < 60) {
       throw new Error('Chinese country-name mapping is missing or incomplete');
@@ -1792,41 +1860,51 @@ export async function main({
     ? { value: null, text: null }
     : await readJsonWithExistence(snapshotIndexPath, null);
   const originalSnapshotIndex = originalSnapshotIndexState.value;
-  let snapshotSaved = false;
-  if (!dryRun) {
-    snapshotSaved = await savePublishedAppleSnapshot(html, parsed, observedAt, {
-      snapshotsDir,
-      indexPath: snapshotIndexPath
-    });
-  }
 
   if (dryRun) {
     console.log(`Live check passed with ${parsed.parser}: ${countries.length} countries and ${countries.length * parsed.tiers.length} prices. No files were changed.`);
   } else {
+    const publishedDate = publicationDateKey(parsed.sourcePublishedDate);
+    const contentHash = appleSnapshotContentHash(parsed);
+    const existingSnapshot = originalSnapshotIndex?.snapshots?.find((item) => item.publishedDate === publishedDate);
+    const existingRevision = existingSnapshot?.revisions?.some((revision) => revision.contentHash === contentHash);
+    const snapshotFile = existingSnapshot ? `${publishedDate}-${contentHash.slice(0, 12)}.html` : `${publishedDate}.html`;
+    const snapshotCandidates = existingRevision ? [] : [
+      path.join(snapshotsDir, snapshotFile),
+      path.join(snapshotsDir, snapshotFile.replace(/\.html$/, '.json'))
+    ];
+    const candidateExists = await Promise.all(snapshotCandidates.map(pathExists));
+    const createdSnapshotFiles = snapshotCandidates.filter((_, index) => !candidateExists[index]);
+    const transaction = {
+      schemaVersion: 1,
+      phase: 'writing',
+      originalFiles,
+      originalSnapshotIndexText: originalSnapshotIndexState.text,
+      createdSnapshotFiles
+    };
+    await writeJsonAtomic(transactionPath, transaction);
     try {
+      await savePublishedAppleSnapshot(html, parsed, observedAt, {
+        snapshotsDir,
+        indexPath: snapshotIndexPath
+      });
       await writeJson(currentDataPath, data);
       await writeJson(historyPath, history);
       await writeJson(runLogPath, runLog);
+      await writeJsonAtomic(transactionPath, { ...transaction, phase: 'committed' });
     } catch (error) {
-      const rollbackTasks = [restoreProductionFiles(originalFiles)];
-      if (snapshotSaved) {
-        const publishedDate = publicationDateKey(parsed.sourcePublishedDate);
-        const contentHash = appleSnapshotContentHash(parsed);
-        const existingDate = originalSnapshotIndex?.snapshots?.some((item) => item.publishedDate === publishedDate);
-        const file = existingDate ? `${publishedDate}-${contentHash.slice(0, 12)}.html` : `${publishedDate}.html`;
-        rollbackTasks.push(restorePublishedSnapshot({
+      try {
+        await recoverUpdateTransaction(transactionPath, {
+          productionPaths: [currentDataPath, historyPath, runLogPath],
           snapshotsDir,
-          snapshotIndexPath,
-          originalSnapshotIndexText: originalSnapshotIndexState.text,
-          file
-        }));
-      }
-      const rollbackResults = await Promise.allSettled(rollbackTasks);
-      if (rollbackResults.some(({ status }) => status === 'rejected')) {
-        throw new AggregateError([error, ...rollbackResults.filter(({ status }) => status === 'rejected').map(({ reason }) => reason)], 'Production update failed and rollback was incomplete');
+          snapshotIndexPath
+        });
+      } catch (rollbackError) {
+        throw new AggregateError([error, rollbackError], 'Production update failed and rollback was incomplete');
       }
       throw error;
     }
+    await unlinkIfExists(transactionPath);
     console.log(`Saved ${countries.length} countries and ${countries.length * parsed.tiers.length} prices using ${parsed.parser}.`);
   }
   try {

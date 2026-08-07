@@ -59,7 +59,7 @@ async function writeSkipSummary(result) {
 }
 
 export async function main() {
-  const runLog = await readRunLog();
+  const runLog = await readRunLog(process.env.ICLOUD_RUN_LOG_PATH ?? RUN_LOG_PATH);
   const result = evaluateDailyRun({
     runLog,
     eventName: process.env.GITHUB_EVENT_NAME,

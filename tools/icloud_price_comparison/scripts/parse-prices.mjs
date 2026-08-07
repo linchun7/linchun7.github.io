@@ -1,4 +1,9 @@
 import * as cheerio from 'cheerio';
+import { readFileSync } from 'node:fs';
+
+const OFFICIAL_COUNTRIES = new Set(Object.keys(JSON.parse(
+  readFileSync(new URL('./country-names.zh.json', import.meta.url), 'utf8')
+)));
 
 export const TIERS = [
   { id: '50GB', label: '50 GB', capacityGb: 50 },
@@ -226,6 +231,9 @@ function parseCountryHeading($, heading) {
   const normalizedCountryLabel = cleanText(countryLabel);
   if (!normalizedCountryLabel) throw new Error(`Country heading is missing a country name: ${title}`);
   const country = COUNTRY_ALIASES[normalizedCountryLabel] ?? normalizedCountryLabel;
+  if (!OFFICIAL_COUNTRIES.has(country)) {
+    throw new Error(`Unknown Apple country heading "${normalizedCountryLabel}"`);
+  }
   const currency = /^[A-Z]{3}$/.test(currencyLabel)
     ? currencyLabel
     : CURRENCY_ALIASES[currencyLabel];
@@ -347,6 +355,8 @@ function parseByDocumentOrder($) {
       continue;
     }
 
+    // Validate the heading before rejecting ambiguous neighboring lists so pseudo-country headings fail closed.
+    parseCountryHeading($, node);
     const priceLists = [];
     for (let nextIndex = index + 1; nextIndex < nodes.length; nextIndex += 1) {
       const candidate = nodes[nextIndex];
@@ -383,6 +393,8 @@ function parseByAppleMarkers($) {
     if (!$(node).hasClass('gb-header') || !isCountryHeading($, node)) continue;
     if (!currentRegion) throw new Error(`Apple marker parser found a country before a region: ${headingText($, node)}`);
 
+    // Validate the heading before rejecting ambiguous neighboring lists so pseudo-country headings fail closed.
+    parseCountryHeading($, node);
     const priceLists = [];
     for (let nextIndex = index + 1; nextIndex < nodes.length; nextIndex += 1) {
       const candidate = nodes[nextIndex];
@@ -511,11 +523,17 @@ export function validatePrices(countries, {
     }
   }
 
-  if (previousCountries.length && countries.length < previousCountries.length - 3) {
-    throw new Error(`Country count dropped from ${previousCountries.length} to ${countries.length}`);
-  }
-
   if (previousCountries.length) {
+    const previousCountryNames = new Set(previousCountries.map(({ country }) => country));
+    const currentCountryNames = new Set(countries.map(({ country }) => country));
+    const missingCountries = [...previousCountryNames].filter((country) => !currentCountryNames.has(country));
+    if (missingCountries.length) {
+      const countMessage = countries.length < previousCountries.length - 3
+        ? ` Country count dropped from ${previousCountries.length} to ${countries.length}.`
+        : '';
+      throw new Error(`Previously published countries are missing: ${missingCountries.join(', ')}.${countMessage}`);
+    }
+
     const countByRegion = (entries) => entries.reduce((counts, entry) => {
       counts.set(entry.region, (counts.get(entry.region) ?? 0) + 1);
       return counts;
@@ -568,6 +586,11 @@ function convertToCny(price, currency, rates) {
   return (price / currencyRate) * cnyRate;
 }
 
+function symmetricPercentageChange(current, previous) {
+  if (!Number.isFinite(current) || !Number.isFinite(previous) || previous <= 0 || current <= 0) return Number.POSITIVE_INFINITY;
+  return Math.max(current / previous, previous / current) - 1;
+}
+
 export function validatePriceChangeAnomalies(countries, {
   previousData,
   currentRates,
@@ -602,7 +625,7 @@ export function validatePriceChangeAnomalies(countries, {
 
       if (currencyChanged) {
         const cnyDelta = Math.abs(currentCnyAtCurrentRate - previousCnyAtPreviousRate);
-        const percentageDelta = cnyDelta / previousCnyAtPreviousRate;
+        const percentageDelta = symmetricPercentageChange(currentCnyAtCurrentRate, previousCnyAtPreviousRate);
         const fixedRateThreshold = Math.max(
           thresholds.cnyMinimum,
           previousCnyAtPreviousRate * (thresholds.cnyRelative ?? PRICE_CHANGE_THRESHOLDS.cnyRelative)
@@ -624,7 +647,7 @@ export function validatePriceChangeAnomalies(countries, {
       }
 
       const localDelta = Math.abs(currentPlan.price - previousPlan.price);
-      const percentageDelta = localDelta / previousPlan.price;
+      const percentageDelta = symmetricPercentageChange(currentPlan.price, previousPlan.price);
       const currentCnyAtPreviousRate = convertToCny(
         currentPlan.price,
         entry.currency,

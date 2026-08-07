@@ -107,6 +107,17 @@ test('discovers a newly published storage tier from Apple markup', async () => {
   assert.equal(validatePrices(expanded.countries, { minCountries: 5, tiers: expanded.tiers }), true);
 });
 
+test('rejects a full-price pseudo-country heading', async () => {
+  const fixture = await readFile(fixtureUrl, 'utf8');
+  const adjusted = fixture.replace(
+    '<h4 class="gb-header">United States<sup>4</sup> (USD)</h4>',
+    '<h4 class="gb-header">Monthly examples (USD)</h4><ul>'
+      + '<li>50 GB: $0.99</li><li>200 GB: $2.99</li><li>2 TB: $9.99</li>'
+      + '<li>6 TB: $29.99</li><li>12 TB: $59.99</li></ul>'
+  );
+  assert.throws(() => parseApplePrices(adjusted), /Unknown Apple country heading/);
+});
+
 test('rejects ambiguous full-tier decoy lists before a country price list', async () => {
   const fixture = await readFile(fixtureUrl, 'utf8');
   const decoy = '<ul><li><b>50 GB</b>: $1.99</li><li><b>200 GB</b>: $5.99</li>'
@@ -272,6 +283,21 @@ test('rejects negative prices in Apple markup instead of stripping the sign', as
   assert.throws(() => parseApplePrices(adjusted), /Unable to parse price|Apple parser disagreement/);
 });
 
+test('rejects a large downward price change', () => {
+  const tiers = [testTier('50GB')];
+  const previousCountries = [testCountry({ '50GB': { price: 100 } })];
+  const currentCountries = [testCountry({ '50GB': { price: 20 } })];
+  assert.throws(
+    () => validatePriceChangeAnomalies(currentCountries, {
+      previousData: { countries: previousCountries, fx: { rates: { USD: 1, CNY: 7 } } },
+      currentRates: { USD: 1, CNY: 7 },
+      tiers,
+      thresholds: { percentage: 0.5, localRelative: 0, localMinimum: 0, cnyMinimum: 0, cnyRelative: 0, marketRelative: 0 }
+    }),
+    /Suspicious combined 50GB price change/
+  );
+});
+
 test('rejects implausible changes against the last valid snapshot', async () => {
   const parsed = parseApplePrices(await readFile(fixtureUrl, 'utf8'));
   const changed = structuredClone(parsed.countries);
@@ -280,6 +306,21 @@ test('rejects implausible changes against the last valid snapshot', async () => 
   assert.throws(
     () => validatePrices(changed, { minCountries: 5, previousCountries: parsed.countries }),
     /Suspicious 200GB price change/
+  );
+});
+
+test('rejects missing previous countries instead of applying a count tolerance', () => {
+  const tiers = [testTier('50GB')];
+  const previousCountries = [
+    testCountry({ '50GB': { price: 10 } }, { country: 'Bahamas' }),
+    testCountry({ '50GB': { price: 10 } }, { country: 'Albania' }),
+    testCountry({ '50GB': { price: 10 } }, { country: 'Australia' }),
+    testCountry({ '50GB': { price: 10 } }, { country: 'Example Two' })
+  ];
+  const currentCountries = previousCountries.slice(0, 1);
+  assert.throws(
+    () => validatePrices(currentCountries, { minCountries: 1, previousCountries, tiers }),
+    /Previously published countries are missing/
   );
 });
 
