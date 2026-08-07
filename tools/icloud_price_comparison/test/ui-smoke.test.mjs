@@ -329,9 +329,19 @@ test('renders current prices, sorting, and country history in a real browser', {
           assert.ok(countryVisibility.countryLeft >= countryVisibility.scrollerLeft - 1, 'tablet country column must not be shifted off-screen');
           assert.ok(countryVisibility.countryRight <= countryVisibility.scrollerRight + 1, 'tablet country column must remain visible inside the table scroller');
         }
+        if (viewport.width <= 1100) {
+          const mobileControlMetrics = await page.locator('#searchInput, #regionSelect').evaluateAll((controls) => controls.map((control) => ({
+            fontSize: Number.parseFloat(getComputedStyle(control).fontSize),
+            height: control.getBoundingClientRect().height
+          })));
+          assert.ok(mobileControlMetrics.every(({ fontSize }) => fontSize >= 16), `${viewport.name} form controls must not trigger iOS focus zoom`);
+          assert.ok(mobileControlMetrics.every(({ height }) => height >= 44), `${viewport.name} form controls must retain comfortable touch targets`);
+          const mobileTierHeights = await page.locator('#mobileTierControl button').evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().height));
+          assert.ok(mobileTierHeights.every((height) => height >= 44), `${viewport.name} tier controls must retain comfortable touch targets`);
+        }
         if (viewport.width <= 640) {
-          const mobileControlFontSizes = await page.locator('#searchInput, #regionSelect').evaluateAll((controls) => controls.map((control) => Number.parseFloat(getComputedStyle(control).fontSize)));
-          assert.ok(mobileControlFontSizes.every((fontSize) => fontSize >= 16), `${viewport.name} form controls must not trigger iOS focus zoom`);
+          const sourceTargetHeights = await page.locator('.source-item, .source-meta-button').evaluateAll((targets) => targets.map((target) => target.getBoundingClientRect().height));
+          assert.ok(sourceTargetHeights.every((height) => height >= 44), `${viewport.name} source actions must retain comfortable touch targets`);
         }
         if (viewport.name === 'narrow-mobile') {
           const metricLabels = await page.locator('.overview-stats dt > span:last-child').evaluateAll((labels) => labels.map((label) => ({
@@ -436,6 +446,24 @@ test('renders current prices, sorting, and country history in a real browser', {
           'all generated history headers need column scope'
         );
         assert.equal(await page.locator('#historyTierControl button').count(), expectedData.tiers.length);
+        if (viewport.width <= 1100) {
+          const dialogTouchTargets = await page.locator('#closeHistory, #historyTierControl button').evaluateAll((targets) => targets.map((target) => ({
+            width: target.getBoundingClientRect().width,
+            height: target.getBoundingClientRect().height
+          })));
+          assert.ok(dialogTouchTargets.every(({ width, height }) => width >= 44 && height >= 44), `${viewport.name} history dialog controls must retain comfortable touch targets`);
+        }
+        if (viewport.width <= 640) {
+          const mobileHistoryLayout = await page.locator('#historyDialog .history-table-scroll').evaluate((scroller) => ({
+            clientWidth: scroller.clientWidth,
+            scrollWidth: scroller.scrollWidth,
+            visibleHeaders: [...scroller.querySelectorAll('thead th')].filter((header) => getComputedStyle(header).display !== 'none').length,
+            visibleTierHeaders: [...scroller.querySelectorAll('thead th[data-history-tier-header]')].filter((header) => getComputedStyle(header).display !== 'none').map((header) => header.dataset.tier)
+          }));
+          assert.ok(mobileHistoryLayout.scrollWidth <= mobileHistoryLayout.clientWidth + 1, `${viewport.name} history table must not require horizontal scrolling`);
+          assert.equal(mobileHistoryLayout.visibleHeaders, 3, `${viewport.name} history table should show date, currency, and the active tier`);
+          assert.deepEqual(mobileHistoryLayout.visibleTierHeaders, [firstTier], `${viewport.name} history table should only show the selected tier`);
+        }
         const tierLayout = await page.locator('#historyTierControl').evaluate((control) => ({
           declaredCount: control.style.getPropertyValue('--tier-count'),
           renderedColumns: getComputedStyle(control).gridTemplateColumns.trim().split(/\s+/).filter(Boolean).length
@@ -528,6 +556,13 @@ test('renders current prices, sorting, and country history in a real browser', {
             return nonTransparent;
           });
           assert.ok(chartPixels > 0, `${viewport.name} chart canvas is blank`);
+          const chartAccessibility = await page.locator('#historyChart').evaluate((canvas) => ({
+            label: canvas.getAttribute('aria-label'),
+            animationDuration: window.Chart.getChart(canvas)?.options?.animation?.duration
+          }));
+          assert.match(chartAccessibility.label, new RegExp(expectedDialogName), `${viewport.name} chart must identify the active country`);
+          assert.match(chartAccessibility.label, new RegExp(chartableTier.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${viewport.name} chart must identify the active tier`);
+          if (viewport.name === 'narrow-mobile') assert.equal(chartAccessibility.animationDuration, 0, 'reduced motion must disable chart animation');
         }
         if (viewport.name === 'desktop') await page.keyboard.press('Escape');
         else await page.locator('#closeHistory').click();
@@ -548,6 +583,10 @@ test('renders current prices, sorting, and country history in a real browser', {
         await page.locator('#publishedDateButton').click();
         await page.waitForFunction(() => document.querySelector('#publishedDateDialog')?.open === true);
         assert.equal(await page.getByRole('dialog', { name: '发布日期变更' }).count(), 1, 'publication-date dialog must have an accessible name');
+        if (viewport.width <= 1100) {
+          const closePublishedDateBox = await page.locator('#closePublishedDate').boundingBox();
+          assert.ok(closePublishedDateBox && closePublishedDateBox.width >= 44 && closePublishedDateBox.height >= 44, `${viewport.name} publication dialog close control must retain a comfortable touch target`);
+        }
         assert.equal(await page.locator('#publishedDateRows tr').count(), expectedHistory.sourcePublishedDates.length);
         assert.equal(
           (await page.locator('#publishedDateRows tr').first().locator('td').first().textContent()).trim(),
@@ -1260,7 +1299,13 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
         await assertScrollableDialog(page, '#historyDialog', '#closeHistory', `${viewport.name} price history`);
         const priceTableScroller = page.locator('#historyDialog .history-table-scroll');
         if (viewport.width <= 640) {
-          assert.ok(await priceTableScroller.evaluate((element) => element.scrollWidth > element.clientWidth), 'mobile price history must use its own horizontal scroller');
+          const mobileHistoryLayout = await priceTableScroller.evaluate((element) => ({
+            clientWidth: element.clientWidth,
+            scrollWidth: element.scrollWidth,
+            visibleHeaders: [...element.querySelectorAll('thead th')].filter((header) => getComputedStyle(header).display !== 'none').length
+          }));
+          assert.ok(mobileHistoryLayout.scrollWidth <= mobileHistoryLayout.clientWidth + 1, 'mobile price history must avoid nested horizontal scrolling');
+          assert.equal(mobileHistoryLayout.visibleHeaders, 3, 'mobile price history must show only date, currency, and the active tier');
         } else {
           assert.ok(await priceTableScroller.evaluate((element) => element.scrollWidth <= element.clientWidth + 1), 'desktop price history must not scroll horizontally');
         }
@@ -1460,8 +1505,11 @@ test('rebinds or closes an open history dialog after country replacement', { tim
         await page.waitForFunction((count) => document.querySelector('#marketCount')?.textContent === String(count), scenario.replacement.countries.length);
         if (scenario.expectedOpen) {
           await page.waitForFunction((title) => document.querySelector('#historyTitle')?.textContent === title, scenario.expectedTitle);
+          await page.locator('#closeHistory').click();
+          await page.waitForFunction((country) => document.activeElement?.closest('tr[data-country]')?.dataset.country === country, activeCountry.country);
         } else {
           assert.equal(await page.locator('#historyDialog').evaluate((dialog) => dialog.open), false, scenario.label);
+          await page.waitForFunction(() => document.activeElement?.id === 'priceWorkspace');
           releaseSecondHistory();
           await page.waitForTimeout(100);
           assert.equal(await page.locator('#historyDialog').evaluate((dialog) => dialog.open), false, `${scenario.label} must stay closed after the old history response resolves`);
@@ -1588,6 +1636,7 @@ test('restores URL state, removes the floating search bar, and supports table re
     await page.waitForFunction(() => document.querySelector('#backToTableButton')?.classList.contains('is-visible'));
     assert.equal(await backToTableButton.getAttribute('aria-hidden'), 'false');
     await backToTableButton.click();
+    assert.equal(await page.locator('#priceWorkspace').evaluate((element) => document.activeElement === element), true, 'table return should move keyboard focus to the visible workspace');
     await page.waitForFunction(() => {
       const toolbar = document.querySelector('.workspace-toolbar');
       if (!toolbar) return false;
@@ -1616,6 +1665,7 @@ test('restores URL state, removes the floating search bar, and supports table re
       }))
       .sort((first, second) => first.cny - second.cny)[0].country.country;
     assert.equal(await highlightedRow.getAttribute('data-country'), expectedWinner);
+    assert.equal(await highlightedRow.locator('.country-history-button').evaluate((element) => document.activeElement === element), true, 'minimum navigation should move focus to the located country');
     await page.waitForFunction(() => {
       const row = document.querySelector('#priceRows tr.is-highlighted');
       if (!row) return false;
@@ -1701,6 +1751,8 @@ test('uses only validated cached prices when the network refresh fails', { timeo
     await invalidPage.route('**/data/prices.json*', (route) => route.fulfill({ status: 503, body: '{}' }));
     await invalidPage.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
     await invalidPage.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
+    const retryBox = await invalidPage.locator('#retryButton').boundingBox();
+    assert.ok(retryBox && retryBox.height >= 44, 'the retry action must retain a comfortable touch target');
     assert.equal(await invalidPage.locator('#searchInput').isDisabled(), true);
     assert.equal(await invalidPage.evaluate(() => localStorage.getItem('icloud-price-comparison:validated-prices:v1')), null);
     await invalidPage.close();

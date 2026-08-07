@@ -50,7 +50,7 @@
           <h1>iCloud+ 全球价格对比</h1>
         </span>
       </div>
-      <div class="data-status" aria-live="polite">
+      <div class="data-status">
         <i data-lucide="calendar-clock" aria-hidden="true"></i>
         <span id="updatedAt">正在读取价格数据更新时间</span>
       </div>
@@ -179,7 +179,7 @@
 
     <section class="chart-section" aria-labelledby="chartTitle">
       <div class="section-heading"><h3 id="chartTitle">价格变化</h3><span id="chartCurrency"></span></div>
-      <div class="chart-wrap" id="chartWrap"><canvas id="historyChart"></canvas></div>
+      <div class="chart-wrap" id="chartWrap"><canvas id="historyChart" role="img" aria-label="价格变化图，详细数据见下方变更记录"></canvas></div>
       <div class="empty-history" id="emptyHistory" hidden><i data-lucide="calendar-clock" aria-hidden="true"></i><p>当前只有初始记录，尚未检测到价格变化。</p></div>
     </section>
 

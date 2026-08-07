@@ -417,7 +417,7 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
 .dialog-eyebrow { margin: 0 0 3px; color: var(--accent-dark); font-size: 12px; font-weight: 760; }
 .dialog-header h2 { margin: 0; font-size: 23px; line-height: 1.2; letter-spacing: -.01em; }
 .dialog-header p:last-child { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
-.icon-button { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; padding: 0; color: var(--ink-soft); background: var(--surface-soft); border: 1px solid var(--line); border-radius: 6px; }
+.icon-button { width: 44px; height: 44px; flex: 0 0 44px; display: grid; place-items: center; padding: 0; color: var(--ink-soft); background: var(--surface-soft); border: 1px solid var(--line); border-radius: 6px; }
 .icon-button:hover { color: var(--ink); background: #edf2f6; }
 .icon-button svg { width: 18px; height: 18px; }
 .history-current { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--surface-soft); border-bottom: 1px solid var(--line); }
@@ -451,7 +451,7 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
 .published-change-country { min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: break-all; }
 .history-toolbar { padding: 16px 24px 0; }
 .segmented.compact { width: min(430px, 100%); min-height: 36px; }
-.segmented.compact button { padding: 4px 8px; font-size: 12px; }
+.segmented.compact button { min-height: 44px; padding: 4px 8px; font-size: 12px; }
 .chart-section, .history-list { padding: 20px 24px 24px; }
 .history-list { padding-top: 0; }
 .section-heading { margin-bottom: 12px; display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
@@ -531,6 +531,7 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
   .workspace-footer { align-items: flex-start; flex-direction: column; gap: 8px; }
   .source-links { align-items: flex-start; flex-direction: column; gap: 8px; }
   .source-group { align-items: flex-start; }
+  .source-item, .source-meta-button { min-height: 44px; }
   .source-separator { display: none; }
   .data-disclaimer { padding: 9px 12px; }
 
@@ -542,6 +543,15 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
   .history-current strong { overflow: visible; white-space: normal; }
   .history-current .price-trend { display: block; margin: 2px 0 0; }
   .history-toolbar, .chart-section, .history-list { padding-left: 16px; padding-right: 16px; }
+  .history-dialog:not(.source-history-dialog) .history-table-scroll table { width: 100%; min-width: 0; table-layout: fixed; }
+  .history-dialog:not(.source-history-dialog) .history-table-scroll th:first-child,
+  .history-dialog:not(.source-history-dialog) .history-table-scroll td:first-child { width: 42%; }
+  .history-dialog:not(.source-history-dialog) .history-table-scroll th:nth-child(2),
+  .history-dialog:not(.source-history-dialog) .history-table-scroll td:nth-child(2) { width: 22%; }
+  .history-dialog:not(.source-history-dialog) .history-table-scroll [data-history-tier-header]:not(.is-active-tier),
+  .history-dialog:not(.source-history-dialog) .history-table-scroll [data-history-tier]:not(.is-active-tier) { display: none; }
+  .history-dialog:not(.source-history-dialog) .history-table-scroll [data-history-tier-header].is-active-tier,
+  .history-dialog:not(.source-history-dialog) .history-table-scroll [data-history-tier].is-active-tier { width: 36%; }
   .source-history-dialog .history-table-scroll table { width: 100%; min-width: 0; }
   .source-history-dialog .history-table-scroll th:first-child { width: 104px; }
   .source-history-dialog .history-table-scroll th:last-child,
@@ -668,7 +678,7 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
 @keyframes row-highlight { 0%, 35% { background: #fff2c6; } 100% { background: transparent; } }
 
 .mobile-tier-picker { display: none; }
-.mobile-tier-segmented button { min-height: 40px; }
+.mobile-tier-segmented button { min-height: 44px; }
 
 .back-to-table-button {
   position: fixed;
@@ -699,10 +709,11 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
   .workspace-toolbar { align-items: stretch; flex-direction: column; gap: 11px; }
   .workspace-heading { min-width: 0; }
   .load-status { order: 2; white-space: normal; }
+  .load-status button { min-height: 44px; padding: 8px 12px; font-size: 12px; }
   .filters { order: 3; width: 100%; }
   .mobile-tier-picker { order: 4; display: block; }
   .search-field input,
-  .select-field select { height: 44px; }
+  .select-field select { height: 44px; font-size: 16px; }
   .search-field svg,
   .select-field svg { top: 13px; }
 
