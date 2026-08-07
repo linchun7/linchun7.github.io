@@ -86,6 +86,8 @@ const percentFormatter = new Intl.NumberFormat('zh-CN', { maximumFractionDigits:
 const collator = new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base' });
 let slowLoadingTimer = null;
 let chartLibraryPromise = null;
+let initialPriceRequest = globalThis.__icloudInitialPriceRequest ?? null;
+delete globalThis.__icloudInitialPriceRequest;
 
 function refreshIcons() {
   try {
@@ -177,13 +179,23 @@ async function fetchJson(fileName, { forceRefresh = false } = {}) {
 
   let lastError;
   for (const url of urls) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    let timeout = null;
     try {
-      const response = await fetch(url, {
-        cache: forceRefresh ? 'reload' : 'default',
-        signal: controller.signal
-      });
+      let response;
+      if (!forceRefresh && fileName === 'prices.json' && url === localUrl && initialPriceRequest) {
+        const request = initialPriceRequest;
+        initialPriceRequest = null;
+        const result = await request;
+        if (result.error) throw result.error;
+        response = result.response;
+      } else {
+        const controller = new AbortController();
+        timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+        response = await fetch(url, {
+          cache: forceRefresh ? 'reload' : 'default',
+          signal: controller.signal
+        });
+      }
       if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
       return validatePayload(fileName, await response.json());
     } catch (error) {
@@ -215,6 +227,15 @@ function writeValidatedPriceCache(payload) {
   }
 }
 
+function priceSnapshotsEqual(first, second) {
+  if (first === second) return true;
+  if (!first || !second
+    || first.generatedAt !== second.generatedAt
+    || first.source?.publishedDate !== second.source?.publishedDate
+    || first.fx?.fetchedAt !== second.fx?.fetchedAt) return false;
+  return JSON.stringify(first) === JSON.stringify(second);
+}
+
 function convertPrice(price, currency, targetCurrency) {
   const rates = state.data.fx.rates;
   const sourceRate = rates[currency];
@@ -227,17 +248,22 @@ function calculateMinimumPrices() {
   state.minimumPrices = {};
   state.minimumCountries = {};
   for (const { id } of state.data.tiers) {
-    const candidates = state.data.countries
-      .map((country) => ({
-        country,
-        value: convertPrice(country.plans[id].price, country.currency, 'CNY')
-      }))
-      .filter(({ value }) => value != null)
-      .sort((first, second) => first.value - second.value
-        || collator.compare(first.country.nameZh || first.country.country, second.country.nameZh || second.country.country));
-    const winner = candidates[0];
-    state.minimumPrices[id] = winner?.value ?? null;
-    state.minimumCountries[id] = winner?.country ?? null;
+    let minimumValue = null;
+    let minimumCountry = null;
+    for (const country of state.data.countries) {
+      const value = convertPrice(country.plans[id].price, country.currency, 'CNY');
+      if (value == null) continue;
+      const countryName = country.nameZh || country.country;
+      const minimumCountryName = minimumCountry?.nameZh || minimumCountry?.country;
+      if (minimumValue == null
+        || value < minimumValue
+        || (value === minimumValue && collator.compare(countryName, minimumCountryName) < 0)) {
+        minimumValue = value;
+        minimumCountry = country;
+      }
+    }
+    state.minimumPrices[id] = minimumValue;
+    state.minimumCountries[id] = minimumCountry;
   }
 }
 
@@ -327,7 +353,6 @@ function renderTierHeaders() {
     row.append(header);
     button.addEventListener('click', () => setTierSort(tier.id));
   }
-  refreshIcons();
 }
 
 function renderHistoryHeaders() {
@@ -478,10 +503,9 @@ function renderTable() {
 
   elements.priceRows.replaceChildren(fragment);
   updateTierPresentation();
-  refreshIcons();
   alignActiveTierColumn();
 }
-function renderSortHeaders() {
+function renderSortHeaders({ refresh = true } = {}) {
   document.querySelectorAll('button[data-sort], button[data-sort-tier]').forEach((button) => {
     const header = button.closest('th');
     const active = button.dataset.sort === 'country'
@@ -496,7 +520,7 @@ function renderSortHeaders() {
       icon.replaceWith(replacement);
     }
   });
-  refreshIcons();
+  if (refresh) refreshIcons();
 }
 
 function setCountrySort() {
@@ -1049,7 +1073,7 @@ function applyPriceData(data) {
     warning.textContent = freshnessWarnings.join(' \u00b7 ');
     elements.updatedAt.append(warning);
   }
-  renderSortHeaders();
+  renderSortHeaders({ refresh: false });
   renderMinimumSummary();
   renderTable();
   updateUrlState();
@@ -1145,8 +1169,10 @@ async function initialize({ forceRefresh = false } = {}) {
 
   try {
     const networkData = await fetchJson('prices.json', { forceRefresh });
-    writeValidatedPriceCache(networkData);
-    applyPriceData(networkData);
+    if (forceRefresh || !priceSnapshotsEqual(state.data, networkData)) {
+      writeValidatedPriceCache(networkData);
+      applyPriceData(networkData);
+    }
     setLoadStatus('', { hidden: true });
   } catch (error) {
     if (fallbackData) {
