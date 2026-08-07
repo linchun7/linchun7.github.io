@@ -8,9 +8,8 @@ const CHART_SCRIPT_URL = './vendor/chart.umd.min.js';
 const SLOW_LOADING_MS = 1_500;
 const DEFAULT_SORT_TIER = '200GB';
 const DEFAULT_TIER_COLUMN_COUNT = 5;
-const FIXED_PRICE_TABLE_COLUMN_COUNT = 3;
+const FIXED_PRICE_TABLE_COLUMN_COUNT = 2;
 const PRICE_CACHE_KEY = 'icloud-price-comparison:validated-prices:v1';
-const MAX_COMPARE_COUNTRIES = 4;
 const initialUrlState = new URLSearchParams(location.search);
 const REGION_LABELS = {
   Americas: '美洲',
@@ -39,8 +38,6 @@ const state = {
   chartRequestId: 0,
   historyReturnFocus: null,
   publishedDateReturnFocus: null,
-  compareReturnFocus: null,
-  compareCountries: (initialUrlState.get('compare') || '').split(',').filter(Boolean),
   renderFrame: null,
   scrollFrame: null
 };
@@ -49,7 +46,6 @@ const elements = {
   historyTierControl: document.querySelector('#historyTierControl'),
   mobileTierControl: document.querySelector('#mobileTierControl'),
   searchInput: document.querySelector('#searchInput'),
-  compactSearchInput: document.querySelector('#compactSearchInput'),
   regionSelect: document.querySelector('#regionSelect'),
   resultSummary: document.querySelector('#resultSummary'),
   loadStatus: document.querySelector('#loadStatus'),
@@ -57,8 +53,6 @@ const elements = {
   retryButton: document.querySelector('#retryButton'),
   workspace: document.querySelector('.workspace'),
   workspaceToolbar: document.querySelector('.workspace-toolbar'),
-  compactControls: document.querySelector('#compactControls'),
-  compactSortButton: document.querySelector('#compactSortButton'),
   backToTableButton: document.querySelector('#backToTableButton'),
   minimumSummary: document.querySelector('#minimumSummary'),
   fxStatus: document.querySelector('#fxStatus'),
@@ -83,16 +77,7 @@ const elements = {
   publishedDateDialog: document.querySelector('#publishedDateDialog'),
   closePublishedDate: document.querySelector('#closePublishedDate'),
   publishedDateDialogCurrent: document.querySelector('#publishedDateDialogCurrent'),
-  publishedDateRows: document.querySelector('#publishedDateRows'),
-  compareDock: document.querySelector('#compareDock'),
-  compareCount: document.querySelector('#compareCount'),
-  compareChips: document.querySelector('#compareChips'),
-  clearCompareButton: document.querySelector('#clearCompareButton'),
-  copyCompareLinkButton: document.querySelector('#copyCompareLinkButton'),
-  openCompareButton: document.querySelector('#openCompareButton'),
-  compareDialog: document.querySelector('#compareDialog'),
-  compareGrid: document.querySelector('#compareGrid'),
-  closeCompare: document.querySelector('#closeCompare')
+  publishedDateRows: document.querySelector('#publishedDateRows')
 };
 
 const numberFormatter = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 });
@@ -122,8 +107,7 @@ function setLoadStatus(message, { error = false, hidden = false } = {}) {
 function setFiltersDisabled(disabled) {
   elements.searchInput.disabled = disabled;
   elements.regionSelect.disabled = disabled;
-  if (elements.compactSearchInput) elements.compactSearchInput.disabled = disabled;
-  if (elements.compactSortButton) elements.compactSortButton.disabled = disabled;
+  if (elements.backToTableButton) elements.backToTableButton.disabled = disabled;
   document.querySelectorAll('button[data-sort], button[data-sort-tier], #publishedDateButton, #mobileTierControl button').forEach((button) => {
     button.disabled = disabled;
   });
@@ -317,7 +301,6 @@ function populateFilters() {
   }
   elements.regionSelect.value = state.region;
   elements.searchInput.value = state.query;
-  if (elements.compactSearchInput) elements.compactSearchInput.value = state.query;
 }
 
 function renderTierHeaders() {
@@ -325,7 +308,6 @@ function renderTierHeaders() {
   if (!row) return;
   document.querySelector('#tierHeaderPlaceholder')?.remove();
   row.querySelectorAll('th[data-tier-header]').forEach((header) => header.remove());
-  const compareHeader = row.querySelector('.compare-column');
   for (const tier of state.data.tiers) {
     const header = document.createElement('th');
     header.dataset.tierHeader = 'true';
@@ -342,7 +324,7 @@ function renderTierHeaders() {
     icon.setAttribute('aria-hidden', 'true');
     button.append(icon);
     header.append(button);
-    row.insertBefore(header, compareHeader);
+    row.append(header);
     button.addEventListener('click', () => setTierSort(tier.id));
   }
   refreshIcons();
@@ -415,6 +397,7 @@ function createPriceCell(country, tierId) {
     symbol.className = 'price-symbol';
     symbol.textContent = '¥';
     const amount = document.createElement('span');
+    amount.className = 'price-amount';
     amount.textContent = moneyFormatter.format(cny);
     if (isMinimum) {
       const badge = document.createElement('span');
@@ -440,26 +423,6 @@ function alignActiveTierColumn() {
     const activeHeader = document.querySelector(`button[data-sort-tier="${state.sortTier}"]`)?.closest('th');
     if (activeHeader) activeHeader.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   });
-}
-
-function createCompareButton(country) {
-  const selected = state.compareCountries.includes(country.country);
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = 'row-compare-button';
-  button.classList.toggle('is-selected', selected);
-  button.setAttribute('aria-pressed', String(selected));
-  button.setAttribute('aria-label', `${selected ? '移出' : '加入'} ${country.nameZh || country.country} ${selected ? '对比' : '到对比'}`);
-  button.title = selected ? '移出对比' : '加入对比';
-  const icon = document.createElement('i');
-  icon.dataset.lucide = selected ? 'check' : 'plus';
-  icon.setAttribute('aria-hidden', 'true');
-  button.append(icon);
-  button.addEventListener('click', (event) => {
-    event.stopPropagation();
-    toggleCompareCountry(country.country);
-  });
-  return button;
 }
 
 function renderTable() {
@@ -500,10 +463,7 @@ function renderTable() {
       }
       nameCell.append(historyButton);
 
-      const compareCell = document.createElement('td');
-      compareCell.className = 'compare-cell';
-      compareCell.append(createCompareButton(country));
-      row.append(rank, nameCell, ...state.data.tiers.map(({ id }) => createPriceCell(country, id)), compareCell);
+      row.append(rank, nameCell, ...state.data.tiers.map(({ id }) => createPriceCell(country, id)));
       historyButton.addEventListener('click', (event) => {
         event.stopPropagation();
         openHistory(country, historyButton);
@@ -518,7 +478,6 @@ function renderTable() {
 
   elements.priceRows.replaceChildren(fragment);
   updateTierPresentation();
-  renderCompareDock();
   refreshIcons();
   alignActiveTierColumn();
 }
@@ -980,8 +939,7 @@ function updateUrlState() {
   else url.searchParams.delete('q');
   if (state.region !== 'all') url.searchParams.set('region', state.region);
   else url.searchParams.delete('region');
-  if (state.compareCountries.length) url.searchParams.set('compare', state.compareCountries.join(','));
-  else url.searchParams.delete('compare');
+  url.searchParams.delete('compare');
   history.replaceState(null, '', url);
 }
 
@@ -996,19 +954,11 @@ function updateTierPresentation() {
   document.querySelectorAll('.price-table [data-tier]').forEach((element) => {
     element.classList.toggle('is-active-tier', element.dataset.tier === state.sortTier);
   });
-  if (elements.compactSortButton && state.data) {
-    const tier = state.data.tiers.find(({ id }) => id === state.sortTier);
-    const direction = state.sortDirection === 'asc' ? '\u5347\u5e8f' : '\u964d\u5e8f';
-    elements.compactSortButton.textContent = state.sortKey === 'country'
-      ? `\u540d\u79f0${direction}`
-      : `${tier?.label || state.sortTier} ${direction}`;
-  }
 }
 
 function scheduleQueryRender(value) {
   state.query = value;
   elements.searchInput.value = value;
-  if (elements.compactSearchInput) elements.compactSearchInput.value = value;
   updateUrlState();
   if (state.renderFrame) cancelAnimationFrame(state.renderFrame);
   state.renderFrame = requestAnimationFrame(() => {
@@ -1018,143 +968,49 @@ function scheduleQueryRender(value) {
 }
 
 function focusMinimumCountry(tierId, countryId) {
+  if (state.renderFrame) {
+    cancelAnimationFrame(state.renderFrame);
+    state.renderFrame = null;
+  }
+  state.query = '';
+  state.region = 'all';
+  elements.searchInput.value = '';
+  elements.regionSelect.value = 'all';
   setTierSort(tierId, { forceAscending: true });
-  requestAnimationFrame(() => {
-    const row = countryId ? elements.priceRows.querySelector(`tr[data-country="${CSS.escape(countryId)}"]`) : null;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const row = countryId
+      ? [...elements.priceRows.querySelectorAll('tr[data-country]')].find((item) => item.dataset.country === countryId)
+      : null;
     if (!row) return;
-    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    row.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
     row.classList.add('is-highlighted');
     setTimeout(() => row.classList.remove('is-highlighted'), 1800);
-  });
+  }));
 }
 
-function toggleCompareCountry(countryId) {
-  const index = state.compareCountries.indexOf(countryId);
-  if (index >= 0) state.compareCountries.splice(index, 1);
-  else if (state.compareCountries.length < MAX_COMPARE_COUNTRIES) state.compareCountries.push(countryId);
-  else {
-    elements.compareCount.textContent = '\u6700\u591a\u9009\u62e9 4 \u4e2a\u5730\u533a';
-    elements.compareDock.hidden = false;
-    document.body.classList.add('has-compare-dock');
+function setBackToTableVisible(visible) {
+  if (!elements.backToTableButton) return;
+  elements.backToTableButton.classList.toggle('is-visible', visible);
+  elements.backToTableButton.setAttribute('aria-hidden', String(!visible));
+  elements.backToTableButton.tabIndex = visible ? 0 : -1;
+}
+
+function updateBackToTableButton() {
+  if (!elements.workspaceToolbar || !elements.workspace || !state.data) {
+    setBackToTableVisible(false);
     return;
   }
-  updateUrlState();
-  renderTable();
-  if (elements.compareDialog.open) renderCompareDialog();
-}
-
-function renderCompareDock() {
-  if (!state.data || !elements.compareDock) return;
-  const selected = state.compareCountries
-    .map((id) => state.data.countries.find(({ country }) => country === id))
-    .filter(Boolean);
-  elements.compareDock.hidden = selected.length === 0;
-  document.body.classList.toggle('has-compare-dock', selected.length > 0);
-  elements.compareCount.textContent = `\u5df2\u9009 ${selected.length}/${MAX_COMPARE_COUNTRIES} \u4e2a\u5730\u533a`;
-  elements.openCompareButton.disabled = selected.length < 2;
-  elements.openCompareButton.title = selected.length < 2 ? '\u81f3\u5c11\u9009\u62e9 2 \u4e2a\u5730\u533a' : '';
-
-  const fragment = document.createDocumentFragment();
-  for (const country of selected) {
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = 'compare-chip';
-    chip.setAttribute('aria-label', `\u4ece\u5bf9\u6bd4\u4e2d\u79fb\u51fa ${country.nameZh || country.country}`);
-    chip.append(document.createTextNode(country.nameZh || country.country));
-    const icon = document.createElement('i');
-    icon.dataset.lucide = 'x';
-    icon.setAttribute('aria-hidden', 'true');
-    chip.append(icon);
-    chip.addEventListener('click', () => toggleCompareCountry(country.country));
-    fragment.append(chip);
-  }
-  elements.compareChips.replaceChildren(fragment);
-}
-
-function renderCompareDialog() {
-  if (!state.data) return;
-  const fragment = document.createDocumentFragment();
-  const selected = state.compareCountries
-    .map((id) => state.data.countries.find(({ country }) => country === id))
-    .filter(Boolean);
-  elements.compareGrid.style.setProperty('--compare-count', String(Math.max(1, selected.length)));
-  for (const country of selected) {
-    const card = document.createElement('article');
-    card.className = 'compare-card';
-    const heading = document.createElement('h3');
-    heading.textContent = country.nameZh || country.country;
-    const meta = document.createElement('p');
-    meta.textContent = `${country.country} \u00b7 ${country.currency} \u00b7 ${REGION_LABELS[country.region] || country.region}`;
-    const list = document.createElement('dl');
-    for (const tier of state.data.tiers) {
-      const plan = country.plans[tier.id];
-      const row = document.createElement('div');
-      const label = document.createElement('dt');
-      label.textContent = tier.label;
-      const value = document.createElement('dd');
-      const converted = convertPrice(plan.price, country.currency, 'CNY');
-      const cny = document.createElement('strong');
-      cny.textContent = formatConverted(converted, '\u00a5');
-      const local = document.createElement('span');
-      local.textContent = plan.formattedPrice;
-      value.append(cny, local);
-      row.append(label, value);
-      list.append(row);
-    }
-    card.append(heading, meta, list);
-    fragment.append(card);
-  }
-  elements.compareGrid.replaceChildren(fragment);
-}
-
-async function copyCompareLink() {
-  updateUrlState();
-  const url = location.href;
-  let copied = false;
-  try {
-    await navigator.clipboard.writeText(url);
-    copied = true;
-  } catch {
-    const textarea = document.createElement('textarea');
-    textarea.value = url;
-    textarea.setAttribute('readonly', '');
-    textarea.style.position = 'fixed';
-    textarea.style.opacity = '0';
-    document.body.append(textarea);
-    textarea.select();
-    try { copied = document.execCommand('copy'); } catch {}
-    textarea.remove();
-  }
-  const original = elements.copyCompareLinkButton.innerHTML;
-  elements.copyCompareLinkButton.textContent = copied ? '\u5df2\u590d\u5236' : '\u8bf7\u624b\u52a8\u590d\u5236\u5730\u5740\u680f\u94fe\u63a5';
-  setTimeout(() => {
-    elements.copyCompareLinkButton.innerHTML = original;
-    refreshIcons();
-  }, 1600);
-}
-
-function setCompactControlsVisible(visible) {
-  if (!elements.compactControls) return;
-  elements.compactControls.classList.toggle('is-visible', visible);
-  elements.compactControls.setAttribute('aria-hidden', String(!visible));
-  elements.compactControls.querySelectorAll('input, button').forEach((control) => {
-    control.tabIndex = visible ? 0 : -1;
-  });
-}
-
-function updateCompactControls() {
-  if (!elements.workspaceToolbar || !elements.workspace || !state.data) return;
   const toolbarRect = elements.workspaceToolbar.getBoundingClientRect();
   const workspaceRect = elements.workspace.getBoundingClientRect();
-  const compactControlHasFocus = elements.compactControls?.contains(document.activeElement) === true;
-  setCompactControlsVisible(compactControlHasFocus || (toolbarRect.bottom < 8 && workspaceRect.bottom > 120));
+  const buttonHasFocus = document.activeElement === elements.backToTableButton;
+  setBackToTableVisible(buttonHasFocus || (toolbarRect.bottom < 8 && workspaceRect.bottom > 120));
 }
 
-function scheduleCompactControlsUpdate() {
+function scheduleBackToTableUpdate() {
   if (state.scrollFrame) return;
   state.scrollFrame = requestAnimationFrame(() => {
     state.scrollFrame = null;
-    updateCompactControls();
+    updateBackToTableButton();
   });
 }
 
@@ -1163,8 +1019,6 @@ function applyPriceData(data) {
   if (!state.data.tiers.some(({ id }) => id === state.sortTier)) {
     state.sortTier = state.data.tiers.find(({ id }) => id === DEFAULT_SORT_TIER)?.id || state.data.tiers[0].id;
   }
-  const validCountries = new Set(state.data.countries.map(({ country }) => country));
-  state.compareCountries = [...new Set(state.compareCountries)].filter((id) => validCountries.has(id)).slice(0, MAX_COMPARE_COUNTRIES);
   state.historyTier = state.sortTier;
   syncActiveHistoryCountry();
   if (elements.historyDialog.open || elements.publishedDateDialog.open) void ensureHistoryLoaded();
@@ -1199,7 +1053,7 @@ function applyPriceData(data) {
   renderMinimumSummary();
   renderTable();
   updateUrlState();
-  updateCompactControls();
+  updateBackToTableButton();
   refreshIcons();
 }
 
@@ -1207,42 +1061,18 @@ function bindEvents() {
   if (state.eventsBound) return;
   state.eventsBound = true;
   elements.searchInput.addEventListener('input', (event) => scheduleQueryRender(event.target.value));
-  elements.compactSearchInput?.addEventListener('input', (event) => scheduleQueryRender(event.target.value));
   elements.regionSelect.addEventListener('change', (event) => {
     state.region = event.target.value;
     updateUrlState();
     renderTable();
   });
   document.querySelector('button[data-sort="country"]').addEventListener('click', setCountrySort);
-  elements.compactSortButton?.addEventListener('click', () => {
-    if (state.sortKey === 'tier') setTierSort(state.sortTier);
-    else setTierSort(state.sortTier, { forceAscending: true });
-  });
   elements.backToTableButton?.addEventListener('click', () => {
     elements.backToTableButton.blur();
-    elements.workspaceToolbar.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  });
-  elements.clearCompareButton?.addEventListener('click', () => {
-    state.compareCountries = [];
-    updateUrlState();
-    renderTable();
-    if (elements.compareDialog.open) elements.compareDialog.close();
-  });
-  elements.copyCompareLinkButton?.addEventListener('click', copyCompareLink);
-  elements.openCompareButton?.addEventListener('click', () => {
-    if (state.compareCountries.length < 2) return;
-    state.compareReturnFocus = elements.openCompareButton;
-    renderCompareDialog();
-    elements.compareDialog.showModal();
-  });
-  elements.closeCompare?.addEventListener('click', () => elements.compareDialog.close());
-  elements.compareDialog?.addEventListener('click', (event) => {
-    if (event.target === elements.compareDialog) elements.compareDialog.close();
-  });
-  elements.compareDialog?.addEventListener('close', () => {
-    const returnFocus = state.compareReturnFocus;
-    state.compareReturnFocus = null;
-    if (returnFocus?.isConnected) requestAnimationFrame(() => returnFocus.focus());
+    elements.workspaceToolbar.scrollIntoView({
+      behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+      block: 'start'
+    });
   });
   document.querySelector('#closeHistory').addEventListener('click', () => elements.historyDialog.close());
   elements.historyDialog.addEventListener('click', (event) => {
@@ -1264,9 +1094,9 @@ function bindEvents() {
     state.publishedDateReturnFocus = null;
     if (returnFocus?.isConnected) requestAnimationFrame(() => returnFocus.focus());
   });
-  addEventListener('scroll', scheduleCompactControlsUpdate, { passive: true });
+  addEventListener('scroll', scheduleBackToTableUpdate, { passive: true });
   addEventListener('resize', () => {
-    scheduleCompactControlsUpdate();
+    scheduleBackToTableUpdate();
     updateTierPresentation();
   }, { passive: true });
 }
