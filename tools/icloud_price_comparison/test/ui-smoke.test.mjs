@@ -172,6 +172,16 @@ after(async () => {
   await Promise.allSettled(cleanup);
 });
 
+test('starts price data early and deprioritizes optional third-party work', async () => {
+  const html = await readFile(path.join(PROJECT_DIR, 'index.html'), 'utf8');
+  const eagerPriceFetch = "window.__icloudInitialPriceRequest = fetch('data/prices.json'";
+  assert.ok(html.includes(eagerPriceFetch), 'prices.json should start loading during HTML parsing');
+  assert.ok(html.indexOf(eagerPriceFetch) < html.indexOf('<script type="module" src="script.js"></script>'), 'the initial price request should precede module execution');
+  assert.doesNotMatch(html, /rel="preload" href="data\/prices\.json"/, 'cross-browser loading should not rely on a fetch preload that WebKit may duplicate');
+  assert.match(html, /<script async fetchpriority="low" src="https:\/\/www\.googletagmanager\.com\/gtag\/js\?id=G-K2S9L4CHNP"><\/script>/);
+  assert.doesNotMatch(html, /rel="preconnect" href="https:\/\/raw\.githubusercontent\.com"/, 'the rarely used fallback host should not consume an eager connection');
+});
+
 test('renders current prices, sorting, and country history in a real browser', { timeout: 60_000 }, async (context) => {
   const browserConfig = await resolveBrowser(context, 'the UI smoke test');
   if (!browserConfig) return;
@@ -264,6 +274,15 @@ test('renders current prices, sorting, and country history in a real browser', {
           assert.ok(referenceBox && statsBox && statsBox.y >= referenceBox.y + referenceBox.height, `${viewport.name} metrics should form a separate row below the minimum summary`);
           assert.ok(referenceBox && statsBox && Math.abs(referenceBox.width - statsBox.width) <= 2, `${viewport.name} overview rows should share the same width`);
         }
+        const sectionGaps = await page.evaluate(() => {
+          const header = document.querySelector('.app-header').getBoundingClientRect();
+          const reference = document.querySelector('.overview-reference').getBoundingClientRect();
+          const stats = document.querySelector('.overview-stats').getBoundingClientRect();
+          const workspace = document.querySelector('.workspace').getBoundingClientRect();
+          return [reference.top - header.bottom, stats.top - reference.bottom, workspace.top - stats.bottom];
+        });
+        assert.ok(sectionGaps.every((gap) => gap >= 11 && gap <= 15), `${viewport.name} section gaps should stay compact: ${sectionGaps.join(', ')}`);
+        assert.ok(Math.max(...sectionGaps) - Math.min(...sectionGaps) <= 1, `${viewport.name} section gaps should share one vertical rhythm: ${sectionGaps.join(', ')}`);
         const statValues = await page.locator('.overview-stats dd').evaluateAll((elements) => elements.map((element) => {
           const style = getComputedStyle(element);
           return {
@@ -1602,6 +1621,46 @@ test('restores URL state, removes the floating search bar, and supports table re
     const rowBox = await highlightedRow.boundingBox();
     assert.ok(rowBox && rowBox.y + rowBox.height > 0 && rowBox.y < 760, 'minimum-price winner should be positioned in the viewport');
   } finally {
+    await page.close();
+    await browser.close();
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test('keeps the cached table DOM when the network snapshot is unchanged', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the unchanged-cache performance test');
+  if (!browserConfig) return;
+  const validData = await readFixture('prices.json');
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+  let releaseRequest;
+  let requestSeen = false;
+  const requestReleased = new Promise((resolve) => { releaseRequest = resolve; });
+  await page.addInitScript((payload) => {
+    localStorage.setItem('icloud-price-comparison:validated-prices:v1', JSON.stringify(payload));
+  }, validData);
+  await page.route('https://**/*', (route) => route.abort());
+  await page.route('**/data/prices.json*', async (route) => {
+    requestSeen = true;
+    await requestReleased;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(validData)
+    });
+  });
+  try {
+    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, validData.countries.length);
+    await page.locator('#priceRows tr[data-country]').first().evaluate((row) => { row.dataset.renderMarker = 'cached'; });
+    releaseRequest();
+    await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
+    assert.equal(requestSeen, true, 'the cached view must still check for a network update');
+    assert.equal(await page.locator('#priceRows tr[data-render-marker="cached"]').count(), 1, 'an identical network snapshot should not rebuild the rendered table');
+  } finally {
+    releaseRequest?.();
     await page.close();
     await browser.close();
     await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));

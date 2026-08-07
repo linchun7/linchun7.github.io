@@ -67,6 +67,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   margin: 0 auto;
 }
 
+.page-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+
 .app-header-inner {
   min-height: 66px;
   display: flex;
@@ -118,8 +124,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
-  gap: 10px;
-  padding: 22px 0 18px;
+  gap: 14px;
+  padding: 14px 0 0;
 }
 
 .overview-reference,
@@ -493,7 +499,8 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
   .freshness-warning { display: block; margin-top: 2px; }
   .freshness-warning::before { content: ""; }
 
-  .overview { padding: 14px 0 12px; gap: 10px; }
+  .page-main { gap: 12px; }
+  .overview { padding: 12px 0 0; gap: 12px; }
   .overview-reference { min-height: 0; padding: 17px 15px 15px; }
   .overview h1 { font-size: 25px; }
   .overview-note { font-size: 12px; }
