@@ -23,7 +23,7 @@ permissions:
 
 concurrency:
   group: validate-icloud-price-comparison-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   test:
@@ -55,7 +55,6 @@ jobs:
         run: pnpm test:core
 
       - name: 深度审计全部 Apple 快照
-        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: pnpm validate:snapshots
 
       - name: 并行运行 Chromium 与 WebKit 测试

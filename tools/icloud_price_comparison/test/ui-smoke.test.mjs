@@ -1052,7 +1052,7 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
     return {
       observedAt,
       currency: country.currency,
-      plans: Object.fromEntries(data.tiers.map(({ id }) => [id, country.plans[id].price + index / 100]))
+      plans: Object.fromEntries(data.tiers.map(({ id }) => [id, country.plans[id].price + (99 - index) / 100]))
     };
   });
   const verboseCountries = Array.from({ length: 24 }, (_, index) => ({
@@ -1099,13 +1099,15 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
   });
   const history = {
     schemaVersion: 2,
-    countries: {
-      [country.country]: {
-        nameZh: country.nameZh,
-        region: country.region,
-        events: priceEvents
-      }
-    },
+    countries: Object.fromEntries(data.countries.map((entry) => [entry.country, {
+      nameZh: entry.nameZh,
+      region: entry.region,
+      events: entry.country === country.country ? priceEvents : [{
+        observedAt: '2026-08-01',
+        currency: entry.currency,
+        plans: Object.fromEntries(data.tiers.map(({ id }) => [id, entry.plans[id].price]))
+      }]
+    }])),
     sourcePublishedDates
   };
   const server = await startServer();

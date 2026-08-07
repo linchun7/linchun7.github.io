@@ -40,11 +40,19 @@ jobs:
         with:
           node-version: 22
 
+      - name: 读取最新 main 的每日幂等状态
+        working-directory: .
+        shell: bash
+        run: |
+          git fetch origin main --depth=1
+          git show origin/main:tools/icloud_price_comparison/data/run-log.json > "$RUNNER_TEMP/icloud-run-log.json"
+
       - name: 检查每日幂等状态
         id: daily_guard
         working-directory: tools/icloud_price_comparison
         env:
           REQUESTED_TRIGGER_SOURCE: ${{ inputs.trigger_source }}
+          ICLOUD_RUN_LOG_PATH: ${{ runner.temp }}/icloud-run-log.json
         run: node scripts/daily-run-guard.mjs
 
   update:
@@ -64,6 +72,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: 固定本次生成基线
+        working-directory: .
+        shell: bash
+        run: |
+          git fetch origin main
+          git checkout --detach origin/main
+          echo "GENERATION_BASE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
       - name: 检查仓库容量
         working-directory: .
         shell: bash
@@ -155,7 +170,11 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add tools/icloud_price_comparison/data
           git commit -m "chore: update iCloud prices"
-          git pull --rebase origin main
+          git fetch origin main
+          if [[ "$(git rev-parse origin/main)" != "$GENERATION_BASE_SHA" ]]; then
+            echo "::error title=main 已在生成期间前进::远端 main 已变化；为避免覆盖自动数据提交，本次更新将失败并在下一次运行重试。"
+            exit 1
+          fi
           pnpm --dir tools/icloud_price_comparison install --frozen-lockfile
           pnpm --dir tools/icloud_price_comparison run test:core
           pnpm --dir tools/icloud_price_comparison run test:data

@@ -61,12 +61,24 @@ export function isValidPublicationChanges(changes) {
   if (arrays.some((key) => changes[key] !== undefined && !Array.isArray(changes[key]))) return false;
   const validTier = (tier) => isPlainObject(tier) && typeof tier.id === 'string' && tier.id.trim();
   const validCountry = (country) => isPlainObject(country) && typeof country.country === 'string' && country.country.trim();
+  const validChangedTier = (tier) => validTier(tier)
+    && (tier.from === null || (Number.isFinite(tier.from) && tier.from > 0))
+    && (tier.to === null || (Number.isFinite(tier.to) && tier.to > 0))
+    && (tier.from !== null || tier.to !== null);
+  const validCurrency = (value) => typeof value === 'string' && /^[A-Z]{3}$/.test(value);
+  const validRegion = (value) => typeof value === 'string' && value.trim();
   if ((changes.addedTiers ?? []).some((tier) => !validTier(tier))) return false;
   if ((changes.removedTiers ?? []).some((tier) => !validTier(tier))) return false;
   if ((changes.addedCountries ?? []).some((country) => !validCountry(country))) return false;
   if ((changes.removedCountries ?? []).some((country) => !validCountry(country))) return false;
   return (changes.changedCountries ?? []).every((country) => validCountry(country)
-    && (country.tiers === undefined || (Array.isArray(country.tiers) && country.tiers.every((tier) => validTier(tier)))));
+    && validCurrency(country.fromCurrency)
+    && validCurrency(country.toCurrency)
+    && validRegion(country.fromRegion)
+    && validRegion(country.toRegion)
+    && Array.isArray(country.tiers)
+    && country.tiers.length > 0
+    && country.tiers.every(validChangedTier));
 }
 
 function formatBeijingDate(value) {
@@ -245,6 +257,32 @@ export function validateHistoryPayload(payload) {
     previousObservedAt = entry.observedAt;
   }
   return payload;
+}
+
+export function validatePriceHistoryConsistency(prices, history) {
+  validatePricePayload(prices);
+  validateHistoryPayload(history);
+  const currentPublishedDate = publicationDateKey(prices.source.publishedDate);
+  const latestPublishedDate = publicationDateKey(history.sourcePublishedDates.at(-1)?.publishedDate);
+  if (latestPublishedDate !== currentPublishedDate) {
+    throw new Error('prices.json and history.json have different latest publication dates');
+  }
+  const tierIds = new Set(prices.tiers.map(({ id }) => id));
+  for (const country of prices.countries) {
+    const record = history.countries[country.country];
+    const latestEvent = record?.events?.at(-1);
+    const eventTierIds = new Set(Object.keys(latestEvent?.plans ?? {}));
+    if (!record
+      || record.nameZh !== country.nameZh
+      || record.region !== country.region
+      || latestEvent?.currency !== country.currency
+      || eventTierIds.size !== tierIds.size
+      || [...tierIds].some((id) => !eventTierIds.has(id)
+        || latestEvent.plans[id] !== country.plans[id].price)) {
+      throw new Error('Existing history.json latest values do not match ' + country.country + '; prices.json and history.json are inconsistent');
+    }
+  }
+  return history;
 }
 
 export function validatePayload(fileName, payload) {

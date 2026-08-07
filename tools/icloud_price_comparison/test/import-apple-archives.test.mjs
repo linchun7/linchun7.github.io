@@ -538,3 +538,52 @@ test('attempts every archive rollback action when one cleanup fails', async () =
     ['remove', 'staging', { recursive: true, force: true }]
   ]);
 });
+
+test('rejects archives newer than current prices without changing history or snapshot evidence', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'icloud-archive-future-publication-'));
+  const inputDir = path.join(root, 'input');
+  const snapshotsDir = path.join(root, 'snapshots');
+  const historyPath = path.join(root, 'history.json');
+  const pricesPath = path.join(root, 'prices.json');
+  const namesPath = path.join(root, 'names.json');
+  const snapshotIndexPath = path.join(snapshotsDir, 'index.json');
+  const currentHtml = archiveHtml({ date: 'May 12, 2025', stamp: '20250513010000' });
+  const futureHtml = archiveHtml({ date: 'June 1, 2025', stamp: '20250602010000' });
+  const parsedCurrent = parseLegacyAppleArchive(currentHtml);
+
+  try {
+    await mkdir(inputDir, { recursive: true });
+    await seedSnapshotStore({ snapshotsDir, snapshotIndexPath, html: currentHtml });
+    await Promise.all([
+      writeFile(path.join(inputDir, 'future.html'), futureHtml, 'utf8'),
+      writeFile(historyPath, '{"sentinel":"history"}\r\n', 'utf8'),
+      writeFile(pricesPath, `${JSON.stringify(currentData(parsedCurrent), null, 2)}\n`, 'utf8'),
+      writeFile(namesPath, '{}\n', 'utf8')
+    ]);
+    const beforeHistory = await readFile(historyPath);
+    const beforeIndex = await readFile(snapshotIndexPath);
+    const beforeFiles = (await readdir(snapshotsDir)).sort();
+    const beforeEvidence = await Promise.all(beforeFiles.map((name) => readFile(path.join(snapshotsDir, name))));
+
+    await assert.rejects(
+      () => importAppleArchives(inputDir, {
+        historyPath,
+        pricesPath,
+        namesPath,
+        snapshotsDir,
+        snapshotIndexPath
+      }),
+      /publication date is newer than current prices\.json/i
+    );
+
+    assert.deepEqual(await readFile(historyPath), beforeHistory);
+    assert.deepEqual(await readFile(snapshotIndexPath), beforeIndex);
+    assert.deepEqual((await readdir(snapshotsDir)).sort(), beforeFiles);
+    assert.deepEqual(
+      await Promise.all(beforeFiles.map((name) => readFile(path.join(snapshotsDir, name)))),
+      beforeEvidence
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
