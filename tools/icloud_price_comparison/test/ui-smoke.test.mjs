@@ -1716,6 +1716,28 @@ test('restores URL state, removes the floating search bar, and supports table re
       'the floating search and sort toolbar should be removed'
     );
 
+    const initialTier = params.get('tier');
+    const initialMinimumCard = page.locator(`#minimumSummary .minimum-card[data-tier="${initialTier}"]`);
+    assert.equal(await initialMinimumCard.getAttribute('aria-pressed'), 'true');
+    assert.equal(await initialMinimumCard.evaluate((card) => card.classList.contains('is-active-tier')), true);
+
+    const alternateTier = validData.tiers.find(({ id }) => id !== initialTier).id;
+    const alternateMinimumCard = page.locator(`#minimumSummary .minimum-card[data-tier="${alternateTier}"]`);
+    await page.locator(`th[data-tier="${alternateTier}"] button`).click();
+    assert.equal(await page.locator(`th[data-tier="${alternateTier}"]`).getAttribute('aria-sort'), 'ascending');
+    assert.equal(await alternateMinimumCard.getAttribute('aria-pressed'), 'true');
+    assert.equal(await alternateMinimumCard.evaluate((card) => card.classList.contains('is-active-tier')), true);
+    assert.equal(await initialMinimumCard.getAttribute('aria-pressed'), 'false');
+    assert.equal(await initialMinimumCard.evaluate((card) => card.classList.contains('is-active-tier')), false);
+
+    await page.locator(`th[data-tier="${alternateTier}"] button`).click();
+    assert.equal(await page.locator(`th[data-tier="${alternateTier}"]`).getAttribute('aria-sort'), 'descending');
+    assert.equal(await alternateMinimumCard.getAttribute('aria-pressed'), 'true');
+    assert.equal(await alternateMinimumCard.evaluate((card) => card.classList.contains('is-active-tier')), true);
+
+    await page.locator('button[data-sort="country"]').click();
+    assert.equal(await page.locator('#minimumSummary .minimum-card[aria-pressed="true"]').count(), 0);
+
     await page.locator('#searchInput').fill('');
     await page.locator('#regionSelect').selectOption('all');
     await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, validData.countries.length);
@@ -1748,6 +1770,8 @@ test('restores URL state, removes the floating search bar, and supports table re
     assert.equal(await page.locator('#searchInput').inputValue(), '');
     assert.equal(await page.locator('#regionSelect').inputValue(), 'all');
     assert.equal(await page.locator(`th[data-tier="${minimumTier}"]`).getAttribute('aria-sort'), 'ascending');
+    assert.equal(await minimumCard.getAttribute('aria-pressed'), 'true');
+    assert.equal(await minimumCard.evaluate((card) => card.classList.contains('is-active-tier')), true);
     await page.waitForFunction(() => document.querySelectorAll('#priceRows tr.is-highlighted').length === 1);
     const highlightedRow = page.locator('#priceRows tr.is-highlighted');
     const expectedWinner = validData.countries
