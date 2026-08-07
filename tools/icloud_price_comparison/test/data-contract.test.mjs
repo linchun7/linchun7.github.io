@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { validateHistoryPayload, validatePriceHistoryConsistency, validatePricePayload } from '../data-contract.js';
+import { validateHistoryPayload, validatePayload, validatePriceHistoryConsistency, validatePricePayload } from '../data-contract.js';
 import { validateExistingHistory, validateExistingPrices } from '../scripts/update-prices.mjs';
 
 const pricesUrl = new URL('../data/prices.json', import.meta.url);
@@ -21,6 +21,21 @@ test('shared browser and updater contracts accept the committed production paylo
   assert.equal(validateHistoryPayload(history), history);
   assert.doesNotThrow(() => validateExistingPrices(prices));
   assert.doesNotThrow(() => validateExistingHistory(history, prices));
+});
+
+test('rejects undeclared price tiers and truncated browser payloads', async () => {
+  const { prices, history } = await productionFixtures();
+  const extraTier = structuredClone(prices);
+  extraTier.countries[0].plans.EXTRA = { price: 1, formattedPrice: '$1' };
+  assert.throws(() => validatePricePayload(extraTier), /plans that do not match declared tiers/);
+  assert.throws(() => validatePriceHistoryConsistency(extraTier, history), /plans that do not match declared tiers/);
+
+  const truncated = structuredClone(prices);
+  truncated.countries = truncated.countries.slice(0, 1);
+  truncated.run.countries = truncated.countries.length;
+  truncated.run.pricePoints = truncated.countries.length * truncated.tiers.length;
+  assert.doesNotThrow(() => validatePricePayload(truncated), 'the low-level contract remains usable for isolated fixtures');
+  assert.throws(() => validatePayload('prices.json', truncated), /incomplete tiers or countries/);
 });
 
 test('shared browser and updater contracts reject the same price schema divergences', async () => {
