@@ -329,6 +329,10 @@ test('renders current prices, sorting, and country history in a real browser', {
           assert.ok(countryVisibility.countryLeft >= countryVisibility.scrollerLeft - 1, 'tablet country column must not be shifted off-screen');
           assert.ok(countryVisibility.countryRight <= countryVisibility.scrollerRight + 1, 'tablet country column must remain visible inside the table scroller');
         }
+        if (viewport.width <= 640) {
+          const mobileControlFontSizes = await page.locator('#searchInput, #regionSelect').evaluateAll((controls) => controls.map((control) => Number.parseFloat(getComputedStyle(control).fontSize)));
+          assert.ok(mobileControlFontSizes.every((fontSize) => fontSize >= 16), `${viewport.name} form controls must not trigger iOS focus zoom`);
+        }
         if (viewport.name === 'narrow-mobile') {
           const metricLabels = await page.locator('.overview-stats dt > span:last-child').evaluateAll((labels) => labels.map((label) => ({
             height: label.getBoundingClientRect().height,
