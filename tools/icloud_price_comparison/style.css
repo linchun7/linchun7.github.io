@@ -521,7 +521,7 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
   .workspace-heading p { font-size: 12px; }
   .load-status { width: 100%; font-size: 11px; }
   .filters { grid-template-columns: 1fr; gap: 8px; }
-  .search-field input, .select-field select { height: 40px; }
+  .search-field input, .select-field select { height: 40px; font-size: 16px; }
 
   .price-table { min-width: 830px; }
   .price-table th:first-child, .price-table td:first-child { display: none; }
