@@ -1508,8 +1508,8 @@ test('keeps the minimum-price overview stable and the desktop table header stick
     });
     assert.ok(tableChrome.fontSize >= 13, 'desktop price headers should be visually prominent');
     assert.notEqual(tableChrome.background, tableChrome.rowBackground, 'price headers should remain distinct from table rows');
-    assert.ok(tableChrome.lastHeaderPadding >= 20, 'the rightmost header should keep balanced space from the table edge');
-    assert.ok(tableChrome.lastCellPadding >= 20, 'the rightmost price should keep balanced space from the table edge');
+    assert.ok(tableChrome.lastHeaderPadding >= 25, 'the rightmost header should keep balanced space from the table edge');
+    assert.ok(tableChrome.lastCellPadding >= 25, 'the rightmost price should keep balanced space from the table edge');
   } finally {
     releaseRequest();
     await page.close();
