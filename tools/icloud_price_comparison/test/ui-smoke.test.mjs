@@ -1493,6 +1493,23 @@ test('keeps the minimum-price overview stable and the desktop table header stick
     await page.evaluate(() => scrollBy(0, 220));
     const stickyTop = await page.locator('.price-table thead th').first().evaluate((header) => header.getBoundingClientRect().top);
     assert.ok(stickyTop >= -1 && stickyTop <= 1, `desktop header should remain sticky at the viewport top, got ${stickyTop}`);
+    const tableChrome = await page.evaluate(() => {
+      const header = document.querySelector('.price-table th[data-tier]');
+      const lastHeader = document.querySelector('.price-table th:last-child');
+      const lastCell = document.querySelector('#priceRows tr[data-country] td:last-child');
+      const headerStyle = getComputedStyle(header);
+      return {
+        fontSize: Number.parseFloat(headerStyle.fontSize),
+        background: headerStyle.backgroundColor,
+        rowBackground: getComputedStyle(document.querySelector('#priceRows tr[data-country] td')).backgroundColor,
+        lastHeaderPadding: Number.parseFloat(getComputedStyle(lastHeader).paddingRight),
+        lastCellPadding: Number.parseFloat(getComputedStyle(lastCell).paddingRight)
+      };
+    });
+    assert.ok(tableChrome.fontSize >= 13, 'desktop price headers should be visually prominent');
+    assert.notEqual(tableChrome.background, tableChrome.rowBackground, 'price headers should remain distinct from table rows');
+    assert.ok(tableChrome.lastHeaderPadding >= 20, 'the rightmost header should keep balanced space from the table edge');
+    assert.ok(tableChrome.lastCellPadding >= 20, 'the rightmost price should keep balanced space from the table edge');
   } finally {
     releaseRequest();
     await page.close();
