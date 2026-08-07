@@ -242,6 +242,10 @@ async function importAppleArchivesUnlocked(inputDir, paths = {}) {
   let snapshotIndex = normalizeAppleSnapshotIndex(migratedSnapshotIndex);
   const currentPublishedDate = publicationDateKey(currentData.source.publishedDate);
   if (!archives.length) throw new Error('No validated Apple archives were found in the input directory');
+  const futureArchives = archives.filter(({ publishedDate }) => publishedDate > currentPublishedDate);
+  if (futureArchives.length) {
+    throw new Error(`Archive publication date is newer than current prices.json: ${futureArchives.map(({ fileName, publishedDate }) => `${fileName} (${publishedDate})`).join(', ')}`);
+  }
   const archiveDates = new Set(archives.map(({ publishedDate }) => publishedDate));
   const missingDates = snapshotIndex.snapshots
     .map(({ publishedDate }) => publishedDate)
@@ -353,6 +357,8 @@ async function importAppleArchivesUnlocked(inputDir, paths = {}) {
       snapshotIndexPath,
       snapshotIndex,
       snapshotIndexExists: true,
+      history: rebuilt,
+      currentData,
       deep: true
     });
     await writeTextAtomic(historyPath, `${JSON.stringify(rebuilt, null, 2)}\n`);

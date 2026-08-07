@@ -1,4 +1,4 @@
-import { publicationDateKey, validatePayload } from './data-contract.js';
+import { publicationDateKey, validatePayload, validatePriceHistoryConsistency } from './data-contract.js';
 import { createIcons } from './vendor/lucide-subset.js';
 
 const REMOTE_DATA_ROOT = 'https://raw.githubusercontent.com/linchun7/linchun7.github.io/main/tools/icloud_price_comparison/data';
@@ -100,6 +100,9 @@ function setLoadStatus(message, { error = false, hidden = false } = {}) {
 function setFiltersDisabled(disabled) {
   elements.searchInput.disabled = disabled;
   elements.regionSelect.disabled = disabled;
+  document.querySelectorAll('button[data-sort], #publishedDateButton').forEach((button) => {
+    button.disabled = disabled;
+  });
 }
 
 function formatDate(value) {
@@ -493,11 +496,12 @@ function renderHistoryTierButtons() {
 }
 
 function compactHistorySeries(events, tier) {
-  const availableEvents = events.filter((event) => Number.isFinite(event.plans[tier]));
-  return availableEvents.filter((event, index) => {
+  return events.filter((event, index) => {
     if (index === 0) return true;
-    const previous = availableEvents[index - 1];
-    return event.currency !== previous.currency || event.plans[tier] !== previous.plans[tier];
+    const previous = events[index - 1];
+    const price = Number.isFinite(event.plans[tier]) ? event.plans[tier] : null;
+    const previousPrice = Number.isFinite(previous.plans[tier]) ? previous.plans[tier] : null;
+    return event.currency !== previous.currency || price !== previousPrice;
   });
 }
 
@@ -597,7 +601,7 @@ async function renderChart(record) {
         animation: { duration: 250 },
         plugins: {
           legend: { display: false },
-          tooltip: { callbacks: { label: (item) => `${numberFormatter.format(item.raw)} ${currency}` } }
+          tooltip: { callbacks: { label: (item) => item.raw == null ? '????' : `${numberFormatter.format(item.raw)} ${currency}` } }
         },
         scales: {
           x: { grid: { display: false }, ticks: { color: '#687078' } },
@@ -674,6 +678,7 @@ function ensureHistoryLoaded() {
   const request = fetchJson('history.json')
     .then((historyData) => {
       if (requestId !== state.historyRequestId) return null;
+      validatePriceHistoryConsistency(state.data, historyData);
       state.history = historyData;
       state.historyStatus = 'ready';
       refreshOpenHistoryViews();

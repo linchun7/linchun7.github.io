@@ -10,6 +10,7 @@ import {
   buildAppleSnapshotEntry,
   buildAppleSnapshotIndex,
   defaultUpdateLockPath,
+  defaultUpdateTransactionPath,
   appleSnapshotContentHash,
   acquireUpdateLock,
   normalizeAppleSnapshotIndex,
@@ -460,6 +461,64 @@ test('runs the production write path against isolated files', async () => {
   }
 });
 
+test('preserves a pre-existing unindexed snapshot file when a production collision occurs', async () => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const changed = structuredClone(data);
+  const changedCountry = changed.countries.find(({ country: countryName }) => countryName === 'Bahamas');
+  changedCountry.plans['50GB'] = { price: 1.09, formattedPrice: '$1.09' };
+  const html = buildAppleHtml(changed);
+  const contentHash = appleSnapshotContentHash(changed);
+  const publishedDate = publicationDateKey(changed.source.publishedDate);
+  const collisionPath = path.join(paths.snapshotsDir, `${publishedDate}-${contentHash.slice(0, 12)}.html`);
+  const candidateDataPath = collisionPath.replace(/\.html$/, '.json');
+  const transactionPath = defaultUpdateTransactionPath(paths.currentDataPath);
+  const sentinel = '<html>pre-existing unindexed evidence</html>\n';
+  const productionPaths = [paths.currentDataPath, paths.historyPath, paths.runLogPath];
+  const productionBefore = await Promise.all(productionPaths.map((filePath) => readFile(filePath, 'utf8')));
+  const snapshotIndexBefore = await readFile(paths.snapshotIndexPath, 'utf8');
+  const originalFetch = globalThis.fetch;
+  let collisionCreated = false;
+  const fxPayload = {
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: recentFxTimestamp(),
+    rates: data.fx.rates
+  };
+
+  globalThis.fetch = async (url) => {
+    const target = String(url);
+    if (target.includes('support.apple.com')) {
+      await writeFile(collisionPath, sentinel, 'utf8');
+      collisionCreated = true;
+      return new Response(html, { status: 200 });
+    }
+    if (target.includes('v6.exchangerate-api.com') || target.includes('open.er-api.com')) {
+      return new Response(JSON.stringify(fxPayload), { status: 200 });
+    }
+    throw new Error(`Unexpected URL in collision test: ${target}`);
+  };
+
+  try {
+    await assert.rejects(
+      () => main({ dryRun: false, paths, stepSummaryPath: null }),
+      { code: 'EEXIST' }
+    );
+    assert.equal(collisionCreated, true);
+    assert.equal(await readFile(collisionPath, 'utf8'), sentinel);
+    await assert.rejects(readFile(candidateDataPath, 'utf8'), { code: 'ENOENT' });
+    assert.deepEqual(
+      await Promise.all(productionPaths.map((filePath) => readFile(filePath, 'utf8'))),
+      productionBefore
+    );
+    assert.equal(await readFile(paths.snapshotIndexPath, 'utf8'), snapshotIndexBefore);
+    await assert.rejects(readFile(transactionPath, 'utf8'), { code: 'ENOENT' });
+  } finally {
+    globalThis.fetch = originalFetch;
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('removes unambiguous updater temporary files before a production run', async () => {
   const { root, paths } = await createTemporaryProductionPaths();
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
@@ -686,7 +745,17 @@ test('rejects an existing production baseline when the snapshot store is missing
 test('rolls back prices, history, logs, and snapshots when a production write fails midway', async () => {
   const { root, paths } = await createTemporaryProductionPaths();
   const snapshotIndexText = await readFile(paths.snapshotIndexPath, 'utf8');
-  await writeFile(paths.snapshotIndexPath, snapshotIndexText.replace(/\r?\n/g, '\r\n'), 'utf8');
+  await Promise.all([
+    paths.currentDataPath,
+    paths.historyPath,
+    paths.runLogPath,
+    paths.snapshotIndexPath
+  ].map(async (filePath) => {
+    const text = filePath === paths.snapshotIndexPath
+      ? snapshotIndexText
+      : await readFile(filePath, 'utf8');
+    await writeFile(filePath, text.replace(/\r?\n/g, '\r\n'), 'utf8');
+  }));
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
   const changed = structuredClone(data);
   const changedCountry = changed.countries.find(({ currency }) => currency === 'USD');
@@ -725,7 +794,7 @@ test('rolls back prices, history, logs, and snapshots when a production write fa
       readFile(paths.historyPath, 'utf8'),
       readFile(paths.runLogPath, 'utf8')
     ]);
-    assert.deepEqual(after.map(JSON.parse), before.map(JSON.parse));
+    assert.deepEqual(after, before, 'rollback must restore the original bytes, including CRLF line endings');
     assert.deepEqual(await readSnapshotStoreState(paths), snapshotStoreBefore);
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -2321,4 +2390,174 @@ test('rejects future Apple snapshot confirmation dates', () => {
     }),
     /first confirmation date is invalid or in the future/
   );
+});
+
+test('rejects malformed recovery transactions before any network fetch', async () => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  const transactionPath = defaultUpdateTransactionPath(paths.currentDataPath);
+  try {
+    await writeFile(transactionPath, `${JSON.stringify({
+      schemaVersion: 1,
+      phase: 'writing',
+      originalFiles: [null],
+      originalSnapshotIndexText: null,
+      createdSnapshotFiles: [path.join(paths.snapshotsDir, 'index.json')]
+    }, null, 2)}\n`, 'utf8');
+    await assertRejectsBeforeFetch(
+      () => main({ dryRun: false, paths, stepSummaryPath: null }),
+      /Unsafe or unsupported iCloud price update recovery transaction/
+    );
+    assert.ok(await readFile(transactionPath, 'utf8'), 'unsafe transaction must remain for manual inspection');
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('recovers an interrupted update transaction before the next network fetch', async () => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  const transactionPath = defaultUpdateTransactionPath(paths.currentDataPath);
+  const productionPaths = [paths.currentDataPath, paths.historyPath, paths.runLogPath];
+  const originalFiles = await Promise.all(productionPaths.map(async (filePath) => ({
+    filePath,
+    text: await readFile(filePath, 'utf8'),
+    existed: true
+  })));
+  const originalSnapshotIndexText = await readFile(paths.snapshotIndexPath, 'utf8');
+  const createdSnapshotFiles = [
+    path.join(paths.snapshotsDir, '2026-08-07-aaaaaaaaaaaa.html'),
+    path.join(paths.snapshotsDir, '2026-08-07-aaaaaaaaaaaa.json')
+  ];
+  const originalFetch = globalThis.fetch;
+  let fetched = false;
+  let clock = 0;
+  const networkBudget = createNetworkBudget({
+    budgetMs: 1,
+    now: () => clock,
+    sleep: async () => {},
+    createTimeoutSignal: () => undefined
+  });
+
+  try {
+    await Promise.all(createdSnapshotFiles.map((filePath) => writeFile(filePath, 'partial evidence', 'utf8')));
+    await writeFile(transactionPath, `${JSON.stringify({
+      schemaVersion: 1,
+      phase: 'writing',
+      originalFiles,
+      originalSnapshotIndexText,
+      createdSnapshotFiles
+    }, null, 2)}\n`, 'utf8');
+    await Promise.all([
+      ...productionPaths.map((filePath) => writeFile(filePath, '{"corrupt":true}\n', 'utf8')),
+      writeFile(paths.snapshotIndexPath, '{"corrupt":true}\n', 'utf8')
+    ]);
+
+    globalThis.fetch = async () => {
+      fetched = true;
+      assert.deepEqual(
+        await Promise.all(productionPaths.map((filePath) => readFile(filePath, 'utf8'))),
+        originalFiles.map(({ text }) => text)
+      );
+      assert.equal(await readFile(paths.snapshotIndexPath, 'utf8'), originalSnapshotIndexText);
+      await assert.rejects(readFile(transactionPath, 'utf8'), { code: 'ENOENT' });
+      for (const filePath of createdSnapshotFiles) {
+        await assert.rejects(readFile(filePath, 'utf8'), { code: 'ENOENT' });
+      }
+      clock = 2;
+      throw new Error('stop after interrupted transaction recovery');
+    };
+
+    await assert.rejects(
+      () => main({ dryRun: false, paths, stepSummaryPath: null, networkBudget }),
+      /Network deadline exceeded/
+    );
+    assert.equal(fetched, true);
+    assert.deepEqual(
+      await Promise.all(productionPaths.map((filePath) => readFile(filePath, 'utf8'))),
+      originalFiles.map(({ text }) => text)
+    );
+    assert.equal(await readFile(paths.snapshotIndexPath, 'utf8'), originalSnapshotIndexText);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('keeps committed production data when cleaning a leftover transaction marker', async () => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  const transactionPath = defaultUpdateTransactionPath(paths.currentDataPath);
+  const productionPaths = [paths.currentDataPath, paths.historyPath, paths.runLogPath];
+  const productionBefore = await Promise.all(productionPaths.map((filePath) => readFile(filePath, 'utf8')));
+  const snapshotIndexBefore = await readFile(paths.snapshotIndexPath, 'utf8');
+  const originalFetch = globalThis.fetch;
+  let fetched = false;
+  let clock = 0;
+  const networkBudget = createNetworkBudget({
+    budgetMs: 1,
+    now: () => clock,
+    sleep: async () => {},
+    createTimeoutSignal: () => undefined
+  });
+
+  try {
+    await writeFile(transactionPath, `${JSON.stringify({
+      schemaVersion: 1,
+      phase: 'committed',
+      originalFiles: productionPaths.map((filePath) => ({
+        filePath,
+        text: '{"stale-original":true}\n',
+        existed: true
+      })),
+      originalSnapshotIndexText: '{"stale-index":true}\n',
+      createdSnapshotFiles: []
+    }, null, 2)}\n`, 'utf8');
+
+    globalThis.fetch = async () => {
+      fetched = true;
+      assert.deepEqual(
+        await Promise.all(productionPaths.map((filePath) => readFile(filePath, 'utf8'))),
+        productionBefore
+      );
+      assert.equal(await readFile(paths.snapshotIndexPath, 'utf8'), snapshotIndexBefore);
+      await assert.rejects(readFile(transactionPath, 'utf8'), { code: 'ENOENT' });
+      clock = 2;
+      throw new Error('stop after committed transaction cleanup');
+    };
+
+    await assert.rejects(
+      () => main({ dryRun: false, paths, stepSummaryPath: null, networkBudget }),
+      /Network deadline exceeded/
+    );
+    assert.equal(fetched, true);
+    assert.deepEqual(
+      await Promise.all(productionPaths.map((filePath) => readFile(filePath, 'utf8'))),
+      productionBefore
+    );
+    assert.equal(await readFile(paths.snapshotIndexPath, 'utf8'), snapshotIndexBefore);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('records pure tier removal and same-price restoration as availability changes', () => {
+  const history = {
+    schemaVersion: 2,
+    countries: {
+      Alpha: {
+        nameZh: '甲',
+        region: 'Americas',
+        events: [{ observedAt: '2026-07-01', currency: 'USD', plans: { '50GB': 1, '200GB': 3 } }]
+      }
+    }
+  };
+  const withoutTier = country('Alpha', { nameZh: '甲', prices: { '50GB': 1 } });
+  const removed = updateHistory(history, [withoutTier], '2026-07-15', [TIER_50]);
+  assert.equal(removed.changedCountries, 1);
+  assert.deepEqual(removed.history.countries.Alpha.events.at(-1).plans, { '50GB': 1 });
+
+  const restoredCountry = country('Alpha', { nameZh: '甲', prices: { '50GB': 1, '200GB': 3 } });
+  const restored = updateHistory(removed.history, [restoredCountry], '2026-08-01', [TIER_50, TIER_200]);
+  assert.equal(restored.changedCountries, 1);
+  assert.equal(restored.history.countries.Alpha.events.length, 3);
+  assert.deepEqual(restored.history.countries.Alpha.events.at(-1).plans, { '50GB': 1, '200GB': 3 });
 });
