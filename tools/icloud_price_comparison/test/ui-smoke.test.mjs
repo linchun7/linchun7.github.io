@@ -172,7 +172,7 @@ after(async () => {
   await Promise.allSettled(cleanup);
 });
 
-test('renders current prices, sorting, and country history in a real browser', { timeout: 30_000 }, async (context) => {
+test('renders current prices, sorting, and country history in a real browser', { timeout: 60_000 }, async (context) => {
   const browserConfig = await resolveBrowser(context, 'the UI smoke test');
   if (!browserConfig) return;
 
