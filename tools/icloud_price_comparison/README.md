@@ -37,7 +37,7 @@ Secret 只配置在仓库 **Settings > Secrets and variables > Actions**。密�
 1. 安装锁定依赖，运行 `pnpm test:core`。
 2. 抓取 Apple 页面，由 `document-order` 和 `apple-markers` 两条路径独立解析。
 3. 校验发布日期、地区、分区、容量、价格、汇率和异常调价。
-4. 写入当前价格、历史、运行日志和 Apple 快照；随后运行 `pnpm test:data` 和并行的 Chromium、WebKit UI 测试。
+4. 写入当前价格、历史、运行日志和 Apple 快照；随后运行 `pnpm test:data`，并用 runner 预装的 Chrome 验证更新后的页面。
 5. 上传诊断附件（保留 14 天），提交 `data/` 变更并先 `git pull --rebase`；变基后重新安装锁定依赖并复跑核心、数据测试，再推送。
 
 UI 测试失败只产生警告，不阻断已经通过抓取和核心数据校验的数据；抓取、解析、数据校验或生产写入失败会停止更新，并恢复上一份有效数据。
@@ -114,7 +114,7 @@ pnpm audit --audit-level low
 - `pnpm check:live`：只读访问 Apple 和汇率服务并执行校验，不写生产文件。
 - `pnpm update:data`：写入生产数据，只用于明确的手动更新或隔离环境。
 
-`.github/workflows/validate-icloud-price-comparison.yml` 会在 PR、`main` 推送和手动触发时以只读权限运行核心、并行浏览器和依赖漏洞检查；手动及每周计划任务还会深度审计全部 Apple 快照。仓库使用的 Action 全部固定到完整提交 SHA。
+`.github/workflows/validate-icloud-price-comparison.yml` 会在相关 PR、人工 `main` 推送和手动触发时以只读权限运行核心、Chromium、WebKit 和依赖漏洞检查；手动及每周计划任务还会深度审计全部 Apple 快照；每周计划任务在北京时间周一 06:05 运行。每日更新使用 runner Chrome，自动数据提交不会重复启动该完整验证。仓库使用的 Action 全部固定到完整提交 SHA。
 
 本地预览从仓库根目录启动静态服务器：
 

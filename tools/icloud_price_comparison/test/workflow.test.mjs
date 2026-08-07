@@ -27,8 +27,8 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /update:[\s\S]*?permissions:\s+contents: write/, 'only the update job may write committed data');
   assert.match(workflow, /pnpm install --frozen-lockfile/);
   assert.match(workflow, /name: 运行解析与数据安全测试\s+run: pnpm test:core/);
-  assert.match(workflow, /name: 验证更新后的页面[\s\S]*?id: ui_after[\s\S]*?ui_failed=false[\s\S]*?if pnpm exec playwright install --with-deps chromium webkit; then[\s\S]*?pnpm test:browsers \|\| ui_failed=true[\s\S]*?ui_failed=\$ui_failed/);
-  assert.doesNotMatch(workflow, /name: 验证更新后的页面[\s\S]*?continue-on-error: true[\s\S]*?run: pnpm test:ui/);
+  assert.match(workflow, /name: 验证更新后的页面[\s\S]*?id: ui_after[\s\S]*?ui_failed=false[\s\S]*?pnpm test:ui \|\| ui_failed=true[\s\S]*?ui_failed=\$ui_failed/);
+  assert.doesNotMatch(workflow, /name: 验证更新后的页面[\s\S]*?playwright install|name: 验证更新后的页面[\s\S]*?pnpm test:browsers/);
   assert.doesNotMatch(workflow, /ui_before|运行浏览器界面测试（更新前）/, 'the workflow must not repeat UI tests before fetching data');
   assert.match(workflow, /name: 验证更新后的价格数据\s+run: pnpm test:data/);
   assert.match(workflow, /name: 抓取并校验 Apple 价格[\s\S]*?id: update_data[\s\S]*?EXCHANGE_RATE_API_KEY:\s*\$\{\{ secrets\.EXCHANGE_RATE_API_KEY \}\}[\s\S]*?run: pnpm update:data/);
@@ -53,14 +53,14 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   const duplicateCoreTest = workflow.indexOf('run: pnpm test:core', firstCoreTest + 1);
   const update = workflow.indexOf('run: pnpm update:data');
   const dataTest = workflow.indexOf('run: pnpm test:data');
-  const browserTest = workflow.indexOf('pnpm test:browsers || ui_failed=true');
-  const duplicateBrowserTest = workflow.indexOf('pnpm test:browsers', browserTest + 'pnpm test:browsers'.length);
+  const browserTest = workflow.indexOf('pnpm test:ui || ui_failed=true');
+  const duplicateBrowserTest = workflow.indexOf('pnpm test:ui', browserTest + 'pnpm test:ui'.length);
   const commit = workflow.indexOf('name: 提交价格数据变更');
   assert.ok(firstCoreTest >= 0 && firstCoreTest < update, 'core tests must run before the live update');
   assert.equal(duplicateCoreTest, -1, 'the workflow must not repeat unchanged fixture and workflow tests after the update');
   assert.ok(update < dataTest, 'the updated snapshot must pass data validation');
   assert.ok(dataTest < browserTest, 'updated data must pass before the browser tests');
-  assert.equal(duplicateBrowserTest, -1, 'the workflow must run the parallel browser suite only once');
+  assert.equal(duplicateBrowserTest, -1, 'the workflow must run the system Chrome suite only once');
   assert.ok(browserTest < commit, 'the updated browser tests must finish before commit');
 
   const uiGate = workflow.indexOf('name: 记录浏览器界面测试警告');
@@ -92,7 +92,7 @@ test('keeps pull-request validation read-only, complete, and SHA-pinned', async 
   assert.match(ciWorkflow, /pnpm install --frozen-lockfile/);
   assert.match(ciWorkflow, /pnpm exec playwright install --with-deps chromium webkit/);
   assert.match(ciWorkflow, /run: pnpm test:core/);
-  assert.match(ciWorkflow, /schedule:[\s\S]*?cron:\s*['"]35 1 \* \* 1['"]/);
+  assert.match(ciWorkflow, /schedule:[\s\S]*?cron:\s*['"]5 22 \* \* 0['"]/);
   assert.match(ciWorkflow, /run: pnpm validate:snapshots/);
   assert.match(ciWorkflow, /run: pnpm test:browsers/);
   assert.match(ciWorkflow, /run: pnpm audit --audit-level low/);
