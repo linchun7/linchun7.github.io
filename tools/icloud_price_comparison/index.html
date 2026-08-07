@@ -11,16 +11,28 @@
   <meta property="og:description" content="统一比较全球 iCloud+ 月度订阅价格和历史变化。">
   <meta property="og:type" content="website">
   <title>iCloud+ 全球价格对比</title>
+  <script>
+    {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+      window.__icloudInitialPriceRequest = fetch('data/prices.json', {
+        cache: 'default',
+        signal: controller.signal
+      }).then(
+        (response) => ({ response }),
+        (error) => ({ error })
+      ).finally(() => clearTimeout(timeout));
+    }
+  </script>
   <link rel="stylesheet" href="style.css">
   <link rel="modulepreload" href="script.js">
   <link rel="modulepreload" href="data-contract.js">
   <link rel="modulepreload" href="vendor/lucide-subset.js">
-  <link rel="preconnect" href="https://raw.githubusercontent.com" crossorigin>
   <script type="module" src="script.js"></script>
   <link rel="shortcut icon" href="/images/favicon.ico">
   <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
   <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-K2S9L4CHNP"></script>
+  <script async fetchpriority="low" src="https://www.googletagmanager.com/gtag/js?id=G-K2S9L4CHNP"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
