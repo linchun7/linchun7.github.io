@@ -316,7 +316,7 @@ th {
 }
 .price-table th:nth-child(2), .price-table td:nth-child(2) { width: 220px; text-align: left; }
 .price-table th:nth-child(n+3), .price-table td:nth-child(n+3) { width: 154px; }
-.price-table th:last-child, .price-table td:last-child { padding-right: 22px; }
+.price-table th:last-child, .price-table td:last-child { padding-right: 26px; }
 .price-table .rank-column, .price-table td:first-child { width: 48px; text-align: center; color: var(--muted); }
 
 th button {
