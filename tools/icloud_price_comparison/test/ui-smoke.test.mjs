@@ -1005,6 +1005,7 @@ test('keeps the page and publication history bounded on narrow mobile screens wh
 
     await page.locator('#publishedDateButton').click();
     await page.waitForFunction(() => document.querySelector('#publishedDateDialog')?.open === true);
+    await page.waitForFunction(() => document.querySelector('#publishedDateRows tr')?.cells.length === 2);
     const publicationLayout = await page.locator('#publishedDateDialog').evaluate((dialog) => {
       const scroller = dialog.querySelector('.history-table-scroll');
       const cells = [...dialog.querySelector('#publishedDateRows tr').cells].map((cell) => cell.getBoundingClientRect());
