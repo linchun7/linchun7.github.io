@@ -772,8 +772,8 @@ test('rebuilds tier headers and filters after a successful retry with changed ti
       await page.waitForFunction((count) => document.querySelector('#tierCount')?.textContent === String(count), fullData.tiers.length);
       await page.locator('#retryButton').dispatchEvent('click');
       await page.waitForFunction((count) => document.querySelector('#tierCount')?.textContent === String(count), reducedData.tiers.length);
-      assert.equal(await page.locator('.price-table thead th').count(), reducedData.tiers.length + 3);
-      assert.equal(await page.locator('#priceRows tr[data-country]').first().locator('td').count(), reducedData.tiers.length + 3);
+      assert.equal(await page.locator('.price-table thead th').count(), reducedData.tiers.length + 2);
+      assert.equal(await page.locator('#priceRows tr[data-country]').first().locator('td').count(), reducedData.tiers.length + 2);
       assert.deepEqual(
         await page.locator('.price-table thead button[data-sort-tier]').evaluateAll((buttons) => buttons.map((button) => button.dataset.sortTier)),
         reducedData.tiers.map(({ id }) => id)
@@ -1011,11 +1011,44 @@ test('keeps the page and publication history bounded with a single-tier table on
     assert.equal(layout.visibleTierHeaders, 1);
     assert.equal(layout.visibleTierCells, 1);
     assert.equal(layout.tierButtons, validData.tiers.length);
+    assert.equal(await page.locator('#tableHint').count(), 0);
+    assert.equal(await page.locator('#compareDock, #compareDialog, .compare-column, .compare-cell, .row-compare-button').count(), 0);
+
+    const minimumBadgeLayout = await page.locator('.price-cell.is-minimum.is-active-tier .minimum-badge').first().evaluate((badge) => {
+      const badgeBox = badge.getBoundingClientRect();
+      const cellBox = badge.closest('td').getBoundingClientRect();
+      return {
+        text: badge.textContent,
+        badgeLeft: badgeBox.left,
+        badgeRight: badgeBox.right,
+        cellLeft: cellBox.left,
+        cellRight: cellBox.right
+      };
+    });
+    assert.equal(minimumBadgeLayout.text, '\u6700\u4f4e');
+    assert.ok(minimumBadgeLayout.badgeLeft >= minimumBadgeLayout.cellLeft - 1, 'minimum badge must stay inside the active price cell on narrow screens');
+    assert.ok(minimumBadgeLayout.badgeRight <= minimumBadgeLayout.cellRight + 1, 'minimum badge must not overflow the table on narrow screens');
 
     const nextTier = validData.tiers[1];
     await page.locator(`#mobileTierControl button[data-tier="${nextTier.id}"]`).click();
     assert.equal(await page.locator('th[data-tier].is-active-tier').getAttribute('data-tier'), nextTier.id);
     assert.equal(new URL(page.url()).searchParams.get('tier'), nextTier.id);
+
+    await page.locator('#priceRows tr[data-country]').nth(35).scrollIntoViewIfNeeded();
+    await page.evaluate(() => scrollBy(0, 180));
+    const stickyHeaders = await page.locator('.price-table th:nth-child(2), .price-table th[data-tier].is-active-tier').evaluateAll((headers) => (
+      headers.map((header) => ({
+        top: header.getBoundingClientRect().top,
+        height: header.getBoundingClientRect().height,
+        position: getComputedStyle(header).position
+      }))
+    ));
+    assert.equal(stickyHeaders.length, 2);
+    for (const header of stickyHeaders) {
+      assert.equal(header.position, 'sticky');
+      assert.ok(header.height > 0, 'mobile sticky header cells must remain visible');
+      assert.ok(header.top >= -1 && header.top <= 1, `mobile header should remain sticky at the viewport top, got ${header.top}`);
+    }
 
     await page.locator('#publishedDateButton').click();
     await page.waitForFunction(() => document.querySelector('#publishedDateDialog')?.open === true);
@@ -1461,28 +1494,29 @@ test('keeps the minimum-price overview stable and the desktop table header stick
     const stickyTop = await page.locator('.price-table thead th').first().evaluate((header) => header.getBoundingClientRect().top);
     assert.ok(stickyTop >= -1 && stickyTop <= 1, `desktop header should remain sticky at the viewport top, got ${stickyTop}`);
   } finally {
+    releaseRequest();
     await page.close();
     await browser.close();
     await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }
 });
 
-test('restores URL state and supports compact controls plus four-country comparison', { timeout: 30_000 }, async (context) => {
-  const browserConfig = await resolveBrowser(context, 'the comparison UI test');
+test('restores URL state, removes the floating search bar, and supports table return plus minimum navigation', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the URL, table-return, and minimum-navigation UI test');
   if (!browserConfig) return;
   const validData = await readFixture('prices.json');
-  const selected = validData.countries.slice(0, 2);
   const initialCountry = validData.countries.find(({ nameZh }) => nameZh) || validData.countries[0];
   const params = new URLSearchParams({
     tier: validData.tiers.at(-1).id,
     q: initialCountry.nameZh || initialCountry.country,
     region: initialCountry.region,
-    compare: selected.map(({ country }) => country).join(',')
+    compare: validData.countries.slice(0, 2).map(({ country }) => country).join(',')
   });
   const server = await startServer();
   const { port } = server.address();
   const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
   const page = await browser.newPage({ viewport: { width: 1365, height: 760 } });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.route('https://**/*', (route) => route.abort());
   await page.route('**/data/prices.json*', (route) => route.fulfill({
     status: 200,
@@ -1494,44 +1528,62 @@ test('restores URL state and supports compact controls plus four-country compari
     await page.waitForFunction(() => document.querySelector('#marketCount')?.textContent !== '--');
     assert.equal(await page.locator('#searchInput').inputValue(), initialCountry.nameZh || initialCountry.country);
     assert.equal(await page.locator('#regionSelect').inputValue(), initialCountry.region);
-    assert.equal(await page.locator('#compareChips .compare-chip').count(), 2);
-    assert.equal(await page.locator('#compareDock').isVisible(), true);
+    assert.equal(new URL(page.url()).searchParams.has('compare'), false, 'legacy comparison state should be removed from the URL');
+    assert.equal(await page.locator('#compareDock, #compareDialog, .compare-column, .compare-cell, .row-compare-button').count(), 0);
+    assert.equal(
+      await page.locator('#compactControls, #compactSearchInput, #compactSortButton').count(),
+      0,
+      'the floating search and sort toolbar should be removed'
+    );
 
-    await page.locator('#openCompareButton').click();
-    assert.equal(await page.locator('#compareDialog').evaluate((dialog) => dialog.open), true);
-    assert.equal(await page.locator('#compareGrid .compare-card').count(), 2);
-    assert.equal(await page.locator('#compareGrid .compare-card dl div').count(), validData.tiers.length * 2);
-    await page.locator('#closeCompare').click();
-
-    await page.locator('#clearCompareButton').click();
     await page.locator('#searchInput').fill('');
     await page.locator('#regionSelect').selectOption('all');
     await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, validData.countries.length);
-    for (const country of validData.countries.slice(0, 4)) {
-      await page.locator(`#priceRows tr[data-country="${country.country}"] .row-compare-button`).click();
-    }
-    assert.equal(await page.locator('#compareChips .compare-chip').count(), 4);
-    const fifth = validData.countries[4];
-    await page.locator(`#priceRows tr[data-country="${fifth.country}"] .row-compare-button`).click();
-    assert.equal(await page.locator('#compareChips .compare-chip').count(), 4);
-    assert.match(await page.locator('#compareCount').textContent(), /\u6700\u591a\u9009\u62e9 4/);
-    assert.equal(new URL(page.url()).searchParams.get('compare').split(',').length, 4);
 
-    await page.locator('#priceRows tr[data-country]').nth(35).scrollIntoViewIfNeeded();
+    const backToTableButton = page.locator('#backToTableButton');
+    assert.equal(await backToTableButton.count(), 1);
+    assert.equal(await backToTableButton.getAttribute('aria-hidden'), 'true');
+    await page.evaluate(() => document.querySelectorAll('#priceRows tr[data-country]')[35]?.scrollIntoView());
     await page.evaluate(() => scrollBy(0, 180));
-    await page.waitForFunction(() => document.querySelector('#compactControls')?.classList.contains('is-visible'));
-    assert.equal(await page.locator('#compactControls').getAttribute('aria-hidden'), 'false');
-    await page.locator('#compactSearchInput').fill(initialCountry.nameZh || initialCountry.country);
-    await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length === 1);
-    assert.equal(await page.locator('#searchInput').inputValue(), initialCountry.nameZh || initialCountry.country);
+    await page.waitForFunction(() => document.querySelector('#backToTableButton')?.classList.contains('is-visible'));
+    assert.equal(await backToTableButton.getAttribute('aria-hidden'), 'false');
+    await backToTableButton.click();
+    await page.waitForFunction(() => {
+      const toolbar = document.querySelector('.workspace-toolbar');
+      if (!toolbar) return false;
+      const top = toolbar.getBoundingClientRect().top;
+      return top >= -1 && top <= 2;
+    });
 
-    await page.locator('#backToTableButton').click();
-    await page.locator('#searchInput').fill('');
-    const minimumCard = page.locator('#minimumSummary .minimum-card').last();
+    await page.locator('#searchInput').fill(initialCountry.nameZh || initialCountry.country);
+    await page.locator('#regionSelect').selectOption(initialCountry.region);
+    await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length === 1);
+    const minimumCard = page.locator('#minimumSummary .minimum-card').filter({ hasText: '200 GB' });
     const minimumTier = await minimumCard.getAttribute('data-tier');
     await minimumCard.click();
     assert.equal(new URL(page.url()).searchParams.get('tier'), minimumTier);
-    assert.equal(await page.locator('#priceRows tr.is-highlighted').count(), 1);
+    assert.equal(new URL(page.url()).searchParams.has('q'), false);
+    assert.equal(new URL(page.url()).searchParams.has('region'), false);
+    assert.equal(await page.locator('#searchInput').inputValue(), '');
+    assert.equal(await page.locator('#regionSelect').inputValue(), 'all');
+    assert.equal(await page.locator(`th[data-tier="${minimumTier}"]`).getAttribute('aria-sort'), 'ascending');
+    await page.waitForFunction(() => document.querySelectorAll('#priceRows tr.is-highlighted').length === 1);
+    const highlightedRow = page.locator('#priceRows tr.is-highlighted');
+    const expectedWinner = validData.countries
+      .map((country) => ({
+        country,
+        cny: country.plans[minimumTier].price / validData.fx.rates[country.currency] * validData.fx.rates.CNY
+      }))
+      .sort((first, second) => first.cny - second.cny)[0].country.country;
+    assert.equal(await highlightedRow.getAttribute('data-country'), expectedWinner);
+    await page.waitForFunction(() => {
+      const row = document.querySelector('#priceRows tr.is-highlighted');
+      if (!row) return false;
+      const box = row.getBoundingClientRect();
+      return box.bottom > 0 && box.top < innerHeight;
+    });
+    const rowBox = await highlightedRow.boundingBox();
+    assert.ok(rowBox && rowBox.y + rowBox.height > 0 && rowBox.y < 760, 'minimum-price winner should be positioned in the viewport');
   } finally {
     await page.close();
     await browser.close();

@@ -105,23 +105,21 @@
         <div class="mobile-tier-picker">
           <span class="control-label">容量</span>
           <div id="mobileTierControl" class="segmented mobile-tier-segmented" role="group" aria-label="选择要比较的容量"></div>
-          <p id="tableHint">中小屏幕仅显示当前容量，切换后自动按价格排序。</p>
         </div>
       </div>
 
       <div class="table-scroll">
-        <table class="price-table" aria-describedby="resultSummary tableHint">
+        <table class="price-table" aria-describedby="resultSummary">
           <caption class="visually-hidden">全球各地区 iCloud+ 月度价格与人民币参考价</caption>
           <thead>
             <tr>
               <th class="rank-column" scope="col">#</th>
               <th scope="col" aria-sort="none"><button type="button" data-sort="country" disabled>国家/地区 <i data-lucide="arrow-up-down" aria-hidden="true"></i></button></th>
               <th id="tierHeaderPlaceholder" scope="col" colspan="5">容量</th>
-              <th class="compare-column" scope="col"><span class="visually-hidden">加入对比</span></th>
             </tr>
           </thead>
           <tbody id="priceRows">
-            <tr><td class="loading-cell" colspan="8"><span class="spinner"></span>正在加载…</td></tr>
+            <tr><td class="loading-cell" colspan="7"><span class="spinner"></span>正在加载…</td></tr>
           </tbody>
         </table>
       </div>
@@ -210,44 +208,7 @@
     </section>
   </dialog>
 
-  <div id="compactControls" class="compact-controls" aria-hidden="true">
-    <div class="compact-controls-inner">
-      <label class="compact-search-field">
-        <i data-lucide="search" aria-hidden="true"></i>
-        <span class="visually-hidden">在价格表中快速搜索</span>
-        <input id="compactSearchInput" type="search" placeholder="快速搜索" autocomplete="off" tabindex="-1">
-      </label>
-      <button id="compactSortButton" class="compact-sort-button" type="button" tabindex="-1">价格升序</button>
-      <button id="backToTableButton" class="compact-icon-button" type="button" aria-label="返回价格表顶部" title="返回价格表顶部" tabindex="-1"><i data-lucide="chevron-up" aria-hidden="true"></i></button>
-    </div>
-  </div>
-
-  <section id="compareDock" class="compare-dock" aria-label="已选地区对比" hidden>
-    <div class="compare-dock-inner">
-      <div class="compare-dock-summary">
-        <i data-lucide="columns-3" aria-hidden="true"></i>
-        <span id="compareCount">已选 0/4 个地区</span>
-      </div>
-      <div id="compareChips" class="compare-chips"></div>
-      <div class="compare-dock-actions">
-        <button id="clearCompareButton" class="secondary-button" type="button">清空</button>
-        <button id="copyCompareLinkButton" class="secondary-button" type="button"><i data-lucide="copy" aria-hidden="true"></i>复制链接</button>
-        <button id="openCompareButton" class="primary-button" type="button"><i data-lucide="columns-3" aria-hidden="true"></i>打开对比</button>
-      </div>
-    </div>
-  </section>
-
-  <dialog id="compareDialog" class="compare-dialog" aria-labelledby="compareDialogTitle">
-    <div class="dialog-header">
-      <div>
-        <p class="dialog-eyebrow">地区对比</p>
-        <h2 id="compareDialogTitle">iCloud+ 月费并列对比</h2>
-        <p>人民币为参考换算，当地价格与方案以 Apple 页面为准。</p>
-      </div>
-      <button class="icon-button" id="closeCompare" type="button" aria-label="关闭地区对比" title="关闭"><i data-lucide="x" aria-hidden="true"></i></button>
-    </div>
-    <div id="compareGrid" class="compare-grid"></div>
-  </dialog>
+  <button id="backToTableButton" class="back-to-table-button" type="button" aria-label="返回价格表顶部" title="返回价格表顶部" aria-hidden="true" tabindex="-1"><i data-lucide="arrow-up" aria-hidden="true"></i></button>
 
   <footer class="page-footer">
     <p>本工具与 Apple Inc. 无关联，数据仅供参考。</p>
