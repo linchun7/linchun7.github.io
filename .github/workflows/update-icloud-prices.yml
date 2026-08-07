@@ -119,11 +119,8 @@ jobs:
         shell: bash
         run: |
           ui_failed=false
-          if pnpm exec playwright install --with-deps chromium webkit; then
-            pnpm test:browsers || ui_failed=true
-          else
-            ui_failed=true
-          fi
+          # 每日更新使用 runner 预装的 Chrome；完整 Chromium + WebKit 验证由独立验证工作流负责。
+          pnpm test:ui || ui_failed=true
           echo "ui_failed=$ui_failed" >> "$GITHUB_OUTPUT"
 
       - name: 上传诊断信息和 Apple 页面快照

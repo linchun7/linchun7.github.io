@@ -15,7 +15,8 @@ on:
       - 'tools/icloud_price_comparison/**'
   workflow_dispatch:
   schedule:
-    - cron: '35 1 * * 1'
+    # 北京时间每周一 06:05；GitHub cron 使用 UTC，因此为周日 22:05。
+    - cron: '5 22 * * 0'
 
 permissions:
   contents: read
