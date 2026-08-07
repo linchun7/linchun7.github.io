@@ -560,13 +560,12 @@ function renderHistoryTierButtons() {
 }
 
 function compactHistorySeries(events, tier) {
-  return events.filter((event, index) => {
-    if (index === 0) return true;
-    const previous = events[index - 1];
-    const price = Number.isFinite(event.plans[tier]) ? event.plans[tier] : null;
-    const previousPrice = Number.isFinite(previous.plans[tier]) ? previous.plans[tier] : null;
-    return event.currency !== previous.currency || price !== previousPrice;
-  });
+  const availableEvents = events.filter((event) => Number.isFinite(event.plans[tier]));
+  return availableEvents.filter((event, index) => (
+    index === 0
+    || event.currency !== availableEvents[index - 1].currency
+    || event.plans[tier] !== availableEvents[index - 1].plans[tier]
+  ));
 }
 
 function renderLocalPriceWithTrend(plan, country, changedSeries) {

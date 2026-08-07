@@ -693,6 +693,8 @@ async function readLockContents(lockPath) {
 }
 
 async function hasActiveLockClaim(lockPath) {
+  const currentLockContents = await readLockContents(lockPath);
+  if (currentLockContents === null) return false;
   const directory = path.dirname(lockPath);
   const prefix = `${path.basename(lockPath)}.claim-`;
   const entries = await readdir(directory, { withFileTypes: true }).catch((error) => {
@@ -706,12 +708,13 @@ async function hasActiveLockClaim(lockPath) {
       throw error;
     });
     const metadata = contents === null ? null : parseLockClaim(contents);
-    if (metadata && isActiveLockClaim(metadata)) return true;
+    if (metadata?.expectedContents === currentLockContents && isActiveLockClaim(metadata)) return true;
   }
   return false;
 }
 
 async function claimLockMutation(lockPath, expectedContents, operation) {
+  const currentLockContents = await readLockContents(lockPath);
   let claimKey = expectedContents;
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const claimPath = lockClaimPath(lockPath, claimKey);
@@ -735,7 +738,9 @@ async function claimLockMutation(lockPath, expectedContents, operation) {
     });
     if (existingContents === null) continue;
     const existing = parseLockClaim(existingContents);
-    if (existing?.expectedContents === expectedContents && isActiveLockClaim(existing)) {
+    if (existing?.expectedContents === expectedContents
+      && currentLockContents === expectedContents
+      && isActiveLockClaim(existing)) {
       return { owned: false, active: true, claimPath };
     }
     claimKey = `${expectedContents}\u0000${existingContents}`;
@@ -778,9 +783,8 @@ async function isStaleUpdateLock(lockPath, contents, staleAfterMs) {
   const ageMs = Number.isFinite(acquiredAtMs)
     ? Date.now() - acquiredAtMs
     : Date.now() - fileStat.mtimeMs;
-  if (ageMs > staleAfterMs) return true;
-  if (metadata?.pid && !isProcessAlive(Number(metadata.pid))) return true;
-  return false;
+  if (metadata?.pid) return !isProcessAlive(Number(metadata.pid));
+  return ageMs > staleAfterMs;
 }
 
 export async function acquireUpdateLock(lockPath, {

@@ -166,6 +166,47 @@ test('recovers a stale updater lock and protects an active lock', async () => {
   }
 });
 
+test('never steals an old lock from a live process', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'icloud-live-lock-'));
+  const lockPath = path.join(root, '.icloud-price-update.lock');
+  try {
+    await writeFile(lockPath, JSON.stringify({
+      pid: process.pid,
+      acquiredAtUtc: new Date(Date.now() - 31 * 60 * 1_000).toISOString(),
+      token: 'live-process'
+    }), 'utf8');
+    await assert.rejects(() => acquireUpdateLock(lockPath, { staleAfterMs: 60_000 }), /already running/);
+    assert.equal((await readFile(lockPath, 'utf8')).includes('live-process'), true);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('ignores residual claims that are not bound to the current lock', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'icloud-residual-claim-'));
+  const lockPath = path.join(root, '.icloud-price-update.lock');
+  const oldLockContents = `${JSON.stringify({ pid: 999_999_999, token: 'old-lock' })}\n`;
+  const claimPath = `${lockPath}.claim-residual`;
+  try {
+    await writeFile(claimPath, JSON.stringify({
+      pid: process.pid,
+      expectedContents: oldLockContents,
+      token: 'residual-claim'
+    }), 'utf8');
+
+    const releaseWithoutLock = await acquireUpdateLock(lockPath, { staleAfterMs: 60_000 });
+    await releaseWithoutLock();
+
+    const replacementLockContents = `${JSON.stringify({ pid: 999_999_998, token: 'replacement-lock' })}\n`;
+    await writeFile(lockPath, replacementLockContents, 'utf8');
+    const releaseReplacement = await acquireUpdateLock(lockPath, { staleAfterMs: 60_000 });
+    await releaseReplacement();
+    await assert.rejects(readFile(lockPath, 'utf8'), { code: 'ENOENT' });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('does not delete a winner lock during stale-lock contention', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'icloud-lock-contention-'));
   const lockPath = path.join(root, '.icloud-price-update.lock');
