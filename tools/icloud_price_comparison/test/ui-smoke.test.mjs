@@ -608,13 +608,100 @@ test('renders current prices, sorting, and country history in a real browser', {
   }
 });
 
+test('excludes history events from before a tier was introduced', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the tier introduction history regression test');
+  if (!browserConfig) return;
+
+  const expectedData = await readFixture('prices.json');
+  const history = await readFixture('history.json');
+  const countryName = '\u0054\u00fcrkiye';
+  const tierId = '200GB';
+  const patchedHistory = structuredClone(history);
+  const targetRecord = patchedHistory.countries[countryName];
+  assert.ok(targetRecord?.events.length >= 3, 'the regression fixture needs multiple history events');
+  delete targetRecord.events[0].plans[tierId];
+  const expectedSeries = compactExpectedSeries(targetRecord.events, tierId);
+  assert.equal(expectedSeries.length, 2, 'the fixture should produce two comparable tier events');
+
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  const page = await browser.newPage({ viewport: { width: 1365, height: 900 } });
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(message.text());
+  });
+  await page.route('https://**/*', (route) => {
+    if (route.request().url().startsWith('https://www.googletagmanager.com/')) {
+      return route.fulfill({ status: 200, contentType: 'text/javascript', body: '' });
+    }
+    return route.abort();
+  });
+  await page.route('**/data/history.json*', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify(patchedHistory)
+  }));
+
+  try {
+    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, expectedData.countries.length);
+    await page.locator('#searchInput').fill(countryName);
+    const historyButton = page.locator('#priceRows tr[data-country]').first().locator('button.country-history-button');
+    await historyButton.click();
+    await page.waitForFunction(() => document.querySelector('#historyDialog')?.open === true);
+    await page.locator(`#historyTierControl button[data-tier="${tierId}"]`).click();
+    await page.waitForFunction(() => !document.querySelector('#chartWrap')?.hidden);
+    await page.waitForFunction(() => window.Chart?.getChart?.(document.querySelector('#historyChart'))?.data?.labels?.length === 2);
+
+    const chartData = await page.locator('#historyChart').evaluate((canvas) => {
+      const chart = window.Chart.getChart(canvas);
+      return {
+        labels: [...chart.data.labels],
+        prices: [...chart.data.datasets[0].data],
+        ariaLabel: canvas.getAttribute('aria-label')
+      };
+    });
+    assert.deepEqual(chartData.labels, expectedSeries.map(({ observedAt }) => formatUiDate(observedAt)));
+    assert.deepEqual(chartData.prices, expectedSeries.map((event) => event.plans[tierId]));
+    assert.doesNotMatch(chartData.ariaLabel, /NaN|undefined/);
+
+    const oldEventDate = formatUiDate(targetRecord.events[0].observedAt);
+    const oldEventTierCell = await page.locator('#historyRows tr').evaluateAll((rows, date) => {
+      const row = rows.find((candidate) => candidate.cells[0]?.textContent.trim() === date);
+      return row?.querySelector('[data-history-tier="200GB"]')?.textContent.trim();
+    }, oldEventDate);
+    assert.equal(oldEventTierCell, '--', 'pre-introduction events should remain visibly unavailable in the table');
+    assert.deepEqual(errors, []);
+  } finally {
+    await page.close();
+    await browser.close();
+  }
+});
+
 test('adapts table and history controls to a different tier count', { timeout: 30_000 }, async (context) => {
   const browserConfig = await resolveBrowser(context, 'the dynamic-tier UI test');
   if (!browserConfig) return;
   const expectedData = await readFixture('prices.json');
+  const expectedHistory = await readFixture('history.json');
   const threeTierData = structuredClone(expectedData);
   threeTierData.tiers = threeTierData.tiers.slice(0, 3);
+  const retainedTierIds = new Set(threeTierData.tiers.map(({ id }) => id));
+  for (const country of threeTierData.countries) {
+    country.plans = Object.fromEntries(
+      Object.entries(country.plans).filter(([tierId]) => retainedTierIds.has(tierId))
+    );
+  }
   threeTierData.run.pricePoints = threeTierData.countries.length * threeTierData.tiers.length;
+  const threeTierHistory = structuredClone(expectedHistory);
+  for (const record of Object.values(threeTierHistory.countries)) {
+    for (const event of record.events) {
+      event.plans = Object.fromEntries(
+        Object.entries(event.plans).filter(([tierId]) => retainedTierIds.has(tierId))
+      );
+    }
+  }
   const server = await startServer();
   const { port } = server.address();
   const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
@@ -630,6 +717,11 @@ test('adapts table and history controls to a different tier count', { timeout: 3
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(threeTierData)
+    }));
+    await page.route('**/data/history.json*', (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(threeTierHistory)
     }));
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
