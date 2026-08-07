@@ -254,8 +254,8 @@ test('renders current prices, sorting, and country history in a real browser', {
         assert.equal(await page.locator('.workspace').getAttribute('aria-busy'), 'false');
         assert.equal(await page.locator('#searchInput').isEnabled(), true);
         assert.equal(await page.locator('#regionSelect').isEnabled(), true);
-        assert.equal(await page.locator('.app-brand strong').textContent(), 'iCloud+ 全球价格对比');
-        assert.equal(await page.locator('#pageTitle').textContent(), '各容量最低价');
+        assert.equal(await page.locator('.app-brand h1').textContent(), 'iCloud+ 全球价格对比');
+        assert.equal(await page.locator('#overviewTitle').textContent(), '各容量最低价');
         assert.equal(await page.locator('.workspace-heading h2').textContent(), '各地区 iCloud+ 价格');
         assert.equal(await page.locator('button[data-sort-tier]').count(), expectedData.tiers.length);
         if (viewport.width > 900) {
@@ -282,7 +282,7 @@ test('renders current prices, sorting, and country history in a real browser', {
         }));
         assert.equal(new Set(statCards.map(({ backgroundColor }) => backgroundColor)).size, 1, `${viewport.name} stat backgrounds should have equal emphasis`);
         assert.equal(new Set(statCards.map(({ borderColor }) => borderColor)).size, 1, `${viewport.name} stat borders should have equal emphasis`);
-        assert.equal(await page.locator('#minimumSummary > div').count(), expectedData.tiers.length);
+        assert.equal(await page.locator('#minimumSummary > button').count(), expectedData.tiers.length);
         for (const tier of expectedData.tiers) {
           const lowest = expectedData.countries
             .map((country) => ({
@@ -290,7 +290,7 @@ test('renders current prices, sorting, and country history in a real browser', {
               cny: country.plans[tier.id].price / expectedData.fx.rates[country.currency] * expectedData.fx.rates.CNY
             }))
             .sort((first, second) => first.cny - second.cny)[0];
-          const summaryText = await page.locator('#minimumSummary > div').evaluateAll((items, label) => {
+          const summaryText = await page.locator('#minimumSummary > button').evaluateAll((items, label) => {
             const item = items.find((element) => element.querySelector('.minimum-tier-label')?.textContent === label);
             return item?.textContent ?? '';
           }, tier.label);
@@ -348,6 +348,9 @@ test('renders current prices, sorting, and country history in a real browser', {
         const searchableCountry = expectedData.countries.find(({ nameZh, country }) => nameZh && nameZh !== country) ?? expectedData.countries[0];
         const firstCountry = searchableCountry.country;
         const firstTier = expectedData.tiers[0].id;
+        const tierSortControl = viewport.width <= 1100
+          ? page.locator(`#mobileTierControl button[data-tier="${firstTier}"]`)
+          : page.locator(`button[data-sort-tier="${firstTier}"]`);
         await page.locator('#searchInput').fill(searchableCountry.nameZh || firstCountry);
         await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length === 1);
         await page.locator('#searchInput').fill('不存在的国家或币种');
@@ -358,7 +361,7 @@ test('renders current prices, sorting, and country history in a real browser', {
         await page.locator('#regionSelect').selectOption(searchableCountry.region);
         await page.locator('#searchInput').fill(searchableCountry.nameZh || firstCountry);
         await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length === 1);
-        await page.locator(`button[data-sort-tier="${firstTier}"]`).click();
+        await tierSortControl.click();
         assert.equal(await page.locator('#priceRows tr[data-country]').count(), 1, 'combined search, region, and tier sorting should retain the matching country');
         await page.locator('#searchInput').fill('');
         await page.locator('#regionSelect').selectOption('all');
@@ -368,7 +371,7 @@ test('renders current prices, sorting, and country history in a real browser', {
         await page.locator('button[data-sort="country"]').click();
         assert.equal(await page.locator('button[data-sort="country"]').locator('xpath=ancestor::th').getAttribute('aria-sort'), 'descending');
 
-        await page.locator(`button[data-sort-tier="${firstTier}"]`).click();
+        await tierSortControl.click();
         assert.equal(
           await page.locator(`button[data-sort-tier="${firstTier}"]`).locator('xpath=ancestor::th').getAttribute('aria-sort'),
           'ascending'
@@ -769,8 +772,8 @@ test('rebuilds tier headers and filters after a successful retry with changed ti
       await page.waitForFunction((count) => document.querySelector('#tierCount')?.textContent === String(count), fullData.tiers.length);
       await page.locator('#retryButton').dispatchEvent('click');
       await page.waitForFunction((count) => document.querySelector('#tierCount')?.textContent === String(count), reducedData.tiers.length);
-      assert.equal(await page.locator('.price-table thead th').count(), reducedData.tiers.length + 2);
-      assert.equal(await page.locator('#priceRows tr[data-country]').first().locator('td').count(), reducedData.tiers.length + 2);
+      assert.equal(await page.locator('.price-table thead th').count(), reducedData.tiers.length + 3);
+      assert.equal(await page.locator('#priceRows tr[data-country]').first().locator('td').count(), reducedData.tiers.length + 3);
       assert.deepEqual(
         await page.locator('.price-table thead button[data-sort-tier]').evaluateAll((buttons) => buttons.map((button) => button.dataset.sortTier)),
         reducedData.tiers.map(({ id }) => id)
@@ -968,7 +971,7 @@ test('keeps history dialog usable when Chart construction fails', { timeout: 30_
   }
 });
 
-test('keeps the page and publication history bounded on narrow mobile screens while the price table scrolls', { timeout: 30_000 }, async (context) => {
+test('keeps the page and publication history bounded with a single-tier table on narrow screens', { timeout: 30_000 }, async (context) => {
   const browserConfig = await resolveBrowser(context, 'the narrow mobile UI test');
   if (!browserConfig) return;
   const validData = await readFixture('prices.json');
@@ -997,11 +1000,22 @@ test('keeps the page and publication history bounded on narrow mobile screens wh
         documentWidth: document.documentElement.scrollWidth,
         viewportWidth: document.documentElement.clientWidth,
         tableWidth: table.scrollWidth,
-        tableClientWidth: table.clientWidth
+        tableClientWidth: table.clientWidth,
+        visibleTierHeaders: [...document.querySelectorAll('th[data-tier]')].filter((header) => getComputedStyle(header).display !== 'none').length,
+        visibleTierCells: [...document.querySelector('#priceRows tr[data-country]').querySelectorAll('td[data-tier]')].filter((cell) => getComputedStyle(cell).display !== 'none').length,
+        tierButtons: document.querySelectorAll('#mobileTierControl button').length
       };
     });
     assert.ok(layout.documentWidth <= layout.viewportWidth + 1);
-    assert.ok(layout.tableWidth > layout.tableClientWidth);
+    assert.ok(layout.tableWidth <= layout.tableClientWidth + 1);
+    assert.equal(layout.visibleTierHeaders, 1);
+    assert.equal(layout.visibleTierCells, 1);
+    assert.equal(layout.tierButtons, validData.tiers.length);
+
+    const nextTier = validData.tiers[1];
+    await page.locator(`#mobileTierControl button[data-tier="${nextTier.id}"]`).click();
+    assert.equal(await page.locator('th[data-tier].is-active-tier').getAttribute('data-tier'), nextTier.id);
+    assert.equal(new URL(page.url()).searchParams.get('tier'), nextTier.id);
 
     await page.locator('#publishedDateButton').click();
     await page.waitForFunction(() => document.querySelector('#publishedDateDialog')?.open === true);
@@ -1403,6 +1417,161 @@ test('rebinds or closes an open history dialog after country replacement', { tim
         await page.close();
       }
     }
+  } finally {
+    await browser.close();
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+
+
+test('keeps the minimum-price overview stable and the desktop table header sticky', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the stable-layout UI test');
+  if (!browserConfig) return;
+  const validData = await readFixture('prices.json');
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  let releaseRequest;
+  const requestReleased = new Promise((resolve) => { releaseRequest = resolve; });
+  await page.route('https://**/*', (route) => route.abort());
+  await page.route('**/data/prices.json*', async (route) => {
+    await requestReleased;
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(validData) });
+  });
+  try {
+    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+    assert.equal(await page.locator('#minimumSummary .minimum-card.is-loading').count(), 5);
+    assert.equal(await page.locator('h1').count(), 1);
+    assert.equal(await page.locator('h1').textContent(), 'iCloud+ \u5168\u7403\u4ef7\u683c\u5bf9\u6bd4');
+    assert.equal(await page.locator('#overviewTitle').evaluate((element) => element.tagName), 'H2');
+    assert.equal(await page.locator('head script[type="module"][src="script.js"]').count(), 1);
+    assert.equal(await page.locator('head link[rel="modulepreload"]').count(), 3);
+    const before = await page.locator('#minimumSummary').boundingBox();
+    releaseRequest();
+    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, validData.countries.length);
+    const afterBox = await page.locator('#minimumSummary').boundingBox();
+    assert.ok(before && afterBox && Math.abs(before.height - afterBox.height) <= 2, 'minimum summary height should stay stable across loading');
+    assert.equal(await page.locator('#minimumSummary .minimum-card.is-loading').count(), 0);
+
+    await page.setViewportSize({ width: 1440, height: 800 });
+    await page.locator('#priceRows tr[data-country]').nth(35).scrollIntoViewIfNeeded();
+    await page.evaluate(() => scrollBy(0, 220));
+    const stickyTop = await page.locator('.price-table thead th').first().evaluate((header) => header.getBoundingClientRect().top);
+    assert.ok(stickyTop >= -1 && stickyTop <= 1, `desktop header should remain sticky at the viewport top, got ${stickyTop}`);
+  } finally {
+    await page.close();
+    await browser.close();
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test('restores URL state and supports compact controls plus four-country comparison', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the comparison UI test');
+  if (!browserConfig) return;
+  const validData = await readFixture('prices.json');
+  const selected = validData.countries.slice(0, 2);
+  const initialCountry = validData.countries.find(({ nameZh }) => nameZh) || validData.countries[0];
+  const params = new URLSearchParams({
+    tier: validData.tiers.at(-1).id,
+    q: initialCountry.nameZh || initialCountry.country,
+    region: initialCountry.region,
+    compare: selected.map(({ country }) => country).join(',')
+  });
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  const page = await browser.newPage({ viewport: { width: 1365, height: 760 } });
+  await page.route('https://**/*', (route) => route.abort());
+  await page.route('**/data/prices.json*', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify(validData)
+  }));
+  try {
+    await page.goto(`http://127.0.0.1:${port}/?${params}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#marketCount')?.textContent !== '--');
+    assert.equal(await page.locator('#searchInput').inputValue(), initialCountry.nameZh || initialCountry.country);
+    assert.equal(await page.locator('#regionSelect').inputValue(), initialCountry.region);
+    assert.equal(await page.locator('#compareChips .compare-chip').count(), 2);
+    assert.equal(await page.locator('#compareDock').isVisible(), true);
+
+    await page.locator('#openCompareButton').click();
+    assert.equal(await page.locator('#compareDialog').evaluate((dialog) => dialog.open), true);
+    assert.equal(await page.locator('#compareGrid .compare-card').count(), 2);
+    assert.equal(await page.locator('#compareGrid .compare-card dl div').count(), validData.tiers.length * 2);
+    await page.locator('#closeCompare').click();
+
+    await page.locator('#clearCompareButton').click();
+    await page.locator('#searchInput').fill('');
+    await page.locator('#regionSelect').selectOption('all');
+    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, validData.countries.length);
+    for (const country of validData.countries.slice(0, 4)) {
+      await page.locator(`#priceRows tr[data-country="${country.country}"] .row-compare-button`).click();
+    }
+    assert.equal(await page.locator('#compareChips .compare-chip').count(), 4);
+    const fifth = validData.countries[4];
+    await page.locator(`#priceRows tr[data-country="${fifth.country}"] .row-compare-button`).click();
+    assert.equal(await page.locator('#compareChips .compare-chip').count(), 4);
+    assert.match(await page.locator('#compareCount').textContent(), /\u6700\u591a\u9009\u62e9 4/);
+    assert.equal(new URL(page.url()).searchParams.get('compare').split(',').length, 4);
+
+    await page.locator('#priceRows tr[data-country]').nth(35).scrollIntoViewIfNeeded();
+    await page.evaluate(() => scrollBy(0, 180));
+    await page.waitForFunction(() => document.querySelector('#compactControls')?.classList.contains('is-visible'));
+    assert.equal(await page.locator('#compactControls').getAttribute('aria-hidden'), 'false');
+    await page.locator('#compactSearchInput').fill(initialCountry.nameZh || initialCountry.country);
+    await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length === 1);
+    assert.equal(await page.locator('#searchInput').inputValue(), initialCountry.nameZh || initialCountry.country);
+
+    await page.locator('#backToTableButton').click();
+    await page.locator('#searchInput').fill('');
+    const minimumCard = page.locator('#minimumSummary .minimum-card').last();
+    const minimumTier = await minimumCard.getAttribute('data-tier');
+    await minimumCard.click();
+    assert.equal(new URL(page.url()).searchParams.get('tier'), minimumTier);
+    assert.equal(await page.locator('#priceRows tr.is-highlighted').count(), 1);
+  } finally {
+    await page.close();
+    await browser.close();
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test('uses only validated cached prices when the network refresh fails', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the validated-cache UI test');
+  if (!browserConfig) return;
+  const validData = await readFixture('prices.json');
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  try {
+    const cachedPage = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    await cachedPage.addInitScript((payload) => {
+      localStorage.setItem('icloud-price-comparison:validated-prices:v1', JSON.stringify(payload));
+    }, validData);
+    await cachedPage.route('https://**/*', (route) => route.abort());
+    await cachedPage.route('**/data/prices.json*', (route) => route.fulfill({ status: 503, body: '{}' }));
+    await cachedPage.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+    await cachedPage.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, validData.countries.length);
+    await cachedPage.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
+    assert.equal(await cachedPage.locator('#searchInput').isEnabled(), true);
+    assert.match(await cachedPage.locator('#loadStatusText').textContent(), /\u5df2\u9a8c\u8bc1\u7f13\u5b58/);
+    assert.match(await cachedPage.locator('#updatedAt').textContent(), /\u7f51\u7edc\u5237\u65b0\u5931\u8d25/);
+    await cachedPage.close();
+
+    const invalidPage = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    await invalidPage.addInitScript(() => {
+      localStorage.setItem('icloud-price-comparison:validated-prices:v1', JSON.stringify({ schemaVersion: 999 }));
+    });
+    await invalidPage.route('https://**/*', (route) => route.abort());
+    await invalidPage.route('**/data/prices.json*', (route) => route.fulfill({ status: 503, body: '{}' }));
+    await invalidPage.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+    await invalidPage.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
+    assert.equal(await invalidPage.locator('#searchInput').isDisabled(), true);
+    assert.equal(await invalidPage.evaluate(() => localStorage.getItem('icloud-price-comparison:validated-prices:v1')), null);
+    await invalidPage.close();
   } finally {
     await browser.close();
     await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));

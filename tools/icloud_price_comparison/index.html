@@ -12,6 +12,11 @@
   <meta property="og:type" content="website">
   <title>iCloud+ 全球价格对比</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="modulepreload" href="script.js">
+  <link rel="modulepreload" href="data-contract.js">
+  <link rel="modulepreload" href="vendor/lucide-subset.js">
+  <link rel="preconnect" href="https://raw.githubusercontent.com" crossorigin>
+  <script type="module" src="script.js"></script>
   <link rel="shortcut icon" href="/images/favicon.ico">
   <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
   <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
@@ -30,7 +35,7 @@
       <div class="app-brand">
         <span class="brand-mark" aria-hidden="true"><i data-lucide="cloud"></i></span>
         <span class="brand-copy">
-          <strong>iCloud+ 全球价格对比</strong>
+          <h1>iCloud+ 全球价格对比</h1>
         </span>
       </div>
       <div class="data-status" aria-live="polite">
@@ -41,16 +46,20 @@
   </header>
 
   <main class="page-main">
-    <section class="overview" aria-labelledby="pageTitle">
+    <section class="overview" aria-labelledby="overviewTitle">
       <div class="overview-reference">
         <div class="overview-copy">
           <p class="overview-kicker">人民币参考价</p>
-          <h1 id="pageTitle">各容量最低价</h1>
+          <h2 id="overviewTitle">各容量最低价</h2>
           <p class="overview-note">按人民币参考汇率换算，便于横向比较</p>
         </div>
-        <dl id="minimumSummary" class="minimum-stats overview-stat-list" aria-label="各容量最低价概览">
-          <div><dt>正在计算</dt><dd>--</dd></div>
-        </dl>
+        <div id="minimumSummary" class="minimum-stats overview-stat-list" aria-label="各容量最低价概览">
+          <button class="minimum-card is-loading" type="button" disabled aria-label="正在计算最低价"><span class="minimum-tier-label"></span><strong class="minimum-country"></strong><small class="minimum-price"></small></button>
+          <button class="minimum-card is-loading" type="button" disabled aria-hidden="true"><span class="minimum-tier-label"></span><strong class="minimum-country"></strong><small class="minimum-price"></small></button>
+          <button class="minimum-card is-loading" type="button" disabled aria-hidden="true"><span class="minimum-tier-label"></span><strong class="minimum-country"></strong><small class="minimum-price"></small></button>
+          <button class="minimum-card is-loading" type="button" disabled aria-hidden="true"><span class="minimum-tier-label"></span><strong class="minimum-country"></strong><small class="minimum-price"></small></button>
+          <button class="minimum-card is-loading" type="button" disabled aria-hidden="true"><span class="minimum-tier-label"></span><strong class="minimum-country"></strong><small class="minimum-price"></small></button>
+        </div>
       </div>
       <dl class="overview-stats overview-stat-list" aria-label="数据概览">
         <div class="metric-card">
@@ -93,19 +102,26 @@
             </select>
           </label>
         </div>
+        <div class="mobile-tier-picker">
+          <span class="control-label">容量</span>
+          <div id="mobileTierControl" class="segmented mobile-tier-segmented" role="group" aria-label="选择要比较的容量"></div>
+          <p id="tableHint">中小屏幕仅显示当前容量，切换后自动按价格排序。</p>
+        </div>
       </div>
 
       <div class="table-scroll">
-        <table class="price-table">
+        <table class="price-table" aria-describedby="resultSummary tableHint">
+          <caption class="visually-hidden">全球各地区 iCloud+ 月度价格与人民币参考价</caption>
           <thead>
             <tr>
               <th class="rank-column" scope="col">#</th>
               <th scope="col" aria-sort="none"><button type="button" data-sort="country" disabled>国家/地区 <i data-lucide="arrow-up-down" aria-hidden="true"></i></button></th>
               <th id="tierHeaderPlaceholder" scope="col" colspan="5">容量</th>
+              <th class="compare-column" scope="col"><span class="visually-hidden">加入对比</span></th>
             </tr>
           </thead>
           <tbody id="priceRows">
-            <tr><td class="loading-cell" colspan="7"><span class="spinner"></span>正在加载…</td></tr>
+            <tr><td class="loading-cell" colspan="8"><span class="spinner"></span>正在加载…</td></tr>
           </tbody>
         </table>
       </div>
@@ -194,11 +210,49 @@
     </section>
   </dialog>
 
+  <div id="compactControls" class="compact-controls" aria-hidden="true">
+    <div class="compact-controls-inner">
+      <label class="compact-search-field">
+        <i data-lucide="search" aria-hidden="true"></i>
+        <span class="visually-hidden">在价格表中快速搜索</span>
+        <input id="compactSearchInput" type="search" placeholder="快速搜索" autocomplete="off" tabindex="-1">
+      </label>
+      <button id="compactSortButton" class="compact-sort-button" type="button" tabindex="-1">价格升序</button>
+      <button id="backToTableButton" class="compact-icon-button" type="button" aria-label="返回价格表顶部" title="返回价格表顶部" tabindex="-1"><i data-lucide="chevron-up" aria-hidden="true"></i></button>
+    </div>
+  </div>
+
+  <section id="compareDock" class="compare-dock" aria-label="已选地区对比" hidden>
+    <div class="compare-dock-inner">
+      <div class="compare-dock-summary">
+        <i data-lucide="columns-3" aria-hidden="true"></i>
+        <span id="compareCount">已选 0/4 个地区</span>
+      </div>
+      <div id="compareChips" class="compare-chips"></div>
+      <div class="compare-dock-actions">
+        <button id="clearCompareButton" class="secondary-button" type="button">清空</button>
+        <button id="copyCompareLinkButton" class="secondary-button" type="button"><i data-lucide="copy" aria-hidden="true"></i>复制链接</button>
+        <button id="openCompareButton" class="primary-button" type="button"><i data-lucide="columns-3" aria-hidden="true"></i>打开对比</button>
+      </div>
+    </div>
+  </section>
+
+  <dialog id="compareDialog" class="compare-dialog" aria-labelledby="compareDialogTitle">
+    <div class="dialog-header">
+      <div>
+        <p class="dialog-eyebrow">地区对比</p>
+        <h2 id="compareDialogTitle">iCloud+ 月费并列对比</h2>
+        <p>人民币为参考换算，当地价格与方案以 Apple 页面为准。</p>
+      </div>
+      <button class="icon-button" id="closeCompare" type="button" aria-label="关闭地区对比" title="关闭"><i data-lucide="x" aria-hidden="true"></i></button>
+    </div>
+    <div id="compareGrid" class="compare-grid"></div>
+  </dialog>
+
   <footer class="page-footer">
     <p>本工具与 Apple Inc. 无关联，数据仅供参考。</p>
     <p>&copy; 2026 <a href="https://www.linchun.com.cn">林春写字的地方</a></p>
   </footer>
 
-  <script type="module" src="script.js"></script>
 </body>
 </html>
