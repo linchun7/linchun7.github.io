@@ -618,7 +618,7 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
   border: 1px solid #e1e8ee;
   border-radius: 7px;
   text-align: left;
-  transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
 .minimum-card:hover:not(:disabled),
@@ -626,6 +626,18 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
   background: var(--surface-blue);
   border-color: #b9d6f7;
   transform: translateY(-1px);
+}
+
+.minimum-card.is-active-tier {
+  background: var(--surface-blue);
+  border-color: var(--accent);
+  box-shadow: inset 0 -3px var(--accent), 0 2px 5px rgba(24, 43, 61, .06);
+}
+
+.minimum-card.is-active-tier .minimum-tier-label {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 .minimum-card .minimum-price {

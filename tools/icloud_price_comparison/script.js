@@ -275,9 +275,12 @@ function renderMinimumSummary() {
     const winner = state.minimumCountries[tier.id];
     const countryName = winner?.nameZh || winner?.country || '暂无地区';
     const item = document.createElement('button');
+    const isActiveTier = state.sortKey === 'tier' && state.sortTier === tier.id;
     item.type = 'button';
     item.className = 'minimum-card';
+    item.classList.toggle('is-active-tier', isActiveTier);
     item.dataset.tier = tier.id;
+    item.setAttribute('aria-pressed', String(isActiveTier));
     item.title = `查看 ${tier.label} 最低价地区`;
     item.setAttribute('aria-label', `${tier.label}最低价为${countryName}，${formatConverted(state.minimumPrices[tier.id], '¥')}，点击在价格表中定位`);
 
@@ -533,6 +536,7 @@ function setCountrySort() {
     state.sortDirection = 'asc';
   }
   updateUrlState();
+  renderMinimumSummary();
   renderSortHeaders();
   renderTable();
 }
@@ -546,6 +550,7 @@ function setTierSort(tier, { forceAscending = false } = {}) {
     state.sortDirection = 'asc';
   }
   updateUrlState();
+  renderMinimumSummary();
   renderMobileTierButtons();
   renderSortHeaders();
   renderTable();
