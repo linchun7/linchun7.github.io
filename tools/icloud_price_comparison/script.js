@@ -37,6 +37,7 @@ const state = {
   historyPromise: null,
   chartRequestId: 0,
   historyReturnFocus: null,
+  historyReturnCountry: null,
   publishedDateReturnFocus: null,
   renderFrame: null,
   scrollFrame: null
@@ -363,6 +364,8 @@ function renderHistoryHeaders() {
   for (const tier of state.data.tiers) {
     const header = document.createElement('th');
     header.dataset.historyTierHeader = 'true';
+    header.dataset.tier = tier.id;
+    header.classList.toggle('is-active-tier', tier.id === state.historyTier);
     header.scope = 'col';
     header.textContent = tier.label;
     row.append(header);
@@ -636,6 +639,11 @@ async function renderChart(record) {
   const currency = series[0].currency;
   elements.chartCurrency.textContent = currency;
   const context = document.querySelector('#historyChart');
+  const tier = state.data.tiers.find(({ id }) => id === state.historyTier);
+  const firstPrice = series[0].plans[state.historyTier];
+  const lastPrice = series.at(-1).plans[state.historyTier];
+  const trend = lastPrice === firstPrice ? '保持不变' : lastPrice > firstPrice ? '上涨' : '下降';
+  context.setAttribute('aria-label', `${state.activeCountry?.nameZh || state.activeCountry?.country || ''} ${tier?.label || state.historyTier} 价格变化图，币种 ${currency}，从 ${numberFormatter.format(firstPrice)} 变为 ${numberFormatter.format(lastPrice)}，${trend}，共 ${series.length} 个记录点。详细数据见下方变更记录。`);
   try {
     const Chart = await loadChartLibrary();
     if (requestId !== state.chartRequestId || !elements.historyDialog.open) return;
@@ -659,10 +667,10 @@ async function renderChart(record) {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        animation: { duration: 250 },
+        animation: { duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 250 },
         plugins: {
           legend: { display: false },
-          tooltip: { callbacks: { label: (item) => item.raw == null ? '????' : `${numberFormatter.format(item.raw)} ${currency}` } }
+          tooltip: { callbacks: { label: (item) => item.raw == null ? '暂无数据' : `${numberFormatter.format(item.raw)} ${currency}` } }
         },
         scales: {
           x: { grid: { display: false }, ticks: { color: '#687078' } },
@@ -701,7 +709,10 @@ function renderHistoryRows(record) {
     row.append(createCell(formatDate(event.observedAt)), createCell(event.currency, 'currency-code'));
     for (const tier of state.data.tiers) {
       const price = event.plans[tier.id];
-      row.append(createCell(Number.isFinite(price) ? numberFormatter.format(price) : '--'));
+      const cell = createCell(Number.isFinite(price) ? numberFormatter.format(price) : '--');
+      cell.dataset.historyTier = tier.id;
+      cell.classList.toggle('is-active-tier', tier.id === state.historyTier);
+      row.append(cell);
     }
     elements.historyRows.append(row);
   });
@@ -927,6 +938,7 @@ function openHistory(country, returnFocus = null) {
   const record = getHistoryRecord(country);
   state.activeCountry = country;
   state.historyReturnFocus = returnFocus;
+  state.historyReturnCountry = country.country;
   state.historyTier = state.sortTier;
   elements.historyTitle.textContent = country.nameZh || country.country;
   renderHistorySubtitle(country, record);
@@ -1007,6 +1019,7 @@ function focusMinimumCountry(tierId, countryId) {
       : null;
     if (!row) return;
     row.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+    row.querySelector('.country-history-button')?.focus({ preventScroll: true });
     row.classList.add('is-highlighted');
     setTimeout(() => row.classList.remove('is-highlighted'), 1800);
   }));
@@ -1092,11 +1105,11 @@ function bindEvents() {
   });
   document.querySelector('button[data-sort="country"]').addEventListener('click', setCountrySort);
   elements.backToTableButton?.addEventListener('click', () => {
-    elements.backToTableButton.blur();
     elements.workspaceToolbar.scrollIntoView({
       behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
       block: 'start'
     });
+    elements.workspace.focus({ preventScroll: true });
   });
   document.querySelector('#closeHistory').addEventListener('click', () => elements.historyDialog.close());
   elements.historyDialog.addEventListener('click', (event) => {
@@ -1110,8 +1123,17 @@ function bindEvents() {
   elements.historyDialog.addEventListener('close', () => {
     destroyChart();
     const returnFocus = state.historyReturnFocus;
+    const returnCountry = state.historyReturnCountry;
     state.historyReturnFocus = null;
-    if (returnFocus?.isConnected) requestAnimationFrame(() => returnFocus.focus());
+    state.historyReturnCountry = null;
+    requestAnimationFrame(() => {
+      const currentButton = returnCountry
+        ? [...elements.priceRows.querySelectorAll('tr[data-country]')].find((row) => row.dataset.country === returnCountry)?.querySelector('.country-history-button')
+        : null;
+      if (returnFocus?.isConnected) returnFocus.focus();
+      else if (currentButton) currentButton.focus();
+      else elements.workspace.focus();
+    });
   });
   elements.publishedDateDialog.addEventListener('close', () => {
     const returnFocus = state.publishedDateReturnFocus;
