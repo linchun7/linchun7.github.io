@@ -1,10 +1,10 @@
 import { publicationDateKey, validatePayload, validatePriceHistoryConsistency } from './data-contract.js?v=3';
-import { createIcons } from './vendor/lucide-subset.js?v=3';
+import { createIcons } from './vendor/lucide-subset.js?v=4';
 
 const REMOTE_DATA_ROOT = 'https://raw.githubusercontent.com/linchun7/linchun7.github.io/main/tools/icloud_price_comparison/data';
 const HOSTED_NAMES = new Set(['linchun7.github.io', 'linchun.com.cn', 'www.linchun.com.cn']);
 const REQUEST_TIMEOUT_MS = 8_000;
-const CHART_SCRIPT_URL = './vendor/chart.umd.min.js?v=3';
+const CHART_SCRIPT_URL = './vendor/chart.umd.min.js?v=4';
 const ANALYTICS_ID = 'G-K2S9L4CHNP';
 const SLOW_LOADING_MS = 1_500;
 const DEFAULT_SORT_TIER = '200GB';
