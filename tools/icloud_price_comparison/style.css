@@ -611,8 +611,8 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
 .minimum-card {
   position: relative;
   min-width: 0;
-  min-height: 73px;
-  padding: 20px 10px 10px;
+  min-height: 83px;
+  padding: 30px 10px 10px;
   color: inherit;
   background: var(--surface-soft);
   border: 1px solid #e1e8ee;
@@ -751,7 +751,7 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
 @media (max-width: 640px) {
   .brand-copy h1 { font-size: 17px; }
   .overview h2 { font-size: 25px; }
-  .minimum-card { min-height: 69px; padding: 20px 9px 9px; }
+  .minimum-card { min-height: 79px; padding: 29px 9px 9px; }
   .minimum-card .minimum-price { font-size: 15px; }
   .price-table th:nth-child(2),
   .price-table td:nth-child(2) { width: 43%; }
