@@ -1284,8 +1284,8 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
     nameZh: index === 0 ? '' : `测试地区${index}${'超长变化内容'.repeat(8)}`
   }));
   const verboseChanges = {
-    addedTiers: Array.from({ length: 12 }, (_, index) => ({ id: `NEW${index}TB`, label: `新增容量 ${index + 1} TB` })),
-    removedTiers: Array.from({ length: 12 }, (_, index) => ({ id: `OLD${index}TB`, label: `移除容量 ${index + 1} TB` })),
+    addedTiers: Array.from({ length: 12 }, (_, index) => ({ id: `${100 + index}TB`, label: `新增容量 ${index + 1} TB` })),
+    removedTiers: Array.from({ length: 12 }, (_, index) => ({ id: `${200 + index}TB`, label: `移除容量 ${index + 1} TB` })),
     addedCountries: verboseCountries,
     removedCountries: verboseCountries.map((entry, index) => ({ ...entry, country: `Removed${index}${entry.country}` })),
     changedCountries: verboseCountries.map((entry, index) => ({
