@@ -22,6 +22,7 @@ import {
   getExchangeRates,
   main,
   publicationDateKey,
+  selectRequiredRates,
   writeFailureDiagnostics,
   updateHistory,
   updatePublishedDateHistory,
@@ -1126,23 +1127,35 @@ test('rejects malformed or duplicate existing publication history', () => {
   );
 });
 
-test('does not carry a missing currency from old rates into a successful refresh', async () => {
+test('adds a newly required currency and removes a delisted currency on a successful refresh', async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async () => new Response(JSON.stringify({
     result: 'success',
     base_code: 'USD',
     time_last_update_unix: recentFxTimestamp(),
-    rates: { USD: 1, CNY: 7.2 }
+    rates: { USD: 1, CNY: 7.2, EUR: 0.86 }
   }), { status: 200 });
   try {
-    const fx = await getExchangeRates({ fx: { rates: { USD: 1, CNY: 7.1, JPY: 150 } } }, { apiKey: '' });
+    const fx = await getExchangeRates(
+      { fx: { rates: { USD: 1, CNY: 7.1, JPY: 150 } } },
+      { apiKey: '', requiredCurrencies: ['EUR'] }
+    );
     assert.equal(fx.stale, false);
     assert.equal(fx.apiKeyStatus, 'not-configured');
     assert.equal(fx.rates.CNY, 7.2);
+    assert.equal(fx.rates.EUR, 0.86);
     assert.equal(fx.rates.JPY, undefined);
+    assert.deepEqual(Object.keys(fx.rates), ['CNY', 'EUR', 'USD']);
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test('fails closed when a newly required currency has no online rate', () => {
+  assert.throws(
+    () => selectRequiredRates({ USD: 1, CNY: 7.2, JPY: 150 }, ['EUR']),
+    /Exchange rates are missing for: EUR/
+  );
 });
 
 test('uses the authenticated exchange-rate endpoint without putting the key in the URL', async () => {
