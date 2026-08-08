@@ -1,0 +1,2 @@
+tools/icloud_price_comparison/data/apple-snapshots/*.json text eol=lf
+tools/icloud_price_comparison/vendor/* text eol=lf
