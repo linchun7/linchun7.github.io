@@ -350,6 +350,24 @@ test('renders current prices, sorting, and country history in a real browser', {
           })));
           assert.ok(metricLabels.every(({ height, lineHeight }) => height <= lineHeight * 1.2), '320px metric labels must stay on one line');
         }
+        const semanticAlignments = await page.evaluate(() => ({
+          minimumCard: getComputedStyle(document.querySelector('#minimumSummary .minimum-card')).textAlign,
+          metricCard: getComputedStyle(document.querySelector('.overview-stats .metric-card')).textAlign,
+          rankHeader: getComputedStyle(document.querySelector('.price-table .rank-column')).textAlign,
+          countryHeader: getComputedStyle(document.querySelector('.price-table th:nth-child(2)')).textAlign,
+          priceHeader: getComputedStyle(document.querySelector('.price-table th[data-tier-header]')).textAlign,
+          countryCell: getComputedStyle(document.querySelector('#priceRows tr[data-country] td:nth-child(2)')).textAlign,
+          priceCell: getComputedStyle(document.querySelector('#priceRows tr[data-country] .price-cell')).textAlign
+        }));
+        assert.deepEqual(semanticAlignments, {
+          minimumCard: 'left',
+          metricCard: 'left',
+          rankHeader: 'center',
+          countryHeader: 'left',
+          priceHeader: 'right',
+          countryCell: 'left',
+          priceCell: 'right'
+        }, 'cards and the main comparison table must follow semantic alignment rules');
         const minimumBadges = page.locator('.price-cell.is-minimum .minimum-badge');
         assert.ok(await minimumBadges.count() >= expectedData.tiers.length, 'each tier should expose at least one minimum-price badge');
         const minimumBadgePosition = await minimumBadges.first().evaluate((badge) => ({
@@ -440,6 +458,11 @@ test('renders current prices, sorting, and country history in a real browser', {
         const expectedDialogName = expectedData.countries.find(({ country }) => country === historySearch)?.nameZh || historySearch;
         assert.equal(await page.getByRole('dialog', { name: expectedDialogName }).count(), 1, 'history dialog must have an accessible name');
         assert.ok(await page.locator('#historyRows tr').count() > 0);
+        assert.deepEqual(
+          await page.locator('#historyDialog thead th').evaluateAll((headers) => headers.slice(0, 3).map((header) => getComputedStyle(header).textAlign)),
+          ['left', 'left', 'right'],
+          'history dates and currency labels must align left while comparable prices align right'
+        );
         assert.deepEqual(
           await page.locator('#historyDialog thead th').evaluateAll((headers) => headers.map((header) => header.getAttribute('scope'))),
           Array.from({ length: expectedData.tiers.length + 2 }, () => 'col'),
@@ -1469,9 +1492,12 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
         assert.ok(verboseMetrics.height > verboseMetrics.lineHeight * 5, 'long change text must use multiple lines');
         const tableWidths = await tableScroller.evaluate((element) => ({ clientWidth: element.clientWidth, scrollWidth: element.scrollWidth }));
         assert.ok(tableWidths.scrollWidth <= tableWidths.clientWidth + 1, `${viewport.name} publication table must show both columns without horizontal scrolling (${tableWidths.scrollWidth}/${tableWidths.clientWidth})`);
-        if (viewport.width <= 640) {
-          assert.equal(await verboseCell.evaluate((element) => getComputedStyle(element).textAlign), 'left', 'mobile publication details must remain easy to scan');
-        }
+        assert.equal(await verboseCell.evaluate((element) => getComputedStyle(element).textAlign), 'left', 'publication details must remain easy to scan');
+        assert.deepEqual(
+          await page.locator('#publishedDateDialog thead th').evaluateAll((headers) => headers.map((header) => getComputedStyle(header).textAlign)),
+          ['left', 'left'],
+          'publication history text headers must align left'
+        );
         if (viewport.width <= 640) {
           const stackedCells = await page.locator('#publishedDateRows tr').first().locator('td').evaluateAll((cells) => cells.map((cell) => cell.getBoundingClientRect()));
           assert.ok(stackedCells[1].top >= stackedCells[0].bottom - 1, 'mobile publication records must stack date above details');
