@@ -103,6 +103,7 @@ test('keeps pull-request validation read-only, complete, and SHA-pinned', async 
 
   assert.match(ciWorkflow, /pull_request:[\s\S]*?\.github\/dependabot\.yml[\s\S]*?push:[\s\S]*?\.github\/dependabot\.yml[\s\S]*?workflow_dispatch:/);
   assert.match(ciWorkflow, /permissions:\s+contents: read/);
+  assert.match(ciWorkflow, /uses: actions\/checkout@[a-f0-9]{40}[^]*?persist-credentials: false/);
   assert.doesNotMatch(ciWorkflow, /contents: write|secrets\./);
   assert.match(ciWorkflow, /pnpm install --frozen-lockfile/);
   assert.match(ciWorkflow, /pnpm exec playwright install --with-deps chromium webkit/);

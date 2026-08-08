@@ -11,9 +11,9 @@
     {
       "file": "lucide-subset.js",
       "package": "lucide",
-      "version": "1.28.0",
+      "version": "1.30.0",
       "license": "ISC",
-      "sha256": "9800960268474bf7197ebddd408c12cc36e98889824402b3fd9dc56162e99d49"
+      "sha256": "657f4f9d9d869448312fd4e56132206c9196f36a44e59206c4ab121e21b00653"
     }
   ]
 }

@@ -157,6 +157,16 @@ function withNames(parsed, names) {
   };
 }
 
+export function assertArchiveCountriesAreKnown(parsed, names, fileName = 'archive') {
+  const unknownCountries = parsed.countries
+    .map(({ country }) => country)
+    .filter((country) => typeof names[country] !== 'string' || !names[country].trim());
+  if (unknownCountries.length) {
+    throw new Error(`${fileName} contains countries outside the reviewed Apple country list: ${unknownCountries.join(', ')}`);
+  }
+  return parsed;
+}
+
 function emptyChanges() {
   return { addedTiers: [], removedTiers: [], addedCountries: [], removedCountries: [], changedCountries: [] };
 }
@@ -252,8 +262,9 @@ async function importAppleArchivesUnlocked(inputDir, paths = {}) {
   const snapshotsDir = paths.snapshotsDir ?? SNAPSHOTS_DIR;
   const snapshotIndexPath = paths.snapshotIndexPath ?? SNAPSHOT_INDEX_PATH;
   const transactionPath = paths.transactionPath ?? path.join(path.dirname(historyPath), '.apple-archive-import-transaction.json');
+  const enforceReviewedCountries = paths.enforceReviewedCountries ?? paths.namesPath == null;
   await recoverAppleArchiveImport({ transactionPath, historyPath, snapshotIndexPath, snapshotsDir });
-  const [, currentData, names, fileNames, existingSnapshotIndexState] = await Promise.all([
+  const [existingHistory, currentData, names, fileNames, existingSnapshotIndexState] = await Promise.all([
     readFile(historyPath, 'utf8').then(JSON.parse),
     readFile(pricesPath, 'utf8').then(JSON.parse),
     readFile(namesPath, 'utf8').then(JSON.parse),
@@ -263,6 +274,15 @@ async function importAppleArchivesUnlocked(inputDir, paths = {}) {
       throw error;
     })
   ]);
+  const reviewedCountryNames = {
+    ...names,
+    ...Object.fromEntries(Object.entries(existingHistory.countries ?? {}).map(([country, record]) => (
+      [country, record.nameZh || country]
+    ))),
+    ...Object.fromEntries((currentData.countries ?? []).map(({ country, nameZh }) => (
+      [country, nameZh || country]
+    )))
+  };
   let migratedSnapshotIndex = migrateSnapshotIndex(existingSnapshotIndexState.value);
   const validatedSnapshotIndex = await validateAppleSnapshotStore({
     snapshotsDir,
@@ -277,7 +297,9 @@ async function importAppleArchivesUnlocked(inputDir, paths = {}) {
     const filePath = path.join(inputDir, fileName);
     const htmlBuffer = await readFile(filePath);
     const html = htmlBuffer.toString('utf8');
-    const parsed = withNames(parseArchive(html), names);
+    const rawParsed = parseArchive(html);
+    if (enforceReviewedCountries) assertArchiveCountriesAreKnown(rawParsed, reviewedCountryNames, fileName);
+    const parsed = withNames(rawParsed, names);
     validatePrices(parsed.countries, { tiers: parsed.tiers, minCountries: 60 });
     const publishedDate = publicationDateKey(parsed.sourcePublishedDate);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(publishedDate)) throw new Error(`Invalid publication date in ${fileName}`);

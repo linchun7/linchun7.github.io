@@ -54,6 +54,28 @@ test('rejects unsafe or unsupported storage tier identifiers', async () => {
   }
 });
 
+test('rejects tier labels or capacities that disagree with their canonical identifiers', async () => {
+  const { prices } = await productionFixtures();
+  for (const mutate of [
+    (payload) => { payload.tiers[0].capacityGb += 1; },
+    (payload) => { payload.tiers[0].label = 'Fifty GB'; },
+    (payload) => { payload.tiers[0].id = '050GB'; }
+  ]) {
+    const payload = structuredClone(prices);
+    mutate(payload);
+    assert.throws(() => validatePricePayload(payload), /invalid or duplicate tiers/);
+    assert.throws(() => validateExistingPrices(payload), /invalid or duplicate tiers/);
+  }
+});
+
+test('rejects non-tier plan keys in every historical event', async () => {
+  const { prices, history } = await productionFixtures();
+  const payload = structuredClone(history);
+  Object.values(payload.countries)[0].events[0].plans.EVIL = 1;
+  assert.throws(() => validateHistoryPayload(payload), /invalid event/);
+  assert.throws(() => validateExistingHistory(payload, prices), /invalid event/);
+});
+
 test('shared browser and updater contracts reject the same price schema divergences', async () => {
   const { prices } = await productionFixtures();
   const mutations = [

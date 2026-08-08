@@ -1,8 +1,6 @@
-import { publicationDateKey, validatePayload, validatePriceHistoryConsistency } from './data-contract.js?v=3';
-import { createIcons } from './vendor/lucide-subset.js?v=4';
+import { publicationDateKey, validatePayload, validatePriceHistoryConsistency } from './data-contract.js?v=4';
+import { createIcons } from './vendor/lucide-subset.js?v=5';
 
-const REMOTE_DATA_ROOT = 'https://raw.githubusercontent.com/linchun7/linchun7.github.io/main/tools/icloud_price_comparison/data';
-const HOSTED_NAMES = new Set(['linchun7.github.io', 'linchun.com.cn', 'www.linchun.com.cn']);
 const REQUEST_TIMEOUT_MS = 8_000;
 const CHART_SCRIPT_URL = './vendor/chart.umd.min.js?v=4';
 const ANALYTICS_ID = 'G-K2S9L4CHNP';
@@ -12,6 +10,13 @@ const DEFAULT_TIER_COLUMN_COUNT = 5;
 const FIXED_PRICE_TABLE_COLUMN_COUNT = 2;
 const PRICE_CACHE_KEY = 'icloud-price-comparison:validated-prices:v1';
 const initialUrlState = new URLSearchParams(location.search);
+const initialQuery = globalThis.__icloudInitialQuery ?? initialUrlState.get('q') ?? '';
+delete globalThis.__icloudInitialQuery;
+if (initialUrlState.has('q')) {
+  const sanitizedUrl = new URL(location.href);
+  sanitizedUrl.searchParams.delete('q');
+  history.replaceState(null, '', sanitizedUrl);
+}
 const initialSortKey = initialUrlState.get('sort') === 'country' ? 'country' : 'tier';
 const initialSortDirection = initialUrlState.get('dir') === 'desc' ? 'desc' : 'asc';
 const REGION_LABELS = {
@@ -24,7 +29,7 @@ const state = {
   data: null,
   history: null,
   sortTier: initialUrlState.get('tier') || DEFAULT_SORT_TIER,
-  query: initialUrlState.get('q') || '',
+  query: initialQuery,
   region: initialUrlState.get('region') || 'all',
   sortKey: initialSortKey,
   sortDirection: initialSortDirection,
@@ -109,7 +114,13 @@ function analyticsTag() {
 function loadAnalytics() {
   if (document.querySelector('script[data-analytics-loader]')) return;
   analyticsTag('js', new Date());
-  analyticsTag('config', ANALYTICS_ID);
+  const analyticsUrl = new URL(location.href);
+  analyticsUrl.searchParams.delete('q');
+  analyticsTag('config', ANALYTICS_ID, {
+    page_location: analyticsUrl.href,
+    allow_google_signals: false,
+    allow_ad_personalization_signals: false
+  });
   const script = document.createElement('script');
   script.async = true;
   script.fetchPriority = 'low';
@@ -206,9 +217,7 @@ function formatPublishedDate(value) {
 
 async function fetchJson(fileName, { forceRefresh = false } = {}) {
   const localUrl = `./data/${fileName}`;
-  const urls = HOSTED_NAMES.has(location.hostname)
-    ? [localUrl, `${REMOTE_DATA_ROOT}/${fileName}`]
-    : [localUrl];
+  const urls = [localUrl];
 
   let lastError;
   for (const url of urls) {
@@ -1009,8 +1018,7 @@ function updateUrlState() {
   url.searchParams.set('tier', state.sortTier);
   url.searchParams.set('sort', state.sortKey);
   url.searchParams.set('dir', state.sortDirection);
-  if (state.query) url.searchParams.set('q', state.query);
-  else url.searchParams.delete('q');
+  url.searchParams.delete('q');
   if (state.region !== 'all') url.searchParams.set('region', state.region);
   else url.searchParams.delete('region');
   url.searchParams.delete('compare');

@@ -3,7 +3,12 @@ import { access, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:f
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { importAppleArchives, recoverAppleArchiveImport, rollbackAppleArchiveImport } from '../scripts/import-apple-archives.mjs';
+import {
+  assertArchiveCountriesAreKnown,
+  importAppleArchives,
+  recoverAppleArchiveImport,
+  rollbackAppleArchiveImport
+} from '../scripts/import-apple-archives.mjs';
 import { parseLegacyAppleArchive } from '../scripts/parse-legacy-archive.mjs';
 import { appleSnapshotContentHash, normalizeAppleSnapshot } from '../scripts/update-prices.mjs';
 
@@ -12,6 +17,16 @@ const regions = [
   ['emea', 'Europe', 'Beta', 'EUR'],
   ['ap', 'Asia Pacific', 'Gamma', 'JPY']
 ];
+
+test('production archive imports reject countries outside the reviewed Apple list', () => {
+  const parsed = { countries: [{ country: 'Known' }, { country: 'Unexpected' }] };
+  assert.throws(
+    () => assertArchiveCountriesAreKnown(parsed, { Known: '已知' }, 'archive.html'),
+    /outside the reviewed Apple country list: Unexpected/
+  );
+  const known = { countries: [{ country: 'Known' }] };
+  assert.equal(assertArchiveCountriesAreKnown(known, { Known: '已知' }), known);
+});
 
 function archiveHtml({ date = 'May 12, 2025', alphaPrice = '0.99', stamp }) {
   const countries = regions.flatMap(([id, heading, prefix, currency]) => [
