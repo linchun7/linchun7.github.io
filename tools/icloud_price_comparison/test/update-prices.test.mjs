@@ -17,6 +17,7 @@ import {
   savePublishedAppleSnapshot,
   createRunLogEntry,
   createNetworkBudget,
+  confirmCountryRemovals,
   fetchResource,
   getExchangeRates,
   main,
@@ -35,27 +36,23 @@ test('builds a deduplicated Apple snapshot index by published date', () => {
     pricePoints: 350,
     contentHash: 'abc'
   });
-  assert.equal(first.file, '2026-04-06.html');
   const index = buildAppleSnapshotIndex(null, first);
+  assert.equal(index.schemaVersion, 2);
   assert.equal(first.dataFile, '2026-04-06.json');
   const duplicate = buildAppleSnapshotIndex(index, { ...first, firstConfirmedDate: '2026-08-02' });
   assert.deepEqual(duplicate, index);
   const earlierDuplicate = buildAppleSnapshotIndex(index, {
     ...first,
-    file: '2026-04-06-ignored.html',
     dataFile: '2026-04-06-ignored.json',
     firstConfirmedDate: '2026-07-01',
     archiveUrl: 'https://web.archive.org/web/20260701000000/https://support.apple.com/en-us/108047'
   });
   assert.equal(earlierDuplicate.snapshots[0].revisions.length, 1);
   assert.equal(earlierDuplicate.snapshots[0].revisions[0].firstConfirmedDate, '2026-07-01');
-  assert.equal(earlierDuplicate.snapshots[0].revisions[0].file, first.file);
   assert.equal(earlierDuplicate.snapshots[0].revisions[0].dataFile, first.dataFile);
   assert.match(earlierDuplicate.snapshots[0].revisions[0].archiveUrl, /20260701000000/);
-  assert.equal(earlierDuplicate.snapshots[0].activeFile, first.file);
   const revised = buildAppleSnapshotIndex(index, {
     ...first,
-    file: '2026-04-06-different.html',
     dataFile: '2026-04-06-different.json',
     contentHash: 'different'
   });
@@ -66,7 +63,6 @@ test('builds a deduplicated Apple snapshot index by published date', () => {
 
   const olderImportedLater = buildAppleSnapshotIndex(revised, {
     ...first,
-    file: '2026-04-06-older.html',
     dataFile: '2026-04-06-older.json',
     firstConfirmedDate: '2026-07-01',
     contentHash: 'older'
@@ -180,6 +176,28 @@ test('never steals an old lock from a live process', async () => {
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test('confirms legitimate removals only when two complete Apple parses are identical', async () => {
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const first = {
+    sourcePublishedDate: data.source.publishedDate,
+    parser: 'cross-checked',
+    tiers: data.tiers,
+    countries: data.countries.slice(1)
+  };
+  const second = structuredClone(first);
+  assert.deepEqual(confirmCountryRemovals(first, second, data.countries), [data.countries[0].country]);
+
+  second.countries[0].plans[data.tiers[0].id].price += 1;
+  assert.throws(
+    () => confirmCountryRemovals(first, second, data.countries),
+    /not reproduced by the independent Apple confirmation fetch/
+  );
+  assert.throws(
+    () => confirmCountryRemovals({ ...first, parser: 'document-order' }, first, data.countries),
+    /two fully cross-checked Apple parses/
+  );
 });
 
 test('ignores residual claims that are not bound to the current lock', async () => {
@@ -303,7 +321,8 @@ test('writes, deduplicates, and revises Apple snapshots in production format', a
     assert.equal(index.snapshots[0].revisions.length, 2);
     assert.equal(index.snapshots[0].revisions[0].firstConfirmedDate, '2026-08-02');
     assert.equal(index.snapshots[0].revisions[1].firstConfirmedDate, '2026-08-03');
-    assert.equal((await readFile(path.join(snapshotsDir, index.snapshots[0].activeFile), 'utf8')), '<html>two</html>');
+    const activeSnapshot = JSON.parse(await readFile(path.join(snapshotsDir, index.snapshots[0].activeDataFile), 'utf8'));
+    assert.equal(activeSnapshot.countries[0].plans['50GB'], 2);
   } finally {
     await rm(snapshotsDir, { recursive: true, force: true });
   }
@@ -447,10 +466,9 @@ async function copyCommittedSnapshotStore(paths) {
   await mkdir(paths.snapshotsDir, { recursive: true });
   await Promise.all([
     copyFile(snapshotIndexUrl, paths.snapshotIndexPath),
-    ...index.snapshots.flatMap(({ revisions }) => revisions.flatMap(({ file, dataFile }) => [
-      copyFile(new URL(`../data/apple-snapshots/${file}`, import.meta.url), path.join(paths.snapshotsDir, file)),
+    ...index.snapshots.flatMap(({ revisions }) => revisions.map(({ dataFile }) => (
       copyFile(new URL(`../data/apple-snapshots/${dataFile}`, import.meta.url), path.join(paths.snapshotsDir, dataFile))
-    ]))
+    )))
   ]);
   return index;
 }
@@ -511,10 +529,9 @@ test('preserves a pre-existing unindexed snapshot file when a production collisi
   const html = buildAppleHtml(changed);
   const contentHash = appleSnapshotContentHash(changed);
   const publishedDate = publicationDateKey(changed.source.publishedDate);
-  const collisionPath = path.join(paths.snapshotsDir, `${publishedDate}-${contentHash.slice(0, 12)}.html`);
-  const candidateDataPath = collisionPath.replace(/\.html$/, '.json');
+  const collisionPath = path.join(paths.snapshotsDir, `${publishedDate}-${contentHash.slice(0, 12)}.json`);
   const transactionPath = defaultUpdateTransactionPath(paths.currentDataPath);
-  const sentinel = '<html>pre-existing unindexed evidence</html>\n';
+  const sentinel = '{"preExisting":true}\n';
   const productionPaths = [paths.currentDataPath, paths.historyPath, paths.runLogPath];
   const productionBefore = await Promise.all(productionPaths.map((filePath) => readFile(filePath, 'utf8')));
   const snapshotIndexBefore = await readFile(paths.snapshotIndexPath, 'utf8');
@@ -547,7 +564,6 @@ test('preserves a pre-existing unindexed snapshot file when a production collisi
     );
     assert.equal(collisionCreated, true);
     assert.equal(await readFile(collisionPath, 'utf8'), sentinel);
-    await assert.rejects(readFile(candidateDataPath, 'utf8'), { code: 'ENOENT' });
     assert.deepEqual(
       await Promise.all(productionPaths.map((filePath) => readFile(filePath, 'utf8'))),
       productionBefore
@@ -563,7 +579,7 @@ test('preserves a pre-existing unindexed snapshot file when a production collisi
 test('removes unambiguous updater temporary files before a production run', async () => {
   const { root, paths } = await createTemporaryProductionPaths();
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
-  const html = await readFile(new URL('../data/apple-snapshots/2026-07-17.html', import.meta.url), 'utf8');
+  const html = buildAppleHtml(data);
   const fxPayload = {
     result: 'success',
     base_code: 'USD',
@@ -871,8 +887,8 @@ test('cleans up only created snapshot files when index writing fails', async () 
 test('preserves pre-existing snapshot evidence when exclusive creation fails', async () => {
   const snapshotsDir = await mkdtemp(path.join(tmpdir(), 'icloud-snapshot-collision-'));
   const indexPath = path.join(snapshotsDir, 'index.json');
-  const snapshotPath = path.join(snapshotsDir, '2026-04-06.html');
-  const preserved = '<html>preserved evidence</html>';
+  const snapshotPath = path.join(snapshotsDir, '2026-04-06.json');
+  const preserved = '{"preserved":true}';
   const parsed = {
     sourcePublishedDate: 'Published Date: April 06, 2026',
     parser: 'cross-checked',
@@ -889,13 +905,13 @@ test('preserves pre-existing snapshot evidence when exclusive creation fails', a
       { code: 'EEXIST' }
     );
     assert.equal(await readFile(snapshotPath, 'utf8'), preserved);
-    assert.deepEqual(await readdir(snapshotsDir), ['2026-04-06.html']);
+    assert.deepEqual(await readdir(snapshotsDir), ['2026-04-06.json']);
   } finally {
     await rm(snapshotsDir, { recursive: true, force: true });
   }
 });
 
-test('writes a failure report and Apple response diagnostic', async () => {
+test('writes a failure report and normalized Apple diagnostic', async () => {
   const diagnosticsDir = await mkdtemp(path.join(tmpdir(), 'icloud-diagnostics-'));
   const summaryPath = path.join(diagnosticsDir, 'summary.md');
   const startedAt = new Date('2026-08-02T15:00:00.000Z');
@@ -903,15 +919,15 @@ test('writes a failure report and Apple response diagnostic', async () => {
   try {
     const report = await writeFailureDiagnostics(new Error('snapshot write failed'), {
       diagnosticsDir,
-      appleHtml: '<html>diagnostic</html>',
+      appleSnapshot: { schemaVersion: 1, publishedDate: '2026-07-17', tiers: [], countries: [] },
       startedAt,
       finishedAt,
       stepSummaryPath: summaryPath
     });
     const files = await readdir(diagnosticsDir);
-    assert.deepEqual(files.sort(), ['apple-response-20260802T150000Z.html', 'run-report.json', 'summary.md']);
+    assert.deepEqual(files.sort(), ['apple-snapshot.json', 'run-report.json', 'summary.md']);
     assert.equal(report.status, 'failure');
-    assert.equal(report.appleResponseCaptured, true);
+    assert.equal(report.appleSnapshotCaptured, true);
     assert.equal(JSON.parse(await readFile(path.join(diagnosticsDir, 'run-report.json'), 'utf8')).error.message, 'snapshot write failed');
     assert.match(await readFile(summaryPath, 'utf8'), /snapshot write failed/);
   } finally {
@@ -946,11 +962,9 @@ test('captures the current Apple response for failure diagnostics', async () => 
       diagnosticsDir,
       stepSummaryPath: null
     });
-    const diagnosticFile = (await readdir(diagnosticsDir)).find((name) => name.startsWith('apple-response-'));
-    assert.ok(diagnosticFile, 'failure diagnostics should include the current Apple response');
-    const diagnosticHtml = await readFile(path.join(diagnosticsDir, diagnosticFile), 'utf8');
-    assert.match(diagnosticHtml, /July 17, 2026/);
-    assert.doesNotMatch(diagnosticHtml, /January 1, 2099/);
+    const diagnosticFile = path.join(diagnosticsDir, 'apple-snapshot.json');
+    const diagnostic = JSON.parse(await readFile(diagnosticFile, 'utf8'));
+    assert.equal(diagnostic.publishedDate, '2026-07-17');
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -1154,7 +1168,7 @@ test('uses the authenticated exchange-rate endpoint without putting the key in t
     assert.equal(fx.fallbackUsed, false);
     assert.equal(fx.fallbackReason, null);
     assert.equal(fx.apiKeyStatus, 'valid');
-    assert.equal(fx.rates.JPY, 150);
+    assert.deepEqual(fx.rates, { CNY: 7.2, JPY: 150, USD: 1 });
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -1218,7 +1232,7 @@ test('falls back when the authenticated response omits a required currency', asy
     assert.equal(fx.fallbackUsed, true);
     assert.equal(fx.fallbackReason, 'missing-rates');
     assert.equal(fx.apiKeyStatus, 'missing-rates');
-    assert.equal(fx.rates.JPY, 150);
+    assert.deepEqual(fx.rates, { CNY: 7.2, JPY: 150, USD: 1 });
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -1365,7 +1379,7 @@ test('keeps the previous exchange rates when the refresh fails', async () => {
     assert.equal(fx.stale, true);
     assert.equal(fx.apiKeyStatus, 'not-configured');
     assert.equal(fx.fetchedAt, fetchedAt);
-    assert.equal(fx.rates.JPY, 150);
+    assert.deepEqual(fx.rates, { CNY: 7.1, USD: 1 });
   } finally {
     globalThis.fetch = originalFetch;
     globalThis.setTimeout = originalSetTimeout;
@@ -1994,7 +2008,7 @@ test('initializes the confirmation date before saving a production snapshot', as
 test('fails closed when the snapshot index is missing while evidence exists', async () => {
   const { root, paths } = await createTemporaryProductionPaths({ copySnapshots: false });
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
-  const html = await readFile(new URL('../data/apple-snapshots/2026-07-17.html', import.meta.url), 'utf8');
+  const html = buildAppleHtml(data);
   const fxPayload = {
     result: 'success',
     base_code: 'USD',
@@ -2035,7 +2049,7 @@ test('fails closed when the snapshot index is missing while evidence exists', as
 test('fails closed on an invalid snapshot index without deleting evidence', async () => {
   const { root, paths } = await createTemporaryProductionPaths({ copySnapshots: false });
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
-  const html = await readFile(new URL('../data/apple-snapshots/2026-07-17.html', import.meta.url), 'utf8');
+  const html = buildAppleHtml(data);
   const fxPayload = {
     result: 'success',
     base_code: 'USD',
@@ -2063,7 +2077,7 @@ test('fails closed on an invalid snapshot index without deleting evidence', asyn
 test('fails closed on an empty snapshot index without deleting evidence', async () => {
   const { root, paths } = await createTemporaryProductionPaths({ copySnapshots: false });
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
-  const html = await readFile(new URL('../data/apple-snapshots/2026-07-17.html', import.meta.url), 'utf8');
+  const html = buildAppleHtml(data);
   const fxPayload = {
     result: 'success',
     base_code: 'USD',
@@ -2126,7 +2140,7 @@ test('fails closed when a snapshot index omits existing evidence', async () => {
 });
 
 test('fails closed when indexed snapshot evidence is missing', async () => {
-  for (const field of ['file', 'dataFile']) {
+  for (const field of ['dataFile']) {
     const { root, paths } = await createTemporaryProductionPaths({ copySnapshots: false });
     const index = await copyCommittedSnapshotStore(paths);
     const missingFile = index.snapshots[0].revisions[0][field];
@@ -2362,7 +2376,7 @@ test('rejects current prices that disagree with the active snapshot evidence', a
 test('rejects malformed history countries before any production write', async () => {
   const { root, paths } = await createTemporaryProductionPaths();
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
-  const html = await readFile(new URL('../data/apple-snapshots/2026-07-17.html', import.meta.url), 'utf8');
+  const html = buildAppleHtml(data);
   const fxPayload = {
     result: 'success',
     base_code: 'USD',
@@ -2465,7 +2479,6 @@ test('recovers an interrupted update transaction before the next network fetch',
   })));
   const originalSnapshotIndexText = await readFile(paths.snapshotIndexPath, 'utf8');
   const createdSnapshotFiles = [
-    path.join(paths.snapshotsDir, '2026-08-07-aaaaaaaaaaaa.html'),
     path.join(paths.snapshotsDir, '2026-08-07-aaaaaaaaaaaa.json')
   ];
   const originalFetch = globalThis.fetch;

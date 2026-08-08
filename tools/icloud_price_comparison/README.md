@@ -37,8 +37,8 @@ Secret 只配置在仓库 **Settings > Secrets and variables > Actions**。密�
 1. 安装锁定依赖，运行 `pnpm test:core`。
 2. 抓取 Apple 页面，由 `document-order` 和 `apple-markers` 两条路径独立解析。
 3. 校验发布日期、地区、分区、容量、价格、汇率和异常调价。
-4. 写入当前价格、历史、运行日志和 Apple 快照；随后运行 `pnpm test:data`，并用 runner 预装的 Chrome 验证更新后的页面。
-5. 上传诊断附件（保留 14 天），确认远端 `main` 仍是本次生成基线；复跑核心与数据测试后提交并推送 `data/` 变更。若远端已经前进，本次运行停止并等待下次重试。
+4. 写入当前价格、历史、运行日志和规范化 Apple JSON 快照；随后运行 `pnpm test:data`，并用 runner 预装的 Chrome 验证更新后的页面。
+5. 将已经通过测试的 `data/` 打包并校验哈希，以只读构建任务上传；拥有写权限的独立发布任务只下载该工件、确认远端 `main` 仍是生成基线，再提交并推送。远端已前进时停止发布并等待下次重试。
 
 UI 测试、抓取、解析、数据校验或生产写入任一步骤失败都会停止提交；生产写入失败时恢复上一份有效数据。
 
@@ -46,10 +46,10 @@ UI 测试、抓取、解析、数据校验或生产写入任一步骤失败都�
 
 | 文件 | 内容 | 保留策略 |
 | --- | --- | --- |
-| `data/prices.json` | 当前有效价格、Apple 来源和发布日期、容量、汇率、解析器和运行时间 | 只保留最新有效快照 |
+| `data/prices.json` | 当前有效价格、Apple 来源和发布日期、容量、计算所需的最小汇率集、解析器和运行时间 | 只保留最新有效快照 |
 | `data/history.json` | 地区价格/币种事件和 Apple 发布日期事件 | 真实变化才追加；同一发布日期不重复 |
 | `data/run-log.json` | 成功运行的来源、数量、耗时、汇率状态和差异 | 最近 90 条成功运行 |
-| `data/apple-snapshots/` | Apple HTML 证据、规范化 JSON 和 `index.json` | 见 `data/apple-snapshots/README.md`；旧修订不覆盖 |
+| `data/apple-snapshots/` | Apple 页面解析后的规范化 JSON 证据和 `index.json` | 见 `data/apple-snapshots/README.md`；不保存原始 HTML，旧修订不覆盖 |
 
 当前有效快照的生成时间和 Apple `Published Date` 见 `data/prices.json`；当前快照包含 73 个地区、44 种币种、5 个容量和 365 个价格点，后续自动运行可能改变这些数量。
 
@@ -60,7 +60,7 @@ UI 测试、抓取、解析、数据校验或生产写入任一步骤失败都�
 - 两套解析器一致时标记 `cross-checked`；单路失败可降级，两路分歧或同时失败则拒绝更新。
 - 只接受 Apple 价格；Wayback 仅用于导入历史 Apple 页面证据，不是替代价格源。
 - Apple 发布日期缺失、格式无效、倒退或晚于本次观测日期时拒绝更新。
-- 拒绝重复地区、关键分区缺失、价格容量不完整，以及地区数比上一份有效数据下降超过 3 个。
+- 拒绝重复地区、关键分区缺失和价格容量不完整。若 Apple 合法下架任意数量的地区，必须用第二次独立请求得到相同发布日期、相同规范化内容和完全一致的下架名单才允许同步；数量不再决定能否下架。分区数量保护仍会拦截标题或区域结构被误解析造成的批量假下架。
 - 同一币种的单项价格超过旧价 10 倍或低于旧价 1/10 时拒绝更新。
 - 币种变化时使用新旧汇率分别折算人民币，同样执行 10 倍硬限制和联合异常校验，不能通过换币种绕过检查。
 - 联合异常需同时达到至少 200% 的涨幅、当地金额门槛、按旧汇率计算的人民币门槛和按当前汇率计算的人民币门槛；人民币门槛为 `max(15 元, 上次人民币价值 × 50%)`。
@@ -75,7 +75,9 @@ UI 测试、抓取、解析、数据校验或生产写入任一步骤失败都�
 
 - 成功摘要：解析状态、地区/价格点数量、Apple 日期、汇率时间、汇率来源和本次变化。
 - 黄色提示：解析降级或汇率回退需要复核；核心数据可能已经提交。
-- 红色失败：先看第一个失败步骤，再下载 `icloud-price-diagnostics-*` 附件。失败附件通常含 `run-report.json` 和 `apple-response-*.html`。
+- 红色失败：先看第一个失败步骤，再下载 `icloud-price-diagnostics-*` 附件。失败附件只含结构化运行报告和成功解析后的规范化 JSON，不保存失败响应或 Apple 原始 HTML。
+
+可选的第三方告警使用 Healthchecks：创建一个周期约 26 小时、宽限期约 4 小时的检查，将 Ping URL 保存为 Actions Secret `ICLOUD_HEALTHCHECK_PING_URL`。工作流成功发送 `/0`，失败发送 `/1`；未配置或告警服务自身短暂不可用都不会阻塞价格更新。Cloudflare 08:05 仍是主触发，GitHub 08:10 只是备用。
 
 容量预警阈值为 Git 历史 500 MiB、800 MiB，或 `history.json` 2 MiB；工作流不会自动清理 Git 历史。恢复数据时使用 Git 历史中的完整 `data/` 文件，不要手工拼接 JSON。
 
@@ -110,7 +112,7 @@ pnpm audit --audit-level low
 - `pnpm test:browsers`：在独立进程中并行运行 Chromium 和 WebKit 的同一套 UI 验收。
 - `pnpm test:ui`：启动本地静态服务器并优先使用 Playwright Chromium；未安装时回退系统 Chrome/Chromium，CI 没有浏览器会失败，本地没有浏览器会跳过。
 - `pnpm test:webkit`：使用 Playwright WebKit 运行同一套 UI 验收，用于覆盖 Safari/WebKit 兼容性。
-- `pnpm validate:snapshots`：深度解析全部 Apple HTML/JSON 快照；日常核心测试只核对全部原始哈希并深度解析最新活动修订。
+- `pnpm validate:snapshots`：深度校验全部规范化 Apple JSON 快照、索引和哈希；任何未入索引的 HTML 或 JSON 都会失败。
 - `pnpm check:live`：只读访问 Apple 和汇率服务并执行校验，不写生产文件。
 - `pnpm update:data`：写入生产数据，只用于明确的手动更新或隔离环境。
 
@@ -126,7 +128,7 @@ python -m http.server 4173
 
 ## Apple 页面快照与历史导入
 
-`data/apple-snapshots/` 保存每个 Apple `Published Date` 的 HTML 证据、规范化 JSON 和索引。生产更新和历史导入的文件命名、修订、`firstConfirmedDate`、回滚和完整性要求见 `data/apple-snapshots/README.md`。
+`data/apple-snapshots/` 只保存每个 Apple `Published Date` 的规范化 JSON 和索引。生产更新和历史导入的文件命名、修订、`firstConfirmedDate`、回滚和完整性要求见 `data/apple-snapshots/README.md`。导入器可以读取外部历史 HTML，但不会把 HTML 写进仓库。
 
 历史资料导入（命令从本目录执行）：
 
@@ -145,3 +147,10 @@ node scripts/import-apple-archives.mjs --input <包含完整历史快照的目�
 - 汇率：[ExchangeRate-API](https://www.exchangerate-api.com/docs/overview)，开放接口作为自动回退
 
 人民币金额仅用于横向比较；税费、可用性和购买区域限制以 Apple 对应地区页面及结算结果为准。本工具与 Apple Inc. 无关联。
+
+## 隐私、安全与许可
+
+- Google Analytics 只有在访客明确点击“允许匿名统计”后才加载；拒绝不影响功能，页脚可随时重新打开隐私设置。
+- 前端只展示本页换算所需的币种汇率，汇率署名链接固定为 [Rates By Exchange Rate API](https://www.exchangerate-api.com)。
+- Cloudflare 上线响应头配置见 `SECURITY_HEADERS.md`；其中 `frame-ancestors` 无法由 HTML `<meta>` 代替。
+- 本项目自有代码许可见 `LICENSE`，第三方前端资源的版本、哈希和完整许可文本见 `THIRD_PARTY_NOTICES.md` 与 `vendor/manifest.json`。Dependabot 每周检查 npm 和 GitHub Actions 更新。
