@@ -766,7 +766,7 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
   .minimum-card { min-height: 79px; padding: 9px; }
   .minimum-card .minimum-price { font-size: 15px; }
   .price-table th:nth-child(2),
-  .price-table td:nth-child(2) { width: 43%; }
+  .price-table td:nth-child(2) { width: 43%; padding-left: 18px; }
   .price-table th,
   .price-table td { padding-inline: 9px; }
   .price-table th button { margin-inline: -9px; padding-inline: 9px; }
