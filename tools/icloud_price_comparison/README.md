@@ -36,7 +36,7 @@ Secret 只配置在仓库 **Settings > Secrets and variables > Actions**。密�
 
 1. 安装锁定依赖，运行 `pnpm test:core`。
 2. 抓取 Apple 页面，由 `document-order` 和 `apple-markers` 两条 DOM 关联路径分别解析并逐字段比对。前者按通用标题/列表的文档顺序关联地区与价格，后者按 Apple 的区域 ID 和 `.gb-header` 标记关联；两者共享币种、数字、容量等底层规范化，因此属于结构关联层冗余，不宣称完全独立实现。
-3. 校验发布日期、地区、分区、容量、价格、汇率和异常调价。
+3. 校验发布日期、地区、分区、容量、价格、汇率和异常调价；国家或容量集合发生变化时，再执行一次无缓存抓取并要求两次完整结果一致。
 4. 写入当前价格、历史、运行日志和规范化 Apple JSON 快照；随后运行 `pnpm test:data`，并用 runner 预装的 Chrome 验证更新后的页面。
 5. 将已经通过测试的 `data/` 打包并校验哈希，以只读构建任务上传；拥有写权限的独立发布任务只下载该工件、确认远端 `main` 仍是生成基线，再提交并推送。远端已前进时停止发布并等待下次重试。
 
@@ -60,7 +60,7 @@ UI 测试、抓取、解析、数据校验或生产写入任一步骤失败都�
 - 两条 DOM 关联路径逐字段一致时标记 `cross-checked`；单路失败可降级，两路分歧或同时失败则拒绝更新。两路采用不同的页面结构定位维度，但共享底层价格/币种/容量规范化；它能发现区域定位和列表关联漂移，不能对共享规范化代码里的同一缺陷提供完全独立证明。
 - 只接受 Apple 价格；Wayback 仅用于导入历史 Apple 页面证据，不是替代价格源。
 - Apple 发布日期缺失、格式无效、倒退或晚于本次观测日期时拒绝更新。
-- 拒绝重复地区、关键分区缺失和价格容量不完整。若 Apple 合法下架任意数量的地区，必须用第二次独立请求得到相同发布日期、相同规范化内容和完全一致的下架名单才允许同步；数量不再决定能否下架。分区数量保护仍会拦截标题或区域结构被误解析造成的批量假下架。
+- 拒绝重复地区、关键分区缺失和价格容量不完整。国家或容量集合只要新增或移除，就必须用第二次独立请求得到相同发布日期、相同规范化内容和完全一致的变化集合后才允许同步；数量不决定合法变化能否发布。Apple 新增但尚无中文映射的国家经过该确认后使用官方英文名，合法下架同样正常同步。
 - 同一币种的单项价格超过旧价 10 倍或低于旧价 1/10 时拒绝更新。
 - 币种变化时使用新旧汇率分别折算人民币，同样执行 10 倍硬限制和联合异常校验，不能通过换币种绕过检查。
 - 联合异常需同时达到至少 200% 的涨幅、当地金额门槛、按旧汇率计算的人民币门槛和按当前汇率计算的人民币门槛；人民币门槛为 `max(15 元, 上次人民币价值 × 50%)`。
@@ -80,12 +80,12 @@ UI 测试、抓取、解析、数据校验或生产写入任一步骤失败都�
 可选的第三方告警已接入 Healthchecks，启用步骤如下：
 
 1. 在 [Healthchecks.io](https://healthchecks.io/) 免费账户中新建检查，名称建议 `iCloud price daily update`。
-2. 推荐使用 Cron 计划 `5 0 * * *`、时区 `UTC`、Grace Time `4 hours`；它对应北京时间 08:05 主触发，并给 GitHub 08:10 备用和完整更新留出时间。也可用简单周期 `26 hours` 加 `4 hours` 宽限。
+2. 使用 Cron 计划 `5 8 * * *`、时区 `Asia/Shanghai`、Grace Time `25 hours`。长宽限用于只在连续多日没有成功更新时告警，而不是因单次网络波动立即发邮件。
 3. 给检查启用至少一个真正会查看的通知渠道（邮件最简单），复制该检查的私密 Ping URL。
 4. 在仓库 **Settings > Secrets and variables > Actions > New repository secret** 新建 `ICLOUD_HEALTHCHECK_PING_URL`，值为不带结尾 `/0` 或 `/1` 的基础 Ping URL。
 5. 在 **Actions > Update iCloud prices > Run workflow** 手动运行一次，确认 Healthchecks 最近事件显示退出码 `0`。不要把 Ping URL 写进仓库、日志或公开 Issue。
 
-工作流完成后成功发送 `/0`、失败发送 `/1`；每日幂等跳过也视为成功。心跳步骤设置了 `continue-on-error`，未配置或告警服务短暂不可用都不会反过来阻塞价格更新。Cloudflare 08:05 仍是主触发，GitHub 08:10 是备用；外部心跳的价值是当两个入口都没有完成时仍能从 Cloudflare/GitHub 之外发出“未按时运行”告警。
+工作流成功或每日幂等跳过时发送 `/0`；数据损坏、解析降级、发布工件校验失败等严重故障发送 `/1`；普通网络超时等暂时性失败不发送信号，由 25 小时 Grace Time 判断是否连续多日未成功。心跳步骤设置了 `continue-on-error`，未配置或告警服务短暂不可用都不会反过来阻塞价格更新。Cloudflare 08:05 仍是主触发，GitHub 08:10 是备用；外部心跳的价值是当两个入口都没有完成时仍能从 Cloudflare/GitHub 之外发出“未按时运行”告警。
 
 Healthchecks 不是唯一选择。UptimeRobot 免费版包含 heartbeat/cron 和网站可用性监控，Better Stack 免费版也包含 heartbeat、站点监控和事件管理；但当前 `/0`、`/1` 实现按 Healthchecks 的退出码 Ping API 编写，换服务前要适配对应的成功/失败 URL。Cloudflare Cron Events 能查看 Worker 最近 100 次计划调用；Cloudflare 独立 Health Checks 可监测网址/源站可用性，但仅 Pro 及以上提供，并不能直接证明每日 GitHub 数据更新成功。若由同一个 Cloudflare 账户同时负责触发和告警，Cloudflare 自身故障时会形成共同失效点，因此仍建议保留一个外部心跳。
 
@@ -126,7 +126,7 @@ pnpm audit --audit-level low
 - `pnpm check:live`：只读访问 Apple 和汇率服务并执行校验，不写生产文件。
 - `pnpm update:data`：写入生产数据，只用于明确的手动更新或隔离环境。
 
-`.github/workflows/validate-icloud-price-comparison.yml` 会在相关 PR、人工 `main` 推送和手动触发时以只读权限运行核心、Chromium、WebKit 和依赖漏洞检查；手动及每周计划任务还会深度审计全部 Apple 快照；每周计划任务在北京时间周一 06:05 运行。每日更新使用 runner Chrome，自动数据提交不会重复启动该完整验证。仓库使用的 Action 全部固定到完整提交 SHA。
+`.github/workflows/validate-icloud-price-comparison.yml` 会在相关 PR、人工 `main` 推送、手动触发及每周计划任务中，以只读权限运行核心、全部 Apple 快照深审、Chromium、WebKit 和依赖漏洞检查；每周计划任务在北京时间周一 06:05 运行。每日更新使用 runner Chrome，自动数据提交不会重复启动该完整验证。仓库使用的 Action 全部固定到完整提交 SHA。
 
 本地预览从仓库根目录启动静态服务器：
 
@@ -146,7 +146,7 @@ python -m http.server 4173
 node scripts/import-apple-archives.mjs --input <包含完整历史快照的目录>
 ```
 
-输入目录必须包含索引中除当前 live 日期以外的所有既有发布日期；空目录或不完整目录会拒绝。导入使用隔离临时目录，校验和写入任一环节失败都会恢复原有历史和索引。
+输入目录必须包含索引中除当前 live 日期以外的所有既有发布日期，并且地区名必须存在于已复核的 Apple 名称表；空目录、不完整目录或未知地区会拒绝。导入使用隔离临时目录，校验和写入任一环节失败都会恢复原有历史和索引。
 
 这里的“当前 live 日期”是 `data/prices.json.source.publishedDate` 规范化后的日期。
 
@@ -160,6 +160,7 @@ node scripts/import-apple-archives.mjs --input <包含完整历史快照的目�
 
 ## 隐私、安全与许可
 
-- Google Analytics 不写在阻塞渲染的 HTML 中；页面及核心价格数据加载完成后，浏览器在空闲阶段异步加载统计脚本。页面不显示统计同意弹窗或隐私设置入口；Google 服务无法访问时不影响价格比较。
+- Google Analytics 不写在阻塞渲染的 HTML 中；页面及核心价格数据加载完成后，浏览器在空闲阶段异步加载统计脚本。自由文本搜索词只保留在当前页面状态，不写入 URL，也不会作为 GA4 搜索事件发送；Google Signals 和广告个性化信号在页面配置中关闭。页面不显示统计同意弹窗或隐私设置入口；Google 服务无法访问时不影响价格比较。
+- Cloudflare Web Analytics 与 GA4 同时保留：前者用于基础访问和真实用户性能，后者用于 GA4 报表，两边统计口径不可相加。CSP 允许 Cloudflare 自动注入的 beacon；本页入口脚本使用 `data-cfasync="false"`，避免 Rocket Loader 改写 ES modules。
 - 前端只展示本页换算所需的币种汇率，汇率署名链接固定为 [Rates By Exchange Rate API](https://www.exchangerate-api.com)。
 - 本项目自有代码许可见 `LICENSE`，第三方前端资源的版本、哈希和完整许可文本见 `THIRD_PARTY_NOTICES.md` 与 `vendor/manifest.json`。Dependabot 每周检查 npm 和 GitHub Actions 更新。

@@ -20,6 +20,8 @@ function run({
   return {
     id,
     status,
+    startedAtUtc: '2026-08-02T00:05:00.000Z',
+    finishedAtUtc: id,
     trigger: 'cloudflare',
     automaticRunDateBeijing: date,
     source: {
@@ -62,6 +64,19 @@ test('reruns when a same-day automatic run has future exchange-rate data', () =>
     now
   });
   assert.equal(formatBeijingDate('2026-08-02T02:00:00.000Z'), '2026-08-02');
+  assert.equal(result.shouldRun, true);
+  assert.equal(result.previousRun, null);
+});
+
+test('reruns when a same-day success record has future run timestamps', () => {
+  const futureRun = run();
+  futureRun.startedAtUtc = '2026-08-02T02:00:00.000Z';
+  futureRun.finishedAtUtc = '2026-08-02T02:01:00.000Z';
+  const result = evaluateDailyRun({
+    runLog: { schemaVersion: 1, runs: [futureRun] },
+    eventName: 'schedule',
+    now: new Date('2026-08-02T00:10:00.000Z')
+  });
   assert.equal(result.shouldRun, true);
   assert.equal(result.previousRun, null);
 });

@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import { canonicalTierDefinition } from '../data-contract.js';
 
 const REGIONS = {
   nasalac: 'Americas',
@@ -22,13 +23,8 @@ function parseTier(value) {
   if (!match) return null;
   const amount = Number(match[1]);
   const unit = match[2].toUpperCase();
-  const capacityGb = amount * (unit === 'TB' ? 1024 : 1);
-  if (!Number.isFinite(amount) || amount <= 0 || !Number.isFinite(capacityGb) || capacityGb <= 0) return null;
-  return {
-    id: `${amount}${unit}`,
-    label: `${amount} ${unit}`,
-    capacityGb
-  };
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  return canonicalTierDefinition(`${amount}${unit}`);
 }
 
 function isCurrencyDecoration(value) {
