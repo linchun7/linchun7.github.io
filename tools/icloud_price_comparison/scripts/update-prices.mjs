@@ -35,6 +35,17 @@ const DRY_RUN = process.argv.includes('--dry-run');
 let lastAppleSnapshot = null;
 let runStartedAt = new Date();
 
+function transientHealthcheckError(message, { code = null, cause = null } = {}) {
+  const error = new Error(message, cause ? { cause } : undefined);
+  if (code) error.code = code;
+  error.healthcheckSeverity = 'transient';
+  return error;
+}
+
+export function classifyHealthcheckFailure(error) {
+  return error?.healthcheckSeverity === 'transient' ? 'transient' : 'severe';
+}
+
 export function defaultUpdateLockPath(currentDataPath = CURRENT_DATA_PATH) {
   return path.join(path.dirname(path.dirname(currentDataPath)), '.icloud-price-update.lock');
 }
@@ -57,9 +68,9 @@ export function createNetworkBudget({
 }
 
 function networkDeadlineError(resourceName) {
-  const error = new Error(`Network deadline exceeded while fetching ${resourceName}`);
-  error.code = 'NETWORK_DEADLINE_EXCEEDED';
-  return error;
+  return transientHealthcheckError(`Network deadline exceeded while fetching ${resourceName}`, {
+    code: 'NETWORK_DEADLINE_EXCEEDED'
+  });
 }
 
 function remainingNetworkBudget(networkBudget) {
@@ -121,7 +132,10 @@ export async function fetchResource(url, {
     }
   }
   if (lastError?.code === 'NETWORK_DEADLINE_EXCEEDED') throw lastError;
-  throw new Error(`Failed to fetch ${resourceName}: ${lastError?.message}`);
+  throw transientHealthcheckError(`Failed to fetch ${resourceName}: ${lastError?.message}`, {
+    code: 'NETWORK_FETCH_FAILED',
+    cause: lastError
+  });
 }
 
 async function readJson(filePath, fallback = null) {
@@ -281,18 +295,26 @@ export async function getExchangeRates(previousData, {
   const previousCny = previousData?.fx?.rates?.CNY;
   const failureMessage = failures.map(({ sourceMode, message }) => `${sourceMode}: ${message}`).join('; ');
   if (previousUsd !== 1 || !Number.isFinite(previousCny) || previousCny <= 0) {
-    throw new Error(failureMessage || 'Exchange-rate update failed');
+    throw transientHealthcheckError(failureMessage || 'Exchange-rate update failed', {
+      code: 'EXCHANGE_RATE_SOURCES_UNAVAILABLE'
+    });
   }
   try {
     validateExchangeRateFreshness(previousData.fx.fetchedAt);
   } catch (error) {
-    throw new Error(`${failureMessage}; previous exchange rates are unusable: ${error.message}`, { cause: error });
+    throw transientHealthcheckError(`${failureMessage}; previous exchange rates are unusable: ${error.message}`, {
+      code: 'EXCHANGE_RATE_SOURCES_UNAVAILABLE',
+      cause: error
+    });
   }
   const missingPreviousRates = requiredCurrencies.filter(
     (currency) => !Number.isFinite(previousData.fx.rates[currency]) || previousData.fx.rates[currency] <= 0
   );
   if (missingPreviousRates.length) {
-    throw new Error(`${failureMessage}; previous exchange rates are missing for: ${missingPreviousRates.join(', ')}`);
+    throw transientHealthcheckError(
+      `${failureMessage}; previous exchange rates are missing for: ${missingPreviousRates.join(', ')}`,
+      { code: 'EXCHANGE_RATE_SOURCES_UNAVAILABLE' }
+    );
   }
   console.warn(`Exchange-rate update failed; keeping previous rates: ${failureMessage}`);
   return {
@@ -809,7 +831,9 @@ export async function acquireUpdateLock(lockPath, {
   })}\n`;
   for (let attempt = 0; attempt < 4; attempt += 1) {
     if (await hasActiveLockClaim(lockPath)) {
-      throw new Error('Another iCloud price update is already running');
+      throw transientHealthcheckError('Another iCloud price update is already running', {
+        code: 'UPDATE_ALREADY_RUNNING'
+      });
     }
     try {
       await writeFile(lockPath, lockContents, { flag: 'wx', encoding: 'utf8' });
@@ -819,10 +843,16 @@ export async function acquireUpdateLock(lockPath, {
       const contents = await readLockContents(lockPath);
       if (contents === null) continue;
       if (!(await isStaleUpdateLock(lockPath, contents, staleAfterMs))) {
-        throw new Error('Another iCloud price update is already running');
+        throw transientHealthcheckError('Another iCloud price update is already running', {
+          code: 'UPDATE_ALREADY_RUNNING'
+        });
       }
       const claim = await claimLockMutation(lockPath, contents, 'stale-recovery');
-      if (!claim.owned) throw new Error('Another iCloud price update is already running');
+      if (!claim.owned) {
+        throw transientHealthcheckError('Another iCloud price update is already running', {
+          code: 'UPDATE_ALREADY_RUNNING'
+        });
+      }
       try {
         if (onStaleLockClaimed) await onStaleLockClaimed({ lockPath, claimPath: claim.claimPath });
         const confirmed = await readLockContents(lockPath);
@@ -840,7 +870,9 @@ export async function acquireUpdateLock(lockPath, {
       }
     }
   }
-  throw new Error('Unable to acquire the iCloud price update lock');
+  throw transientHealthcheckError('Unable to acquire the iCloud price update lock', {
+    code: 'UPDATE_LOCK_CONTENTION'
+  });
 }
 async function cleanupUpdaterTemporaryFiles({ currentDataPath, historyPath, runLogPath, snapshotsDir, snapshotIndexPath }) {
   const directories = new Set([
@@ -956,6 +988,7 @@ function failureRunLogEntry(error, startedAt, finishedAt, appleSnapshotCaptured 
       message: error.message,
       stack: error.stack ?? null
     },
+    healthcheckSeverity: classifyHealthcheckFailure(error),
     appleSnapshotCaptured
   };
 }
