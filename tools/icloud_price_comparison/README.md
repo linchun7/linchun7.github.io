@@ -162,5 +162,4 @@ node scripts/import-apple-archives.mjs --input <包含完整历史快照的目�
 
 - Google Analytics 不写在阻塞渲染的 HTML 中；页面及核心价格数据加载完成后，浏览器在空闲阶段异步加载统计脚本。页面不显示统计同意弹窗或隐私设置入口；Google 服务无法访问时不影响价格比较。
 - 前端只展示本页换算所需的币种汇率，汇率署名链接固定为 [Rates By Exchange Rate API](https://www.exchangerate-api.com)。
-- Cloudflare 上线时应在响应头转换规则中补充 CSP 等安全响应头；其中 `frame-ancestors` 无法由 HTML `<meta>` 代替，具体配置由站点管理员在 Cloudflare Dashboard 中维护。
 - 本项目自有代码许可见 `LICENSE`，第三方前端资源的版本、哈希和完整许可文本见 `THIRD_PARTY_NOTICES.md` 与 `vendor/manifest.json`。Dependabot 每周检查 npm 和 GitHub Actions 更新。
