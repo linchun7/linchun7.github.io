@@ -1654,9 +1654,16 @@ test('keeps the minimum-price overview stable and the desktop table header stick
       const gaps = await page.locator('#minimumSummary .minimum-card').evaluateAll((cards) => cards.map((card) => {
         const tierBox = card.querySelector('.minimum-tier-label').getBoundingClientRect();
         const countryBox = card.querySelector('.minimum-country').getBoundingClientRect();
-        return countryBox.top - tierBox.bottom;
+        const priceBox = card.querySelector('.minimum-price').getBoundingClientRect();
+        return {
+          tierToCountry: countryBox.top - tierBox.bottom,
+          countryToPrice: priceBox.top - countryBox.bottom
+        };
       }));
-      assert.ok(Math.min(...gaps) >= 4, `${viewport} capacity labels must not overlap country names; smallest gap was ${Math.min(...gaps)}px`);
+      const smallestGap = Math.min(...gaps.flatMap(({ tierToCountry, countryToPrice }) => [tierToCountry, countryToPrice]));
+      const largestImbalance = Math.max(...gaps.map(({ tierToCountry, countryToPrice }) => Math.abs(tierToCountry - countryToPrice)));
+      assert.ok(smallestGap >= 3, `${viewport} card labels must remain separated; smallest gap was ${smallestGap}px`);
+      assert.ok(largestImbalance <= 1, `${viewport} card spacing must stay balanced; largest difference was ${largestImbalance}px`);
     };
     await assertMinimumCardSpacing('mobile');
 
@@ -1742,8 +1749,9 @@ test('restores URL state, removes the floating search bar, and supports table re
 
     await page.locator(`th[data-tier="${alternateTier}"] button`).click();
     assert.equal(await page.locator(`th[data-tier="${alternateTier}"]`).getAttribute('aria-sort'), 'descending');
-    assert.equal(await alternateMinimumCard.getAttribute('aria-pressed'), 'true');
-    assert.equal(await alternateMinimumCard.evaluate((card) => card.classList.contains('is-active-tier')), true);
+    assert.equal(await alternateMinimumCard.getAttribute('aria-pressed'), 'false');
+    assert.equal(await alternateMinimumCard.evaluate((card) => card.classList.contains('is-active-tier')), false);
+    assert.equal(await page.locator('#minimumSummary .minimum-card[aria-pressed="true"]').count(), 0);
 
     await page.locator('button[data-sort="country"]').click();
     assert.equal(await page.locator('#minimumSummary .minimum-card[aria-pressed="true"]').count(), 0);

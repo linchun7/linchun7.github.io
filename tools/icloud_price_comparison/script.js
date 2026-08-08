@@ -275,7 +275,7 @@ function renderMinimumSummary() {
     const winner = state.minimumCountries[tier.id];
     const countryName = winner?.nameZh || winner?.country || '暂无地区';
     const item = document.createElement('button');
-    const isActiveTier = state.sortKey === 'tier' && state.sortTier === tier.id;
+    const isActiveTier = state.sortKey === 'tier' && state.sortTier === tier.id && state.sortDirection === 'asc';
     item.type = 'button';
     item.className = 'minimum-card';
     item.classList.toggle('is-active-tier', isActiveTier);
