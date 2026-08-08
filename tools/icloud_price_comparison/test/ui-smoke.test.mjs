@@ -1650,8 +1650,18 @@ test('keeps the minimum-price overview stable and the desktop table header stick
     const afterBox = await page.locator('#minimumSummary').boundingBox();
     assert.ok(before && afterBox && Math.abs(before.height - afterBox.height) <= 2, 'minimum summary height should stay stable across loading');
     assert.equal(await page.locator('#minimumSummary .minimum-card.is-loading').count(), 0);
+    const assertMinimumCardSpacing = async (viewport) => {
+      const gaps = await page.locator('#minimumSummary .minimum-card').evaluateAll((cards) => cards.map((card) => {
+        const tierBox = card.querySelector('.minimum-tier-label').getBoundingClientRect();
+        const countryBox = card.querySelector('.minimum-country').getBoundingClientRect();
+        return countryBox.top - tierBox.bottom;
+      }));
+      assert.ok(Math.min(...gaps) >= 4, `${viewport} capacity labels must not overlap country names; smallest gap was ${Math.min(...gaps)}px`);
+    };
+    await assertMinimumCardSpacing('mobile');
 
     await page.setViewportSize({ width: 1440, height: 800 });
+    await assertMinimumCardSpacing('desktop');
     await page.locator('#priceRows tr[data-country]').nth(35).scrollIntoViewIfNeeded();
     await page.evaluate(() => scrollBy(0, 220));
     const stickyTop = await page.locator('.price-table thead th').first().evaluate((header) => header.getBoundingClientRect().top);
