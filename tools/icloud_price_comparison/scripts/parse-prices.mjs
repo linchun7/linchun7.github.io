@@ -444,7 +444,7 @@ export function parseApplePrices(html) {
     return {
       ...documentOrderResult,
       parser: 'cross-checked',
-      parserStatus: 'Both independent parser paths agreed'
+      parserStatus: 'Both DOM association paths agreed'
     };
   }
   if (documentOrderResult) {
