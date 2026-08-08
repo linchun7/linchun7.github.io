@@ -467,6 +467,7 @@ export function parseApplePrices(html) {
 export function validatePrices(countries, {
   minCountries = 60,
   previousCountries = [],
+  confirmedRemovedCountries = [],
   previousRates,
   currentRates,
   tiers = TIERS
@@ -528,23 +529,34 @@ export function validatePrices(countries, {
     const currentCountryNames = new Set(countries.map(({ country }) => country));
     const missingCountries = [...previousCountryNames].filter((country) => !currentCountryNames.has(country));
     if (missingCountries.length) {
-      const countMessage = countries.length < previousCountries.length - 3
-        ? ` Country count dropped from ${previousCountries.length} to ${countries.length}.`
-        : '';
-      throw new Error(`Previously published countries are missing: ${missingCountries.join(', ')}.${countMessage}`);
+      const confirmed = new Set(confirmedRemovedCountries);
+      const unconfirmed = missingCountries.filter((country) => !confirmed.has(country));
+      const unexpectedConfirmations = [...confirmed].filter((country) => !missingCountries.includes(country));
+      if (unconfirmed.length || unexpectedConfirmations.length || confirmed.size !== missingCountries.length) {
+        const details = [
+          unconfirmed.length ? `unconfirmed: ${unconfirmed.join(', ')}` : null,
+          unexpectedConfirmations.length ? `unexpected confirmations: ${unexpectedConfirmations.join(', ')}` : null
+        ].filter(Boolean).join('; ');
+        throw new Error(`Previously published countries are missing without exact confirmation: ${missingCountries.join(', ')}${details ? ` (${details})` : ''}`);
+      }
     }
 
+    const confirmed = new Set(confirmedRemovedCountries);
     const countByRegion = (entries) => entries.reduce((counts, entry) => {
       counts.set(entry.region, (counts.get(entry.region) ?? 0) + 1);
       return counts;
     }, new Map());
     const previousRegionCounts = countByRegion(previousCountries);
     const currentRegionCounts = countByRegion(countries);
+    const confirmedRemovedByRegion = countByRegion(
+      previousCountries.filter(({ country }) => confirmed.has(country))
+    );
     for (const region of EXPECTED_REGIONS) {
       const previousCount = previousRegionCounts.get(region) ?? 0;
       const currentCount = currentRegionCounts.get(region) ?? 0;
-      if (currentCount < previousCount - 3) {
-        throw new Error(`Country count for ${region} dropped from ${previousCount} to ${currentCount}`);
+      const confirmedRemovalCount = confirmedRemovedByRegion.get(region) ?? 0;
+      if (currentCount < previousCount - confirmedRemovalCount - 3) {
+        throw new Error(`Country count for ${region} dropped from ${previousCount} to ${currentCount} beyond confirmed removals`);
       }
     }
   }

@@ -324,6 +324,29 @@ test('rejects missing previous countries instead of applying a count tolerance',
   );
 });
 
+test('accepts any exact set of independently confirmed country removals', () => {
+  const tiers = [testTier('50GB')];
+  const previousCountries = [
+    testCountry({ '50GB': { price: 10 } }, { country: 'Bahamas' }),
+    testCountry({ '50GB': { price: 10 } }, { country: 'Albania' }),
+    testCountry({ '50GB': { price: 10 } }, { country: 'Australia' }),
+    testCountry({ '50GB': { price: 10 } }, { country: 'Example Two' })
+  ];
+  const currentCountries = previousCountries.slice(0, 1);
+  assert.equal(validatePrices(currentCountries, {
+    minCountries: 1,
+    previousCountries,
+    confirmedRemovedCountries: previousCountries.slice(1).map(({ country }) => country),
+    tiers
+  }), true);
+  assert.throws(() => validatePrices(currentCountries, {
+    minCountries: 1,
+    previousCountries,
+    confirmedRemovedCountries: ['Albania'],
+    tiers
+  }), /missing without exact confirmation/);
+});
+
 test('allows exact tenfold hard-limit boundaries but rejects either side', () => {
   const tiers = [testTier('50GB')];
   const previousCountries = [testCountry({ '50GB': { price: 10 } })];
@@ -553,7 +576,7 @@ test('accepts a newly added country with complete pricing', async () => {
   }), true);
 });
 
-test('rejects duplicate countries and an excessive country-count drop', async () => {
+test('rejects duplicate countries and an unconfirmed country-count drop', async () => {
   const parsed = parseApplePrices(await readFile(fixtureUrl, 'utf8'));
   const duplicate = [...parsed.countries, structuredClone(parsed.countries[0])];
   assert.throws(
@@ -566,7 +589,7 @@ test('rejects duplicate countries and an excessive country-count drop', async ()
       minCountries: 1,
       previousCountries: parsed.countries
     }),
-    /Country count dropped/
+    /missing without exact confirmation/
   );
 });
 
@@ -600,7 +623,7 @@ test('rejects a large regional drop even when the global country count is unchan
       previousCountries,
       tiers: parsed.tiers
     }),
-    /Country count for Americas dropped from 6 to 2/
+    /Country count for Americas dropped from 6 to 2 beyond confirmed removals/
   );
 });
 

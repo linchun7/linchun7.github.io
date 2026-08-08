@@ -174,12 +174,61 @@ after(async () => {
 
 test('starts price data early and deprioritizes optional third-party work', async () => {
   const html = await readFile(path.join(PROJECT_DIR, 'index.html'), 'utf8');
-  const eagerPriceFetch = "window.__icloudInitialPriceRequest = fetch('data/prices.json'";
-  assert.ok(html.includes(eagerPriceFetch), 'prices.json should start loading during HTML parsing');
-  assert.ok(html.indexOf(eagerPriceFetch) < html.indexOf('<script type="module" src="script.js"></script>'), 'the initial price request should precede module execution');
+  const eagerPriceFetch = '<script src="price-bootstrap.js?v=3"></script>';
+  assert.ok(html.includes(eagerPriceFetch), 'prices.json bootstrap should run during HTML parsing');
+  assert.ok(html.indexOf(eagerPriceFetch) < html.indexOf('<script type="module" src="script.js?v=3"></script>'), 'the initial price request should precede module execution');
   assert.doesNotMatch(html, /rel="preload" href="data\/prices\.json"/, 'cross-browser loading should not rely on a fetch preload that WebKit may duplicate');
-  assert.match(html, /<script async fetchpriority="low" src="https:\/\/www\.googletagmanager\.com\/gtag\/js\?id=G-K2S9L4CHNP"><\/script>/);
+  assert.doesNotMatch(html, /<script[^>]+src="https:\/\/www\.googletagmanager\.com/, 'analytics must not load before explicit consent');
+  assert.match(html, /Content-Security-Policy/);
+  assert.match(html, /Rates By Exchange Rate API/);
   assert.doesNotMatch(html, /rel="preconnect" href="https:\/\/raw\.githubusercontent\.com"/, 'the rarely used fallback host should not consume an eager connection');
+});
+
+test('loads GA4 only after explicit consent and keeps rejection reversible', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the analytics consent test');
+  if (!browserConfig) return;
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const analyticsRequests = [];
+  page.on('request', (request) => {
+    if (request.url().includes('googletagmanager.com/gtag/js')) analyticsRequests.push(request.url());
+  });
+  await page.route('https://www.googletagmanager.com/**', (route) => route.fulfill({
+    status: 200,
+    contentType: 'text/javascript',
+    body: ''
+  }));
+  try {
+    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+    await page.locator('#analyticsConsent').waitFor({ state: 'visible' });
+    assert.equal(analyticsRequests.length, 0);
+    assert.equal((await page.context().cookies()).some(({ name }) => name.startsWith('_ga')), false);
+
+    await page.locator('#rejectAnalytics').click();
+    assert.equal(await page.locator('#analyticsConsent').isHidden(), true);
+    assert.equal(await page.evaluate(() => localStorage.getItem('icloud-price-comparison:analytics-consent:v1')), 'denied');
+    assert.equal(analyticsRequests.length, 0);
+
+    await page.locator('#privacySettings').click();
+    assert.equal(await page.locator('#analyticsConsent').isVisible(), true);
+    await page.locator('#acceptAnalytics').click();
+    await page.waitForFunction(() => document.querySelector('script[data-analytics-loader]'));
+    assert.equal(await page.evaluate(() => localStorage.getItem('icloud-price-comparison:analytics-consent:v1')), 'granted');
+    assert.equal(analyticsRequests.length, 1);
+    assert.deepEqual(await page.evaluate(() => dataLayer.map((entry) => ({
+      command: entry[0],
+      value: entry[0] === 'js' ? entry[1] instanceof Date : entry[1],
+      options: entry[2] ?? null
+    }))), [
+      { command: 'consent', value: 'default', options: { analytics_storage: 'granted' } },
+      { command: 'js', value: true, options: null },
+      { command: 'config', value: 'G-K2S9L4CHNP', options: null }
+    ]);
+  } finally {
+    await browser.close();
+  }
 });
 
 test('renders current prices, sorting, and country history in a real browser', { timeout: 60_000 }, async (context) => {
@@ -385,7 +434,10 @@ test('renders current prices, sorting, and country history in a real browser', {
         assert.equal(await page.locator('#sourceLinks .source-group').count(), 2);
         assert.equal(await page.locator('#sourceLinks .source-status svg').count(), 1);
         assert.ok(sourceText.indexOf('Apple iCloud+价格') < sourceText.indexOf('页面发布日期'));
-        assert.ok(sourceText.indexOf('页面发布日期') < sourceText.indexOf('人民币参考汇率'));
+        assert.ok(sourceText.indexOf('页面发布日期') < sourceText.indexOf('Rates By Exchange Rate API'));
+        const fxAttribution = page.locator('a[href="https://www.exchangerate-api.com"]');
+        assert.equal((await fxAttribution.textContent()).trim(), 'Rates By Exchange Rate API');
+        assert.equal(await fxAttribution.getAttribute('aria-label'), '人民币参考汇率：Rates By Exchange Rate API');
         assert.match(sourceText, /更新时间：.+北京时间/);
         const layout = await page.evaluate(() => ({
           documentWidth: document.documentElement.scrollWidth,
@@ -1123,7 +1175,7 @@ test('keeps history dialog usable when Chart construction fails', { timeout: 30_
     contentType: 'application/json',
     body: JSON.stringify(validHistory)
   }));
-  await page.route('**/vendor/chart.umd.min.js', (route) => route.fulfill({
+  await page.route('**/vendor/chart.umd.min.js*', (route) => route.fulfill({
     status: 200,
     contentType: 'application/javascript',
     body: 'window.Chart = class { constructor() { throw new Error("chart-bomb"); } };'
@@ -1668,7 +1720,7 @@ test('keeps the minimum-price overview stable and the desktop table header stick
     assert.equal(await page.locator('h1').count(), 1);
     assert.equal(await page.locator('h1').textContent(), 'iCloud+ \u5168\u7403\u4ef7\u683c\u5bf9\u6bd4');
     assert.equal(await page.locator('#overviewTitle').evaluate((element) => element.tagName), 'H2');
-    assert.equal(await page.locator('head script[type="module"][src="script.js"]').count(), 1);
+    assert.equal(await page.locator('head script[type="module"][src="script.js?v=3"]').count(), 1);
     assert.equal(await page.locator('head link[rel="modulepreload"]').count(), 3);
     const before = await page.locator('#minimumSummary').boundingBox();
     releaseRequest();

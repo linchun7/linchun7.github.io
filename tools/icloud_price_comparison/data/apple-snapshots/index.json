@@ -1,14 +1,12 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "snapshots": [
     {
       "publishedDate": "2024-12-05",
-      "activeFile": "2024-12-05.html",
       "activeContentHash": "192d9e5797b0a4b43cb7511776a096c3f57d8e199203820ab9a4b647efae58d9",
       "revisions": [
         {
           "publishedDate": "2024-12-05",
-          "file": "2024-12-05.html",
           "sourceUrl": "https://support.apple.com/en-us/108047",
           "archiveUrl": "https://web.archive.org/web/20250518125256/https://support.apple.com/en-us/108047",
           "parser": "legacy-archive-cross-checked",
@@ -17,7 +15,6 @@
           "contentHash": "192d9e5797b0a4b43cb7511776a096c3f57d8e199203820ab9a4b647efae58d9",
           "dataFile": "2024-12-05.json",
           "firstConfirmedDate": "2025-05-18",
-          "htmlSha256": "65dfda557674b9eff3653eb4a5e44b32f05cd01ebefccb8033d747deddc4a91e",
           "dataSha256": "7510e1b07f1ed074b91542c9f038e2cff96aa9ad79f02346b70a8ff6ff312409"
         }
       ],
@@ -25,12 +22,10 @@
     },
     {
       "publishedDate": "2025-05-22",
-      "activeFile": "2025-05-22.html",
       "activeContentHash": "08ec908c03cd89112385fe282dacd8d9a6a79707aa1b7a4579a0562a174d2f4b",
       "revisions": [
         {
           "publishedDate": "2025-05-22",
-          "file": "2025-05-22.html",
           "sourceUrl": "https://support.apple.com/en-us/108047",
           "archiveUrl": "https://web.archive.org/web/20250813005853/https://support.apple.com/en-us/108047",
           "parser": "legacy-archive-cross-checked",
@@ -39,7 +34,6 @@
           "contentHash": "08ec908c03cd89112385fe282dacd8d9a6a79707aa1b7a4579a0562a174d2f4b",
           "dataFile": "2025-05-22.json",
           "firstConfirmedDate": "2025-08-13",
-          "htmlSha256": "f9f4abf2e7874cfaeb576f7b127d28bf0e9e9ae7b682279a5eec1421ac9cc011",
           "dataSha256": "1a2c5aa3215a4e3a1e4382298d4302153515aeca8bead7351ac513e13e06192a"
         }
       ],
@@ -47,12 +41,10 @@
     },
     {
       "publishedDate": "2025-08-21",
-      "activeFile": "2025-08-21.html",
       "activeContentHash": "f7f2e7874a7c22c8e242424e04e3cda81aedb6d6af3da1af4aa6abc59971e876",
       "revisions": [
         {
           "publishedDate": "2025-08-21",
-          "file": "2025-08-21.html",
           "sourceUrl": "https://support.apple.com/en-us/108047",
           "archiveUrl": "https://web.archive.org/web/20251214030006/https://support.apple.com/en-us/108047",
           "parser": "legacy-archive-cross-checked",
@@ -61,7 +53,6 @@
           "contentHash": "f7f2e7874a7c22c8e242424e04e3cda81aedb6d6af3da1af4aa6abc59971e876",
           "dataFile": "2025-08-21.json",
           "firstConfirmedDate": "2025-12-14",
-          "htmlSha256": "383308c14754c2c3fc7dcc4faf7eebcc7fce18a3f4530c556e23f33e7b553aa0",
           "dataSha256": "e37387f6e25e8ec4115cc0e12257f4fd4d863587cfb9dd7fda4278fa4b90291d"
         }
       ],
@@ -69,12 +60,10 @@
     },
     {
       "publishedDate": "2025-12-16",
-      "activeFile": "2025-12-16.html",
       "activeContentHash": "f7f2e7874a7c22c8e242424e04e3cda81aedb6d6af3da1af4aa6abc59971e876",
       "revisions": [
         {
           "publishedDate": "2025-12-16",
-          "file": "2025-12-16.html",
           "sourceUrl": "https://support.apple.com/en-us/108047",
           "archiveUrl": "https://web.archive.org/web/20260330014443/https://support.apple.com/en-us/108047",
           "parser": "cross-checked",
@@ -83,7 +72,6 @@
           "contentHash": "f7f2e7874a7c22c8e242424e04e3cda81aedb6d6af3da1af4aa6abc59971e876",
           "dataFile": "2025-12-16.json",
           "firstConfirmedDate": "2026-03-30",
-          "htmlSha256": "9b9178ac85a33ff64bc2feb9afc5a979f87abfc25d0fbf60f7a08e16b33205d9",
           "dataSha256": "86d58450b0f8c4fd0cb83d828dd74799e9513457b002497bb710b556ffa88d09"
         }
       ],
@@ -91,12 +79,10 @@
     },
     {
       "publishedDate": "2026-04-02",
-      "activeFile": "2026-04-02.html",
       "activeContentHash": "d7064f3625c768169e5fc6c49a36d994eb7565e9feea9f15ff4f9857a26bb51b",
       "revisions": [
         {
           "publishedDate": "2026-04-02",
-          "file": "2026-04-02.html",
           "sourceUrl": "https://support.apple.com/en-us/108047",
           "archiveUrl": "https://web.archive.org/web/20260403000851/https://support.apple.com/en-us/108047",
           "parser": "cross-checked",
@@ -105,7 +91,6 @@
           "contentHash": "d7064f3625c768169e5fc6c49a36d994eb7565e9feea9f15ff4f9857a26bb51b",
           "dataFile": "2026-04-02.json",
           "firstConfirmedDate": "2026-04-03",
-          "htmlSha256": "3894d4127f00da2abb3fe497ac5ad442cdbe9db42ff8514dc8aa0ed07aa042fc",
           "dataSha256": "4933564b5349b91c49ebf6c5fecdea7ea147b7469084d497ffcf58293661c8a2"
         }
       ],
@@ -113,12 +98,10 @@
     },
     {
       "publishedDate": "2026-04-06",
-      "activeFile": "2026-04-06.html",
       "activeContentHash": "f7f2e7874a7c22c8e242424e04e3cda81aedb6d6af3da1af4aa6abc59971e876",
       "revisions": [
         {
           "publishedDate": "2026-04-06",
-          "file": "2026-04-06.html",
           "sourceUrl": "https://support.apple.com/en-us/108047",
           "archiveUrl": "https://web.archive.org/web/20260716062720/https://support.apple.com/en-us/108047",
           "parser": "cross-checked",
@@ -127,7 +110,6 @@
           "contentHash": "f7f2e7874a7c22c8e242424e04e3cda81aedb6d6af3da1af4aa6abc59971e876",
           "dataFile": "2026-04-06.json",
           "firstConfirmedDate": "2026-07-16",
-          "htmlSha256": "c62232cdf625d73ddef4bebbf18357c6e7c5a2e070215dee3c26598ba95dc58b",
           "dataSha256": "7ec7985284b9e4e967cbeef697c759c6874753300db8a1322f9130eebd7e9fd2"
         }
       ],
@@ -135,12 +117,10 @@
     },
     {
       "publishedDate": "2026-07-17",
-      "activeFile": "2026-07-17.html",
       "activeContentHash": "174395538fa9529d56611dbf994798b5a395e22184e78600b1765b5bb918af05",
       "revisions": [
         {
           "publishedDate": "2026-07-17",
-          "file": "2026-07-17.html",
           "sourceUrl": "https://support.apple.com/en-us/108047",
           "parser": "cross-checked",
           "countries": 73,
@@ -148,7 +128,6 @@
           "contentHash": "174395538fa9529d56611dbf994798b5a395e22184e78600b1765b5bb918af05",
           "dataFile": "2026-07-17.json",
           "firstConfirmedDate": "2026-07-30",
-          "htmlSha256": "5de5a649a4e59eed6b661ce36ed57108ebd9b97a284308d2971f4c2663e6a1ef",
           "dataSha256": "5a4b7bb369c5e60f9d10c855ff4f46406046bdb9ac519f54aeb0032989c63a07"
         }
       ],

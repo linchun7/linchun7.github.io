@@ -112,19 +112,24 @@ test('committed prices and history form a complete usable snapshot', async () =>
   }
 });
 
+test('committed exchange rates expose only currencies required by the comparison', async () => {
+  const data = await readJson('../data/prices.json');
+  const required = [...new Set(['USD', 'CNY', ...data.countries.map(({ currency }) => currency)])].sort();
+  assert.deepEqual(Object.keys(data.fx.rates).sort(), required);
+});
+
 test('committed Apple snapshot index has unique dates and existing revision files', async () => {
   const [index, history] = await Promise.all([
     readJson('../data/apple-snapshots/index.json'),
     readJson('../data/history.json')
   ]);
-  assert.equal(index.schemaVersion, 1);
+  assert.equal(index.schemaVersion, 2);
   const dates = new Set();
   for (const snapshot of index.snapshots) {
     assert.match(snapshot.publishedDate, /^\d{4}-\d{2}-\d{2}$/);
     assert.ok(!dates.has(snapshot.publishedDate), `duplicate snapshot date: ${snapshot.publishedDate}`);
     dates.add(snapshot.publishedDate);
     assert.ok(snapshot.revisions.length >= 1);
-    assert.equal(snapshot.activeFile, snapshot.revisions.at(-1).file);
     assert.equal(snapshot.activeDataFile, snapshot.revisions.at(-1).dataFile);
     assert.equal(snapshot.activeContentHash, snapshot.revisions.at(-1).contentHash);
     const publicationRecord = history.sourcePublishedDates.find(
@@ -138,15 +143,12 @@ test('committed Apple snapshot index has unique dates and existing revision file
     );
     for (const revision of snapshot.revisions) {
       assert.match(revision.contentHash, /^[a-f0-9]{64}$/);
-      assert.match(revision.htmlSha256, /^[a-f0-9]{64}$/);
       assert.match(revision.dataSha256, /^[a-f0-9]{64}$/);
       assert.match(revision.firstConfirmedDate, /^\d{4}-\d{2}-\d{2}$/);
       assert.equal('capturedAtUtc' in revision, false);
-      const [html, normalized] = await Promise.all([
-        readFile(new URL(`../data/apple-snapshots/${revision.file}`, import.meta.url)),
-        readFile(new URL(`../data/apple-snapshots/${revision.dataFile}`, import.meta.url))
-      ]);
-      assert.equal(snapshotFileSha256(html), revision.htmlSha256);
+      assert.equal('file' in revision, false);
+      assert.equal('htmlSha256' in revision, false);
+      const normalized = await readFile(new URL(`../data/apple-snapshots/${revision.dataFile}`, import.meta.url));
       assert.equal(snapshotFileSha256(normalized), revision.dataSha256);
     }
   }

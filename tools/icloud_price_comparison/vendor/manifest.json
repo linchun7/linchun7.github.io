@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "assets": [
+    {
+      "file": "chart.umd.min.js",
+      "package": "chart.js",
+      "version": "4.4.7",
+      "license": "MIT",
+      "sha256": "206b6e8bb00fc7bba2c7ee80ca41db3e9e05ba7be0aa35abeba9cfd5357f5d0e"
+    },
+    {
+      "file": "lucide-subset.js",
+      "package": "lucide",
+      "version": "0.468.0",
+      "license": "ISC",
+      "sha256": "d81116a4561037048709278d770ad064cd3f8481121b8c04879c82622d25ba1f"
+    }
+  ]
+}

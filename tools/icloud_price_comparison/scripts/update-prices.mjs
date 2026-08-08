@@ -10,7 +10,6 @@ import {
   validatePrices
 } from './parse-prices.mjs';
 import { validateHistoryPayload, validatePriceHistoryConsistency, validatePricePayload } from '../data-contract.js';
-import { parseLegacyAppleArchive } from './parse-legacy-archive.mjs';
 import { describeTriggerSource, formatBeijingDate, resolveTriggerSource } from './run-context.mjs';
 
 const APPLE_URL = 'https://support.apple.com/en-us/108047';
@@ -33,7 +32,7 @@ const FX_MAX_FUTURE_SKEW_MS = 5 * 60 * 1_000;
 const UPDATE_LOCK_STALE_MS = 30 * 60 * 1_000;
 const TEMPORARY_FILE_PATTERN = /\.tmp-\d+-\d+-[a-z0-9]+$/i;
 const DRY_RUN = process.argv.includes('--dry-run');
-let lastAppleHtml = null;
+let lastAppleSnapshot = null;
 let runStartedAt = new Date();
 
 export function defaultUpdateLockPath(currentDataPath = CURRENT_DATA_PATH) {
@@ -163,6 +162,22 @@ function parseExchangeRatePayload(payload, ratesField) {
   };
 }
 
+export function selectRequiredRates(rates, requiredCurrencies = []) {
+  if (!rates || typeof rates !== 'object' || Array.isArray(rates)) {
+    throw exchangeRateError('Exchange-rate response has an unsupported rates structure');
+  }
+  const currencies = [...new Set(['USD', 'CNY', ...requiredCurrencies])].sort();
+  const selected = {};
+  for (const currency of currencies) {
+    const rate = rates[currency];
+    if (!Number.isFinite(rate) || rate <= 0) {
+      throw exchangeRateError(`Exchange rates are missing for: ${currency}`, 'missing-rates');
+    }
+    selected[currency] = rate;
+  }
+  return selected;
+}
+
 function validateExchangeRateFreshness(fetchedAt, now = new Date()) {
   const fetchedAtMs = Date.parse(fetchedAt);
   const nowMs = now.getTime();
@@ -251,7 +266,7 @@ export async function getExchangeRates(previousData, {
         base: 'USD',
         fetchedAt: parsed.fetchedAt,
         stale: false,
-        rates: parsed.rates
+        rates: selectRequiredRates(parsed.rates, requiredCurrencies)
       };
     } catch (error) {
       failures.push({
@@ -285,7 +300,8 @@ export async function getExchangeRates(previousData, {
     stale: true,
     fallbackUsed: Boolean(normalizedApiKey),
     fallbackReason: failures[0]?.reason ?? 'request-failed',
-    apiKeyStatus: normalizedApiKey ? failures[0]?.reason ?? 'request-failed' : 'not-configured'
+    apiKeyStatus: normalizedApiKey ? failures[0]?.reason ?? 'request-failed' : 'not-configured',
+    rates: selectRequiredRates(previousData.fx.rates, requiredCurrencies)
   };
 }
 
@@ -632,12 +648,6 @@ export function buildRunLog(existing, entry) {
   };
 }
 
-async function writeAppleSnapshot(html, startedAt, diagnosticsDir = DIAGNOSTICS_DIR) {
-  const stamp = startedAt.toISOString().replaceAll(/[-:]/g, '').replace('.000Z', 'Z');
-  await mkdir(diagnosticsDir, { recursive: true });
-  await writeFile(path.join(diagnosticsDir, `apple-response-${stamp}.html`), html, 'utf8');
-}
-
 async function unlinkIfExists(filePath) {
   try {
     await unlink(filePath);
@@ -898,7 +908,7 @@ async function recoverUpdateTransaction(transactionPath, {
     const resolved = path.resolve(filePath);
     const fileName = path.basename(resolved);
     if (path.dirname(resolved) !== snapshotRoot
-      || !/^\d{4}-\d{2}-\d{2}(?:-[a-f0-9]{12})?\.(?:html|json)$/.test(fileName)
+      || !/^\d{4}-\d{2}-\d{2}(?:-[a-f0-9]{12})?\.json$/.test(fileName)
       || createdSnapshotPaths.has(resolved)) return true;
     createdSnapshotPaths.add(resolved);
     return false;
@@ -927,7 +937,7 @@ async function recoverUpdateTransaction(transactionPath, {
   return true;
 }
 
-function failureRunLogEntry(error, startedAt, finishedAt, appleResponseCaptured = Boolean(lastAppleHtml)) {
+function failureRunLogEntry(error, startedAt, finishedAt, appleSnapshotCaptured = Boolean(lastAppleSnapshot)) {
   const trigger = resolveTriggerSource(
     process.env.GITHUB_EVENT_NAME,
     process.env.ICLOUD_TRIGGER_SOURCE
@@ -946,7 +956,7 @@ function failureRunLogEntry(error, startedAt, finishedAt, appleResponseCaptured 
       message: error.message,
       stack: error.stack ?? null
     },
-    appleResponseCaptured
+    appleSnapshotCaptured
   };
 }
 
@@ -963,7 +973,6 @@ export function buildAppleSnapshotEntry(publishedDate, {
   countries,
   pricePoints,
   contentHash,
-  htmlSha256,
   dataSha256
 } = {}) {
   const publishedDateIso = publicationDateKey(publishedDate);
@@ -973,7 +982,6 @@ export function buildAppleSnapshotEntry(publishedDate, {
   }
   return {
     publishedDate: publishedDateIso,
-    file: `${publishedDateIso}.html`,
     dataFile: `${publishedDateIso}.json`,
     firstConfirmedDate,
     sourceUrl,
@@ -982,13 +990,37 @@ export function buildAppleSnapshotEntry(publishedDate, {
     countries,
     pricePoints,
     contentHash,
-    ...(htmlSha256 ? { htmlSha256 } : {}),
     ...(dataSha256 ? { dataSha256 } : {})
   };
 }
 
 export function appleSnapshotContentHash(parsed) {
   return createHash('sha256').update(JSON.stringify(normalizeApplePricing(parsed))).digest('hex');
+}
+
+export function removedCountryNames(previousCountries = [], currentCountries = []) {
+  const currentNames = new Set(currentCountries.map(({ country }) => country));
+  return previousCountries
+    .map(({ country }) => country)
+    .filter((country) => !currentNames.has(country));
+}
+
+export function confirmCountryRemovals(firstParsed, secondParsed, previousCountries = []) {
+  const removals = removedCountryNames(previousCountries, firstParsed.countries);
+  if (!removals.length) return [];
+  if (firstParsed.parser !== 'cross-checked' || secondParsed.parser !== 'cross-checked') {
+    throw new Error('Country removals require two fully cross-checked Apple parses');
+  }
+  validatePrices(secondParsed.countries, { tiers: secondParsed.tiers });
+  if (publicationDateKey(firstParsed.sourcePublishedDate) !== publicationDateKey(secondParsed.sourcePublishedDate)
+    || appleSnapshotContentHash(firstParsed) !== appleSnapshotContentHash(secondParsed)) {
+    throw new Error('Country removals were not reproduced by the independent Apple confirmation fetch');
+  }
+  const secondRemovals = removedCountryNames(previousCountries, secondParsed.countries);
+  if (JSON.stringify(removals) !== JSON.stringify(secondRemovals)) {
+    throw new Error('Country removal confirmation did not reproduce the exact removed-country set');
+  }
+  return removals;
 }
 
 function snapshotPlanPrice(value) {
@@ -1035,7 +1067,7 @@ function validateSnapshotFileName(value, extension) {
 }
 
 export function normalizeAppleSnapshotIndex(index) {
-  if (index?.schemaVersion !== 1 || !Array.isArray(index.snapshots)) {
+  if (![1, 2].includes(index?.schemaVersion) || !Array.isArray(index.snapshots)) {
     throw new Error('Apple snapshot index has an unsupported structure');
   }
   const dates = new Set();
@@ -1048,60 +1080,56 @@ export function normalizeAppleSnapshotIndex(index) {
     dates.add(publishedDate);
     const revisions = Array.isArray(snapshot.revisions)
       ? snapshot.revisions
-      : snapshot.file ? [{ ...snapshot }] : null;
+      : (snapshot.dataFile || snapshot.file) ? [{ ...snapshot }] : null;
     if (!revisions?.length) throw new Error(`Apple snapshot index has no revisions for ${publishedDate}`);
     const hashes = new Set();
     const files = new Set();
-    const htmlFilePattern = new RegExp(`^${publishedDate}(?:-[a-f0-9]{12})?\\.html$`);
     const dataFilePattern = new RegExp(`^${publishedDate}(?:-[a-f0-9]{12})?\\.json$`);
     const normalizedRevisions = revisions.map((revision) => {
+      const { file: ignoredFile, htmlSha256: ignoredHtmlSha256, ...revisionData } = revision;
       const normalized = {
-        ...revision,
+        ...revisionData,
         publishedDate: revision.publishedDate ?? publishedDate,
         dataFile: revision.dataFile ?? revision.file?.replace(/\.html$/, '.json')
       };
-      const hasHtmlSha256 = normalized.htmlSha256 !== undefined;
       const hasDataSha256 = normalized.dataSha256 !== undefined;
       if (normalized.publishedDate !== publishedDate
         || !isFirstConfirmedDateAllowed(normalized.firstConfirmedDate)
-        || !validateSnapshotFileName(normalized.file, '.html')
         || !validateSnapshotFileName(normalized.dataFile, '.json')
-        || !htmlFilePattern.test(normalized.file)
         || !dataFilePattern.test(normalized.dataFile)
         || !/^[a-f0-9]{64}$/.test(normalized.contentHash ?? '')
-        || hasHtmlSha256 !== hasDataSha256
-        || (hasHtmlSha256 && !/^[a-f0-9]{64}$/.test(normalized.htmlSha256))
         || (hasDataSha256 && !/^[a-f0-9]{64}$/.test(normalized.dataSha256))
         || hashes.has(normalized.contentHash)
-        || files.has(normalized.file)
         || files.has(normalized.dataFile)
-        || allFiles.has(normalized.file)
         || allFiles.has(normalized.dataFile)) {
         throw new Error(`Apple snapshot index has an invalid revision for ${publishedDate}`);
       }
       hashes.add(normalized.contentHash);
-      files.add(normalized.file);
       files.add(normalized.dataFile);
-      allFiles.add(normalized.file);
       allFiles.add(normalized.dataFile);
       return normalized;
     }).sort((a, b) => a.firstConfirmedDate.localeCompare(b.firstConfirmedDate));
     const active = normalizedRevisions.at(-1);
-    if ((snapshot.activeFile && snapshot.activeFile !== active.file)
-      || (snapshot.activeDataFile && snapshot.activeDataFile !== active.dataFile)
+    if ((snapshot.activeDataFile && snapshot.activeDataFile !== active.dataFile)
       || (snapshot.activeContentHash && snapshot.activeContentHash !== active.contentHash)) {
       throw new Error(`Apple snapshot index has an invalid active revision for ${publishedDate}`);
     }
+    const {
+      activeFile: ignoredActiveFile,
+      file: ignoredTopLevelFile,
+      htmlSha256: ignoredTopLevelHtmlSha256,
+      schemaVersion: ignoredNestedSchemaVersion,
+      ...snapshotData
+    } = snapshot;
     return {
-      ...snapshot,
+      ...snapshotData,
       publishedDate,
-      activeFile: active.file,
       activeDataFile: active.dataFile,
       activeContentHash: active.contentHash,
       revisions: normalizedRevisions
     };
   });
-  return { schemaVersion: 1, snapshots };
+  return { schemaVersion: 2, snapshots };
 }
 
 function isIsoDateTime(value) {
@@ -1144,18 +1172,6 @@ function normalizedSnapshotAsParsed(snapshot) {
   return parsed;
 }
 
-function parseStoredAppleSnapshot(html, fileName) {
-  try {
-    return parseApplePrices(html);
-  } catch (modernError) {
-    try {
-      return parseLegacyAppleArchive(html);
-    } catch (legacyError) {
-      throw new Error(`Unable to parse indexed Apple snapshot ${fileName}; modern: ${modernError.message}; legacy: ${legacyError.message}`);
-    }
-  }
-}
-
 async function listSnapshotEvidence(snapshotsDir) {
   return readdir(snapshotsDir, { withFileTypes: true }).catch((error) => {
     if (error.code === 'ENOENT') return [];
@@ -1190,7 +1206,7 @@ export async function validateAppleSnapshotStore({
 
   const normalizedIndex = normalizeAppleSnapshotIndex(indexState.value);
   const indexedFiles = new Set(normalizedIndex.snapshots.flatMap(({ revisions }) => (
-    revisions.flatMap(({ file, dataFile }) => [file, dataFile])
+    revisions.map(({ dataFile }) => dataFile)
   )));
   const unindexedEvidence = evidenceNames.filter((name) => !indexedFiles.has(name));
   if (unindexedEvidence.length) {
@@ -1223,59 +1239,39 @@ export async function validateAppleSnapshotStore({
         || (revision.archiveUrl && !revision.archiveUrl.startsWith('https://web.archive.org/web/'))) {
         throw new Error(`Apple snapshot index has invalid evidence metadata for ${snapshot.publishedDate}`);
       }
-      for (const fileName of [revision.file, revision.dataFile]) {
-        const entry = evidenceByName.get(fileName);
-        if (!entry) throw new Error(`Apple snapshot index references missing evidence: ${fileName}`);
-        if (!entry.isFile()) throw new Error(`Apple snapshot evidence is not a regular file: ${fileName}`);
-      }
+      const entry = evidenceByName.get(revision.dataFile);
+      if (!entry) throw new Error(`Apple snapshot index references missing evidence: ${revision.dataFile}`);
+      if (!entry.isFile()) throw new Error(`Apple snapshot evidence is not a regular file: ${revision.dataFile}`);
 
-      const htmlPath = path.join(snapshotsDir, revision.file);
       const dataPath = path.join(snapshotsDir, revision.dataFile);
-      const hadRawHashes = Boolean(revision.htmlSha256 && revision.dataSha256);
-      const [htmlBuffer, dataBuffer] = await Promise.all([
-        readFile(htmlPath),
-        readFile(dataPath)
-      ]);
-      const htmlSha256 = snapshotFileSha256(htmlBuffer);
+      const hadRawHash = Boolean(revision.dataSha256);
+      const dataBuffer = await readFile(dataPath);
       const dataSha256 = snapshotFileSha256(dataBuffer);
-      if ((revision.htmlSha256 && revision.htmlSha256 !== htmlSha256)
-        || (revision.dataSha256 && revision.dataSha256 !== dataSha256)) {
+      if (revision.dataSha256 && revision.dataSha256 !== dataSha256) {
         throw new Error(`Apple snapshot evidence has a content-hash mismatch in raw bytes for ${snapshot.publishedDate}`);
       }
-      revision.htmlSha256 = htmlSha256;
       revision.dataSha256 = dataSha256;
-      const isLatestActiveRevision = snapshot === latestSnapshot && revision.file === snapshot.activeFile;
-      if (!deep && hadRawHashes && !isLatestActiveRevision) continue;
+      const isLatestActiveRevision = snapshot === latestSnapshot && revision.dataFile === snapshot.activeDataFile;
+      if (!deep && hadRawHash && !isLatestActiveRevision) continue;
 
-      const html = htmlBuffer.toString('utf8');
       let normalizedSnapshot;
       try {
         normalizedSnapshot = JSON.parse(dataBuffer.toString('utf8'));
       } catch (error) {
         throw new Error(`Unable to read valid JSON from ${revision.dataFile}: ${error.message}`);
       }
-      const parsedHtml = parseStoredAppleSnapshot(html, revision.file);
-      validatePrices(parsedHtml.countries, { minCountries: 60, tiers: parsedHtml.tiers });
       const parsedNormalized = normalizedSnapshotAsParsed(normalizedSnapshot);
-      if (publicationDateKey(parsedHtml.sourcePublishedDate) !== snapshot.publishedDate
-        || normalizedSnapshot.publishedDate !== snapshot.publishedDate) {
+      if (normalizedSnapshot.publishedDate !== snapshot.publishedDate) {
         throw new Error(`Apple snapshot evidence has a publication-date mismatch for ${snapshot.publishedDate}`);
       }
-      const expectedPricePoints = parsedHtml.countries.length * parsedHtml.tiers.length;
       const normalizedPricePoints = parsedNormalized.countries.length * parsedNormalized.tiers.length;
-      if (parsedHtml.countries.length !== revision.countries
-        || parsedNormalized.countries.length !== revision.countries
-        || expectedPricePoints !== revision.pricePoints
+      if (parsedNormalized.countries.length !== revision.countries
         || normalizedPricePoints !== revision.pricePoints) {
         throw new Error(`Apple snapshot evidence has a count mismatch for ${snapshot.publishedDate}`);
       }
-      const htmlHash = appleSnapshotContentHash(parsedHtml);
       const normalizedHash = appleSnapshotContentHash(parsedNormalized);
-      if (htmlHash !== revision.contentHash || normalizedHash !== revision.contentHash) {
+      if (normalizedHash !== revision.contentHash) {
         throw new Error(`Apple snapshot evidence has a content-hash mismatch for ${snapshot.publishedDate}`);
-      }
-      if (JSON.stringify(normalizeApplePricing(parsedHtml)) !== JSON.stringify(normalizeApplePricing(parsedNormalized))) {
-        throw new Error(`Apple snapshot HTML and JSON disagree for ${snapshot.publishedDate}`);
       }
     }
   }
@@ -1498,7 +1494,6 @@ export function buildAppleSnapshotIndex(existing, entry) {
   if (!current) {
     byDate.set(entry.publishedDate, {
       publishedDate: entry.publishedDate,
-      activeFile: entry.file,
       activeDataFile: entry.dataFile,
       activeContentHash: entry.contentHash,
       revisions: [entry]
@@ -1517,7 +1512,7 @@ export function buildAppleSnapshotIndex(existing, entry) {
       };
     } else {
       return {
-        schemaVersion: 1,
+        schemaVersion: 2,
         snapshots: [...byDate.values()].sort((a, b) => a.publishedDate.localeCompare(b.publishedDate))
       };
     }
@@ -1527,19 +1522,18 @@ export function buildAppleSnapshotIndex(existing, entry) {
     const activeRevision = orderedRevisions.at(-1);
     byDate.set(entry.publishedDate, {
       ...current,
-      activeFile: activeRevision.file,
       activeDataFile: activeRevision.dataFile,
       activeContentHash: activeRevision.contentHash,
       revisions: orderedRevisions
     });
   }
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     snapshots: [...byDate.values()].sort((a, b) => a.publishedDate.localeCompare(b.publishedDate))
   };
 }
 
-export async function savePublishedAppleSnapshot(html, parsed, firstConfirmedDate, {
+export async function savePublishedAppleSnapshot(_html, parsed, firstConfirmedDate, {
   snapshotsDir = APPLE_SNAPSHOTS_DIR,
   indexPath = APPLE_SNAPSHOT_INDEX_PATH
 } = {}) {
@@ -1547,30 +1541,25 @@ export async function savePublishedAppleSnapshot(html, parsed, firstConfirmedDat
   const contentHash = appleSnapshotContentHash(parsed);
   const normalizedSnapshot = normalizeAppleSnapshot(parsed);
   const normalizedSnapshotText = serializeJson(normalizedSnapshot);
-  const index = normalizeAppleSnapshotIndex(await readJson(indexPath, { schemaVersion: 1, snapshots: [] }));
+  const index = normalizeAppleSnapshotIndex(await readJson(indexPath, { schemaVersion: 2, snapshots: [] }));
   const existing = index.snapshots?.find((item) => item.publishedDate === publishedDate);
   const revisions = Array.isArray(existing?.revisions) ? existing.revisions : existing ? [existing] : [];
   if (revisions.some((revision) => revision.contentHash === contentHash)) return false;
-  const file = existing ? `${publishedDate}-${contentHash.slice(0, 12)}.html` : `${publishedDate}.html`;
+  const dataFile = existing ? `${publishedDate}-${contentHash.slice(0, 12)}.json` : `${publishedDate}.json`;
   const entry = buildAppleSnapshotEntry(parsed.sourcePublishedDate, {
     firstConfirmedDate,
     parser: parsed.parser,
     countries: parsed.countries.length,
     pricePoints: parsed.countries.length * parsed.tiers.length,
     contentHash,
-    htmlSha256: snapshotFileSha256(html),
     dataSha256: snapshotFileSha256(normalizedSnapshotText)
   });
-  entry.file = file;
-  entry.dataFile = file.replace(/\.html$/, '.json');
+  entry.dataFile = dataFile;
   const updatedIndex = normalizeAppleSnapshotIndex(buildAppleSnapshotIndex(index, entry));
-  const snapshotPath = path.join(snapshotsDir, entry.file);
   const dataPath = path.join(snapshotsDir, entry.dataFile);
   const createdPaths = [];
   try {
     await mkdir(snapshotsDir, { recursive: true });
-    await writeFile(snapshotPath, html, { encoding: 'utf8', flag: 'wx' });
-    createdPaths.push(snapshotPath);
     await writeTextExclusiveAtomic(dataPath, normalizedSnapshotText, (filePath) => createdPaths.push(filePath));
     await writeJsonAtomic(indexPath, updatedIndex);
   } catch (error) {
@@ -1730,7 +1719,7 @@ export async function main({
   const releaseLock = dryRun ? null : await acquireUpdateLock(lockPath);
   try {
     runStartedAt = new Date();
-    lastAppleHtml = null;
+    lastAppleSnapshot = null;
     if (!dryRun) {
       await recoverUpdateTransaction(transactionPath, {
         productionPaths: [currentDataPath, historyPath, runLogPath],
@@ -1769,12 +1758,10 @@ export async function main({
     if (!countryNames || Object.keys(countryNames).length < 60) {
       throw new Error('Chinese country-name mapping is missing or incomplete');
     }
-    const html = await fetchResource(APPLE_URL, { networkBudget }).then((response) => {
-      lastAppleHtml = response;
-      return response;
-    });
+    const html = await fetchResource(APPLE_URL, { networkBudget });
 
   const parsed = parseApplePrices(html);
+  lastAppleSnapshot = normalizeAppleSnapshot(parsed);
   if (parsed.parser !== 'cross-checked') {
     console.warn(`Apple parser redundancy degraded: ${parsed.parserStatus}`);
     if (process.env.GITHUB_ACTIONS === 'true') {
@@ -1785,6 +1772,22 @@ export async function main({
     throw new Error('Apple published date was not found or has an unsupported format');
   }
   validatePrices(parsed.countries, { tiers: parsed.tiers });
+  let confirmedRemovedCountries = [];
+  const removalCandidates = removedCountryNames(previousData?.countries ?? [], parsed.countries);
+  if (removalCandidates.length) {
+    const confirmationHtml = await fetchResource(APPLE_URL, {
+      networkBudget,
+      attempts: 2,
+      headers: { 'cache-control': 'no-cache, no-store', pragma: 'no-cache' },
+      resourceName: 'Apple iCloud+ pricing removal confirmation'
+    });
+    const confirmationParsed = parseApplePrices(confirmationHtml);
+    confirmedRemovedCountries = confirmCountryRemovals(
+      parsed,
+      confirmationParsed,
+      previousData?.countries ?? []
+    );
+  }
   const countries = parsed.countries.map((country) => ({
     ...country,
     nameZh: countryNames[country.country] ?? country.country
@@ -1810,6 +1813,7 @@ export async function main({
   validatePrices(countries, {
     tiers: parsed.tiers,
     previousCountries: previousData?.countries ?? [],
+    confirmedRemovedCountries,
     previousRates: previousData?.fx?.rates,
     currentRates: fx.rates
   });
@@ -1872,10 +1876,9 @@ export async function main({
     const contentHash = appleSnapshotContentHash(parsed);
     const existingSnapshot = originalSnapshotIndex?.snapshots?.find((item) => item.publishedDate === publishedDate);
     const existingRevision = existingSnapshot?.revisions?.some((revision) => revision.contentHash === contentHash);
-    const snapshotFile = existingSnapshot ? `${publishedDate}-${contentHash.slice(0, 12)}.html` : `${publishedDate}.html`;
+    const snapshotFile = existingSnapshot ? `${publishedDate}-${contentHash.slice(0, 12)}.json` : `${publishedDate}.json`;
     const snapshotCandidates = existingRevision ? [] : [
-      path.join(snapshotsDir, snapshotFile),
-      path.join(snapshotsDir, snapshotFile.replace(/\.html$/, '.json'))
+      path.join(snapshotsDir, snapshotFile)
     ];
     const candidateExists = await Promise.all(snapshotCandidates.map(pathExists));
     const createdSnapshotFiles = snapshotCandidates.filter((_, index) => !candidateExists[index]);
@@ -1929,16 +1932,20 @@ export async function main({
 
 export async function writeFailureDiagnostics(error, {
   diagnosticsDir = DIAGNOSTICS_DIR,
-  appleHtml = lastAppleHtml,
+  appleSnapshot = lastAppleSnapshot,
   startedAt = runStartedAt,
   finishedAt = new Date(),
   stepSummaryPath = process.env.GITHUB_STEP_SUMMARY
 } = {}) {
-  const report = failureRunLogEntry(error, startedAt, finishedAt, Boolean(appleHtml));
+  const report = failureRunLogEntry(error, startedAt, finishedAt, Boolean(appleSnapshot));
   await mkdir(diagnosticsDir, { recursive: true });
   await writeFile(path.join(diagnosticsDir, 'run-report.json'), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
-  if (appleHtml) {
-    await writeAppleSnapshot(appleHtml, startedAt, diagnosticsDir);
+  if (appleSnapshot) {
+    await writeFile(
+      path.join(diagnosticsDir, 'apple-snapshot.json'),
+      `${JSON.stringify(appleSnapshot, null, 2)}\n`,
+      'utf8'
+    );
   }
   if (stepSummaryPath) {
     await appendFile(stepSummaryPath, [
@@ -1949,7 +1956,7 @@ export async function writeFailureDiagnostics(error, {
       `- 触发方式：${describeTriggerSource(report.trigger)}`,
       `- 失败时间（北京时间）：${formatBeijingDateTime(finishedAt)}`,
       `- **失败原因：${error.message}**`,
-      `- Apple 原始响应：${report.appleResponseCaptured ? '已保存到运行附件' : '未获取到'}`,
+      `- Apple 规范化 JSON：${report.appleSnapshotCaptured ? '已保存到运行附件' : '解析完成前失败，未生成'}`,
       '',
       '### 处理建议',
       '- 请先查看当前失败步骤日志，再下载 `icloud-price-diagnostics-*` 附件。',
