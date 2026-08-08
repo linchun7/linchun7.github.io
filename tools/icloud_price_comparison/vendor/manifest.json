@@ -4,16 +4,16 @@
     {
       "file": "chart.umd.min.js",
       "package": "chart.js",
-      "version": "4.4.7",
+      "version": "4.5.1",
       "license": "MIT",
-      "sha256": "206b6e8bb00fc7bba2c7ee80ca41db3e9e05ba7be0aa35abeba9cfd5357f5d0e"
+      "sha256": "48444a82d4edcb5bec0f1965faacdde18d9c17db3063d042abada2f705c9f54a"
     },
     {
       "file": "lucide-subset.js",
       "package": "lucide",
-      "version": "0.468.0",
+      "version": "1.28.0",
       "license": "ISC",
-      "sha256": "d81116a4561037048709278d770ad064cd3f8481121b8c04879c82622d25ba1f"
+      "sha256": "9800960268474bf7197ebddd408c12cc36e98889824402b3fd9dc56162e99d49"
     }
   ]
 }
