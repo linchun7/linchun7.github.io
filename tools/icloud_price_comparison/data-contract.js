@@ -6,6 +6,7 @@ const ALLOWED_FX_SOURCE_URLS = new Set([
 ]);
 const ALLOWED_PARSERS = new Set(['cross-checked', 'document-order', 'apple-markers-fallback']);
 const UNSAFE_OBJECT_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+const TIER_ID_PATTERN = /^\d+(?:\.\d+)?(?:GB|TB)$/;
 const MONTHS = [
   'january', 'february', 'march', 'april', 'may', 'june',
   'july', 'august', 'september', 'october', 'november', 'december'
@@ -59,7 +60,10 @@ export function isValidPublicationChanges(changes) {
   if (!isPlainObject(changes)) return false;
   const arrays = ['addedTiers', 'removedTiers', 'addedCountries', 'removedCountries', 'changedCountries'];
   if (arrays.some((key) => changes[key] !== undefined && !Array.isArray(changes[key]))) return false;
-  const validTier = (tier) => isPlainObject(tier) && typeof tier.id === 'string' && tier.id.trim();
+  const validTier = (tier) => isPlainObject(tier)
+    && typeof tier.id === 'string'
+    && TIER_ID_PATTERN.test(tier.id)
+    && !UNSAFE_OBJECT_KEYS.has(tier.id);
   const validCountry = (country) => isPlainObject(country) && typeof country.country === 'string' && country.country.trim();
   const validChangedTier = (tier) => validTier(tier)
     && (tier.from === null || (Number.isFinite(tier.from) && tier.from > 0))
@@ -124,7 +128,8 @@ export function validatePricePayload(payload, { minCountries = 1 } = {}) {
   for (const tier of payload.tiers) {
     if (!isPlainObject(tier)
       || typeof tier.id !== 'string'
-      || !tier.id.trim()
+      || !TIER_ID_PATTERN.test(tier.id)
+      || UNSAFE_OBJECT_KEYS.has(tier.id)
       || typeof tier.label !== 'string'
       || !tier.label.trim()
       || !Number.isFinite(tier.capacityGb)
