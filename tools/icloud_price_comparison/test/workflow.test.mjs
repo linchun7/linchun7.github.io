@@ -30,12 +30,12 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /publish:[\s\S]*?permissions:\s+contents: write/, 'only the dependency-free publisher may write committed data');
   assert.match(workflow, /persist-credentials: false/g);
   assert.match(workflow, /pnpm install --frozen-lockfile/);
-  assert.match(workflow, /name: 运行解析与数据安全测试\s+run: pnpm test:core/);
+  assert.match(workflow, /name: 运行解析与数据安全测试[\s\S]*?id: core_tests[\s\S]*?run: pnpm test:core/);
   assert.match(workflow, /name: 验证更新后的页面[\s\S]*?run: pnpm test:ui/);
   assert.doesNotMatch(workflow, /ui_failed|pnpm test:ui\s*\|\||记录浏览器界面测试警告/);
   assert.doesNotMatch(workflow, /name: 验证更新后的页面[\s\S]*?playwright install|name: 验证更新后的页面[\s\S]*?pnpm test:browsers/);
   assert.doesNotMatch(workflow, /ui_before|运行浏览器界面测试（更新前）/, 'the workflow must not repeat UI tests before fetching data');
-  assert.match(workflow, /name: 验证更新后的价格数据\s+run: pnpm test:data/);
+  assert.match(workflow, /name: 验证更新后的价格数据[\s\S]*?id: data_tests[\s\S]*?run: pnpm test:data/);
   assert.match(workflow, /name: 抓取并校验 Apple 价格[\s\S]*?id: update_data[\s\S]*?EXCHANGE_RATE_API_KEY:\s*\$\{\{ secrets\.EXCHANGE_RATE_API_KEY \}\}[\s\S]*?run: pnpm update:data/);
   assert.doesNotMatch(workflow, /v6\/\$\{\{ secrets\.EXCHANGE_RATE_API_KEY \}\}/, 'the API key must not be placed in a request URL');
   assert.match(workflow, /actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7/);
@@ -56,6 +56,16 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /上一份有效数据继续保留/);
   assert.match(workflow, /git_kib >= 819200[\s\S]*elif \(\( git_kib >= 512000 \)\)/);
   assert.match(workflow, /ICLOUD_HEALTHCHECK_PING_URL[\s\S]*?HEALTHCHECK_PING_URL%\/\}\/\$status/);
+  assert.match(workflow, /classify_prepare[\s\S]*?steps\.daily_guard\.outcome[\s\S]*?severe_failure/);
+  assert.match(workflow, /classify_update[\s\S]*?report\.healthcheckSeverity === "transient"[\s\S]*?source\?\.parser[\s\S]*?cross-checked/);
+  assert.match(workflow, /classify_publish[\s\S]*?steps\.validate_data_artifact\.outcome[\s\S]*?severe_failure/);
+  assert.match(workflow, /PREPARE_SEVERE_FAILURE:[\s\S]*?UPDATE_SEVERE_FAILURE:[\s\S]*?PUBLISH_SEVERE_FAILURE:/);
+  assert.match(workflow, /PREPARE_SEVERE_FAILURE[\s\S]*?status=1[\s\S]*?PREPARE_RESULT[\s\S]*?status=0[\s\S]*?单次暂时故障[\s\S]*?exit 0/);
+  assert.doesNotMatch(
+    workflow,
+    /PREPARE_RESULT" != success[\s\S]*?status=1/,
+    'one ordinary failed run must not immediately signal a Healthchecks failure',
+  );
   assert.match(workflow, /sha256sum --check icloud-price-data\.tar\.sha256/);
   assert.match(workflow, /GITHUB_TOKEN:\s*\$\{\{ github\.token \}\}[\s\S]*?push origin HEAD:main/);
 

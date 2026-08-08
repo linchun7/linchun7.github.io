@@ -18,6 +18,7 @@ import {
   createRunLogEntry,
   createNetworkBudget,
   confirmCountryRemovals,
+  classifyHealthcheckFailure,
   fetchResource,
   getExchangeRates,
   main,
@@ -28,6 +29,14 @@ import {
   updatePublishedDateHistory,
   writeJsonAtomic
 } from '../scripts/update-prices.mjs';
+
+test('classifies only explicitly tagged operational failures as transient', () => {
+  assert.equal(classifyHealthcheckFailure(new Error('unknown integrity failure')), 'severe');
+  const transient = new Error('temporary network outage');
+  transient.healthcheckSeverity = 'transient';
+  assert.equal(classifyHealthcheckFailure(transient), 'transient');
+  assert.equal(classifyHealthcheckFailure(null), 'severe');
+});
 
 test('builds a deduplicated Apple snapshot index by published date', () => {
   const first = buildAppleSnapshotEntry('Published Date: April 06, 2026', {
@@ -928,6 +937,7 @@ test('writes a failure report and normalized Apple diagnostic', async () => {
     const files = await readdir(diagnosticsDir);
     assert.deepEqual(files.sort(), ['apple-snapshot.json', 'run-report.json', 'summary.md']);
     assert.equal(report.status, 'failure');
+    assert.equal(report.healthcheckSeverity, 'severe');
     assert.equal(report.appleSnapshotCaptured, true);
     assert.equal(JSON.parse(await readFile(path.join(diagnosticsDir, 'run-report.json'), 'utf8')).error.message, 'snapshot write failed');
     assert.match(await readFile(summaryPath, 'utf8'), /snapshot write failed/);
@@ -1323,7 +1333,11 @@ test('caps retry delays and request timeouts by the shared network deadline', as
         resourceName: 'test resource',
         networkBudget
       }),
-      /Network deadline exceeded while fetching test resource/
+      (error) => {
+        assert.match(error.message, /Network deadline exceeded while fetching test resource/);
+        assert.equal(classifyHealthcheckFailure(error), 'transient');
+        return true;
+      }
     );
     assert.equal(requests, 2);
     assert.deepEqual(sleeps, [50]);
@@ -1413,7 +1427,11 @@ test('rejects expired or incomplete previous rates when both online sources fail
           rates: { USD: 1, CNY: 7.1, JPY: 150 }
         }
       }, { requiredCurrencies: ['USD', 'CNY', 'JPY'] }),
-      /previous exchange rates are unusable: Exchange-rate response is too old/
+      (error) => {
+        assert.match(error.message, /previous exchange rates are unusable: Exchange-rate response is too old/);
+        assert.equal(classifyHealthcheckFailure(error), 'transient');
+        return true;
+      }
     );
     await assert.rejects(
       () => getExchangeRates({
@@ -1423,7 +1441,11 @@ test('rejects expired or incomplete previous rates when both online sources fail
           rates: { USD: 1, CNY: 7.1 }
         }
       }, { requiredCurrencies: ['USD', 'CNY', 'JPY'] }),
-      /previous exchange rates are missing for: JPY/
+      (error) => {
+        assert.match(error.message, /previous exchange rates are missing for: JPY/);
+        assert.equal(classifyHealthcheckFailure(error), 'transient');
+        return true;
+      }
     );
   } finally {
     globalThis.fetch = originalFetch;
