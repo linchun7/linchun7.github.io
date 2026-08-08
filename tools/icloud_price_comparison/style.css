@@ -465,7 +465,11 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
 .history-table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; }
 .history-table-scroll table { min-width: 720px; }
 .history-table-scroll th, .history-table-scroll td { padding: 11px 12px; font-size: 12px; text-align: right; }
-.history-table-scroll th:first-child, .history-table-scroll td:first-child { text-align: left; }
+.history-table-scroll th:first-child, .history-table-scroll td:first-child,
+#historyDialog .history-table-scroll th:nth-child(2),
+#historyDialog .history-table-scroll td:nth-child(2),
+.source-history-dialog .history-table-scroll th:last-child,
+.source-history-dialog .published-change-cell { text-align: left; }
 
 .page-footer { margin-top: 20px; margin-bottom: 28px; color: var(--muted); font-size: 11px; text-align: center; }
 .page-footer p { margin: 3px 0; }
@@ -555,7 +559,7 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
   .source-history-dialog .history-table-scroll table { width: 100%; min-width: 0; }
   .source-history-dialog .history-table-scroll th:first-child { width: 104px; }
   .source-history-dialog .history-table-scroll th:last-child,
-  .source-history-dialog .published-change-cell { width: auto; text-align: left; }
+  .source-history-dialog .published-change-cell { width: auto; }
   .segmented { grid-template-columns: repeat(var(--tier-count), minmax(0, 1fr)); }
   .segmented button { padding-inline: 3px; font-size: 12px; }
   .chart-wrap { height: 230px; }
