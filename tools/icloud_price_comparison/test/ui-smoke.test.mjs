@@ -1666,6 +1666,17 @@ test('keeps the minimum-price overview stable and the desktop table header stick
       assert.ok(largestImbalance <= 1, `${viewport} card spacing must stay balanced; largest difference was ${largestImbalance}px`);
     };
     await assertMinimumCardSpacing('mobile');
+    const mobileTableInsets = await page.locator('#priceRows tr[data-country]').first().evaluate((row) => {
+      const tableBox = row.closest('.price-table').getBoundingClientRect();
+      const countryBox = row.querySelector('.country-name').getBoundingClientRect();
+      const priceBox = row.querySelector('td[data-tier].is-active-tier .price-cny').getBoundingClientRect();
+      return {
+        country: countryBox.left - tableBox.left,
+        price: tableBox.right - priceBox.right
+      };
+    });
+    assert.ok(mobileTableInsets.country >= 16, `mobile country names need comfortable left padding; got ${mobileTableInsets.country}px`);
+    assert.ok(Math.abs(mobileTableInsets.country - mobileTableInsets.price) <= 1, `mobile table edge spacing must be balanced; country=${mobileTableInsets.country}px, price=${mobileTableInsets.price}px`);
 
     await page.setViewportSize({ width: 1440, height: 800 });
     await assertMinimumCardSpacing('desktop');
