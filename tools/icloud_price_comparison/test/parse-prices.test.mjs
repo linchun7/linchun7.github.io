@@ -35,7 +35,7 @@ function testCountry(plans, overrides = {}) {
 test('parses footnotes, currencies, and all storage tiers', async () => {
   const result = parseApplePrices(await readFile(fixtureUrl, 'utf8'));
   assert.equal(result.parser, 'cross-checked');
-  assert.match(result.parserStatus, /Both independent parser paths agreed/);
+  assert.match(result.parserStatus, /Both DOM association paths agreed/);
   assert.equal(result.countries.length, 5);
   assert.equal(result.sourcePublishedDate, 'July 17, 2026');
   assert.equal(result.countries[0].country, 'United States');

@@ -176,16 +176,17 @@ test('starts price data early and deprioritizes optional third-party work', asyn
   const html = await readFile(path.join(PROJECT_DIR, 'index.html'), 'utf8');
   const eagerPriceFetch = '<script src="price-bootstrap.js?v=3"></script>';
   assert.ok(html.includes(eagerPriceFetch), 'prices.json bootstrap should run during HTML parsing');
-  assert.ok(html.indexOf(eagerPriceFetch) < html.indexOf('<script type="module" src="script.js?v=3"></script>'), 'the initial price request should precede module execution');
+  assert.ok(html.indexOf(eagerPriceFetch) < html.indexOf('<script type="module" src="script.js?v=4"></script>'), 'the initial price request should precede module execution');
   assert.doesNotMatch(html, /rel="preload" href="data\/prices\.json"/, 'cross-browser loading should not rely on a fetch preload that WebKit may duplicate');
-  assert.doesNotMatch(html, /<script[^>]+src="https:\/\/www\.googletagmanager\.com/, 'analytics must not load before explicit consent');
+  assert.doesNotMatch(html, /<script[^>]+src="https:\/\/www\.googletagmanager\.com/, 'analytics must not block HTML parsing');
+  assert.doesNotMatch(html, /analyticsConsent|privacySettings|允许匿名统计/, 'analytics consent overlay and its settings entry must be absent');
   assert.match(html, /Content-Security-Policy/);
   assert.match(html, /Rates By Exchange Rate API/);
   assert.doesNotMatch(html, /rel="preconnect" href="https:\/\/raw\.githubusercontent\.com"/, 'the rarely used fallback host should not consume an eager connection');
 });
 
-test('loads GA4 only after explicit consent and keeps rejection reversible', { timeout: 30_000 }, async (context) => {
-  const browserConfig = await resolveBrowser(context, 'the analytics consent test');
+test('loads GA4 only after page load without rendering a consent overlay', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the deferred analytics test');
   if (!browserConfig) return;
   const server = await startServer();
   const { port } = server.address();
@@ -202,27 +203,16 @@ test('loads GA4 only after explicit consent and keeps rejection reversible', { t
   }));
   try {
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-    await page.locator('#analyticsConsent').waitFor({ state: 'visible' });
-    assert.equal(analyticsRequests.length, 0);
-    assert.equal((await page.context().cookies()).some(({ name }) => name.startsWith('_ga')), false);
-
-    await page.locator('#rejectAnalytics').click();
-    assert.equal(await page.locator('#analyticsConsent').isHidden(), true);
-    assert.equal(await page.evaluate(() => localStorage.getItem('icloud-price-comparison:analytics-consent:v1')), 'denied');
-    assert.equal(analyticsRequests.length, 0);
-
-    await page.locator('#privacySettings').click();
-    assert.equal(await page.locator('#analyticsConsent').isVisible(), true);
-    await page.locator('#acceptAnalytics').click();
+    await page.locator('#priceRows tr').first().waitFor();
+    assert.equal(await page.locator('#analyticsConsent').count(), 0);
+    assert.equal(await page.locator('#privacySettings').count(), 0);
     await page.waitForFunction(() => document.querySelector('script[data-analytics-loader]'));
-    assert.equal(await page.evaluate(() => localStorage.getItem('icloud-price-comparison:analytics-consent:v1')), 'granted');
     assert.equal(analyticsRequests.length, 1);
     assert.deepEqual(await page.evaluate(() => dataLayer.map((entry) => ({
       command: entry[0],
       value: entry[0] === 'js' ? entry[1] instanceof Date : entry[1],
       options: entry[2] ?? null
     }))), [
-      { command: 'consent', value: 'default', options: { analytics_storage: 'granted' } },
       { command: 'js', value: true, options: null },
       { command: 'config', value: 'G-K2S9L4CHNP', options: null }
     ]);
@@ -1720,7 +1710,7 @@ test('keeps the minimum-price overview stable and the desktop table header stick
     assert.equal(await page.locator('h1').count(), 1);
     assert.equal(await page.locator('h1').textContent(), 'iCloud+ \u5168\u7403\u4ef7\u683c\u5bf9\u6bd4');
     assert.equal(await page.locator('#overviewTitle').evaluate((element) => element.tagName), 'H2');
-    assert.equal(await page.locator('head script[type="module"][src="script.js?v=3"]').count(), 1);
+    assert.equal(await page.locator('head script[type="module"][src="script.js?v=4"]').count(), 1);
     assert.equal(await page.locator('head link[rel="modulepreload"]').count(), 3);
     const before = await page.locator('#minimumSummary').boundingBox();
     releaseRequest();
@@ -1851,6 +1841,7 @@ test('restores URL state, removes the floating search bar, and supports table re
     assert.equal(await page.locator('#minimumSummary .minimum-card[aria-pressed="true"]').count(), 0);
     assert.equal(new URL(page.url()).searchParams.get('sort'), 'country');
     assert.equal(new URL(page.url()).searchParams.get('dir'), 'asc');
+    assert.equal(new URL(page.url()).searchParams.get('tier'), alternateTier, 'country sorting must retain the selected comparison tier');
     await page.locator('button[data-sort="country"]').click();
     assert.equal(await page.locator('th:has(button[data-sort="country"])').getAttribute('aria-sort'), 'descending');
     assert.equal(new URL(page.url()).searchParams.get('dir'), 'desc');
