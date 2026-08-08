@@ -38,6 +38,22 @@ test('rejects undeclared price tiers and truncated browser payloads', async () =
   assert.throws(() => validatePayload('prices.json', truncated), /incomplete tiers or countries/);
 });
 
+test('rejects unsafe or unsupported storage tier identifiers', async () => {
+  const { prices } = await productionFixtures();
+  for (const tierId of ['__proto__', 'constructor', 'prototype', '50 GB', '50GB\"]']) {
+    const payload = structuredClone(prices);
+    const previousTierId = payload.tiers[0].id;
+    payload.tiers[0].id = tierId;
+    for (const country of payload.countries) {
+      country.plans = Object.fromEntries(Object.entries(country.plans).map(([id, plan]) => (
+        [id === previousTierId ? tierId : id, plan]
+      )));
+    }
+    assert.throws(() => validatePricePayload(payload), /invalid or duplicate tiers/);
+    assert.throws(() => validateExistingPrices(payload), /invalid or duplicate tiers/);
+  }
+});
+
 test('shared browser and updater contracts reject the same price schema divergences', async () => {
   const { prices } = await productionFixtures();
   const mutations = [
@@ -60,6 +76,7 @@ test('shared browser and updater contracts reject invalid publication kind and c
   const mutations = [
     (payload) => { payload.sourcePublishedDates[0].kind = 'unknown'; },
     (payload) => { payload.sourcePublishedDates[0].changes.addedCountries = {}; },
+    (payload) => { payload.sourcePublishedDates[0].changes.addedTiers = [{ id: '__proto__' }]; },
     (payload) => { payload.sourcePublishedDates[0].observedAt = '2024-12-04'; },
     (payload) => {
       const event = Object.values(payload.countries)[0].events[0];

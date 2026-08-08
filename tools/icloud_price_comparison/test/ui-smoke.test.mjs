@@ -1742,6 +1742,8 @@ test('restores URL state, removes the floating search bar, and supports table re
   const initialCountry = validData.countries.find(({ nameZh }) => nameZh) || validData.countries[0];
   const params = new URLSearchParams({
     tier: validData.tiers.at(-1).id,
+    sort: 'tier',
+    dir: 'asc',
     q: initialCountry.nameZh || initialCountry.country,
     region: initialCountry.region,
     compare: validData.countries.slice(0, 2).map(({ country }) => country).join(',')
@@ -1779,6 +1781,8 @@ test('restores URL state, removes the floating search bar, and supports table re
     const alternateMinimumCard = page.locator(`#minimumSummary .minimum-card[data-tier="${alternateTier}"]`);
     await page.locator(`th[data-tier="${alternateTier}"] button`).click();
     assert.equal(await page.locator(`th[data-tier="${alternateTier}"]`).getAttribute('aria-sort'), 'ascending');
+    assert.equal(new URL(page.url()).searchParams.get('sort'), 'tier');
+    assert.equal(new URL(page.url()).searchParams.get('dir'), 'asc');
     assert.equal(await alternateMinimumCard.getAttribute('aria-pressed'), 'true');
     assert.equal(await alternateMinimumCard.evaluate((card) => card.classList.contains('is-active-tier')), true);
     assert.equal(await initialMinimumCard.getAttribute('aria-pressed'), 'false');
@@ -1786,12 +1790,23 @@ test('restores URL state, removes the floating search bar, and supports table re
 
     await page.locator(`th[data-tier="${alternateTier}"] button`).click();
     assert.equal(await page.locator(`th[data-tier="${alternateTier}"]`).getAttribute('aria-sort'), 'descending');
+    assert.equal(new URL(page.url()).searchParams.get('dir'), 'desc');
     assert.equal(await alternateMinimumCard.getAttribute('aria-pressed'), 'false');
     assert.equal(await alternateMinimumCard.evaluate((card) => card.classList.contains('is-active-tier')), false);
     assert.equal(await page.locator('#minimumSummary .minimum-card[aria-pressed="true"]').count(), 0);
 
     await page.locator('button[data-sort="country"]').click();
     assert.equal(await page.locator('#minimumSummary .minimum-card[aria-pressed="true"]').count(), 0);
+    assert.equal(new URL(page.url()).searchParams.get('sort'), 'country');
+    assert.equal(new URL(page.url()).searchParams.get('dir'), 'asc');
+    await page.locator('button[data-sort="country"]').click();
+    assert.equal(await page.locator('th:has(button[data-sort="country"])').getAttribute('aria-sort'), 'descending');
+    assert.equal(new URL(page.url()).searchParams.get('dir'), 'desc');
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#marketCount')?.textContent !== '--');
+    assert.equal(await page.locator('th:has(button[data-sort="country"])').getAttribute('aria-sort'), 'descending');
+    assert.equal(new URL(page.url()).searchParams.get('sort'), 'country');
+    assert.equal(new URL(page.url()).searchParams.get('dir'), 'desc');
 
     await page.locator('#searchInput').fill('');
     await page.locator('#regionSelect').selectOption('all');
@@ -1820,6 +1835,8 @@ test('restores URL state, removes the floating search bar, and supports table re
     const minimumTier = await minimumCard.getAttribute('data-tier');
     await minimumCard.click();
     assert.equal(new URL(page.url()).searchParams.get('tier'), minimumTier);
+    assert.equal(new URL(page.url()).searchParams.get('sort'), 'tier');
+    assert.equal(new URL(page.url()).searchParams.get('dir'), 'asc');
     assert.equal(new URL(page.url()).searchParams.has('q'), false);
     assert.equal(new URL(page.url()).searchParams.has('region'), false);
     assert.equal(await page.locator('#searchInput').inputValue(), '');
