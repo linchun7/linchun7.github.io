@@ -11,6 +11,8 @@ const DEFAULT_TIER_COLUMN_COUNT = 5;
 const FIXED_PRICE_TABLE_COLUMN_COUNT = 2;
 const PRICE_CACHE_KEY = 'icloud-price-comparison:validated-prices:v1';
 const initialUrlState = new URLSearchParams(location.search);
+const initialSortKey = initialUrlState.get('sort') === 'country' ? 'country' : 'tier';
+const initialSortDirection = initialUrlState.get('dir') === 'desc' ? 'desc' : 'asc';
 const REGION_LABELS = {
   Americas: '美洲',
   'Europe, Middle East & Africa': '欧洲、中东和非洲',
@@ -23,8 +25,8 @@ const state = {
   sortTier: initialUrlState.get('tier') || DEFAULT_SORT_TIER,
   query: initialUrlState.get('q') || '',
   region: initialUrlState.get('region') || 'all',
-  sortKey: 'tier',
-  sortDirection: 'asc',
+  sortKey: initialSortKey,
+  sortDirection: initialSortDirection,
   activeCountry: null,
   historyTier: DEFAULT_SORT_TIER,
   minimumPrices: {},
@@ -975,6 +977,8 @@ function syncActiveHistoryCountry() {
 function updateUrlState() {
   const url = new URL(location.href);
   url.searchParams.set('tier', state.sortTier);
+  url.searchParams.set('sort', state.sortKey);
+  url.searchParams.set('dir', state.sortDirection);
   if (state.query) url.searchParams.set('q', state.query);
   else url.searchParams.delete('q');
   if (state.region !== 'all') url.searchParams.set('region', state.region);
