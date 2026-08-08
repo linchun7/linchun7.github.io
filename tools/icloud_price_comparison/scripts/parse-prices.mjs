@@ -1,5 +1,6 @@
 import * as cheerio from 'cheerio';
 import { readFileSync } from 'node:fs';
+import { canonicalTierDefinition } from '../data-contract.js';
 
 const OFFICIAL_COUNTRIES = new Set(Object.keys(JSON.parse(
   readFileSync(new URL('./country-names.zh.json', import.meta.url), 'utf8')
@@ -180,14 +181,9 @@ function parseTierLabel(label) {
   if (!match) return null;
   const amount = Number(match[1]);
   const unit = match[2].toUpperCase();
-  const capacityGb = amount * (unit === 'TB' ? 1024 : 1);
-  if (!Number.isFinite(amount) || amount <= 0 || !Number.isFinite(capacityGb) || capacityGb <= 0) return null;
+  if (!Number.isFinite(amount) || amount <= 0) return null;
   const normalizedAmount = String(amount).replace(/\.0+$/, '');
-  return {
-    id: `${normalizedAmount}${unit}`,
-    label: `${normalizedAmount} ${unit}`,
-    capacityGb
-  };
+  return canonicalTierDefinition(`${normalizedAmount}${unit}`);
 }
 
 function isPriceList($, node) {
@@ -212,7 +208,9 @@ function extractPublishedDate($) {
     /published\s+date/i.test(cleanText($(node).parent().text()))
   ));
   if (publishedTime) {
-    return cleanPublishedDate($(publishedTime).text()) || cleanPublishedDate($(publishedTime).attr('datetime') ?? '');
+    const datetime = cleanPublishedDate($(publishedTime).attr('datetime') ?? '');
+    if (/^\d{4}-\d{2}-\d{2}$/.test(datetime)) return datetime;
+    return cleanPublishedDate($(publishedTime).text()) || datetime;
   }
 
   const pageText = cleanText($.root().text());
@@ -221,7 +219,7 @@ function extractPublishedDate($) {
   return null;
 }
 
-function parseCountryHeading($, heading) {
+function parseCountryHeading($, heading, { allowUnknownCountries = false } = {}) {
   const title = headingText($, heading);
   const titleMatch = title.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
 
@@ -231,7 +229,7 @@ function parseCountryHeading($, heading) {
   const normalizedCountryLabel = cleanText(countryLabel);
   if (!normalizedCountryLabel) throw new Error(`Country heading is missing a country name: ${title}`);
   const country = COUNTRY_ALIASES[normalizedCountryLabel] ?? normalizedCountryLabel;
-  if (!OFFICIAL_COUNTRIES.has(country)) {
+  if (!allowUnknownCountries && !OFFICIAL_COUNTRIES.has(country)) {
     throw new Error(`Unknown Apple country heading "${normalizedCountryLabel}"`);
   }
   const currency = /^[A-Z]{3}$/.test(currencyLabel)
@@ -241,8 +239,8 @@ function parseCountryHeading($, heading) {
   return { country: cleanText(country), currency };
 }
 
-function parseCountry($, heading, priceList, region) {
-  const { country, currency } = parseCountryHeading($, heading);
+function parseCountry($, heading, priceList, region, options) {
+  const { country, currency } = parseCountryHeading($, heading, options);
   const $prices = $(priceList);
 
   const plans = {};
@@ -268,8 +266,8 @@ function parseCountry($, heading, priceList, region) {
   return { country, region, currency, plans, detectedTiers: [...detectedTiers.values()] };
 }
 
-function parseCountryByAppleMarkers($, heading, priceList, region) {
-  const { country, currency } = parseCountryHeading($, heading);
+function parseCountryByAppleMarkers($, heading, priceList, region, options) {
+  const { country, currency } = parseCountryHeading($, heading, options);
   const plans = {};
   const detectedTiers = new Map();
   const tierItems = $(priceList).find('li').toArray().filter((item) => (
@@ -334,7 +332,7 @@ function finalizeParsedResult($, parsedCountries, foundRegions) {
   return { countries, tiers, sourcePublishedDate: extractPublishedDate($) };
 }
 
-function parseByDocumentOrder($) {
+function parseByDocumentOrder($, options) {
   const parsedCountries = [];
   const foundRegions = new Set();
   const nodes = $('h2, h3, h4, h5, .gb-header, ul').toArray();
@@ -356,7 +354,7 @@ function parseByDocumentOrder($) {
     }
 
     // Validate the heading before rejecting ambiguous neighboring lists so pseudo-country headings fail closed.
-    parseCountryHeading($, node);
+    parseCountryHeading($, node, options);
     const priceLists = [];
     for (let nextIndex = index + 1; nextIndex < nodes.length; nextIndex += 1) {
       const candidate = nodes[nextIndex];
@@ -370,13 +368,13 @@ function parseByDocumentOrder($) {
     }
     if (!priceLists.length) throw new Error(`Price list not found after ${headingText($, node)}`);
     if (priceLists.length > 1) throw new Error(`Ambiguous price lists found after ${headingText($, node)}`);
-    parsedCountries.push(parseCountry($, node, priceLists[0], currentRegion));
+    parsedCountries.push(parseCountry($, node, priceLists[0], currentRegion, options));
   }
 
   return finalizeParsedResult($, parsedCountries, foundRegions);
 }
 
-function parseByAppleMarkers($) {
+function parseByAppleMarkers($, options) {
   const parsedCountries = [];
   const foundRegions = new Set();
   const nodes = $('#nasalac, #emea, #ap, h2, h3, h4, h5, .gb-header, ul').toArray();
@@ -394,7 +392,7 @@ function parseByAppleMarkers($) {
     if (!currentRegion) throw new Error(`Apple marker parser found a country before a region: ${headingText($, node)}`);
 
     // Validate the heading before rejecting ambiguous neighboring lists so pseudo-country headings fail closed.
-    parseCountryHeading($, node);
+    parseCountryHeading($, node, options);
     const priceLists = [];
     for (let nextIndex = index + 1; nextIndex < nodes.length; nextIndex += 1) {
       const candidate = nodes[nextIndex];
@@ -405,7 +403,7 @@ function parseByAppleMarkers($) {
     }
     if (!priceLists.length) throw new Error(`Apple marker price list not found after ${headingText($, node)}`);
     if (priceLists.length > 1) throw new Error(`Ambiguous Apple marker price lists after ${headingText($, node)}`);
-    parsedCountries.push(parseCountryByAppleMarkers($, node, priceLists[0], currentRegion));
+    parsedCountries.push(parseCountryByAppleMarkers($, node, priceLists[0], currentRegion, options));
   }
 
   return finalizeParsedResult($, parsedCountries, foundRegions);
@@ -419,20 +417,21 @@ function comparableParseResult(result) {
   });
 }
 
-export function parseApplePrices(html) {
+export function parseApplePrices(html, { allowUnknownCountries = false } = {}) {
   const $ = cheerio.load(html);
+  const options = { allowUnknownCountries };
   let documentOrderResult = null;
   let appleMarkerResult = null;
   let documentOrderError = null;
   let appleMarkerError = null;
 
   try {
-    documentOrderResult = parseByDocumentOrder($);
+    documentOrderResult = parseByDocumentOrder($, options);
   } catch (error) {
     documentOrderError = error;
   }
   try {
-    appleMarkerResult = parseByAppleMarkers($);
+    appleMarkerResult = parseByAppleMarkers($, options);
   } catch (error) {
     appleMarkerError = error;
   }
@@ -479,15 +478,11 @@ export function validatePrices(countries, {
   const tierCapacities = new Set();
   for (const tier of tiers) {
     if (!tier
-      || typeof tier.id !== 'string'
-      || !tier.id.trim()
-      || typeof tier.label !== 'string'
-      || !tier.label.trim()
-      || !Number.isFinite(tier.capacityGb)
-      || tier.capacityGb <= 0
+      || canonicalTierDefinition(tier.id)?.label !== tier.label
+      || canonicalTierDefinition(tier.id)?.capacityGb !== tier.capacityGb
       || tierIds.has(tier.id)
       || tierCapacities.has(tier.capacityGb)) {
-      throw new Error('Apple pricing tiers contain an invalid or duplicate entry');
+      throw new Error('Apple pricing has invalid or duplicate tiers');
     }
     tierIds.add(tier.id);
     tierCapacities.add(tier.capacityGb);

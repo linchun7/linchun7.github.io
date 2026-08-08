@@ -12,12 +12,14 @@ import {
   defaultUpdateLockPath,
   defaultUpdateTransactionPath,
   appleSnapshotContentHash,
+  appleStructuralChanges,
   acquireUpdateLock,
   normalizeAppleSnapshotIndex,
   savePublishedAppleSnapshot,
   createRunLogEntry,
   createNetworkBudget,
   confirmCountryRemovals,
+  confirmAppleStructuralChanges,
   classifyHealthcheckFailure,
   fetchResource,
   getExchangeRates,
@@ -207,6 +209,32 @@ test('confirms legitimate removals only when two complete Apple parses are ident
   assert.throws(
     () => confirmCountryRemovals({ ...first, parser: 'document-order' }, first, data.countries),
     /two fully cross-checked Apple parses/
+  );
+});
+
+test('requires an identical independent confirmation for global storage-tier changes', async () => {
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const removedTier = data.tiers.at(-1).id;
+  const first = {
+    sourcePublishedDate: data.source.publishedDate,
+    parser: 'cross-checked',
+    tiers: data.tiers.slice(0, -1),
+    countries: data.countries.map((country) => {
+      const next = structuredClone(country);
+      delete next.plans[removedTier];
+      return next;
+    })
+  };
+  const changes = appleStructuralChanges(data, first);
+  assert.deepEqual(changes.removedTiers, [removedTier]);
+  const confirmed = confirmAppleStructuralChanges(first, structuredClone(first), data);
+  assert.deepEqual(confirmed.changes.removedTiers, [removedTier]);
+
+  const mismatched = structuredClone(first);
+  mismatched.countries[0].plans[data.tiers[0].id].price += 1;
+  assert.throws(
+    () => confirmAppleStructuralChanges(first, mismatched, data),
+    /not reproduced by the independent confirmation fetch/
   );
 });
 
@@ -2453,6 +2481,12 @@ test('fails closed on a fresh malformed updater lock and recovers an old one', a
       () => acquireUpdateLock(lockPath, { staleAfterMs: 60_000 }),
       /already running/
     );
+    await writeFile(lockPath, JSON.stringify({ pid: 'not-a-pid', acquiredAtUtc: new Date().toISOString() }), 'utf8');
+    await assert.rejects(
+      () => acquireUpdateLock(lockPath, { staleAfterMs: 60_000 }),
+      /already running/
+    );
+    await writeFile(lockPath, '{', 'utf8');
     const old = new Date(Date.now() - 120_000);
     await utimes(lockPath, old, old);
     const release = await acquireUpdateLock(lockPath, { staleAfterMs: 60_000 });

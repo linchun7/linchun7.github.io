@@ -324,6 +324,30 @@ test('rejects missing previous countries instead of applying a count tolerance',
   );
 });
 
+test('prefers a complete time datetime value over abbreviated visible text', async () => {
+  const fixture = await readFile(fixtureUrl, 'utf8');
+  const adjusted = fixture.replace(
+    '<p>Published Date: <time>July 17, 2026</time></p>',
+    '<p>Published Date: <time datetime="2026-07-17">Jul 17</time></p>'
+  );
+  assert.equal(parseApplePrices(adjusted).sourcePublishedDate, '2026-07-17');
+});
+
+test('allows a newly published Apple country only through the explicit confirmation mode', async () => {
+  const fixture = await readFile(fixtureUrl, 'utf8');
+  const adjusted = fixture.replace('United States<sup>4</sup> (USD)', 'New Market<sup>4</sup> (USD)');
+  assert.throws(() => parseApplePrices(adjusted), /Unknown Apple country heading|Both Apple parsers failed/);
+  const parsed = parseApplePrices(adjusted, { allowUnknownCountries: true });
+  assert.equal(parsed.parser, 'cross-checked');
+  assert.equal(parsed.countries[0].country, 'New Market');
+});
+
+test('rejects non-canonical or implausibly large storage tier identifiers', async () => {
+  const fixture = await readFile(fixtureUrl, 'utf8');
+  const adjusted = fixture.replaceAll('50 GB', '1000000000000000000000 GB');
+  assert.throws(() => parseApplePrices(adjusted), /Both Apple parsers failed/);
+});
+
 test('accepts any exact set of independently confirmed country removals', () => {
   const tiers = [testTier('50GB')];
   const previousCountries = [

@@ -37,18 +37,22 @@ export function isAutomaticTriggerSource(source) {
   return AUTOMATIC_TRIGGER_SOURCES.has(source);
 }
 
-export function findSuccessfulAutomaticRun(runLog, automaticRunDateBeijing, now = null) {
+export function findSuccessfulAutomaticRun(runLog, automaticRunDateBeijing, now = new Date()) {
   if (!Array.isArray(runLog?.runs) || !automaticRunDateBeijing) return null;
-  const nowMs = now instanceof Date ? now.getTime() : null;
+  const nowMs = now instanceof Date ? now.getTime() : Number.NaN;
   return [...runLog.runs].reverse().find((run) => (
     run?.status === 'success'
     && isAutomaticTriggerSource(run.trigger)
     && run.automaticRunDateBeijing === automaticRunDateBeijing
     && run.source?.exchangeRatesStale === false
     && formatBeijingDate(run.source?.exchangeRatesFetchedAtUtc) === automaticRunDateBeijing
-    && (nowMs === null
-      || (Number.isFinite(nowMs)
-        && Number.isFinite(Date.parse(run.source?.exchangeRatesFetchedAtUtc))
-        && Date.parse(run.source.exchangeRatesFetchedAtUtc) <= nowMs))
+    && Number.isFinite(nowMs)
+    && Number.isFinite(Date.parse(run.startedAtUtc))
+    && Number.isFinite(Date.parse(run.finishedAtUtc))
+    && Number.isFinite(Date.parse(run.source?.exchangeRatesFetchedAtUtc))
+    && Date.parse(run.startedAtUtc) <= Date.parse(run.finishedAtUtc)
+    && Date.parse(run.startedAtUtc) <= nowMs
+    && Date.parse(run.finishedAtUtc) <= nowMs
+    && Date.parse(run.source.exchangeRatesFetchedAtUtc) <= nowMs
   )) ?? null;
 }

@@ -7,6 +7,7 @@ const ALLOWED_FX_SOURCE_URLS = new Set([
 const ALLOWED_PARSERS = new Set(['cross-checked', 'document-order', 'apple-markers-fallback']);
 const UNSAFE_OBJECT_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 const TIER_ID_PATTERN = /^\d+(?:\.\d+)?(?:GB|TB)$/;
+const MAX_TIER_CAPACITY_GB = 1024 * 1024;
 const MONTHS = [
   'january', 'february', 'march', 'april', 'may', 'june',
   'july', 'august', 'september', 'october', 'november', 'december'
@@ -32,6 +33,24 @@ export function isValidIsoTimestamp(value) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) return false;
   const date = new Date(value);
   return !Number.isNaN(date.getTime()) && date.toISOString() === value;
+}
+
+export function canonicalTierDefinition(id) {
+  if (typeof id !== 'string' || !TIER_ID_PATTERN.test(id) || UNSAFE_OBJECT_KEYS.has(id)) return null;
+  const match = id.match(/^(\d+(?:\.\d+)?)(GB|TB)$/);
+  const amount = Number(match?.[1]);
+  const unit = match?.[2];
+  if (!Number.isFinite(amount) || amount <= 0 || String(amount) !== match[1]) return null;
+  const capacityGb = amount * (unit === 'TB' ? 1024 : 1);
+  if (!Number.isFinite(capacityGb) || capacityGb <= 0 || capacityGb > MAX_TIER_CAPACITY_GB) return null;
+  return { id, label: `${match[1]} ${unit}`, capacityGb };
+}
+
+function isCanonicalTier(tier) {
+  const canonical = canonicalTierDefinition(tier?.id);
+  return canonical !== null
+    && tier.label === canonical.label
+    && tier.capacityGb === canonical.capacityGb;
 }
 
 export function publicationDateKey(value) {
@@ -60,10 +79,9 @@ export function isValidPublicationChanges(changes) {
   if (!isPlainObject(changes)) return false;
   const arrays = ['addedTiers', 'removedTiers', 'addedCountries', 'removedCountries', 'changedCountries'];
   if (arrays.some((key) => changes[key] !== undefined && !Array.isArray(changes[key]))) return false;
-  const validTier = (tier) => isPlainObject(tier)
-    && typeof tier.id === 'string'
-    && TIER_ID_PATTERN.test(tier.id)
-    && !UNSAFE_OBJECT_KEYS.has(tier.id);
+  const validTier = (tier) => isPlainObject(tier) && canonicalTierDefinition(tier.id) !== null;
+  const validListedTier = (tier) => validTier(tier)
+    && tier.label === canonicalTierDefinition(tier.id).label;
   const validCountry = (country) => isPlainObject(country) && typeof country.country === 'string' && country.country.trim();
   const validChangedTier = (tier) => validTier(tier)
     && (tier.from === null || (Number.isFinite(tier.from) && tier.from > 0))
@@ -71,8 +89,8 @@ export function isValidPublicationChanges(changes) {
     && (tier.from !== null || tier.to !== null);
   const validCurrency = (value) => typeof value === 'string' && /^[A-Z]{3}$/.test(value);
   const validRegion = (value) => typeof value === 'string' && value.trim();
-  if ((changes.addedTiers ?? []).some((tier) => !validTier(tier))) return false;
-  if ((changes.removedTiers ?? []).some((tier) => !validTier(tier))) return false;
+  if ((changes.addedTiers ?? []).some((tier) => !validListedTier(tier))) return false;
+  if ((changes.removedTiers ?? []).some((tier) => !validListedTier(tier))) return false;
   if ((changes.addedCountries ?? []).some((country) => !validCountry(country))) return false;
   if ((changes.removedCountries ?? []).some((country) => !validCountry(country))) return false;
   return (changes.changedCountries ?? []).every((country) => validCountry(country)
@@ -127,13 +145,7 @@ export function validatePricePayload(payload, { minCountries = 1 } = {}) {
   const tierCapacities = new Set();
   for (const tier of payload.tiers) {
     if (!isPlainObject(tier)
-      || typeof tier.id !== 'string'
-      || !TIER_ID_PATTERN.test(tier.id)
-      || UNSAFE_OBJECT_KEYS.has(tier.id)
-      || typeof tier.label !== 'string'
-      || !tier.label.trim()
-      || !Number.isFinite(tier.capacityGb)
-      || tier.capacityGb <= 0
+      || !isCanonicalTier(tier)
       || tierIds.has(tier.id)
       || tierCapacities.has(tier.capacityGb)) {
       throw new Error('prices.json has invalid or duplicate tiers');
@@ -236,6 +248,7 @@ export function validateHistoryPayload(payload) {
         || !/^[A-Z]{3}$/.test(event.currency)
         || !isPlainObject(event.plans)
         || !Object.keys(event.plans).length
+        || Object.keys(event.plans).some((tierId) => canonicalTierDefinition(tierId) === null)
         || Object.values(event.plans).some((price) => !Number.isFinite(price) || price <= 0)
         || !isValidObservationMetadata(event)) {
         throw new Error(`history.json has an invalid event for ${countryName}`);

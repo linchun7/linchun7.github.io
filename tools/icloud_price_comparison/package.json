@@ -24,7 +24,7 @@
   },
   "devDependencies": {
     "chart.js": "4.5.1",
-    "lucide": "1.28.0",
+    "lucide": "1.30.0",
     "playwright": "1.62.1"
   }
 }

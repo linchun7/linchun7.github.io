@@ -1,5 +1,5 @@
 const SVG_NS = 'http://www.w3.org/2000/svg';
-/* Lucide 1.28.0 icon subset - ISC license; see ../THIRD_PARTY_NOTICES.md. */
+/* Lucide 1.30.0 icon subset - ISC license; see ../THIRD_PARTY_NOTICES.md. */
 
 const ICONS = {
   "arrow-down": [["path",{"d":"M12 5v14"}],["path",{"d":"m19 12-7 7-7-7"}]],

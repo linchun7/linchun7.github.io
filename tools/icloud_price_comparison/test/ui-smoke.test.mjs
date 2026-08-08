@@ -174,15 +174,17 @@ after(async () => {
 
 test('starts price data early and deprioritizes optional third-party work', async () => {
   const html = await readFile(path.join(PROJECT_DIR, 'index.html'), 'utf8');
-  const eagerPriceFetch = '<script src="price-bootstrap.js?v=3"></script>';
+  const eagerPriceFetch = '<script data-cfasync="false" src="price-bootstrap.js?v=4"></script>';
   assert.ok(html.includes(eagerPriceFetch), 'prices.json bootstrap should run during HTML parsing');
-  assert.ok(html.indexOf(eagerPriceFetch) < html.indexOf('<script type="module" src="script.js?v=4"></script>'), 'the initial price request should precede module execution');
+  assert.ok(html.indexOf(eagerPriceFetch) < html.indexOf('<script data-cfasync="false" type="module" src="script.js?v=5"></script>'), 'the initial price request should precede module execution');
   assert.doesNotMatch(html, /rel="preload" href="data\/prices\.json"/, 'cross-browser loading should not rely on a fetch preload that WebKit may duplicate');
   assert.doesNotMatch(html, /<script[^>]+src="https:\/\/www\.googletagmanager\.com/, 'analytics must not block HTML parsing');
   assert.doesNotMatch(html, /analyticsConsent|privacySettings|允许匿名统计/, 'analytics consent overlay and its settings entry must be absent');
   assert.match(html, /Content-Security-Policy/);
+  assert.match(html, /script-src[^;]+static\.cloudflareinsights\.com/, 'Cloudflare Web Analytics must be explicitly allowed by CSP');
+  assert.doesNotMatch(html, /raw\.githubusercontent\.com/, 'frontend data must not fall back to a mutable branch URL');
   assert.match(html, /Rates By Exchange Rate API/);
-  assert.doesNotMatch(html, /rel="preconnect" href="https:\/\/raw\.githubusercontent\.com"/, 'the rarely used fallback host should not consume an eager connection');
+  assert.match(html, /data-cfasync="false" type="module"/, 'Rocket Loader must not rewrite the module entry point');
 });
 
 test('loads GA4 only after page load without rendering a consent overlay', { timeout: 30_000 }, async (context) => {
@@ -202,19 +204,29 @@ test('loads GA4 only after page load without rendering a consent overlay', { tim
     body: ''
   }));
   try {
-    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`http://127.0.0.1:${port}/?q=privateSearchTerm`, { waitUntil: 'domcontentloaded' });
     await page.locator('#priceRows tr').first().waitFor();
     assert.equal(await page.locator('#analyticsConsent').count(), 0);
     assert.equal(await page.locator('#privacySettings').count(), 0);
     await page.waitForFunction(() => document.querySelector('script[data-analytics-loader]'));
     assert.equal(analyticsRequests.length, 1);
+    assert.equal(await page.locator('#searchInput').inputValue(), 'privateSearchTerm');
+    assert.equal(new URL(page.url()).searchParams.has('q'), false);
     assert.deepEqual(await page.evaluate(() => dataLayer.map((entry) => ({
       command: entry[0],
       value: entry[0] === 'js' ? entry[1] instanceof Date : entry[1],
       options: entry[2] ?? null
     }))), [
       { command: 'js', value: true, options: null },
-      { command: 'config', value: 'G-K2S9L4CHNP', options: null }
+      {
+        command: 'config',
+        value: 'G-K2S9L4CHNP',
+        options: {
+          page_location: `http://127.0.0.1:${port}/?tier=200GB&sort=tier&dir=asc`,
+          allow_google_signals: false,
+          allow_ad_personalization_signals: false
+        }
+      }
     ]);
   } finally {
     await browser.close();
@@ -1326,8 +1338,8 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
     nameZh: index === 0 ? '' : `测试地区${index}${'超长变化内容'.repeat(8)}`
   }));
   const verboseChanges = {
-    addedTiers: Array.from({ length: 12 }, (_, index) => ({ id: `${100 + index}TB`, label: `新增容量 ${index + 1} TB` })),
-    removedTiers: Array.from({ length: 12 }, (_, index) => ({ id: `${200 + index}TB`, label: `移除容量 ${index + 1} TB` })),
+    addedTiers: Array.from({ length: 12 }, (_, index) => ({ id: `${100 + index}TB`, label: `${100 + index} TB` })),
+    removedTiers: Array.from({ length: 12 }, (_, index) => ({ id: `${200 + index}TB`, label: `${200 + index} TB` })),
     addedCountries: verboseCountries,
     removedCountries: verboseCountries.map((entry, index) => ({ ...entry, country: `Removed${index}${entry.country}` })),
     changedCountries: verboseCountries.map((entry, index) => ({
@@ -1710,7 +1722,7 @@ test('keeps the minimum-price overview stable and the desktop table header stick
     assert.equal(await page.locator('h1').count(), 1);
     assert.equal(await page.locator('h1').textContent(), 'iCloud+ \u5168\u7403\u4ef7\u683c\u5bf9\u6bd4');
     assert.equal(await page.locator('#overviewTitle').evaluate((element) => element.tagName), 'H2');
-    assert.equal(await page.locator('head script[type="module"][src="script.js?v=4"]').count(), 1);
+    assert.equal(await page.locator('head script[type="module"][src="script.js?v=5"][data-cfasync="false"]').count(), 1);
     assert.equal(await page.locator('head link[rel="modulepreload"]').count(), 3);
     const before = await page.locator('#minimumSummary').boundingBox();
     releaseRequest();
@@ -1806,6 +1818,7 @@ test('restores URL state, removes the floating search bar, and supports table re
     await page.waitForFunction(() => document.querySelector('#marketCount')?.textContent !== '--');
     assert.equal(await page.locator('#searchInput').inputValue(), initialCountry.nameZh || initialCountry.country);
     assert.equal(await page.locator('#regionSelect').inputValue(), initialCountry.region);
+    assert.equal(new URL(page.url()).searchParams.has('q'), false, 'free-text search terms must be removed before analytics loads');
     assert.equal(new URL(page.url()).searchParams.has('compare'), false, 'legacy comparison state should be removed from the URL');
     assert.equal(await page.locator('#compareDock, #compareDialog, .compare-column, .compare-cell, .row-compare-button').count(), 0);
     assert.equal(

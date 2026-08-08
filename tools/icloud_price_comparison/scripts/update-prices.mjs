@@ -815,7 +815,11 @@ async function isStaleUpdateLock(lockPath, contents, staleAfterMs) {
   const ageMs = Number.isFinite(acquiredAtMs)
     ? Date.now() - acquiredAtMs
     : Date.now() - fileStat.mtimeMs;
-  if (metadata?.pid) return !isProcessAlive(Number(metadata.pid));
+  if (metadata && Object.hasOwn(metadata, 'pid')) {
+    const pid = Number(metadata.pid);
+    if (Number.isSafeInteger(pid) && pid > 0) return !isProcessAlive(pid);
+    return ageMs > staleAfterMs;
+  }
   return ageMs > staleAfterMs;
 }
 
@@ -1054,6 +1058,44 @@ export function confirmCountryRemovals(firstParsed, secondParsed, previousCountr
     throw new Error('Country removal confirmation did not reproduce the exact removed-country set');
   }
   return removals;
+}
+
+function setDifference(values, baseline) {
+  const baselineSet = new Set(baseline);
+  return values.filter((value) => !baselineSet.has(value));
+}
+
+export function appleStructuralChanges(previousData, parsed) {
+  const previousCountries = (previousData?.countries ?? []).map(({ country }) => country);
+  const currentCountries = (parsed?.countries ?? []).map(({ country }) => country);
+  const previousTiers = (previousData?.tiers ?? []).map(({ id }) => id);
+  const currentTiers = (parsed?.tiers ?? []).map(({ id }) => id);
+  return {
+    addedCountries: setDifference(currentCountries, previousCountries),
+    removedCountries: setDifference(previousCountries, currentCountries),
+    addedTiers: setDifference(currentTiers, previousTiers),
+    removedTiers: setDifference(previousTiers, currentTiers)
+  };
+}
+
+export function confirmAppleStructuralChanges(firstParsed, secondParsed, previousData) {
+  const changes = appleStructuralChanges(previousData, firstParsed);
+  if (Object.values(changes).every((items) => items.length === 0)) {
+    return { changes, confirmedRemovedCountries: [] };
+  }
+  if (firstParsed.parser !== 'cross-checked' || secondParsed.parser !== 'cross-checked') {
+    throw new Error('Apple country or storage-tier changes require two fully cross-checked parses');
+  }
+  validatePrices(secondParsed.countries, { tiers: secondParsed.tiers });
+  if (publicationDateKey(firstParsed.sourcePublishedDate) !== publicationDateKey(secondParsed.sourcePublishedDate)
+    || appleSnapshotContentHash(firstParsed) !== appleSnapshotContentHash(secondParsed)) {
+    throw new Error('Apple country or storage-tier changes were not reproduced by the independent confirmation fetch');
+  }
+  const confirmationChanges = appleStructuralChanges(previousData, secondParsed);
+  if (JSON.stringify(changes) !== JSON.stringify(confirmationChanges)) {
+    throw new Error('Apple structural confirmation did not reproduce the exact country and storage-tier changes');
+  }
+  return { changes, confirmedRemovedCountries: changes.removedCountries };
 }
 
 function snapshotPlanPrice(value) {
@@ -1453,12 +1495,15 @@ function validateExistingRunLog(runLog, data) {
     throw new Error('Existing run-log.json has an unsupported structure');
   }
   let previousFinishedAt = '';
+  const latestAllowedTimestamp = Date.now() + FX_MAX_FUTURE_SKEW_MS;
   for (const run of runLog.runs) {
     if (!isPlainObject(run)
       || run.status !== 'success'
       || !isIsoDateTime(run.startedAtUtc)
       || !isIsoDateTime(run.finishedAtUtc)
       || run.finishedAtUtc < run.startedAtUtc
+      || Date.parse(run.startedAtUtc) > latestAllowedTimestamp
+      || Date.parse(run.finishedAtUtc) > latestAllowedTimestamp
       || run.finishedAtUtc < previousFinishedAt) {
       throw new Error('Existing run-log.json contains an invalid run');
     }
@@ -1793,7 +1838,7 @@ export async function main({
     }
     const html = await fetchResource(APPLE_URL, { networkBudget });
 
-  const parsed = parseApplePrices(html);
+  const parsed = parseApplePrices(html, { allowUnknownCountries: true });
   lastAppleSnapshot = normalizeAppleSnapshot(parsed);
   if (parsed.parser !== 'cross-checked') {
     console.warn(`Apple parser redundancy degraded: ${parsed.parserStatus}`);
@@ -1806,20 +1851,20 @@ export async function main({
   }
   validatePrices(parsed.countries, { tiers: parsed.tiers });
   let confirmedRemovedCountries = [];
-  const removalCandidates = removedCountryNames(previousData?.countries ?? [], parsed.countries);
-  if (removalCandidates.length) {
+  const structuralChanges = appleStructuralChanges(previousData, parsed);
+  if (previousData && Object.values(structuralChanges).some((items) => items.length > 0)) {
     const confirmationHtml = await fetchResource(APPLE_URL, {
       networkBudget,
       attempts: 2,
       headers: { 'cache-control': 'no-cache, no-store', pragma: 'no-cache' },
-      resourceName: 'Apple iCloud+ pricing removal confirmation'
+      resourceName: 'Apple iCloud+ pricing structural-change confirmation'
     });
-    const confirmationParsed = parseApplePrices(confirmationHtml);
-    confirmedRemovedCountries = confirmCountryRemovals(
+    const confirmationParsed = parseApplePrices(confirmationHtml, { allowUnknownCountries: true });
+    ({ confirmedRemovedCountries } = confirmAppleStructuralChanges(
       parsed,
       confirmationParsed,
-      previousData?.countries ?? []
-    );
+      previousData
+    ));
   }
   const countries = parsed.countries.map((country) => ({
     ...country,
@@ -1897,6 +1942,10 @@ export async function main({
   };
   const run = createRunLogEntry(data, summary, runStartedAt, finishedAt);
   const runLog = buildRunLog(previousRunLog, run);
+  validatePricePayload(data, { minCountries: 60 });
+  validateHistoryPayload(history);
+  validatePriceHistoryConsistency(data, history);
+  validateExistingRunLog(runLog, data);
   const originalSnapshotIndexState = dryRun
     ? { value: null, text: null }
     : await readJsonWithExistence(snapshotIndexPath, null);
