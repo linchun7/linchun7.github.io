@@ -1,10 +1,12 @@
-import { publicationDateKey, validatePayload, validatePriceHistoryConsistency } from './data-contract.js';
-import { createIcons } from './vendor/lucide-subset.js';
+import { publicationDateKey, validatePayload, validatePriceHistoryConsistency } from './data-contract.js?v=3';
+import { createIcons } from './vendor/lucide-subset.js?v=3';
 
 const REMOTE_DATA_ROOT = 'https://raw.githubusercontent.com/linchun7/linchun7.github.io/main/tools/icloud_price_comparison/data';
 const HOSTED_NAMES = new Set(['linchun7.github.io', 'linchun.com.cn', 'www.linchun.com.cn']);
 const REQUEST_TIMEOUT_MS = 8_000;
-const CHART_SCRIPT_URL = './vendor/chart.umd.min.js';
+const CHART_SCRIPT_URL = './vendor/chart.umd.min.js?v=3';
+const ANALYTICS_ID = 'G-K2S9L4CHNP';
+const ANALYTICS_CONSENT_KEY = 'icloud-price-comparison:analytics-consent:v1';
 const SLOW_LOADING_MS = 1_500;
 const DEFAULT_SORT_TIER = '200GB';
 const DEFAULT_TIER_COLUMN_COUNT = 5;
@@ -80,7 +82,11 @@ const elements = {
   publishedDateDialog: document.querySelector('#publishedDateDialog'),
   closePublishedDate: document.querySelector('#closePublishedDate'),
   publishedDateDialogCurrent: document.querySelector('#publishedDateDialogCurrent'),
-  publishedDateRows: document.querySelector('#publishedDateRows')
+  publishedDateRows: document.querySelector('#publishedDateRows'),
+  analyticsConsent: document.querySelector('#analyticsConsent'),
+  acceptAnalytics: document.querySelector('#acceptAnalytics'),
+  rejectAnalytics: document.querySelector('#rejectAnalytics'),
+  privacySettings: document.querySelector('#privacySettings')
 };
 
 const numberFormatter = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 });
@@ -98,6 +104,75 @@ function refreshIcons() {
   } catch (error) {
     console.warn(`图标加载失败：${error.message}`);
   }
+}
+
+function readAnalyticsConsent() {
+  try {
+    const value = localStorage.getItem(ANALYTICS_CONSENT_KEY);
+    return value === 'granted' || value === 'denied' ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeAnalyticsConsent(value) {
+  try {
+    localStorage.setItem(ANALYTICS_CONSENT_KEY, value);
+  } catch {
+    // Consent still applies for this page even when storage is unavailable.
+  }
+}
+
+function analyticsTag() {
+  globalThis.dataLayer = globalThis.dataLayer || [];
+  globalThis.dataLayer.push(arguments);
+}
+
+function loadAnalytics() {
+  if (document.querySelector('script[data-analytics-loader]')) return;
+  analyticsTag('consent', 'default', { analytics_storage: 'granted' });
+  analyticsTag('js', new Date());
+  analyticsTag('config', ANALYTICS_ID);
+  const script = document.createElement('script');
+  script.async = true;
+  script.fetchPriority = 'low';
+  script.dataset.analyticsLoader = 'true';
+  script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(ANALYTICS_ID)}`;
+  document.head.append(script);
+}
+
+function deleteAnalyticsCookies() {
+  const hostVariants = ['', location.hostname, `.${location.hostname}`];
+  for (const cookie of document.cookie.split(';')) {
+    const name = cookie.split('=')[0]?.trim();
+    if (!name || !/^_ga(?:_|$)/.test(name)) continue;
+    for (const domain of hostVariants) {
+      document.cookie = `${name}=; Max-Age=0; path=/${domain ? `; domain=${domain}` : ''}; SameSite=Lax`;
+    }
+  }
+}
+
+function setAnalyticsConsent(value) {
+  writeAnalyticsConsent(value);
+  elements.analyticsConsent.hidden = true;
+  if (value === 'granted') {
+    loadAnalytics();
+    return;
+  }
+  if (globalThis.dataLayer) analyticsTag('consent', 'update', { analytics_storage: 'denied' });
+  deleteAnalyticsCookies();
+}
+
+function initializeAnalyticsConsent() {
+  const consent = readAnalyticsConsent();
+  if (consent === 'granted') loadAnalytics();
+  else if (!consent) elements.analyticsConsent.hidden = false;
+  elements.acceptAnalytics?.addEventListener('click', () => setAnalyticsConsent('granted'));
+  elements.rejectAnalytics?.addEventListener('click', () => setAnalyticsConsent('denied'));
+  elements.privacySettings?.addEventListener('click', () => {
+    elements.analyticsConsent.hidden = false;
+    elements.rejectAnalytics.focus();
+  });
 }
 
 function setLoadStatus(message, { error = false, hidden = false } = {}) {
@@ -1230,4 +1305,5 @@ elements.retryButton?.addEventListener('click', () => {
   initialize({ forceRefresh: true });
 });
 
+initializeAnalyticsConsent();
 initialize();

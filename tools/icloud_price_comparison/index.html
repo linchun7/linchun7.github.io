@@ -4,41 +4,30 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="format-detection" content="telephone=no">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; form-action 'none'; object-src 'none'; script-src 'self' https://www.googletagmanager.com; style-src 'self'; connect-src 'self' https://raw.githubusercontent.com https://*.google-analytics.com https://*.analytics.google.com; img-src 'self' data: https://*.google-analytics.com; font-src 'self'">
   <meta name="theme-color" content="#ffffff">
   <meta name="description" content="比较全球不同国家和地区的 iCloud+ 月度价格，支持人民币换算、容量排序和历史价格查询。">
   <meta name="keywords" content="iCloud+,Apple,云存储,全球价格,价格历史,汇率换算">
   <meta property="og:title" content="iCloud+ 全球价格对比">
   <meta property="og:description" content="统一比较全球 iCloud+ 月度订阅价格和历史变化。">
   <meta property="og:type" content="website">
+  <meta property="og:url" content="https://www.linchun.com.cn/tools/icloud_price_comparison/">
+  <meta property="og:image" content="https://www.linchun.com.cn/images/favicon-192x192.png">
+  <meta property="og:image:width" content="192">
+  <meta property="og:image:height" content="192">
+  <meta name="twitter:card" content="summary">
+  <link rel="canonical" href="https://www.linchun.com.cn/tools/icloud_price_comparison/">
   <title>iCloud+ 全球价格对比</title>
-  <script>
-    {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000);
-      window.__icloudInitialPriceRequest = fetch('data/prices.json', {
-        cache: 'default',
-        signal: controller.signal
-      }).then(
-        (response) => ({ response }),
-        (error) => ({ error })
-      ).finally(() => clearTimeout(timeout));
-    }
-  </script>
-  <link rel="stylesheet" href="style.css">
-  <link rel="modulepreload" href="script.js">
-  <link rel="modulepreload" href="data-contract.js">
-  <link rel="modulepreload" href="vendor/lucide-subset.js">
-  <script type="module" src="script.js"></script>
+  <script src="price-bootstrap.js?v=3"></script>
+  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="modulepreload" href="script.js?v=3">
+  <link rel="modulepreload" href="data-contract.js?v=3">
+  <link rel="modulepreload" href="vendor/lucide-subset.js?v=3">
+  <script type="module" src="script.js?v=3"></script>
   <link rel="shortcut icon" href="/images/favicon.ico">
   <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
   <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
-  <script async fetchpriority="low" src="https://www.googletagmanager.com/gtag/js?id=G-K2S9L4CHNP"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-K2S9L4CHNP');
-  </script>
 </head>
 <body>
   <a class="skip-link" href="#priceWorkspace">跳到价格表</a>
@@ -147,7 +136,7 @@
           </div>
           <span class="source-separator"></span>
           <div class="source-group">
-            <a class="source-item" href="https://www.exchangerate-api.com/docs/overview" target="_blank" rel="noopener noreferrer"><i data-lucide="landmark" aria-hidden="true"></i>人民币参考汇率</a>
+            <a class="source-item" href="https://www.exchangerate-api.com" target="_blank" rel="noopener noreferrer" aria-label="人民币参考汇率：Rates By Exchange Rate API"><i data-lucide="landmark" aria-hidden="true"></i>Rates By Exchange Rate API</a>
             <span class="source-status"><i data-lucide="clock-3" aria-hidden="true"></i><span id="fxStatus">更新时间：--</span></span>
           </div>
         </div>
@@ -222,9 +211,20 @@
 
   <button id="backToTableButton" class="back-to-table-button" type="button" aria-label="返回价格表顶部" title="返回价格表顶部" aria-hidden="true" tabindex="-1"><i data-lucide="arrow-up" aria-hidden="true"></i></button>
 
+  <section id="analyticsConsent" class="analytics-consent" aria-labelledby="analyticsConsentTitle" hidden>
+    <div class="analytics-consent-copy">
+      <strong id="analyticsConsentTitle">是否允许匿名访问统计？</strong>
+      <p>同意后才会加载 Google Analytics，用于了解页面使用情况；拒绝不影响价格比较，也不会加载统计脚本。</p>
+    </div>
+    <div class="analytics-consent-actions">
+      <button id="rejectAnalytics" class="consent-button consent-button-secondary" type="button">拒绝</button>
+      <button id="acceptAnalytics" class="consent-button consent-button-primary" type="button">允许匿名统计</button>
+    </div>
+  </section>
+
   <footer class="page-footer">
     <p>本工具与 Apple Inc. 无关联，数据仅供参考。</p>
-    <p>&copy; 2026 <a href="https://www.linchun.com.cn">林春写字的地方</a></p>
+    <p>&copy; 2026 <a href="https://www.linchun.com.cn">林春写字的地方</a> · <button id="privacySettings" class="footer-link-button" type="button">隐私设置</button></p>
   </footer>
 
 </body>

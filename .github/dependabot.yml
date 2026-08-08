@@ -1,5 +1,18 @@
 version: 2
 updates:
+  - package-ecosystem: npm
+    directory: /tools/icloud_price_comparison
+    schedule:
+      interval: weekly
+      day: monday
+      time: "08:20"
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 5
+    groups:
+      icloud-price-dependencies:
+        patterns:
+          - "*"
+
   - package-ecosystem: github-actions
     directory: /
     schedule:

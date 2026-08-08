@@ -34,6 +34,8 @@ jobs:
     steps:
       - name: 检出仓库
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: 配置 Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -60,7 +62,9 @@ jobs:
     needs: prepare
     if: needs.prepare.outputs.should_run == 'true'
     permissions:
-      contents: write
+      contents: read
+    outputs:
+      generation_base_sha: ${{ steps.generation_base.outputs.sha }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -71,14 +75,17 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: 固定本次生成基线
+        id: generation_base
         working-directory: .
         shell: bash
         run: |
           git fetch origin main
           git checkout --detach origin/main
           echo "GENERATION_BASE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: 检查仓库容量
         working-directory: .
         shell: bash
@@ -133,7 +140,7 @@ jobs:
         # 每日更新使用 runner 预装的 Chrome；完整 Chromium + WebKit 验证由独立验证工作流负责。
         run: pnpm test:ui
 
-      - name: 上传诊断信息和 Apple 页面快照
+      - name: 上传诊断信息和 Apple 规范化快照
         if: always()
         continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -152,28 +159,24 @@ jobs:
             cat "$RUNNER_TEMP/icloud-storage-summary.md" >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: 提交价格数据变更
-        id: commit_data
+      - name: 打包已测试的数据工件
+        id: package_data
         working-directory: .
         shell: bash
         run: |
-          if git diff --quiet -- tools/icloud_price_comparison/data; then
-            echo "No data changes"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add tools/icloud_price_comparison/data
-          git commit -m "chore: update iCloud prices"
-          git fetch origin main
-          if [[ "$(git rev-parse origin/main)" != "$GENERATION_BASE_SHA" ]]; then
-            echo "::error title=main 已在生成期间前进::远端 main 已变化；为避免覆盖自动数据提交，本次更新将失败并在下一次运行重试。"
-            exit 1
-          fi
-          pnpm --dir tools/icloud_price_comparison install --frozen-lockfile
-          pnpm --dir tools/icloud_price_comparison run test:core
-          pnpm --dir tools/icloud_price_comparison run test:data
-          git push origin HEAD:main
+          tar -cf "$RUNNER_TEMP/icloud-price-data.tar" tools/icloud_price_comparison/data
+          cd "$RUNNER_TEMP"
+          sha256sum icloud-price-data.tar > icloud-price-data.tar.sha256
+
+      - name: 上传已测试的数据工件
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: icloud-price-data-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/icloud-price-data.tar
+            ${{ runner.temp }}/icloud-price-data.tar.sha256
+          if-no-files-found: error
+          retention-days: 1
 
       - name: 补充未报告的失败摘要
         if: failure()
@@ -185,7 +188,7 @@ jobs:
             exit 0
           fi
           echo "::error title=iCloud+ 价格更新失败::自动任务未完成，请查看上方第一个标红步骤确定失败阶段。"
-          if [[ "${{ steps.commit_data.outcome }}" == "success" ]]; then
+          if [[ "${{ steps.package_data.outcome }}" == "success" ]]; then
             data_status="价格数据步骤已经完成；本次失败来自其他验收或收尾步骤。"
           else
             data_status="本次运行未确认价格数据已成功提交。上一份有效数据继续保留。"
@@ -197,3 +200,117 @@ jobs:
             echo ""
             echo "$data_status"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    name: 发布已测试的数据
+    needs:
+      - prepare
+      - update
+    if: needs.prepare.outputs.should_run == 'true' && needs.update.result == 'success'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 检出精确生成基线
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.update.outputs.generation_base_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: 配置 Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: 下载已测试的数据工件
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: icloud-price-data-${{ github.run_id }}
+          path: ${{ runner.temp }}/icloud-price-data
+
+      - name: 校验并展开数据工件
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/icloud-price-data"
+          sha256sum --check icloud-price-data.tar.sha256
+          while IFS= read -r item; do
+            if [[ ( "$item" != "tools/icloud_price_comparison/data" && "$item" != "tools/icloud_price_comparison/data/"* ) || "$item" == /* || "$item" == *".."* ]]; then
+              echo "::error title=数据工件路径非法::$item"
+              exit 1
+            fi
+          done < <(tar -tf icloud-price-data.tar)
+          mkdir unpacked
+          tar -xf icloud-price-data.tar -C unpacked
+          find unpacked/tools/icloud_price_comparison/data -type f -name '*.json' -print0 \
+            | xargs -0 -n1 node -e 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))'
+
+      - name: 确认 main 未前进并准备提交
+        shell: bash
+        env:
+          GENERATION_BASE_SHA: ${{ needs.update.outputs.generation_base_sha }}
+        run: |
+          set -euo pipefail
+          git fetch origin main --depth=1
+          if [[ "$(git rev-parse origin/main)" != "$GENERATION_BASE_SHA" ]]; then
+            echo "::error title=main 已在生成期间前进::远端 main 已变化；本次不发布，下一次运行会重新生成。"
+            exit 1
+          fi
+          cp -a "$RUNNER_TEMP/icloud-price-data/unpacked/tools/icloud_price_comparison/data/." tools/icloud_price_comparison/data/
+          if git diff --quiet -- tools/icloud_price_comparison/data; then
+            echo "NO_DATA_CHANGES=true" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tools/icloud_price_comparison/data
+          git commit -m "chore: update iCloud prices"
+
+      - name: 仅在最终步骤推送
+        if: env.NO_DATA_CHANGES != 'true'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git fetch origin main --depth=1
+          if [[ "$(git rev-parse origin/main)" != "${{ needs.update.outputs.generation_base_sha }}" ]]; then
+            echo "::error title=main 已在提交前前进::本次不推送，下一次运行会重新生成。"
+            exit 1
+          fi
+          auth_header=$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" push origin HEAD:main
+
+  notify:
+    name: 外部心跳告警
+    needs:
+      - prepare
+      - update
+      - publish
+    if: always() && needs.prepare.result != 'skipped'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: 报告每日更新结果
+        continue-on-error: true
+        env:
+          HEALTHCHECK_PING_URL: ${{ secrets.ICLOUD_HEALTHCHECK_PING_URL }}
+          PREPARE_RESULT: ${{ needs.prepare.result }}
+          SHOULD_RUN: ${{ needs.prepare.outputs.should_run }}
+          UPDATE_RESULT: ${{ needs.update.result }}
+          PUBLISH_RESULT: ${{ needs.publish.result }}
+        shell: bash
+        run: |
+          if [[ -z "$HEALTHCHECK_PING_URL" ]]; then
+            echo "未配置 ICLOUD_HEALTHCHECK_PING_URL，跳过第三方心跳。"
+            exit 0
+          fi
+          status=0
+          if [[ "$PREPARE_RESULT" != success ]] \
+            || [[ "$SHOULD_RUN" == true && "$UPDATE_RESULT" != success ]] \
+            || [[ "$SHOULD_RUN" == true && "$PUBLISH_RESULT" != success ]]; then
+            status=1
+          fi
+          curl --fail --silent --show-error --max-time 10 --retry 3 "${HEALTHCHECK_PING_URL%/}/$status"
