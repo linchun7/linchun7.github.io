@@ -1,4 +1,4 @@
-import { publicationDateKey, validatePayload, validatePriceHistoryConsistency } from './data-contract.js?v=4';
+import { publicationDateKey, validatePayload, validatePriceHistoryConsistency } from './data-contract.js?v=5';
 import { createIcons } from './vendor/lucide-subset.js?v=5';
 
 const REQUEST_TIMEOUT_MS = 8_000;
