@@ -2,6 +2,7 @@
 .DS_Store
 categories/.DS_Store
 node_modules/
+.playwright-cli/
 tools/icloud_price_comparison/artifacts/
 tools/icloud_price_comparison/.icloud-price-update.lock
 tools/icloud_price_comparison/.icloud-price-update.lock.claim-*
