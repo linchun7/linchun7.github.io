@@ -9,14 +9,12 @@ const DEFAULT_SORT_TIER = '200GB';
 const DEFAULT_TIER_COLUMN_COUNT = 5;
 const FIXED_PRICE_TABLE_COLUMN_COUNT = 2;
 const PRICE_CACHE_KEY = 'icloud-price-comparison:validated-prices:v1';
+const URL_STATE_KEYS = new Set(['tier', 'sort', 'dir', 'region']);
 const initialUrlState = new URLSearchParams(location.search);
 const initialQuery = globalThis.__icloudInitialQuery ?? initialUrlState.get('q') ?? '';
 delete globalThis.__icloudInitialQuery;
-if (initialUrlState.has('q')) {
-  const sanitizedUrl = new URL(location.href);
-  sanitizedUrl.searchParams.delete('q');
-  history.replaceState(null, '', sanitizedUrl);
-}
+const sanitizedInitialUrl = createSanitizedStateUrl();
+if (sanitizedInitialUrl.href !== location.href) history.replaceState(null, '', sanitizedInitialUrl);
 const initialSortKey = initialUrlState.get('sort') === 'country' ? 'country' : 'tier';
 const initialSortDirection = initialUrlState.get('dir') === 'desc' ? 'desc' : 'asc';
 const REGION_LABELS = {
@@ -111,11 +109,18 @@ function analyticsTag() {
   globalThis.dataLayer.push(arguments);
 }
 
+function createSanitizedStateUrl() {
+  const url = new URL(location.href);
+  for (const key of new Set(url.searchParams.keys())) {
+    if (!URL_STATE_KEYS.has(key)) url.searchParams.delete(key);
+  }
+  return url;
+}
+
 function loadAnalytics() {
   if (document.querySelector('script[data-analytics-loader]')) return;
   analyticsTag('js', new Date());
-  const analyticsUrl = new URL(location.href);
-  analyticsUrl.searchParams.delete('q');
+  const analyticsUrl = createSanitizedStateUrl();
   analyticsTag('config', ANALYTICS_ID, {
     page_location: analyticsUrl.href,
     allow_google_signals: false,
@@ -1021,13 +1026,12 @@ function syncActiveHistoryCountry() {
 
 function updateUrlState() {
   const url = new URL(location.href);
+  url.search = '';
   url.searchParams.set('tier', state.sortTier);
   url.searchParams.set('sort', state.sortKey);
   url.searchParams.set('dir', state.sortDirection);
-  url.searchParams.delete('q');
   if (state.region !== 'all') url.searchParams.set('region', state.region);
   else url.searchParams.delete('region');
-  url.searchParams.delete('compare');
   history.replaceState(null, '', url);
 }
 
