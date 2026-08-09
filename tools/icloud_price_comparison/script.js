@@ -323,7 +323,7 @@ function renderMinimumSummary() {
     item.dataset.tier = tier.id;
     item.setAttribute('aria-pressed', String(isActiveTier));
     item.title = `查看 ${tier.label} 最低价地区`;
-    item.setAttribute('aria-label', `${tier.label}最低价为${countryName}，${formatConverted(state.minimumPrices[tier.id], '¥')}，点击在价格表中定位`);
+    item.setAttribute('aria-label', `${tier.label} ${countryName} ${formatConverted(state.minimumPrices[tier.id], '¥')}，该容量最低价，点击在价格表中定位`);
 
     const tierLabel = document.createElement('span');
     tierLabel.className = 'minimum-tier-label';
@@ -522,15 +522,19 @@ function renderTable() {
       const historyButton = document.createElement('button');
       historyButton.type = 'button';
       historyButton.className = 'country-history-button';
-      historyButton.setAttribute('aria-label', `查看 ${country.nameZh || country.country} 价格历史`);
+      const displayName = country.nameZh || country.country;
+      const secondaryName = country.nameZh && country.nameZh !== country.country
+        ? `${country.country} · ${country.currency}`
+        : '';
+      historyButton.setAttribute('aria-label', `${displayName}${secondaryName ? ` ${secondaryName}` : ''}，查看价格历史`);
       const name = document.createElement('span');
       name.className = 'country-name';
-      name.textContent = country.nameZh || country.country;
+      name.textContent = displayName;
       historyButton.append(name);
-      if (country.nameZh && country.nameZh !== country.country) {
+      if (secondaryName) {
         const nameEn = document.createElement('span');
         nameEn.className = 'country-name-en';
-        nameEn.textContent = `${country.country} · ${country.currency}`;
+        nameEn.textContent = secondaryName;
         historyButton.append(nameEn);
       }
       nameCell.append(historyButton);
@@ -907,8 +911,10 @@ function renderPublishedDateHistory() {
   if (!state.data || !elements.applePublishedDate) return;
   const entries = getPublishedDateHistory();
   const latest = state.data.source.publishedDate;
-  elements.applePublishedDate.textContent = formatPublishedDate(latest);
-  elements.publishedDateDialogCurrent.textContent = formatPublishedDate(latest);
+  const displayedDate = formatPublishedDate(latest);
+  elements.applePublishedDate.textContent = displayedDate;
+  elements.publishedDateButton.setAttribute('aria-label', `页面发布日期：${displayedDate}；查看 Apple 官网发布日期变更记录`);
+  elements.publishedDateDialogCurrent.textContent = displayedDate;
   elements.publishedDateRows.replaceChildren();
 
   if (state.historyStatus !== 'ready') {

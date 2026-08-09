@@ -46,6 +46,11 @@ function setPayloadGeneratedAt(data, generatedAt) {
   }).format(new Date(generatedAt));
 }
 
+function retainRatesForCurrentCountries(data) {
+  const currencies = new Set(['USD', 'CNY', ...data.countries.map(({ currency }) => currency)]);
+  data.fx.rates = Object.fromEntries(Object.entries(data.fx.rates).filter(([currency]) => currencies.has(currency)));
+}
+
 const uiNumberFormatter = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 });
 
 function compactExpectedSeries(events, tier) {
@@ -441,6 +446,13 @@ test('renders current prices, sorting, and country history in a real browser', {
         assert.equal((await fxAttribution.textContent()).trim(), 'Rates By Exchange Rate API');
         assert.equal(await fxAttribution.getAttribute('aria-label'), '人民币参考汇率：Rates By Exchange Rate API');
         assert.match(sourceText, /更新时间：.+北京时间/);
+        const labelInNameFailures = await page.locator('#minimumSummary .minimum-card, .country-history-button, #publishedDateButton').evaluateAll((controls) => controls.flatMap((control) => {
+          const normalize = (value) => value.replace(/\s+/g, ' ').trim();
+          const visibleText = normalize(control.innerText);
+          const accessibleName = normalize(control.getAttribute('aria-label') || visibleText);
+          return accessibleName.includes(visibleText) ? [] : [{ visibleText, accessibleName }];
+        }));
+        assert.deepEqual(labelInNameFailures, [], `${viewport.name} interactive labels must contain their visible text in order`);
         const layout = await page.evaluate(() => ({
           documentWidth: document.documentElement.scrollWidth,
           viewportWidth: document.documentElement.clientWidth
@@ -483,6 +495,7 @@ test('renders current prices, sorting, and country history in a real browser', {
         );
 
         const historySearch = historyCountry ?? firstCountry;
+        const expectedRecord = expectedHistory.countries[historySearch];
         await page.locator('#searchInput').fill(historySearch);
         await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length === 1);
         const historyRow = page.locator('#priceRows tr[data-country]').first();
@@ -509,6 +522,9 @@ test('renders current prices, sorting, and country history in a real browser', {
           await historyRow.locator('.price-cell').first().click();
         }
         await page.waitForFunction(() => document.querySelector('#historyDialog')?.open === true);
+        if (expectedRecord) {
+          await page.waitForFunction((count) => document.querySelectorAll('#historyRows tr').length === count, expectedRecord.events.length);
+        }
         const expectedDialogName = expectedData.countries.find(({ country }) => country === historySearch)?.nameZh || historySearch;
         assert.equal(await page.getByRole('dialog', { name: expectedDialogName }).count(), 1, 'history dialog must have an accessible name');
         assert.ok(await page.locator('#historyRows tr').count() > 0);
@@ -548,7 +564,6 @@ test('renders current prices, sorting, and country history in a real browser', {
         assert.equal(tierLayout.declaredCount, String(expectedData.tiers.length));
         assert.equal(tierLayout.renderedColumns, expectedData.tiers.length);
         const expectedCountry = expectedData.countries.find(({ country }) => country === historySearch);
-        const expectedRecord = expectedHistory.countries[historySearch];
         if (expectedCountry) {
           assert.match(await page.locator('#historyLocalPrice').textContent(), new RegExp(expectedCountry.plans[firstTier].formattedPrice.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
         }
@@ -1578,6 +1593,7 @@ test('resets a removed region filter after a successful price retry', { timeout:
   const replacement = structuredClone(fullData);
   const removedRegion = fullData.countries[0].region;
   replacement.countries = replacement.countries.filter(({ region }) => region !== removedRegion);
+  retainRatesForCurrentCountries(replacement);
   replacement.run.countries = replacement.countries.length;
   replacement.run.pricePoints = replacement.countries.length * replacement.tiers.length;
   const server = await startServer();
@@ -1634,8 +1650,10 @@ test('rebinds or closes an open history dialog after country replacement', { tim
     plan.formattedPrice = `${changedCountry.currency} ${plan.price.toFixed(2)}`;
   }
   changedData.run.pricePoints = changedData.countries.length * changedData.tiers.length;
+  retainRatesForCurrentCountries(changedData);
   const removedData = structuredClone(changedData);
   removedData.countries = removedData.countries.filter(({ country }) => country !== activeCountry.country);
+  retainRatesForCurrentCountries(removedData);
   removedData.run.countries = removedData.countries.length;
   removedData.run.pricePoints = removedData.countries.length * removedData.tiers.length;
   const scenarios = [

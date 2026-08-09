@@ -163,6 +163,7 @@ export function validatePricePayload(payload, { minCountries = 1 } = {}) {
   }
 
   const countryNames = new Set();
+  const requiredCurrencies = new Set(['USD', 'CNY']);
   for (const country of payload.countries) {
     if (!isPlainObject(country)
       || typeof country.country !== 'string'
@@ -179,6 +180,7 @@ export function validatePricePayload(payload, { minCountries = 1 } = {}) {
       throw new Error('prices.json has an invalid country entry');
     }
     countryNames.add(country.country);
+    requiredCurrencies.add(country.currency);
     const actualPlanIds = new Set(Object.keys(country.plans));
     if (actualPlanIds.size !== tierIds.size || [...tierIds].some((tierId) => !actualPlanIds.has(tierId))) {
       throw new Error(`prices.json has plans that do not match declared tiers for ${country.country}`);
@@ -197,6 +199,12 @@ export function validatePricePayload(payload, { minCountries = 1 } = {}) {
         throw new Error(`prices.json has invalid ${tierId} pricing for ${country.country}`);
       }
     }
+  }
+
+  const actualCurrencies = Object.keys(payload.fx.rates);
+  if (actualCurrencies.length !== requiredCurrencies.size
+    || actualCurrencies.some((currency) => !/^[A-Z]{3}$/.test(currency) || !requiredCurrencies.has(currency))) {
+    throw new Error('prices.json exchange rates do not exactly match the currencies in use');
   }
 
   if (payload.schemaVersion === 2) {

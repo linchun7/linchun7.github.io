@@ -32,6 +32,8 @@ test('rejects undeclared price tiers and truncated browser payloads', async () =
 
   const truncated = structuredClone(prices);
   truncated.countries = truncated.countries.slice(0, 1);
+  const retainedCurrencies = new Set(['USD', 'CNY', truncated.countries[0].currency]);
+  truncated.fx.rates = Object.fromEntries(Object.entries(truncated.fx.rates).filter(([currency]) => retainedCurrencies.has(currency)));
   truncated.run.countries = truncated.countries.length;
   truncated.run.pricePoints = truncated.countries.length * truncated.tiers.length;
   assert.doesNotThrow(() => validatePricePayload(truncated), 'the low-level contract remains usable for isolated fixtures');
@@ -91,6 +93,14 @@ test('shared browser and updater contracts reject the same price schema divergen
     assert.throws(() => validatePricePayload(payload));
     assert.throws(() => validateExistingPrices(payload));
   }
+});
+
+test('rejects exchange rates that include currencies not used by current countries', async () => {
+  const { prices } = await productionFixtures();
+  const payload = structuredClone(prices);
+  payload.fx.rates.ZZZ = 1;
+  assert.throws(() => validatePricePayload(payload), /exchange rates do not exactly match/);
+  assert.throws(() => validateExistingPrices(payload), /exchange rates do not exactly match/);
 });
 
 test('shared browser and updater contracts reject invalid publication kind and changes', async () => {
