@@ -160,7 +160,7 @@ node scripts/import-apple-archives.mjs --input <包含完整历史快照的目�
 
 ## 隐私、安全与许可
 
-- Google Analytics 不写在阻塞渲染的 HTML 中；页面及核心价格数据加载完成后，浏览器在空闲阶段异步加载统计脚本。自由文本搜索词只保留在当前页面状态，不写入 URL，也不会作为 GA4 搜索事件发送；Google Signals 和广告个性化信号在页面配置中关闭。页面不显示统计同意弹窗或隐私设置入口；Google 服务无法访问时不影响价格比较。
+- Google Analytics 不写在阻塞渲染的 HTML 中；页面及核心价格数据加载完成后，浏览器在空闲阶段异步加载统计脚本。自由文本搜索词只保留在当前页面状态，不写入 URL，也不会作为 GA4 搜索事件发送；统计加载前还会删除页面不支持的未知查询参数，只保留公开的容量、排序和地区状态。Google Signals 和广告个性化信号在页面配置中关闭。页面不显示统计同意弹窗或隐私设置入口；Google 服务无法访问时不影响价格比较。
 - Cloudflare Web Analytics 与 GA4 同时保留：前者用于基础访问和真实用户性能，后者用于 GA4 报表，两边统计口径不可相加。CSP 允许 Cloudflare 自动注入的 beacon；本页入口脚本使用 `data-cfasync="false"`，避免 Rocket Loader 改写 ES modules。
 - 前端只展示本页换算所需的币种汇率，汇率署名链接固定为 [Rates By Exchange Rate API](https://www.exchangerate-api.com)。
 - Cloudflare 为本页下发 HTTP 安全响应头：CSP 限制脚本、连接和嵌入来源，`X-Frame-Options: DENY` 防止页面被第三方框架嵌入，`Referrer-Policy` 减少跨站来源信息，`Permissions-Policy` 关闭本页不使用的设备权限。HTML 内的 meta CSP 作为静态托管回退，修改外部规则时必须保持两者允许来源一致。
