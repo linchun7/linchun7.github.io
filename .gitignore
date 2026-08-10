@@ -6,4 +6,7 @@ node_modules/
 tools/icloud_price_comparison/artifacts/
 tools/icloud_price_comparison/.icloud-price-update.lock
 tools/icloud_price_comparison/.icloud-price-update.lock.claim-*
+tools/icloud_price_comparison/data/.icloud-price-update-transaction.json
+tools/icloud_price_comparison/data/*.tmp-*
+tools/icloud_price_comparison/data/apple-snapshots/*.tmp-*
 tools/icloud_price_comparison/data/.apple-snapshot-import-*

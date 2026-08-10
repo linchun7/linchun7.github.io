@@ -23,7 +23,7 @@
 
 JSON 通过同目录临时文件和硬链接排他落盘，`index.json` 使用原子替换；任一快照写入失败只清理本次计划创建的文件，外层更新器还会恢复价格、历史、运行日志和原索引文本。生产任务成功后，活动修订是该发布日期中 `firstConfirmedDate` 最新的修订。
 
-日常校验会读取并核对所有规范化快照的 `dataSha256`，但只深度解析最新活动修订；缺少字节哈希的旧索引会自动执行深度校验。`pnpm validate:snapshots` 会深度解析全部 JSON 修订，并由手动及每周只读工作流执行。
+`pnpm test:data` 会核对全部规范化快照的文件存在性与 `dataSha256`，并深度解析当前价格所引用的活动修订；缺少字节哈希的旧索引项也会自动执行深度校验。`pnpm validate:snapshots` 会逐个深度解析全部 JSON 修订，并由手动及每周只读工作流执行。`pnpm validate:artifact` 除了深验全部修订，还会校验精确文件集合、索引/current price/hash 关系，并从相邻活动快照重算 Apple 发布日期变化，核对 `history.json` 的跨文件语义；数据打包前和发布 job 解包后都会运行该验证器。
 
 ## 历史导入
 
@@ -46,4 +46,4 @@ Wayback 抓取时间只用于历史 Apple 页面排序、来源追溯和最早�
 - 不要手工修改 `index.json`，也不要只复制单个快照文件进行重建。
 - 重新导入前保留完整的 HTML 输入目录，并在隔离目录或 fixture 中测试；不要用生产数据做破坏性测试。
 - 需要重建历史时，使用完整输入重新运行导入器，让它同时更新快照、历史和索引。
-- 修改快照校验或索引格式后，运行 `pnpm test:data` 和 `pnpm validate:snapshots`。
+- 修改快照校验、索引格式或历史语义后，运行 `pnpm test:data`、`pnpm validate:snapshots` 和 `pnpm validate:artifact`。
