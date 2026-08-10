@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "retention": 90,
-  "updatedAtUtc": "2026-08-10T00:05:56.887Z",
+  "updatedAtUtc": "2026-08-10T01:14:30.320Z",
   "runs": [
     {
       "schemaVersion": 1,
@@ -708,8 +708,7 @@
         "exchangeRatesStale": false,
         "exchangeRatesSourceMode": "api-key",
         "exchangeRatesFallbackUsed": false,
-        "exchangeRatesFallbackReason": null,
-        "exchangeRatesApiKeyStatus": "valid"
+        "exchangeRatesFallbackReason": null
       },
       "counts": {
         "countries": 73,
@@ -770,8 +769,7 @@
         "exchangeRatesStale": false,
         "exchangeRatesSourceMode": "api-key",
         "exchangeRatesFallbackUsed": false,
-        "exchangeRatesFallbackReason": null,
-        "exchangeRatesApiKeyStatus": "valid"
+        "exchangeRatesFallbackReason": null
       },
       "counts": {
         "countries": 73,
@@ -832,8 +830,7 @@
         "exchangeRatesStale": false,
         "exchangeRatesSourceMode": "api-key",
         "exchangeRatesFallbackUsed": false,
-        "exchangeRatesFallbackReason": null,
-        "exchangeRatesApiKeyStatus": "valid"
+        "exchangeRatesFallbackReason": null
       },
       "counts": {
         "countries": 73,
@@ -894,8 +891,7 @@
         "exchangeRatesStale": false,
         "exchangeRatesSourceMode": "open-access",
         "exchangeRatesFallbackUsed": false,
-        "exchangeRatesFallbackReason": null,
-        "exchangeRatesApiKeyStatus": "not-configured"
+        "exchangeRatesFallbackReason": null
       },
       "counts": {
         "countries": 73,
@@ -956,8 +952,7 @@
         "exchangeRatesStale": false,
         "exchangeRatesSourceMode": "api-key",
         "exchangeRatesFallbackUsed": false,
-        "exchangeRatesFallbackReason": null,
-        "exchangeRatesApiKeyStatus": "valid"
+        "exchangeRatesFallbackReason": null
       },
       "counts": {
         "countries": 73,
@@ -1018,8 +1013,7 @@
         "exchangeRatesStale": false,
         "exchangeRatesSourceMode": "api-key",
         "exchangeRatesFallbackUsed": false,
-        "exchangeRatesFallbackReason": null,
-        "exchangeRatesApiKeyStatus": "valid"
+        "exchangeRatesFallbackReason": null
       },
       "counts": {
         "countries": 73,
@@ -1080,8 +1074,7 @@
         "exchangeRatesStale": false,
         "exchangeRatesSourceMode": "api-key",
         "exchangeRatesFallbackUsed": false,
-        "exchangeRatesFallbackReason": null,
-        "exchangeRatesApiKeyStatus": "valid"
+        "exchangeRatesFallbackReason": null
       },
       "counts": {
         "countries": 73,
@@ -1142,8 +1135,7 @@
         "exchangeRatesStale": false,
         "exchangeRatesSourceMode": "api-key",
         "exchangeRatesFallbackUsed": false,
-        "exchangeRatesFallbackReason": null,
-        "exchangeRatesApiKeyStatus": "valid"
+        "exchangeRatesFallbackReason": null
       },
       "counts": {
         "countries": 73,
@@ -1204,8 +1196,7 @@
         "exchangeRatesStale": false,
         "exchangeRatesSourceMode": "api-key",
         "exchangeRatesFallbackUsed": false,
-        "exchangeRatesFallbackReason": null,
-        "exchangeRatesApiKeyStatus": "valid"
+        "exchangeRatesFallbackReason": null
       },
       "counts": {
         "countries": 73,
@@ -1266,8 +1257,7 @@
         "exchangeRatesStale": false,
         "exchangeRatesSourceMode": "api-key",
         "exchangeRatesFallbackUsed": false,
-        "exchangeRatesFallbackReason": null,
-        "exchangeRatesApiKeyStatus": "valid"
+        "exchangeRatesFallbackReason": null
       },
       "counts": {
         "countries": 73,
@@ -1328,8 +1318,7 @@
         "exchangeRatesStale": false,
         "exchangeRatesSourceMode": "api-key",
         "exchangeRatesFallbackUsed": false,
-        "exchangeRatesFallbackReason": null,
-        "exchangeRatesApiKeyStatus": "valid"
+        "exchangeRatesFallbackReason": null
       },
       "counts": {
         "countries": 73,
@@ -1390,8 +1379,7 @@
         "exchangeRatesStale": false,
         "exchangeRatesSourceMode": "api-key",
         "exchangeRatesFallbackUsed": false,
-        "exchangeRatesFallbackReason": null,
-        "exchangeRatesApiKeyStatus": "valid"
+        "exchangeRatesFallbackReason": null
       },
       "counts": {
         "countries": 73,
@@ -1452,8 +1440,7 @@
         "exchangeRatesStale": false,
         "exchangeRatesSourceMode": "api-key",
         "exchangeRatesFallbackUsed": false,
-        "exchangeRatesFallbackReason": null,
-        "exchangeRatesApiKeyStatus": "valid"
+        "exchangeRatesFallbackReason": null
       },
       "counts": {
         "countries": 73,
@@ -1514,8 +1501,7 @@
         "exchangeRatesStale": false,
         "exchangeRatesSourceMode": "api-key",
         "exchangeRatesFallbackUsed": false,
-        "exchangeRatesFallbackReason": null,
-        "exchangeRatesApiKeyStatus": "valid"
+        "exchangeRatesFallbackReason": null
       },
       "counts": {
         "countries": 73,
@@ -1576,8 +1562,7 @@
         "exchangeRatesStale": false,
         "exchangeRatesSourceMode": "api-key",
         "exchangeRatesFallbackUsed": false,
-        "exchangeRatesFallbackReason": null,
-        "exchangeRatesApiKeyStatus": "valid"
+        "exchangeRatesFallbackReason": null
       },
       "counts": {
         "countries": 73,
@@ -1638,8 +1623,7 @@
         "exchangeRatesStale": false,
         "exchangeRatesSourceMode": "api-key",
         "exchangeRatesFallbackUsed": false,
-        "exchangeRatesFallbackReason": null,
-        "exchangeRatesApiKeyStatus": "valid"
+        "exchangeRatesFallbackReason": null
       },
       "counts": {
         "countries": 73,
@@ -1700,8 +1684,7 @@
         "exchangeRatesStale": false,
         "exchangeRatesSourceMode": "api-key",
         "exchangeRatesFallbackUsed": false,
-        "exchangeRatesFallbackReason": null,
-        "exchangeRatesApiKeyStatus": "valid"
+        "exchangeRatesFallbackReason": null
       },
       "counts": {
         "countries": 73,
@@ -1762,8 +1745,7 @@
         "exchangeRatesStale": false,
         "exchangeRatesSourceMode": "api-key",
         "exchangeRatesFallbackUsed": false,
-        "exchangeRatesFallbackReason": null,
-        "exchangeRatesApiKeyStatus": "valid"
+        "exchangeRatesFallbackReason": null
       },
       "counts": {
         "countries": 73,
@@ -1824,8 +1806,7 @@
         "exchangeRatesStale": false,
         "exchangeRatesSourceMode": "api-key",
         "exchangeRatesFallbackUsed": false,
-        "exchangeRatesFallbackReason": null,
-        "exchangeRatesApiKeyStatus": "valid"
+        "exchangeRatesFallbackReason": null
       },
       "counts": {
         "countries": 73,
@@ -1886,8 +1867,7 @@
         "exchangeRatesStale": false,
         "exchangeRatesSourceMode": "api-key",
         "exchangeRatesFallbackUsed": false,
-        "exchangeRatesFallbackReason": null,
-        "exchangeRatesApiKeyStatus": "valid"
+        "exchangeRatesFallbackReason": null
       },
       "counts": {
         "countries": 73,
@@ -1948,8 +1928,7 @@
         "exchangeRatesStale": false,
         "exchangeRatesSourceMode": "api-key",
         "exchangeRatesFallbackUsed": false,
-        "exchangeRatesFallbackReason": null,
-        "exchangeRatesApiKeyStatus": "valid"
+        "exchangeRatesFallbackReason": null
       },
       "counts": {
         "countries": 73,
@@ -2010,8 +1989,7 @@
         "exchangeRatesStale": false,
         "exchangeRatesSourceMode": "api-key",
         "exchangeRatesFallbackUsed": false,
-        "exchangeRatesFallbackReason": null,
-        "exchangeRatesApiKeyStatus": "valid"
+        "exchangeRatesFallbackReason": null
       },
       "counts": {
         "countries": 73,
@@ -2072,8 +2050,7 @@
         "exchangeRatesStale": false,
         "exchangeRatesSourceMode": "api-key",
         "exchangeRatesFallbackUsed": false,
-        "exchangeRatesFallbackReason": null,
-        "exchangeRatesApiKeyStatus": "valid"
+        "exchangeRatesFallbackReason": null
       },
       "counts": {
         "countries": 73,
@@ -2134,8 +2111,7 @@
         "exchangeRatesStale": false,
         "exchangeRatesSourceMode": "api-key",
         "exchangeRatesFallbackUsed": false,
-        "exchangeRatesFallbackReason": null,
-        "exchangeRatesApiKeyStatus": "valid"
+        "exchangeRatesFallbackReason": null
       },
       "counts": {
         "countries": 73,
@@ -2196,8 +2172,7 @@
         "exchangeRatesStale": false,
         "exchangeRatesSourceMode": "open-access",
         "exchangeRatesFallbackUsed": false,
-        "exchangeRatesFallbackReason": null,
-        "exchangeRatesApiKeyStatus": "not-configured"
+        "exchangeRatesFallbackReason": null
       },
       "counts": {
         "countries": 73,
@@ -2258,8 +2233,7 @@
         "exchangeRatesStale": false,
         "exchangeRatesSourceMode": "api-key",
         "exchangeRatesFallbackUsed": false,
-        "exchangeRatesFallbackReason": null,
-        "exchangeRatesApiKeyStatus": "valid"
+        "exchangeRatesFallbackReason": null
       },
       "counts": {
         "countries": 73,
@@ -2320,8 +2294,7 @@
         "exchangeRatesStale": false,
         "exchangeRatesSourceMode": "api-key",
         "exchangeRatesFallbackUsed": false,
-        "exchangeRatesFallbackReason": null,
-        "exchangeRatesApiKeyStatus": "valid"
+        "exchangeRatesFallbackReason": null
       },
       "counts": {
         "countries": 73,
@@ -2382,8 +2355,7 @@
         "exchangeRatesStale": false,
         "exchangeRatesSourceMode": "api-key",
         "exchangeRatesFallbackUsed": false,
-        "exchangeRatesFallbackReason": null,
-        "exchangeRatesApiKeyStatus": "valid"
+        "exchangeRatesFallbackReason": null
       },
       "counts": {
         "countries": 73,
@@ -2444,8 +2416,7 @@
         "exchangeRatesStale": false,
         "exchangeRatesSourceMode": "api-key",
         "exchangeRatesFallbackUsed": false,
-        "exchangeRatesFallbackReason": null,
-        "exchangeRatesApiKeyStatus": "valid"
+        "exchangeRatesFallbackReason": null
       },
       "counts": {
         "countries": 73,
@@ -2489,25 +2460,24 @@
     },
     {
       "schemaVersion": 1,
-      "id": "2026-08-10T00:05:56.887Z",
+      "id": "2026-08-10T01:14:30.320Z",
       "status": "success",
-      "trigger": "cloudflare",
-      "automaticRunDateBeijing": "2026-08-10",
-      "startedAtUtc": "2026-08-10T00:05:56.110Z",
-      "finishedAtUtc": "2026-08-10T00:05:56.887Z",
-      "durationMs": 777,
+      "trigger": "local",
+      "automaticRunDateBeijing": null,
+      "startedAtUtc": "2026-08-10T01:14:29.054Z",
+      "finishedAtUtc": "2026-08-10T01:14:30.320Z",
+      "durationMs": 1266,
       "observedAtBeijing": "2026-08-10",
       "source": {
         "appleUrl": "https://support.apple.com/en-us/108047",
         "applePublishedDate": "July 17, 2026",
         "appleParser": "cross-checked",
         "appleParserStatus": "Both DOM association paths agreed",
-        "exchangeRatesFetchedAtUtc": "2026-08-10T00:00:01.000Z",
+        "exchangeRatesFetchedAtUtc": "2026-08-10T00:02:31.000Z",
         "exchangeRatesStale": false,
-        "exchangeRatesSourceMode": "api-key",
+        "exchangeRatesSourceMode": "open-access",
         "exchangeRatesFallbackUsed": false,
-        "exchangeRatesFallbackReason": null,
-        "exchangeRatesApiKeyStatus": "valid"
+        "exchangeRatesFallbackReason": null
       },
       "counts": {
         "countries": 73,

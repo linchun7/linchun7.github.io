@@ -27,6 +27,7 @@ jobs:
     name: 检查每日自动更新
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       should_run: ${{ steps.daily_guard.outputs.should_run }}
       trigger_source: ${{ steps.daily_guard.outputs.trigger_source }}
@@ -43,19 +44,25 @@ jobs:
         with:
           node-version: 22
 
-      - name: 读取最新 main 的每日幂等状态
+      - name: 读取并深验最新 main 的每日幂等状态
+        id: validate_main_data
         working-directory: .
         shell: bash
         run: |
+          set -euo pipefail
           git fetch origin main --depth=1
-          git show origin/main:tools/icloud_price_comparison/data/run-log.json > "$RUNNER_TEMP/icloud-run-log.json"
+          main_snapshot="$RUNNER_TEMP/icloud-main-snapshot"
+          mkdir -p "$main_snapshot"
+          git archive --format=tar origin/main tools/icloud_price_comparison/data | tar --extract --file=- --directory="$main_snapshot"
+          node tools/icloud_price_comparison/scripts/validate-data-artifact.mjs \
+            --data-dir "$main_snapshot/tools/icloud_price_comparison/data"
 
       - name: 检查每日幂等状态
         id: daily_guard
         working-directory: tools/icloud_price_comparison
         env:
           REQUESTED_TRIGGER_SOURCE: ${{ inputs.trigger_source }}
-          ICLOUD_RUN_LOG_PATH: ${{ runner.temp }}/icloud-run-log.json
+          ICLOUD_RUN_LOG_PATH: ${{ runner.temp }}/icloud-main-snapshot/tools/icloud_price_comparison/data/run-log.json
         run: node scripts/daily-run-guard.mjs
 
       - name: 分类前置检查故障
@@ -64,7 +71,8 @@ jobs:
         shell: bash
         run: |
           severe_failure=false
-          if [[ "${{ steps.daily_guard.outcome }}" == "failure" ]]; then
+          if [[ "${{ steps.validate_main_data.outcome }}" == "failure" ]] \
+            || [[ "${{ steps.daily_guard.outcome }}" == "failure" ]]; then
             severe_failure=true
           fi
           echo "severe_failure=$severe_failure" >> "$GITHUB_OUTPUT"
@@ -129,11 +137,13 @@ jobs:
         with:
           node-version: 22
 
-      - name: 安装 pnpm
-        run: npm install --global pnpm@10.14.0
+      - name: 启用并校验 pnpm
+        run: |
+          corepack enable
+          pnpm --version
 
       - name: 安装项目依赖
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: 运行解析与数据安全测试
         id: core_tests
@@ -153,13 +163,13 @@ jobs:
 
       - name: 验证更新后的页面
         id: ui_tests
-        # 每日更新使用 runner 预装的 Chrome；完整 Chromium + WebKit 验证由独立验证工作流负责。
+        # 每日更新使用 runner 预装的 Chrome；完整 Chromium + Firefox + WebKit 验证由独立验证工作流负责。
         run: pnpm test:ui
 
       - name: 上传诊断信息和 Apple 规范化快照
         if: always()
         continue-on-error: true
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: icloud-price-diagnostics-${{ github.run_id }}
           path: tools/icloud_price_comparison/artifacts
@@ -180,7 +190,8 @@ jobs:
         working-directory: .
         shell: bash
         run: |
-          tar -cf "$RUNNER_TEMP/icloud-price-data.tar" tools/icloud_price_comparison/data
+          node tools/icloud_price_comparison/scripts/validate-data-artifact.mjs --data-dir tools/icloud_price_comparison/data
+          tar --format=ustar -cf "$RUNNER_TEMP/icloud-price-data.tar" tools/icloud_price_comparison/data
           cd "$RUNNER_TEMP"
           sha256sum icloud-price-data.tar > icloud-price-data.tar.sha256
 
@@ -225,29 +236,34 @@ jobs:
           severe_failure=false
           if [[ "${{ steps.core_tests.outcome }}" == "failure" ]] \
             || [[ "${{ steps.data_tests.outcome }}" == "failure" ]] \
-            || [[ "${{ steps.ui_tests.outcome }}" == "failure" ]]; then
+            || [[ "${{ steps.ui_tests.outcome }}" == "failure" ]] \
+            || [[ "${{ steps.package_data.outcome }}" == "failure" ]]; then
             severe_failure=true
           fi
 
           if [[ "${{ steps.update_data.outcome }}" == "failure" ]]; then
             report="artifacts/run-report.json"
-            if [[ ! -f "$report" ]]; then
-              severe_failure=true
-            else
-              severity=$(node -e '
+            update_failure_severe=true
+            if [[ -f "$report" ]] && severity=$(node -e '
                 const report = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
                 process.stdout.write(report.healthcheckSeverity === "transient" ? "transient" : "severe");
-              ' "$report")
+              ' "$report" 2>/dev/null); then
               if [[ "$severity" == "severe" ]]; then
-                severe_failure=true
+                update_failure_severe=true
+              else
+                update_failure_severe=false
               fi
             fi
+            if [[ "$update_failure_severe" == "true" ]]; then
+              severe_failure=true
+            fi
           elif [[ "${{ steps.update_data.outcome }}" == "success" ]]; then
-            parser=$(node -e '
+            if ! parser=$(node -e '
               const data = JSON.parse(require("fs").readFileSync("data/prices.json", "utf8"));
               process.stdout.write(data?.source?.parser || "missing");
-            ')
-            if [[ "$parser" != "cross-checked" ]]; then
+            ' 2>/dev/null); then
+              severe_failure=true
+            elif [[ "$parser" != "cross-checked" ]]; then
               severe_failure=true
             fi
           fi
@@ -292,16 +308,11 @@ jobs:
           set -euo pipefail
           cd "$RUNNER_TEMP/icloud-price-data"
           sha256sum --check icloud-price-data.tar.sha256
-          while IFS= read -r item; do
-            if [[ ( "$item" != "tools/icloud_price_comparison/data" && "$item" != "tools/icloud_price_comparison/data/"* ) || "$item" == /* || "$item" == *".."* ]]; then
-              echo "::error title=数据工件路径非法::$item"
-              exit 1
-            fi
-          done < <(tar -tf icloud-price-data.tar)
+          validator="$GITHUB_WORKSPACE/tools/icloud_price_comparison/scripts/validate-data-artifact.mjs"
+          node "$validator" --archive icloud-price-data.tar
           mkdir unpacked
-          tar -xf icloud-price-data.tar -C unpacked
-          find unpacked/tools/icloud_price_comparison/data -type f -name '*.json' -print0 \
-            | xargs -0 -n1 node -e 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))'
+          tar --extract --file icloud-price-data.tar --directory unpacked --no-same-owner --no-same-permissions
+          node "$validator" --data-dir unpacked/tools/icloud_price_comparison/data
 
       - name: 确认 main 未前进并准备提交
         shell: bash
@@ -314,14 +325,16 @@ jobs:
             echo "::error title=main 已在生成期间前进::远端 main 已变化；本次不发布，下一次运行会重新生成。"
             exit 1
           fi
-          cp -a "$RUNNER_TEMP/icloud-price-data/unpacked/tools/icloud_price_comparison/data/." tools/icloud_price_comparison/data/
+          validated_data="$RUNNER_TEMP/icloud-price-data/unpacked/tools/icloud_price_comparison/data"
+          rm -rf tools/icloud_price_comparison/data
+          cp -a "$validated_data" tools/icloud_price_comparison/data
           if git diff --quiet -- tools/icloud_price_comparison/data; then
             echo "NO_DATA_CHANGES=true" >> "$GITHUB_ENV"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add tools/icloud_price_comparison/data
+          git add --all tools/icloud_price_comparison/data
           git commit -m "chore: update iCloud prices"
 
       - name: 仅在最终步骤推送
@@ -389,4 +402,4 @@ jobs:
             echo "本次属于单次暂时故障，不发送失败信号；由 Healthchecks 连续缺少成功心跳的宽限期处理。"
             exit 0
           fi
-          curl --fail --silent --show-error --max-time 10 --retry 3 "${HEALTHCHECK_PING_URL%/}/$status"
+          curl --fail --silent --show-error --max-time 10 --retry 3 -- "${HEALTHCHECK_PING_URL%/}/$status"

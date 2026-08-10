@@ -219,6 +219,15 @@ test('keeps the document-order parser when Apple marker classes disappear', asyn
   assert.equal(result.countries.length, 5);
 });
 
+test('rejects a storage-looking tier that uses an unsupported capacity unit', async () => {
+  const fixture = await readFile(fixtureUrl, 'utf8');
+  const adjusted = fixture.replace('<b>50 GB</b>', '<b>50 PB</b>');
+  assert.throws(
+    () => parseApplePrices(adjusted),
+    /Unsupported storage tier/
+  );
+});
+
 test('rejects disagreement when both independent parsers return different countries', async () => {
   const fixture = await readFile(fixtureUrl, 'utf8');
   const adjusted = fixture.replace(
@@ -264,7 +273,7 @@ test('rejects incomplete pricing data', () => {
 
 test('rejects zero, negative, non-finite, and duplicate Apple prices', () => {
   const tiers = [testTier('50GB')];
-  for (const price of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+  for (const price of [0, -1, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1]) {
     assert.throws(
       () => validatePrices([testCountry({ '50GB': { price } })], { minCountries: 1, tiers }),
       /Invalid 50GB price/
@@ -275,6 +284,43 @@ test('rejects zero, negative, non-finite, and duplicate Apple prices', () => {
     () => validatePrices([valid, structuredClone(valid)], { minCountries: 1, tiers }),
     /Duplicate country entry/
   );
+});
+
+test('rejects extra plans, non-canonical tier order, and oversized parsed collections', () => {
+  const tiers = [testTier('50GB'), testTier('200GB')];
+  const valid = testCountry({ '50GB': { price: 1 }, '200GB': { price: 2 } });
+  const extraPlan = structuredClone(valid);
+  extraPlan.plans.EXTRA = { price: 3 };
+  assert.throws(
+    () => validatePrices([extraPlan], { minCountries: 1, tiers }),
+    /plans do not exactly match tiers/
+  );
+  assert.throws(
+    () => validatePrices([valid], { minCountries: 1, tiers: [...tiers].reverse() }),
+    /invalid or duplicate tiers/
+  );
+  assert.throws(
+    () => validatePrices([valid], {
+      minCountries: 1,
+      tiers: Array.from({ length: 21 }, () => structuredClone(tiers[0]))
+    }),
+    /unsupported structure/
+  );
+  assert.throws(
+    () => validatePrices(Array.from({ length: 251 }, () => structuredClone(valid)), { minCountries: 1, tiers }),
+    /Too many countries/
+  );
+});
+
+test('rejects unsafe country names before they reach mapping or history objects', () => {
+  for (const unsafeName of ['__proto__', 'constructor', 'Alpha\u202e']) {
+    assert.throws(
+      () => validatePrices([
+        testCountry({ '50GB': { price: 1 } }, { country: unsafeName })
+      ], { minCountries: 1, tiers: [testTier('50GB')] }),
+      /invalid country, region, currency, or plans entry/
+    );
+  }
 });
 
 test('rejects negative prices in Apple markup instead of stripping the sign', async () => {
@@ -478,18 +524,47 @@ test('allows a rounded currency-driven repricing whose real value stays close', 
   }), true);
 });
 
-test('does not treat a large exchange-rate move without an Apple price change as an anomaly', () => {
+test('rejects an extreme exchange-rate move even when Apple local prices are unchanged', () => {
   const previousData = {
     countries: [{ country: 'Example', currency: 'XYZ', plans: { '50GB': { price: 10 } } }],
     fx: { rates: { XYZ: 1, CNY: 7 } }
   };
   const unchanged = [{ country: 'Example', currency: 'XYZ', plans: { '50GB': { price: 10 } } }];
 
+  assert.throws(
+    () => validatePriceChangeAnomalies(unchanged, {
+      previousData,
+      currentRates: { XYZ: 100, CNY: 7 },
+      tiers: [{ id: '50GB' }]
+    }),
+    /Suspicious FX-derived 50GB CNY change/
+  );
   assert.equal(validatePriceChangeAnomalies(unchanged, {
     previousData,
-    currentRates: { XYZ: 100, CNY: 7 },
+    currentRates: { XYZ: 1.1, CNY: 7 },
     tiers: [{ id: '50GB' }]
   }), true);
+});
+
+test('rejects an extreme derived-CNY outlier in a newly added market', () => {
+  const normalCountries = Array.from({ length: 10 }, (_, index) => ({
+    country: `Market ${index}`,
+    currency: 'USD',
+    plans: { '50GB': { price: 1, cnyPrice: 7 } }
+  }));
+  const countries = [...normalCountries, {
+    country: 'New Outlier',
+    currency: 'USD',
+    plans: { '50GB': { price: 1_000, cnyPrice: 7_000 } }
+  }];
+  assert.throws(
+    () => validatePriceChangeAnomalies(countries, {
+      previousData: { countries: normalCountries, fx: {} },
+      currentRates: null,
+      tiers: [{ id: '50GB' }]
+    }),
+    /Suspicious 50GB CNY market outlier for New Outlier/
+  );
 });
 
 test('scales the CNY threshold with the previous plan value', () => {

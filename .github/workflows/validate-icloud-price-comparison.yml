@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   test:
-    name: 核心、Chrome 与 WebKit 测试
+    name: 核心、Chromium、Firefox 与 WebKit 测试
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -44,22 +44,27 @@ jobs:
         with:
           node-version: 22
 
-      - name: 安装 pnpm
-        run: npm install --global pnpm@10.14.0
+      - name: 启用并校验 pnpm
+        run: |
+          corepack enable
+          pnpm --version
 
       - name: 安装项目依赖
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
-      - name: 安装 Chromium 与 WebKit
-        run: pnpm exec playwright install --with-deps chromium webkit
+      - name: 安装 Chromium、Firefox 与 WebKit
+        run: pnpm exec playwright install --with-deps chromium firefox webkit
 
       - name: 运行核心与数据测试
         run: pnpm test:core
 
+      - name: 深度验证当前完整数据工件
+        run: pnpm validate:artifact
+
       - name: 深度审计全部 Apple 快照
         run: pnpm validate:snapshots
 
-      - name: 并行运行 Chromium 与 WebKit 测试
+      - name: 并行运行 Chromium、Firefox 与 WebKit 测试
         run: pnpm test:browsers
 
       - name: 检查依赖漏洞

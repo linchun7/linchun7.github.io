@@ -14,6 +14,7 @@ import {
   appleSnapshotContentHash,
   appleStructuralChanges,
   acquireUpdateLock,
+  attachDerivedCnyPrices,
   normalizeAppleSnapshotIndex,
   savePublishedAppleSnapshot,
   createRunLogEntry,
@@ -23,9 +24,12 @@ import {
   classifyHealthcheckFailure,
   fetchResource,
   getExchangeRates,
+  logInline,
   main,
   publicationDateKey,
+  publicExchangeRateMetadata,
   selectRequiredRates,
+  validateCountryNameMapping,
   writeFailureDiagnostics,
   updateHistory,
   updatePublishedDateHistory,
@@ -38,6 +42,31 @@ test('classifies only explicitly tagged operational failures as transient', () =
   transient.healthcheckSeverity = 'transient';
   assert.equal(classifyHealthcheckFailure(transient), 'transient');
   assert.equal(classifyHealthcheckFailure(null), 'severe');
+});
+
+test('strictly validates the committed country-name mapping and rejects unsafe entries', async () => {
+  const mapping = JSON.parse(await readFile(namesUrl, 'utf8'));
+  assert.equal(validateCountryNameMapping(mapping), mapping);
+  assert.throws(() => validateCountryNameMapping([]), /unsupported structure/);
+  assert.throws(() => validateCountryNameMapping({ Alpha: '甲' }), /incomplete/);
+
+  const unsafeKey = structuredClone(mapping);
+  Object.defineProperty(unsafeKey, '__proto__', { value: '危险', enumerable: true });
+  assert.throws(() => validateCountryNameMapping(unsafeKey), /unsafe entry/);
+
+  const unsafeValue = structuredClone(mapping);
+  unsafeValue.Australia = '澳大利亚\u202e';
+  assert.throws(() => validateCountryNameMapping(unsafeValue), /unsafe entry/);
+});
+
+test('bounds and flattens untrusted workflow log text', () => {
+  assert.equal(
+    logInline('remote failure\n::warning title=injected::payload\u202e'),
+    'remote failure : :warning title=injected: :payload '
+  );
+  const bounded = logInline('x'.repeat(2_500));
+  assert.equal([...bounded].length, 2_001);
+  assert.match(bounded, /…$/);
 });
 
 test('builds a deduplicated Apple snapshot index by published date', () => {
@@ -306,7 +335,7 @@ test('serializes concurrent production runs and releases the updater lock', asyn
     result: 'success',
     base_code: 'USD',
     time_last_update_unix: recentFxTimestamp(),
-    rates: data.fx.rates
+    rates: compatibleExchangeRates(data)
   };
   const originalFetch = globalThis.fetch;
   const originalApiKey = process.env.EXCHANGE_RATE_API_KEY;
@@ -380,6 +409,58 @@ function recentFxTimestamp() {
   return Math.floor(Date.now() / 1000);
 }
 
+function compatibleExchangeRates(data) {
+  const rateBoundsFor = (currency, cnyRate) => {
+    let lower = 0;
+    let upper = Number.POSITIVE_INFINITY;
+    for (const country of data.countries.filter((entry) => entry.currency === currency)) {
+      for (const plan of Object.values(country.plans)) {
+        assert.ok(Number.isFinite(plan.cnyPrice) && plan.cnyPrice > 0, `${country.country} must expose cnyPrice`);
+        lower = Math.max(lower, (plan.price * cnyRate) / (plan.cnyPrice + 0.005));
+        upper = Math.min(upper, (plan.price * cnyRate) / (plan.cnyPrice - 0.005));
+      }
+    }
+    assert.ok(lower < upper, `public CNY values must define a compatible ${currency} rate`);
+    return (lower + upper) / 2;
+  };
+
+  let cnyLower = 0;
+  let cnyUpper = Number.POSITIVE_INFINITY;
+  for (const country of data.countries.filter((entry) => entry.currency === 'USD')) {
+    for (const plan of Object.values(country.plans)) {
+      cnyLower = Math.max(cnyLower, (plan.cnyPrice - 0.005) / plan.price);
+      cnyUpper = Math.min(cnyUpper, (plan.cnyPrice + 0.005) / plan.price);
+    }
+  }
+  assert.ok(cnyLower < cnyUpper, 'public CNY values must define a compatible USD/CNY rate');
+  const cnyRate = (cnyLower + cnyUpper) / 2;
+  const rates = { USD: 1, CNY: cnyRate };
+  for (const currency of [...new Set(data.countries.map(({ currency }) => currency))].sort()) {
+    if (currency === 'USD' || currency === 'CNY') continue;
+    rates[currency] = rateBoundsFor(currency, cnyRate);
+  }
+
+  for (const country of data.countries) {
+    for (const plan of Object.values(country.plans)) {
+      const derived = Number(((plan.price / rates[country.currency]) * rates.CNY).toFixed(2));
+      assert.equal(derived, plan.cnyPrice, `${country.country} fixture rate must reproduce committed CNY values`);
+    }
+  }
+  return rates;
+}
+
+function legacySchema2Fixture(data) {
+  const legacy = structuredClone(data);
+  legacy.schemaVersion = 2;
+  delete legacy.fx.derivedCurrency;
+  legacy.fx.apiKeyStatus = 'valid';
+  legacy.fx.rates = compatibleExchangeRates(data);
+  for (const country of legacy.countries) {
+    for (const plan of Object.values(country.plans)) delete plan.cnyPrice;
+  }
+  return legacy;
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll('&', '&amp;')
@@ -408,6 +489,97 @@ function buildAppleHtml(data, publishedDate = data.source.publishedDate) {
     : '';
   return `<!doctype html><html><body>${sectionHtml}${publication}<!--${'x'.repeat(20_000)}--></body></html>`;
 }
+
+test('derives rounded plan-level CNY prices without publishing source rates', () => {
+  const countries = [
+    {
+      country: 'Alpha',
+      region: 'Americas',
+      currency: 'USD',
+      plans: { '50GB': { price: 1.99, formattedPrice: '$1.99' } }
+    },
+    {
+      country: 'Beta',
+      region: 'Asia Pacific',
+      currency: 'JPY',
+      plans: { '50GB': { price: 150, formattedPrice: '?150' } }
+    }
+  ];
+  const derived = attachDerivedCnyPrices(countries, {
+    fx: { rates: { USD: 1, CNY: 7.2, JPY: 150 }, reusePreviousCny: false }
+  });
+
+  assert.equal(derived[0].plans['50GB'].cnyPrice, 14.33);
+  assert.equal(derived[1].plans['50GB'].cnyPrice, 7.2);
+  assert.equal(Object.hasOwn(derived[0].plans['50GB'], 'sourceRate'), false);
+});
+
+test('reuses schema 3 CNY values only for unchanged country, currency, tier, and local price', () => {
+  const previousData = {
+    schemaVersion: 3,
+    countries: [{
+      country: 'Alpha',
+      region: 'Americas',
+      currency: 'USD',
+      plans: { '50GB': { price: 0.99, formattedPrice: '$0.99', cnyPrice: 7.13 } }
+    }]
+  };
+  const staleFx = { rates: null, reusePreviousCny: true };
+  const unchanged = [{
+    country: 'Alpha',
+    region: 'Americas',
+    currency: 'USD',
+    plans: { '50GB': { price: 0.99, formattedPrice: '$0.99' } }
+  }];
+  assert.equal(
+    attachDerivedCnyPrices(unchanged, { fx: staleFx, previousData })[0].plans['50GB'].cnyPrice,
+    7.13
+  );
+
+  const invalidChanges = [
+    [{ ...unchanged[0], plans: { '50GB': { price: 1.09, formattedPrice: '$1.09' } } }],
+    [{ ...unchanged[0], currency: 'CAD' }],
+    [{ ...unchanged[0], country: 'New Alpha' }],
+    [{ ...unchanged[0], plans: { ...unchanged[0].plans, '200GB': { price: 2.99, formattedPrice: '$2.99' } } }]
+  ];
+  for (const countries of invalidChanges) {
+    assert.throws(
+      () => attachDerivedCnyPrices(countries, { fx: staleFx, previousData }),
+      /Cannot derive .* CNY price/
+    );
+  }
+});
+
+test('publishes an explicit FX metadata allowlist and drops every internal field', () => {
+  const metadata = publicExchangeRateMetadata({
+    sourceUrl: 'https://example.test/rates',
+    sourceMode: 'open-access',
+    fallbackUsed: true,
+    fallbackReason: 'request-failed',
+    base: 'USD',
+    fetchedAt: '2026-08-09T00:00:00.000Z',
+    stale: true,
+    rates: { USD: 1, CNY: 7.2 },
+    apiKeyStatus: 'request-failed',
+    reusePreviousCny: true,
+    futureInternalField: 'must-not-leak'
+  });
+
+  assert.deepEqual(metadata, {
+    sourceUrl: 'https://example.test/rates',
+    sourceMode: 'open-access',
+    fallbackUsed: true,
+    fallbackReason: 'request-failed',
+    base: 'USD',
+    fetchedAt: '2026-08-09T00:00:00.000Z',
+    stale: true,
+    derivedCurrency: 'CNY'
+  });
+  assert.equal(publicExchangeRateMetadata({
+    ...metadata,
+    fallbackReason: 'invalid-key'
+  }).fallbackReason, 'source-unavailable');
+});
 
 async function runDryMain({ html, fxPayload, apiKey = '', authenticatedFxPayload, githubActions = false }) {
   const originalFetch = globalThis.fetch;
@@ -528,7 +700,7 @@ test('runs the production write path against isolated files', async () => {
     result: 'success',
     base_code: 'USD',
     time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
-    rates: data.fx.rates
+    rates: compatibleExchangeRates(data)
   };
   const snapshotStoreBefore = await readSnapshotStoreState(paths);
   try {
@@ -547,8 +719,18 @@ test('runs the production write path against isolated files', async () => {
       snapshot.revisions[0].firstConfirmedDate,
       JSON.parse(snapshotStoreBefore.index).snapshots.at(-1).revisions[0].firstConfirmedDate
     );
+    assert.equal(writtenData.schemaVersion, 3);
     assert.equal(writtenData.source.publishedDate, data.source.publishedDate);
     assert.equal(writtenData.countries.length, data.countries.length);
+    assert.equal(writtenData.fx.derivedCurrency, 'CNY');
+    assert.equal(Object.hasOwn(writtenData.fx, 'rates'), false);
+    assert.equal(Object.hasOwn(writtenData.fx, 'apiKeyStatus'), false);
+    assert.equal(
+      writtenData.countries.every((country) => Object.values(country.plans).every(
+        (plan) => Number.isFinite(plan.cnyPrice) && plan.cnyPrice > 0
+      )),
+      true
+    );
     assert.deepEqual(await readSnapshotStoreState(paths), snapshotStoreBefore);
     await assert.rejects(readFile(summaryPath, 'utf8'), { code: 'ENOENT' });
   } finally {
@@ -579,7 +761,7 @@ test('preserves a pre-existing unindexed snapshot file when a production collisi
     result: 'success',
     base_code: 'USD',
     time_last_update_unix: recentFxTimestamp(),
-    rates: data.fx.rates
+    rates: compatibleExchangeRates(data)
   };
 
   globalThis.fetch = async (url) => {
@@ -622,7 +804,7 @@ test('removes unambiguous updater temporary files before a production run', asyn
     result: 'success',
     base_code: 'USD',
     time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
-    rates: data.fx.rates
+    rates: compatibleExchangeRates(data)
   };
   const staleFiles = [
     `${paths.currentDataPath}.tmp-1-2-stale`,
@@ -650,7 +832,7 @@ test('preserves updater temporary files during a dry-run', async () => {
     result: 'success',
     base_code: 'USD',
     time_last_update_unix: recentFxTimestamp(),
-    rates: data.fx.rates
+    rates: compatibleExchangeRates(data)
   };
   const temporaryPath = `${paths.currentDataPath}.tmp-1-2-dry-run`;
   await writeFile(temporaryPath, 'partial', 'utf8');
@@ -670,7 +852,7 @@ test('rejects a future Apple publication date before dry-run or production write
     result: 'success',
     base_code: 'USD',
     time_last_update_unix: recentFxTimestamp(),
-    rates: data.fx.rates
+    rates: compatibleExchangeRates(data)
   };
   await withMockedFetch(
     { html: buildAppleHtml(data, 'January 1, 2099'), fxPayload },
@@ -703,7 +885,7 @@ test('does not write a snapshot when publication-date validation fails', async (
     result: 'success',
     base_code: 'USD',
     time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
-    rates: data.fx.rates
+    rates: compatibleExchangeRates(data)
   };
   const before = await Promise.all([
     readFile(paths.currentDataPath, 'utf8'),
@@ -738,7 +920,7 @@ test('validates the run-log schema before persisting snapshots', async () => {
     result: 'success',
     base_code: 'USD',
     time_last_update_unix: recentFxTimestamp(),
-    rates: data.fx.rates
+    rates: compatibleExchangeRates(data)
   };
   await mkdir(paths.snapshotsDir, { recursive: true });
   await writeFile(paths.runLogPath, JSON.stringify({ schemaVersion: 1, retention: 90, runs: {} }), 'utf8');
@@ -764,7 +946,7 @@ test('recreates a missing run log after a valid production update', async () => 
     result: 'success',
     base_code: 'USD',
     time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
-    rates: data.fx.rates
+    rates: compatibleExchangeRates(data)
   };
   await rm(paths.runLogPath);
   const snapshotStoreBefore = await readSnapshotStoreState(paths);
@@ -861,7 +1043,7 @@ test('rolls back prices, history, logs, and snapshots when a production write fa
     result: 'success',
     base_code: 'USD',
     time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
-    rates: data.fx.rates
+    rates: compatibleExchangeRates(data)
   };
   const before = await Promise.all([
     readFile(paths.currentDataPath, 'utf8'),
@@ -954,8 +1136,9 @@ test('writes a failure report and normalized Apple diagnostic', async () => {
   const summaryPath = path.join(diagnosticsDir, 'summary.md');
   const startedAt = new Date('2026-08-02T15:00:00.000Z');
   const finishedAt = new Date('2026-08-02T15:00:02.500Z');
+  const failureMessage = `snapshot [click](https://evil.example)\n::warning title=injected::\u202e# injected <img src=x onerror=alert(1)> failed ${'x'.repeat(1_500)}`;
   try {
-    const report = await writeFailureDiagnostics(new Error('snapshot write failed'), {
+    const report = await writeFailureDiagnostics(new Error(failureMessage), {
       diagnosticsDir,
       appleSnapshot: { schemaVersion: 1, publishedDate: '2026-07-17', tiers: [], countries: [] },
       startedAt,
@@ -967,8 +1150,14 @@ test('writes a failure report and normalized Apple diagnostic', async () => {
     assert.equal(report.status, 'failure');
     assert.equal(report.healthcheckSeverity, 'severe');
     assert.equal(report.appleSnapshotCaptured, true);
-    assert.equal(JSON.parse(await readFile(path.join(diagnosticsDir, 'run-report.json'), 'utf8')).error.message, 'snapshot write failed');
-    assert.match(await readFile(summaryPath, 'utf8'), /snapshot write failed/);
+    assert.equal(JSON.parse(await readFile(path.join(diagnosticsDir, 'run-report.json'), 'utf8')).error.message, failureMessage);
+    const renderedSummary = await readFile(summaryPath, 'utf8');
+    assert.ok(renderedSummary.includes(String.raw`\[click\]\(https://evil\.example\)`));
+    assert.ok(renderedSummary.includes(String.raw`\<img src=x onerror=alert\(1\)\>`));
+    assert.match(renderedSummary, /…/);
+    assert.equal(renderedSummary.includes('x'.repeat(1_001)), false);
+    assert.doesNotMatch(renderedSummary, /\[[^\]]+\]\(https:\/\/evil\.example\)|(^|[^\\])<img\b|\n# /i);
+    assert.doesNotMatch(renderedSummary, /\u202e|::warning/i);
   } finally {
     await rm(diagnosticsDir, { recursive: true, force: true });
   }
@@ -980,7 +1169,7 @@ test('captures the current Apple response for failure diagnostics', async () => 
     result: 'success',
     base_code: 'USD',
     time_last_update_unix: recentFxTimestamp(),
-    rates: data.fx.rates
+    rates: compatibleExchangeRates(data)
   };
   await withMockedFetch(
     { html: buildAppleHtml(data, 'January 1, 2099'), fxPayload },
@@ -990,12 +1179,29 @@ test('captures the current Apple response for failure diagnostics', async () => 
   const { root, paths } = await createTemporaryProductionPaths();
   const diagnosticsDir = path.join(root, 'diagnostics');
   const invalidData = structuredClone(data);
-  invalidData.fx.fetchedAt = '2020-01-01T00:00:00.000Z';
-  await writeFile(paths.currentDataPath, JSON.stringify(invalidData), 'utf8');
+  invalidData.fx.fetchedAt = '2026-07-30T00:00:00.000Z';
+  invalidData.generatedAt = '2026-07-31T00:00:00.000Z';
+  invalidData.run.startedAtUtc = '2026-07-30T23:59:00.000Z';
+  invalidData.run.finishedAtUtc = invalidData.generatedAt;
+  invalidData.run.observedAtUtc = invalidData.generatedAt;
+  invalidData.run.observedAtBeijing = '2026-07-31';
+  const invalidRunLog = JSON.parse(await readFile(paths.runLogPath, 'utf8'));
+  const latestRun = invalidRunLog.runs.at(-1);
+  latestRun.startedAtUtc = invalidData.run.startedAtUtc;
+  latestRun.finishedAtUtc = invalidData.generatedAt;
+  invalidRunLog.runs = [latestRun];
+  invalidRunLog.updatedAtUtc = invalidData.generatedAt;
+  const invalidHistory = JSON.parse(await readFile(paths.historyPath, 'utf8'));
+  invalidHistory.updatedAt = invalidData.generatedAt;
+  await Promise.all([
+    writeFile(paths.currentDataPath, JSON.stringify(invalidData), 'utf8'),
+    writeFile(paths.historyPath, JSON.stringify(invalidHistory), 'utf8'),
+    writeFile(paths.runLogPath, JSON.stringify(invalidRunLog), 'utf8')
+  ]);
   try {
     await withMockedFetch(
       { html: buildAppleHtml(data), fxPayload: { result: 'error', 'error-type': 'quota-reached' } },
-      () => assert.rejects(main({ dryRun: true, paths }), /quota-reached.*previous exchange rates are unusable/i)
+      () => assert.rejects(main({ dryRun: true, paths }), /quota-reached.*previous exchange-rate-derived prices are unusable/i)
     );
     await writeFailureDiagnostics(new Error('rate refresh failed'), {
       diagnosticsDir,
@@ -1021,7 +1227,7 @@ test('does not write production files when a price anomaly is rejected', async (
     result: 'success',
     base_code: 'USD',
     time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
-    rates: data.fx.rates
+    rates: compatibleExchangeRates(data)
   };
   const before = await Promise.all([
     readFile(paths.currentDataPath, 'utf8'),
@@ -1046,12 +1252,12 @@ test('does not write production files when a price anomaly is rejected', async (
   }
 });
 
-test('rejects a production baseline with missing required exchange rates before fetch', async () => {
+test('rejects a legacy production baseline with missing required exchange rates before fetch', async () => {
   const { root, paths } = await createTemporaryProductionPaths();
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
   const missingCurrency = data.countries.find(({ currency }) => currency !== 'USD')?.currency;
   assert.ok(missingCurrency, 'fixture must contain a non-USD currency');
-  const previousData = structuredClone(data);
+  const previousData = legacySchema2Fixture(data);
   delete previousData.fx.rates[missingCurrency];
   await writeFile(paths.currentDataPath, `${JSON.stringify(previousData, null, 2)}\n`, 'utf8');
   const before = await Promise.all([
@@ -1204,6 +1410,7 @@ test('uses the authenticated exchange-rate endpoint without putting the key in t
     requestCount += 1;
     assert.equal(String(url), 'https://v6.exchangerate-api.com/v6/latest/USD');
     assert.equal(options.headers.authorization, `Bearer ${apiKey}`);
+    assert.equal(options.redirect, 'error', 'credentialed requests must never follow redirects');
     assert.doesNotMatch(String(url), new RegExp(apiKey));
     return new Response(JSON.stringify({
       result: 'success',
@@ -1376,6 +1583,137 @@ test('caps retry delays and request timeouts by the shared network deadline', as
   }
 });
 
+test('rejects an oversized response from its declared content length before reading it', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalWarn = console.warn;
+  globalThis.fetch = async () => new Response('small', {
+    status: 200,
+    headers: { 'content-length': '1025' }
+  });
+  console.warn = () => {};
+  try {
+    await assert.rejects(
+      fetchResource('https://example.test/resource', {
+        attempts: 1,
+        maxResponseBytes: 1024,
+        resourceName: 'declared oversized resource'
+      }),
+      (error) => {
+        assert.match(error.message, /declared oversized resource response exceeds 1024 bytes/);
+        assert.equal(classifyHealthcheckFailure(error), 'transient');
+        return true;
+      }
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    console.warn = originalWarn;
+  }
+});
+
+test('rejects an unsafe declared content length instead of trusting a rounded Number', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalWarn = console.warn;
+  globalThis.fetch = async () => new Response('small', {
+    status: 200,
+    headers: { 'content-length': '9007199254740992' }
+  });
+  console.warn = () => {};
+  try {
+    await assert.rejects(
+      fetchResource('https://example.test/resource', {
+        attempts: 1,
+        maxResponseBytes: 1024,
+        resourceName: 'unsafe declared resource'
+      }),
+      (error) => {
+        assert.match(error.message, /unsafe declared resource response exceeds 1024 bytes/);
+        assert.equal(classifyHealthcheckFailure(error), 'transient');
+        return true;
+      }
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    console.warn = originalWarn;
+  }
+});
+
+test('rejects an oversized streamed response when content length is absent', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalWarn = console.warn;
+  globalThis.fetch = async () => new Response('x'.repeat(1025), { status: 200 });
+  console.warn = () => {};
+  try {
+    await assert.rejects(
+      fetchResource('https://example.test/resource', {
+        attempts: 1,
+        maxResponseBytes: 1024,
+        resourceName: 'streamed oversized resource'
+      }),
+      (error) => {
+        assert.match(error.message, /streamed oversized resource response exceeds 1024 bytes/);
+        assert.equal(classifyHealthcheckFailure(error), 'transient');
+        return true;
+      }
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    console.warn = originalWarn;
+  }
+});
+
+test('rejects malformed UTF-8 response bytes instead of decoding replacement characters', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalWarn = console.warn;
+  globalThis.fetch = async () => new Response(new Uint8Array([0xc3, 0x28]), { status: 200 });
+  console.warn = () => {};
+  try {
+    await assert.rejects(
+      fetchResource('https://example.test/resource', {
+        attempts: 1,
+        json: true,
+        resourceName: 'malformed UTF-8 resource'
+      }),
+      (error) => {
+        assert.match(error.message, /malformed UTF-8 resource.*encoded data was not valid/i);
+        assert.equal(classifyHealthcheckFailure(error), 'transient');
+        return true;
+      }
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    console.warn = originalWarn;
+  }
+});
+
+test('strictly decodes the array-buffer fallback when a Response body stream is unavailable', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalWarn = console.warn;
+  globalThis.fetch = async () => ({
+    ok: true,
+    headers: new Headers(),
+    body: null,
+    arrayBuffer: async () => new Uint8Array([0xc3, 0x28]).buffer
+  });
+  console.warn = () => {};
+  try {
+    await assert.rejects(
+      fetchResource('https://example.test/resource', {
+        attempts: 1,
+        json: true,
+        resourceName: 'bodyless malformed UTF-8 resource'
+      }),
+      (error) => {
+        assert.match(error.message, /bodyless malformed UTF-8 resource.*encoded data was not valid/i);
+        assert.equal(classifyHealthcheckFailure(error), 'transient');
+        return true;
+      }
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    console.warn = originalWarn;
+  }
+});
+
 test('keeps previous exchange rates when the shared network deadline expires', async () => {
   const originalFetch = globalThis.fetch;
   const originalWarn = console.warn;
@@ -1456,7 +1794,7 @@ test('rejects expired or incomplete previous rates when both online sources fail
         }
       }, { requiredCurrencies: ['USD', 'CNY', 'JPY'] }),
       (error) => {
-        assert.match(error.message, /previous exchange rates are unusable: Exchange-rate response is too old/);
+        assert.match(error.message, /previous exchange-rate-derived prices are unusable: Exchange-rate response is too old/);
         assert.equal(classifyHealthcheckFailure(error), 'transient');
         return true;
       }
@@ -1568,6 +1906,11 @@ test('keeps removed-country history and appends complete events for a new tier',
   assert.deepEqual(result.history.countries.Alpha.events.at(-1).plans, { '50GB': 1, '1TB': 8 });
   assert.equal(result.history.countries.Alpha.events.at(-1).observedAtBeijing, '2026-08-01');
   assert.equal(result.history.countries.Alpha.events.at(-1).observedAtUtc, '2026-07-31T16:00:00.000Z');
+  assert.equal(result.history.updatedAt, '2026-07-31T16:00:00.000Z');
+  assert.throws(
+    () => updateHistory(result.history, [alphaWithNewTier], '2026-08-02', [TIER_50, TIER_1TB], 'not-an-iso-timestamp'),
+    /UTC observation timestamp is invalid/
+  );
 
   const repeated = updateHistory(result.history, [alphaWithNewTier], '2026-08-02', [TIER_50, TIER_1TB]);
   assert.equal(repeated.history.countries.Alpha.events.length, 2, 'unchanged prices should not duplicate history');
@@ -1652,7 +1995,7 @@ test('runs the complete updater in dry-run mode without modifying committed data
         result: 'success',
         base_code: 'USD',
         time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
-        rates: data.fx.rates
+        rates: compatibleExchangeRates(data)
       }
     });
   } finally {
@@ -1669,7 +2012,7 @@ test('accepts compact Apple 50GB labels during the fetch preflight', async () =>
     result: 'success',
     base_code: 'USD',
     time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
-    rates: data.fx.rates
+    rates: compatibleExchangeRates(data)
   };
   await runDryMain({
     html: buildAppleHtml(data).replaceAll('50 GB', '50GB'),
@@ -1677,10 +2020,27 @@ test('accepts compact Apple 50GB labels during the fetch preflight', async () =>
   });
 });
 
-test('complete dry-run keeps previous rates for an incomplete online response and rejects a missing Apple publication date', async () => {
+test('fails closed before FX processing when only one Apple parser succeeds', async () => {
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const fxPayload = {
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
+    rates: compatibleExchangeRates(data)
+  };
+  await assert.rejects(
+    () => runDryMain({
+      html: buildAppleHtml(data).replaceAll(' class="gb-header"', ''),
+      fxPayload
+    }),
+    /Apple parser redundancy failed closed/
+  );
+});
+
+test('complete dry-run keeps previous derived CNY prices for an incomplete online response and rejects a missing Apple publication date', async () => {
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
   const missingCurrency = data.countries.find(({ currency }) => currency !== 'USD').currency;
-  const incompleteRates = { ...data.fx.rates };
+  const incompleteRates = { ...compatibleExchangeRates(data) };
   delete incompleteRates[missingCurrency];
   const fxPayload = {
     result: 'success',
@@ -1698,9 +2058,9 @@ test('complete dry-run keeps previous rates for an incomplete online response an
     console.warn = originalWarn;
   }
   assert.match(warnings.join('\n'), new RegExp(`Exchange rates are missing for:.*${missingCurrency}`));
-  assert.match(warnings.join('\n'), /keeping previous rates/);
+  assert.match(warnings.join('\n'), /keeping previous derived CNY prices/);
   await assert.rejects(
-    () => runDryMain({ html: buildAppleHtml(data, null), fxPayload: { ...fxPayload, rates: data.fx.rates } }),
+    () => runDryMain({ html: buildAppleHtml(data, null), fxPayload: { ...fxPayload, rates: compatibleExchangeRates(data) } }),
     /Apple published date was not found/
   );
 });
@@ -1770,7 +2130,7 @@ test('builds a structured successful run log with source, counts, and changes', 
   assert.equal(entry.source.exchangeRatesSourceMode, 'api-key');
   assert.equal(entry.source.exchangeRatesFallbackUsed, false);
   assert.equal(entry.source.exchangeRatesFallbackReason, null);
-  assert.equal(entry.source.exchangeRatesApiKeyStatus, 'valid');
+  assert.equal(Object.hasOwn(entry.source, 'exchangeRatesApiKeyStatus'), false);
   assert.equal(entry.counts.countries, 2);
   assert.equal(entry.counts.pricePoints, 4);
   assert.equal(entry.counts.currencies, 2);
@@ -1786,6 +2146,40 @@ test('builds a structured successful run log with source, counts, and changes', 
   assert.equal(log.runs.length, 90);
   assert.equal(log.runs.at(-1), entry);
   assert.equal(log.runs[0].id, '1');
+  const sanitized = buildRunLog({
+    schemaVersion: 1,
+    retention: 90,
+    runs: [{ id: 'legacy', source: { exchangeRatesApiKeyStatus: 'valid', exchangeRatesStale: false } }]
+  }, entry);
+  assert.deepEqual(sanitized.runs[0].source, { exchangeRatesStale: false });
+
+  const legacyWithDebugFields = structuredClone(entry);
+  legacyWithDebugFields.debug = true;
+  legacyWithDebugFields.source.exchangeRatesApiKeyStatus = 'valid';
+  legacyWithDebugFields.source.exchangeRatesFallbackReason = 'invalid-key';
+  legacyWithDebugFields.source.rawRates = { USD: 1 };
+  legacyWithDebugFields.counts.debug = true;
+  legacyWithDebugFields.counts.tiers[0].debug = true;
+  legacyWithDebugFields.changes.debug = true;
+  legacyWithDebugFields.changes.publishedDate.debug = true;
+  legacyWithDebugFields.changes.addedCountries[0].debug = true;
+  legacyWithDebugFields.changes.changedCountries = [{
+    country: 'Alpha',
+    nameZh: 'Alpha',
+    fromCurrency: 'USD',
+    toCurrency: 'CAD',
+    fromRegion: 'Other',
+    toRegion: 'Americas',
+    tiers: [{ id: '50GB', from: 0.99, to: 1.29, debug: true }],
+    debug: true
+  }];
+  const fullySanitized = buildRunLog({ schemaVersion: 1, retention: 90, runs: [legacyWithDebugFields] }, entry);
+  assert.doesNotMatch(JSON.stringify(fullySanitized.runs[0]), /debug|rawRates|ApiKey/);
+  assert.equal(fullySanitized.runs[0].source.exchangeRatesFallbackReason, 'source-unavailable');
+  assert.deepEqual(fullySanitized.runs[0].changes.addedCountries[0], { country: 'Beta', nameZh: 'Beta' });
+  assert.deepEqual(fullySanitized.runs[0].changes.changedCountries[0].tiers[0], {
+    id: '50GB', from: 0.99, to: 1.29
+  });
   assert.throws(
     () => buildRunLog({ schemaVersion: 2, runs: [] }, entry),
     /unsupported structure/
@@ -1919,8 +2313,8 @@ test('keeps successful Action summaries concise and promotes warnings', () => {
   assert.match(rendered, /### 结论/);
   assert.match(rendered, /触发方式：手动执行/);
   assert.match(rendered, /Apple 解析路径：cross-checked（双解析器一致）/);
-  assert.match(rendered, /汇率来源：ExchangeRate-API Key 接口（主来源）/);
-  assert.match(rendered, /汇率认证：API Key 有效/);
+  assert.match(rendered, /汇率来源：ExchangeRate-API 认证接口（主来源）/);
+  assert.doesNotMatch(rendered, /API Key|汇率认证|未配置|invalid-key|quota-reached/i);
   assert.match(rendered, /### 本次变化\n本次变化：无/);
   assert.doesNotMatch(rendered, /本次新增地区：无|本次移除地区：无|缺少汇率：无/);
 
@@ -1939,7 +2333,7 @@ test('keeps successful Action summaries concise and promotes warnings', () => {
   }, 'schedule').join('\n');
   assert.match(stale, /### 警告/);
   assert.match(stale, /汇率降级/);
-  assert.match(stale, /汇率认证：主接口请求失败，开放接口也不可用/);
+  assert.doesNotMatch(stale, /API Key|汇率认证|未配置/i);
   assert.match(stale, /缺少汇率.*JPY/);
 
   const noSecret = buildActionSummaryLines({
@@ -1952,7 +2346,8 @@ test('keeps successful Action summaries concise and promotes warnings', () => {
       apiKeyStatus: 'not-configured'
     }
   }, summary, 'schedule').join('\n');
-  assert.match(noSecret, /汇率认证：未配置 API Key，使用开放接口/);
+  assert.match(noSecret, /汇率来源：ExchangeRate-API 开放接口/);
+  assert.doesNotMatch(noSecret, /API Key|汇率认证|未配置/i);
   assert.doesNotMatch(noSecret, /### 警告/);
 
   const fallback = buildActionSummaryLines({
@@ -1966,17 +2361,45 @@ test('keeps successful Action summaries concise and promotes warnings', () => {
     }
   }, summary, 'schedule').join('\n');
   assert.match(fallback, /汇率来源：ExchangeRate-API 开放接口（自动回退）/);
-  assert.match(fallback, /汇率认证：API 额度已用完，使用开放接口/);
+  assert.doesNotMatch(fallback, /API Key|汇率认证|额度|quota-reached/i);
   assert.doesNotMatch(fallback, /### 警告/);
+
+  const injected = buildActionSummaryLines({
+    ...data,
+    source: {
+      publishedDate: '[date](https://evil.example)',
+      parser: '[parser](https://evil.example)',
+      parserStatus: '<img src=x onerror=alert(1)>\n# injected heading'
+    }
+  }, {
+    ...summary,
+    missingRates: ['[JPY](https://evil.example)'],
+    publicationDateChanged: true,
+    publishedDateHistory: [
+      { publishedDate: 'July 1, 2026' },
+      { publishedDate: '[date](https://evil.example)' }
+    ],
+    publicationChanges: {
+      ...summary.publicationChanges,
+      addedTiers: [{ id: '1TB', label: '[tier](https://evil.example)' }],
+      addedCountries: [{ country: 'Injected', nameZh: '[click](https://evil.example)' }]
+    }
+  }, 'schedule').join('\n');
+  assert.ok(injected.includes(String.raw`\[click\]\(https://evil\.example\)`));
+  assert.ok(injected.includes(String.raw`\[tier\]\(https://evil\.example\)`));
+  assert.ok(injected.includes(String.raw`\[parser\]\(https://evil\.example\)`));
+  assert.ok(injected.includes(String.raw`\<img src=x onerror=alert\(1\)\>`));
+  assert.doesNotMatch(injected, /\[[^\]]+\]\(https:\/\/evil\.example\)/);
+  assert.doesNotMatch(injected, /(^|[^\\])<img\b|\n# /i);
 });
 
-test('reports missing or invalid exchange-rate credentials as notices without warnings', async () => {
+test('keeps credential configuration and failure details out of public Action notices', async () => {
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
   const fxPayload = {
     result: 'success',
     base_code: 'USD',
     time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
-    rates: data.fx.rates
+    rates: compatibleExchangeRates(data)
   };
   const messages = [];
   const originalLog = console.log;
@@ -1995,8 +2418,9 @@ test('reports missing or invalid exchange-rate credentials as notices without wa
   }
 
   const output = messages.join('\n');
-  assert.match(output, /::notice title=未配置汇率 API Key::/);
-  assert.match(output, /::notice title=汇率 API Key 未生效::API Key 无效，已使用开放接口。/);
+  assert.match(output, /::notice title=汇率来源自动回退::认证汇率来源不可用，已使用开放接口。/);
+  assert.equal((output.match(/::notice title=汇率来源自动回退::/g) ?? []).length, 1);
+  assert.doesNotMatch(output, /API Key|未配置|无效|invalid-key|quota-reached/i);
   assert.doesNotMatch(output, /::warning/);
 });
 
@@ -2076,7 +2500,7 @@ test('fails closed when the snapshot index is missing while evidence exists', as
     result: 'success',
     base_code: 'USD',
     time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
-    rates: data.fx.rates
+    rates: compatibleExchangeRates(data)
   };
   const oldHtml = path.join(paths.snapshotsDir, '2024-12-05.html');
   const oldData = path.join(paths.snapshotsDir, '2024-12-05.json');
@@ -2117,7 +2541,7 @@ test('fails closed on an invalid snapshot index without deleting evidence', asyn
     result: 'success',
     base_code: 'USD',
     time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
-    rates: data.fx.rates
+    rates: compatibleExchangeRates(data)
   };
   const oldHtml = path.join(paths.snapshotsDir, '2024-12-05.html');
   await mkdir(paths.snapshotsDir, { recursive: true });
@@ -2145,7 +2569,7 @@ test('fails closed on an empty snapshot index without deleting evidence', async 
     result: 'success',
     base_code: 'USD',
     time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
-    rates: data.fx.rates
+    rates: compatibleExchangeRates(data)
   };
   const oldHtml = path.join(paths.snapshotsDir, '2024-12-05.html');
   const oldData = path.join(paths.snapshotsDir, '2024-12-05.json');
@@ -2444,7 +2868,7 @@ test('rejects malformed history countries before any production write', async ()
     result: 'success',
     base_code: 'USD',
     time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
-    rates: data.fx.rates
+    rates: compatibleExchangeRates(data)
   };
   const malformedHistory = JSON.stringify({ schemaVersion: 2, countries: [], sourcePublishedDates: [] });
   await writeFile(paths.historyPath, malformedHistory, 'utf8');

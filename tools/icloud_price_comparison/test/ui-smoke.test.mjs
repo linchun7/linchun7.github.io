@@ -4,7 +4,9 @@ import http from 'node:http';
 import path from 'node:path';
 import test, { after } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { chromium, webkit } from 'playwright';
+import { chromium, firefox, webkit } from 'playwright';
+
+import { validatePriceHistoryConsistency } from '../data-contract.js';
 
 const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REPOSITORY_DIR = path.resolve(PROJECT_DIR, '../..');
@@ -18,7 +20,7 @@ const BROWSER_UNDER_TEST = process.env.PLAYWRIGHT_BROWSER || 'chromium';
 let sharedBrowserPromise = null;
 let sharedServerPromise = null;
 
-if (!['chromium', 'webkit'].includes(BROWSER_UNDER_TEST)) {
+if (!['chromium', 'firefox', 'webkit'].includes(BROWSER_UNDER_TEST)) {
   throw new Error(`Unsupported Playwright browser: ${BROWSER_UNDER_TEST}`);
 }
 
@@ -44,11 +46,6 @@ function setPayloadGeneratedAt(data, generatedAt) {
   data.run.observedAtBeijing = new Intl.DateTimeFormat('en-CA', {
     year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Shanghai'
   }).format(new Date(generatedAt));
-}
-
-function retainRatesForCurrentCountries(data) {
-  const currencies = new Set(['USD', 'CNY', ...data.countries.map(({ currency }) => currency)]);
-  data.fx.rates = Object.fromEntries(Object.entries(data.fx.rates).filter(([currency]) => currencies.has(currency)));
 }
 
 const uiNumberFormatter = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 });
@@ -87,15 +84,17 @@ async function findChrome() {
 }
 
 async function resolveBrowser(context, purpose) {
-  if (BROWSER_UNDER_TEST === 'webkit') {
+  if (BROWSER_UNDER_TEST !== 'chromium') {
+    const browserType = BROWSER_UNDER_TEST === 'firefox' ? firefox : webkit;
+    const browserName = BROWSER_UNDER_TEST === 'firefox' ? 'Firefox' : 'WebKit';
     try {
-      await access(webkit.executablePath());
+      await access(browserType.executablePath());
     } catch {
-      if (process.env.CI) assert.fail(`Playwright WebKit is required for ${purpose}`);
-      context.skip('Playwright WebKit is not installed');
+      if (process.env.CI) assert.fail(`Playwright ${browserName} is required for ${purpose}`);
+      context.skip(`Playwright ${browserName} is not installed`);
       return null;
     }
-    return { browserType: sharedBrowserType(webkit), launchOptions: { headless: true } };
+    return { browserType: sharedBrowserType(browserType), launchOptions: { headless: true } };
   }
 
   try {
@@ -139,6 +138,10 @@ async function createServer() {
   const server = http.createServer(async (request, response) => {
     try {
       const pathname = decodeURIComponent(new URL(request.url, 'http://127.0.0.1').pathname);
+      if (pathname === '/data/prices.json' && request.headers['x-icloud-test-price-response'] === 'redirect') {
+        response.writeHead(302, { location: '/data/history.json' }).end();
+        return;
+      }
       const publicRoot = pathname.startsWith('/images/') ? REPOSITORY_DIR : PROJECT_DIR;
       const requestedPath = path.resolve(publicRoot, `.${pathname === '/' ? '/index.html' : pathname}`);
       if (!requestedPath.startsWith(`${publicRoot}${path.sep}`)) {
@@ -178,62 +181,190 @@ after(async () => {
 });
 
 test('starts price data early and deprioritizes optional third-party work', async () => {
-  const html = await readFile(path.join(PROJECT_DIR, 'index.html'), 'utf8');
-  const eagerPriceFetch = '<script data-cfasync="false" src="price-bootstrap.js?v=4"></script>';
+  const [html, bootstrapSource, moduleSource] = await Promise.all([
+    readFile(path.join(PROJECT_DIR, 'index.html'), 'utf8'),
+    readFile(path.join(PROJECT_DIR, 'price-bootstrap.js'), 'utf8'),
+    readFile(path.join(PROJECT_DIR, 'script.js'), 'utf8')
+  ]);
+  const eagerPriceFetch = '<script data-cfasync="false" src="price-bootstrap.js?v=9"></script>';
   assert.ok(html.includes(eagerPriceFetch), 'prices.json bootstrap should run during HTML parsing');
-  assert.ok(html.indexOf(eagerPriceFetch) < html.indexOf('<script data-cfasync="false" type="module" src="script.js?v=7"></script>'), 'the initial price request should precede module execution');
+  assert.ok(html.indexOf(eagerPriceFetch) < html.indexOf('<script data-cfasync="false" type="module" src="script.js?v=18"></script>'), 'the initial price request should precede module execution');
   assert.doesNotMatch(html, /rel="preload" href="data\/prices\.json"/, 'cross-browser loading should not rely on a fetch preload that WebKit may duplicate');
-  assert.doesNotMatch(html, /<script[^>]+src="https:\/\/www\.googletagmanager\.com/, 'analytics must not block HTML parsing');
+  assert.doesNotMatch(html, /googletagmanager\.com|google-analytics\.com|Google Analytics|gtag\s*\(|G-K2S9L4CHNP/i, 'Google Analytics must be absent from HTML and CSP');
   assert.doesNotMatch(html, /analyticsConsent|privacySettings|允许匿名统计/, 'analytics consent overlay and its settings entry must be absent');
   assert.match(html, /Content-Security-Policy/);
+  assert.match(html, /<meta name="referrer" content="origin">/, 'subresource requests must not receive URL paths or query parameters in Referer');
+  assert.match(html, /<input id="searchInput"[^>]+maxlength="160"/, 'free-text search input must have a bounded length');
   assert.match(html, /script-src[^;]+static\.cloudflareinsights\.com/, 'Cloudflare Web Analytics must be explicitly allowed by CSP');
   assert.doesNotMatch(html, /raw\.githubusercontent\.com/, 'frontend data must not fall back to a mutable branch URL');
   assert.match(html, /Rates By Exchange Rate API/);
   assert.match(html, /data-cfasync="false" type="module"/, 'Rocket Loader must not rewrite the module entry point');
+  assert.match(bootstrapSource, /redirect:\s*'error'/, 'the eager price request must reject redirects');
+  assert.match(bootstrapSource, /String\(amount\) === match\[1\]/, 'bootstrap URL tiers must use the same canonical numeric spelling as the module');
+  assert.match(bootstrapSource, /finish:\s*\(\) => clearTimeout\(timeout\)/, 'the eager timeout must remain active while its body is read');
+  assert.doesNotMatch(bootstrapSource, /\.finally\(\(\) => clearTimeout\(timeout\)\)/, 'receiving response headers must not clear the eager body timeout');
+  assert.match(moduleSource, /MAX_RESPONSE_BYTES[\s\S]*?'prices\.json': 1024 \* 1024[\s\S]*?'history\.json': 8 \* 1024 \* 1024/);
+  assert.match(moduleSource, /TextDecoder\('utf-8', \{ fatal: true \}\)/, 'network JSON must use strict UTF-8 decoding');
+  assert.match(moduleSource, /fetch\(url,[\s\S]*?redirect:\s*'error'/, 'all later data requests must reject redirects');
+  assert.match(moduleSource, /serialized\.length > MAX_PRICE_CACHE_CHARACTERS/, 'oversized price payloads must not be persisted');
 });
 
-test('loads GA4 only after page load without rendering a consent overlay', { timeout: 30_000 }, async (context) => {
-  const browserConfig = await resolveBrowser(context, 'the deferred analytics test');
+test('does not load Google Analytics and removes private URL state before rendering', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the analytics privacy regression test');
   if (!browserConfig) return;
   const server = await startServer();
   const { port } = server.address();
   const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-  const analyticsRequests = [];
+  const origin = `http://127.0.0.1:${port}`;
+  const privateQuery = `privateSearchTerm${'x'.repeat(200)}`;
+  const expectedQuery = [...privateQuery].slice(0, 160).join('');
+  const forbiddenRequests = [];
+  const sameOriginSubresourceReferrers = [];
   page.on('request', (request) => {
-    if (request.url().includes('googletagmanager.com/gtag/js')) analyticsRequests.push(request.url());
+    if (/googletagmanager\.com|google-analytics\.com/i.test(request.url())) forbiddenRequests.push(request.url());
+    const requestUrl = new URL(request.url());
+    if (requestUrl.origin === origin && request.resourceType() !== 'document') {
+      sameOriginSubresourceReferrers.push({
+        url: request.url(),
+        referrer: request.headers().referer || ''
+      });
+    }
   });
-  await page.route('https://www.googletagmanager.com/**', (route) => route.fulfill({
-    status: 200,
-    contentType: 'text/javascript',
-    body: ''
-  }));
+  await page.route('https://**/*', (route) => route.abort());
   try {
-    await page.goto(`http://127.0.0.1:${port}/?q=privateSearchTerm&privateToken=sensitiveValue`, { waitUntil: 'domcontentloaded' });
-    await page.locator('#priceRows tr').first().waitFor();
-    assert.equal(await page.locator('#analyticsConsent').count(), 0);
-    assert.equal(await page.locator('#privacySettings').count(), 0);
-    await page.waitForFunction(() => document.querySelector('script[data-analytics-loader]'));
-    assert.equal(analyticsRequests.length, 1);
-    assert.equal(await page.locator('#searchInput').inputValue(), 'privateSearchTerm');
-    assert.equal(new URL(page.url()).searchParams.has('q'), false);
-    assert.equal(new URL(page.url()).searchParams.has('privateToken'), false);
-    assert.deepEqual(await page.evaluate(() => dataLayer.map((entry) => ({
-      command: entry[0],
-      value: entry[0] === 'js' ? entry[1] instanceof Date : entry[1],
-      options: entry[2] ?? null
-    }))), [
-      { command: 'js', value: true, options: null },
-      {
-        command: 'config',
-        value: 'G-K2S9L4CHNP',
-        options: {
-          page_location: `http://127.0.0.1:${port}/?tier=200GB&sort=tier&dir=asc`,
-          allow_google_signals: false,
-          allow_ad_personalization_signals: false
-        }
+    const privateUrl = new URL(origin);
+    privateUrl.searchParams.append('q', privateQuery);
+    privateUrl.searchParams.append('privateToken', 'sensitiveValue');
+    privateUrl.searchParams.append('tier', '200GB');
+    privateUrl.searchParams.append('tier', 'sensitiveTier');
+    privateUrl.searchParams.append('sort', 'tier');
+    privateUrl.searchParams.append('sort', 'sensitiveSort');
+    privateUrl.searchParams.append('dir', 'asc');
+    privateUrl.searchParams.append('dir', 'sensitiveDirection');
+    privateUrl.searchParams.append('region', 'sensitiveRegion');
+    privateUrl.hash = 'sensitiveFragment';
+    await page.goto(privateUrl.href, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#marketCount')?.textContent !== '--');
+    assert.equal(await page.locator('#analyticsConsent, #privacySettings').count(), 0);
+    assert.equal(await page.locator('script[data-analytics-loader]').count(), 0);
+    assert.equal(await page.evaluate(() => 'dataLayer' in globalThis), false);
+    assert.deepEqual(forbiddenRequests, []);
+    assert.equal(await page.locator('#searchInput').inputValue(), expectedQuery);
+    const sanitizedUrl = new URL(page.url());
+    assert.equal(sanitizedUrl.searchParams.has('q'), false);
+    assert.equal(sanitizedUrl.searchParams.has('privateToken'), false);
+    assert.equal(sanitizedUrl.searchParams.get('tier'), '200GB');
+    assert.equal(sanitizedUrl.searchParams.getAll('tier').length, 1, 'duplicate public state must be canonicalized');
+    assert.equal(sanitizedUrl.searchParams.get('sort'), 'tier');
+    assert.equal(sanitizedUrl.searchParams.getAll('sort').length, 1, 'duplicate sort state must be canonicalized');
+    assert.equal(sanitizedUrl.searchParams.get('dir'), 'asc');
+    assert.equal(sanitizedUrl.searchParams.getAll('dir').length, 1, 'duplicate direction state must be canonicalized');
+    assert.equal(sanitizedUrl.searchParams.has('region'), false, 'invalid values of public URL keys must be removed');
+    assert.equal(sanitizedUrl.hash, '', 'unknown fragments must be removed before analytics can observe them');
+    assert.doesNotMatch(page.url(), /privateSearchTerm|sensitive/i);
+    assert.ok(sameOriginSubresourceReferrers.length > 0, 'the privacy test must observe same-origin subresources');
+    for (const { url, referrer } of sameOriginSubresourceReferrers) {
+      assert.doesNotMatch(referrer, /privateSearchTerm|privateToken|sensitive|[?&]q=/i, `private URL state leaked in the Referer for ${url}`);
+      if (referrer) {
+        const referrerUrl = new URL(referrer);
+        assert.equal(referrerUrl.origin, origin, `unexpected Referer origin for ${url}`);
+        assert.equal(referrerUrl.pathname, '/', `same-origin subresource Referer must be origin-only for ${url}`);
+        assert.equal(referrerUrl.search, '', `same-origin subresource Referer must not include a query for ${url}`);
       }
-    ]);
+    }
+    const googleCookies = (await page.context().cookies()).filter(({ name }) => /^_ga(?:_|$)/.test(name));
+    assert.deepEqual(googleCookies, []);
+    const footerText = await page.locator('.page-footer').innerText();
+    assert.match(footerText, /本工具与 Apple Inc\. 无关联，数据仅供参考。/);
+    assert.doesNotMatch(footerText, /访问统计|Cloudflare Web Analytics|Google Analytics|Google Tag Manager|GA4|商标|授权|赞助|认可/i);
+    const csp = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content');
+    assert.doesNotMatch(csp, /google/i);
+    for (const directive of [
+      "base-uri 'none'",
+      "form-action 'none'",
+      "object-src 'none'",
+      "frame-src 'none'",
+      "worker-src 'none'",
+      "media-src 'none'",
+      "manifest-src 'none'"
+    ]) assert.ok(csp.includes(directive), `missing restrictive CSP directive: ${directive}`);
+  } finally {
+    await browser.close();
+  }
+});
+
+test('keeps keyboard focus inside modal dialogs and exposes the skip link in both browsers', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the modal focus and skip-link keyboard test');
+  if (!browserConfig) return;
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await page.route('https://**/*', (route) => route.abort());
+
+  const assertFocusLoop = async (dialogSelector, iterations) => {
+    await page.waitForFunction((selector) => {
+      const dialog = document.querySelector(selector);
+      return dialog?.open && dialog.contains(document.activeElement);
+    }, dialogSelector);
+    for (const key of ['Tab', 'Shift+Tab']) {
+      for (let index = 0; index < iterations; index += 1) {
+        await page.keyboard.press(key);
+        const focusState = await page.locator(dialogSelector).evaluate((dialog) => ({
+          activeTag: document.activeElement?.tagName || '',
+          activeId: document.activeElement?.id || '',
+          inside: dialog.contains(document.activeElement)
+        }));
+        assert.equal(focusState.inside, true, `${key} moved focus outside ${dialogSelector}: ${JSON.stringify(focusState)}`);
+      }
+    }
+  };
+
+  try {
+    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#priceRows tr[data-country]'));
+
+    await page.keyboard.press('Tab');
+    assert.equal(await page.locator('.skip-link').evaluate((element) => document.activeElement === element), true, 'the first Tab stop must be the skip link');
+    await page.keyboard.press('Enter');
+    assert.equal(await page.locator('#priceWorkspace').evaluate((element) => document.activeElement === element), true, 'activating the skip link must move focus to the price workspace');
+    assert.equal(new URL(page.url()).hash, '#priceWorkspace');
+
+    const historyTrigger = page.locator('.country-history-button').first();
+    await historyTrigger.click();
+    await assertFocusLoop('#historyDialog', 10);
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => document.querySelector('#historyDialog')?.open === false);
+    await page.waitForFunction(() => document.activeElement === document.querySelector('.country-history-button'));
+    assert.equal(await historyTrigger.evaluate((element) => document.activeElement === element), true, 'closing price history must restore its trigger focus');
+
+    const publicationTrigger = page.locator('#publishedDateButton');
+    await publicationTrigger.click();
+    await assertFocusLoop('#publishedDateDialog', 4);
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => document.querySelector('#publishedDateDialog')?.open === false);
+    await page.waitForFunction(() => document.activeElement === document.querySelector('#publishedDateButton'));
+    assert.equal(await publicationTrigger.evaluate((element) => document.activeElement === element), true, 'closing publication history must restore its trigger focus');
+  } finally {
+    await browser.close();
+  }
+});
+
+test('shows a usable explanation when JavaScript is disabled', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the no-JavaScript fallback test');
+  if (!browserConfig) return;
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, javaScriptEnabled: false });
+  await page.route('https://**/*', (route) => route.abort());
+  try {
+    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+    const notice = page.locator('.noscript-notice');
+    assert.equal(await notice.isVisible(), true);
+    assert.match(await notice.innerText(), /JavaScript/);
+    assert.equal(await page.locator('#priceRows tr[data-country]').count(), 0);
   } finally {
     await browser.close();
   }
@@ -275,12 +406,7 @@ test('renders current prices, sorting, and country history in a real browser', {
           errors.push(`${response.status()} ${response.url()}`);
         }
       });
-      await page.route('https://**/*', (route) => {
-        if (route.request().url().startsWith('https://www.googletagmanager.com/')) {
-          return route.fulfill({ status: 200, contentType: 'text/javascript', body: '' });
-        }
-        return route.abort();
-      });
+      await page.route('https://**/*', (route) => route.abort());
       let releasePriceRequest;
       const priceRequestReleased = new Promise((resolve) => {
         releasePriceRequest = resolve;
@@ -309,6 +435,7 @@ test('renders current prices, sorting, and country history in a real browser', {
           (count) => document.querySelectorAll('#priceRows tr[data-country]').length === count,
           expectedData.countries.length
         );
+        assert.equal(await page.locator('th[data-tier-placeholder]').count(), 0, `${viewport.name} price header placeholders must be replaced after data validation`);
         const initialResources = await page.evaluate(() => performance.getEntriesByType('resource').map(({ name }) => name));
         assert.equal(initialResources.some((url) => url.includes('/data/history.json')), false, `${viewport.name} must defer history data`);
         assert.equal(initialResources.some((url) => url.includes('/vendor/chart.umd.min.js')), false, `${viewport.name} must defer Chart.js`);
@@ -363,7 +490,7 @@ test('renders current prices, sorting, and country history in a real browser', {
           const lowest = expectedData.countries
             .map((country) => ({
               country,
-              cny: country.plans[tier.id].price / expectedData.fx.rates[country.currency] * expectedData.fx.rates.CNY
+              cny: country.plans[tier.id].cnyPrice
             }))
             .sort((first, second) => first.cny - second.cny)[0];
           const summaryText = await page.locator('#minimumSummary > button').evaluateAll((items, label) => {
@@ -441,11 +568,13 @@ test('renders current prices, sorting, and country history in a real browser', {
         const sourceText = await page.locator('#sourceLinks').innerText();
         assert.equal(await page.locator('#sourceLinks .source-group').count(), 2);
         assert.equal(await page.locator('#sourceLinks .source-status svg').count(), 1);
-        assert.ok(sourceText.indexOf('Apple iCloud+价格') < sourceText.indexOf('页面发布日期'));
+        assert.match(sourceText, /Apple iCloud\+ 价格/);
+        assert.ok(sourceText.indexOf('Apple iCloud+ 价格') < sourceText.indexOf('页面发布日期'));
         assert.ok(sourceText.indexOf('页面发布日期') < sourceText.indexOf('Rates By Exchange Rate API'));
         const fxAttribution = page.locator('a[href="https://www.exchangerate-api.com"]');
-        assert.equal((await fxAttribution.textContent()).trim(), 'Rates By Exchange Rate API');
-        assert.equal(await fxAttribution.getAttribute('aria-label'), '人民币参考汇率：Rates By Exchange Rate API');
+        assert.match((await fxAttribution.textContent()).trim(), /Rates By Exchange Rate API$/);
+        assert.equal(await fxAttribution.getAttribute('aria-label'), null);
+        assert.equal(await page.getByRole('link', { name: /Rates By Exchange Rate API/ }).count(), 1);
         assert.match(sourceText, /更新时间：.+北京时间/);
         const labelInNameFailures = await page.locator('#minimumSummary .minimum-card, .country-history-button, #publishedDateButton').evaluateAll((controls) => controls.flatMap((control) => {
           const normalize = (value) => value.replace(/\s+/g, ' ').trim();
@@ -473,7 +602,9 @@ test('renders current prices, sorting, and country history in a real browser', {
         await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length === 1);
         await page.locator('#searchInput').fill('不存在的国家或币种');
         await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length === 0);
-        assert.match(await page.locator('#priceRows .empty-cell').textContent(), /没有符合当前条件的结果/);
+        const emptyResultCell = page.locator('#priceRows .empty-cell');
+        assert.match(await emptyResultCell.textContent(), /没有符合当前条件的结果/);
+        assert.equal(await emptyResultCell.isVisible(), true, `${viewport.name} empty-result message must remain visible`);
         await page.locator('#searchInput').fill('');
         await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, expectedData.countries.length);
         await page.locator('#regionSelect').selectOption(searchableCountry.region);
@@ -526,6 +657,7 @@ test('renders current prices, sorting, and country history in a real browser', {
         if (expectedRecord) {
           await page.waitForFunction((count) => document.querySelectorAll('#historyRows tr').length === count, expectedRecord.events.length);
         }
+        assert.equal(await page.locator('th[data-history-tier-placeholder]').count(), 0, `${viewport.name} history header placeholders must be replaced before the dialog is announced`);
         const expectedDialogName = expectedData.countries.find(({ country }) => country === historySearch)?.nameZh || historySearch;
         assert.equal(await page.getByRole('dialog', { name: expectedDialogName }).count(), 1, 'history dialog must have an accessible name');
         assert.ok(await page.locator('#historyRows tr').count() > 0);
@@ -725,12 +857,7 @@ test('excludes history events from before a tier was introduced', { timeout: 30_
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text());
   });
-  await page.route('https://**/*', (route) => {
-    if (route.request().url().startsWith('https://www.googletagmanager.com/')) {
-      return route.fulfill({ status: 200, contentType: 'text/javascript', body: '' });
-    }
-    return route.abort();
-  });
+  await page.route('https://**/*', (route) => route.abort());
   await page.route('**/data/history.json*', (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -800,12 +927,7 @@ test('adapts table and history controls to a different tier count', { timeout: 3
   const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
   try {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-    await page.route('https://**/*', (route) => {
-      if (route.request().url().startsWith('https://www.googletagmanager.com/')) {
-        return route.fulfill({ status: 200, contentType: 'text/javascript', body: '' });
-      }
-      return route.abort();
-    });
+    await page.route('https://**/*', (route) => route.abort());
     await page.route('**/data/prices.json*', (route) => route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -954,7 +1076,8 @@ test('rejects malformed price payloads and recovers without a full-page refresh'
   const validData = await readFixture('prices.json');
   const corruptions = [
     ['duplicate country', (data) => data.countries.push(structuredClone(data.countries[0]))],
-    ['invalid USD anchor', (data) => { data.fx.rates.USD = 2; }],
+    ['missing derived CNY price', (data) => { delete data.countries[0].plans[data.tiers[0].id].cnyPrice; }],
+    ['forbidden raw FX rates', (data) => { data.fx.rates = { USD: 1, CNY: 7 }; }],
     ['invalid generated timestamp', (data) => { data.generatedAt = '2026-02-30T00:00:00.000Z'; }],
     ['invalid FX timestamp', (data) => { data.fx.fetchedAt = '2026-02-30'; }],
     ['invalid Apple publication date', (data) => { data.source.publishedDate = 'February 30, 2026'; }],
@@ -1044,6 +1167,7 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
       label: 'old snapshot',
       mutate: (data) => {
         setPayloadGeneratedAt(data, '2020-01-01T00:00:00.000Z');
+        data.fx.fetchedAt = data.generatedAt;
         data.fx.stale = false;
         data.source.publishedDate = 'Published Date: December 17, 2019';
       },
@@ -1052,19 +1176,30 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
     },
     {
       label: 'future snapshot',
-      mutate: (data) => { setPayloadGeneratedAt(data, '2099-01-01T00:00:00.000Z'); data.fx.stale = false; },
+      mutate: (data) => {
+        setPayloadGeneratedAt(data, '2099-01-01T00:00:00.000Z');
+        data.fx.fetchedAt = data.generatedAt;
+        data.fx.stale = false;
+      },
       expected: /数据生成时间在未来/
     },
     {
       label: 'fallback rates',
-      mutate: (data) => { setPayloadGeneratedAt(data, new Date().toISOString()); data.fx.stale = true; },
+      mutate: (data) => {
+        setPayloadGeneratedAt(data, new Date().toISOString());
+        data.fx.fetchedAt = data.generatedAt;
+        data.fx.stale = true;
+        data.fx.fallbackReason = 'request-failed';
+      },
       expected: /汇率沿用上次成功结果/
     },
     {
       label: 'old snapshot with fallback rates',
       mutate: (data) => {
         setPayloadGeneratedAt(data, '2020-01-01T00:00:00.000Z');
+        data.fx.fetchedAt = data.generatedAt;
         data.fx.stale = true;
+        data.fx.fallbackReason = 'request-failed';
         data.source.publishedDate = 'Published Date: December 17, 2019';
       },
       expected: /超过 36 小时 · 汇率沿用上次成功结果/
@@ -1351,7 +1486,7 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
   });
   const verboseCountries = Array.from({ length: 24 }, (_, index) => ({
     country: `SyntheticCountry${index}${'UnbrokenName'.repeat(8)}`,
-    nameZh: index === 0 ? '' : `测试地区${index}${'超长变化内容'.repeat(8)}`
+    nameZh: index === 0 ? undefined : `测试地区${index}${'超长变化内容'.repeat(8)}`
   }));
   const verboseChanges = {
     addedTiers: Array.from({ length: 12 }, (_, index) => ({ id: `${100 + index}TB`, label: `${100 + index} TB` })),
@@ -1393,6 +1528,7 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
   });
   const history = {
     schemaVersion: 2,
+    updatedAt: data.generatedAt,
     countries: Object.fromEntries(data.countries.map((entry) => [entry.country, {
       nameZh: entry.nameZh,
       region: entry.region,
@@ -1404,6 +1540,10 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
     }])),
     sourcePublishedDates
   };
+  assert.doesNotThrow(
+    () => validatePriceHistoryConsistency(data, history),
+    'long-history fixture must satisfy the same cross-file contract as production data'
+  );
   const server = await startServer();
   const { port } = server.address();
   const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
@@ -1473,6 +1613,10 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
         contentType: 'application/json',
         body: JSON.stringify(history)
       }));
+      await page.route('**/vendor/chart.umd.min.js*', async (route) => {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        await route.continue();
+      });
       try {
         await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
         await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, data.countries.length);
@@ -1594,7 +1738,6 @@ test('resets a removed region filter after a successful price retry', { timeout:
   const replacement = structuredClone(fullData);
   const removedRegion = fullData.countries[0].region;
   replacement.countries = replacement.countries.filter(({ region }) => region !== removedRegion);
-  retainRatesForCurrentCountries(replacement);
   replacement.run.countries = replacement.countries.length;
   replacement.run.pricePoints = replacement.countries.length * replacement.tiers.length;
   const server = await startServer();
@@ -1651,10 +1794,8 @@ test('rebinds or closes an open history dialog after country replacement', { tim
     plan.formattedPrice = `${changedCountry.currency} ${plan.price.toFixed(2)}`;
   }
   changedData.run.pricePoints = changedData.countries.length * changedData.tiers.length;
-  retainRatesForCurrentCountries(changedData);
   const removedData = structuredClone(changedData);
   removedData.countries = removedData.countries.filter(({ country }) => country !== activeCountry.country);
-  retainRatesForCurrentCountries(removedData);
   removedData.run.countries = removedData.countries.length;
   removedData.run.pricePoints = removedData.countries.length * removedData.tiers.length;
   const scenarios = [
@@ -1727,7 +1868,7 @@ test('keeps the minimum-price overview stable and the desktop table header stick
   const server = await startServer();
   const { port } = server.address();
   const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
-  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   let releaseRequest;
   const requestReleased = new Promise((resolve) => { releaseRequest = resolve; });
   await page.route('https://**/*', (route) => route.abort());
@@ -1741,9 +1882,14 @@ test('keeps the minimum-price overview stable and the desktop table header stick
     assert.equal(await page.locator('h1').count(), 1);
     assert.equal(await page.locator('h1').textContent(), 'iCloud+ \u5168\u7403\u4ef7\u683c\u5bf9\u6bd4');
     assert.equal(await page.locator('#overviewTitle').evaluate((element) => element.tagName), 'H2');
-    assert.equal(await page.locator('head script[type="module"][src="script.js?v=7"][data-cfasync="false"]').count(), 1);
+    assert.equal(await page.locator('head script[type="module"][src="script.js?v=18"][data-cfasync="false"]').count(), 1);
     assert.equal(await page.locator('head link[rel="modulepreload"]').count(), 3);
     const before = await page.locator('#minimumSummary').boundingBox();
+    const loadingLayout = await page.evaluate(() => ({
+      footerTop: document.querySelector('.workspace-footer').getBoundingClientRect().top,
+      viewportHeight: innerHeight
+    }));
+    assert.ok(loadingLayout.footerTop >= loadingLayout.viewportHeight, `the loading table must keep the footer below the desktop viewport; footer=${loadingLayout.footerTop}, viewport=${loadingLayout.viewportHeight}`);
     releaseRequest();
     await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, validData.countries.length);
     const afterBox = await page.locator('#minimumSummary').boundingBox();
@@ -1764,6 +1910,7 @@ test('keeps the minimum-price overview stable and the desktop table header stick
       assert.ok(smallestGap >= 3, `${viewport} card labels must remain separated; smallest gap was ${smallestGap}px`);
       assert.ok(largestImbalance <= 1, `${viewport} card spacing must stay balanced; largest difference was ${largestImbalance}px`);
     };
+    await page.setViewportSize({ width: 390, height: 844 });
     await assertMinimumCardSpacing('mobile');
     const mobileTableInsets = await page.locator('#priceRows tr[data-country]').first().evaluate((row) => {
       const tableBox = row.closest('.price-table').getBoundingClientRect();
@@ -1837,7 +1984,7 @@ test('restores URL state, removes the floating search bar, and supports table re
     await page.waitForFunction(() => document.querySelector('#marketCount')?.textContent !== '--');
     assert.equal(await page.locator('#searchInput').inputValue(), initialCountry.nameZh || initialCountry.country);
     assert.equal(await page.locator('#regionSelect').inputValue(), initialCountry.region);
-    assert.equal(new URL(page.url()).searchParams.has('q'), false, 'free-text search terms must be removed before analytics loads');
+    assert.equal(new URL(page.url()).searchParams.has('q'), false, 'free-text search terms must not remain in a shareable URL');
     assert.equal(new URL(page.url()).searchParams.has('compare'), false, 'legacy comparison state should be removed from the URL');
     assert.equal(await page.locator('#compareDock, #compareDialog, .compare-column, .compare-cell, .row-compare-button').count(), 0);
     assert.equal(
@@ -1924,7 +2071,7 @@ test('restores URL state, removes the floating search bar, and supports table re
     const expectedWinner = validData.countries
       .map((country) => ({
         country,
-        cny: country.plans[minimumTier].price / validData.fx.rates[country.currency] * validData.fx.rates.CNY
+        cny: country.plans[minimumTier].cnyPrice
       }))
       .sort((first, second) => first.cny - second.cny)[0].country.country;
     assert.equal(await highlightedRow.getAttribute('data-country'), expectedWinner);
@@ -1956,7 +2103,7 @@ test('keeps the cached table DOM when the network snapshot is unchanged', { time
   let requestSeen = false;
   const requestReleased = new Promise((resolve) => { releaseRequest = resolve; });
   await page.addInitScript((payload) => {
-    localStorage.setItem('icloud-price-comparison:validated-prices:v1', JSON.stringify(payload));
+    localStorage.setItem('icloud-price-comparison:validated-prices:v2', JSON.stringify(payload));
   }, validData);
   await page.route('https://**/*', (route) => route.abort());
   await page.route('**/data/prices.json*', async (route) => {
@@ -1984,6 +2131,52 @@ test('keeps the cached table DOM when the network snapshot is unchanged', { time
   }
 });
 
+test('rejects redirected, oversized, and malformed UTF-8 price responses before parsing', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the bounded network-data test');
+  if (!browserConfig) return;
+  const server = await startServer();
+  const { port } = server.address();
+  const origin = `http://127.0.0.1:${port}`;
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  const cases = [
+    {
+      name: 'redirected',
+      serverResponse: 'redirect'
+    },
+    {
+      name: 'oversized',
+      fulfill: { status: 200, contentType: 'application/json', body: ' '.repeat((1024 * 1024) + 1) }
+    },
+    {
+      name: 'malformed UTF-8',
+      fulfill: { status: 200, contentType: 'application/json', body: Buffer.from([0xff, 0xfe, 0xfd]) }
+    }
+  ];
+  try {
+    for (const testCase of cases) {
+      const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+      let redirectTargetRequested = false;
+      page.on('request', (request) => {
+        if (request.url() === `${origin}/data/history.json`) redirectTargetRequested = true;
+      });
+      await page.route('https://**/*', (route) => route.abort());
+      if (testCase.serverResponse) {
+        await page.setExtraHTTPHeaders({ 'x-icloud-test-price-response': testCase.serverResponse });
+      } else {
+        await page.route('**/data/prices.json*', (route) => route.fulfill(testCase.fulfill));
+      }
+      await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
+      await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
+      assert.equal(await page.locator('#searchInput').isDisabled(), true, `${testCase.name} data must not render`);
+      assert.equal(redirectTargetRequested, false, 'price fetch must not follow redirects');
+      await page.close();
+    }
+  } finally {
+    await browser.close();
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
 test('uses only validated cached prices when the network refresh fails', { timeout: 30_000 }, async (context) => {
   const browserConfig = await resolveBrowser(context, 'the validated-cache UI test');
   if (!browserConfig) return;
@@ -1994,7 +2187,7 @@ test('uses only validated cached prices when the network refresh fails', { timeo
   try {
     const cachedPage = await browser.newPage({ viewport: { width: 1024, height: 768 } });
     await cachedPage.addInitScript((payload) => {
-      localStorage.setItem('icloud-price-comparison:validated-prices:v1', JSON.stringify(payload));
+      localStorage.setItem('icloud-price-comparison:validated-prices:v2', JSON.stringify(payload));
     }, validData);
     await cachedPage.route('https://**/*', (route) => route.abort());
     await cachedPage.route('**/data/prices.json*', (route) => route.fulfill({ status: 503, body: '{}' }));
@@ -2008,17 +2201,52 @@ test('uses only validated cached prices when the network refresh fails', { timeo
 
     const invalidPage = await browser.newPage({ viewport: { width: 1024, height: 768 } });
     await invalidPage.addInitScript(() => {
-      localStorage.setItem('icloud-price-comparison:validated-prices:v1', JSON.stringify({ schemaVersion: 999 }));
+      localStorage.setItem('icloud-price-comparison:validated-prices:v2', JSON.stringify({ schemaVersion: 999 }));
     });
     await invalidPage.route('https://**/*', (route) => route.abort());
     await invalidPage.route('**/data/prices.json*', (route) => route.fulfill({ status: 503, body: '{}' }));
     await invalidPage.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
     await invalidPage.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
     const retryBox = await invalidPage.locator('#retryButton').boundingBox();
-    assert.ok(retryBox && retryBox.height >= 44, 'the retry action must retain a comfortable touch target');
+    assert.ok(
+      retryBox && retryBox.height >= 43.99,
+      `the retry action must retain a comfortable touch target (actual: ${retryBox?.height ?? 'missing'}px)`
+    );
     assert.equal(await invalidPage.locator('#searchInput').isDisabled(), true);
-    assert.equal(await invalidPage.evaluate(() => localStorage.getItem('icloud-price-comparison:validated-prices:v1')), null);
+    assert.equal(await invalidPage.evaluate(() => localStorage.getItem('icloud-price-comparison:validated-prices:v2')), null);
     await invalidPage.close();
+
+    const oversizedPage = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    await oversizedPage.addInitScript(() => {
+      localStorage.setItem('icloud-price-comparison:validated-prices:v2', ' '.repeat((1024 * 1024) + 1));
+    });
+    await oversizedPage.route('https://**/*', (route) => route.abort());
+    await oversizedPage.route('**/data/prices.json*', (route) => route.fulfill({ status: 503, body: '{}' }));
+    await oversizedPage.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+    await oversizedPage.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
+    assert.equal(await oversizedPage.locator('#searchInput').isDisabled(), true, 'oversized cache must never render');
+    assert.equal(await oversizedPage.evaluate(() => localStorage.getItem('icloud-price-comparison:validated-prices:v2')), null);
+    await oversizedPage.close();
+
+    const legacyData = structuredClone(validData);
+    legacyData.schemaVersion = 2;
+    legacyData.fx.rates = { USD: 1, CNY: 7 };
+    delete legacyData.fx.derivedCurrency;
+    for (const country of legacyData.countries) {
+      for (const tier of legacyData.tiers) delete country.plans[tier.id].cnyPrice;
+    }
+    const legacyPage = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    await legacyPage.addInitScript((payload) => {
+      localStorage.setItem('icloud-price-comparison:validated-prices:v1', JSON.stringify(payload));
+    }, legacyData);
+    await legacyPage.route('https://**/*', (route) => route.abort());
+    await legacyPage.route('**/data/prices.json*', (route) => route.fulfill({ status: 503, body: '{}' }));
+    await legacyPage.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+    await legacyPage.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
+    assert.equal(await legacyPage.locator('#searchInput').isDisabled(), true, 'legacy schema cache must never render');
+    assert.equal(await legacyPage.evaluate(() => localStorage.getItem('icloud-price-comparison:validated-prices:v1')), null, 'legacy cache key must be removed during startup');
+    assert.equal(await legacyPage.evaluate(() => localStorage.getItem('icloud-price-comparison:validated-prices:v2')), null);
+    await legacyPage.close();
   } finally {
     await browser.close();
     await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));

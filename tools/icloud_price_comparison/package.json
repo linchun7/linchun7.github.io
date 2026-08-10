@@ -6,16 +6,18 @@
   "engines": {
     "node": ">=22"
   },
-  "packageManager": "pnpm@10.14.0",
+  "packageManager": "pnpm@10.14.0+sha512.ad27a79641b49c3e481a16a805baa71817a04bbe06a38d17e60e2eaee83f6a146c6a688125f5792e48dd5ba30e7da52a5cda4c3992b9ccf333f9ce223af84748",
   "scripts": {
     "check:live": "node scripts/update-prices.mjs --dry-run",
     "update:data": "node scripts/update-prices.mjs",
+    "validate:artifact": "node scripts/validate-data-artifact.mjs --data-dir data",
     "test": "pnpm test:core && pnpm test:browsers",
-    "test:core": "pnpm test:vendor && node --test test/auto-merge-official-actions.test.mjs test/daily-run-guard.test.mjs test/data-contract.test.mjs test/data-integrity.test.mjs test/parse-legacy-archive.test.mjs test/parse-prices.test.mjs test/import-apple-archives.test.mjs test/update-prices.test.mjs test/workflow.test.mjs",
+    "test:core": "pnpm test:vendor && node --test test/auto-merge-official-actions.test.mjs test/daily-run-guard.test.mjs test/data-contract.test.mjs test/data-integrity.test.mjs test/parse-legacy-archive.test.mjs test/parse-prices.test.mjs test/import-apple-archives.test.mjs test/update-prices.test.mjs test/validate-data-artifact.test.mjs test/workflow.test.mjs",
     "test:data": "node --test test/data-integrity.test.mjs",
     "validate:snapshots": "node --test test/snapshot-deep-audit.test.mjs",
     "test:browsers": "node scripts/test-browsers.mjs",
     "test:ui": "node --test test/ui-smoke.test.mjs",
+    "test:firefox": "node --test scripts/test-firefox.mjs",
     "test:webkit": "node --test scripts/test-webkit.mjs",
     "test:vendor": "node scripts/verify-vendor.mjs"
   },
