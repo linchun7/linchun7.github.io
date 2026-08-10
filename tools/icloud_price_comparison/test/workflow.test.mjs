@@ -1,5 +1,9 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 const workflowUrl = new URL('../../../.github/workflows/update-icloud-prices.yml', import.meta.url);
@@ -11,6 +15,25 @@ const packageUrl = new URL('../package.json', import.meta.url);
 const browserRunnerUrl = new URL('../scripts/test-browsers.mjs', import.meta.url);
 const firefoxRunnerUrl = new URL('../scripts/test-firefox.mjs', import.meta.url);
 const webkitRunnerUrl = new URL('../scripts/test-webkit.mjs', import.meta.url);
+const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
+
+test('keeps only long-lived public Markdown in the project', () => {
+  const trackedMarkdown = execFileSync('git', ['ls-files'], {
+    cwd: repositoryRoot,
+    encoding: 'utf8'
+  })
+    .split(/\r?\n/)
+    .filter((file) => file.startsWith('tools/icloud_price_comparison/')
+      && file.endsWith('.md')
+      && existsSync(path.join(repositoryRoot, file)))
+    .sort();
+  assert.deepEqual(trackedMarkdown, [
+    'tools/icloud_price_comparison/OPERATIONS.md',
+    'tools/icloud_price_comparison/README.md',
+    'tools/icloud_price_comparison/THIRD_PARTY_NOTICES.md',
+    'tools/icloud_price_comparison/data/apple-snapshots/README.md'
+  ]);
+});
 
 test('keeps updater locks, recovery journals, temporary writes, and diagnostics out of Git', async () => {
   const gitignore = await readFile(gitignoreUrl, 'utf8');
