@@ -1,4 +1,18 @@
 const AUTOMATIC_TRIGGER_SOURCES = new Set(['cloudflare', 'github-schedule']);
+const KNOWN_TRIGGER_SOURCES = new Set([
+  'cloudflare',
+  'github-schedule',
+  'schedule',
+  'manual',
+  'workflow_dispatch',
+  'local'
+]);
+
+function isCanonicalIsoTimestamp(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)) return false;
+  const date = new Date(value);
+  return !Number.isNaN(date.getTime()) && date.toISOString() === value;
+}
 
 export function formatBeijingDate(value = new Date()) {
   const date = value instanceof Date ? value : new Date(value);
@@ -18,7 +32,9 @@ export function resolveTriggerSource(eventName, requestedSource) {
   if (eventName === 'workflow_dispatch') {
     return requestedSource === 'cloudflare' ? 'cloudflare' : 'manual';
   }
-  return requestedSource || eventName || 'local';
+  if (KNOWN_TRIGGER_SOURCES.has(requestedSource)) return requestedSource;
+  if (KNOWN_TRIGGER_SOURCES.has(eventName)) return eventName;
+  return 'local';
 }
 
 export function describeTriggerSource(source) {
@@ -41,15 +57,19 @@ export function findSuccessfulAutomaticRun(runLog, automaticRunDateBeijing, now 
   if (!Array.isArray(runLog?.runs) || !automaticRunDateBeijing) return null;
   const nowMs = now instanceof Date ? now.getTime() : Number.NaN;
   return [...runLog.runs].reverse().find((run) => (
-    run?.status === 'success'
+    run?.schemaVersion === 1
+    && run?.id === run.finishedAtUtc
+    && run.status === 'success'
     && isAutomaticTriggerSource(run.trigger)
     && run.automaticRunDateBeijing === automaticRunDateBeijing
+    && run.observedAtBeijing === automaticRunDateBeijing
     && run.source?.exchangeRatesStale === false
     && formatBeijingDate(run.source?.exchangeRatesFetchedAtUtc) === automaticRunDateBeijing
+    && formatBeijingDate(run.finishedAtUtc) === automaticRunDateBeijing
     && Number.isFinite(nowMs)
-    && Number.isFinite(Date.parse(run.startedAtUtc))
-    && Number.isFinite(Date.parse(run.finishedAtUtc))
-    && Number.isFinite(Date.parse(run.source?.exchangeRatesFetchedAtUtc))
+    && isCanonicalIsoTimestamp(run.startedAtUtc)
+    && isCanonicalIsoTimestamp(run.finishedAtUtc)
+    && isCanonicalIsoTimestamp(run.source?.exchangeRatesFetchedAtUtc)
     && Date.parse(run.startedAtUtc) <= Date.parse(run.finishedAtUtc)
     && Date.parse(run.startedAtUtc) <= nowMs
     && Date.parse(run.finishedAtUtc) <= nowMs

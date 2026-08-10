@@ -1,12 +1,12 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="format-detection" content="telephone=no">
-  <meta name="referrer" content="strict-origin-when-cross-origin">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; form-action 'none'; object-src 'none'; script-src 'self' https://www.googletagmanager.com https://static.cloudflareinsights.com; style-src 'self'; connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com; img-src 'self' data: https://*.google-analytics.com; font-src 'self'">
-  <meta name="theme-color" content="#ffffff">
+  <meta name="referrer" content="origin">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; media-src 'none'; manifest-src 'none'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; connect-src 'self'; img-src 'self' data:; font-src 'self'">
+  <meta name="theme-color" content="#eef2f6">
   <meta name="description" content="比较全球不同国家和地区的 iCloud+ 月度价格，支持人民币换算、容量排序和历史价格查询。">
   <meta name="keywords" content="iCloud+,Apple,云存储,全球价格,价格历史,汇率换算">
   <meta property="og:title" content="iCloud+ 全球价格对比">
@@ -19,25 +19,25 @@
   <meta name="twitter:card" content="summary">
   <link rel="canonical" href="https://www.linchun.com.cn/tools/icloud_price_comparison/">
   <title>iCloud+ 全球价格对比</title>
-  <script data-cfasync="false" src="price-bootstrap.js?v=4"></script>
-  <link rel="stylesheet" href="style.css?v=4">
-  <link rel="modulepreload" href="script.js?v=7">
-  <link rel="modulepreload" href="data-contract.js?v=5">
+  <script data-cfasync="false" src="price-bootstrap.js?v=9"></script>
+  <link rel="stylesheet" href="style.css?v=10">
+  <link rel="modulepreload" href="script.js?v=18">
+  <link rel="modulepreload" href="data-contract.js?v=10">
   <link rel="modulepreload" href="vendor/lucide-subset.js?v=5">
-  <script data-cfasync="false" type="module" src="script.js?v=7"></script>
+  <script data-cfasync="false" type="module" src="script.js?v=18"></script>
   <link rel="shortcut icon" href="/images/favicon.ico">
   <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
   <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
 </head>
 <body>
-  <a class="skip-link" href="#priceWorkspace">跳到价格表</a>
+  <a class="skip-link" href="#priceWorkspace" tabindex="0">跳到价格表</a>
   <header class="app-header">
     <div class="app-header-inner">
       <div class="app-brand">
         <span class="brand-mark" aria-hidden="true"><i data-lucide="cloud"></i></span>
-        <span class="brand-copy">
+        <div class="brand-copy">
           <h1>iCloud+ 全球价格对比</h1>
-        </span>
+        </div>
       </div>
       <div class="data-status">
         <i data-lucide="calendar-clock" aria-hidden="true"></i>
@@ -47,6 +47,9 @@
   </header>
 
   <main class="page-main">
+    <noscript>
+      <p class="noscript-notice">此工具需要启用 JavaScript 才能读取、校验和比较价格数据。</p>
+    </noscript>
     <section class="overview" aria-labelledby="overviewTitle">
       <div class="overview-reference">
         <div class="overview-copy">
@@ -54,15 +57,15 @@
           <h2 id="overviewTitle">各容量最低价</h2>
           <p class="overview-note">按人民币参考汇率换算，便于横向比较</p>
         </div>
-        <div id="minimumSummary" class="minimum-stats overview-stat-list" aria-label="各容量最低价概览">
-          <button class="minimum-card is-loading" type="button" disabled aria-label="正在计算最低价"><span class="minimum-tier-label"></span><strong class="minimum-country"></strong><small class="minimum-price"></small></button>
+        <div id="minimumSummary" class="minimum-stats overview-stat-list" role="group" aria-label="各容量最低价概览" aria-busy="true">
+          <button class="minimum-card is-loading" type="button" disabled aria-hidden="true"><span class="minimum-tier-label"></span><strong class="minimum-country"></strong><small class="minimum-price"></small></button>
           <button class="minimum-card is-loading" type="button" disabled aria-hidden="true"><span class="minimum-tier-label"></span><strong class="minimum-country"></strong><small class="minimum-price"></small></button>
           <button class="minimum-card is-loading" type="button" disabled aria-hidden="true"><span class="minimum-tier-label"></span><strong class="minimum-country"></strong><small class="minimum-price"></small></button>
           <button class="minimum-card is-loading" type="button" disabled aria-hidden="true"><span class="minimum-tier-label"></span><strong class="minimum-country"></strong><small class="minimum-price"></small></button>
           <button class="minimum-card is-loading" type="button" disabled aria-hidden="true"><span class="minimum-tier-label"></span><strong class="minimum-country"></strong><small class="minimum-price"></small></button>
         </div>
       </div>
-      <dl class="overview-stats overview-stat-list" aria-label="数据概览">
+      <dl class="overview-stats overview-stat-list">
         <div class="metric-card">
           <dt><span class="metric-icon" aria-hidden="true"><i data-lucide="globe-2"></i></span><span>覆盖地区</span></dt>
           <dd id="marketCount">--</dd>
@@ -93,12 +96,12 @@
           <label class="search-field">
             <i data-lucide="search" aria-hidden="true"></i>
             <span class="visually-hidden">搜索国家、地区或币种</span>
-            <input id="searchInput" name="price-search" type="search" placeholder="搜索国家、地区或币种…" autocomplete="off" disabled>
+            <input id="searchInput" name="price-search" type="search" placeholder="搜索国家、地区或币种…" autocomplete="off" maxlength="160" disabled>
           </label>
           <label class="select-field">
             <i data-lucide="globe-2" aria-hidden="true"></i>
             <span class="visually-hidden">筛选地区</span>
-            <select id="regionSelect" name="region" aria-label="筛选地区" disabled>
+            <select id="regionSelect" name="region" disabled>
               <option value="all">所有地区</option>
             </select>
           </label>
@@ -116,7 +119,11 @@
             <tr>
               <th class="rank-column" scope="col">#</th>
               <th scope="col" aria-sort="none"><button type="button" data-sort="country" disabled>国家/地区 <i data-lucide="arrow-up-down" aria-hidden="true"></i></button></th>
-              <th id="tierHeaderPlaceholder" scope="col" colspan="5">容量</th>
+              <th data-tier-placeholder scope="col"><span class="visually-hidden">容量方案（加载中）</span></th>
+              <th data-tier-placeholder scope="col"><span class="visually-hidden">容量方案（加载中）</span></th>
+              <th data-tier-placeholder scope="col"><span class="visually-hidden">容量方案（加载中）</span></th>
+              <th data-tier-placeholder scope="col"><span class="visually-hidden">容量方案（加载中）</span></th>
+              <th data-tier-placeholder scope="col"><span class="visually-hidden">容量方案（加载中）</span></th>
             </tr>
           </thead>
           <tbody id="priceRows">
@@ -126,17 +133,18 @@
       </div>
 
       <div class="workspace-footer">
-        <div class="source-links" id="sourceLinks" aria-label="数据来源与更新时间">
+        <div class="source-links" id="sourceLinks" role="group" aria-label="数据来源与更新时间">
           <div class="source-group">
-            <a class="source-item" href="https://support.apple.com/en-us/108047" target="_blank" rel="noopener noreferrer"><i data-lucide="badge-check" aria-hidden="true"></i>Apple iCloud+价格</a>
-            <button class="source-meta-button" id="publishedDateButton" type="button" disabled title="查看 Apple 官网发布日期变更记录">
+            <a class="source-item" href="https://support.apple.com/en-us/108047" target="_blank" rel="noopener noreferrer"><i data-lucide="badge-check" aria-hidden="true"></i>Apple iCloud+ 价格</a>
+            <button class="source-meta-button" id="publishedDateButton" type="button" disabled title="查看 Apple 官网发布日期变更记录" aria-describedby="publishedDateHint">
               <i data-lucide="calendar-days" aria-hidden="true"></i>
               <span>页面发布日期：<strong id="applePublishedDate">--</strong></span>
             </button>
+            <span id="publishedDateHint" class="visually-hidden">打开 Apple 官网发布日期变更记录</span>
           </div>
-          <span class="source-separator"></span>
+          <span class="source-separator" aria-hidden="true"></span>
           <div class="source-group">
-            <a class="source-item" href="https://www.exchangerate-api.com" target="_blank" rel="noopener noreferrer" aria-label="人民币参考汇率：Rates By Exchange Rate API"><i data-lucide="landmark" aria-hidden="true"></i>Rates By Exchange Rate API</a>
+            <a class="source-item" href="https://www.exchangerate-api.com" target="_blank" rel="noopener noreferrer"><i data-lucide="landmark" aria-hidden="true"></i><span class="visually-hidden">人民币参考汇率：</span>Rates By Exchange Rate API</a>
             <span class="source-status"><i data-lucide="clock-3" aria-hidden="true"></i><span id="fxStatus">更新时间：--</span></span>
           </div>
         </div>
@@ -149,7 +157,7 @@
     <div class="dialog-header">
       <div>
         <p class="dialog-eyebrow">价格历史</p>
-        <h2 id="historyTitle"></h2>
+        <h2 id="historyTitle">地区价格历史</h2>
         <p id="historySubtitle"></p>
       </div>
       <button class="icon-button" id="closeHistory" type="button" aria-label="关闭价格历史" title="关闭"><i data-lucide="x" aria-hidden="true"></i></button>
@@ -176,7 +184,7 @@
       <div class="section-heading"><h3 id="historyListTitle">变更记录</h3></div>
       <div class="history-table-scroll">
         <table>
-          <thead><tr><th scope="col">记录日期</th><th scope="col">币种</th><th id="historyTierHeaderPlaceholder" scope="col" colspan="5">容量方案</th></tr></thead>
+          <thead><tr><th scope="col">记录日期</th><th scope="col">币种</th><th data-history-tier-placeholder scope="col"><span class="visually-hidden">容量方案（加载中）</span></th><th data-history-tier-placeholder scope="col"><span class="visually-hidden">容量方案（加载中）</span></th><th data-history-tier-placeholder scope="col"><span class="visually-hidden">容量方案（加载中）</span></th><th data-history-tier-placeholder scope="col"><span class="visually-hidden">容量方案（加载中）</span></th><th data-history-tier-placeholder scope="col"><span class="visually-hidden">容量方案（加载中）</span></th></tr></thead>
           <tbody id="historyRows"></tbody>
         </table>
       </div>
@@ -213,7 +221,6 @@
 
   <footer class="page-footer">
     <p>本工具与 Apple Inc. 无关联，数据仅供参考。</p>
-    <p>访问统计使用 Google Analytics 和 Cloudflare Web Analytics；站内搜索词不会发送给统计服务。</p>
     <p>&copy; 2026 <a href="https://www.linchun.com.cn">林春写字的地方</a></p>
   </footer>
 

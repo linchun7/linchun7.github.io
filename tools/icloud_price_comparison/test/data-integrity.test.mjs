@@ -15,20 +15,22 @@ test('committed prices and history form a complete usable snapshot', async () =>
     readJson('../data/run-log.json')
   ]);
 
-  assert.ok([1, 2].includes(data.schemaVersion));
+  assert.equal(data.schemaVersion, 3);
   assert.match(data.generatedAt, /^\d{4}-\d{2}-\d{2}T/);
   assert.equal(data.source.url, 'https://support.apple.com/en-us/108047');
   assert.ok(data.tiers.length > 0);
   assert.equal(new Set(data.tiers.map(({ id }) => id)).size, data.tiers.length);
   assert.ok(data.countries.length >= 60);
-  assert.ok(Number.isFinite(data.fx.rates.CNY) && data.fx.rates.CNY > 0);
+  assert.equal(data.fx.derivedCurrency, 'CNY');
+  assert.equal(Object.hasOwn(data.fx, 'rates'), false);
+  assert.equal(Object.hasOwn(data.fx, 'apiKeyStatus'), false);
   assert.ok([
     'https://v6.exchangerate-api.com/v6/latest/USD',
     'https://open.er-api.com/v6/latest/USD'
   ].includes(data.fx.sourceUrl), 'exchange-rate credentials must never be stored in the source URL');
-  if (data.schemaVersion === 2) {
+  {
     if (data.source.parser != null) {
-      assert.match(data.source.parser, /^(cross-checked|document-order|apple-markers-fallback)$/);
+      assert.equal(data.source.parser, 'cross-checked');
       assert.equal(typeof data.source.parserStatus, 'string');
     }
     assert.equal(data.run.countries, data.countries.length);
@@ -41,9 +43,17 @@ test('committed prices and history form a complete usable snapshot', async () =>
   assert.equal(names['Euro Zone'], '欧盟');
   assert.equal(names['United Arab Emirates'], '阿拉伯联合酋长国');
   assert.ok(Array.isArray(history.sourcePublishedDates) && history.sourcePublishedDates.length);
-  assert.ok([1, 2].includes(history.schemaVersion));
+  assert.equal(history.schemaVersion, 2);
+  assert.equal(history.updatedAt, data.generatedAt);
   assert.equal(runLog.schemaVersion, 1);
   assert.ok(Array.isArray(runLog.runs));
+  for (const run of runLog.runs) {
+    assert.equal(
+      Object.keys(run.source ?? {}).some((key) => /api.?key/i.test(key)),
+      false,
+      'public run-log.json must not expose API-key configuration or status metadata'
+    );
+  }
   if (runLog.runs.length) {
     const latestRun = runLog.runs.at(-1);
     assert.equal(latestRun.status, 'success');
@@ -56,7 +66,7 @@ test('committed prices and history form a complete usable snapshot', async () =>
     assert.ok(Array.isArray(latestRun.changes.addedCountries));
     assert.ok(Array.isArray(latestRun.changes.removedCountries));
     assert.ok(Array.isArray(latestRun.changes.changedCountries));
-    if (data.schemaVersion === 2) assert.equal(latestRun.finishedAtUtc, data.run.finishedAtUtc);
+    assert.equal(latestRun.finishedAtUtc, data.run.finishedAtUtc);
   }
   const latestPublishedDate = history.sourcePublishedDates.at(-1);
   assert.equal(latestPublishedDate.publishedDate, data.source.publishedDate);
@@ -74,14 +84,15 @@ test('committed prices and history form a complete usable snapshot', async () =>
     assert.ok(!seen.has(country.country), `duplicate country: ${country.country}`);
     seen.add(country.country);
     assert.equal(country.nameZh, names[country.country] ?? country.country);
-    assert.ok(Number.isFinite(data.fx.rates[country.currency]) && data.fx.rates[country.currency] > 0,
-      `missing exchange rate: ${country.currency}`);
-
     for (const { id } of data.tiers) {
       const plan = country.plans[id];
       assert.ok(plan && Number.isFinite(plan.price) && plan.price > 0, `invalid ${id}: ${country.country}`);
       assert.ok(typeof plan.formattedPrice === 'string' && plan.formattedPrice.length > 0,
         `missing formatted ${id}: ${country.country}`);
+      assert.ok(Number.isFinite(plan.cnyPrice) && plan.cnyPrice > 0,
+        `missing derived CNY ${id}: ${country.country}`);
+      assert.ok(Math.abs(plan.cnyPrice * 100 - Math.round(plan.cnyPrice * 100)) < 1e-7,
+        `derived CNY has more than two decimals: ${country.country} ${id}`);
     }
 
     const record = history.countries[country.country];
@@ -112,10 +123,23 @@ test('committed prices and history form a complete usable snapshot', async () =>
   }
 });
 
-test('committed exchange rates expose only currencies required by the comparison', async () => {
+test('committed public prices expose only allowlisted FX metadata and complete derived CNY values', async () => {
   const data = await readJson('../data/prices.json');
-  const required = [...new Set(['USD', 'CNY', ...data.countries.map(({ currency }) => currency)])].sort();
-  assert.deepEqual(Object.keys(data.fx.rates).sort(), required);
+  assert.deepEqual(Object.keys(data.fx).sort(), [
+    'base',
+    'derivedCurrency',
+    'fallbackReason',
+    'fallbackUsed',
+    'fetchedAt',
+    'sourceMode',
+    'sourceUrl',
+    'stale'
+  ]);
+  assert.equal(data.fx.derivedCurrency, 'CNY');
+  assert.equal(data.countries.flatMap(({ plans }) => Object.values(plans)).length, data.run.pricePoints);
+  assert.ok(data.countries.every(({ plans }) => Object.values(plans).every(({ cnyPrice }) => (
+    Number.isFinite(cnyPrice) && cnyPrice > 0
+  ))));
 });
 
 test('committed Apple snapshot index has unique dates and existing revision files', async () => {
