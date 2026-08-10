@@ -370,7 +370,10 @@ test('rejects semantically invalid run-log evidence', async (t) => {
     ['trigger', (run) => { run.trigger = 'untrusted-trigger'; }],
     ['duration', (run) => { run.durationMs += 1; }],
     ['observation date', (run) => { run.observedAtBeijing = '2026-08-08'; }],
-    ['manual automatic date', (run) => { run.automaticRunDateBeijing = run.observedAtBeijing; }],
+    ['manual automatic date', (run) => {
+      run.trigger = 'manual';
+      run.automaticRunDateBeijing = run.observedAtBeijing;
+    }],
     ['Apple URL', (run) => { run.source.appleUrl = 'https://example.com/'; }],
     ['Apple publication date', (run) => { run.source.applePublishedDate = 'not a date'; }],
     ['Apple parser', (run) => { run.source.appleParser = 'debug-parser'; }],
