@@ -261,10 +261,100 @@ test('requires an identical independent confirmation for global storage-tier cha
 
   const mismatched = structuredClone(first);
   mismatched.countries[0].plans[data.tiers[0].id].price += 1;
-  assert.throws(
+  const mismatchError = assert.throws(
     () => confirmAppleStructuralChanges(first, mismatched, data),
     /not reproduced by the independent confirmation fetch/
   );
+  assert.equal(classifyHealthcheckFailure(mismatchError), 'severe');
+});
+
+test('does not perform a second Apple fetch for an ordinary price-only change', async () => {
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const changed = structuredClone(data);
+  const tierId = changed.tiers[0].id;
+  changed.countries[0].plans[tierId].price = 1;
+  changed.countries[0].plans[tierId].formattedPrice = '$1.00';
+  const fxPayload = {
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: recentFxTimestamp(),
+    rates: compatibleExchangeRates(data)
+  };
+  const originalFetch = globalThis.fetch;
+  const originalApiKey = process.env.EXCHANGE_RATE_API_KEY;
+  let appleRequests = 0;
+  delete process.env.EXCHANGE_RATE_API_KEY;
+  globalThis.fetch = async (url) => {
+    const target = String(url);
+    if (target.includes('support.apple.com')) {
+      appleRequests += 1;
+      return new Response(buildAppleHtml(changed), { status: 200 });
+    }
+    if (target.includes('open.er-api.com')) {
+      return new Response(JSON.stringify(fxPayload), { status: 200 });
+    }
+    throw new Error(`Unexpected URL in price-only update test: ${target}`);
+  };
+  try {
+    await main({ dryRun: true, stepSummaryPath: null });
+    assert.equal(appleRequests, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalApiKey === undefined) delete process.env.EXCHANGE_RATE_API_KEY;
+    else process.env.EXCHANGE_RATE_API_KEY = originalApiKey;
+  }
+});
+
+test('classifies an unavailable structural confirmation as transient and preserves stable production data', async () => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const changed = structuredClone(data);
+  changed.countries = changed.countries.slice(1);
+  const before = await Promise.all([
+    readFile(paths.currentDataPath, 'utf8'),
+    readFile(paths.historyPath, 'utf8'),
+    readFile(paths.runLogPath, 'utf8')
+  ]);
+  const snapshotStoreBefore = await readSnapshotStoreState(paths);
+  const originalFetch = globalThis.fetch;
+  let appleRequests = 0;
+  globalThis.fetch = async (url) => {
+    const target = String(url);
+    if (!target.includes('support.apple.com')) {
+      throw new Error(`Unexpected URL before Apple confirmation completed: ${target}`);
+    }
+    appleRequests += 1;
+    if (appleRequests === 1) return new Response(buildAppleHtml(changed), { status: 200 });
+    throw new Error('simulated connection reset during independent confirmation');
+  };
+  const networkBudget = createNetworkBudget({
+    budgetMs: 5 * 60 * 1_000,
+    now: () => 0,
+    sleep: async () => {},
+    createTimeoutSignal: () => undefined
+  });
+  try {
+    await assert.rejects(
+      () => main({ dryRun: false, paths, stepSummaryPath: null, networkBudget }),
+      (error) => {
+        assert.equal(error.code, 'APPLE_CONFIRMATION_UNAVAILABLE');
+        assert.equal(error.cause?.code, 'NETWORK_FETCH_FAILED');
+        assert.equal(classifyHealthcheckFailure(error), 'transient');
+        assert.match(error.message, /stable data was preserved.*next run must retry/i);
+        return true;
+      }
+    );
+    assert.equal(appleRequests, 6, 'one primary fetch plus the full five-attempt confirmation retry sequence');
+    assert.deepEqual(await Promise.all([
+      readFile(paths.currentDataPath, 'utf8'),
+      readFile(paths.historyPath, 'utf8'),
+      readFile(paths.runLogPath, 'utf8')
+    ]), before);
+    assert.deepEqual(await readSnapshotStoreState(paths), snapshotStoreBefore);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test('ignores residual claims that are not bound to the current lock', async () => {

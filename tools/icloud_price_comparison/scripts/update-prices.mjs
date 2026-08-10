@@ -56,6 +56,13 @@ function transientHealthcheckError(message, { code = null, cause = null } = {}) 
   return error;
 }
 
+function appleConfirmationUnavailableError(cause) {
+  return transientHealthcheckError(
+    'Apple structural-change confirmation is temporarily unavailable; stable data was preserved and the next run must retry',
+    { code: 'APPLE_CONFIRMATION_UNAVAILABLE', cause }
+  );
+}
+
 export function classifyHealthcheckFailure(error) {
   return error?.healthcheckSeverity === 'transient' ? 'transient' : 'severe';
 }
@@ -1224,6 +1231,8 @@ function failureRunLogEntry(error, startedAt, finishedAt, appleSnapshotCaptured 
     durationMs: Math.max(0, finishedAt.getTime() - startedAt.getTime()),
     error: {
       name: error.name,
+      code: typeof error?.code === 'string' ? error.code : null,
+      causeCode: typeof error?.cause?.code === 'string' ? error.cause.code : null,
       message: error.message,
       stack: error.stack ?? null
     },
@@ -2069,12 +2078,16 @@ export async function main({
   let confirmedRemovedCountries = [];
   const structuralChanges = appleStructuralChanges(previousData, parsed);
   if (previousData && Object.values(structuralChanges).some((items) => items.length > 0)) {
-    const confirmationHtml = await fetchResource(APPLE_URL, {
-      networkBudget,
-      attempts: 2,
-      headers: { 'cache-control': 'no-cache, no-store', pragma: 'no-cache' },
-      resourceName: 'Apple iCloud+ pricing structural-change confirmation'
-    });
+    let confirmationHtml;
+    try {
+      confirmationHtml = await fetchResource(APPLE_URL, {
+        networkBudget,
+        headers: { 'cache-control': 'no-cache, no-store', pragma: 'no-cache' },
+        resourceName: 'Apple iCloud+ pricing structural-change confirmation'
+      });
+    } catch (error) {
+      throw appleConfirmationUnavailableError(error);
+    }
     const confirmationParsed = parseApplePrices(confirmationHtml, { allowUnknownCountries: true });
     ({ confirmedRemovedCountries } = confirmAppleStructuralChanges(
       parsed,
