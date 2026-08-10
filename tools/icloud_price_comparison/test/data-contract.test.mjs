@@ -248,6 +248,10 @@ test('enforces coherent stale and fallback exchange-rate metadata', async () => 
   ];
   for (const mutate of invalidVariants) {
     const payload = structuredClone(prices);
+    // Keep the baseline on the authenticated source so fallbackUsed=true is
+    // unambiguously invalid regardless of which live FX source refreshed the fixture.
+    payload.fx.sourceUrl = 'https://v6.exchangerate-api.com/v6/latest/USD';
+    payload.fx.sourceMode = 'api-key';
     mutate(payload);
     assert.throws(() => validatePricePayload(payload), /unexpected or invalid fields/);
     assert.throws(() => validateExistingPrices(payload));
