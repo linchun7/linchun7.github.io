@@ -6,11 +6,8 @@
 
 本工具以 Apple Support 的 iCloud+ 价格页作为价格与发布日期来源，保留当地月费，并使用 ExchangeRate-API 数据生成两位小数的人民币参考价。人民币金额只用于横向比较，不是 Apple 结算价。
 
-上线、日常值守和回滚请同时阅读：
+日常值守、自动更新、告警、事故处理、恢复和外部配置基线请阅读 [OPERATIONS.md](OPERATIONS.md)。一次性的发布清单与终验报告属于项目内部审计资料，不纳入公开仓库；它们不参与运行时，也不影响数据更新和页面展示。
 
-- [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md)：发布前、部署后和回滚验收清单。
-- [OPERATIONS.md](OPERATIONS.md)：自动更新、告警、事故处理、恢复和外部配置基线。
-- [RELEASE_REVIEW_2026-08-09.md](RELEASE_REVIEW_2026-08-09.md)：本次上线前终验范围、证据摘要和未关闭风险。
 
 ## 功能
 
@@ -95,7 +92,7 @@
 - vendored Chart.js 和 Lucide subset 的版本、精确文件集、SHA-256、上游字节/icon node、实际使用集和许可 notice 由 `pnpm test:vendor` 校验。
 - lockfile 中所有直接版本均精确固定，所有 npm 包 resolution 都有 SHA-512 integrity；`packageManager` 还固定 pnpm 10.14.0 的 Corepack SHA-512。CI 使用 Corepack、`pnpm install --frozen-lockfile --ignore-scripts`，并显式安装浏览器，避免全局安装漂移和依赖生命周期脚本。
 
-仓库 ruleset、required checks、Cloudflare 配置和 Secret 值属于外部状态，代码测试无法代替其发布前验收；必须逐项完成 [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md)。
+仓库 ruleset、required checks、Cloudflare 配置和 Secret 值属于外部状态，代码测试无法代替项目所有者的发布前验收；这些控制面应按内部发布清单逐项核对，仓库不保存 Secret 或内部签字记录。
 
 ## 本地验证
 
