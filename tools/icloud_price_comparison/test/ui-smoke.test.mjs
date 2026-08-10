@@ -362,6 +362,7 @@ test('shows a usable explanation when JavaScript is disabled', { timeout: 30_000
   try {
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
     const notice = page.locator('.noscript-notice');
+    await notice.waitFor({ state: 'visible' });
     assert.equal(await notice.isVisible(), true);
     assert.match(await notice.innerText(), /JavaScript/);
     assert.equal(await page.locator('#priceRows tr[data-country]').count(), 0);
