@@ -6,6 +6,26 @@ const workflowUrl = new URL('../../../.github/workflows/update-icloud-prices.yml
 const ciWorkflowUrl = new URL('../../../.github/workflows/validate-icloud-price-comparison.yml', import.meta.url);
 const autoMergeWorkflowUrl = new URL('../../../.github/workflows/auto-merge-official-actions.yml', import.meta.url);
 const dependabotUrl = new URL('../../../.github/dependabot.yml', import.meta.url);
+const gitignoreUrl = new URL('../../../.gitignore', import.meta.url);
+const packageUrl = new URL('../package.json', import.meta.url);
+const browserRunnerUrl = new URL('../scripts/test-browsers.mjs', import.meta.url);
+const firefoxRunnerUrl = new URL('../scripts/test-firefox.mjs', import.meta.url);
+const webkitRunnerUrl = new URL('../scripts/test-webkit.mjs', import.meta.url);
+
+test('keeps updater locks, recovery journals, temporary writes, and diagnostics out of Git', async () => {
+  const gitignore = await readFile(gitignoreUrl, 'utf8');
+  for (const pattern of [
+    'tools/icloud_price_comparison/artifacts/',
+    'tools/icloud_price_comparison/.icloud-price-update.lock',
+    'tools/icloud_price_comparison/.icloud-price-update.lock.claim-*',
+    'tools/icloud_price_comparison/data/.icloud-price-update-transaction.json',
+    'tools/icloud_price_comparison/data/*.tmp-*',
+    'tools/icloud_price_comparison/data/apple-snapshots/*.tmp-*',
+    'tools/icloud_price_comparison/data/.apple-snapshot-import-*'
+  ]) {
+    assert.ok(gitignore.split(/\r?\n/).includes(pattern), `missing ignored runtime path: ${pattern}`);
+  }
+});
 
 test('keeps the scheduled update workflow guarded and ordered', async () => {
   const workflow = await readFile(workflowUrl, 'utf8');
@@ -19,8 +39,9 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.doesNotMatch(workflow, /cron:\s*['"]5 0 \* \* \*['"]/, 'Cloudflare owns the 08:05 primary trigger');
   assert.match(workflow, /workflow_dispatch:[\s\S]*?trigger_source:[\s\S]*?default: manual[\s\S]*?options:[\s\S]*?- manual[\s\S]*?- cloudflare/);
   assert.match(workflow, /name: 检查每日幂等状态[\s\S]*?id: daily_guard[\s\S]*?node scripts\/daily-run-guard\.mjs/);
-  assert.match(workflow, /git show origin\/main:tools\/icloud_price_comparison\/data\/run-log\.json/);
-  assert.match(workflow, /ICLOUD_RUN_LOG_PATH:\s*\$\{\{ runner\.temp \}\}\/icloud-run-log\.json/);
+  assert.match(workflow, /name: 读取并深验最新 main 的每日幂等状态[\s\S]*?id: validate_main_data[\s\S]*?git archive --format=tar origin\/main tools\/icloud_price_comparison\/data[\s\S]*?tar --extract --file=-/);
+  assert.match(workflow, /validate-data-artifact\.mjs[\s\S]*?--data-dir "\$main_snapshot\/tools\/icloud_price_comparison\/data"/);
+  assert.match(workflow, /ICLOUD_RUN_LOG_PATH:\s*\$\{\{ runner\.temp \}\}\/icloud-main-snapshot\/tools\/icloud_price_comparison\/data\/run-log\.json/);
   assert.match(workflow, /update:[\s\S]*?needs: prepare[\s\S]*?if: needs\.prepare\.outputs\.should_run == 'true'/);
   assert.match(workflow, /ICLOUD_TRIGGER_SOURCE:\s*\$\{\{ needs\.prepare\.outputs\.trigger_source \}\}/);
   assert.match(workflow, /ICLOUD_AUTOMATIC_RUN_DATE_BEIJING:\s*\$\{\{ needs\.prepare\.outputs\.automatic_run_date_beijing \}\}/);
@@ -29,7 +50,9 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /update:[\s\S]*?permissions:\s+contents: read/, 'generation and tests must remain read-only');
   assert.match(workflow, /publish:[\s\S]*?permissions:\s+contents: write/, 'only the dependency-free publisher may write committed data');
   assert.match(workflow, /persist-credentials: false/g);
-  assert.match(workflow, /pnpm install --frozen-lockfile/);
+  assert.match(workflow, /name: 启用并校验 pnpm[\s\S]*?corepack enable[\s\S]*?pnpm --version/);
+  assert.doesNotMatch(workflow, /npm install[^\n]*pnpm/);
+  assert.match(workflow, /pnpm install --frozen-lockfile --ignore-scripts/);
   assert.match(workflow, /name: 运行解析与数据安全测试[\s\S]*?id: core_tests[\s\S]*?run: pnpm test:core/);
   assert.match(workflow, /name: 验证更新后的页面[\s\S]*?run: pnpm test:ui/);
   assert.doesNotMatch(workflow, /ui_failed|pnpm test:ui\s*\|\||记录浏览器界面测试警告/);
@@ -56,8 +79,9 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /上一份有效数据继续保留/);
   assert.match(workflow, /git_kib >= 819200[\s\S]*elif \(\( git_kib >= 512000 \)\)/);
   assert.match(workflow, /ICLOUD_HEALTHCHECK_PING_URL[\s\S]*?HEALTHCHECK_PING_URL%\/\}\/\$status/);
-  assert.match(workflow, /classify_prepare[\s\S]*?steps\.daily_guard\.outcome[\s\S]*?severe_failure/);
-  assert.match(workflow, /classify_update[\s\S]*?report\.healthcheckSeverity === "transient"[\s\S]*?source\?\.parser[\s\S]*?cross-checked/);
+  assert.match(workflow, /prepare:[\s\S]*?runs-on: ubuntu-latest\s+timeout-minutes: 5[\s\S]*?\n  update:/);
+  assert.match(workflow, /classify_prepare[\s\S]*?steps\.validate_main_data\.outcome[\s\S]*?steps\.daily_guard\.outcome[\s\S]*?severe_failure/);
+  assert.match(workflow, /classify_update[\s\S]*?steps\.package_data\.outcome[\s\S]*?update_failure_severe=true[\s\S]*?report\.healthcheckSeverity === "transient"[\s\S]*?2>\/dev\/null[\s\S]*?source\?\.parser[\s\S]*?2>\/dev\/null[\s\S]*?cross-checked/);
   assert.match(workflow, /classify_publish[\s\S]*?steps\.validate_data_artifact\.outcome[\s\S]*?severe_failure/);
   assert.match(workflow, /PREPARE_SEVERE_FAILURE:[\s\S]*?UPDATE_SEVERE_FAILURE:[\s\S]*?PUBLISH_SEVERE_FAILURE:/);
   assert.match(workflow, /PREPARE_SEVERE_FAILURE[\s\S]*?status=1[\s\S]*?PREPARE_RESULT[\s\S]*?status=0[\s\S]*?单次暂时故障[\s\S]*?exit 0/);
@@ -67,6 +91,12 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
     'one ordinary failed run must not immediately signal a Healthchecks failure',
   );
   assert.match(workflow, /sha256sum --check icloud-price-data\.tar\.sha256/);
+  assert.match(workflow, /validate-data-artifact\.mjs --data-dir tools\/icloud_price_comparison\/data[\s\S]*?tar --format=ustar/);
+  assert.match(workflow, /validate-data-artifact\.mjs"[\s\S]*?--archive icloud-price-data\.tar[\s\S]*?tar --extract[\s\S]*?--no-same-owner --no-same-permissions[\s\S]*?--data-dir unpacked\/tools\/icloud_price_comparison\/data/);
+  assert.doesNotMatch(workflow, /tar -tf icloud-price-data\.tar|find unpacked\/tools\/icloud_price_comparison\/data/);
+  assert.match(workflow, /validated_data=.*unpacked\/tools\/icloud_price_comparison\/data[\s\S]*?rm -rf tools\/icloud_price_comparison\/data[\s\S]*?cp -a "\$validated_data" tools\/icloud_price_comparison\/data/);
+  assert.match(workflow, /git add --all tools\/icloud_price_comparison\/data/);
+  assert.doesNotMatch(workflow, /cp -a .*data\/\." tools\/icloud_price_comparison\/data\//, 'publisher must replace the complete validated data directory');
   assert.match(workflow, /GITHUB_TOKEN:\s*\$\{\{ github\.token \}\}[\s\S]*?push origin HEAD:main/);
 
   const firstCoreTest = workflow.indexOf('run: pnpm test:core');
@@ -105,15 +135,38 @@ test('keeps pull-request validation read-only, complete, and SHA-pinned', async 
   assert.match(ciWorkflow, /permissions:\s+contents: read/);
   assert.match(ciWorkflow, /uses: actions\/checkout@[a-f0-9]{40}[^]*?persist-credentials: false/);
   assert.doesNotMatch(ciWorkflow, /contents: write|secrets\./);
-  assert.match(ciWorkflow, /pnpm install --frozen-lockfile/);
-  assert.match(ciWorkflow, /pnpm exec playwright install --with-deps chromium webkit/);
+  assert.match(ciWorkflow, /name: 启用并校验 pnpm[\s\S]*?corepack enable[\s\S]*?pnpm --version/);
+  assert.doesNotMatch(ciWorkflow, /npm install[^\n]*pnpm/);
+  assert.match(ciWorkflow, /pnpm install --frozen-lockfile --ignore-scripts/);
+  assert.match(ciWorkflow, /pnpm exec playwright install --with-deps chromium firefox webkit/);
   assert.match(ciWorkflow, /run: pnpm test:core/);
+  assert.match(ciWorkflow, /run: pnpm validate:artifact/);
   assert.match(ciWorkflow, /schedule:[\s\S]*?cron:\s*['"]5 22 \* \* 0['"]/);
   assert.match(ciWorkflow, /run: pnpm validate:snapshots/);
   assert.doesNotMatch(ciWorkflow, /if: github.event_name == 'schedule' \\|\\| github.event_name == 'workflow_dispatch'/);
   assert.match(ciWorkflow, /cancel-in-progress: false/);
   assert.match(ciWorkflow, /run: pnpm test:browsers/);
   assert.match(ciWorkflow, /run: pnpm audit --audit-level low/);
+});
+
+test('runs the same UI acceptance suite in Chromium, Firefox, and WebKit', async () => {
+  const [packageText, browserRunner, firefoxRunner, webkitRunner] = await Promise.all([
+    readFile(packageUrl, 'utf8'),
+    readFile(browserRunnerUrl, 'utf8'),
+    readFile(firefoxRunnerUrl, 'utf8'),
+    readFile(webkitRunnerUrl, 'utf8')
+  ]);
+  const packageJson = JSON.parse(packageText);
+
+  assert.equal(
+    packageJson.packageManager,
+    'pnpm@10.14.0+sha512.ad27a79641b49c3e481a16a805baa71817a04bbe06a38d17e60e2eaee83f6a146c6a688125f5792e48dd5ba30e7da52a5cda4c3992b9ccf333f9ce223af84748'
+  );
+  assert.match(browserRunner, /\['chromium', 'firefox', 'webkit'\]\.map\(runBrowserSuite\)/);
+  assert.equal(packageJson.scripts['test:firefox'], 'node --test scripts/test-firefox.mjs');
+  assert.equal(packageJson.scripts['test:webkit'], 'node --test scripts/test-webkit.mjs');
+  assert.match(firefoxRunner, /PLAYWRIGHT_BROWSER = 'firefox'[\s\S]*?import\('\.\.\/test\/ui-smoke\.test\.mjs'\)/);
+  assert.match(webkitRunner, /PLAYWRIGHT_BROWSER = 'webkit'[\s\S]*?import\('\.\.\/test\/ui-smoke\.test\.mjs'\)/);
 });
 
 test('automates only official GitHub Actions updates after exact-SHA validation', async () => {

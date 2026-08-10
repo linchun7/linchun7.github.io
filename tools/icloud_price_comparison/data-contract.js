@@ -5,9 +5,43 @@ const ALLOWED_FX_SOURCE_URLS = new Set([
   'https://open.er-api.com/v6/latest/USD'
 ]);
 const ALLOWED_PARSERS = new Set(['cross-checked', 'document-order', 'apple-markers-fallback']);
+export const PUBLIC_PRICE_SCHEMA_VERSION = 3;
+const PUBLIC_PRICE_TOP_LEVEL_KEYS = new Set(['schemaVersion', 'generatedAt', 'source', 'run', 'fx', 'tiers', 'countries']);
+const PUBLIC_PRICE_SOURCE_KEYS = new Set(['name', 'url', 'publishedDate', 'parser', 'parserStatus']);
+const PUBLIC_PRICE_RUN_KEYS = new Set(['startedAtUtc', 'finishedAtUtc', 'observedAtBeijing', 'observedAtUtc', 'countries', 'pricePoints']);
+const PUBLIC_PRICE_FX_KEYS = new Set(['sourceUrl', 'sourceMode', 'fallbackUsed', 'fallbackReason', 'base', 'fetchedAt', 'stale', 'derivedCurrency']);
+const PUBLIC_PRICE_TIER_KEYS = new Set(['id', 'label', 'capacityGb']);
+const PUBLIC_PRICE_COUNTRY_KEYS = new Set(['country', 'region', 'currency', 'plans', 'nameZh']);
+const PUBLIC_PRICE_PLAN_KEYS = new Set(['price', 'formattedPrice', 'cnyPrice']);
+const PUBLIC_HISTORY_TOP_LEVEL_KEYS = new Set(['schemaVersion', 'updatedAt', 'countries', 'sourcePublishedDates']);
+const PUBLIC_HISTORY_RECORD_KEYS = new Set(['nameZh', 'region', 'events']);
+const PUBLIC_HISTORY_EVENT_KEYS = new Set(['observedAt', 'observedAtUtc', 'observedAtBeijing', 'currency', 'plans']);
+const PUBLIC_HISTORY_PUBLICATION_KEYS = new Set(['publishedDate', 'observedAt', 'observedAtUtc', 'observedAtBeijing', 'kind', 'changes']);
+const PUBLIC_HISTORY_CHANGE_KEYS = new Set(['addedTiers', 'removedTiers', 'addedCountries', 'removedCountries', 'changedCountries']);
+const PUBLIC_HISTORY_LISTED_TIER_KEYS = new Set(['id', 'label']);
+const PUBLIC_HISTORY_LISTED_COUNTRY_KEYS = new Set(['country', 'nameZh']);
+const PUBLIC_HISTORY_CHANGED_COUNTRY_KEYS = new Set(['country', 'nameZh', 'fromCurrency', 'toCurrency', 'fromRegion', 'toRegion', 'tiers']);
+const PUBLIC_HISTORY_CHANGED_TIER_KEYS = new Set(['id', 'from', 'to']);
 const UNSAFE_OBJECT_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 const TIER_ID_PATTERN = /^\d+(?:\.\d+)?(?:GB|TB)$/;
 const MAX_TIER_CAPACITY_GB = 1024 * 1024;
+const MAX_PUBLIC_TIERS = 20;
+const MAX_PUBLIC_COUNTRIES = 250;
+const MAX_HISTORY_COUNTRIES = 500;
+const MAX_HISTORY_EVENTS_PER_COUNTRY = 1000;
+const MAX_PUBLICATION_HISTORY_ENTRIES = 1000;
+const MAX_FX_FUTURE_SKEW_MS = 5 * 60 * 1_000;
+const MAX_FX_ARTIFACT_AGE_MS = (36 * 60 * 60 * 1_000) + MAX_FX_FUTURE_SKEW_MS;
+const PUBLIC_FX_FALLBACK_REASONS = new Set([
+  'source-unavailable',
+  'request-failed',
+  'missing-rates',
+  'stale-response',
+  'future-timestamp',
+  'invalid-timestamp',
+  'invalid-response'
+]);
+const FORBIDDEN_PUBLIC_TEXT_PATTERN = /[\0-\x1f\x7f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff\ufffd]/u;
 const MONTHS = [
   'january', 'february', 'march', 'april', 'may', 'june',
   'july', 'august', 'september', 'october', 'november', 'december'
@@ -21,6 +55,50 @@ const BEIJING_DATE_FORMATTER = new Intl.DateTimeFormat('en-CA', {
 
 export function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function hasExactKeys(value, expectedKeys) {
+  if (!isPlainObject(value)) return false;
+  const actualKeys = Object.keys(value);
+  return actualKeys.length === expectedKeys.size && actualKeys.every((key) => expectedKeys.has(key));
+}
+
+function hasAllowedKeys(value, allowedKeys, requiredKeys = []) {
+  if (!isPlainObject(value)) return false;
+  const actualKeys = Object.keys(value);
+  return actualKeys.every((key) => allowedKeys.has(key))
+    && requiredKeys.every((key) => Object.hasOwn(value, key));
+}
+
+function hasUnpairedSurrogate(value) {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const next = value.charCodeAt(index + 1);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) return true;
+      index += 1;
+    } else if (code >= 0xdc00 && code <= 0xdfff) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function hasSafeText(value, maxLength = 256) {
+  return typeof value === 'string'
+    && value.length <= maxLength
+    && Boolean(value.trim())
+    && !FORBIDDEN_PUBLIC_TEXT_PATTERN.test(value)
+    && !hasUnpairedSurrogate(value);
+}
+
+export function isPublicFxFallbackReason(value) {
+  return value === null || PUBLIC_FX_FALLBACK_REASONS.has(value);
+}
+
+export function publicFxFallbackReason(value) {
+  if (value === null || value === undefined) return null;
+  return PUBLIC_FX_FALLBACK_REASONS.has(value) ? value : 'source-unavailable';
 }
 
 export function isValidDateOnly(value) {
@@ -76,30 +154,53 @@ export function isValidPublishedDate(value) {
 
 export function isValidPublicationChanges(changes) {
   if (changes === undefined || changes === null) return true;
-  if (!isPlainObject(changes)) return false;
+  if (!hasAllowedKeys(changes, PUBLIC_HISTORY_CHANGE_KEYS)) return false;
   const arrays = ['addedTiers', 'removedTiers', 'addedCountries', 'removedCountries', 'changedCountries'];
   if (arrays.some((key) => changes[key] !== undefined && !Array.isArray(changes[key]))) return false;
+  if ((changes.addedTiers?.length ?? 0) > MAX_PUBLIC_TIERS
+    || (changes.removedTiers?.length ?? 0) > MAX_PUBLIC_TIERS
+    || (changes.addedCountries?.length ?? 0) > MAX_HISTORY_COUNTRIES
+    || (changes.removedCountries?.length ?? 0) > MAX_HISTORY_COUNTRIES
+    || (changes.changedCountries?.length ?? 0) > MAX_HISTORY_COUNTRIES) return false;
   const validTier = (tier) => isPlainObject(tier) && canonicalTierDefinition(tier.id) !== null;
-  const validListedTier = (tier) => validTier(tier)
+  const validListedTier = (tier) => hasExactKeys(tier, PUBLIC_HISTORY_LISTED_TIER_KEYS)
+    && validTier(tier)
     && tier.label === canonicalTierDefinition(tier.id).label;
-  const validCountry = (country) => isPlainObject(country) && typeof country.country === 'string' && country.country.trim();
-  const validChangedTier = (tier) => validTier(tier)
+  const validCountry = (country) => hasAllowedKeys(
+    country,
+    PUBLIC_HISTORY_LISTED_COUNTRY_KEYS,
+    ['country']
+  ) && hasSafeText(country.country, 160)
+    && (country.nameZh === undefined || hasSafeText(country.nameZh, 160));
+  const validChangedTier = (tier) => hasExactKeys(tier, PUBLIC_HISTORY_CHANGED_TIER_KEYS)
+    && validTier(tier)
     && (tier.from === null || (Number.isFinite(tier.from) && tier.from > 0))
+    && (tier.from === null || tier.from <= Number.MAX_SAFE_INTEGER)
     && (tier.to === null || (Number.isFinite(tier.to) && tier.to > 0))
+    && (tier.to === null || tier.to <= Number.MAX_SAFE_INTEGER)
     && (tier.from !== null || tier.to !== null);
   const validCurrency = (value) => typeof value === 'string' && /^[A-Z]{3}$/.test(value);
-  const validRegion = (value) => typeof value === 'string' && value.trim();
+  const validRegion = (value) => hasSafeText(value, 160);
   if ((changes.addedTiers ?? []).some((tier) => !validListedTier(tier))) return false;
   if ((changes.removedTiers ?? []).some((tier) => !validListedTier(tier))) return false;
   if ((changes.addedCountries ?? []).some((country) => !validCountry(country))) return false;
   if ((changes.removedCountries ?? []).some((country) => !validCountry(country))) return false;
-  return (changes.changedCountries ?? []).every((country) => validCountry(country)
+  return (changes.changedCountries ?? []).every((country) => hasAllowedKeys(
+    country,
+    PUBLIC_HISTORY_CHANGED_COUNTRY_KEYS,
+    ['country', 'fromCurrency', 'toCurrency', 'fromRegion', 'toRegion', 'tiers']
+  )
+    && hasSafeText(country.country, 160)
+    && (country.nameZh === undefined || hasSafeText(country.nameZh, 160))
     && validCurrency(country.fromCurrency)
     && validCurrency(country.toCurrency)
     && validRegion(country.fromRegion)
     && validRegion(country.toRegion)
     && Array.isArray(country.tiers)
-    && country.tiers.length > 0
+    && country.tiers.length <= MAX_PUBLIC_TIERS
+    && (country.tiers.length > 0
+      || country.fromCurrency !== country.toCurrency
+      || country.fromRegion !== country.toRegion)
     && country.tiers.every(validChangedTier));
 }
 
@@ -121,37 +222,77 @@ function isValidObservationMetadata(value) {
 
 export function validatePricePayload(payload, { minCountries = 1 } = {}) {
   if (!isPlainObject(payload)
-    || ![1, 2].includes(payload.schemaVersion)
+    || ![1, 2, PUBLIC_PRICE_SCHEMA_VERSION].includes(payload.schemaVersion)
     || !Array.isArray(payload.tiers)
+    || payload.tiers.length > MAX_PUBLIC_TIERS
     || !Array.isArray(payload.countries)
+    || payload.countries.length > MAX_PUBLIC_COUNTRIES
     || !isValidIsoTimestamp(payload.generatedAt)
     || !isPlainObject(payload.source)
     || payload.source.url !== APPLE_SUPPORT_URL
+    || !hasSafeText(payload.source.publishedDate, 100)
     || !isValidPublishedDate(payload.source.publishedDate)
     || (payload.source.parser != null && !ALLOWED_PARSERS.has(payload.source.parser))
     || !isPlainObject(payload.fx)
     || !ALLOWED_FX_SOURCE_URLS.has(payload.fx.sourceUrl)
     || payload.fx.base !== 'USD'
     || typeof payload.fx.stale !== 'boolean'
-    || !isValidIsoTimestamp(payload.fx.fetchedAt)
-    || !isPlainObject(payload.fx.rates)
+    || !isValidIsoTimestamp(payload.fx.fetchedAt)) {
+    throw new Error('prices.json has an unsupported or unsafe structure');
+  }
+  const usesDerivedCnyPrices = payload.schemaVersion === PUBLIC_PRICE_SCHEMA_VERSION;
+  if (usesDerivedCnyPrices) {
+    const sourceModeMatchesUrl = (payload.fx.sourceMode === 'api-key' && payload.fx.sourceUrl === 'https://v6.exchangerate-api.com/v6/latest/USD')
+      || (payload.fx.sourceMode === 'open-access' && payload.fx.sourceUrl === 'https://open.er-api.com/v6/latest/USD');
+    const fallbackReasonRequired = payload.fx.stale || payload.fx.fallbackUsed;
+    const fallbackMetadataConsistent = fallbackReasonRequired
+      ? typeof payload.fx.fallbackReason === 'string' && isPublicFxFallbackReason(payload.fx.fallbackReason)
+      : payload.fx.fallbackReason === null;
+    const fallbackSourceConsistent = payload.fx.stale
+      || !payload.fx.fallbackUsed
+      || payload.fx.sourceMode === 'open-access';
+    const generatedAtMs = Date.parse(payload.generatedAt);
+    const fxFetchedAtMs = Date.parse(payload.fx.fetchedAt);
+    const fxTimestampPlausible = fxFetchedAtMs <= generatedAtMs + MAX_FX_FUTURE_SKEW_MS
+      && generatedAtMs - fxFetchedAtMs <= MAX_FX_ARTIFACT_AGE_MS;
+    if (!hasExactKeys(payload, PUBLIC_PRICE_TOP_LEVEL_KEYS)
+      || !hasExactKeys(payload.source, PUBLIC_PRICE_SOURCE_KEYS)
+      || payload.source.name !== 'Apple Support'
+      || payload.source.parser !== 'cross-checked'
+      || !hasSafeText(payload.source.parserStatus, 512)
+      || !hasExactKeys(payload.run, PUBLIC_PRICE_RUN_KEYS)
+      || !hasExactKeys(payload.fx, PUBLIC_PRICE_FX_KEYS)
+      || !sourceModeMatchesUrl
+      || typeof payload.fx.fallbackUsed !== 'boolean'
+      || !isPublicFxFallbackReason(payload.fx.fallbackReason)
+      || !fallbackMetadataConsistent
+      || !fallbackSourceConsistent
+      || !fxTimestampPlausible
+      || payload.fx.derivedCurrency !== 'CNY') {
+      throw new Error('prices.json current public schema has unexpected or invalid fields');
+    }
+  } else if (!isPlainObject(payload.fx.rates)
     || payload.fx.rates.USD !== 1
     || !Number.isFinite(payload.fx.rates.CNY)
     || payload.fx.rates.CNY <= 0) {
-    throw new Error('prices.json has an unsupported or unsafe structure');
+    throw new Error('prices.json has invalid legacy exchange rates');
   }
 
   const tierIds = new Set();
   const tierCapacities = new Set();
+  let previousTierCapacity = 0;
   for (const tier of payload.tiers) {
     if (!isPlainObject(tier)
+      || (usesDerivedCnyPrices && !hasExactKeys(tier, PUBLIC_PRICE_TIER_KEYS))
       || !isCanonicalTier(tier)
       || tierIds.has(tier.id)
-      || tierCapacities.has(tier.capacityGb)) {
+      || tierCapacities.has(tier.capacityGb)
+      || tier.capacityGb <= previousTierCapacity) {
       throw new Error('prices.json has invalid or duplicate tiers');
     }
     tierIds.add(tier.id);
     tierCapacities.add(tier.capacityGb);
+    previousTierCapacity = tier.capacityGb;
   }
   if (!tierIds.size || payload.countries.length < minCountries) {
     throw new Error('prices.json has incomplete tiers or countries');
@@ -163,51 +304,61 @@ export function validatePricePayload(payload, { minCountries = 1 } = {}) {
   }
 
   const countryNames = new Set();
-  const requiredCurrencies = new Set(['USD', 'CNY']);
+  const requiredCurrencies = usesDerivedCnyPrices ? null : new Set(['USD', 'CNY']);
   for (const country of payload.countries) {
     if (!isPlainObject(country)
-      || typeof country.country !== 'string'
-      || !country.country.trim()
+      || (usesDerivedCnyPrices && !hasExactKeys(country, PUBLIC_PRICE_COUNTRY_KEYS))
+      || !hasSafeText(country.country, 160)
       || countryNames.has(country.country)
       || UNSAFE_OBJECT_KEYS.has(country.country)
-      || typeof country.nameZh !== 'string'
-      || !country.nameZh.trim()
-      || typeof country.region !== 'string'
-      || !country.region.trim()
+      || !hasSafeText(country.nameZh, 160)
+      || !hasSafeText(country.region, 160)
       || typeof country.currency !== 'string'
       || !/^[A-Z]{3}$/.test(country.currency)
       || !isPlainObject(country.plans)) {
       throw new Error('prices.json has an invalid country entry');
     }
     countryNames.add(country.country);
-    requiredCurrencies.add(country.currency);
+    requiredCurrencies?.add(country.currency);
     const actualPlanIds = new Set(Object.keys(country.plans));
     if (actualPlanIds.size !== tierIds.size || [...tierIds].some((tierId) => !actualPlanIds.has(tierId))) {
       throw new Error(`prices.json has plans that do not match declared tiers for ${country.country}`);
     }
-    const currencyRate = payload.fx.rates[country.currency];
-    if (!Number.isFinite(currencyRate) || currencyRate <= 0) {
-      throw new Error(`prices.json has an invalid ${country.currency} exchange rate`);
+    if (!usesDerivedCnyPrices) {
+      const currencyRate = payload.fx.rates[country.currency];
+      if (!Number.isFinite(currencyRate) || currencyRate <= 0) {
+        throw new Error(`prices.json has an invalid ${country.currency} exchange rate`);
+      }
     }
     for (const tierId of tierIds) {
       const plan = country.plans[tierId];
+      const cnyPriceIsValid = !usesDerivedCnyPrices || (
+        Number.isFinite(plan?.cnyPrice)
+        && plan.cnyPrice > 0
+        && plan.cnyPrice <= Number.MAX_SAFE_INTEGER
+        && Math.abs(plan.cnyPrice * 100 - Math.round(plan.cnyPrice * 100)) < 1e-7
+      );
       if (!isPlainObject(plan)
+        || (usesDerivedCnyPrices && !hasExactKeys(plan, PUBLIC_PRICE_PLAN_KEYS))
         || !Number.isFinite(plan.price)
         || plan.price <= 0
-        || typeof plan.formattedPrice !== 'string'
-        || !plan.formattedPrice.trim()) {
+        || plan.price > Number.MAX_SAFE_INTEGER
+        || !hasSafeText(plan.formattedPrice, 100)
+        || !cnyPriceIsValid) {
         throw new Error(`prices.json has invalid ${tierId} pricing for ${country.country}`);
       }
     }
   }
 
-  const actualCurrencies = Object.keys(payload.fx.rates);
-  if (actualCurrencies.length !== requiredCurrencies.size
-    || actualCurrencies.some((currency) => !/^[A-Z]{3}$/.test(currency) || !requiredCurrencies.has(currency))) {
-    throw new Error('prices.json exchange rates do not exactly match the currencies in use');
+  if (!usesDerivedCnyPrices) {
+    const actualCurrencies = Object.keys(payload.fx.rates);
+    if (actualCurrencies.length !== requiredCurrencies.size
+      || actualCurrencies.some((currency) => !/^[A-Z]{3}$/.test(currency) || !requiredCurrencies.has(currency))) {
+      throw new Error('prices.json exchange rates do not exactly match the currencies in use');
+    }
   }
 
-  if (payload.schemaVersion === 2) {
+  if (payload.schemaVersion >= 2) {
     if (!isPlainObject(payload.run)
       || !isValidIsoTimestamp(payload.run.startedAtUtc)
       || !isValidIsoTimestamp(payload.run.finishedAtUtc)
@@ -227,29 +378,32 @@ export function validatePricePayload(payload, { minCountries = 1 } = {}) {
 
 export function validateHistoryPayload(payload) {
   if (!isPlainObject(payload)
+    || !hasAllowedKeys(payload, PUBLIC_HISTORY_TOP_LEVEL_KEYS, ['schemaVersion', 'countries', 'sourcePublishedDates'])
     || ![1, 2].includes(payload.schemaVersion)
     || !isPlainObject(payload.countries)
     || !Object.keys(payload.countries).length
+    || Object.keys(payload.countries).length > MAX_HISTORY_COUNTRIES
     || !Array.isArray(payload.sourcePublishedDates)
     || !payload.sourcePublishedDates.length
+    || payload.sourcePublishedDates.length > MAX_PUBLICATION_HISTORY_ENTRIES
     || (payload.updatedAt != null && !isValidIsoTimestamp(payload.updatedAt))) {
     throw new Error('history.json has an unsupported structure');
   }
 
   for (const [countryName, record] of Object.entries(payload.countries)) {
     if (UNSAFE_OBJECT_KEYS.has(countryName)
-      || !isPlainObject(record)
-      || typeof record.nameZh !== 'string'
-      || !record.nameZh.trim()
-      || typeof record.region !== 'string'
-      || !record.region.trim()
+      || !hasSafeText(countryName, 160)
+      || !hasExactKeys(record, PUBLIC_HISTORY_RECORD_KEYS)
+      || !hasSafeText(record.nameZh, 160)
+      || !hasSafeText(record.region, 160)
       || !Array.isArray(record.events)
-      || !record.events.length) {
+      || !record.events.length
+      || record.events.length > MAX_HISTORY_EVENTS_PER_COUNTRY) {
       throw new Error(`history.json has an invalid record for ${countryName}`);
     }
     let previousObservedAt = '';
     for (const event of record.events) {
-      if (!isPlainObject(event)
+      if (!hasAllowedKeys(event, PUBLIC_HISTORY_EVENT_KEYS, ['observedAt', 'currency', 'plans'])
         || !isValidDateOnly(event.observedAt)
         || event.observedAt < previousObservedAt
         || typeof event.currency !== 'string'
@@ -257,7 +411,7 @@ export function validateHistoryPayload(payload) {
         || !isPlainObject(event.plans)
         || !Object.keys(event.plans).length
         || Object.keys(event.plans).some((tierId) => canonicalTierDefinition(tierId) === null)
-        || Object.values(event.plans).some((price) => !Number.isFinite(price) || price <= 0)
+        || Object.values(event.plans).some((price) => !Number.isFinite(price) || price <= 0 || price > Number.MAX_SAFE_INTEGER)
         || !isValidObservationMetadata(event)) {
         throw new Error(`history.json has an invalid event for ${countryName}`);
       }
@@ -270,7 +424,8 @@ export function validateHistoryPayload(payload) {
   let previousObservedAt = '';
   for (const entry of payload.sourcePublishedDates) {
     const publishedDate = publicationDateKey(entry?.publishedDate);
-    if (!isPlainObject(entry)
+    if (!hasAllowedKeys(entry, PUBLIC_HISTORY_PUBLICATION_KEYS, ['publishedDate', 'observedAt'])
+      || !hasSafeText(entry.publishedDate, 100)
       || !isValidDateOnly(publishedDate)
       || publishedDates.has(publishedDate)
       || publishedDate < previousPublishedDate
@@ -292,6 +447,9 @@ export function validateHistoryPayload(payload) {
 export function validatePriceHistoryConsistency(prices, history) {
   validatePricePayload(prices);
   validateHistoryPayload(history);
+  if (history.schemaVersion >= 2 && history.updatedAt !== prices.generatedAt) {
+    throw new Error('prices.json and history.json have different update timestamps');
+  }
   const currentPublishedDate = publicationDateKey(prices.source.publishedDate);
   const latestPublishedDate = publicationDateKey(history.sourcePublishedDates.at(-1)?.publishedDate);
   if (latestPublishedDate !== currentPublishedDate) {
@@ -316,7 +474,12 @@ export function validatePriceHistoryConsistency(prices, history) {
 }
 
 export function validatePayload(fileName, payload) {
-  return fileName === 'history.json'
-    ? validateHistoryPayload(payload)
-    : validatePricePayload(payload, { minCountries: 60 });
+  if (fileName === 'history.json') {
+    if (payload?.schemaVersion !== 2) throw new Error('history.json must use the current public schema');
+    return validateHistoryPayload(payload);
+  }
+  if (payload?.schemaVersion !== PUBLIC_PRICE_SCHEMA_VERSION) {
+    throw new Error('prices.json must use the current public schema');
+  }
+  return validatePricePayload(payload, { minCountries: 60 });
 }

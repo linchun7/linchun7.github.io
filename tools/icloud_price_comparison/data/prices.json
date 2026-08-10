@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 2,
-  "generatedAt": "2026-08-10T00:05:56.887Z",
+  "schemaVersion": 3,
+  "generatedAt": "2026-08-10T01:14:30.320Z",
   "source": {
     "name": "Apple Support",
     "url": "https://support.apple.com/en-us/108047",
@@ -9,68 +9,22 @@
     "parserStatus": "Both DOM association paths agreed"
   },
   "run": {
-    "startedAtUtc": "2026-08-10T00:05:56.110Z",
-    "finishedAtUtc": "2026-08-10T00:05:56.887Z",
+    "startedAtUtc": "2026-08-10T01:14:29.054Z",
+    "finishedAtUtc": "2026-08-10T01:14:30.320Z",
     "observedAtBeijing": "2026-08-10",
-    "observedAtUtc": "2026-08-10T00:05:56.887Z",
+    "observedAtUtc": "2026-08-10T01:14:30.320Z",
     "countries": 73,
     "pricePoints": 365
   },
   "fx": {
-    "sourceUrl": "https://v6.exchangerate-api.com/v6/latest/USD",
-    "sourceMode": "api-key",
+    "sourceUrl": "https://open.er-api.com/v6/latest/USD",
+    "sourceMode": "open-access",
     "fallbackUsed": false,
     "fallbackReason": null,
-    "apiKeyStatus": "valid",
     "base": "USD",
-    "fetchedAt": "2026-08-10T00:00:01.000Z",
+    "fetchedAt": "2026-08-10T00:02:31.000Z",
     "stale": false,
-    "rates": {
-      "AED": 3.6725,
-      "AUD": 1.4164,
-      "BGN": 1.6928,
-      "BRL": 5.0891,
-      "CAD": 1.3954,
-      "CHF": 0.8085,
-      "CLP": 913.8985,
-      "CNY": 6.7523,
-      "COP": 3158.5888,
-      "CZK": 20.9949,
-      "DKK": 6.4581,
-      "EGP": 49.8194,
-      "EUR": 0.8655,
-      "GBP": 0.7415,
-      "HKD": 7.8455,
-      "HUF": 314.9552,
-      "IDR": 17861.3937,
-      "ILS": 2.9987,
-      "INR": 95.2664,
-      "JPY": 157.8819,
-      "KRW": 1410.1186,
-      "KZT": 468.8204,
-      "MXN": 17.141,
-      "MYR": 4.0911,
-      "NGN": 1363.9063,
-      "NOK": 9.4987,
-      "NZD": 1.6981,
-      "PEN": 3.3836,
-      "PHP": 60.8316,
-      "PKR": 277.8116,
-      "PLN": 3.721,
-      "QAR": 3.64,
-      "RON": 4.5529,
-      "RUB": 81.9679,
-      "SAR": 3.75,
-      "SEK": 9.4813,
-      "SGD": 1.2792,
-      "THB": 33.017,
-      "TRY": 47.7067,
-      "TWD": 32.18,
-      "TZS": 2646.3264,
-      "USD": 1,
-      "VND": 26115.2843,
-      "ZAR": 16.1644
-    }
+    "derivedCurrency": "CNY"
   },
   "tiers": [
     {
@@ -107,23 +61,28 @@
       "plans": {
         "50GB": {
           "price": 0.99,
-          "formattedPrice": "$0.99"
+          "formattedPrice": "$0.99",
+          "cnyPrice": 6.68
         },
         "200GB": {
           "price": 2.99,
-          "formattedPrice": "$2.99"
+          "formattedPrice": "$2.99",
+          "cnyPrice": 20.19
         },
         "2TB": {
           "price": 10.99,
-          "formattedPrice": "$10.99"
+          "formattedPrice": "$10.99",
+          "cnyPrice": 74.21
         },
         "6TB": {
           "price": 32.99,
-          "formattedPrice": "$32.99"
+          "formattedPrice": "$32.99",
+          "cnyPrice": 222.76
         },
         "12TB": {
           "price": 64.99,
-          "formattedPrice": "$64.99"
+          "formattedPrice": "$64.99",
+          "cnyPrice": 438.83
         }
       },
       "nameZh": "巴哈马"
@@ -135,23 +94,28 @@
       "plans": {
         "50GB": {
           "price": 0.99,
-          "formattedPrice": "$0.99"
+          "formattedPrice": "$0.99",
+          "cnyPrice": 6.68
         },
         "200GB": {
           "price": 3.49,
-          "formattedPrice": "$3.49"
+          "formattedPrice": "$3.49",
+          "cnyPrice": 23.57
         },
         "2TB": {
           "price": 11.99,
-          "formattedPrice": "$11.99"
+          "formattedPrice": "$11.99",
+          "cnyPrice": 80.96
         },
         "6TB": {
           "price": 34.99,
-          "formattedPrice": "$34.99"
+          "formattedPrice": "$34.99",
+          "cnyPrice": 236.26
         },
         "12TB": {
           "price": 69.99,
-          "formattedPrice": "$69.99"
+          "formattedPrice": "$69.99",
+          "cnyPrice": 472.59
         }
       },
       "nameZh": "巴巴多斯"
@@ -163,23 +127,28 @@
       "plans": {
         "50GB": {
           "price": 5.9,
-          "formattedPrice": "R$ 5.90"
+          "formattedPrice": "R$ 5.90",
+          "cnyPrice": 7.83
         },
         "200GB": {
           "price": 19.9,
-          "formattedPrice": "R$ 19.90"
+          "formattedPrice": "R$ 19.90",
+          "cnyPrice": 26.4
         },
         "2TB": {
           "price": 66.9,
-          "formattedPrice": "R$ 66.90"
+          "formattedPrice": "R$ 66.90",
+          "cnyPrice": 88.76
         },
         "6TB": {
           "price": 199.9,
-          "formattedPrice": "R$ 199.90"
+          "formattedPrice": "R$ 199.90",
+          "cnyPrice": 265.23
         },
         "12TB": {
           "price": 399.9,
-          "formattedPrice": "R$ 399.90"
+          "formattedPrice": "R$ 399.90",
+          "cnyPrice": 530.6
         }
       },
       "nameZh": "巴西"
@@ -191,23 +160,28 @@
       "plans": {
         "50GB": {
           "price": 1.29,
-          "formattedPrice": "$1.29"
+          "formattedPrice": "$1.29",
+          "cnyPrice": 6.24
         },
         "200GB": {
           "price": 3.99,
-          "formattedPrice": "$3.99"
+          "formattedPrice": "$3.99",
+          "cnyPrice": 19.31
         },
         "2TB": {
           "price": 12.99,
-          "formattedPrice": "$12.99"
+          "formattedPrice": "$12.99",
+          "cnyPrice": 62.86
         },
         "6TB": {
           "price": 39.99,
-          "formattedPrice": "$39.99"
+          "formattedPrice": "$39.99",
+          "cnyPrice": 193.51
         },
         "12TB": {
           "price": 79.99,
-          "formattedPrice": "$79.99"
+          "formattedPrice": "$79.99",
+          "cnyPrice": 387.06
         }
       },
       "nameZh": "加拿大"
@@ -219,23 +193,28 @@
       "plans": {
         "50GB": {
           "price": 990,
-          "formattedPrice": "$990"
+          "formattedPrice": "$990",
+          "cnyPrice": 7.31
         },
         "200GB": {
           "price": 3290,
-          "formattedPrice": "$3290"
+          "formattedPrice": "$3290",
+          "cnyPrice": 24.31
         },
         "2TB": {
           "price": 10990,
-          "formattedPrice": "$10990"
+          "formattedPrice": "$10990",
+          "cnyPrice": 81.2
         },
         "6TB": {
           "price": 32990,
-          "formattedPrice": "$32990"
+          "formattedPrice": "$32990",
+          "cnyPrice": 243.75
         },
         "12TB": {
           "price": 64990,
-          "formattedPrice": "$64990"
+          "formattedPrice": "$64990",
+          "cnyPrice": 480.18
         }
       },
       "nameZh": "智利"
@@ -247,23 +226,28 @@
       "plans": {
         "50GB": {
           "price": 3900,
-          "formattedPrice": "$3900"
+          "formattedPrice": "$3900",
+          "cnyPrice": 8.34
         },
         "200GB": {
           "price": 12900,
-          "formattedPrice": "$12900"
+          "formattedPrice": "$12900",
+          "cnyPrice": 27.58
         },
         "2TB": {
           "price": 44900,
-          "formattedPrice": "$44900"
+          "formattedPrice": "$44900",
+          "cnyPrice": 95.99
         },
         "6TB": {
           "price": 129900,
-          "formattedPrice": "$129900"
+          "formattedPrice": "$129900",
+          "cnyPrice": 277.7
         },
         "12TB": {
           "price": 269900,
-          "formattedPrice": "$269900"
+          "formattedPrice": "$269900",
+          "cnyPrice": 576.98
         }
       },
       "nameZh": "哥伦比亚"
@@ -275,23 +259,28 @@
       "plans": {
         "50GB": {
           "price": 17,
-          "formattedPrice": "$17"
+          "formattedPrice": "$17",
+          "cnyPrice": 6.7
         },
         "200GB": {
           "price": 49,
-          "formattedPrice": "$49"
+          "formattedPrice": "$49",
+          "cnyPrice": 19.3
         },
         "2TB": {
           "price": 179,
-          "formattedPrice": "$179"
+          "formattedPrice": "$179",
+          "cnyPrice": 70.51
         },
         "6TB": {
           "price": 499,
-          "formattedPrice": "$499"
+          "formattedPrice": "$499",
+          "cnyPrice": 196.57
         },
         "12TB": {
           "price": 999,
-          "formattedPrice": "$999"
+          "formattedPrice": "$999",
+          "cnyPrice": 393.54
         }
       },
       "nameZh": "墨西哥"
@@ -303,23 +292,28 @@
       "plans": {
         "50GB": {
           "price": 3.9,
-          "formattedPrice": "S/.3.90"
+          "formattedPrice": "S/.3.90",
+          "cnyPrice": 7.78
         },
         "200GB": {
           "price": 12.9,
-          "formattedPrice": "S/.12.90"
+          "formattedPrice": "S/.12.90",
+          "cnyPrice": 25.74
         },
         "2TB": {
           "price": 42.9,
-          "formattedPrice": "S/.42.90"
+          "formattedPrice": "S/.42.90",
+          "cnyPrice": 85.61
         },
         "6TB": {
           "price": 129.9,
-          "formattedPrice": "S/.129.90"
+          "formattedPrice": "S/.129.90",
+          "cnyPrice": 259.23
         },
         "12TB": {
           "price": 259.9,
-          "formattedPrice": "S/.259.90"
+          "formattedPrice": "S/.259.90",
+          "cnyPrice": 518.65
         }
       },
       "nameZh": "秘鲁"
@@ -331,23 +325,28 @@
       "plans": {
         "50GB": {
           "price": 0.99,
-          "formattedPrice": "$0.99"
+          "formattedPrice": "$0.99",
+          "cnyPrice": 6.68
         },
         "200GB": {
           "price": 3.49,
-          "formattedPrice": "$3.49"
+          "formattedPrice": "$3.49",
+          "cnyPrice": 23.57
         },
         "2TB": {
           "price": 11.99,
-          "formattedPrice": "$11.99"
+          "formattedPrice": "$11.99",
+          "cnyPrice": 80.96
         },
         "6TB": {
           "price": 34.99,
-          "formattedPrice": "$34.99"
+          "formattedPrice": "$34.99",
+          "cnyPrice": 236.26
         },
         "12TB": {
           "price": 69.99,
-          "formattedPrice": "$69.99"
+          "formattedPrice": "$69.99",
+          "cnyPrice": 472.59
         }
       },
       "nameZh": "苏里南"
@@ -359,23 +358,28 @@
       "plans": {
         "50GB": {
           "price": 0.99,
-          "formattedPrice": "$0.99"
+          "formattedPrice": "$0.99",
+          "cnyPrice": 6.68
         },
         "200GB": {
           "price": 2.99,
-          "formattedPrice": "$2.99"
+          "formattedPrice": "$2.99",
+          "cnyPrice": 20.19
         },
         "2TB": {
           "price": 9.99,
-          "formattedPrice": "$9.99"
+          "formattedPrice": "$9.99",
+          "cnyPrice": 67.46
         },
         "6TB": {
           "price": 29.99,
-          "formattedPrice": "$29.99"
+          "formattedPrice": "$29.99",
+          "cnyPrice": 202.5
         },
         "12TB": {
           "price": 59.99,
-          "formattedPrice": "$59.99"
+          "formattedPrice": "$59.99",
+          "cnyPrice": 405.07
         }
       },
       "nameZh": "美国"
@@ -387,23 +391,28 @@
       "plans": {
         "50GB": {
           "price": 1.19,
-          "formattedPrice": "$1.19"
+          "formattedPrice": "$1.19",
+          "cnyPrice": 8.04
         },
         "200GB": {
           "price": 3.59,
-          "formattedPrice": "$3.59"
+          "formattedPrice": "$3.59",
+          "cnyPrice": 24.24
         },
         "2TB": {
           "price": 11.99,
-          "formattedPrice": "$11.99"
+          "formattedPrice": "$11.99",
+          "cnyPrice": 80.96
         },
         "6TB": {
           "price": 34.99,
-          "formattedPrice": "$34.99"
+          "formattedPrice": "$34.99",
+          "cnyPrice": 236.26
         },
         "12TB": {
           "price": 69.99,
-          "formattedPrice": "$69.99"
+          "formattedPrice": "$69.99",
+          "cnyPrice": 472.59
         }
       },
       "nameZh": "阿尔巴尼亚"
@@ -415,23 +424,28 @@
       "plans": {
         "50GB": {
           "price": 1.19,
-          "formattedPrice": "$1.19"
+          "formattedPrice": "$1.19",
+          "cnyPrice": 8.04
         },
         "200GB": {
           "price": 3.49,
-          "formattedPrice": "$3.49"
+          "formattedPrice": "$3.49",
+          "cnyPrice": 23.57
         },
         "2TB": {
           "price": 11.99,
-          "formattedPrice": "$11.99"
+          "formattedPrice": "$11.99",
+          "cnyPrice": 80.96
         },
         "6TB": {
           "price": 34.99,
-          "formattedPrice": "$34.99"
+          "formattedPrice": "$34.99",
+          "cnyPrice": 236.26
         },
         "12TB": {
           "price": 69.99,
-          "formattedPrice": "$69.99"
+          "formattedPrice": "$69.99",
+          "cnyPrice": 472.59
         }
       },
       "nameZh": "亚美尼亚"
@@ -443,23 +457,28 @@
       "plans": {
         "50GB": {
           "price": 0.99,
-          "formattedPrice": "$0.99"
+          "formattedPrice": "$0.99",
+          "cnyPrice": 6.68
         },
         "200GB": {
           "price": 3.49,
-          "formattedPrice": "$3.49"
+          "formattedPrice": "$3.49",
+          "cnyPrice": 23.57
         },
         "2TB": {
           "price": 11.99,
-          "formattedPrice": "$11.99"
+          "formattedPrice": "$11.99",
+          "cnyPrice": 80.96
         },
         "6TB": {
           "price": 34.99,
-          "formattedPrice": "$34.99"
+          "formattedPrice": "$34.99",
+          "cnyPrice": 236.26
         },
         "12TB": {
           "price": 69.99,
-          "formattedPrice": "$69.99"
+          "formattedPrice": "$69.99",
+          "cnyPrice": 472.59
         }
       },
       "nameZh": "阿塞拜疆"
@@ -471,23 +490,28 @@
       "plans": {
         "50GB": {
           "price": 0.99,
-          "formattedPrice": "$0.99"
+          "formattedPrice": "$0.99",
+          "cnyPrice": 6.68
         },
         "200GB": {
           "price": 2.99,
-          "formattedPrice": "$2.99"
+          "formattedPrice": "$2.99",
+          "cnyPrice": 20.19
         },
         "2TB": {
           "price": 10.99,
-          "formattedPrice": "$10.99"
+          "formattedPrice": "$10.99",
+          "cnyPrice": 74.21
         },
         "6TB": {
           "price": 32.99,
-          "formattedPrice": "$32.99"
+          "formattedPrice": "$32.99",
+          "cnyPrice": 222.76
         },
         "12TB": {
           "price": 64.99,
-          "formattedPrice": "$64.99"
+          "formattedPrice": "$64.99",
+          "cnyPrice": 438.83
         }
       },
       "nameZh": "巴林"
@@ -499,23 +523,28 @@
       "plans": {
         "50GB": {
           "price": 1.19,
-          "formattedPrice": "$1.19"
+          "formattedPrice": "$1.19",
+          "cnyPrice": 8.04
         },
         "200GB": {
           "price": 3.49,
-          "formattedPrice": "$3.49"
+          "formattedPrice": "$3.49",
+          "cnyPrice": 23.57
         },
         "2TB": {
           "price": 11.99,
-          "formattedPrice": "$11.99"
+          "formattedPrice": "$11.99",
+          "cnyPrice": 80.96
         },
         "6TB": {
           "price": 34.99,
-          "formattedPrice": "$34.99"
+          "formattedPrice": "$34.99",
+          "cnyPrice": 236.26
         },
         "12TB": {
           "price": 69.99,
-          "formattedPrice": "$69.99"
+          "formattedPrice": "$69.99",
+          "cnyPrice": 472.59
         }
       },
       "nameZh": "白俄罗斯"
@@ -527,23 +556,28 @@
       "plans": {
         "50GB": {
           "price": 0.99,
-          "formattedPrice": "$0.99"
+          "formattedPrice": "$0.99",
+          "cnyPrice": 6.68
         },
         "200GB": {
           "price": 3.49,
-          "formattedPrice": "$3.49"
+          "formattedPrice": "$3.49",
+          "cnyPrice": 23.57
         },
         "2TB": {
           "price": 11.99,
-          "formattedPrice": "$11.99"
+          "formattedPrice": "$11.99",
+          "cnyPrice": 80.96
         },
         "6TB": {
           "price": 34.99,
-          "formattedPrice": "$34.99"
+          "formattedPrice": "$34.99",
+          "cnyPrice": 236.26
         },
         "12TB": {
           "price": 69.99,
-          "formattedPrice": "$69.99"
+          "formattedPrice": "$69.99",
+          "cnyPrice": 472.59
         }
       },
       "nameZh": "贝宁"
@@ -555,23 +589,28 @@
       "plans": {
         "50GB": {
           "price": 1.99,
-          "formattedPrice": "1.99 лв"
+          "formattedPrice": "1.99 лв",
+          "cnyPrice": 7.94
         },
         "200GB": {
           "price": 5.99,
-          "formattedPrice": "5.99 лв"
+          "formattedPrice": "5.99 лв",
+          "cnyPrice": 23.89
         },
         "2TB": {
           "price": 20.99,
-          "formattedPrice": "20.99 лв"
+          "formattedPrice": "20.99 лв",
+          "cnyPrice": 83.73
         },
         "6TB": {
           "price": 64.99,
-          "formattedPrice": "64.99 лв"
+          "formattedPrice": "64.99 лв",
+          "cnyPrice": 259.24
         },
         "12TB": {
           "price": 129.99,
-          "formattedPrice": "129.99 лв"
+          "formattedPrice": "129.99 лв",
+          "cnyPrice": 518.52
         }
       },
       "nameZh": "保加利亚"
@@ -583,23 +622,28 @@
       "plans": {
         "50GB": {
           "price": 0.99,
-          "formattedPrice": "$0.99"
+          "formattedPrice": "$0.99",
+          "cnyPrice": 6.68
         },
         "200GB": {
           "price": 3.49,
-          "formattedPrice": "$3.49"
+          "formattedPrice": "$3.49",
+          "cnyPrice": 23.57
         },
         "2TB": {
           "price": 11.99,
-          "formattedPrice": "$11.99"
+          "formattedPrice": "$11.99",
+          "cnyPrice": 80.96
         },
         "6TB": {
           "price": 34.99,
-          "formattedPrice": "$34.99"
+          "formattedPrice": "$34.99",
+          "cnyPrice": 236.26
         },
         "12TB": {
           "price": 69.99,
-          "formattedPrice": "$69.99"
+          "formattedPrice": "$69.99",
+          "cnyPrice": 472.59
         }
       },
       "nameZh": "喀麦隆"
@@ -611,23 +655,28 @@
       "plans": {
         "50GB": {
           "price": 0.99,
-          "formattedPrice": "0.99 €"
+          "formattedPrice": "0.99 €",
+          "cnyPrice": 7.72
         },
         "200GB": {
           "price": 2.99,
-          "formattedPrice": "2.99 €"
+          "formattedPrice": "2.99 €",
+          "cnyPrice": 23.33
         },
         "2TB": {
           "price": 9.99,
-          "formattedPrice": "9.99 €"
+          "formattedPrice": "9.99 €",
+          "cnyPrice": 77.94
         },
         "6TB": {
           "price": 29.99,
-          "formattedPrice": "29.99 €"
+          "formattedPrice": "29.99 €",
+          "cnyPrice": 233.97
         },
         "12TB": {
           "price": 59.99,
-          "formattedPrice": "59.99 €"
+          "formattedPrice": "59.99 €",
+          "cnyPrice": 468.02
         }
       },
       "nameZh": "克罗地亚"
@@ -639,23 +688,28 @@
       "plans": {
         "50GB": {
           "price": 25,
-          "formattedPrice": "25 Kč"
+          "formattedPrice": "25 Kč",
+          "cnyPrice": 8.04
         },
         "200GB": {
           "price": 79,
-          "formattedPrice": "79 Kč"
+          "formattedPrice": "79 Kč",
+          "cnyPrice": 25.41
         },
         "2TB": {
           "price": 249,
-          "formattedPrice": "249 Kč"
+          "formattedPrice": "249 Kč",
+          "cnyPrice": 80.08
         },
         "6TB": {
           "price": 749,
-          "formattedPrice": "749 Kč"
+          "formattedPrice": "749 Kč",
+          "cnyPrice": 240.88
         },
         "12TB": {
           "price": 1490,
-          "formattedPrice": "1490 Kč"
+          "formattedPrice": "1490 Kč",
+          "cnyPrice": 479.2
         }
       },
       "nameZh": "捷克"
@@ -667,23 +721,28 @@
       "plans": {
         "50GB": {
           "price": 9,
-          "formattedPrice": "9 kr"
+          "formattedPrice": "9 kr",
+          "cnyPrice": 9.41
         },
         "200GB": {
           "price": 25,
-          "formattedPrice": "25 kr"
+          "formattedPrice": "25 kr",
+          "cnyPrice": 26.14
         },
         "2TB": {
           "price": 89,
-          "formattedPrice": "89 kr"
+          "formattedPrice": "89 kr",
+          "cnyPrice": 93.06
         },
         "6TB": {
           "price": 269,
-          "formattedPrice": "269 kr"
+          "formattedPrice": "269 kr",
+          "cnyPrice": 281.26
         },
         "12TB": {
           "price": 549,
-          "formattedPrice": "549 kr"
+          "formattedPrice": "549 kr",
+          "cnyPrice": 574.03
         }
       },
       "nameZh": "丹麦"
@@ -695,23 +754,28 @@
       "plans": {
         "50GB": {
           "price": 49.99,
-          "formattedPrice": "£49.99"
+          "formattedPrice": "£49.99",
+          "cnyPrice": 6.78
         },
         "200GB": {
           "price": 179.99,
-          "formattedPrice": "£179.99"
+          "formattedPrice": "£179.99",
+          "cnyPrice": 24.4
         },
         "2TB": {
           "price": 599.99,
-          "formattedPrice": "£599.99"
+          "formattedPrice": "£599.99",
+          "cnyPrice": 81.32
         },
         "6TB": {
           "price": 1799.99,
-          "formattedPrice": "£1799.99"
+          "formattedPrice": "£1799.99",
+          "cnyPrice": 243.97
         },
         "12TB": {
           "price": 3599.99,
-          "formattedPrice": "£3599.99"
+          "formattedPrice": "£3599.99",
+          "cnyPrice": 487.94
         }
       },
       "nameZh": "埃及"
@@ -723,23 +787,28 @@
       "plans": {
         "50GB": {
           "price": 0.99,
-          "formattedPrice": "0.99 €"
+          "formattedPrice": "0.99 €",
+          "cnyPrice": 7.72
         },
         "200GB": {
           "price": 2.99,
-          "formattedPrice": "2.99 €"
+          "formattedPrice": "2.99 €",
+          "cnyPrice": 23.33
         },
         "2TB": {
           "price": 9.99,
-          "formattedPrice": "9.99 €"
+          "formattedPrice": "9.99 €",
+          "cnyPrice": 77.94
         },
         "6TB": {
           "price": 29.99,
-          "formattedPrice": "29.99 €"
+          "formattedPrice": "29.99 €",
+          "cnyPrice": 233.97
         },
         "12TB": {
           "price": 59.99,
-          "formattedPrice": "59.99 €"
+          "formattedPrice": "59.99 €",
+          "cnyPrice": 468.02
         }
       },
       "nameZh": "欧盟"
@@ -751,23 +820,28 @@
       "plans": {
         "50GB": {
           "price": 0.99,
-          "formattedPrice": "$0.99"
+          "formattedPrice": "$0.99",
+          "cnyPrice": 6.68
         },
         "200GB": {
           "price": 3.49,
-          "formattedPrice": "$3.49"
+          "formattedPrice": "$3.49",
+          "cnyPrice": 23.57
         },
         "2TB": {
           "price": 11.99,
-          "formattedPrice": "$11.99"
+          "formattedPrice": "$11.99",
+          "cnyPrice": 80.96
         },
         "6TB": {
           "price": 34.99,
-          "formattedPrice": "$34.99"
+          "formattedPrice": "$34.99",
+          "cnyPrice": 236.26
         },
         "12TB": {
           "price": 69.99,
-          "formattedPrice": "$69.99"
+          "formattedPrice": "$69.99",
+          "cnyPrice": 472.59
         }
       },
       "nameZh": "格鲁吉亚"
@@ -779,23 +853,28 @@
       "plans": {
         "50GB": {
           "price": 0.99,
-          "formattedPrice": "$0.99"
+          "formattedPrice": "$0.99",
+          "cnyPrice": 6.68
         },
         "200GB": {
           "price": 3.49,
-          "formattedPrice": "$3.49"
+          "formattedPrice": "$3.49",
+          "cnyPrice": 23.57
         },
         "2TB": {
           "price": 11.99,
-          "formattedPrice": "$11.99"
+          "formattedPrice": "$11.99",
+          "cnyPrice": 80.96
         },
         "6TB": {
           "price": 34.99,
-          "formattedPrice": "$34.99"
+          "formattedPrice": "$34.99",
+          "cnyPrice": 236.26
         },
         "12TB": {
           "price": 69.99,
-          "formattedPrice": "$69.99"
+          "formattedPrice": "$69.99",
+          "cnyPrice": 472.59
         }
       },
       "nameZh": "加纳"
@@ -807,23 +886,28 @@
       "plans": {
         "50GB": {
           "price": 399,
-          "formattedPrice": "399 Ft"
+          "formattedPrice": "399 Ft",
+          "cnyPrice": 8.56
         },
         "200GB": {
           "price": 1290,
-          "formattedPrice": "1290 Ft"
+          "formattedPrice": "1290 Ft",
+          "cnyPrice": 27.67
         },
         "2TB": {
           "price": 4490,
-          "formattedPrice": "4490 Ft"
+          "formattedPrice": "4490 Ft",
+          "cnyPrice": 96.29
         },
         "6TB": {
           "price": 12990,
-          "formattedPrice": "12990 Ft"
+          "formattedPrice": "12990 Ft",
+          "cnyPrice": 278.59
         },
         "12TB": {
           "price": 26990,
-          "formattedPrice": "26990 Ft"
+          "formattedPrice": "26990 Ft",
+          "cnyPrice": 578.83
         }
       },
       "nameZh": "匈牙利"
@@ -835,23 +919,28 @@
       "plans": {
         "50GB": {
           "price": 1.19,
-          "formattedPrice": "$1.19"
+          "formattedPrice": "$1.19",
+          "cnyPrice": 8.04
         },
         "200GB": {
           "price": 3.69,
-          "formattedPrice": "$3.69"
+          "formattedPrice": "$3.69",
+          "cnyPrice": 24.92
         },
         "2TB": {
           "price": 11.99,
-          "formattedPrice": "$11.99"
+          "formattedPrice": "$11.99",
+          "cnyPrice": 80.96
         },
         "6TB": {
           "price": 34.99,
-          "formattedPrice": "$34.99"
+          "formattedPrice": "$34.99",
+          "cnyPrice": 236.26
         },
         "12TB": {
           "price": 69.99,
-          "formattedPrice": "$69.99"
+          "formattedPrice": "$69.99",
+          "cnyPrice": 472.59
         }
       },
       "nameZh": "冰岛"
@@ -863,23 +952,28 @@
       "plans": {
         "50GB": {
           "price": 3.9,
-          "formattedPrice": "₪3.90"
+          "formattedPrice": "₪3.90",
+          "cnyPrice": 8.78
         },
         "200GB": {
           "price": 11.9,
-          "formattedPrice": "₪11.90"
+          "formattedPrice": "₪11.90",
+          "cnyPrice": 26.8
         },
         "2TB": {
           "price": 39.9,
-          "formattedPrice": "₪39.90"
+          "formattedPrice": "₪39.90",
+          "cnyPrice": 89.85
         },
         "6TB": {
           "price": 119.9,
-          "formattedPrice": "₪119.90"
+          "formattedPrice": "₪119.90",
+          "cnyPrice": 269.99
         },
         "12TB": {
           "price": 239.9,
-          "formattedPrice": "₪239.90"
+          "formattedPrice": "₪239.90",
+          "cnyPrice": 540.2
         }
       },
       "nameZh": "以色列"
@@ -891,23 +985,28 @@
       "plans": {
         "50GB": {
           "price": 0.99,
-          "formattedPrice": "$0.99"
+          "formattedPrice": "$0.99",
+          "cnyPrice": 6.68
         },
         "200GB": {
           "price": 3.49,
-          "formattedPrice": "$3.49"
+          "formattedPrice": "$3.49",
+          "cnyPrice": 23.57
         },
         "2TB": {
           "price": 11.99,
-          "formattedPrice": "$11.99"
+          "formattedPrice": "$11.99",
+          "cnyPrice": 80.96
         },
         "6TB": {
           "price": 34.99,
-          "formattedPrice": "$34.99"
+          "formattedPrice": "$34.99",
+          "cnyPrice": 236.26
         },
         "12TB": {
           "price": 69.99,
-          "formattedPrice": "$69.99"
+          "formattedPrice": "$69.99",
+          "cnyPrice": 472.59
         }
       },
       "nameZh": "科特迪瓦"
@@ -919,23 +1018,28 @@
       "plans": {
         "50GB": {
           "price": 0.99,
-          "formattedPrice": "$0.99"
+          "formattedPrice": "$0.99",
+          "cnyPrice": 6.68
         },
         "200GB": {
           "price": 3.49,
-          "formattedPrice": "$3.49"
+          "formattedPrice": "$3.49",
+          "cnyPrice": 23.57
         },
         "2TB": {
           "price": 11.99,
-          "formattedPrice": "$11.99"
+          "formattedPrice": "$11.99",
+          "cnyPrice": 80.96
         },
         "6TB": {
           "price": 34.99,
-          "formattedPrice": "$34.99"
+          "formattedPrice": "$34.99",
+          "cnyPrice": 236.26
         },
         "12TB": {
           "price": 69.99,
-          "formattedPrice": "$69.99"
+          "formattedPrice": "$69.99",
+          "cnyPrice": 472.59
         }
       },
       "nameZh": "肯尼亚"
@@ -947,23 +1051,28 @@
       "plans": {
         "50GB": {
           "price": 1.19,
-          "formattedPrice": "$1.19"
+          "formattedPrice": "$1.19",
+          "cnyPrice": 8.04
         },
         "200GB": {
           "price": 3.49,
-          "formattedPrice": "$3.49"
+          "formattedPrice": "$3.49",
+          "cnyPrice": 23.57
         },
         "2TB": {
           "price": 11.99,
-          "formattedPrice": "$11.99"
+          "formattedPrice": "$11.99",
+          "cnyPrice": 80.96
         },
         "6TB": {
           "price": 34.99,
-          "formattedPrice": "$34.99"
+          "formattedPrice": "$34.99",
+          "cnyPrice": 236.26
         },
         "12TB": {
           "price": 69.99,
-          "formattedPrice": "$69.99"
+          "formattedPrice": "$69.99",
+          "cnyPrice": 472.59
         }
       },
       "nameZh": "毛里求斯"
@@ -975,23 +1084,28 @@
       "plans": {
         "50GB": {
           "price": 0.99,
-          "formattedPrice": "$0.99"
+          "formattedPrice": "$0.99",
+          "cnyPrice": 6.68
         },
         "200GB": {
           "price": 3.49,
-          "formattedPrice": "$3.49"
+          "formattedPrice": "$3.49",
+          "cnyPrice": 23.57
         },
         "2TB": {
           "price": 11.99,
-          "formattedPrice": "$11.99"
+          "formattedPrice": "$11.99",
+          "cnyPrice": 80.96
         },
         "6TB": {
           "price": 34.99,
-          "formattedPrice": "$34.99"
+          "formattedPrice": "$34.99",
+          "cnyPrice": 236.26
         },
         "12TB": {
           "price": 69.99,
-          "formattedPrice": "$69.99"
+          "formattedPrice": "$69.99",
+          "cnyPrice": 472.59
         }
       },
       "nameZh": "摩尔多瓦"
@@ -1003,23 +1117,28 @@
       "plans": {
         "50GB": {
           "price": 1300,
-          "formattedPrice": "₦1300"
+          "formattedPrice": "₦1300",
+          "cnyPrice": 6.44
         },
         "200GB": {
           "price": 4500,
-          "formattedPrice": "₦4500"
+          "formattedPrice": "₦4500",
+          "cnyPrice": 22.28
         },
         "2TB": {
           "price": 14900,
-          "formattedPrice": "₦14900"
+          "formattedPrice": "₦14900",
+          "cnyPrice": 73.77
         },
         "6TB": {
           "price": 39900,
-          "formattedPrice": "₦39900"
+          "formattedPrice": "₦39900",
+          "cnyPrice": 197.53
         },
         "12TB": {
           "price": 66900,
-          "formattedPrice": "₦66900"
+          "formattedPrice": "₦66900",
+          "cnyPrice": 331.2
         }
       },
       "nameZh": "尼日利亚"
@@ -1031,23 +1150,28 @@
       "plans": {
         "50GB": {
           "price": 12,
-          "formattedPrice": "12 kr"
+          "formattedPrice": "12 kr",
+          "cnyPrice": 8.53
         },
         "200GB": {
           "price": 39,
-          "formattedPrice": "39 kr"
+          "formattedPrice": "39 kr",
+          "cnyPrice": 27.72
         },
         "2TB": {
           "price": 129,
-          "formattedPrice": "129 kr"
+          "formattedPrice": "129 kr",
+          "cnyPrice": 91.71
         },
         "6TB": {
           "price": 399,
-          "formattedPrice": "399 kr"
+          "formattedPrice": "399 kr",
+          "cnyPrice": 283.65
         },
         "12TB": {
           "price": 799,
-          "formattedPrice": "799 kr"
+          "formattedPrice": "799 kr",
+          "cnyPrice": 568
         }
       },
       "nameZh": "挪威"
@@ -1059,23 +1183,28 @@
       "plans": {
         "50GB": {
           "price": 200,
-          "formattedPrice": "Rs200"
+          "formattedPrice": "Rs200",
+          "cnyPrice": 4.86
         },
         "200GB": {
           "price": 800,
-          "formattedPrice": "Rs800"
+          "formattedPrice": "Rs800",
+          "cnyPrice": 19.43
         },
         "2TB": {
           "price": 2500,
-          "formattedPrice": "Rs2500"
+          "formattedPrice": "Rs2500",
+          "cnyPrice": 60.73
         },
         "6TB": {
           "price": 8900,
-          "formattedPrice": "Rs8900"
+          "formattedPrice": "Rs8900",
+          "cnyPrice": 216.2
         },
         "12TB": {
           "price": 17900,
-          "formattedPrice": "Rs17900"
+          "formattedPrice": "Rs17900",
+          "cnyPrice": 434.83
         }
       },
       "nameZh": "巴基斯坦"
@@ -1087,23 +1216,28 @@
       "plans": {
         "50GB": {
           "price": 4.99,
-          "formattedPrice": "4.99 zł"
+          "formattedPrice": "4.99 zł",
+          "cnyPrice": 9.06
         },
         "200GB": {
           "price": 14.99,
-          "formattedPrice": "14.99 zł"
+          "formattedPrice": "14.99 zł",
+          "cnyPrice": 27.2
         },
         "2TB": {
           "price": 49.99,
-          "formattedPrice": "49.99 zł"
+          "formattedPrice": "49.99 zł",
+          "cnyPrice": 90.72
         },
         "6TB": {
           "price": 149.99,
-          "formattedPrice": "149.99 zł"
+          "formattedPrice": "149.99 zł",
+          "cnyPrice": 272.18
         },
         "12TB": {
           "price": 299.99,
-          "formattedPrice": "299.99 zł"
+          "formattedPrice": "299.99 zł",
+          "cnyPrice": 544.39
         }
       },
       "nameZh": "波兰"
@@ -1115,23 +1249,28 @@
       "plans": {
         "50GB": {
           "price": 3.69,
-          "formattedPrice": "3.69﷼"
+          "formattedPrice": "3.69﷼",
+          "cnyPrice": 6.85
         },
         "200GB": {
           "price": 10.99,
-          "formattedPrice": "10.99﷼"
+          "formattedPrice": "10.99﷼",
+          "cnyPrice": 20.39
         },
         "2TB": {
           "price": 36.99,
-          "formattedPrice": "36.99﷼"
+          "formattedPrice": "36.99﷼",
+          "cnyPrice": 68.62
         },
         "6TB": {
           "price": 109.99,
-          "formattedPrice": "109.99﷼"
+          "formattedPrice": "109.99﷼",
+          "cnyPrice": 204.03
         },
         "12TB": {
           "price": 219.99,
-          "formattedPrice": "219.99﷼"
+          "formattedPrice": "219.99﷼",
+          "cnyPrice": 408.09
         }
       },
       "nameZh": "卡塔尔"
@@ -1143,23 +1282,28 @@
       "plans": {
         "50GB": {
           "price": 1.19,
-          "formattedPrice": "$1.19"
+          "formattedPrice": "$1.19",
+          "cnyPrice": 8.04
         },
         "200GB": {
           "price": 3.49,
-          "formattedPrice": "$3.49"
+          "formattedPrice": "$3.49",
+          "cnyPrice": 23.57
         },
         "2TB": {
           "price": 11.99,
-          "formattedPrice": "$11.99"
+          "formattedPrice": "$11.99",
+          "cnyPrice": 80.96
         },
         "6TB": {
           "price": 34.99,
-          "formattedPrice": "$34.99"
+          "formattedPrice": "$34.99",
+          "cnyPrice": 236.26
         },
         "12TB": {
           "price": 69.99,
-          "formattedPrice": "$69.99"
+          "formattedPrice": "$69.99",
+          "cnyPrice": 472.59
         }
       },
       "nameZh": "刚果共和国"
@@ -1171,23 +1315,28 @@
       "plans": {
         "50GB": {
           "price": 4.99,
-          "formattedPrice": "4.99 lei"
+          "formattedPrice": "4.99 lei",
+          "cnyPrice": 7.4
         },
         "200GB": {
           "price": 14.99,
-          "formattedPrice": "14.99 lei"
+          "formattedPrice": "14.99 lei",
+          "cnyPrice": 22.23
         },
         "2TB": {
           "price": 49.99,
-          "formattedPrice": "49.99 lei"
+          "formattedPrice": "49.99 lei",
+          "cnyPrice": 74.14
         },
         "6TB": {
           "price": 149.99,
-          "formattedPrice": "149.99 lei"
+          "formattedPrice": "149.99 lei",
+          "cnyPrice": 222.45
         },
         "12TB": {
           "price": 299.99,
-          "formattedPrice": "299.99 lei"
+          "formattedPrice": "299.99 lei",
+          "cnyPrice": 444.91
         }
       },
       "nameZh": "罗马尼亚"
@@ -1199,23 +1348,28 @@
       "plans": {
         "50GB": {
           "price": 59,
-          "formattedPrice": "59 p."
+          "formattedPrice": "59 p.",
+          "cnyPrice": 4.86
         },
         "200GB": {
           "price": 149,
-          "formattedPrice": "149 p."
+          "formattedPrice": "149 p.",
+          "cnyPrice": 12.27
         },
         "2TB": {
           "price": 599,
-          "formattedPrice": "599 p."
+          "formattedPrice": "599 p.",
+          "cnyPrice": 49.34
         },
         "6TB": {
           "price": 3490,
-          "formattedPrice": "3490 p."
+          "formattedPrice": "3490 p.",
+          "cnyPrice": 287.49
         },
         "12TB": {
           "price": 6990,
-          "formattedPrice": "6990 p."
+          "formattedPrice": "6990 p.",
+          "cnyPrice": 575.81
         }
       },
       "nameZh": "俄罗斯"
@@ -1227,23 +1381,28 @@
       "plans": {
         "50GB": {
           "price": 3.99,
-          "formattedPrice": "3.99﷼"
+          "formattedPrice": "3.99﷼",
+          "cnyPrice": 7.18
         },
         "200GB": {
           "price": 12.99,
-          "formattedPrice": "12.99﷼"
+          "formattedPrice": "12.99﷼",
+          "cnyPrice": 23.39
         },
         "2TB": {
           "price": 44.99,
-          "formattedPrice": "44.99﷼"
+          "formattedPrice": "44.99﷼",
+          "cnyPrice": 81.01
         },
         "6TB": {
           "price": 129.99,
-          "formattedPrice": "129.99﷼"
+          "formattedPrice": "129.99﷼",
+          "cnyPrice": 234.06
         },
         "12TB": {
           "price": 269.99,
-          "formattedPrice": "269.99﷼"
+          "formattedPrice": "269.99﷼",
+          "cnyPrice": 486.15
         }
       },
       "nameZh": "沙特阿拉伯"
@@ -1255,23 +1414,28 @@
       "plans": {
         "50GB": {
           "price": 0.99,
-          "formattedPrice": "$0.99"
+          "formattedPrice": "$0.99",
+          "cnyPrice": 6.68
         },
         "200GB": {
           "price": 3.49,
-          "formattedPrice": "$3.49"
+          "formattedPrice": "$3.49",
+          "cnyPrice": 23.57
         },
         "2TB": {
           "price": 11.99,
-          "formattedPrice": "$11.99"
+          "formattedPrice": "$11.99",
+          "cnyPrice": 80.96
         },
         "6TB": {
           "price": 34.99,
-          "formattedPrice": "$34.99"
+          "formattedPrice": "$34.99",
+          "cnyPrice": 236.26
         },
         "12TB": {
           "price": 69.99,
-          "formattedPrice": "$69.99"
+          "formattedPrice": "$69.99",
+          "cnyPrice": 472.59
         }
       },
       "nameZh": "塞内加尔"
@@ -1283,23 +1447,28 @@
       "plans": {
         "50GB": {
           "price": 14.99,
-          "formattedPrice": "R14.99"
+          "formattedPrice": "R14.99",
+          "cnyPrice": 6.26
         },
         "200GB": {
           "price": 59.99,
-          "formattedPrice": "R59.99"
+          "formattedPrice": "R59.99",
+          "cnyPrice": 25.06
         },
         "2TB": {
           "price": 199.99,
-          "formattedPrice": "R199.99"
+          "formattedPrice": "R199.99",
+          "cnyPrice": 83.54
         },
         "6TB": {
           "price": 599.99,
-          "formattedPrice": "R599.99"
+          "formattedPrice": "R599.99",
+          "cnyPrice": 250.63
         },
         "12TB": {
           "price": 1199.99,
-          "formattedPrice": "R1199.99"
+          "formattedPrice": "R1199.99",
+          "cnyPrice": 501.27
         }
       },
       "nameZh": "南非"
@@ -1311,23 +1480,28 @@
       "plans": {
         "50GB": {
           "price": 12,
-          "formattedPrice": "12 kr"
+          "formattedPrice": "12 kr",
+          "cnyPrice": 8.55
         },
         "200GB": {
           "price": 39,
-          "formattedPrice": "39 kr"
+          "formattedPrice": "39 kr",
+          "cnyPrice": 27.77
         },
         "2TB": {
           "price": 129,
-          "formattedPrice": "129 kr"
+          "formattedPrice": "129 kr",
+          "cnyPrice": 91.87
         },
         "6TB": {
           "price": 399,
-          "formattedPrice": "399 kr"
+          "formattedPrice": "399 kr",
+          "cnyPrice": 284.15
         },
         "12TB": {
           "price": 799,
-          "formattedPrice": "799 kr"
+          "formattedPrice": "799 kr",
+          "cnyPrice": 569.01
         }
       },
       "nameZh": "瑞典"
@@ -1339,23 +1513,28 @@
       "plans": {
         "50GB": {
           "price": 1,
-          "formattedPrice": "CHF 1"
+          "formattedPrice": "CHF 1",
+          "cnyPrice": 8.35
         },
         "200GB": {
           "price": 3,
-          "formattedPrice": "CHF 3"
+          "formattedPrice": "CHF 3",
+          "cnyPrice": 25.05
         },
         "2TB": {
           "price": 10,
-          "formattedPrice": "CHF 10"
+          "formattedPrice": "CHF 10",
+          "cnyPrice": 83.51
         },
         "6TB": {
           "price": 30,
-          "formattedPrice": "CHF 30"
+          "formattedPrice": "CHF 30",
+          "cnyPrice": 250.54
         },
         "12TB": {
           "price": 60,
-          "formattedPrice": "CHF 60"
+          "formattedPrice": "CHF 60",
+          "cnyPrice": 501.09
         }
       },
       "nameZh": "瑞士"
@@ -1367,23 +1546,28 @@
       "plans": {
         "50GB": {
           "price": 2500,
-          "formattedPrice": "2500 TSh"
+          "formattedPrice": "2500 TSh",
+          "cnyPrice": 6.38
         },
         "200GB": {
           "price": 8900,
-          "formattedPrice": "8900 TSh"
+          "formattedPrice": "8900 TSh",
+          "cnyPrice": 22.71
         },
         "2TB": {
           "price": 29900,
-          "formattedPrice": "29900 TSh"
+          "formattedPrice": "29900 TSh",
+          "cnyPrice": 76.29
         },
         "6TB": {
           "price": 89900,
-          "formattedPrice": "89900 TSh"
+          "formattedPrice": "89900 TSh",
+          "cnyPrice": 229.39
         },
         "12TB": {
           "price": 179900,
-          "formattedPrice": "179900 TSh"
+          "formattedPrice": "179900 TSh",
+          "cnyPrice": 459.03
         }
       },
       "nameZh": "坦桑尼亚"
@@ -1395,23 +1579,28 @@
       "plans": {
         "50GB": {
           "price": 49.99,
-          "formattedPrice": "49.99 TL"
+          "formattedPrice": "49.99 TL",
+          "cnyPrice": 7.08
         },
         "200GB": {
           "price": 169.99,
-          "formattedPrice": "169.99 TL"
+          "formattedPrice": "169.99 TL",
+          "cnyPrice": 24.06
         },
         "2TB": {
           "price": 549.99,
-          "formattedPrice": "549.99 TL"
+          "formattedPrice": "549.99 TL",
+          "cnyPrice": 77.85
         },
         "6TB": {
           "price": 1699.99,
-          "formattedPrice": "1699.99 TL"
+          "formattedPrice": "1699.99 TL",
+          "cnyPrice": 240.62
         },
         "12TB": {
           "price": 3399.99,
-          "formattedPrice": "3399.99 TL"
+          "formattedPrice": "3399.99 TL",
+          "cnyPrice": 481.24
         }
       },
       "nameZh": "土耳其"
@@ -1423,23 +1612,28 @@
       "plans": {
         "50GB": {
           "price": 0.99,
-          "formattedPrice": "$0.99"
+          "formattedPrice": "$0.99",
+          "cnyPrice": 6.68
         },
         "200GB": {
           "price": 3.49,
-          "formattedPrice": "$3.49"
+          "formattedPrice": "$3.49",
+          "cnyPrice": 23.57
         },
         "2TB": {
           "price": 11.99,
-          "formattedPrice": "$11.99"
+          "formattedPrice": "$11.99",
+          "cnyPrice": 80.96
         },
         "6TB": {
           "price": 34.99,
-          "formattedPrice": "$34.99"
+          "formattedPrice": "$34.99",
+          "cnyPrice": 236.26
         },
         "12TB": {
           "price": 69.99,
-          "formattedPrice": "$69.99"
+          "formattedPrice": "$69.99",
+          "cnyPrice": 472.59
         }
       },
       "nameZh": "乌干达"
@@ -1451,23 +1645,28 @@
       "plans": {
         "50GB": {
           "price": 3.99,
-          "formattedPrice": "AED 3.99"
+          "formattedPrice": "AED 3.99",
+          "cnyPrice": 7.34
         },
         "200GB": {
           "price": 11.99,
-          "formattedPrice": "AED 11.99"
+          "formattedPrice": "AED 11.99",
+          "cnyPrice": 22.04
         },
         "2TB": {
           "price": 39.99,
-          "formattedPrice": "AED 39.99"
+          "formattedPrice": "AED 39.99",
+          "cnyPrice": 73.53
         },
         "6TB": {
           "price": 119.99,
-          "formattedPrice": "AED 119.99"
+          "formattedPrice": "AED 119.99",
+          "cnyPrice": 220.62
         },
         "12TB": {
           "price": 239.99,
-          "formattedPrice": "AED 239.99"
+          "formattedPrice": "AED 239.99",
+          "cnyPrice": 441.25
         }
       },
       "nameZh": "阿拉伯联合酋长国"
@@ -1479,23 +1678,28 @@
       "plans": {
         "50GB": {
           "price": 0.99,
-          "formattedPrice": "£0.99"
+          "formattedPrice": "£0.99",
+          "cnyPrice": 9.01
         },
         "200GB": {
           "price": 2.99,
-          "formattedPrice": "£2.99"
+          "formattedPrice": "£2.99",
+          "cnyPrice": 27.23
         },
         "2TB": {
           "price": 8.99,
-          "formattedPrice": "£8.99"
+          "formattedPrice": "£8.99",
+          "cnyPrice": 81.86
         },
         "6TB": {
           "price": 26.99,
-          "formattedPrice": "£26.99"
+          "formattedPrice": "£26.99",
+          "cnyPrice": 245.76
         },
         "12TB": {
           "price": 54.99,
-          "formattedPrice": "£54.99"
+          "formattedPrice": "£54.99",
+          "cnyPrice": 500.72
         }
       },
       "nameZh": "英国"
@@ -1507,23 +1711,28 @@
       "plans": {
         "50GB": {
           "price": 0.99,
-          "formattedPrice": "$0.99"
+          "formattedPrice": "$0.99",
+          "cnyPrice": 6.68
         },
         "200GB": {
           "price": 3.49,
-          "formattedPrice": "$3.49"
+          "formattedPrice": "$3.49",
+          "cnyPrice": 23.57
         },
         "2TB": {
           "price": 11.99,
-          "formattedPrice": "$11.99"
+          "formattedPrice": "$11.99",
+          "cnyPrice": 80.96
         },
         "6TB": {
           "price": 34.99,
-          "formattedPrice": "$34.99"
+          "formattedPrice": "$34.99",
+          "cnyPrice": 236.26
         },
         "12TB": {
           "price": 69.99,
-          "formattedPrice": "$69.99"
+          "formattedPrice": "$69.99",
+          "cnyPrice": 472.59
         }
       },
       "nameZh": "赞比亚"
@@ -1535,23 +1744,28 @@
       "plans": {
         "50GB": {
           "price": 0.99,
-          "formattedPrice": "$0.99"
+          "formattedPrice": "$0.99",
+          "cnyPrice": 6.68
         },
         "200GB": {
           "price": 3.49,
-          "formattedPrice": "$3.49"
+          "formattedPrice": "$3.49",
+          "cnyPrice": 23.57
         },
         "2TB": {
           "price": 11.99,
-          "formattedPrice": "$11.99"
+          "formattedPrice": "$11.99",
+          "cnyPrice": 80.96
         },
         "6TB": {
           "price": 34.99,
-          "formattedPrice": "$34.99"
+          "formattedPrice": "$34.99",
+          "cnyPrice": 236.26
         },
         "12TB": {
           "price": 69.99,
-          "formattedPrice": "$69.99"
+          "formattedPrice": "$69.99",
+          "cnyPrice": 472.59
         }
       },
       "nameZh": "津巴布韦"
@@ -1563,23 +1777,28 @@
       "plans": {
         "50GB": {
           "price": 1.49,
-          "formattedPrice": "$1.49"
+          "formattedPrice": "$1.49",
+          "cnyPrice": 7.1
         },
         "200GB": {
           "price": 4.49,
-          "formattedPrice": "$4.49"
+          "formattedPrice": "$4.49",
+          "cnyPrice": 21.4
         },
         "2TB": {
           "price": 14.99,
-          "formattedPrice": "$14.99"
+          "formattedPrice": "$14.99",
+          "cnyPrice": 71.46
         },
         "6TB": {
           "price": 44.99,
-          "formattedPrice": "$44.99"
+          "formattedPrice": "$44.99",
+          "cnyPrice": 214.47
         },
         "12TB": {
           "price": 89.99,
-          "formattedPrice": "$89.99"
+          "formattedPrice": "$89.99",
+          "cnyPrice": 428.99
         }
       },
       "nameZh": "澳大利亚"
@@ -1591,23 +1810,28 @@
       "plans": {
         "50GB": {
           "price": 0.99,
-          "formattedPrice": "$0.99"
+          "formattedPrice": "$0.99",
+          "cnyPrice": 6.68
         },
         "200GB": {
           "price": 2.99,
-          "formattedPrice": "$2.99"
+          "formattedPrice": "$2.99",
+          "cnyPrice": 20.19
         },
         "2TB": {
           "price": 10.99,
-          "formattedPrice": "$10.99"
+          "formattedPrice": "$10.99",
+          "cnyPrice": 74.21
         },
         "6TB": {
           "price": 32.99,
-          "formattedPrice": "$32.99"
+          "formattedPrice": "$32.99",
+          "cnyPrice": 222.76
         },
         "12TB": {
           "price": 64.99,
-          "formattedPrice": "$64.99"
+          "formattedPrice": "$64.99",
+          "cnyPrice": 438.83
         }
       },
       "nameZh": "柬埔寨"
@@ -1619,23 +1843,28 @@
       "plans": {
         "50GB": {
           "price": 6,
-          "formattedPrice": "¥6"
+          "formattedPrice": "¥6",
+          "cnyPrice": 6
         },
         "200GB": {
           "price": 21,
-          "formattedPrice": "¥21"
+          "formattedPrice": "¥21",
+          "cnyPrice": 21
         },
         "2TB": {
           "price": 68,
-          "formattedPrice": "¥68"
+          "formattedPrice": "¥68",
+          "cnyPrice": 68
         },
         "6TB": {
           "price": 198,
-          "formattedPrice": "¥198"
+          "formattedPrice": "¥198",
+          "cnyPrice": 198
         },
         "12TB": {
           "price": 398,
-          "formattedPrice": "¥398"
+          "formattedPrice": "¥398",
+          "cnyPrice": 398
         }
       },
       "nameZh": "中国大陆"
@@ -1647,23 +1876,28 @@
       "plans": {
         "50GB": {
           "price": 8,
-          "formattedPrice": "HK$ 8"
+          "formattedPrice": "HK$ 8",
+          "cnyPrice": 6.89
         },
         "200GB": {
           "price": 23,
-          "formattedPrice": "HK$ 23"
+          "formattedPrice": "HK$ 23",
+          "cnyPrice": 19.8
         },
         "2TB": {
           "price": 78,
-          "formattedPrice": "HK$ 78"
+          "formattedPrice": "HK$ 78",
+          "cnyPrice": 67.13
         },
         "6TB": {
           "price": 238,
-          "formattedPrice": "HK$ 238"
+          "formattedPrice": "HK$ 238",
+          "cnyPrice": 204.84
         },
         "12TB": {
           "price": 468,
-          "formattedPrice": "HK$ 468"
+          "formattedPrice": "HK$ 468",
+          "cnyPrice": 402.79
         }
       },
       "nameZh": "香港"
@@ -1675,23 +1909,28 @@
       "plans": {
         "50GB": {
           "price": 75,
-          "formattedPrice": "Rs 75"
+          "formattedPrice": "Rs 75",
+          "cnyPrice": 5.32
         },
         "200GB": {
           "price": 219,
-          "formattedPrice": "Rs 219"
+          "formattedPrice": "Rs 219",
+          "cnyPrice": 15.52
         },
         "2TB": {
           "price": 749,
-          "formattedPrice": "Rs 749"
+          "formattedPrice": "Rs 749",
+          "cnyPrice": 53.09
         },
         "6TB": {
           "price": 2999,
-          "formattedPrice": "Rs 2999"
+          "formattedPrice": "Rs 2999",
+          "cnyPrice": 212.59
         },
         "12TB": {
           "price": 5900,
-          "formattedPrice": "Rs 5900"
+          "formattedPrice": "Rs 5900",
+          "cnyPrice": 418.24
         }
       },
       "nameZh": "印度"
@@ -1703,23 +1942,28 @@
       "plans": {
         "50GB": {
           "price": 15000,
-          "formattedPrice": "Rp 15000"
+          "formattedPrice": "Rp 15000",
+          "cnyPrice": 5.67
         },
         "200GB": {
           "price": 59000,
-          "formattedPrice": "Rp 59000"
+          "formattedPrice": "Rp 59000",
+          "cnyPrice": 22.3
         },
         "2TB": {
           "price": 199000,
-          "formattedPrice": "Rp 199000"
+          "formattedPrice": "Rp 199000",
+          "cnyPrice": 75.23
         },
         "6TB": {
           "price": 599000,
-          "formattedPrice": "Rp 599000"
+          "formattedPrice": "Rp 599000",
+          "cnyPrice": 226.44
         },
         "12TB": {
           "price": 1199000,
-          "formattedPrice": "Rp 1199000"
+          "formattedPrice": "Rp 1199000",
+          "cnyPrice": 453.25
         }
       },
       "nameZh": "印度尼西亚"
@@ -1731,23 +1975,28 @@
       "plans": {
         "50GB": {
           "price": 180,
-          "formattedPrice": "¥180"
+          "formattedPrice": "¥180",
+          "cnyPrice": 7.7
         },
         "200GB": {
           "price": 540,
-          "formattedPrice": "¥540"
+          "formattedPrice": "¥540",
+          "cnyPrice": 23.09
         },
         "2TB": {
           "price": 1800,
-          "formattedPrice": "¥1800"
+          "formattedPrice": "¥1800",
+          "cnyPrice": 76.98
         },
         "6TB": {
           "price": 5500,
-          "formattedPrice": "¥5500"
+          "formattedPrice": "¥5500",
+          "cnyPrice": 235.23
         },
         "12TB": {
           "price": 11000,
-          "formattedPrice": "¥11000"
+          "formattedPrice": "¥11000",
+          "cnyPrice": 470.45
         }
       },
       "nameZh": "日本"
@@ -1759,23 +2008,28 @@
       "plans": {
         "50GB": {
           "price": 499,
-          "formattedPrice": "₸499"
+          "formattedPrice": "₸499",
+          "cnyPrice": 7.19
         },
         "200GB": {
           "price": 1490,
-          "formattedPrice": "₸1490"
+          "formattedPrice": "₸1490",
+          "cnyPrice": 21.48
         },
         "2TB": {
           "price": 4990,
-          "formattedPrice": "₸4990"
+          "formattedPrice": "₸4990",
+          "cnyPrice": 71.95
         },
         "6TB": {
           "price": 14990,
-          "formattedPrice": "₸14990"
+          "formattedPrice": "₸14990",
+          "cnyPrice": 216.13
         },
         "12TB": {
           "price": 29990,
-          "formattedPrice": "₸29990"
+          "formattedPrice": "₸29990",
+          "cnyPrice": 432.4
         }
       },
       "nameZh": "哈萨克斯坦"
@@ -1787,23 +2041,28 @@
       "plans": {
         "50GB": {
           "price": 0.99,
-          "formattedPrice": "$0.99"
+          "formattedPrice": "$0.99",
+          "cnyPrice": 6.68
         },
         "200GB": {
           "price": 2.99,
-          "formattedPrice": "$2.99"
+          "formattedPrice": "$2.99",
+          "cnyPrice": 20.19
         },
         "2TB": {
           "price": 10.99,
-          "formattedPrice": "$10.99"
+          "formattedPrice": "$10.99",
+          "cnyPrice": 74.21
         },
         "6TB": {
           "price": 32.99,
-          "formattedPrice": "$32.99"
+          "formattedPrice": "$32.99",
+          "cnyPrice": 222.76
         },
         "12TB": {
           "price": 64.99,
-          "formattedPrice": "$64.99"
+          "formattedPrice": "$64.99",
+          "cnyPrice": 438.83
         }
       },
       "nameZh": "吉尔吉斯斯坦"
@@ -1815,23 +2074,28 @@
       "plans": {
         "50GB": {
           "price": 0.99,
-          "formattedPrice": "$0.99"
+          "formattedPrice": "$0.99",
+          "cnyPrice": 6.68
         },
         "200GB": {
           "price": 3.29,
-          "formattedPrice": "$3.29"
+          "formattedPrice": "$3.29",
+          "cnyPrice": 22.22
         },
         "2TB": {
           "price": 10.99,
-          "formattedPrice": "$10.99"
+          "formattedPrice": "$10.99",
+          "cnyPrice": 74.21
         },
         "6TB": {
           "price": 32.99,
-          "formattedPrice": "$32.99"
+          "formattedPrice": "$32.99",
+          "cnyPrice": 222.76
         },
         "12TB": {
           "price": 64.99,
-          "formattedPrice": "$64.99"
+          "formattedPrice": "$64.99",
+          "cnyPrice": 438.83
         }
       },
       "nameZh": "老挝"
@@ -1843,23 +2107,28 @@
       "plans": {
         "50GB": {
           "price": 3.9,
-          "formattedPrice": "RM3.90"
+          "formattedPrice": "RM3.90",
+          "cnyPrice": 6.44
         },
         "200GB": {
           "price": 11.9,
-          "formattedPrice": "RM11.90"
+          "formattedPrice": "RM11.90",
+          "cnyPrice": 19.64
         },
         "2TB": {
           "price": 44.9,
-          "formattedPrice": "RM44.90"
+          "formattedPrice": "RM44.90",
+          "cnyPrice": 74.11
         },
         "6TB": {
           "price": 129.9,
-          "formattedPrice": "RM129.90"
+          "formattedPrice": "RM129.90",
+          "cnyPrice": 214.4
         },
         "12TB": {
           "price": 269.9,
-          "formattedPrice": "RM269.90"
+          "formattedPrice": "RM269.90",
+          "cnyPrice": 445.47
         }
       },
       "nameZh": "马来西亚"
@@ -1871,23 +2140,28 @@
       "plans": {
         "50GB": {
           "price": 0.99,
-          "formattedPrice": "$0.99"
+          "formattedPrice": "$0.99",
+          "cnyPrice": 6.68
         },
         "200GB": {
           "price": 3.49,
-          "formattedPrice": "$3.49"
+          "formattedPrice": "$3.49",
+          "cnyPrice": 23.57
         },
         "2TB": {
           "price": 11.99,
-          "formattedPrice": "$11.99"
+          "formattedPrice": "$11.99",
+          "cnyPrice": 80.96
         },
         "6TB": {
           "price": 34.99,
-          "formattedPrice": "$34.99"
+          "formattedPrice": "$34.99",
+          "cnyPrice": 236.26
         },
         "12TB": {
           "price": 69.99,
-          "formattedPrice": "$69.99"
+          "formattedPrice": "$69.99",
+          "cnyPrice": 472.59
         }
       },
       "nameZh": "尼泊尔"
@@ -1899,23 +2173,28 @@
       "plans": {
         "50GB": {
           "price": 1.99,
-          "formattedPrice": "$1.99"
+          "formattedPrice": "$1.99",
+          "cnyPrice": 7.91
         },
         "200GB": {
           "price": 5.99,
-          "formattedPrice": "$5.99"
+          "formattedPrice": "$5.99",
+          "cnyPrice": 23.82
         },
         "2TB": {
           "price": 19.99,
-          "formattedPrice": "$19.99"
+          "formattedPrice": "$19.99",
+          "cnyPrice": 79.48
         },
         "6TB": {
           "price": 59.99,
-          "formattedPrice": "$59.99"
+          "formattedPrice": "$59.99",
+          "cnyPrice": 238.53
         },
         "12TB": {
           "price": 119.99,
-          "formattedPrice": "$119.99"
+          "formattedPrice": "$119.99",
+          "cnyPrice": 477.1
         }
       },
       "nameZh": "新西兰"
@@ -1927,23 +2206,28 @@
       "plans": {
         "50GB": {
           "price": 59,
-          "formattedPrice": "₱59"
+          "formattedPrice": "₱59",
+          "cnyPrice": 6.55
         },
         "200GB": {
           "price": 199,
-          "formattedPrice": "₱199"
+          "formattedPrice": "₱199",
+          "cnyPrice": 22.09
         },
         "2TB": {
           "price": 699,
-          "formattedPrice": "₱699"
+          "formattedPrice": "₱699",
+          "cnyPrice": 77.59
         },
         "6TB": {
           "price": 1990,
-          "formattedPrice": "₱1990"
+          "formattedPrice": "₱1990",
+          "cnyPrice": 220.88
         },
         "12TB": {
           "price": 3990,
-          "formattedPrice": "₱3990"
+          "formattedPrice": "₱3990",
+          "cnyPrice": 442.87
         }
       },
       "nameZh": "菲律宾"
@@ -1955,23 +2239,28 @@
       "plans": {
         "50GB": {
           "price": 1100,
-          "formattedPrice": "₩1100"
+          "formattedPrice": "₩1100",
+          "cnyPrice": 5.27
         },
         "200GB": {
           "price": 4400,
-          "formattedPrice": "₩4400"
+          "formattedPrice": "₩4400",
+          "cnyPrice": 21.08
         },
         "2TB": {
           "price": 14000,
-          "formattedPrice": "₩14000"
+          "formattedPrice": "₩14000",
+          "cnyPrice": 67.06
         },
         "6TB": {
           "price": 44000,
-          "formattedPrice": "₩44000"
+          "formattedPrice": "₩44000",
+          "cnyPrice": 210.76
         },
         "12TB": {
           "price": 88000,
-          "formattedPrice": "₩88000"
+          "formattedPrice": "₩88000",
+          "cnyPrice": 421.53
         }
       },
       "nameZh": "韩国"
@@ -1983,23 +2272,28 @@
       "plans": {
         "50GB": {
           "price": 1.48,
-          "formattedPrice": "S$ 1.48"
+          "formattedPrice": "S$ 1.48",
+          "cnyPrice": 7.81
         },
         "200GB": {
           "price": 3.98,
-          "formattedPrice": "S$ 3.98"
+          "formattedPrice": "S$ 3.98",
+          "cnyPrice": 21.01
         },
         "2TB": {
           "price": 13.98,
-          "formattedPrice": "S$ 13.98"
+          "formattedPrice": "S$ 13.98",
+          "cnyPrice": 73.8
         },
         "6TB": {
           "price": 42.98,
-          "formattedPrice": "S$ 42.98"
+          "formattedPrice": "S$ 42.98",
+          "cnyPrice": 226.88
         },
         "12TB": {
           "price": 84.98,
-          "formattedPrice": "S$ 84.98"
+          "formattedPrice": "S$ 84.98",
+          "cnyPrice": 448.59
         }
       },
       "nameZh": "新加坡"
@@ -2011,23 +2305,28 @@
       "plans": {
         "50GB": {
           "price": 30,
-          "formattedPrice": "NT$ 30"
+          "formattedPrice": "NT$ 30",
+          "cnyPrice": 6.29
         },
         "200GB": {
           "price": 90,
-          "formattedPrice": "NT$ 90"
+          "formattedPrice": "NT$ 90",
+          "cnyPrice": 18.88
         },
         "2TB": {
           "price": 300,
-          "formattedPrice": "NT$ 300"
+          "formattedPrice": "NT$ 300",
+          "cnyPrice": 62.95
         },
         "6TB": {
           "price": 900,
-          "formattedPrice": "NT$ 900"
+          "formattedPrice": "NT$ 900",
+          "cnyPrice": 188.85
         },
         "12TB": {
           "price": 1790,
-          "formattedPrice": "NT$ 1790"
+          "formattedPrice": "NT$ 1790",
+          "cnyPrice": 375.59
         }
       },
       "nameZh": "台湾"
@@ -2039,23 +2338,28 @@
       "plans": {
         "50GB": {
           "price": 0.99,
-          "formattedPrice": "$0.99"
+          "formattedPrice": "$0.99",
+          "cnyPrice": 6.68
         },
         "200GB": {
           "price": 2.99,
-          "formattedPrice": "$2.99"
+          "formattedPrice": "$2.99",
+          "cnyPrice": 20.19
         },
         "2TB": {
           "price": 10.99,
-          "formattedPrice": "$10.99"
+          "formattedPrice": "$10.99",
+          "cnyPrice": 74.21
         },
         "6TB": {
           "price": 32.99,
-          "formattedPrice": "$32.99"
+          "formattedPrice": "$32.99",
+          "cnyPrice": 222.76
         },
         "12TB": {
           "price": 64.99,
-          "formattedPrice": "$64.99"
+          "formattedPrice": "$64.99",
+          "cnyPrice": 438.83
         }
       },
       "nameZh": "塔吉克斯坦"
@@ -2067,23 +2371,28 @@
       "plans": {
         "50GB": {
           "price": 35,
-          "formattedPrice": "฿35"
+          "formattedPrice": "฿35",
+          "cnyPrice": 7.16
         },
         "200GB": {
           "price": 99,
-          "formattedPrice": "฿99"
+          "formattedPrice": "฿99",
+          "cnyPrice": 20.24
         },
         "2TB": {
           "price": 399,
-          "formattedPrice": "฿399"
+          "formattedPrice": "฿399",
+          "cnyPrice": 81.58
         },
         "6TB": {
           "price": 1190,
-          "formattedPrice": "฿1190"
+          "formattedPrice": "฿1190",
+          "cnyPrice": 243.31
         },
         "12TB": {
           "price": 2390,
-          "formattedPrice": "฿2390"
+          "formattedPrice": "฿2390",
+          "cnyPrice": 488.67
         }
       },
       "nameZh": "泰国"
@@ -2095,23 +2404,28 @@
       "plans": {
         "50GB": {
           "price": 0.99,
-          "formattedPrice": "$0.99"
+          "formattedPrice": "$0.99",
+          "cnyPrice": 6.68
         },
         "200GB": {
           "price": 2.99,
-          "formattedPrice": "$2.99"
+          "formattedPrice": "$2.99",
+          "cnyPrice": 20.19
         },
         "2TB": {
           "price": 10.99,
-          "formattedPrice": "$10.99"
+          "formattedPrice": "$10.99",
+          "cnyPrice": 74.21
         },
         "6TB": {
           "price": 32.99,
-          "formattedPrice": "$32.99"
+          "formattedPrice": "$32.99",
+          "cnyPrice": 222.76
         },
         "12TB": {
           "price": 64.99,
-          "formattedPrice": "$64.99"
+          "formattedPrice": "$64.99",
+          "cnyPrice": 438.83
         }
       },
       "nameZh": "乌兹别克斯坦"
@@ -2123,23 +2437,28 @@
       "plans": {
         "50GB": {
           "price": 25000,
-          "formattedPrice": "₫25000"
+          "formattedPrice": "₫25000",
+          "cnyPrice": 6.46
         },
         "200GB": {
           "price": 89000,
-          "formattedPrice": "₫89000"
+          "formattedPrice": "₫89000",
+          "cnyPrice": 23
         },
         "2TB": {
           "price": 299000,
-          "formattedPrice": "₫299000"
+          "formattedPrice": "₫299000",
+          "cnyPrice": 77.27
         },
         "6TB": {
           "price": 899000,
-          "formattedPrice": "₫899000"
+          "formattedPrice": "₫899000",
+          "cnyPrice": 232.33
         },
         "12TB": {
           "price": 1799000,
-          "formattedPrice": "₫1799000"
+          "formattedPrice": "₫1799000",
+          "cnyPrice": 464.93
         }
       },
       "nameZh": "越南"

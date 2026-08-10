@@ -1,34 +1,45 @@
-import { publicationDateKey, validatePayload, validatePriceHistoryConsistency } from './data-contract.js?v=5';
+import {
+  canonicalTierDefinition,
+  publicationDateKey,
+  validatePayload,
+  validatePriceHistoryConsistency
+} from './data-contract.js?v=10';
 import { createIcons } from './vendor/lucide-subset.js?v=5';
 
 const REQUEST_TIMEOUT_MS = 8_000;
 const CHART_SCRIPT_URL = './vendor/chart.umd.min.js?v=4';
-const ANALYTICS_ID = 'G-K2S9L4CHNP';
 const SLOW_LOADING_MS = 1_500;
 const DEFAULT_SORT_TIER = '200GB';
 const DEFAULT_TIER_COLUMN_COUNT = 5;
 const FIXED_PRICE_TABLE_COLUMN_COUNT = 2;
-const PRICE_CACHE_KEY = 'icloud-price-comparison:validated-prices:v1';
-const URL_STATE_KEYS = new Set(['tier', 'sort', 'dir', 'region']);
-const initialUrlState = new URLSearchParams(location.search);
-const initialQuery = globalThis.__icloudInitialQuery ?? initialUrlState.get('q') ?? '';
-delete globalThis.__icloudInitialQuery;
-const sanitizedInitialUrl = createSanitizedStateUrl();
-if (sanitizedInitialUrl.href !== location.href) history.replaceState(null, '', sanitizedInitialUrl);
-const initialSortKey = initialUrlState.get('sort') === 'country' ? 'country' : 'tier';
-const initialSortDirection = initialUrlState.get('dir') === 'desc' ? 'desc' : 'asc';
+const PRICE_CACHE_KEY = 'icloud-price-comparison:validated-prices:v2';
+const LEGACY_PRICE_CACHE_KEYS = ['icloud-price-comparison:validated-prices:v1'];
+const MAX_PRICE_CACHE_CHARACTERS = 1024 * 1024;
+const MAX_RESPONSE_BYTES = Object.freeze({
+  'prices.json': 1024 * 1024,
+  'history.json': 8 * 1024 * 1024
+});
+const MAX_SEARCH_QUERY_CODE_POINTS = 160;
 const REGION_LABELS = {
   Americas: '美洲',
   'Europe, Middle East & Africa': '欧洲、中东和非洲',
   'Asia Pacific': '亚太'
 };
+const URL_STATE_REGIONS = new Set(Object.keys(REGION_LABELS));
+const initialUrlState = new URLSearchParams(location.search);
+const initialQuery = boundedSearchQuery(globalThis.__icloudInitialQuery ?? initialUrlState.get('q') ?? '');
+delete globalThis.__icloudInitialQuery;
+const sanitizedInitialUrl = createSanitizedStateUrl();
+if (sanitizedInitialUrl.href !== location.href) history.replaceState(null, '', sanitizedInitialUrl);
+const initialSortKey = initialUrlState.get('sort') === 'country' ? 'country' : 'tier';
+const initialSortDirection = initialUrlState.get('dir') === 'desc' ? 'desc' : 'asc';
 
 const state = {
   data: null,
   history: null,
-  sortTier: initialUrlState.get('tier') || DEFAULT_SORT_TIER,
+  sortTier: canonicalUrlTier(initialUrlState.get('tier')) ?? DEFAULT_SORT_TIER,
   query: initialQuery,
-  region: initialUrlState.get('region') || 'all',
+  region: canonicalUrlRegion(initialUrlState.get('region')) ?? 'all',
   sortKey: initialSortKey,
   sortDirection: initialSortDirection,
   activeCountry: null,
@@ -104,46 +115,39 @@ function refreshIcons() {
   }
 }
 
-function analyticsTag() {
-  globalThis.dataLayer = globalThis.dataLayer || [];
-  globalThis.dataLayer.push(arguments);
+function boundedSearchQuery(value) {
+  return [...String(value).slice(0, MAX_SEARCH_QUERY_CODE_POINTS * 2)]
+    .slice(0, MAX_SEARCH_QUERY_CODE_POINTS)
+    .join('');
+}
+
+function canonicalUrlTier(value) {
+  if (typeof value !== 'string' || value.length > 32) return null;
+  return canonicalTierDefinition(value)?.id === value ? value : null;
+}
+
+function canonicalUrlRegion(value) {
+  return URL_STATE_REGIONS.has(value) ? value : null;
 }
 
 function createSanitizedStateUrl() {
   const url = new URL(location.href);
-  for (const key of new Set(url.searchParams.keys())) {
-    if (!URL_STATE_KEYS.has(key)) url.searchParams.delete(key);
-  }
+  const tier = canonicalUrlTier(url.searchParams.get('tier'));
+  const sort = ['tier', 'country'].includes(url.searchParams.get('sort'))
+    ? url.searchParams.get('sort')
+    : null;
+  const direction = ['asc', 'desc'].includes(url.searchParams.get('dir'))
+    ? url.searchParams.get('dir')
+    : null;
+  const region = canonicalUrlRegion(url.searchParams.get('region'));
+
+  url.search = '';
+  if (tier !== null) url.searchParams.set('tier', tier);
+  if (sort !== null) url.searchParams.set('sort', sort);
+  if (direction !== null) url.searchParams.set('dir', direction);
+  if (region !== null) url.searchParams.set('region', region);
+  if (url.hash && url.hash !== '#priceWorkspace') url.hash = '';
   return url;
-}
-
-function loadAnalytics() {
-  if (document.querySelector('script[data-analytics-loader]')) return;
-  analyticsTag('js', new Date());
-  const analyticsUrl = createSanitizedStateUrl();
-  analyticsTag('config', ANALYTICS_ID, {
-    page_location: analyticsUrl.href,
-    allow_google_signals: false,
-    allow_ad_personalization_signals: false
-  });
-  const script = document.createElement('script');
-  script.async = true;
-  script.fetchPriority = 'low';
-  script.dataset.analyticsLoader = 'true';
-  script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(ANALYTICS_ID)}`;
-  document.head.append(script);
-}
-
-function scheduleAnalytics() {
-  const scheduleWhenIdle = () => {
-    if ('requestIdleCallback' in globalThis) {
-      globalThis.requestIdleCallback(loadAnalytics, { timeout: 3_000 });
-    } else {
-      globalThis.setTimeout(loadAnalytics, 1_500);
-    }
-  };
-  if (document.readyState === 'complete') scheduleWhenIdle();
-  else globalThis.addEventListener('load', scheduleWhenIdle, { once: true });
 }
 
 function setLoadStatus(message, { error = false, hidden = false } = {}) {
@@ -162,6 +166,50 @@ function setFiltersDisabled(disabled) {
   document.querySelectorAll('button[data-sort], button[data-sort-tier], #publishedDateButton, #mobileTierControl button').forEach((button) => {
     button.disabled = disabled;
   });
+}
+
+async function readBoundedJsonResponse(response, fileName) {
+  const maximumBytes = MAX_RESPONSE_BYTES[fileName];
+  if (!maximumBytes) throw new Error(`不支持的数据文件：${fileName}`);
+  const declaredLength = response.headers.get('content-length');
+  if (/^\d+$/.test(declaredLength ?? '') && Number(declaredLength) > maximumBytes) {
+    throw new Error(`${fileName} 超过允许大小`);
+  }
+
+  const chunks = [];
+  let receivedBytes = 0;
+  if (response.body?.getReader) {
+    const reader = response.body.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      receivedBytes += value.byteLength;
+      if (receivedBytes > maximumBytes) {
+        await reader.cancel().catch(() => {});
+        throw new Error(`${fileName} 超过允许大小`);
+      }
+      chunks.push(value);
+    }
+  } else {
+    const value = new Uint8Array(await response.arrayBuffer());
+    receivedBytes = value.byteLength;
+    if (receivedBytes > maximumBytes) throw new Error(`${fileName} 超过允许大小`);
+    chunks.push(value);
+  }
+
+  const bytes = new Uint8Array(receivedBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  let text;
+  try {
+    text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    throw new Error(`${fileName} 不是有效的 UTF-8`);
+  }
+  return JSON.parse(text);
 }
 
 function formatDate(value) {
@@ -227,12 +275,14 @@ async function fetchJson(fileName, { forceRefresh = false } = {}) {
   let lastError;
   for (const url of urls) {
     let timeout = null;
+    let finishInitialRequest = null;
     try {
       let response;
       if (!forceRefresh && fileName === 'prices.json' && url === localUrl && initialPriceRequest) {
         const request = initialPriceRequest;
         initialPriceRequest = null;
         const result = await request;
+        finishInitialRequest = result.finish ?? null;
         if (result.error) throw result.error;
         response = result.response;
       } else {
@@ -240,24 +290,33 @@ async function fetchJson(fileName, { forceRefresh = false } = {}) {
         timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
         response = await fetch(url, {
           cache: forceRefresh ? 'reload' : 'default',
+          redirect: 'error',
           signal: controller.signal
         });
       }
       if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-      return validatePayload(fileName, await response.json());
+      return validatePayload(fileName, await readBoundedJsonResponse(response, fileName));
     } catch (error) {
       lastError = error;
     } finally {
       clearTimeout(timeout);
+      finishInitialRequest?.();
     }
   }
   throw lastError;
+}
+
+function removeLegacyPriceCaches() {
+  for (const key of LEGACY_PRICE_CACHE_KEYS) {
+    try { localStorage.removeItem(key); } catch {}
+  }
 }
 
 function readValidatedPriceCache() {
   try {
     const cached = localStorage.getItem(PRICE_CACHE_KEY);
     if (!cached) return null;
+    if (cached.length > MAX_PRICE_CACHE_CHARACTERS) throw new Error('价格缓存超过允许大小');
     return validatePayload('prices.json', JSON.parse(cached));
   } catch (error) {
     console.warn(`已忽略无效价格缓存：${error.message}`);
@@ -268,7 +327,9 @@ function readValidatedPriceCache() {
 
 function writeValidatedPriceCache(payload) {
   try {
-    localStorage.setItem(PRICE_CACHE_KEY, JSON.stringify(payload));
+    const serialized = JSON.stringify(payload);
+    if (serialized.length > MAX_PRICE_CACHE_CHARACTERS) throw new Error('价格缓存超过允许大小');
+    localStorage.setItem(PRICE_CACHE_KEY, serialized);
   } catch (error) {
     console.warn(`价格缓存写入失败：${error.message}`);
   }
@@ -283,14 +344,6 @@ function priceSnapshotsEqual(first, second) {
   return JSON.stringify(first) === JSON.stringify(second);
 }
 
-function convertPrice(price, currency, targetCurrency) {
-  const rates = state.data.fx.rates;
-  const sourceRate = rates[currency];
-  const targetRate = rates[targetCurrency];
-  if (!sourceRate || !targetRate) return null;
-  return (price / sourceRate) * targetRate;
-}
-
 function calculateMinimumPrices() {
   state.minimumPrices = {};
   state.minimumCountries = {};
@@ -298,7 +351,7 @@ function calculateMinimumPrices() {
     let minimumValue = null;
     let minimumCountry = null;
     for (const country of state.data.countries) {
-      const value = convertPrice(country.plans[id].price, country.currency, 'CNY');
+      const value = country.plans[id].cnyPrice;
       if (value == null) continue;
       const countryName = country.nameZh || country.country;
       const minimumCountryName = minimumCountry?.nameZh || minimumCountry?.country;
@@ -328,7 +381,6 @@ function renderMinimumSummary() {
     item.dataset.tier = tier.id;
     item.setAttribute('aria-pressed', String(isActiveTier));
     item.title = `查看 ${tier.label} 最低价地区`;
-    item.setAttribute('aria-label', `${tier.label} ${countryName} ${formatConverted(state.minimumPrices[tier.id], '¥')}，该容量最低价，点击在价格表中定位`);
 
     const tierLabel = document.createElement('span');
     tierLabel.className = 'minimum-tier-label';
@@ -339,11 +391,15 @@ function renderMinimumSummary() {
     const price = document.createElement('small');
     price.className = 'minimum-price';
     price.textContent = formatConverted(state.minimumPrices[tier.id], '¥');
-    item.append(tierLabel, country, price);
+    const action = document.createElement('span');
+    action.className = 'visually-hidden';
+    action.textContent = '，在价格表中定位';
+    item.append(tierLabel, country, price, action);
     item.addEventListener('click', () => focusMinimumCountry(tier.id, winner?.country));
     fragment.append(item);
   }
   elements.minimumSummary.replaceChildren(fragment);
+  elements.minimumSummary.setAttribute('aria-busy', 'false');
 }
 
 function formatConverted(value, symbol) {
@@ -382,7 +438,7 @@ function populateFilters() {
 function renderTierHeaders() {
   const row = document.querySelector('.price-table thead tr');
   if (!row) return;
-  document.querySelector('#tierHeaderPlaceholder')?.remove();
+  row.querySelectorAll('[data-tier-placeholder]').forEach((header) => header.remove());
   row.querySelectorAll('th[data-tier-header]').forEach((header) => header.remove());
   for (const tier of state.data.tiers) {
     const header = document.createElement('th');
@@ -408,7 +464,7 @@ function renderTierHeaders() {
 function renderHistoryHeaders() {
   const row = elements.historyRows.closest('table')?.querySelector('thead tr');
   if (!row) return;
-  document.querySelector('#historyTierHeaderPlaceholder')?.remove();
+  row.querySelectorAll('[data-history-tier-placeholder]').forEach((header) => header.remove());
   row.querySelectorAll('th[data-history-tier-header]').forEach((header) => header.remove());
   for (const tier of state.data.tiers) {
     const header = document.createElement('th');
@@ -432,8 +488,7 @@ function filteredCountries() {
 
 function sortValue(country) {
   if (state.sortKey === 'country') return country.nameZh || country.country;
-  const localPrice = country.plans[state.sortTier].price;
-  return convertPrice(localPrice, country.currency, 'CNY') ?? Number.POSITIVE_INFINITY;
+  return country.plans[state.sortTier].cnyPrice ?? Number.POSITIVE_INFINITY;
 }
 
 function sortedCountries() {
@@ -454,7 +509,7 @@ function createCell(text, className) {
 
 function createPriceCell(country, tierId) {
   const plan = country.plans[tierId];
-  const cny = convertPrice(plan.price, country.currency, 'CNY');
+  const cny = plan.cnyPrice;
   const cell = document.createElement('td');
   cell.className = 'price-cell';
   cell.dataset.tier = tierId;
@@ -531,7 +586,6 @@ function renderTable() {
       const secondaryName = country.nameZh && country.nameZh !== country.country
         ? `${country.country} · ${country.currency}`
         : '';
-      historyButton.setAttribute('aria-label', `${displayName}${secondaryName ? ` ${secondaryName}` : ''}，查看价格历史`);
       const name = document.createElement('span');
       name.className = 'country-name';
       name.textContent = displayName;
@@ -542,6 +596,10 @@ function renderTable() {
         nameEn.textContent = secondaryName;
         historyButton.append(nameEn);
       }
+      const historyAction = document.createElement('span');
+      historyAction.className = 'visually-hidden';
+      historyAction.textContent = '，查看价格历史';
+      historyButton.append(historyAction);
       nameCell.append(historyButton);
 
       row.append(rank, nameCell, ...state.data.tiers.map(({ id }) => createPriceCell(country, id)));
@@ -918,7 +976,6 @@ function renderPublishedDateHistory() {
   const latest = state.data.source.publishedDate;
   const displayedDate = formatPublishedDate(latest);
   elements.applePublishedDate.textContent = displayedDate;
-  elements.publishedDateButton.setAttribute('aria-label', `页面发布日期：${displayedDate}；查看 Apple 官网发布日期变更记录`);
   elements.publishedDateDialogCurrent.textContent = displayedDate;
   elements.publishedDateRows.replaceChildren();
 
@@ -974,7 +1031,7 @@ function renderHistoryContent() {
   const country = state.activeCountry;
   const record = getHistoryRecord(country);
   const plan = country.plans[state.historyTier];
-  const cny = convertPrice(plan.price, country.currency, 'CNY');
+  const cny = plan.cnyPrice;
   const tier = state.data.tiers.find(({ id }) => id === state.historyTier);
   const changedSeries = compactHistorySeries(record.events, state.historyTier);
 
@@ -1027,11 +1084,12 @@ function syncActiveHistoryCountry() {
 function updateUrlState() {
   const url = new URL(location.href);
   url.search = '';
-  url.searchParams.set('tier', state.sortTier);
-  url.searchParams.set('sort', state.sortKey);
-  url.searchParams.set('dir', state.sortDirection);
-  if (state.region !== 'all') url.searchParams.set('region', state.region);
-  else url.searchParams.delete('region');
+  url.searchParams.set('tier', canonicalUrlTier(state.sortTier) ?? DEFAULT_SORT_TIER);
+  url.searchParams.set('sort', state.sortKey === 'country' ? 'country' : 'tier');
+  url.searchParams.set('dir', state.sortDirection === 'desc' ? 'desc' : 'asc');
+  const region = canonicalUrlRegion(state.region);
+  if (region !== null) url.searchParams.set('region', region);
+  if (url.hash && url.hash !== '#priceWorkspace') url.hash = '';
   history.replaceState(null, '', url);
 }
 
@@ -1049,8 +1107,9 @@ function updateTierPresentation() {
 }
 
 function scheduleQueryRender(value) {
-  state.query = value;
-  elements.searchInput.value = value;
+  const query = boundedSearchQuery(value);
+  state.query = query;
+  elements.searchInput.value = query;
   updateUrlState();
   if (state.renderFrame) cancelAnimationFrame(state.renderFrame);
   state.renderFrame = requestAnimationFrame(() => {
@@ -1146,8 +1205,41 @@ function applyPriceData(data) {
   renderMinimumSummary();
   renderTable();
   updateUrlState();
-  updateBackToTableButton();
+  scheduleBackToTableUpdate();
   refreshIcons();
+}
+
+const DIALOG_FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])'
+].join(',');
+
+function trapDialogFocus(dialog, event) {
+  if (event.key !== 'Tab' || !dialog.open) return;
+  const focusable = [...dialog.querySelectorAll(DIALOG_FOCUSABLE_SELECTOR)].filter((element) => {
+    const style = getComputedStyle(element);
+    return !element.hidden && style.display !== 'none' && style.visibility !== 'hidden' && element.getClientRects().length > 0;
+  });
+  if (!focusable.length) {
+    event.preventDefault();
+    dialog.focus();
+    return;
+  }
+
+  const first = focusable[0];
+  const last = focusable.at(-1);
+  const active = document.activeElement;
+  if (event.shiftKey && (active === first || !dialog.contains(active))) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && (active === last || !dialog.contains(active))) {
+    event.preventDefault();
+    first.focus();
+  }
 }
 
 function bindEvents() {
@@ -1171,11 +1263,13 @@ function bindEvents() {
   elements.historyDialog.addEventListener('click', (event) => {
     if (event.target === elements.historyDialog) elements.historyDialog.close();
   });
+  elements.historyDialog.addEventListener('keydown', (event) => trapDialogFocus(elements.historyDialog, event));
   elements.publishedDateButton.addEventListener('click', openPublishedDateHistory);
   elements.closePublishedDate.addEventListener('click', () => elements.publishedDateDialog.close());
   elements.publishedDateDialog.addEventListener('click', (event) => {
     if (event.target === elements.publishedDateDialog) elements.publishedDateDialog.close();
   });
+  elements.publishedDateDialog.addEventListener('keydown', (event) => trapDialogFocus(elements.publishedDateDialog, event));
   elements.historyDialog.addEventListener('close', () => {
     destroyChart();
     const returnFocus = state.historyReturnFocus;
@@ -1211,6 +1305,13 @@ function showLoadError(error) {
   setLoadStatus('价格数据加载失败，请检查网络后重试', { error: true });
   setFiltersDisabled(true);
   elements.fxStatus.textContent = '';
+  if (elements.minimumSummary) {
+    const unavailable = document.createElement('p');
+    unavailable.className = 'minimum-unavailable';
+    unavailable.textContent = '最低价暂不可用';
+    elements.minimumSummary.replaceChildren(unavailable);
+    elements.minimumSummary.setAttribute('aria-busy', 'false');
+  }
   elements.priceRows.replaceChildren();
   const row = document.createElement('tr');
   const cell = createCell('请稍后刷新页面重试', 'empty-cell');
@@ -1278,5 +1379,5 @@ elements.retryButton?.addEventListener('click', () => {
   initialize({ forceRefresh: true });
 });
 
+removeLegacyPriceCaches();
 initialize();
-scheduleAnalytics();

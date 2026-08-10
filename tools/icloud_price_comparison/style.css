@@ -34,7 +34,7 @@ body {
 
 button, input, select { font: inherit; }
 button, select { cursor: pointer; }
-button, a, input, select { touch-action: manipulation; }
+button, a, input, select { touch-action: manipulation; -webkit-tap-highlight-color: rgba(0, 113, 227, .18); }
 a { color: var(--accent-dark); text-decoration: none; }
 a:hover { color: var(--accent); }
 
@@ -53,6 +53,17 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+.noscript-notice {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  color: #674500;
+  background: #fff8e6;
+  border: 1px solid #e7c873;
+  border-radius: 8px;
+  box-shadow: var(--shadow-soft);
+  font-weight: 650;
 }
 
 .app-header {
@@ -157,6 +168,19 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   margin-top: 20px;
 }
 
+.minimum-unavailable {
+  min-height: 85px;
+  margin: 0;
+  display: grid;
+  grid-column: 1 / -1;
+  place-items: center;
+  color: var(--muted);
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  font-weight: 650;
+}
+
 .minimum-tier-label {
   position: absolute;
   top: 7px;
@@ -221,6 +245,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 .workspace {
   overflow: visible;
+  scroll-margin-top: 16px;
 }
 
 .workspace-toolbar {
@@ -393,6 +418,8 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
 
 .history-dialog::backdrop { background: rgba(20, 31, 42, .62); }
 .dialog-header { position: sticky; top: 0; z-index: 3; padding: 20px 24px 17px; display: flex; justify-content: space-between; gap: 24px; background: #fff; border-bottom: 1px solid var(--line); }
+.dialog-header > div { min-width: 0; }
+.dialog-header h2, .dialog-header p { overflow-wrap: anywhere; }
 .dialog-eyebrow { margin: 0 0 3px; color: var(--accent-dark); font-size: 12px; font-weight: 760; }
 .dialog-header h2 { margin: 0; font-size: 23px; line-height: 1.2; letter-spacing: -.01em; }
 .dialog-header p:last-child { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
@@ -427,7 +454,7 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
 .published-change-group { min-width: 0; max-width: 100%; white-space: normal; }
 .published-change-group + .published-change-group { margin-top: 5px; }
 .published-change-heading { margin-right: 3px; font-size: 1.04em; color: var(--ink-soft); }
-.published-change-country { min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: break-all; }
+.published-change-country { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
 .history-toolbar { padding: 16px 24px 0; }
 .segmented.compact { width: min(430px, 100%); min-height: 36px; }
 .segmented.compact button { min-height: 44px; padding: 4px 8px; font-size: 12px; }
@@ -437,6 +464,7 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
 .section-heading h3 { margin: 0; font-size: 16px; line-height: 1.25; letter-spacing: -.005em; }
 .section-heading span { color: var(--muted); font-size: 12px; }
 .chart-wrap { position: relative; width: 100%; height: 270px; }
+.chart-wrap canvas { display: block; max-width: 100%; }
 .empty-history { min-height: 210px; display: grid; place-content: center; justify-items: center; color: var(--muted); text-align: center; background: var(--surface-soft); border: 1px dashed var(--line-strong); border-radius: 6px; }
 .empty-history[hidden] { display: none; }
 .empty-history svg { width: 26px; height: 26px; margin-bottom: 8px; }
@@ -694,6 +722,10 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
 .back-to-table-button:focus-visible { outline: 3px solid rgba(17, 104, 212, .22); outline-offset: 2px; }
 .back-to-table-button svg { width: 19px; height: 19px; }
 
+@media (min-width: 1101px) {
+  .loading-cell { height: max(400px, calc(100dvh - 500px)); }
+}
+
 @media (max-width: 1100px) {
   .workspace-toolbar { align-items: stretch; flex-direction: column; gap: 11px; }
   .workspace-heading { min-width: 0; }
@@ -710,6 +742,8 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
   .price-table { width: 100%; min-width: 0; table-layout: fixed; }
   .price-table th:first-child,
   .price-table td:first-child { display: none; }
+  .price-table td.loading-cell:first-child,
+  .price-table td.empty-cell:first-child { display: table-cell; }
   .price-table [data-tier]:not(.is-active-tier) { display: none; }
   .price-table th:nth-child(2),
   .price-table td:nth-child(2) { width: 46%; }

@@ -2,6 +2,7 @@ import { appendFile, link, mkdir, readFile, readdir, rename, stat, unlink, write
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
+import { TextDecoder, TextEncoder } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import {
   getMissingExchangeRates,
@@ -9,7 +10,12 @@ import {
   validatePriceChangeAnomalies,
   validatePrices
 } from './parse-prices.mjs';
-import { validateHistoryPayload, validatePriceHistoryConsistency, validatePricePayload } from '../data-contract.js';
+import {
+  publicFxFallbackReason,
+  validateHistoryPayload,
+  validatePriceHistoryConsistency,
+  validatePricePayload
+} from '../data-contract.js';
 import { describeTriggerSource, formatBeijingDate, resolveTriggerSource } from './run-context.mjs';
 
 const APPLE_URL = 'https://support.apple.com/en-us/108047';
@@ -27,10 +33,18 @@ const DIAGNOSTICS_DIR = path.join(PROJECT_DIR, 'artifacts');
 const RETRY_DELAYS_MS = [0, 2_000, 5_000, 15_000, 30_000];
 const REQUEST_TIMEOUT_MS = 45_000;
 const NETWORK_BUDGET_MS = 5 * 60 * 1_000;
+const MAX_APPLE_RESPONSE_BYTES = 5 * 1024 * 1024;
+const MAX_FX_RESPONSE_BYTES = 1024 * 1024;
 const FX_MAX_AGE_MS = 36 * 60 * 60 * 1_000;
 const FX_MAX_FUTURE_SKEW_MS = 5 * 60 * 1_000;
 const UPDATE_LOCK_STALE_MS = 30 * 60 * 1_000;
 const TEMPORARY_FILE_PATTERN = /\.tmp-\d+-\d+-[a-z0-9]+$/i;
+const UNSAFE_OBJECT_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
+const FORBIDDEN_MAPPING_TEXT_PATTERN = /[\0-\x1f\x7f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069\ufeff\ufffd]/u;
+const PUBLIC_RUN_LOG_ENTRY_KEYS = ['schemaVersion', 'id', 'status', 'trigger', 'automaticRunDateBeijing', 'startedAtUtc', 'finishedAtUtc', 'durationMs', 'observedAtBeijing', 'source', 'counts', 'changes'];
+const PUBLIC_RUN_LOG_SOURCE_KEYS = ['appleUrl', 'applePublishedDate', 'appleParser', 'appleParserStatus', 'exchangeRatesFetchedAtUtc', 'exchangeRatesStale', 'exchangeRatesSourceMode', 'exchangeRatesFallbackUsed', 'exchangeRatesFallbackReason'];
+const PUBLIC_RUN_LOG_COUNT_KEYS = ['countries', 'pricePoints', 'currencies', 'tiers'];
+const PUBLIC_RUN_LOG_CHANGE_KEYS = ['publishedDate', 'addedTiers', 'removedTiers', 'addedCountries', 'removedCountries', 'changedCountries'];
 const DRY_RUN = process.argv.includes('--dry-run');
 let lastAppleSnapshot = null;
 let runStartedAt = new Date();
@@ -77,6 +91,44 @@ function remainingNetworkBudget(networkBudget) {
   return Math.max(0, networkBudget.deadlineAt - networkBudget.now());
 }
 
+async function readBoundedResponseText(response, maxResponseBytes, resourceName) {
+  if (!Number.isSafeInteger(maxResponseBytes) || maxResponseBytes <= 0) {
+    throw new Error('Response byte limit must be a positive safe integer');
+  }
+
+  const contentLengthHeader = response.headers.get('content-length');
+  if (contentLengthHeader != null && /^\d+$/.test(contentLengthHeader.trim())) {
+    const declaredBytes = Number(contentLengthHeader);
+    if (!Number.isSafeInteger(declaredBytes) || declaredBytes > maxResponseBytes) {
+      throw new Error(`${resourceName} response exceeds ${maxResponseBytes} bytes`);
+    }
+  }
+
+  if (!response.body) {
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (bytes.byteLength > maxResponseBytes) {
+      throw new Error(`${resourceName} response exceeds ${maxResponseBytes} bytes`);
+    }
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder('utf-8', { fatal: true });
+  let receivedBytes = 0;
+  let text = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    receivedBytes += value.byteLength;
+    if (receivedBytes > maxResponseBytes) {
+      await reader.cancel().catch(() => {});
+      throw new Error(`${resourceName} response exceeds ${maxResponseBytes} bytes`);
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+  return text + decoder.decode();
+}
+
 export async function fetchResource(url, {
   json = false,
   attempts = RETRY_DELAYS_MS.length,
@@ -84,6 +136,7 @@ export async function fetchResource(url, {
   resourceName = url,
   retryDelaysMs = RETRY_DELAYS_MS,
   requestTimeoutMs = REQUEST_TIMEOUT_MS,
+  maxResponseBytes = json ? MAX_FX_RESPONSE_BYTES : MAX_APPLE_RESPONSE_BYTES,
   networkBudget = createNetworkBudget()
 } = {}) {
   let lastError;
@@ -113,18 +166,18 @@ export async function fetchResource(url, {
           'user-agent': 'Mozilla/5.0 (compatible; iCloud-Price-Comparison/2.0; +https://github.com/linchun7/linchun7.github.io)',
           ...headers
         },
-        redirect: 'follow',
+        redirect: 'error',
         signal: networkBudget.createTimeoutSignal(timeoutMs)
       });
       if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-      const body = await response.text();
+      const body = await readBoundedResponseText(response, maxResponseBytes, resourceName);
       if (!json && (body.length < 20_000 || !/50\s*GB/i.test(body))) {
         throw new Error(`Unexpected Apple response (${body.length} bytes)`);
       }
       return json ? JSON.parse(body) : body;
     } catch (error) {
       lastError = error;
-      console.warn(`Fetch attempt ${attempt}/${attempts} failed for ${resourceName}: ${error.message}`);
+      console.warn(`Fetch attempt ${attempt}/${attempts} failed for ${resourceName}: ${logInline(error.message)}`);
       if (remainingNetworkBudget(networkBudget) <= 0) {
         lastError = networkDeadlineError(resourceName);
         break;
@@ -269,7 +322,7 @@ export async function getExchangeRates(previousData, {
         ? (source.sourceMode === 'api-key' ? 'valid' : fallbackReason)
         : 'not-configured';
       if (fallbackUsed) {
-        console.info(`汇率 Key 接口不可用（${describeExchangeRateFallback(fallbackReason)}），已使用开放接口。`);
+        console.info('认证汇率来源不可用，已使用开放接口。');
       }
       return {
         sourceUrl: source.url,
@@ -280,6 +333,7 @@ export async function getExchangeRates(previousData, {
         base: 'USD',
         fetchedAt: parsed.fetchedAt,
         stale: false,
+        reusePreviousCny: false,
         rates: selectRequiredRates(parsed.rates, requiredCurrencies)
       };
     } catch (error) {
@@ -291,39 +345,105 @@ export async function getExchangeRates(previousData, {
     }
   }
 
-  const previousUsd = previousData?.fx?.rates?.USD;
-  const previousCny = previousData?.fx?.rates?.CNY;
   const failureMessage = failures.map(({ sourceMode, message }) => `${sourceMode}: ${message}`).join('; ');
-  if (previousUsd !== 1 || !Number.isFinite(previousCny) || previousCny <= 0) {
-    throw transientHealthcheckError(failureMessage || 'Exchange-rate update failed', {
-      code: 'EXCHANGE_RATE_SOURCES_UNAVAILABLE'
-    });
-  }
   try {
-    validateExchangeRateFreshness(previousData.fx.fetchedAt);
+    validateExchangeRateFreshness(previousData?.fx?.fetchedAt);
   } catch (error) {
-    throw transientHealthcheckError(`${failureMessage}; previous exchange rates are unusable: ${error.message}`, {
+    throw transientHealthcheckError(`${failureMessage}; previous exchange-rate-derived prices are unusable: ${error.message}`, {
       code: 'EXCHANGE_RATE_SOURCES_UNAVAILABLE',
       cause: error
     });
   }
-  const missingPreviousRates = requiredCurrencies.filter(
-    (currency) => !Number.isFinite(previousData.fx.rates[currency]) || previousData.fx.rates[currency] <= 0
-  );
-  if (missingPreviousRates.length) {
-    throw transientHealthcheckError(
-      `${failureMessage}; previous exchange rates are missing for: ${missingPreviousRates.join(', ')}`,
-      { code: 'EXCHANGE_RATE_SOURCES_UNAVAILABLE' }
+
+  const previousRates = previousData?.fx?.rates;
+  if (previousRates?.USD === 1 && Number.isFinite(previousRates.CNY) && previousRates.CNY > 0) {
+    const missingPreviousRates = requiredCurrencies.filter(
+      (currency) => !Number.isFinite(previousRates[currency]) || previousRates[currency] <= 0
     );
+    if (missingPreviousRates.length) {
+      throw transientHealthcheckError(
+        `${failureMessage}; previous exchange rates are missing for: ${missingPreviousRates.join(', ')}`,
+        { code: 'EXCHANGE_RATE_SOURCES_UNAVAILABLE' }
+      );
+    }
+    console.warn(`Exchange-rate update failed; keeping previous rates: ${logInline(failureMessage)}`);
+    return {
+      ...previousData.fx,
+      stale: true,
+      fallbackUsed: Boolean(normalizedApiKey),
+      fallbackReason: failures[0]?.reason ?? 'request-failed',
+      apiKeyStatus: normalizedApiKey ? failures[0]?.reason ?? 'request-failed' : 'not-configured',
+      reusePreviousCny: false,
+      rates: selectRequiredRates(previousRates, requiredCurrencies)
+    };
   }
-  console.warn(`Exchange-rate update failed; keeping previous rates: ${failureMessage}`);
+
+  if (previousData?.schemaVersion === 3 && previousData.fx?.derivedCurrency === 'CNY') {
+    console.warn(`Exchange-rate update failed; keeping previous derived CNY prices: ${logInline(failureMessage)}`);
+    return {
+      ...previousData.fx,
+      stale: true,
+      fallbackUsed: Boolean(normalizedApiKey),
+      fallbackReason: failures[0]?.reason ?? 'request-failed',
+      apiKeyStatus: normalizedApiKey ? failures[0]?.reason ?? 'request-failed' : 'not-configured',
+      reusePreviousCny: true,
+      rates: null
+    };
+  }
+
+  throw transientHealthcheckError(failureMessage || 'Exchange-rate update failed', {
+    code: 'EXCHANGE_RATE_SOURCES_UNAVAILABLE'
+  });
+}
+
+function roundDerivedCnyPrice(value) {
+  return Number(value.toFixed(2));
+}
+
+function convertToDerivedCny(price, currency, rates) {
+  const currencyRate = rates?.[currency];
+  const cnyRate = rates?.CNY;
+  if (!Number.isFinite(currencyRate) || currencyRate <= 0 || !Number.isFinite(cnyRate) || cnyRate <= 0) return null;
+  return roundDerivedCnyPrice((price / currencyRate) * cnyRate);
+}
+
+export function attachDerivedCnyPrices(countries, { fx, previousData = null } = {}) {
+  const previousByCountry = new Map((previousData?.countries ?? []).map((country) => [country.country, country]));
+  return countries.map((country) => ({
+    ...country,
+    plans: Object.fromEntries(Object.entries(country.plans).map(([tierId, plan]) => {
+      let cnyPrice = convertToDerivedCny(plan.price, country.currency, fx?.rates);
+      if (cnyPrice == null && fx?.reusePreviousCny) {
+        const previousCountry = previousByCountry.get(country.country);
+        const previousPlan = previousCountry?.plans?.[tierId];
+        if (previousCountry?.currency === country.currency
+          && previousPlan?.price === plan.price
+          && Number.isFinite(previousPlan.cnyPrice)
+          && previousPlan.cnyPrice > 0) {
+          cnyPrice = previousPlan.cnyPrice;
+        }
+      }
+      if (!Number.isFinite(cnyPrice) || cnyPrice <= 0) {
+        throw transientHealthcheckError(
+          `Cannot derive ${tierId} CNY price for ${country.country} while exchange-rate sources are unavailable`,
+          { code: 'EXCHANGE_RATE_SOURCES_UNAVAILABLE' }
+        );
+      }
+      return [tierId, { ...plan, cnyPrice }];
+    }))
+  }));
+}
+
+export function publicExchangeRateMetadata(fx) {
   return {
-    ...previousData.fx,
-    stale: true,
-    fallbackUsed: Boolean(normalizedApiKey),
-    fallbackReason: failures[0]?.reason ?? 'request-failed',
-    apiKeyStatus: normalizedApiKey ? failures[0]?.reason ?? 'request-failed' : 'not-configured',
-    rates: selectRequiredRates(previousData.fx.rates, requiredCurrencies)
+    sourceUrl: fx.sourceUrl,
+    sourceMode: fx.sourceMode,
+    fallbackUsed: fx.fallbackUsed,
+    fallbackReason: publicFxFallbackReason(fx.fallbackReason),
+    base: fx.base,
+    fetchedAt: fx.fetchedAt,
+    stale: fx.stale,
+    derivedCurrency: 'CNY'
   };
 }
 
@@ -340,8 +460,20 @@ function formatBeijingDateTime(value) {
   }).format(new Date(value));
 }
 
-function githubAnnotationValue(value) {
-  return String(value).replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
+export function logInline(value, maxCodePoints = 2_000) {
+  const codePoints = [...String(value)];
+  const bounded = codePoints.length > maxCodePoints
+    ? `${codePoints.slice(0, maxCodePoints).join('')}…`
+    : codePoints.join('');
+  return bounded
+    .replace(/[\0-\x1f\x7f\u061c\u200e\u200f\u2028-\u202e\u2066-\u2069\ufeff\ufffd]+/gu, ' ')
+    .replaceAll('::', ': :');
+}
+
+function markdownInline(value, maxCodePoints = 1_000) {
+  return logInline(value, maxCodePoints)
+    .replaceAll('\\', '\\\\')
+    .replace(/([`*_{}\[\]()#+.!|<>])/g, '\\$1');
 }
 
 function snapshotPlans(country, tiers) {
@@ -369,13 +501,52 @@ function isPlainObject(value) {
   return prototype === Object.prototype || prototype === null;
 }
 
+function hasUnpairedSurrogate(value) {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const next = value.charCodeAt(index + 1);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) return true;
+      index += 1;
+    } else if (code >= 0xdc00 && code <= 0xdfff) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function isSafeMappingText(value) {
+  return typeof value === 'string'
+    && value.length <= 160
+    && Boolean(value.trim())
+    && !FORBIDDEN_MAPPING_TEXT_PATTERN.test(value)
+    && !hasUnpairedSurrogate(value);
+}
+
+export function validateCountryNameMapping(mapping) {
+  if (!isPlainObject(mapping)) throw new Error('Chinese country-name mapping has an unsupported structure');
+  const entries = Object.entries(mapping);
+  if (entries.length < 60 || entries.length > 500) {
+    throw new Error('Chinese country-name mapping is missing, incomplete, or oversized');
+  }
+  for (const [country, displayName] of entries) {
+    if (UNSAFE_OBJECT_KEYS.has(country) || !isSafeMappingText(country) || !isSafeMappingText(displayName)) {
+      throw new Error(`Chinese country-name mapping has an unsafe entry: ${logInline(country)}`);
+    }
+  }
+  return mapping;
+}
+
 export function updateHistory(previousHistory, countries, observedAt, tiers, observedAtUtc = null) {
   const history = previousHistory ?? { schemaVersion: 2, countries: {} };
   if (!isPlainObject(history) || !isPlainObject(history.countries)) {
     throw new Error('Price history has an unsupported countries structure');
   }
+  if (observedAtUtc !== null && !isIsoDateTime(observedAtUtc)) {
+    throw new Error('Price history UTC observation timestamp is invalid');
+  }
   history.schemaVersion = 2;
-  history.updatedAt = new Date().toISOString();
+  history.updatedAt = observedAtUtc ?? new Date().toISOString();
   let changedCountries = 0;
 
   for (const country of countries) {
@@ -632,8 +803,7 @@ export function createRunLogEntry(data, summary, startedAt, finishedAt) {
       exchangeRatesStale: Boolean(data.fx.stale),
       exchangeRatesSourceMode: data.fx.sourceMode ?? null,
       exchangeRatesFallbackUsed: Boolean(data.fx.fallbackUsed),
-      exchangeRatesFallbackReason: data.fx.fallbackReason ?? null,
-      exchangeRatesApiKeyStatus: data.fx.apiKeyStatus ?? null
+      exchangeRatesFallbackReason: data.fx.fallbackReason ?? null
     },
     counts: {
       countries: data.countries.length,
@@ -658,6 +828,68 @@ export function createRunLogEntry(data, summary, startedAt, finishedAt) {
   };
 }
 
+function pickPublicFields(value, fields) {
+  if (!isPlainObject(value)) return value;
+  return Object.fromEntries(fields
+    .filter((field) => Object.hasOwn(value, field))
+    .map((field) => [field, value[field]]));
+}
+
+function sanitizeListedTiers(tiers) {
+  return Array.isArray(tiers)
+    ? tiers.map((tier) => pickPublicFields(tier, ['id', 'label']))
+    : tiers;
+}
+
+function sanitizeListedCountries(countries) {
+  return Array.isArray(countries)
+    ? countries.map((country) => pickPublicFields(country, ['country', 'nameZh']))
+    : countries;
+}
+
+function sanitizeChangedCountries(countries) {
+  if (!Array.isArray(countries)) return countries;
+  return countries.map((country) => {
+    const sanitized = pickPublicFields(
+      country,
+      ['country', 'nameZh', 'fromCurrency', 'toCurrency', 'fromRegion', 'toRegion', 'tiers']
+    );
+    if (isPlainObject(sanitized) && Array.isArray(sanitized.tiers)) {
+      sanitized.tiers = sanitized.tiers.map((tier) => pickPublicFields(tier, ['id', 'from', 'to']));
+    }
+    return sanitized;
+  });
+}
+
+function sanitizeRunLogEntry(run) {
+  const sanitized = pickPublicFields(run, PUBLIC_RUN_LOG_ENTRY_KEYS);
+  if (!isPlainObject(sanitized)) return sanitized;
+  if (Object.hasOwn(sanitized, 'source')) {
+    sanitized.source = pickPublicFields(sanitized.source, PUBLIC_RUN_LOG_SOURCE_KEYS);
+    if (isPlainObject(sanitized.source) && Object.hasOwn(sanitized.source, 'exchangeRatesFallbackReason')) {
+      sanitized.source.exchangeRatesFallbackReason = publicFxFallbackReason(
+        sanitized.source.exchangeRatesFallbackReason
+      );
+    }
+  }
+  if (isPlainObject(sanitized.counts)) {
+    sanitized.counts = pickPublicFields(sanitized.counts, PUBLIC_RUN_LOG_COUNT_KEYS);
+    if (Array.isArray(sanitized.counts.tiers)) sanitized.counts.tiers = sanitizeListedTiers(sanitized.counts.tiers);
+  }
+  if (isPlainObject(sanitized.changes)) {
+    sanitized.changes = pickPublicFields(sanitized.changes, PUBLIC_RUN_LOG_CHANGE_KEYS);
+    if (Object.hasOwn(sanitized.changes, 'publishedDate')) {
+      sanitized.changes.publishedDate = pickPublicFields(sanitized.changes.publishedDate, ['changed', 'from', 'to']);
+    }
+    sanitized.changes.addedTiers = sanitizeListedTiers(sanitized.changes.addedTiers);
+    sanitized.changes.removedTiers = sanitizeListedTiers(sanitized.changes.removedTiers);
+    sanitized.changes.addedCountries = sanitizeListedCountries(sanitized.changes.addedCountries);
+    sanitized.changes.removedCountries = sanitizeListedCountries(sanitized.changes.removedCountries);
+    sanitized.changes.changedCountries = sanitizeChangedCountries(sanitized.changes.changedCountries);
+  }
+  return sanitized;
+}
+
 export function buildRunLog(existing, entry) {
   if (existing?.schemaVersion !== 1 || !Array.isArray(existing.runs)) {
     throw new Error('Run log has an unsupported structure');
@@ -666,7 +898,10 @@ export function buildRunLog(existing, entry) {
     schemaVersion: 1,
     retention: 90,
     updatedAtUtc: entry.finishedAtUtc,
-    runs: [...existing.runs, entry].slice(-90)
+    runs: [
+      ...existing.runs.map(sanitizeRunLogEntry),
+      entry
+    ].slice(-90)
   };
 }
 
@@ -1369,7 +1604,7 @@ export async function validateAppleSnapshotStore({
 
 export function validateExistingPrices(data) {
   if (!isPlainObject(data)
-    || ![1, 2].includes(data.schemaVersion)
+    || ![1, 2, 3].includes(data.schemaVersion)
     || !isIsoDateTime(data.generatedAt)
     || !isPlainObject(data.source)
     || data.source.url !== APPLE_URL
@@ -1377,17 +1612,26 @@ export function validateExistingPrices(data) {
     || !isPlainObject(data.fx)
     || !ALLOWED_FX_SOURCE_URLS.has(data.fx.sourceUrl)
     || data.fx.base !== 'USD'
-    || !isIsoDateTime(data.fx.fetchedAt)
-    || !isPlainObject(data.fx.rates)
+    || !isIsoDateTime(data.fx.fetchedAt)) {
+    throw new Error('Existing prices.json has an unsupported or unsafe structure');
+  }
+  const usesDerivedCnyPrices = data.schemaVersion === 3;
+  if (usesDerivedCnyPrices) {
+    if (data.fx.derivedCurrency !== 'CNY' || Object.hasOwn(data.fx, 'rates')) {
+      throw new Error('Existing prices.json exposes raw exchange rates or lacks derived CNY metadata');
+    }
+  } else if (!isPlainObject(data.fx.rates)
     || data.fx.rates.USD !== 1
     || !Number.isFinite(data.fx.rates.CNY)
     || data.fx.rates.CNY <= 0) {
-    throw new Error('Existing prices.json has an unsupported or unsafe structure');
+    throw new Error('Existing prices.json has invalid legacy exchange rates');
   }
   validatePrices(data.countries, { minCountries: 60, tiers: data.tiers });
-  const missingRates = getMissingExchangeRates(data.countries, data.fx.rates);
-  if (missingRates.length) {
-    throw new Error(`Existing prices.json is missing exchange rates for: ${missingRates.join(', ')}`);
+  if (!usesDerivedCnyPrices) {
+    const missingRates = getMissingExchangeRates(data.countries, data.fx.rates);
+    if (missingRates.length) {
+      throw new Error(`Existing prices.json is missing exchange rates for: ${missingRates.join(', ')}`);
+    }
   }
   for (const country of data.countries) {
     if (typeof country.nameZh !== 'string' || !country.nameZh.trim()) {
@@ -1402,10 +1646,13 @@ export function validateExistingPrices(data) {
   if (data.source.parser != null && !/^(cross-checked|document-order|apple-markers-fallback)$/.test(data.source.parser)) {
     throw new Error('Existing prices.json has an invalid Apple parser status');
   }
+  if (data.schemaVersion === 3 && data.source.parser !== 'cross-checked') {
+    throw new Error('Existing schema 3 prices.json was not produced by both Apple parsers');
+  }
   const observedAt = data.run?.observedAtBeijing ?? formatBeijingDate(data.generatedAt);
   if (!isIsoDate(observedAt)) throw new Error('Existing prices.json has an invalid observation date');
   assertPublicationDateNotFuture(data.source.publishedDate, observedAt);
-  if (data.schemaVersion === 2) {
+  if (data.schemaVersion >= 2) {
     if (!isPlainObject(data.run)
       || !isIsoDateTime(data.run.startedAtUtc)
       || !isIsoDateTime(data.run.finishedAtUtc)
@@ -1498,6 +1745,8 @@ function validateExistingRunLog(runLog, data) {
   const latestAllowedTimestamp = Date.now() + FX_MAX_FUTURE_SKEW_MS;
   for (const run of runLog.runs) {
     if (!isPlainObject(run)
+      || !isPlainObject(run.source)
+      || Object.keys(run.source).some((key) => /api.?key/i.test(key))
       || run.status !== 'success'
       || !isIsoDateTime(run.startedAtUtc)
       || !isIsoDateTime(run.finishedAtUtc)
@@ -1658,47 +1907,20 @@ export async function savePublishedAppleSnapshot(_html, parsed, firstConfirmedDa
 }
 
 function summarizeChangedCountries(entries) {
-  return summarizeNames(entries.map(({ nameZh, country }) => nameZh || country));
+  return summarizeNames(entries.map(({ nameZh, country }) => markdownInline(nameZh || country)));
 }
 
 function describeParser(data) {
-  const parser = data.source.parser ?? 'unknown';
+  const parser = markdownInline(data.source.parser ?? 'unknown');
   if (parser === 'cross-checked') return `${parser}（双解析器一致）`;
-  return `${parser}（${data.source.parserStatus ?? 'unknown'}）`;
+  return `${parser}（${markdownInline(data.source.parserStatus ?? 'unknown')}）`;
 }
 
 function describeExchangeRateSource(fx) {
   if (fx.stale) return '上一份有效汇率';
-  if (fx.sourceMode === 'api-key') return 'ExchangeRate-API Key 接口（主来源）';
+  if (fx.sourceMode === 'api-key') return 'ExchangeRate-API 认证接口（主来源）';
   if (fx.fallbackUsed) return 'ExchangeRate-API 开放接口（自动回退）';
   return 'ExchangeRate-API 开放接口';
-}
-
-function describeExchangeRateFallback(reason) {
-  const labels = {
-    'quota-reached': 'API 额度已用完',
-    'invalid-key': 'API Key 无效',
-    'inactive-account': 'API 账户未激活',
-    'unsupported-code': 'API 不支持请求的币种',
-    'malformed-request': 'API 请求格式无效',
-    'missing-rates': '主接口缺少所需币种',
-    'stale-response': '主接口返回的汇率过旧',
-    'future-timestamp': '主接口返回了未来时间戳',
-    'invalid-timestamp': '主接口返回了无效时间戳',
-    'invalid-response': '主接口响应校验失败',
-    'request-failed': '主接口请求失败'
-  };
-  return labels[reason] ?? '主接口不可用';
-}
-
-function describeExchangeRateAuthentication(fx) {
-  if (fx.apiKeyStatus === 'valid') return 'API Key 有效';
-  if (fx.apiKeyStatus === 'not-configured') {
-    return fx.stale ? '未配置 API Key，开放接口失败' : '未配置 API Key，使用开放接口';
-  }
-  return fx.stale
-    ? `${describeExchangeRateFallback(fx.apiKeyStatus)}，开放接口也不可用`
-    : `${describeExchangeRateFallback(fx.apiKeyStatus)}，使用开放接口`;
 }
 
 export function buildActionSummaryLines(data, summary, trigger = resolveTriggerSource(
@@ -1717,13 +1939,13 @@ export function buildActionSummaryLines(data, summary, trigger = resolveTriggerS
 
   if (summary.publicationDateChanged) {
     const previousDate = summary.publishedDateHistory.at(-2)?.publishedDate ?? 'unknown';
-    changes.push(`Apple 发布日期：${previousDate} → ${data.source.publishedDate ?? 'unknown'}`);
+    changes.push(`Apple 发布日期：${markdownInline(previousDate)} → ${markdownInline(data.source.publishedDate ?? 'unknown')}`);
   }
   if (publicationChanges.addedTiers.length) {
-    changes.push(`新增容量：${publicationChanges.addedTiers.map(({ label, id }) => label || id).join('、')}`);
+    changes.push(`新增容量：${publicationChanges.addedTiers.map(({ label, id }) => markdownInline(label || id)).join('、')}`);
   }
   if (publicationChanges.removedTiers.length) {
-    changes.push(`移除容量：${publicationChanges.removedTiers.map(({ label, id }) => label || id).join('、')}`);
+    changes.push(`移除容量：${publicationChanges.removedTiers.map(({ label, id }) => markdownInline(label || id)).join('、')}`);
   }
   if (publicationChanges.addedCountries.length) {
     changes.push(`新增地区：${summarizeChangedCountries(publicationChanges.addedCountries)}`);
@@ -1738,7 +1960,7 @@ export function buildActionSummaryLines(data, summary, trigger = resolveTriggerS
 
   if (data.source.parser !== 'cross-checked') warnings.push(`- **解析降级**：${describeParser(data)}`);
   if (data.fx.stale) warnings.push('- **汇率降级**：本次获取失败，沿用上次成功结果');
-  if (summary.missingRates.length) warnings.push(`- **缺少汇率**：${summary.missingRates.join('、')}`);
+  if (summary.missingRates.length) warnings.push(`- **缺少汇率**：${summary.missingRates.map((currency) => markdownInline(currency)).join('、')}`);
 
   const lines = [
     '## iCloud+ 价格更新',
@@ -1752,13 +1974,12 @@ export function buildActionSummaryLines(data, summary, trigger = resolveTriggerS
     `- 地区数量：${data.countries.length}`,
     `- 价格点数量：${data.countries.length * data.tiers.length}`,
     `- 历史记录覆盖：${Object.keys(summary.history?.countries ?? {}).length} 个地区`,
-    `- Apple 页面标注日期：${data.source.publishedDate ?? 'unknown'}`,
+    `- Apple 页面标注日期：${markdownInline(data.source.publishedDate ?? 'unknown')}`,
     `- Apple 发布日期记录：${summary.publishedDateHistory.length} 条`,
     '',
     '### 校验与来源',
     `- Apple 解析路径：${describeParser(data)}`,
     `- 汇率来源：${describeExchangeRateSource(data.fx)}`,
-    `- 汇率认证：${describeExchangeRateAuthentication(data.fx)}`,
     `- 汇率更新时间（北京时间）：${formatBeijingDateTime(data.fx.fetchedAt)}`,
     `- 汇率状态：${data.fx.stale ? '沿用上次成功结果' : '本次成功获取'}`,
     '',
@@ -1833,18 +2054,13 @@ export async function main({
       { filePath: historyPath, value: structuredClone(previousHistory), text: previousHistoryState.text, existed: previousHistoryState.existed },
       { filePath: runLogPath, value: structuredClone(previousRunLog), text: previousRunLogState.text, existed: previousRunLogState.existed }
     ];
-    if (!countryNames || Object.keys(countryNames).length < 60) {
-      throw new Error('Chinese country-name mapping is missing or incomplete');
-    }
+    validateCountryNameMapping(countryNames);
     const html = await fetchResource(APPLE_URL, { networkBudget });
 
   const parsed = parseApplePrices(html, { allowUnknownCountries: true });
   lastAppleSnapshot = normalizeAppleSnapshot(parsed);
   if (parsed.parser !== 'cross-checked') {
-    console.warn(`Apple parser redundancy degraded: ${parsed.parserStatus}`);
-    if (process.env.GITHUB_ACTIONS === 'true') {
-      console.log(`::warning title=Apple parser redundancy::${githubAnnotationValue(parsed.parserStatus)}`);
-    }
+    throw new Error(`Apple parser redundancy failed closed: ${logInline(parsed.parserStatus)}`);
   }
   if (!parsed.sourcePublishedDate || !/^\d{4}-\d{2}-\d{2}$/.test(publicationDateKey(parsed.sourcePublishedDate))) {
     throw new Error('Apple published date was not found or has an unsupported format');
@@ -1866,25 +2082,23 @@ export async function main({
       previousData
     ));
   }
-  const countries = parsed.countries.map((country) => ({
+  const parsedCountries = parsed.countries.map((country) => ({
     ...country,
-    nameZh: countryNames[country.country] ?? country.country
+    nameZh: Object.hasOwn(countryNames, country.country) ? countryNames[country.country] : country.country
   }));
 
   const fx = await getExchangeRates(previousData, {
-    requiredCurrencies: [...new Set(countries.map(({ currency }) => currency))],
+    requiredCurrencies: [...new Set(parsedCountries.map(({ currency }) => currency))],
     networkBudget
   });
-  if (process.env.GITHUB_ACTIONS === 'true' && fx.apiKeyStatus === 'not-configured') {
-    console.log('::notice title=未配置汇率 API Key::已直接使用开放接口，价格更新继续执行。');
-  } else if (process.env.GITHUB_ACTIONS === 'true' && fx.apiKeyStatus !== 'valid') {
-    const handling = fx.stale ? '已沿用上一份有效汇率' : '已使用开放接口';
-    console.log(`::notice title=汇率 API Key 未生效::${githubAnnotationValue(`${describeExchangeRateFallback(fx.apiKeyStatus)}，${handling}。`)}`);
+  const countries = attachDerivedCnyPrices(parsedCountries, { fx, previousData });
+  if (process.env.GITHUB_ACTIONS === 'true' && fx.fallbackUsed && !fx.stale) {
+    console.log('::notice title=汇率来源自动回退::认证汇率来源不可用，已使用开放接口。');
   }
   if (process.env.GITHUB_ACTIONS === 'true' && fx.stale) {
     console.log('::warning title=汇率更新失败::两个在线汇率来源均不可用，已沿用上一份有效汇率。');
   }
-  const missingRates = getMissingExchangeRates(countries, fx.rates);
+  const missingRates = fx.rates ? getMissingExchangeRates(countries, fx.rates) : [];
   if (missingRates.length) {
     throw new Error(`Exchange rates are missing for: ${missingRates.join(', ')}`);
   }
@@ -1906,7 +2120,7 @@ export async function main({
   const observedAt = formatBeijingDate(generatedAt);
   assertPublicationDateNotFuture(parsed.sourcePublishedDate, observedAt);
   const data = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     generatedAt,
     source: {
       name: 'Apple Support',
@@ -1923,7 +2137,7 @@ export async function main({
       countries: countries.length,
       pricePoints: countries.length * parsed.tiers.length
     },
-    fx,
+    fx: publicExchangeRateMetadata(fx),
     tiers: parsed.tiers,
     countries
   };
@@ -1999,14 +2213,14 @@ export async function main({
   try {
     await writeActionSummary(data, summary, stepSummaryPath);
   } catch (error) {
-    console.warn(`Unable to write GitHub Actions summary: ${error.message}`);
+    console.warn(`Unable to write GitHub Actions summary: ${logInline(error.message)}`);
   }
   } finally {
     if (releaseLock) {
       try {
         await releaseLock();
       } catch (error) {
-        console.warn(`Unable to release the iCloud price update lock: ${error.message}`);
+        console.warn(`Unable to release the iCloud price update lock: ${logInline(error.message)}`);
       }
     }
   }
@@ -2037,7 +2251,7 @@ export async function writeFailureDiagnostics(error, {
       '- **状态：失败**',
       `- 触发方式：${describeTriggerSource(report.trigger)}`,
       `- 失败时间（北京时间）：${formatBeijingDateTime(finishedAt)}`,
-      `- **失败原因：${error.message}**`,
+      `- **失败原因：${markdownInline(error?.message ?? error)}**`,
       `- Apple 规范化 JSON：${report.appleSnapshotCaptured ? '已保存到运行附件' : '解析完成前失败，未生成'}`,
       '',
       '### 处理建议',
@@ -2049,11 +2263,11 @@ export async function writeFailureDiagnostics(error, {
 }
 
 async function handleFailure(error) {
-  console.error(error);
+  console.error(`iCloud price update failed: ${logInline(error?.message ?? error)}`);
   try {
     await writeFailureDiagnostics(error);
   } catch (diagnosticError) {
-    console.error(`Unable to save diagnostics: ${diagnosticError.message}`);
+    console.error(`Unable to save diagnostics: ${logInline(diagnosticError.message)}`);
   }
   process.exitCode = 1;
 }

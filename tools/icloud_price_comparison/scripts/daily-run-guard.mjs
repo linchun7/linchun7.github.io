@@ -38,14 +38,14 @@ export function evaluateDailyRun({ runLog, eventName, requestedSource, now = new
   };
 }
 
-async function appendOutput(name, value) {
-  if (!process.env.GITHUB_OUTPUT) return;
-  await appendFile(process.env.GITHUB_OUTPUT, `${name}=${value ?? ''}\n`, 'utf8');
+async function appendOutput(name, value, outputPath) {
+  if (!outputPath) return;
+  await appendFile(outputPath, `${name}=${value ?? ''}\n`, 'utf8');
 }
 
-async function writeSkipSummary(result) {
-  if (!process.env.GITHUB_STEP_SUMMARY || result.shouldRun) return;
-  await appendFile(process.env.GITHUB_STEP_SUMMARY, [
+async function writeSkipSummary(result, summaryPath) {
+  if (!summaryPath || result.shouldRun) return;
+  await appendFile(summaryPath, [
     '## iCloud+ 价格更新',
     '',
     '### 结论',
@@ -58,20 +58,30 @@ async function writeSkipSummary(result) {
   ].join('\n'), 'utf8');
 }
 
-export async function main() {
-  const runLog = await readRunLog(process.env.ICLOUD_RUN_LOG_PATH ?? RUN_LOG_PATH);
+export async function main({
+  runLogPath = process.env.ICLOUD_RUN_LOG_PATH ?? RUN_LOG_PATH,
+  eventName = process.env.GITHUB_EVENT_NAME,
+  requestedSource = process.env.REQUESTED_TRIGGER_SOURCE,
+  now = new Date(),
+  outputPath = process.env.GITHUB_OUTPUT,
+  summaryPath = process.env.GITHUB_STEP_SUMMARY,
+  log = console.log
+} = {}) {
+  const runLog = await readRunLog(runLogPath);
   const result = evaluateDailyRun({
     runLog,
-    eventName: process.env.GITHUB_EVENT_NAME,
-    requestedSource: process.env.REQUESTED_TRIGGER_SOURCE
+    eventName,
+    requestedSource,
+    now
   });
-  await appendOutput('should_run', String(result.shouldRun));
-  await appendOutput('trigger_source', result.triggerSource);
-  await appendOutput('automatic_run_date_beijing', result.automaticRunDateBeijing);
-  await writeSkipSummary(result);
-  console.log(result.shouldRun
+  await appendOutput('should_run', String(result.shouldRun), outputPath);
+  await appendOutput('trigger_source', result.triggerSource, outputPath);
+  await appendOutput('automatic_run_date_beijing', result.automaticRunDateBeijing, outputPath);
+  await writeSkipSummary(result, summaryPath);
+  log(result.shouldRun
     ? `${describeTriggerSource(result.triggerSource)}：允许执行。`
     : `${describeTriggerSource(result.triggerSource)}：${result.automaticRunDateBeijing} 已成功更新，本次跳过。`);
+  return result;
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

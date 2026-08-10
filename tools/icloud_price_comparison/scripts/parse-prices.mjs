@@ -20,6 +20,11 @@ const REGIONS = {
   ap: 'Asia Pacific'
 };
 const EXPECTED_REGIONS = new Set(Object.values(REGIONS));
+const MAX_PRICE_TIERS = 20;
+const MAX_PRICE_COUNTRIES = 250;
+const UNSAFE_COUNTRY_NAMES = new Set(['__proto__', 'prototype', 'constructor']);
+const FORBIDDEN_COUNTRY_TEXT_PATTERN = /[\0-\x1f\x7f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069\ud800-\udfff\ufeff\ufffd]/u;
+const STORAGE_TIER_PREFIX_PATTERN = /^\d+(?:\.\d+)?\s*(?:KB|MB|GB|TB|PB|EB|KiB|MiB|GiB|TiB|PiB|EiB)\b/i;
 
 const CURRENCY_ALIASES = {
   Euro: 'EUR'
@@ -82,7 +87,9 @@ export const PRICE_CHANGE_THRESHOLDS = {
   localMinimum: 1,
   cnyMinimum: 15,
   cnyRelative: 0.5,
-  marketRelative: 0.5
+  marketRelative: 0.5,
+  fxRelative: 0.5,
+  marketOutlierRatio: 20
 };
 
 function cleanText(value) {
@@ -186,6 +193,12 @@ function parseTierLabel(label) {
   return canonicalTierDefinition(`${normalizedAmount}${unit}`);
 }
 
+function rejectUnsupportedStorageTier(text, country) {
+  if (STORAGE_TIER_PREFIX_PATTERN.test(cleanText(text))) {
+    throw new Error(`Unsupported storage tier "${cleanText(text)}" for ${country}`);
+  }
+}
+
 function isPriceList($, node) {
   return $(node).find('li').toArray().some((item) => (
     /^\d+(?:\.\d+)?\s*(?:GB|TB)\s*:?\s*\S+/i.test(cleanText($(item).text()))
@@ -248,7 +261,10 @@ function parseCountry($, heading, priceList, region, options) {
   $prices.find('li').each((_, item) => {
     const text = itemText($, item);
     const match = text.match(/^(\d+(?:\.\d+)?\s*(?:GB|TB))\s*:?\s*(.+)$/i);
-    if (!match) return;
+    if (!match) {
+      rejectUnsupportedStorageTier(text, country);
+      return;
+    }
 
     const tier = parseTierLabel(match[1]);
     const formattedPrice = cleanText(match[2]).replace(/^:\s*/, '');
@@ -271,17 +287,23 @@ function parseCountryByAppleMarkers($, heading, priceList, region, options) {
   const plans = {};
   const detectedTiers = new Map();
   const tierItems = $(priceList).find('li').toArray().filter((item) => (
-    /^(?:\s*\d+(?:\.\d+)?\s*(?:GB|TB))/i.test(itemText($, item))
+    STORAGE_TIER_PREFIX_PATTERN.test(itemText($, item))
   ));
 
   $(priceList).find('li').each((_, item) => {
     const $item = $(item).clone();
     $item.find('sup').remove();
     const labelNode = $item.find('b, strong').first();
-    if (!labelNode.length) return;
+    if (!labelNode.length) {
+      rejectUnsupportedStorageTier(itemText($, item), country);
+      return;
+    }
     const rawLabel = cleanText(labelNode.text());
     const tier = parseTierLabel(rawLabel.replace(/:\s*$/, ''));
-    if (!tier) return;
+    if (!tier) {
+      rejectUnsupportedStorageTier(rawLabel, country);
+      return;
+    }
 
     const markedItemText = cleanText($item.text());
     const formattedPrice = cleanText(markedItemText.slice(rawLabel.length)).replace(/^:\s*/, '');
@@ -472,24 +494,32 @@ export function validatePrices(countries, {
   tiers = TIERS
 } = {}) {
   if (!Array.isArray(countries)) throw new Error('Apple pricing countries have an unsupported structure');
-  if (!Array.isArray(tiers) || !tiers.length) throw new Error('Apple pricing tiers have an unsupported structure');
+  if (!Array.isArray(tiers) || !tiers.length || tiers.length > MAX_PRICE_TIERS) {
+    throw new Error('Apple pricing tiers have an unsupported structure');
+  }
 
   const tierIds = new Set();
   const tierCapacities = new Set();
+  let previousTierCapacity = 0;
   for (const tier of tiers) {
     if (!tier
       || canonicalTierDefinition(tier.id)?.label !== tier.label
       || canonicalTierDefinition(tier.id)?.capacityGb !== tier.capacityGb
       || tierIds.has(tier.id)
-      || tierCapacities.has(tier.capacityGb)) {
+      || tierCapacities.has(tier.capacityGb)
+      || tier.capacityGb <= previousTierCapacity) {
       throw new Error('Apple pricing has invalid or duplicate tiers');
     }
     tierIds.add(tier.id);
     tierCapacities.add(tier.capacityGb);
+    previousTierCapacity = tier.capacityGb;
   }
 
   if (countries.length < minCountries) {
     throw new Error(`Only ${countries.length} countries were parsed; expected at least ${minCountries}`);
+  }
+  if (countries.length > MAX_PRICE_COUNTRIES) {
+    throw new Error(`Too many countries were parsed: ${countries.length}`);
   }
 
   const seen = new Set();
@@ -497,6 +527,9 @@ export function validatePrices(countries, {
     if (!entry
       || typeof entry.country !== 'string'
       || !entry.country.trim()
+      || entry.country.length > 160
+      || UNSAFE_COUNTRY_NAMES.has(entry.country)
+      || FORBIDDEN_COUNTRY_TEXT_PATTERN.test(entry.country)
       || typeof entry.region !== 'string'
       || !entry.region.trim()
       || !EXPECTED_REGIONS.has(entry.region)
@@ -513,9 +546,13 @@ export function validatePrices(countries, {
 
     for (const tier of tiers) {
       const plan = entry.plans[tier.id];
-      if (!plan || !Number.isFinite(plan.price) || plan.price <= 0) {
+      if (!plan || !Number.isFinite(plan.price) || plan.price <= 0 || plan.price > Number.MAX_SAFE_INTEGER) {
         throw new Error(`Invalid ${tier.id} price for ${entry.country}`);
       }
+    }
+    const planIds = Object.keys(entry.plans);
+    if (planIds.length !== tierIds.size || [...tierIds].some((tierId) => !Object.hasOwn(entry.plans, tierId))) {
+      throw new Error(`Apple pricing plans do not exactly match tiers for ${entry.country}`);
     }
   }
 
@@ -566,8 +603,8 @@ export function validatePrices(countries, {
       if (previous.currency === entry.currency) {
         ratio = entry.plans[tier.id].price / previous.plans[tier.id].price;
       } else {
-        const previousCny = convertToCny(previous.plans[tier.id].price, previous.currency, previousRates);
-        const currentCny = convertToCny(entry.plans[tier.id].price, entry.currency, currentRates);
+        const previousCny = planCnyPrice(previous.plans[tier.id], previous.currency, previousRates);
+        const currentCny = planCnyPrice(entry.plans[tier.id], entry.currency, currentRates);
         if (previousCny == null || currentCny == null) {
           throw new Error(`Cannot validate ${tier.id} currency change for ${entry.country}: exchange rate is missing`);
         }
@@ -593,9 +630,38 @@ function convertToCny(price, currency, rates) {
   return (price / currencyRate) * cnyRate;
 }
 
+function planCnyPrice(plan, currency, rates) {
+  if (Number.isFinite(plan?.cnyPrice) && plan.cnyPrice > 0) return plan.cnyPrice;
+  return convertToCny(plan?.price, currency, rates);
+}
+
 function symmetricPercentageChange(current, previous) {
   if (!Number.isFinite(current) || !Number.isFinite(previous) || previous <= 0 || current <= 0) return Number.POSITIVE_INFINITY;
   return Math.max(current / previous, previous / current) - 1;
+}
+
+function validateCurrentMarketOutliers(countries, tiers, currentRates, thresholds) {
+  const ratioLimit = thresholds.marketOutlierRatio ?? PRICE_CHANGE_THRESHOLDS.marketOutlierRatio;
+  for (const tier of tiers) {
+    const values = countries.map((country) => ({
+      country: country.country,
+      value: planCnyPrice(country.plans[tier.id], country.currency, currentRates)
+    })).filter(({ value }) => Number.isFinite(value) && value > 0);
+    if (values.length < 10) continue;
+    const sorted = values.map(({ value }) => value).sort((first, second) => first - second);
+    const middle = Math.floor(sorted.length / 2);
+    const median = sorted.length % 2
+      ? sorted[middle]
+      : (sorted[middle - 1] + sorted[middle]) / 2;
+    for (const { country, value } of values) {
+      if (value > median * ratioLimit || value * ratioLimit < median) {
+        throw new Error(
+          `Suspicious ${tier.id} CNY market outlier for ${country}: `
+          + `${value.toFixed(2)} versus median ${median.toFixed(2)}`
+        );
+      }
+    }
+  }
 }
 
 export function validatePriceChangeAnomalies(countries, {
@@ -604,7 +670,8 @@ export function validatePriceChangeAnomalies(countries, {
   tiers = TIERS,
   thresholds = PRICE_CHANGE_THRESHOLDS
 } = {}) {
-  if (!previousData?.countries?.length || !previousData?.fx?.rates) return true;
+  validateCurrentMarketOutliers(countries, tiers, currentRates, thresholds);
+  if (!previousData?.countries?.length) return true;
   const previousByCountry = new Map(previousData.countries.map((entry) => [entry.country, entry]));
 
   for (const entry of countries) {
@@ -614,20 +681,34 @@ export function validatePriceChangeAnomalies(countries, {
       const currentPlan = entry.plans[tier.id];
       const previousPlan = previous.plans[tier.id];
       const currencyChanged = previous.currency !== entry.currency;
-      if (!currentPlan || !previousPlan || (!currencyChanged && currentPlan.price === previousPlan.price)) continue;
+      if (!currentPlan || !previousPlan) continue;
 
-      const previousCnyAtPreviousRate = convertToCny(
-        previousPlan.price,
+      const previousCnyAtPreviousRate = planCnyPrice(
+        previousPlan,
         previous.currency,
-        previousData.fx.rates
+        previousData.fx?.rates
       );
-      const currentCnyAtCurrentRate = convertToCny(
-        currentPlan.price,
+      const currentCnyAtCurrentRate = planCnyPrice(
+        currentPlan,
         entry.currency,
         currentRates
       );
       if (previousCnyAtPreviousRate == null || currentCnyAtCurrentRate == null) {
         throw new Error(`Cannot validate combined ${tier.id} currency change for ${entry.country}: exchange rate is missing`);
+      }
+
+      if (!currencyChanged && currentPlan.price === previousPlan.price) {
+        const cnyDelta = Math.abs(currentCnyAtCurrentRate - previousCnyAtPreviousRate);
+        const percentageDelta = symmetricPercentageChange(currentCnyAtCurrentRate, previousCnyAtPreviousRate);
+        const fxRelative = thresholds.fxRelative ?? PRICE_CHANGE_THRESHOLDS.fxRelative;
+        const cnyThreshold = Math.max(thresholds.cnyMinimum, previousCnyAtPreviousRate * fxRelative);
+        if (percentageDelta >= fxRelative && percentageDelta > 0 && cnyDelta >= cnyThreshold && cnyDelta > 0) {
+          throw new Error(
+            `Suspicious FX-derived ${tier.id} CNY change for ${entry.country}: `
+            + `${(percentageDelta * 100).toFixed(1)}%, CNY ${cnyDelta.toFixed(2)}/${cnyThreshold.toFixed(2)}`
+          );
+        }
+        continue;
       }
 
       if (currencyChanged) {
@@ -655,11 +736,9 @@ export function validatePriceChangeAnomalies(countries, {
 
       const localDelta = Math.abs(currentPlan.price - previousPlan.price);
       const percentageDelta = symmetricPercentageChange(currentPlan.price, previousPlan.price);
-      const currentCnyAtPreviousRate = convertToCny(
-        currentPlan.price,
-        entry.currency,
-        previousData.fx.rates
-      );
+      const currentCnyAtPreviousRate = previousPlan.price > 0
+        ? currentPlan.price * (previousCnyAtPreviousRate / previousPlan.price)
+        : null;
       if (currentCnyAtPreviousRate == null) continue;
 
       const fixedRateCnyDelta = Math.abs(currentCnyAtPreviousRate - previousCnyAtPreviousRate);
