@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="format-detection" content="telephone=no">
   <meta name="referrer" content="origin">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; media-src 'none'; manifest-src 'none'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; connect-src 'self'; img-src 'self' data:; font-src 'self'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; media-src 'none'; manifest-src 'none'; script-src 'self' https://www.googletagmanager.com https://static.cloudflareinsights.com; style-src 'self'; connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com; img-src 'self' data: https://*.google-analytics.com https://www.googletagmanager.com; font-src 'self'">
   <meta name="theme-color" content="#eef2f6">
   <meta name="description" content="比较全球不同国家和地区的 iCloud+ 月度价格，支持人民币换算、容量排序和历史价格查询。">
   <meta name="keywords" content="iCloud+,Apple,云存储,全球价格,价格历史,汇率换算">
@@ -21,10 +21,10 @@
   <title>iCloud+ 全球价格对比</title>
   <script data-cfasync="false" src="price-bootstrap.js?v=9"></script>
   <link rel="stylesheet" href="style.css?v=11">
-  <link rel="modulepreload" href="script.js?v=19">
+  <link rel="modulepreload" href="script.js?v=20">
   <link rel="modulepreload" href="data-contract.js?v=11">
   <link rel="modulepreload" href="vendor/lucide-subset.js?v=5">
-  <script data-cfasync="false" type="module" src="script.js?v=19"></script>
+  <script data-cfasync="false" type="module" src="script.js?v=20"></script>
   <link rel="shortcut icon" href="/images/favicon.ico">
   <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
   <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
@@ -221,6 +221,7 @@
 
   <footer class="page-footer">
     <p>本工具与 Apple Inc. 无关联，数据仅供参考。</p>
+    <p>访问统计使用 Google Analytics 和 Cloudflare Web Analytics；站内搜索词不会发送给统计服务。</p>
     <p>&copy; 2026 <a href="https://www.linchun.com.cn">林春写字的地方</a></p>
   </footer>
 

@@ -8,6 +8,7 @@ import { createIcons } from './vendor/lucide-subset.js?v=5';
 
 const REQUEST_TIMEOUT_MS = 8_000;
 const CHART_SCRIPT_URL = './vendor/chart.umd.min.js?v=4';
+const ANALYTICS_ID = 'G-K2S9L4CHNP';
 const SLOW_LOADING_MS = 1_500;
 const DEFAULT_SORT_TIER = '200GB';
 const DEFAULT_TIER_COLUMN_COUNT = 5;
@@ -104,6 +105,7 @@ const percentFormatter = new Intl.NumberFormat('zh-CN', { maximumFractionDigits:
 const collator = new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base' });
 let slowLoadingTimer = null;
 let chartLibraryPromise = null;
+let analyticsScheduled = false;
 let initialPriceRequest = globalThis.__icloudInitialPriceRequest ?? null;
 delete globalThis.__icloudInitialPriceRequest;
 
@@ -113,6 +115,11 @@ function refreshIcons() {
   } catch (error) {
     console.warn(`图标加载失败：${error.message}`);
   }
+}
+
+function analyticsTag() {
+  globalThis.dataLayer = globalThis.dataLayer || [];
+  globalThis.dataLayer.push(arguments);
 }
 
 function boundedSearchQuery(value) {
@@ -148,6 +155,37 @@ function createSanitizedStateUrl() {
   if (region !== null) url.searchParams.set('region', region);
   if (url.hash && url.hash !== '#priceWorkspace') url.hash = '';
   return url;
+}
+
+function loadAnalytics() {
+  if (document.querySelector('script[data-analytics-loader]')) return;
+  const analyticsUrl = createSanitizedStateUrl();
+  analyticsTag('js', new Date());
+  analyticsTag('config', ANALYTICS_ID, {
+    page_location: analyticsUrl.href,
+    allow_google_signals: false,
+    allow_ad_personalization_signals: false
+  });
+  const script = document.createElement('script');
+  script.async = true;
+  script.fetchPriority = 'low';
+  script.dataset.analyticsLoader = 'true';
+  script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(ANALYTICS_ID)}`;
+  document.head.append(script);
+}
+
+function scheduleAnalytics() {
+  if (analyticsScheduled) return;
+  analyticsScheduled = true;
+  const scheduleWhenIdle = () => {
+    if ('requestIdleCallback' in globalThis) {
+      globalThis.requestIdleCallback(loadAnalytics, { timeout: 3_000 });
+    } else {
+      globalThis.setTimeout(loadAnalytics, 1_500);
+    }
+  };
+  if (document.readyState === 'complete') scheduleWhenIdle();
+  else globalThis.addEventListener('load', scheduleWhenIdle, { once: true });
 }
 
 function setLoadStatus(message, { error = false, hidden = false } = {}) {
@@ -1375,6 +1413,7 @@ async function initialize({ forceRefresh = false } = {}) {
     clearTimeout(slowLoadingTimer);
     slowLoadingTimer = null;
     state.loading = false;
+    scheduleAnalytics();
   }
 }
 elements.retryButton?.addEventListener('click', () => {
