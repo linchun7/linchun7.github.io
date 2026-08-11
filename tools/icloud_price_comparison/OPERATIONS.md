@@ -26,7 +26,7 @@ ExchangeRate-API ───┘        │
 - `data/prices.json` 是 schema 3 公共契约：只含当地价格、每个套餐的两位小数 `cnyPrice` 和 allowlist 汇率元数据，不含 raw FX rates、API Key 值或 API Key 配置/状态。
 - `data/run-log.json` 仅保留最近 90 次成功运行，且同样不得公开 API Key 配置/状态。
 - FX provenance 会公开本次成功使用的是认证 endpoint、开放 endpoint 或 stale 回退；它不公开 Key 值、失败/额度状态，但成功认证模式可能间接表明运行时存在可用凭据。若该元数据也被定义为敏感，需通过下一版 schema 迁移统一为供应商级来源。
-- Cloudflare 提供 HTTPS、响应头、缓存和自动注入的 Web Analytics；仓库内不手工嵌入其 Beacon。
+- Cloudflare 提供 HTTPS、响应头、缓存和自动注入的 Web Analytics；仓库内不手工嵌入其 Beacon。前端另以延迟动态脚本启用 GA4（`G-K2S9L4CHNP`）。
 - Apple、ExchangeRate-API、GitHub Actions/Pages、Cloudflare、DNS 注册商和可选 Healthchecks 都是外部依赖。仓库测试不能证明这些控制面的实时状态。
 
 ## 2. 角色与权限
@@ -171,7 +171,7 @@ Cloudflare 08:05 主触发所使用的 GitHub 凭据/应用不在本仓库定义
 
 - 主页面、`prices.json`、`history.json`、核心 JS/CSS 和真实不存在路径。
 - 无页面异常、CSP violation、水平溢出或加载死锁。
-- 无 Google Analytics/Tag Manager 请求、GA 全局对象或新写入的 `_ga` Cookie。
+- GA4 在主内容初始化后只加载一次，测量 ID 为 `G-K2S9L4CHNP`；其 `page_location` 不得包含 `q`、未知参数或未知 fragment，Google Signals 与广告个性化信号保持关闭。
 - Cloudflare Beacon 可加载，`/cdn-cgi/rum` 正常响应；不要因此放宽到任意第三方 `connect-src`。
 - 数据生成时间不超过 36 小时；页面会标记旧数据，但监控不能只依赖用户发现。
 - 浏览器应拒绝 data redirect、非法 UTF-8，以及超过 1 MiB 的 prices / 8 MiB 的 history；8 秒超时必须覆盖完整正文读取。
@@ -191,11 +191,11 @@ Cloudflare 08:05 主触发所使用的 GitHub 凭据/应用不在本仓库定义
 候选页面的预期 HTTP CSP：
 
 ```text
-default-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-ancestors 'none'; frame-src 'none'; worker-src 'none'; media-src 'none'; manifest-src 'none'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; connect-src 'self'; img-src 'self' data:; font-src 'self'
+default-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-ancestors 'none'; frame-src 'none'; worker-src 'none'; media-src 'none'; manifest-src 'none'; script-src 'self' https://www.googletagmanager.com https://static.cloudflareinsights.com; style-src 'self'; connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com; img-src 'self' data: https://*.google-analytics.com https://www.googletagmanager.com; font-src 'self'
 ```
 
-- 不允许 Google 域名、`unsafe-inline`、`unsafe-eval`、通配脚本源或任意第三方连接。
-- Cloudflare 自动 Web Analytics script 来自 `static.cloudflareinsights.com`；采集请求使用同源 `/cdn-cgi/rum`，所以 `connect-src 'self'` 足够。
+- Google 只允许 GA4 所需的 Tag Manager 脚本域名与 Analytics 采集域名；仍不允许 `unsafe-inline`、`unsafe-eval`、通配脚本源或任意第三方连接。
+- Cloudflare 自动 Web Analytics script 来自 `static.cloudflareinsights.com`；其采集请求使用同源 `/cdn-cgi/rum`。GA4 连接/像素仅允许 `*.google-analytics.com`、`*.analytics.google.com` 与 `www.googletagmanager.com`。
 - HTML meta CSP 与 HTTP CSP 同时生效，实际策略取交集；但 `frame-ancestors` 只能依赖 HTTP header。
 - 若关闭 Cloudflare Web Analytics，应同步删除 `static.cloudflareinsights.com`，而不是保留无用白名单。
 
@@ -261,15 +261,15 @@ https://www.linchun.com.cn/tools/icloud_price_comparison/?q=privateSearchMarker&
 
 - 地址栏最终只保留允许的状态键；搜索词仍应用到本地筛选但不留在 URL。
 - 任一子资源 Referer 不包含两个标记；Referrer 最多为 origin。
-- Network 中没有 `googletagmanager.com`、`google-analytics.com` 或其他未批准域。
-- 干净上下文中没有 `_ga` / `_gid` / `_gat` Cookie，应用不写 sessionStorage/IndexedDB。
-- Cloudflare 自动 Beacon 和 `/cdn-cgi/rum` 是唯一预期分析流量。
+- Network 中有且只有获批的 `www.googletagmanager.com/gtag/js?id=G-K2S9L4CHNP`、GA4 采集端点、Cloudflare Beacon 与同源 `/cdn-cgi/rum`；不得出现其他第三方分析域名。
+- GA4 配置队列只有一条该测量 ID 的 `config`，其 `page_location` 是清洗后的 URL，且 `allow_google_signals`、`allow_ad_personalization_signals` 都为 `false`。
+- 应用自身不写 Cookie、sessionStorage/IndexedDB；GA4 可能写 `_ga` 系列 Cookie，验收时检查其来源和数量，不把正常 GA4 Cookie 误判为应用数据泄漏。
 - 控制台无应用 error/CSP violation；对话框、键盘、缓存回退和错误态正常。
 - 生产 JSON 是 schema 3，且 `prices.json`、`run-log.json` 都不含 raw rates 或 API Key 状态。
 
 隐私边界：bootstrap 只能在 HTML 开始执行后清理地址。最初的 document URL 仍可能进入浏览器历史、代理、Cloudflare/GitHub Pages 和访问日志；任何 Secret、Token 或个人信息都不得放进 URL。`localStorage` 也不是防篡改存储：同一 origin 的其他页面可写入格式合法但内容伪造的缓存。工具只在网络失败时使用并明确标记该缓存；高隔离要求应使用独立 origin 或禁用持久缓存。
 
-用户如果先访问主站其他仍使用 GA 的页面，旧的域级 `_ga` Cookie 可能随后随同源请求发送到工具路径；候选代码无法阻止首次请求携带既有域 Cookie。要彻底消除此情况，需要站点级移除 GA/清理旧 Cookie，或将工具迁移到隔离域名。部署验收至少必须证明本工具不创建、读取或发送 GA 请求。
+GA4 可能使用域级 `_ga` Cookie，主站其他 GA 页面也可能复用该 Cookie。本工具的隐私边界是：站内搜索词和未知 URL 状态不得进入 GA4 的 `page_location` 或后续 Referer；若业务要求完全无 Cookie 或与主站分析身份隔离，应改用独立 origin 或另行设计同意/无 Cookie 方案。
 
 ## 9. 故障处理 Runbook
 
@@ -327,7 +327,7 @@ https://www.linchun.com.cn/tools/icloud_price_comparison/?q=privateSearchMarker&
 
 ### 9.6 前端、CSP、缓存或隐私回归
 
-症状：白屏、资源被 CSP 拦截、旧 JS/新 HTML 混用、Google 请求、`_ga` 新写入、查询标记进入 Referer。
+症状：白屏、资源被 CSP 拦截、旧 JS/新 HTML 混用、GA4 缺失/重复/测量 ID 错误、未批准第三方请求、查询标记进入 GA4 或 Referer。
 
 1. 立即保存 HAR/console、响应头和受影响资源版本；使用干净 profile 复现。
 2. 若是 CDN 规则漂移，恢复最后已知良好的路径级规则并定向 purge。

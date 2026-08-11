@@ -189,14 +189,18 @@ test('starts price data early and deprioritizes optional third-party work', asyn
   ]);
   const eagerPriceFetch = '<script data-cfasync="false" src="price-bootstrap.js?v=9"></script>';
   assert.ok(html.includes(eagerPriceFetch), 'prices.json bootstrap should run during HTML parsing');
-  assert.ok(html.indexOf(eagerPriceFetch) < html.indexOf('<script data-cfasync="false" type="module" src="script.js?v=19"></script>'), 'the initial price request should precede module execution');
+  assert.ok(html.indexOf(eagerPriceFetch) < html.indexOf('<script data-cfasync="false" type="module" src="script.js?v=20"></script>'), 'the initial price request should precede module execution');
   assert.doesNotMatch(html, /rel="preload" href="data\/prices\.json"/, 'cross-browser loading should not rely on a fetch preload that WebKit may duplicate');
-  assert.doesNotMatch(html, /googletagmanager\.com|google-analytics\.com|Google Analytics|gtag\s*\(|G-K2S9L4CHNP/i, 'Google Analytics must be absent from HTML and CSP');
+  assert.doesNotMatch(html, /<script[^>]+src="https:\/\/www\.googletagmanager\.com/, 'analytics must not block HTML parsing');
   assert.doesNotMatch(html, /analyticsConsent|privacySettings|允许匿名统计/, 'analytics consent overlay and its settings entry must be absent');
   assert.match(html, /Content-Security-Policy/);
   assert.match(html, /<meta name="referrer" content="origin">/, 'subresource requests must not receive URL paths or query parameters in Referer');
   assert.match(html, /<input id="searchInput"[^>]+maxlength="160"/, 'free-text search input must have a bounded length');
+  assert.match(html, /script-src[^;]+www\.googletagmanager\.com/, 'the deferred GA4 loader must be explicitly allowed by CSP');
   assert.match(html, /script-src[^;]+static\.cloudflareinsights\.com/, 'Cloudflare Web Analytics must be explicitly allowed by CSP');
+  assert.match(html, /connect-src[^;]+google-analytics\.com[^;]+analytics\.google\.com[^;]+www\.googletagmanager\.com/, 'GA4 collection endpoints must be explicitly allowed by CSP');
+  assert.match(html, /img-src[^;]+google-analytics\.com[^;]+www\.googletagmanager\.com/, 'GA4 image endpoints must be explicitly allowed by CSP');
+  assert.match(html, /访问统计使用 Google Analytics 和 Cloudflare Web Analytics；站内搜索词不会发送给统计服务。/);
   assert.doesNotMatch(html, /raw\.githubusercontent\.com/, 'frontend data must not fall back to a mutable branch URL');
   assert.match(html, /Rates By Exchange Rate API/);
   assert.match(html, /data-cfasync="false" type="module"/, 'Rocket Loader must not rewrite the module entry point');
@@ -208,6 +212,10 @@ test('starts price data early and deprioritizes optional third-party work', asyn
   assert.match(moduleSource, /TextDecoder\('utf-8', \{ fatal: true \}\)/, 'network JSON must use strict UTF-8 decoding');
   assert.match(moduleSource, /fetch\(url,[\s\S]*?redirect:\s*'error'/, 'all later data requests must reject redirects');
   assert.match(moduleSource, /serialized\.length > MAX_PRICE_CACHE_CHARACTERS/, 'oversized price payloads must not be persisted');
+  assert.match(moduleSource, /const ANALYTICS_ID = 'G-K2S9L4CHNP'/, 'the approved GA4 measurement ID must remain configured');
+  assert.match(moduleSource, /page_location:\s*analyticsUrl\.href/, 'GA4 must receive only the sanitized page location');
+  assert.match(moduleSource, /allow_google_signals:\s*false/, 'Google Signals must remain disabled');
+  assert.match(moduleSource, /allow_ad_personalization_signals:\s*false/, 'ad personalization signals must remain disabled');
   assert.match(moduleSource, /absoluteChangePercent < 0\.01[\s\S]*?'< 0\.01'/, 'non-zero sub-basis-point trends must not be displayed as 0%');
   assert.match(styleSource, /@media \(forced-colors: active\)/, 'high-contrast mode must retain explicit selection and minimum-price cues');
   assert.match(styleSource, /th button:hover/);
@@ -264,8 +272,8 @@ test('preserves sorting, selection and minimum-price cues in forced-colors mode'
   }
 });
 
-test('does not load Google Analytics and removes private URL state before rendering', { timeout: 30_000 }, async (context) => {
-  const browserConfig = await resolveBrowser(context, 'the analytics privacy regression test');
+test('loads deferred GA4 with a sanitized page location and no consent overlay', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the deferred analytics privacy regression test');
   if (!browserConfig) return;
   const server = await startServer();
   const { port } = server.address();
@@ -274,10 +282,10 @@ test('does not load Google Analytics and removes private URL state before render
   const origin = `http://127.0.0.1:${port}`;
   const privateQuery = `privateSearchTerm${'x'.repeat(200)}`;
   const expectedQuery = [...privateQuery].slice(0, 160).join('');
-  const forbiddenRequests = [];
+  const googleRequests = [];
   const sameOriginSubresourceReferrers = [];
   page.on('request', (request) => {
-    if (/googletagmanager\.com|google-analytics\.com/i.test(request.url())) forbiddenRequests.push(request.url());
+    if (/googletagmanager\.com|google-analytics\.com/i.test(request.url())) googleRequests.push(request.url());
     const requestUrl = new URL(request.url());
     if (requestUrl.origin === origin && request.resourceType() !== 'document') {
       sameOriginSubresourceReferrers.push({
@@ -286,7 +294,12 @@ test('does not load Google Analytics and removes private URL state before render
       });
     }
   });
-  await page.route('https://**/*', (route) => route.abort());
+  await page.route('https://**/*', (route) => {
+    if (route.request().url().startsWith('https://www.googletagmanager.com/')) {
+      return route.fulfill({ status: 200, contentType: 'text/javascript', body: '' });
+    }
+    return route.abort();
+  });
   try {
     const privateUrl = new URL(origin);
     privateUrl.searchParams.append('q', privateQuery);
@@ -302,9 +315,14 @@ test('does not load Google Analytics and removes private URL state before render
     await page.goto(privateUrl.href, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => document.querySelector('#marketCount')?.textContent !== '--');
     assert.equal(await page.locator('#analyticsConsent, #privacySettings').count(), 0);
-    assert.equal(await page.locator('script[data-analytics-loader]').count(), 0);
-    assert.equal(await page.evaluate(() => 'dataLayer' in globalThis), false);
-    assert.deepEqual(forbiddenRequests, []);
+    await page.locator('script[data-analytics-loader]').waitFor({ state: 'attached' });
+    assert.equal(await page.locator('script[data-analytics-loader]').count(), 1);
+    assert.equal(
+      await page.locator('script[data-analytics-loader]').getAttribute('src'),
+      'https://www.googletagmanager.com/gtag/js?id=G-K2S9L4CHNP'
+    );
+    assert.equal(googleRequests.length, 1, 'the test stub must observe exactly one deferred Google tag request');
+    assert.match(googleRequests[0], /^https:\/\/www\.googletagmanager\.com\/gtag\/js\?id=G-K2S9L4CHNP$/);
     assert.equal(await page.locator('#searchInput').inputValue(), expectedQuery);
     const sanitizedUrl = new URL(page.url());
     assert.equal(sanitizedUrl.searchParams.has('q'), false);
@@ -318,6 +336,14 @@ test('does not load Google Analytics and removes private URL state before render
     assert.equal(sanitizedUrl.searchParams.has('region'), false, 'invalid values of public URL keys must be removed');
     assert.equal(sanitizedUrl.hash, '', 'unknown fragments must be removed before analytics can observe them');
     assert.doesNotMatch(page.url(), /privateSearchTerm|sensitive/i);
+    const analyticsCommands = await page.evaluate(() => globalThis.dataLayer.map((entry) => Array.from(entry)));
+    const configCommand = analyticsCommands.find(([command]) => command === 'config');
+    assert.ok(configCommand, 'GA4 config command must be queued before the deferred loader executes');
+    assert.equal(configCommand[1], 'G-K2S9L4CHNP');
+    assert.equal(configCommand[2].page_location, sanitizedUrl.href);
+    assert.equal(configCommand[2].allow_google_signals, false);
+    assert.equal(configCommand[2].allow_ad_personalization_signals, false);
+    assert.doesNotMatch(configCommand[2].page_location, /privateSearchTerm|privateToken|sensitive|[?&]q=/i);
     assert.ok(sameOriginSubresourceReferrers.length > 0, 'the privacy test must observe same-origin subresources');
     for (const { url, referrer } of sameOriginSubresourceReferrers) {
       assert.doesNotMatch(referrer, /privateSearchTerm|privateToken|sensitive|[?&]q=/i, `private URL state leaked in the Referer for ${url}`);
@@ -328,13 +354,15 @@ test('does not load Google Analytics and removes private URL state before render
         assert.equal(referrerUrl.search, '', `same-origin subresource Referer must not include a query for ${url}`);
       }
     }
-    const googleCookies = (await page.context().cookies()).filter(({ name }) => /^_ga(?:_|$)/.test(name));
-    assert.deepEqual(googleCookies, []);
+    const googleCookiesBeforeStubbedLibrary = (await page.context().cookies()).filter(({ name }) => /^_ga(?:_|$)/.test(name));
+    assert.deepEqual(googleCookiesBeforeStubbedLibrary, [], 'the local loader must not write analytics cookies itself');
     const footerText = await page.locator('.page-footer').innerText();
     assert.match(footerText, /本工具与 Apple Inc\. 无关联，数据仅供参考。/);
-    assert.doesNotMatch(footerText, /访问统计|Cloudflare Web Analytics|Google Analytics|Google Tag Manager|GA4|商标|授权|赞助|认可/i);
+    assert.match(footerText, /访问统计使用 Google Analytics 和 Cloudflare Web Analytics；站内搜索词不会发送给统计服务。/);
     const csp = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content');
-    assert.doesNotMatch(csp, /google/i);
+    assert.match(csp, /script-src[^;]+www\.googletagmanager\.com/);
+    assert.match(csp, /connect-src[^;]+google-analytics\.com[^;]+analytics\.google\.com[^;]+www\.googletagmanager\.com/);
+    assert.match(csp, /img-src[^;]+google-analytics\.com[^;]+www\.googletagmanager\.com/);
     for (const directive of [
       "base-uri 'none'",
       "form-action 'none'",
@@ -462,7 +490,12 @@ test('renders current prices, sorting, and country history in a real browser', {
           errors.push(`${response.status()} ${response.url()}`);
         }
       });
-      await page.route('https://**/*', (route) => route.abort());
+      await page.route('https://**/*', (route) => {
+        if (route.request().url().startsWith('https://www.googletagmanager.com/')) {
+          return route.fulfill({ status: 200, contentType: 'text/javascript', body: '' });
+        }
+        return route.abort();
+      });
       let releasePriceRequest;
       const priceRequestReleased = new Promise((resolve) => {
         releasePriceRequest = resolve;
@@ -913,7 +946,12 @@ test('excludes history events from before a tier was introduced', { timeout: 30_
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text());
   });
-  await page.route('https://**/*', (route) => route.abort());
+  await page.route('https://**/*', (route) => {
+    if (route.request().url().startsWith('https://www.googletagmanager.com/')) {
+      return route.fulfill({ status: 200, contentType: 'text/javascript', body: '' });
+    }
+    return route.abort();
+  });
   await page.route('**/data/history.json*', (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
@@ -1938,7 +1976,7 @@ test('keeps the minimum-price overview stable and the desktop table header stick
     assert.equal(await page.locator('h1').count(), 1);
     assert.equal(await page.locator('h1').textContent(), 'iCloud+ \u5168\u7403\u4ef7\u683c\u5bf9\u6bd4');
     assert.equal(await page.locator('#overviewTitle').evaluate((element) => element.tagName), 'H2');
-    assert.equal(await page.locator('head script[type="module"][src="script.js?v=19"][data-cfasync="false"]').count(), 1);
+    assert.equal(await page.locator('head script[type="module"][src="script.js?v=20"][data-cfasync="false"]').count(), 1);
     assert.equal(await page.locator('head link[rel="modulepreload"]').count(), 3);
     const before = await page.locator('#minimumSummary').boundingBox();
     const loadingLayout = await page.evaluate(() => ({
