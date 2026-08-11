@@ -11,11 +11,20 @@ const ciWorkflowUrl = new URL('../../../.github/workflows/validate-icloud-price-
 const autoMergeWorkflowUrl = new URL('../../../.github/workflows/auto-merge-official-actions.yml', import.meta.url);
 const dependabotUrl = new URL('../../../.github/dependabot.yml', import.meta.url);
 const gitignoreUrl = new URL('../../../.gitignore', import.meta.url);
+const notFoundUrl = new URL('../../../404.html', import.meta.url);
 const packageUrl = new URL('../package.json', import.meta.url);
 const browserRunnerUrl = new URL('../scripts/test-browsers.mjs', import.meta.url);
 const firefoxRunnerUrl = new URL('../scripts/test-firefox.mjs', import.meta.url);
 const webkitRunnerUrl = new URL('../scripts/test-webkit.mjs', import.meta.url);
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
+
+test('keeps the shared 404 page local, private, and CSP-safe', async () => {
+  const html = await readFile(notFoundUrl, 'utf8');
+  assert.match(html, /<meta name="robots" content="noindex">/);
+  assert.match(html, /<meta name="referrer" content="origin">/);
+  assert.match(html, /script-src 'none'/);
+  assert.doesNotMatch(html, /<script\b|\sstyle=|googletagmanager|google-analytics|googleapis|gstatic|staticfile|jquery/i);
+});
 
 test('keeps only long-lived public Markdown in the project', () => {
   const trackedMarkdown = execFileSync('git', ['ls-files'], {

@@ -262,7 +262,7 @@ async function importAppleArchivesUnlocked(inputDir, paths = {}) {
   const snapshotsDir = paths.snapshotsDir ?? SNAPSHOTS_DIR;
   const snapshotIndexPath = paths.snapshotIndexPath ?? SNAPSHOT_INDEX_PATH;
   const transactionPath = paths.transactionPath ?? path.join(path.dirname(historyPath), '.apple-archive-import-transaction.json');
-  const enforceReviewedCountries = paths.enforceReviewedCountries ?? paths.namesPath == null;
+  const enforceReviewedCountries = paths.enforceReviewedCountries ?? true;
   await recoverAppleArchiveImport({ transactionPath, historyPath, snapshotIndexPath, snapshotsDir });
   const [existingHistory, currentData, names, fileNames, existingSnapshotIndexState] = await Promise.all([
     readFile(historyPath, 'utf8').then(JSON.parse),

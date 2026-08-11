@@ -92,6 +92,27 @@ function hasSafeText(value, maxLength = 256) {
     && !hasUnpairedSurrogate(value);
 }
 
+export function formattedPriceNumber(value) {
+  if (typeof value !== 'string') return Number.NaN;
+  const text = value.replace(/[\u00a0\u202f]/g, ' ').trim();
+  const matches = [...text.matchAll(/[0-9][0-9.,\s'\u2019]*/g)];
+  if (matches.length !== 1) return Number.NaN;
+  const normalized = matches[0][0]
+    .replace(/\u2019/g, "'")
+    .trim();
+  const groupedInteger = /[1-9]\d{0,2}(?:[.,' ]\d{3})+/;
+  const decimal = new RegExp(`^(?:${groupedInteger.source}|\\d+)[.,]\\d{1,2}$`);
+  const grouped = new RegExp(`^${groupedInteger.source}$`);
+  if (decimal.test(normalized)) {
+    const decimalIndex = Math.max(normalized.lastIndexOf(','), normalized.lastIndexOf('.'));
+    if (normalized.slice(0, decimalIndex).includes(normalized[decimalIndex])) return Number.NaN;
+    const integerPart = normalized.slice(0, decimalIndex).replace(/[.,' ]/g, '');
+    return Number(`${integerPart}.${normalized.slice(decimalIndex + 1)}`);
+  }
+  if (grouped.test(normalized)) return Number(normalized.replace(/[.,' ]/g, ''));
+  return /^\d+$/.test(normalized) ? Number(normalized) : Number.NaN;
+}
+
 export function isPublicFxFallbackReason(value) {
   return value === null || PUBLIC_FX_FALLBACK_REASONS.has(value);
 }
@@ -344,6 +365,7 @@ export function validatePricePayload(payload, { minCountries = 1 } = {}) {
         || plan.price <= 0
         || plan.price > Number.MAX_SAFE_INTEGER
         || !hasSafeText(plan.formattedPrice, 100)
+        || formattedPriceNumber(plan.formattedPrice) !== plan.price
         || !cnyPriceIsValid) {
         throw new Error(`prices.json has invalid ${tierId} pricing for ${country.country}`);
       }
@@ -386,9 +408,12 @@ export function validateHistoryPayload(payload) {
     || !Array.isArray(payload.sourcePublishedDates)
     || !payload.sourcePublishedDates.length
     || payload.sourcePublishedDates.length > MAX_PUBLICATION_HISTORY_ENTRIES
-    || (payload.updatedAt != null && !isValidIsoTimestamp(payload.updatedAt))) {
+    || (payload.schemaVersion === 2 && !isValidIsoTimestamp(payload.updatedAt))
+    || (payload.schemaVersion === 1 && payload.updatedAt != null && !isValidIsoTimestamp(payload.updatedAt))) {
     throw new Error('history.json has an unsupported structure');
   }
+
+  const latestHistoryDate = payload.updatedAt?.slice(0, 10) ?? null;
 
   for (const [countryName, record] of Object.entries(payload.countries)) {
     if (UNSAFE_OBJECT_KEYS.has(countryName)
@@ -406,6 +431,7 @@ export function validateHistoryPayload(payload) {
       if (!hasAllowedKeys(event, PUBLIC_HISTORY_EVENT_KEYS, ['observedAt', 'currency', 'plans'])
         || !isValidDateOnly(event.observedAt)
         || event.observedAt < previousObservedAt
+        || (latestHistoryDate !== null && event.observedAt > latestHistoryDate)
         || typeof event.currency !== 'string'
         || !/^[A-Z]{3}$/.test(event.currency)
         || !isPlainObject(event.plans)
@@ -432,6 +458,7 @@ export function validateHistoryPayload(payload) {
       || !isValidDateOnly(entry.observedAt)
       || publishedDate > entry.observedAt
       || entry.observedAt < previousObservedAt
+      || (latestHistoryDate !== null && entry.observedAt > latestHistoryDate)
       || !isValidObservationMetadata(entry)
       || (entry.kind !== undefined && !['initial', 'change'].includes(entry.kind))
       || !isValidPublicationChanges(entry.changes)) {

@@ -84,6 +84,28 @@ test('rejects non-tier plan keys in every historical event', async () => {
   assert.throws(() => validateExistingHistory(payload, prices), /invalid event/);
 });
 
+test('binds every formatted local price to its numeric value', async () => {
+  const { prices } = await productionFixtures();
+  const payload = structuredClone(prices);
+  const tierId = payload.tiers[0].id;
+  const plan = payload.countries[0].plans[tierId];
+  plan.formattedPrice = `$${plan.price + 1}`;
+  assert.throws(() => validatePricePayload(payload), /invalid .* pricing/);
+  assert.throws(() => validatePayload('prices.json', payload), /invalid .* pricing/);
+});
+
+test('rejects history observations later than the artifact update date', async () => {
+  const { prices, history } = await productionFixtures();
+  const payload = structuredClone(history);
+  Object.values(payload.countries)[0].events.at(-1).observedAt = '2099-01-01';
+  assert.throws(() => validateHistoryPayload(payload), /invalid event/);
+  assert.throws(() => validateExistingHistory(payload, prices), /invalid event/);
+
+  const publication = structuredClone(history);
+  publication.sourcePublishedDates.at(-1).observedAt = '2099-01-01';
+  assert.throws(() => validateHistoryPayload(publication), /invalid publication history/);
+});
+
 test('shared browser and updater contracts reject the same price schema divergences', async () => {
   const { prices } = await productionFixtures();
   const mutations = [

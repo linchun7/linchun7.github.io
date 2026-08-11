@@ -3,7 +3,7 @@ import {
   publicationDateKey,
   validatePayload,
   validatePriceHistoryConsistency
-} from './data-contract.js?v=10';
+} from './data-contract.js?v=11';
 import { createIcons } from './vendor/lucide-subset.js?v=5';
 
 const REQUEST_TIMEOUT_MS = 8_000;
@@ -703,9 +703,13 @@ function renderLocalPriceWithTrend(plan, country, changedSeries) {
     }
     const changePercent = ((plan.price - previousPrice) / previousPrice) * 100;
     const isIncrease = changePercent > 0;
+    const absoluteChangePercent = Math.abs(changePercent);
+    const percentLabel = absoluteChangePercent < 0.01
+      ? '< 0.01'
+      : percentFormatter.format(absoluteChangePercent);
     trend.classList.add(isIncrease ? 'is-up' : 'is-down');
-    trend.textContent = `（${isIncrease ? '↑' : '↓'} ${percentFormatter.format(Math.abs(changePercent))}%）`;
-    trend.title = `与上一次当地月费相比${isIncrease ? '上涨' : '下降'} ${percentFormatter.format(Math.abs(changePercent))}%`;
+    trend.textContent = `（${isIncrease ? '↑' : '↓'} ${percentLabel}%）`;
+    trend.title = `与上一次当地月费相比${isIncrease ? '上涨' : '下降'} ${percentLabel}%`;
   }
   elements.historyLocalPrice.append(trend);
 }
