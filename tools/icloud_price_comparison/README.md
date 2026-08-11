@@ -160,12 +160,12 @@ node scripts/import-apple-archives.mjs --input <包含完整历史快照的目�
 
 ## 隐私与 Web 安全
 
-- 候选版本不包含 Google Analytics、Google Tag Manager、Google Signals 或 Google 域名；页面只使用 Cloudflare Web Analytics。部署后必须用干净浏览器确认没有 Google 请求、`_ga` Cookie 或 GA 全局对象。
+- 页面启用 Google Analytics 4（测量 ID `G-K2S9L4CHNP`）和 Cloudflare Web Analytics。GA4 在价格内容完成初始化后低优先级加载；配置明确关闭 Google Signals 与广告个性化信号，不发送站内搜索词。
 - Cloudflare 代理自动注入 Web Analytics Beacon，并回传同源 `/cdn-cgi/rum`。按 [Cloudflare 官方说明](https://developers.cloudflare.com/web-analytics/about/)，该服务不收集或使用访问者个人数据；其他 Cloudflare 安全功能可能有独立的必要 Cookie/披露要求，应由站点隐私负责人核对。
 - 初始脚本会在价格数据请求及分析 Beacon 执行前删除 `q`、未知/重复/非法查询参数和未知 fragment；搜索词最多 160 个 Unicode code point，只留在内存。URL 只保留规范的 `tier`、`sort`、`dir`、`region`。更早发出的样式/脚本等子资源请求由 meta Referrer Policy `origin` 保护，Referer 不包含路径或查询参数。
 - 客户端无法清理首次文档请求：用户输入的原始 URL 仍可能被浏览器历史、代理、Cloudflare/GitHub Pages 和源站看到，因此不要把 Secret 或个人信息放进 URL。
-- 前端不写 Cookie、sessionStorage 或 IndexedDB；localStorage 只保存通过 schema 3 验证的公共当前价格缓存。因为同一 origin 的其他页面可以写同一存储，网络失败时的缓存不能视为防篡改证据；若该边界不可接受，应使用独立 origin 或移除持久缓存。
+- 应用自身不写 Cookie、sessionStorage 或 IndexedDB；GA4 加载后可能按 Google 的实现写入 `_ga` 系列 Cookie。localStorage 只保存通过 schema 3 验证的公共当前价格缓存。因为同一 origin 的其他页面可以写同一存储，网络失败时的缓存不能视为防篡改证据；若该边界不可接受，应使用独立 origin 或移除持久缓存。
 - 所有动态数据使用 `textContent`、`createTextNode` 和 DOM API 渲染；不使用 `innerHTML`、`eval`、`document.write` 或字符串事件处理器。外链新窗口均带 `noopener noreferrer`。
-- Cloudflare HTTP CSP 与 HTML meta CSP 必须保持一致。候选允许来源为：`script-src 'self' https://static.cloudflareinsights.com`、`connect-src 'self'`、`style-src 'self'`、`img-src 'self' data:`；`base-uri`、form/object/frame/worker/media/manifest 均为 `none`，HTTP header 另需 `frame-ancestors 'none'`。精确策略见 [OPERATIONS.md](OPERATIONS.md)。
+- Cloudflare HTTP CSP 与 HTML meta CSP 必须保持一致。脚本只允许本站、`www.googletagmanager.com` 和 `static.cloudflareinsights.com`；GA4 连接/像素只允许 `*.google-analytics.com`、`*.analytics.google.com` 和 `www.googletagmanager.com`，其他类型继续使用最小来源。`base-uri`、form/object/frame/worker/media/manifest 均为 `none`，HTTP header 另需 `frame-ancestors 'none'`。精确策略见 [OPERATIONS.md](OPERATIONS.md)。
 - HTTP 层还应保持 `X-Content-Type-Options: nosniff`、frame deny、设备权限关闭、HSTS、最低 TLS 1.2，以及可验证的证书/DNS/跳转/404/缓存行为。具体基线见 [OPERATIONS.md](OPERATIONS.md)。
 - 自有代码许可见 [LICENSE](LICENSE)；前端第三方资源许可全文见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 和 `vendor/manifest.json`。
