@@ -389,6 +389,56 @@ function normalizeSnapshotPricing(snapshot) {
   };
 }
 
+function samePlans(first, second) {
+  const firstIds = Object.keys(first ?? {});
+  const secondIds = Object.keys(second ?? {});
+  return firstIds.length === secondIds.length
+    && firstIds.every((tierId) => Object.hasOwn(second, tierId) && first[tierId] === second[tierId]);
+}
+
+function validateHistoryAgainstSnapshotEvidence(history, snapshotIndex, normalizedSnapshots) {
+  const expectedByCountry = new Map();
+  for (const snapshot of snapshotIndex.snapshots) {
+    for (const revision of snapshot.revisions) {
+      const pricing = normalizedSnapshots.get(revision.dataFile);
+      for (const country of pricing.countries) {
+        const expectedEvents = expectedByCountry.get(country.country) ?? [];
+        const event = {
+          observedAt: snapshot.publishedDate,
+          currency: country.currency,
+          plans: country.plans
+        };
+        const previous = expectedEvents.at(-1);
+        if (!previous || previous.currency !== event.currency || !samePlans(previous.plans, event.plans)) {
+          expectedEvents.push(event);
+        }
+        expectedByCountry.set(country.country, expectedEvents);
+      }
+    }
+  }
+
+  for (const [countryName, expectedEvents] of expectedByCountry) {
+    const actualEvents = history.countries[countryName]?.events;
+    if (!Array.isArray(actualEvents) || actualEvents.length !== expectedEvents.length) {
+      fail(`history events do not match snapshot evidence for ${countryName}`);
+    }
+    for (let index = 0; index < expectedEvents.length; index += 1) {
+      const actual = actualEvents[index];
+      const expected = expectedEvents[index];
+      if (actual.observedAt !== expected.observedAt
+        || actual.currency !== expected.currency
+        || !samePlans(actual.plans, expected.plans)) {
+        fail(`history events do not match snapshot evidence for ${countryName}`);
+      }
+    }
+  }
+  const unexpectedCountries = Object.keys(history.countries)
+    .filter((countryName) => !expectedByCountry.has(countryName));
+  if (unexpectedCountries.length) {
+    fail(`history contains countries without snapshot evidence: ${unexpectedCountries.join(', ')}`);
+  }
+}
+
 function buildExpectedSnapshotChanges(previousSnapshot, currentSnapshot) {
   if (!previousSnapshot) {
     return { addedTiers: [], removedTiers: [], addedCountries: [], removedCountries: [], changedCountries: [] };
@@ -809,6 +859,8 @@ export async function validateExtractedDataArtifact(dataDirectory) {
     }
     previousActiveSnapshot = normalizedSnapshots.get(snapshot.activeDataFile);
   }
+
+  validateHistoryAgainstSnapshotEvidence(history, normalizedIndex, normalizedSnapshots);
 
   const latestSnapshot = normalizedIndex.snapshots.at(-1);
   if (latestSnapshot.publishedDate !== publicationDateKey(prices.source.publishedDate)) {

@@ -28,6 +28,7 @@ import {
   main,
   publicationDateKey,
   publicExchangeRateMetadata,
+  redactDiagnosticText,
   selectRequiredRates,
   validateCountryNameMapping,
   writeFailureDiagnostics,
@@ -42,6 +43,16 @@ test('classifies only explicitly tagged operational failures as transient', () =
   transient.healthcheckSeverity = 'transient';
   assert.equal(classifyHealthcheckFailure(transient), 'transient');
   assert.equal(classifyHealthcheckFailure(null), 'severe');
+});
+
+test('redacts credentials from diagnostic text', () => {
+  const secret = 'super-secret-api-key';
+  const redacted = redactDiagnosticText(
+    `Authorization: Bearer ${secret} https://v6.exchangerate-api.com/v6/${secret}/latest/USD?token=${secret}`,
+    { EXCHANGE_RATE_API_KEY: secret }
+  );
+  assert.doesNotMatch(redacted, new RegExp(secret));
+  assert.match(redacted, /\[REDACTED\]/);
 });
 
 test('strictly validates the committed country-name mapping and rejects unsafe entries', async () => {
@@ -1226,7 +1237,10 @@ test('writes a failure report and normalized Apple diagnostic', async () => {
   const summaryPath = path.join(diagnosticsDir, 'summary.md');
   const startedAt = new Date('2026-08-02T15:00:00.000Z');
   const finishedAt = new Date('2026-08-02T15:00:02.500Z');
-  const failureMessage = `snapshot [click](https://evil.example)\n::warning title=injected::\u202e# injected <img src=x onerror=alert(1)> failed ${'x'.repeat(1_500)}`;
+  const secret = 'diagnostic-secret-key';
+  const previousSecret = process.env.EXCHANGE_RATE_API_KEY;
+  process.env.EXCHANGE_RATE_API_KEY = secret;
+  const failureMessage = `snapshot [click](https://evil.example)\n::warning title=injected::\u202e# injected <img src=x onerror=alert(1)> failed ${secret} ${'x'.repeat(1_500)}`;
   try {
     const report = await writeFailureDiagnostics(new Error(failureMessage), {
       diagnosticsDir,
@@ -1240,7 +1254,9 @@ test('writes a failure report and normalized Apple diagnostic', async () => {
     assert.equal(report.status, 'failure');
     assert.equal(report.healthcheckSeverity, 'severe');
     assert.equal(report.appleSnapshotCaptured, true);
-    assert.equal(JSON.parse(await readFile(path.join(diagnosticsDir, 'run-report.json'), 'utf8')).error.message, failureMessage);
+    const storedMessage = JSON.parse(await readFile(path.join(diagnosticsDir, 'run-report.json'), 'utf8')).error.message;
+    assert.equal(storedMessage, failureMessage.replace(secret, '[REDACTED]'));
+    assert.doesNotMatch(await readFile(path.join(diagnosticsDir, 'run-report.json'), 'utf8'), new RegExp(secret));
     const renderedSummary = await readFile(summaryPath, 'utf8');
     assert.ok(renderedSummary.includes(String.raw`\[click\]\(https://evil\.example\)`));
     assert.ok(renderedSummary.includes(String.raw`\<img src=x onerror=alert\(1\)\>`));
@@ -1249,6 +1265,8 @@ test('writes a failure report and normalized Apple diagnostic', async () => {
     assert.doesNotMatch(renderedSummary, /\[[^\]]+\]\(https:\/\/evil\.example\)|(^|[^\\])<img\b|\n# /i);
     assert.doesNotMatch(renderedSummary, /\u202e|::warning/i);
   } finally {
+    if (previousSecret === undefined) delete process.env.EXCHANGE_RATE_API_KEY;
+    else process.env.EXCHANGE_RATE_API_KEY = previousSecret;
     await rm(diagnosticsDir, { recursive: true, force: true });
   }
 });
@@ -2847,6 +2865,7 @@ test('rejects structurally valid cross-file production mismatches', async (t) =>
         const country = prices.countries[0];
         const tierId = prices.tiers[0].id;
         country.plans[tierId].price += 1;
+        country.plans[tierId].formattedPrice = `${country.currency} ${country.plans[tierId].price}`;
       },
       error: /Existing history\.json latest values do not match/i
     },
@@ -2923,6 +2942,7 @@ test('rejects current prices that disagree with the active snapshot evidence', a
   const tierId = prices.tiers[0].id;
   const changedPrice = country.plans[tierId].price + 1;
   country.plans[tierId].price = changedPrice;
+  country.plans[tierId].formattedPrice = `${country.currency} ${changedPrice}`;
   history.countries[country.country].events.at(-1).plans[tierId] = changedPrice;
   await Promise.all([
     writeFile(paths.currentDataPath, `${JSON.stringify(prices, null, 2)}\n`, 'utf8'),

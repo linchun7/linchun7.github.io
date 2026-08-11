@@ -181,14 +181,15 @@ after(async () => {
 });
 
 test('starts price data early and deprioritizes optional third-party work', async () => {
-  const [html, bootstrapSource, moduleSource] = await Promise.all([
+  const [html, bootstrapSource, moduleSource, styleSource] = await Promise.all([
     readFile(path.join(PROJECT_DIR, 'index.html'), 'utf8'),
     readFile(path.join(PROJECT_DIR, 'price-bootstrap.js'), 'utf8'),
-    readFile(path.join(PROJECT_DIR, 'script.js'), 'utf8')
+    readFile(path.join(PROJECT_DIR, 'script.js'), 'utf8'),
+    readFile(path.join(PROJECT_DIR, 'style.css'), 'utf8')
   ]);
   const eagerPriceFetch = '<script data-cfasync="false" src="price-bootstrap.js?v=9"></script>';
   assert.ok(html.includes(eagerPriceFetch), 'prices.json bootstrap should run during HTML parsing');
-  assert.ok(html.indexOf(eagerPriceFetch) < html.indexOf('<script data-cfasync="false" type="module" src="script.js?v=18"></script>'), 'the initial price request should precede module execution');
+  assert.ok(html.indexOf(eagerPriceFetch) < html.indexOf('<script data-cfasync="false" type="module" src="script.js?v=19"></script>'), 'the initial price request should precede module execution');
   assert.doesNotMatch(html, /rel="preload" href="data\/prices\.json"/, 'cross-browser loading should not rely on a fetch preload that WebKit may duplicate');
   assert.doesNotMatch(html, /googletagmanager\.com|google-analytics\.com|Google Analytics|gtag\s*\(|G-K2S9L4CHNP/i, 'Google Analytics must be absent from HTML and CSP');
   assert.doesNotMatch(html, /analyticsConsent|privacySettings|允许匿名统计/, 'analytics consent overlay and its settings entry must be absent');
@@ -207,6 +208,60 @@ test('starts price data early and deprioritizes optional third-party work', asyn
   assert.match(moduleSource, /TextDecoder\('utf-8', \{ fatal: true \}\)/, 'network JSON must use strict UTF-8 decoding');
   assert.match(moduleSource, /fetch\(url,[\s\S]*?redirect:\s*'error'/, 'all later data requests must reject redirects');
   assert.match(moduleSource, /serialized\.length > MAX_PRICE_CACHE_CHARACTERS/, 'oversized price payloads must not be persisted');
+  assert.match(moduleSource, /absoluteChangePercent < 0\.01[\s\S]*?'< 0\.01'/, 'non-zero sub-basis-point trends must not be displayed as 0%');
+  assert.match(styleSource, /@media \(forced-colors: active\)/, 'high-contrast mode must retain explicit selection and minimum-price cues');
+  assert.match(styleSource, /th button:hover/);
+  assert.match(styleSource, /\.segmented button:hover/);
+  assert.doesNotMatch(styleSource, /\.overview h1/);
+  assert.doesNotMatch(styleSource, /\.workspace\s*\{[^}]*overflow:\s*visible/);
+});
+
+test('preserves sorting, selection and minimum-price cues in forced-colors mode', { timeout: 30_000 }, async (context) => {
+  if (BROWSER_UNDER_TEST !== 'chromium') {
+    context.skip('forced-colors emulation is covered in Chromium');
+    return;
+  }
+  const browserConfig = await resolveBrowser(context, 'the forced-colors accessibility regression test');
+  if (!browserConfig) return;
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  const page = await browser.newPage({ viewport: { width: 1365, height: 900 }, forcedColors: 'active' });
+  await page.route('https://**/*', (route) => route.abort());
+  try {
+    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length > 0);
+    assert.equal(await page.evaluate(() => matchMedia('(forced-colors: active)').matches), true);
+    const sortedHeader = page.locator('th[aria-sort="ascending"], th[aria-sort="descending"]').first();
+    const activeCard = page.locator('.minimum-card.is-active-tier').first();
+    const minimumCell = page.locator('.price-cell.is-minimum').first();
+    assert.equal(await sortedHeader.count(), 1, 'the active sort must remain exposed semantically');
+    assert.equal(await activeCard.count(), 1, 'the active tier card must be present');
+    assert.equal(await minimumCell.count(), 1, 'the minimum-price cell must be present');
+    const cues = await page.evaluate(() => {
+      const sorted = document.querySelector('th[aria-sort="ascending"], th[aria-sort="descending"]');
+      const active = document.querySelector('.minimum-card.is-active-tier');
+      const minimum = document.querySelector('.price-cell.is-minimum');
+      return {
+        sortedBorder: getComputedStyle(sorted).borderBottomStyle,
+        sortedBorderWidth: getComputedStyle(sorted).borderBottomWidth,
+        activeOutline: getComputedStyle(active).outlineStyle,
+        activeOutlineWidth: getComputedStyle(active).outlineWidth,
+        minimumOutline: getComputedStyle(minimum).outlineStyle,
+        minimumOutlineWidth: getComputedStyle(minimum).outlineWidth
+      };
+    });
+    assert.deepEqual(cues, {
+      sortedBorder: 'solid',
+      sortedBorderWidth: '3px',
+      activeOutline: 'solid',
+      activeOutlineWidth: '2px',
+      minimumOutline: 'solid',
+      minimumOutlineWidth: '1px'
+    });
+  } finally {
+    await browser.close();
+  }
 });
 
 test('does not load Google Analytics and removes private URL state before rendering', { timeout: 30_000 }, async (context) => {
@@ -1883,7 +1938,7 @@ test('keeps the minimum-price overview stable and the desktop table header stick
     assert.equal(await page.locator('h1').count(), 1);
     assert.equal(await page.locator('h1').textContent(), 'iCloud+ \u5168\u7403\u4ef7\u683c\u5bf9\u6bd4');
     assert.equal(await page.locator('#overviewTitle').evaluate((element) => element.tagName), 'H2');
-    assert.equal(await page.locator('head script[type="module"][src="script.js?v=18"][data-cfasync="false"]').count(), 1);
+    assert.equal(await page.locator('head script[type="module"][src="script.js?v=19"][data-cfasync="false"]').count(), 1);
     assert.equal(await page.locator('head link[rel="modulepreload"]').count(), 3);
     const before = await page.locator('#minimumSummary').boundingBox();
     const loadingLayout = await page.evaluate(() => ({
