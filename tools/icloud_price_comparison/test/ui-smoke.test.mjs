@@ -200,7 +200,7 @@ test('starts price data early and deprioritizes optional third-party work', asyn
   assert.match(html, /script-src[^;]+static\.cloudflareinsights\.com/, 'Cloudflare Web Analytics must be explicitly allowed by CSP');
   assert.match(html, /connect-src[^;]+google-analytics\.com[^;]+analytics\.google\.com[^;]+www\.googletagmanager\.com/, 'GA4 collection endpoints must be explicitly allowed by CSP');
   assert.match(html, /img-src[^;]+google-analytics\.com[^;]+www\.googletagmanager\.com/, 'GA4 image endpoints must be explicitly allowed by CSP');
-  assert.match(html, /访问统计使用 Google Analytics 和 Cloudflare Web Analytics；站内搜索词不会发送给统计服务。/);
+  assert.doesNotMatch(html, /访问统计使用 Google Analytics 和 Cloudflare Web Analytics；站内搜索词不会发送给统计服务。/);
   assert.doesNotMatch(html, /raw\.githubusercontent\.com/, 'frontend data must not fall back to a mutable branch URL');
   assert.match(html, /Rates By Exchange Rate API/);
   assert.match(html, /data-cfasync="false" type="module"/, 'Rocket Loader must not rewrite the module entry point');
@@ -358,7 +358,7 @@ test('loads deferred GA4 with a sanitized page location and no consent overlay',
     assert.deepEqual(googleCookiesBeforeStubbedLibrary, [], 'the local loader must not write analytics cookies itself');
     const footerText = await page.locator('.page-footer').innerText();
     assert.match(footerText, /本工具与 Apple Inc\. 无关联，数据仅供参考。/);
-    assert.match(footerText, /访问统计使用 Google Analytics 和 Cloudflare Web Analytics；站内搜索词不会发送给统计服务。/);
+    assert.doesNotMatch(footerText, /访问统计使用 Google Analytics 和 Cloudflare Web Analytics；站内搜索词不会发送给统计服务。/);
     const csp = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content');
     assert.match(csp, /script-src[^;]+www\.googletagmanager\.com/);
     assert.match(csp, /connect-src[^;]+google-analytics\.com[^;]+analytics\.google\.com[^;]+www\.googletagmanager\.com/);
