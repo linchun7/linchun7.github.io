@@ -1215,6 +1215,24 @@ async function recoverUpdateTransaction(transactionPath, {
   return true;
 }
 
+export function redactDiagnosticText(value, environment = process.env) {
+  let redacted = String(value ?? '');
+  const secrets = Object.entries(environment ?? {})
+    .filter(([name, secret]) => (
+      /(?:KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|PING_URL)$/i.test(name)
+      && typeof secret === 'string'
+      && secret.length >= 4
+    ))
+    .map(([, secret]) => secret)
+    .sort((first, second) => second.length - first.length);
+  for (const secret of secrets) redacted = redacted.replaceAll(secret, '[REDACTED]');
+  return redacted
+    .replace(/\b(Bearer\s+)[^\s,;]+/gi, '$1[REDACTED]')
+    .replace(/\b((?:authorization|x-api-key|api[-_ ]?key|access[-_ ]?token)\s*[:=]\s*)[^\s,;]+/gi, '$1[REDACTED]')
+    .replace(/([?&](?:api[_-]?key|key|token|access_token)=)[^&#\s]+/gi, '$1[REDACTED]')
+    .replace(/(https:\/\/v6\.exchangerate-api\.com\/v6\/)(?!latest(?:\/|\b))[^/?#\s]+/gi, '$1[REDACTED]');
+}
+
 function failureRunLogEntry(error, startedAt, finishedAt, appleSnapshotCaptured = Boolean(lastAppleSnapshot)) {
   const trigger = resolveTriggerSource(
     process.env.GITHUB_EVENT_NAME,
@@ -1231,10 +1249,10 @@ function failureRunLogEntry(error, startedAt, finishedAt, appleSnapshotCaptured 
     durationMs: Math.max(0, finishedAt.getTime() - startedAt.getTime()),
     error: {
       name: error.name,
-      code: typeof error?.code === 'string' ? error.code : null,
-      causeCode: typeof error?.cause?.code === 'string' ? error.cause.code : null,
-      message: error.message,
-      stack: error.stack ?? null
+      code: typeof error?.code === 'string' ? redactDiagnosticText(error.code) : null,
+      causeCode: typeof error?.cause?.code === 'string' ? redactDiagnosticText(error.cause.code) : null,
+      message: redactDiagnosticText(error?.message ?? error),
+      stack: error?.stack == null ? null : redactDiagnosticText(error.stack)
     },
     healthcheckSeverity: classifyHealthcheckFailure(error),
     appleSnapshotCaptured
@@ -2276,11 +2294,11 @@ export async function writeFailureDiagnostics(error, {
 }
 
 async function handleFailure(error) {
-  console.error(`iCloud price update failed: ${logInline(error?.message ?? error)}`);
+  console.error(`iCloud price update failed: ${logInline(redactDiagnosticText(error?.message ?? error))}`);
   try {
     await writeFailureDiagnostics(error);
   } catch (diagnosticError) {
-    console.error(`Unable to save diagnostics: ${logInline(diagnosticError.message)}`);
+    console.error(`Unable to save diagnostics: ${logInline(redactDiagnosticText(diagnosticError.message))}`);
   }
   process.exitCode = 1;
 }

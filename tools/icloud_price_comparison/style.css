@@ -156,7 +156,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 .overview-copy { min-width: 0; }
 .overview-kicker { margin: 0 0 4px; color: var(--accent-dark); font-size: 12px; font-weight: 750; letter-spacing: .01em; }
-.overview h1 { margin: 0; font-size: 27px; line-height: 1.16; letter-spacing: 0; }
 .overview-note { margin: 6px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
 
 .overview-stat-list { margin: 0; }
@@ -244,7 +243,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .overview-stats dd { margin: 12px 0 0; color: var(--ink); font-size: 30px; font-weight: 730; line-height: 1; font-variant-numeric: tabular-nums; }
 
 .workspace {
-  overflow: visible;
   scroll-margin-top: 16px;
 }
 
@@ -340,6 +338,7 @@ th button {
   background: transparent;
   border: 0;
   font-weight: inherit;
+  transition: color 120ms ease-out, background-color 120ms ease-out;
 }
 
 .price-table th:nth-child(2) button { justify-content: flex-start; }
@@ -402,6 +401,14 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
 .segmented { display: grid; grid-template-columns: repeat(var(--tier-count), minmax(62px, 1fr)); padding: 3px; min-height: 40px; background: #e7edf2; border-radius: 7px; }
 .segmented button { min-width: 0; padding: 5px 9px; color: #53616d; background: transparent; border: 0; border-radius: 5px; font-weight: 650; white-space: nowrap; }
 .segmented button[aria-pressed="true"] { color: var(--ink); background: var(--surface); box-shadow: 0 1px 3px rgba(28, 44, 58, .17); }
+
+@media (hover: hover) and (pointer: fine) {
+  th button:hover { color: var(--accent-dark); background: rgba(17, 104, 212, .08); }
+  .segmented button:hover:not([aria-pressed="true"]) { color: var(--ink); background: rgba(255, 255, 255, .58); }
+}
+
+th button:active { background: rgba(17, 104, 212, .13); }
+.segmented button:active { background: rgba(255, 255, 255, .82); }
 
 .history-dialog {
   width: min(940px, calc(100% - 32px));
@@ -778,4 +785,22 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
   .spinner { animation: none; }
   .minimum-card:hover, .overview-stats div:hover { transform: none; }
+}
+
+@media (forced-colors: active) {
+  .minimum-card.is-active-tier,
+  .segmented button[aria-pressed="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+
+  .price-table th[aria-sort="ascending"],
+  .price-table th[aria-sort="descending"] {
+    border-bottom: 3px solid Highlight;
+  }
+
+  .price-cell.is-minimum {
+    outline: 1px solid Highlight;
+    outline-offset: -2px;
+  }
 }

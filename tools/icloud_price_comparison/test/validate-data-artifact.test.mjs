@@ -148,6 +148,21 @@ test('accepts the committed data directory and its strict ustar package', async 
   assert.ok(archiveResult.entries >= 12);
 });
 
+test('rejects historical price events that do not match Apple snapshot evidence', async (t) => {
+  const { dataDirectory } = await copiedData(t);
+  const historyPath = path.join(dataDirectory, 'history.json');
+  const history = JSON.parse(await readFile(historyPath, 'utf8'));
+  const record = Object.values(history.countries).find(({ events }) => events.length > 1);
+  assert.ok(record, 'production history must include a multi-event country');
+  const tierId = Object.keys(record.events[0].plans)[0];
+  record.events[0].plans[tierId] += 1;
+  await writeJson(historyPath, history);
+  await assert.rejects(
+    validateExtractedDataArtifact(dataDirectory),
+    /history events do not match snapshot evidence/
+  );
+});
+
 test('rejects missing core files and extra files or directories', async (t) => {
   const missing = await copiedData(t);
   await unlink(path.join(missing.dataDirectory, 'prices.json'));
