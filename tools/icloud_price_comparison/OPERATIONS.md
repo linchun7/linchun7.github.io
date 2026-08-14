@@ -155,7 +155,7 @@ Cloudflare 08:05 主触发所使用的 GitHub 凭据/应用不在本仓库定义
 - 汇率来源、时间、是否 stale/fallback。
 - 新增/移除地区、容量、币种和价格变化。
 - 发布 job 是否因远端 `main` 前进而安全停止。
-- 容量摘要是否接近 Git 500/800 MiB 或 `history.json` 2 MiB 阈值。
+- 每周仓库维护工作流是否报告 Git 500 MiB 警告、800 MiB 硬失败或 `history.json` 2 MiB 警告；每日更新不再读取完整 Git 历史。
 
 ### Healthchecks 语义
 
@@ -388,7 +388,7 @@ git push origin main
 - 聊天交接、临时状态、内部签字、TODO 草稿、截图说明、测试输出、故障取证、一次性发布清单和终验/审计报告不得进入公开仓库；需要本地保存时放入 ignored `artifacts/`，不得用 `git add -f` 绕过。
 - 页面底部固定为“本工具与 Apple Inc. 无关联，数据仅供参考。”；不要恢复访问统计说明，也不要扩写为复杂的 Apple 商标、授权、赞助或认可声明，除非项目所有者明确提出新文案。
 - 修改或删除文档时必须同步清理 README、运维手册、workflow、测试和代码中的链接或引用。
-- Git 历史超过 500 MiB 开始人工评估，800 MiB 升级告警；不要由 workflow 自动重写历史。
+- Git 历史超过 500 MiB 开始人工评估，800 MiB 时每周审计硬失败；不要由 workflow 自动重写历史。
 - `history.json` 2 MiB 是提前人工评估阈值，不是浏览器 8 MiB 硬上限；达到预警后应在接近客户端上限前设计分片/归档并保持旧 URL 的兼容或明确迁移。
 - 每次发布检查大文件、秘密、Unicode bidi、文件 mode、case collision、混合换行和 `git fsck --strict`。
 

@@ -84,11 +84,12 @@
 
 可选 Healthchecks 心跳使用 Secret `ICLOUD_HEALTHCHECK_PING_URL`：完整成功或幂等跳过发送 `/0`，数据损坏、解析降级、工件验证失败等严重故障发送 `/1`；单次暂时网络故障不立即发送失败，由 Healthchecks 的 Grace Time 判断连续缺失。Ping URL 不得进入仓库、Issue 或日志。
 
-容量预警阈值为 Git 历史 500/800 MiB 或 `history.json` 2 MiB；工作流不自动改写 Git 历史。完整值守、告警分级、Secret 轮换和恢复步骤见 [OPERATIONS.md](OPERATIONS.md)。
+每周只读维护工作流使用完整历史审计仓库增长：Git 历史达到 500 MiB 时警告、达到 800 MiB 时失败，`history.json` 达到 2 MiB 时警告；工作流不自动改写 Git 历史。完整值守、告警分级、Secret 轮换和恢复步骤见 [OPERATIONS.md](OPERATIONS.md)。
 
 ## GitHub Actions 与供应链
 
 - `.github/workflows/validate-icloud-price-comparison.yml` 在相关 PR、人工 `main` push、手动触发及每周计划任务中，以只读权限运行核心、完整数据工件、全部 Apple 快照、Chromium、Firefox、WebKit 和依赖漏洞检查。
+- `.github/workflows/icloud-repository-maintenance.yml` 每周以完整历史、只读权限检查 Git 对象和价格历史增长；每日更新与发布 checkout 保持浅克隆。
 - 每日数据任务使用 runner 预装 Chrome；自动数据提交不会再次触发完整三浏览器工作流，因此发布工件在推送前必须已通过每日 job 自身的 core/data/Chrome 验收。
 - Dependabot 每周检查 npm 与 GitHub Actions。只有官方 `actions/*`、最多 20 个 workflow 文件、完整 40 位 SHA、一对一替换、精确 tested head/base 且 SHA 与注释中的官方 semver tag 一致的变更可以自动合并；第三方 Action、可变 tag、业务文件或额外 YAML 改动会拒绝。
 - vendored Chart.js 和 Lucide subset 的版本、精确文件集、SHA-256、上游字节/icon node、实际使用集和许可 notice 由 `pnpm test:vendor` 校验。
