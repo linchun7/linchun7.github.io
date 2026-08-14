@@ -17,6 +17,7 @@ import {
   validatePricePayload
 } from '../data-contract.js';
 import { describeTriggerSource, formatBeijingDate, resolveTriggerSource } from './run-context.mjs';
+import { attachMarketIdentity, validateMarketRegistry } from './market-registry.mjs';
 
 const APPLE_URL = 'https://support.apple.com/en-us/108047';
 const FX_AUTH_URL = 'https://v6.exchangerate-api.com/v6/latest/USD';
@@ -37,6 +38,7 @@ const MAX_APPLE_RESPONSE_BYTES = 5 * 1024 * 1024;
 const MAX_FX_RESPONSE_BYTES = 1024 * 1024;
 const FX_MAX_AGE_MS = 36 * 60 * 60 * 1_000;
 const FX_MAX_FUTURE_SKEW_MS = 5 * 60 * 1_000;
+const CNY_RANK_EPSILON = 1e-9;
 export const MIN_FX_SANITY_POINTS = 3;
 export const FX_SANITY_MAX_DAILY_CHANGE = 0.12;
 const FX_SANITY_MAX_BASELINE_AGE_DAYS = 7;
@@ -484,7 +486,7 @@ export async function getExchangeRates(previousData, {
     };
   }
 
-  if (previousData?.schemaVersion === 3 && previousData.fx?.derivedCurrency === 'CNY') {
+  if (previousData?.schemaVersion >= 3 && previousData.fx?.derivedCurrency === 'CNY') {
     console.warn(`Exchange-rate update failed; keeping previous derived CNY prices: ${logInline(failureMessage)}`);
     return {
       ...previousData.fx,
@@ -506,36 +508,66 @@ function roundDerivedCnyPrice(value) {
   return Number(value.toFixed(2));
 }
 
-function convertToDerivedCny(price, currency, rates) {
+function convertToFullPrecisionCny(price, currency, rates) {
   const currencyRate = rates?.[currency];
   const cnyRate = rates?.CNY;
   if (!Number.isFinite(currencyRate) || currencyRate <= 0 || !Number.isFinite(cnyRate) || cnyRate <= 0) return null;
-  return roundDerivedCnyPrice((price / currencyRate) * cnyRate);
+  return (price / currencyRate) * cnyRate;
 }
 
 export function attachDerivedCnyPrices(countries, { fx, previousData = null } = {}) {
-  const previousByCountry = new Map((previousData?.countries ?? []).map((country) => [country.country, country]));
-  return countries.map((country) => ({
+  const previousByMarket = new Map((previousData?.countries ?? []).map((country) => [country.marketId ?? country.country, country]));
+  const ranked = countries.map((country) => ({
     ...country,
     plans: Object.fromEntries(Object.entries(country.plans).map(([tierId, plan]) => {
-      let cnyPrice = convertToDerivedCny(plan.price, country.currency, fx?.rates);
-      if (cnyPrice == null && fx?.reusePreviousCny) {
-        const previousCountry = previousByCountry.get(country.country);
+      let fullPrecisionCnyPrice = convertToFullPrecisionCny(plan.price, country.currency, fx?.rates);
+      if (fullPrecisionCnyPrice == null && fx?.reusePreviousCny) {
+        const previousCountry = previousByMarket.get(country.marketId ?? country.country);
         const previousPlan = previousCountry?.plans?.[tierId];
         if (previousCountry?.currency === country.currency
           && previousPlan?.price === plan.price
           && Number.isFinite(previousPlan.cnyPrice)
           && previousPlan.cnyPrice > 0) {
-          cnyPrice = previousPlan.cnyPrice;
+          fullPrecisionCnyPrice = previousPlan.cnyPrice;
         }
       }
-      if (!Number.isFinite(cnyPrice) || cnyPrice <= 0) {
+      if (!Number.isFinite(fullPrecisionCnyPrice) || fullPrecisionCnyPrice <= 0) {
         throw transientHealthcheckError(
           `Cannot derive ${tierId} CNY price for ${country.country} while exchange-rate sources are unavailable`,
           { code: 'EXCHANGE_RATE_SOURCES_UNAVAILABLE' }
         );
       }
-      return [tierId, { ...plan, cnyPrice }];
+      return [tierId, {
+        ...plan,
+        cnyPrice: roundDerivedCnyPrice(fullPrecisionCnyPrice),
+        fullPrecisionCnyPrice
+      }];
+    }))
+  }));
+
+  const tierIds = Object.keys(ranked[0]?.plans ?? {});
+  for (const tierId of tierIds) {
+    const ordered = [...ranked].sort((first, second) => (
+      first.plans[tierId].fullPrecisionCnyPrice - second.plans[tierId].fullPrecisionCnyPrice
+      || String(first.marketId ?? first.country).localeCompare(String(second.marketId ?? second.country), 'en')
+    ));
+    let rank = 0;
+    let previousPrice = null;
+    for (const country of ordered) {
+      const price = country.plans[tierId].fullPrecisionCnyPrice;
+      if (previousPrice === null || Math.abs(price - previousPrice) > CNY_RANK_EPSILON) {
+        rank += 1;
+        previousPrice = price;
+      }
+      country.plans[tierId].cnyRank = rank;
+    }
+  }
+
+  return ranked.map((country) => ({
+    ...country,
+    plans: Object.fromEntries(Object.entries(country.plans).map(([tierId, plan]) => {
+      const { fullPrecisionCnyPrice: _internal, ...publicPlan } = plan;
+      return [tierId, publicPlan];
     }))
   }));
 }
@@ -644,25 +676,33 @@ export function validateCountryNameMapping(mapping) {
 }
 
 export function updateHistory(previousHistory, countries, observedAt, tiers, observedAtUtc = null) {
-  const history = previousHistory ?? { schemaVersion: 2, countries: {} };
-  if (!isPlainObject(history) || !isPlainObject(history.countries)) {
-    throw new Error('Price history has an unsupported countries structure');
+  const history = previousHistory ?? { schemaVersion: 4, markets: {} };
+  const usesMarketIds = history.schemaVersion === 4;
+  const records = usesMarketIds ? history.markets : history.countries;
+  if (!isPlainObject(history) || !isPlainObject(records)) {
+    throw new Error('Price history has an unsupported market structure');
   }
   if (observedAtUtc !== null && !isIsoDateTime(observedAtUtc)) {
     throw new Error('Price history UTC observation timestamp is invalid');
   }
-  history.schemaVersion = 2;
+  history.schemaVersion = usesMarketIds ? 4 : 2;
   history.updatedAt = observedAtUtc ?? new Date().toISOString();
   let changedCountries = 0;
 
   for (const country of countries) {
-    assertSafeHistoryCountryKey(country.country);
-    const existingRecord = Object.hasOwn(history.countries, country.country) ? history.countries[country.country] : null;
+    const recordKey = usesMarketIds ? country.marketId : country.country;
+    assertSafeHistoryCountryKey(recordKey);
+    if (usesMarketIds && (typeof recordKey !== 'string' || !recordKey)) {
+      throw new Error(`Price history is missing marketId for ${country.country}`);
+    }
+    const existingRecord = Object.hasOwn(records, recordKey) ? records[recordKey] : null;
     const record = existingRecord ?? {
+      ...(usesMarketIds ? { country: country.country } : {}),
       nameZh: country.nameZh,
       region: country.region,
       events: []
     };
+    if (usesMarketIds) record.country = country.country;
     record.nameZh = country.nameZh;
     record.region = country.region;
 
@@ -681,7 +721,7 @@ export function updateHistory(previousHistory, countries, observedAt, tiers, obs
         plans: snapshotPlans(country, tiers)
       });
     }
-    history.countries[country.country] = record;
+    records[recordKey] = record;
   }
   return { history, changedCountries };
 }
@@ -720,8 +760,9 @@ function assertPublicationDateNotRegressed(previousPublishedDate, publishedDate)
 }
 
 export function buildSnapshotChanges(previousData, countries, tiers) {
-  const previousByCountry = new Map((previousData?.countries ?? []).map((country) => [country.country, country]));
-  const currentByCountry = new Map(countries.map((country) => [country.country, country]));
+  const marketKey = (country) => country.marketId ?? country.country;
+  const previousByCountry = new Map((previousData?.countries ?? []).map((country) => [marketKey(country), country]));
+  const currentByCountry = new Map(countries.map((country) => [marketKey(country), country]));
   const previousTiers = previousData?.tiers ?? [];
   const previousTierIds = new Set(previousTiers.map(({ id }) => id));
   const currentTierIds = new Set(tiers.map(({ id }) => id));
@@ -733,15 +774,15 @@ export function buildSnapshotChanges(previousData, countries, tiers) {
     .map(({ id, label }) => ({ id, label }));
   const comparableTiers = tiers.filter(({ id }) => previousTierIds.has(id));
   const addedCountries = countries
-    .filter(({ country }) => !previousByCountry.has(country))
+    .filter((country) => !previousByCountry.has(marketKey(country)))
     .map(({ country, nameZh }) => ({ country, nameZh }));
   const removedCountries = [...previousByCountry.values()]
-    .filter(({ country }) => !currentByCountry.has(country))
+    .filter((country) => !currentByCountry.has(marketKey(country)))
     .map(({ country, nameZh }) => ({ country, nameZh: nameZh || country }));
   const changedCountries = [];
 
   for (const country of countries) {
-    const previous = previousByCountry.get(country.country);
+    const previous = previousByCountry.get(marketKey(country));
     if (!previous) continue;
     const tierChanges = comparableTiers
       .filter(({ id }) => previous.plans[id]?.price !== country.plans[id]?.price)
@@ -1770,7 +1811,7 @@ export async function validateAppleSnapshotStore({
 
 export function validateExistingPrices(data) {
   if (!isPlainObject(data)
-    || ![1, 2, 3].includes(data.schemaVersion)
+    || ![1, 2, 3, 4].includes(data.schemaVersion)
     || !isIsoDateTime(data.generatedAt)
     || !isPlainObject(data.source)
     || data.source.url !== APPLE_URL
@@ -1781,7 +1822,7 @@ export function validateExistingPrices(data) {
     || !isIsoDateTime(data.fx.fetchedAt)) {
     throw new Error('Existing prices.json has an unsupported or unsafe structure');
   }
-  const usesDerivedCnyPrices = data.schemaVersion === 3;
+  const usesDerivedCnyPrices = data.schemaVersion >= 3;
   if (usesDerivedCnyPrices) {
     if (data.fx.derivedCurrency !== 'CNY' || Object.hasOwn(data.fx, 'rates')) {
       throw new Error('Existing prices.json exposes raw exchange rates or lacks derived CNY metadata');
@@ -1812,8 +1853,8 @@ export function validateExistingPrices(data) {
   if (data.source.parser != null && !/^(cross-checked|document-order|apple-markers-fallback)$/.test(data.source.parser)) {
     throw new Error('Existing prices.json has an invalid Apple parser status');
   }
-  if (data.schemaVersion === 3 && data.source.parser !== 'cross-checked') {
-    throw new Error('Existing schema 3 prices.json was not produced by both Apple parsers');
+  if (data.schemaVersion >= 3 && data.source.parser !== 'cross-checked') {
+    throw new Error('Existing current prices.json was not produced by both Apple parsers');
   }
   const observedAt = data.run?.observedAtBeijing ?? formatBeijingDate(data.generatedAt);
   if (!isIsoDate(observedAt)) throw new Error('Existing prices.json has an invalid observation date');
@@ -1837,24 +1878,27 @@ export function validateExistingPrices(data) {
 }
 
 export function validateExistingHistory(history, data) {
+  const usesMarketIds = history?.schemaVersion === 4;
+  const records = usesMarketIds ? history?.markets : history?.countries;
   if (!isPlainObject(history)
-    || ![1, 2].includes(history.schemaVersion)
-    || !isPlainObject(history.countries)
+    || ![1, 2, 4].includes(history.schemaVersion)
+    || !isPlainObject(records)
     || !Array.isArray(history.sourcePublishedDates)
     || !history.sourcePublishedDates.length
     || (history.updatedAt != null && !isIsoDateTime(history.updatedAt))) {
     throw new Error('Existing history.json has an unsupported structure');
   }
-  for (const [countryName, record] of Object.entries(history.countries)) {
-    assertSafeHistoryCountryKey(countryName);
+  for (const [recordKey, record] of Object.entries(records)) {
+    assertSafeHistoryCountryKey(recordKey);
     if (!isPlainObject(record)
+      || (usesMarketIds && (typeof record.country !== 'string' || !record.country.trim()))
       || typeof record.nameZh !== 'string'
       || !record.nameZh.trim()
       || typeof record.region !== 'string'
       || !record.region.trim()
       || !Array.isArray(record.events)
       || !record.events.length) {
-      throw new Error(`Existing history.json has an invalid record for ${countryName}`);
+      throw new Error(`Existing history.json has an invalid record for ${recordKey}`);
     }
     let previousObservedAt = '';
     for (const event of record.events) {
@@ -1868,7 +1912,7 @@ export function validateExistingHistory(history, data) {
         || Object.values(event.plans).some((price) => !Number.isFinite(price) || price <= 0)
         || (event.observedAtUtc != null && !isIsoDateTime(event.observedAtUtc))
         || (event.observedAtUtc != null && event.observedAtBeijing !== event.observedAt)) {
-        throw new Error(`Existing history.json has an invalid event for ${countryName}`);
+        throw new Error(`Existing history.json has an invalid event for ${recordKey}`);
       }
       previousObservedAt = event.observedAt;
     }
@@ -2130,6 +2174,9 @@ export function buildActionSummaryLines(data, summary, trigger = resolveTriggerS
   for (const warning of summary.fxSanityWarnings ?? []) {
     warnings.push(`- **FX sanity**：${markdownInline(warning)}`);
   }
+  for (const market of summary.unknownMarkets ?? []) {
+    warnings.push(`- **UNKNOWN_APPLE_MARKET**：${markdownInline(market.sourceName)} → ${markdownInline(market.id)}`);
+  }
 
   const lines = [
     '## iCloud+ 价格更新',
@@ -2142,7 +2189,7 @@ export function buildActionSummaryLines(data, summary, trigger = resolveTriggerS
     '### 数据概览',
     `- 地区数量：${data.countries.length}`,
     `- 价格点数量：${data.countries.length * data.tiers.length}`,
-    `- 历史记录覆盖：${Object.keys(summary.history?.countries ?? {}).length} 个地区`,
+    `- 历史记录覆盖：${Object.keys(summary.history?.markets ?? summary.history?.countries ?? {}).length} 个地区`,
     `- Apple 页面标注日期：${markdownInline(data.source.publishedDate ?? 'unknown')}`,
     `- Apple 发布日期记录：${summary.publishedDateHistory.length} 条`,
     '',
@@ -2224,6 +2271,7 @@ export async function main({
       { filePath: runLogPath, value: structuredClone(previousRunLog), text: previousRunLogState.text, existed: previousRunLogState.existed }
     ];
     validateCountryNameMapping(countryNames);
+    validateMarketRegistry();
     const html = await fetchResource(APPLE_URL, { networkBudget });
 
   const parsed = parseApplePrices(html, { allowUnknownCountries: true });
@@ -2263,9 +2311,15 @@ export async function main({
       previousData
     ));
   }
-  const parsedCountries = parsed.countries.map((country) => ({
+  const unknownMarkets = [];
+  const parsedCountries = attachMarketIdentity(parsed.countries, {
+    onUnknown: (market) => {
+      unknownMarkets.push(market);
+      console.warn(`UNKNOWN_APPLE_MARKET:${logInline(market.sourceName)}:${market.id}`);
+    }
+  }).map((country) => ({
     ...country,
-    nameZh: Object.hasOwn(countryNames, country.country) ? countryNames[country.country] : country.country
+    nameZh: Object.hasOwn(countryNames, country.country) ? countryNames[country.country] : country.nameZh
   }));
 
   const fx = await getExchangeRates(previousData, {
@@ -2303,7 +2357,7 @@ export async function main({
   const observedAt = formatBeijingDate(generatedAt);
   assertPublicationDateNotFuture(parsed.sourcePublishedDate, observedAt);
   const data = {
-    schemaVersion: 3,
+    schemaVersion: 4,
     generatedAt,
     source: {
       name: 'Apple Support',
@@ -2333,6 +2387,7 @@ export async function main({
     history,
     missingRates,
     fxSanityWarnings: fxSanity.warnings,
+    unknownMarkets,
     publishedDateHistory,
     publicationDateChanged: publishedDateUpdate.changed,
     publicationChanges,

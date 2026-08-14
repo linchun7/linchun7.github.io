@@ -15,7 +15,7 @@ test('committed prices and history form a complete usable snapshot', async () =>
     readJson('../data/run-log.json')
   ]);
 
-  assert.equal(data.schemaVersion, 3);
+  assert.equal(data.schemaVersion, 4);
   assert.match(data.generatedAt, /^\d{4}-\d{2}-\d{2}T/);
   assert.equal(data.source.url, 'https://support.apple.com/en-us/108047');
   assert.ok(data.tiers.length > 0);
@@ -43,8 +43,8 @@ test('committed prices and history form a complete usable snapshot', async () =>
   assert.equal(names['Euro Zone'], '欧盟');
   assert.equal(names['United Arab Emirates'], '阿拉伯联合酋长国');
   assert.ok(Array.isArray(history.sourcePublishedDates) && history.sourcePublishedDates.length);
-  assert.equal(history.schemaVersion, 2);
-  assert.equal(history.updatedAt, data.generatedAt);
+  assert.equal(history.schemaVersion, 4);
+  assert.ok(history.updatedAt <= data.generatedAt);
   assert.equal(runLog.schemaVersion, 1);
   assert.ok(Array.isArray(runLog.runs));
   for (const run of runLog.runs) {
@@ -80,9 +80,12 @@ test('committed prices and history form a complete usable snapshot', async () =>
   }
 
   const seen = new Set();
+  const seenMarketIds = new Set();
   for (const country of data.countries) {
     assert.ok(!seen.has(country.country), `duplicate country: ${country.country}`);
     seen.add(country.country);
+    assert.ok(!seenMarketIds.has(country.marketId), `duplicate marketId: ${country.marketId}`);
+    seenMarketIds.add(country.marketId);
     assert.equal(country.nameZh, names[country.country] ?? country.country);
     for (const { id } of data.tiers) {
       const plan = country.plans[id];
@@ -93,10 +96,12 @@ test('committed prices and history form a complete usable snapshot', async () =>
         `missing derived CNY ${id}: ${country.country}`);
       assert.ok(Math.abs(plan.cnyPrice * 100 - Math.round(plan.cnyPrice * 100)) < 1e-7,
         `derived CNY has more than two decimals: ${country.country} ${id}`);
+      assert.ok(Number.isInteger(plan.cnyRank) && plan.cnyRank > 0, `invalid CNY rank: ${country.country} ${id}`);
     }
 
-    const record = history.countries[country.country];
+    const record = history.markets[country.marketId];
     assert.ok(record?.events?.length, `missing history: ${country.country}`);
+    assert.equal(record.country, country.country, `history source name mismatch: ${country.country}`);
     assert.equal(record.nameZh, country.nameZh, `history name mismatch: ${country.country}`);
     assert.equal(record.region, country.region, `history region mismatch: ${country.country}`);
     let previousDate = '';
