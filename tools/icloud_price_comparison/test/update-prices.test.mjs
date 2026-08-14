@@ -1001,6 +1001,20 @@ test('FX sanity dailyizes multi-day changes and skips unusable baselines explici
   assert.equal(cny.checks.find(({ currency }) => currency === 'CNY').status, 'skipped-cny');
 });
 
+test('FX sanity uses the previous FX timestamp when stale rates later become fresh', () => {
+  const previousData = fxSanityFixture({ generatedAt: '2026-08-11T00:00:00.000Z' });
+  previousData.fx = { fetchedAt: '2026-08-10T00:00:00.000Z', stale: true };
+  const result = validateFxSanity(
+    previousData,
+    fxForCnyPerCurrency('JPY', 0.115),
+    { now: new Date('2026-08-12T00:00:00.000Z') }
+  );
+  const check = result.checks.find(({ currency }) => currency === 'JPY');
+  assert.equal(result.status, 'passed');
+  assert.equal(check.days, 2);
+  assert.ok(check.dailyizedChange < 0.12);
+});
+
 test('FX sanity checks only active currencies with a previous baseline', () => {
   const previousData = fxSanityFixture({ currency: 'XYZ' });
   const now = new Date('2026-08-11T00:00:00.000Z');
