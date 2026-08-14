@@ -17,7 +17,7 @@ import {
   validatePricePayload
 } from '../data-contract.js';
 import { describeTriggerSource, formatBeijingDate, resolveTriggerSource } from './run-context.mjs';
-import { attachMarketIdentity, validateMarketRegistry } from './market-registry.mjs';
+import { attachMarketIdentity, validateMarketIdentityContinuity, validateMarketRegistry } from './market-registry.mjs';
 
 const APPLE_URL = 'https://support.apple.com/en-us/108047';
 const FX_AUTH_URL = 'https://v6.exchangerate-api.com/v6/latest/USD';
@@ -2029,6 +2029,7 @@ export async function preflightProductionState({
   snapshotsDir = APPLE_SNAPSHOTS_DIR,
   snapshotIndexPath = APPLE_SNAPSHOT_INDEX_PATH
 }) {
+  validateMarketRegistry();
   const requiredStates = [
     ['prices.json', previousDataState],
     ['history.json', previousHistoryState]
@@ -2049,6 +2050,7 @@ export async function preflightProductionState({
 
   validateExistingPrices(previousDataState.value);
   validateExistingHistory(previousHistoryState.value, previousDataState.value);
+  validateMarketIdentityContinuity(previousDataState.value, previousHistoryState.value);
   if (previousRunLogState.existed) {
     validateExistingRunLog(previousRunLogState.value, previousDataState.value);
   }
@@ -2311,7 +2313,6 @@ export async function main({
       { filePath: runLogPath, value: structuredClone(previousRunLog), text: previousRunLogState.text, existed: previousRunLogState.existed }
     ];
     validateCountryNameMapping(countryNames);
-    validateMarketRegistry();
     const html = await fetchResource(APPLE_URL, { networkBudget });
 
   const parsed = parseApplePrices(html, { allowUnknownCountries: true });
