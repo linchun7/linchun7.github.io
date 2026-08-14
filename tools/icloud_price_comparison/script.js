@@ -16,6 +16,8 @@ const FIXED_PRICE_TABLE_COLUMN_COUNT = 2;
 const PRICE_CACHE_KEY = 'icloud-price-comparison:validated-prices:v2';
 const LEGACY_PRICE_CACHE_KEYS = ['icloud-price-comparison:validated-prices:v1'];
 const MAX_PRICE_CACHE_CHARACTERS = 1024 * 1024;
+const CACHE_FRESH_MAX_AGE_MS = 36 * 60 * 60 * 1_000;
+const CACHE_HARD_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1_000;
 const MAX_RESPONSE_BYTES = Object.freeze({
   'prices.json': 1024 * 1024,
   'history.json': 8 * 1024 * 1024
@@ -47,6 +49,8 @@ const state = {
   historyTier: DEFAULT_SORT_TIER,
   minimumPrices: {},
   minimumCountries: {},
+  dataOrigin: null,
+  minimumCuesEnabled: true,
   chart: null,
   eventsBound: false,
   loading: false,
@@ -74,6 +78,8 @@ const elements = {
   workspaceToolbar: document.querySelector('.workspace-toolbar'),
   backToTableButton: document.querySelector('#backToTableButton'),
   minimumSummary: document.querySelector('#minimumSummary'),
+  overviewTitle: document.querySelector('#overviewTitle'),
+  overviewNote: document.querySelector('.overview-note'),
   fxStatus: document.querySelector('#fxStatus'),
   publishedDateButton: document.querySelector('#publishedDateButton'),
   applePublishedDate: document.querySelector('#applePublishedDate'),
@@ -327,7 +333,7 @@ async function fetchJson(fileName, { forceRefresh = false } = {}) {
         const controller = new AbortController();
         timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
         response = await fetch(url, {
-          cache: forceRefresh ? 'reload' : 'default',
+          cache: forceRefresh ? 'reload' : (fileName === 'prices.json' ? 'no-cache' : 'default'),
           redirect: 'error',
           signal: controller.signal
         });
@@ -350,12 +356,22 @@ function removeLegacyPriceCaches() {
   }
 }
 
-function readValidatedPriceCache() {
+function readPriceCache() {
   try {
     const cached = localStorage.getItem(PRICE_CACHE_KEY);
     if (!cached) return null;
     if (cached.length > MAX_PRICE_CACHE_CHARACTERS) throw new Error('价格缓存超过允许大小');
-    return validatePayload('prices.json', JSON.parse(cached));
+    const data = validatePayload('prices.json', JSON.parse(cached));
+    const ageMs = Date.now() - Date.parse(data.generatedAt);
+    if (!Number.isFinite(ageMs) || ageMs > CACHE_HARD_MAX_AGE_MS) {
+      localStorage.removeItem(PRICE_CACHE_KEY);
+      console.warn('CACHE_EXPIRED');
+      return null;
+    }
+    return {
+      data,
+      stale: ageMs > CACHE_FRESH_MAX_AGE_MS
+    };
   } catch (error) {
     console.warn(`已忽略无效价格缓存：${error.message}`);
     try { localStorage.removeItem(PRICE_CACHE_KEY); } catch {}
@@ -363,7 +379,7 @@ function readValidatedPriceCache() {
   }
 }
 
-function writeValidatedPriceCache(payload) {
+function writePriceCache(payload) {
   try {
     const serialized = JSON.stringify(payload);
     if (serialized.length > MAX_PRICE_CACHE_CHARACTERS) throw new Error('价格缓存超过允许大小');
@@ -385,6 +401,7 @@ function priceSnapshotsEqual(first, second) {
 function calculateMinimumPrices() {
   state.minimumPrices = {};
   state.minimumCountries = {};
+  if (!state.minimumCuesEnabled) return;
   for (const { id } of state.data.tiers) {
     let minimumValue = null;
     let minimumCountry = null;
@@ -407,6 +424,14 @@ function calculateMinimumPrices() {
 
 function renderMinimumSummary() {
   if (!elements.minimumSummary) return;
+  if (!state.minimumCuesEnabled) {
+    const unavailable = document.createElement('p');
+    unavailable.className = 'minimum-unavailable cache-stale-notice';
+    unavailable.textContent = '当前使用的是过期本地缓存，价格仅供历史参考。联网刷新成功后恢复参考最低价排名。';
+    elements.minimumSummary.replaceChildren(unavailable);
+    elements.minimumSummary.setAttribute('aria-busy', 'false');
+    return;
+  }
   const fragment = document.createDocumentFragment();
   for (const tier of state.data.tiers) {
     const winner = state.minimumCountries[tier.id];
@@ -553,7 +578,8 @@ function createPriceCell(country, tierId) {
   cell.dataset.tier = tierId;
   cell.classList.toggle('is-active-tier', state.sortTier === tierId);
   if (state.sortKey === 'tier' && state.sortTier === tierId) cell.classList.add('is-sorted');
-  const isMinimum = cny != null
+  const isMinimum = state.minimumCuesEnabled
+    && cny != null
     && state.minimumPrices[tierId] != null
     && Math.abs(cny - state.minimumPrices[tierId]) < 0.000001;
   if (isMinimum) cell.classList.add('is-minimum');
@@ -1208,8 +1234,16 @@ function scheduleBackToTableUpdate() {
   });
 }
 
-function applyPriceData(data) {
+function applyPriceData(data, { origin = 'network' } = {}) {
   state.data = data;
+  state.dataOrigin = origin;
+  state.minimumCuesEnabled = origin !== 'cache-stale';
+  if (elements.overviewTitle) elements.overviewTitle.textContent = state.minimumCuesEnabled ? '各容量最低价' : '历史缓存价格';
+  if (elements.overviewNote) {
+    elements.overviewNote.textContent = state.minimumCuesEnabled
+      ? '按人民币参考汇率换算，便于横向比较'
+      : '过期缓存仅保留价格查询、筛选与排序功能';
+  }
   if (!state.data.tiers.some(({ id }) => id === state.sortTier)) {
     state.sortTier = state.data.tiers.find(({ id }) => id === DEFAULT_SORT_TIER)?.id || state.data.tiers[0].id;
   }
@@ -1342,15 +1376,15 @@ function bindEvents() {
 function showLoadError(error) {
   console.error(error);
   elements.dataStatus.classList.add('is-error');
-  elements.updatedAt.textContent = '数据加载失败，请稍后重试';
+  elements.updatedAt.textContent = '价格数据无法加载，请检查网络后重试。';
   elements.resultSummary.textContent = '暂时无法读取价格数据';
-  setLoadStatus('价格数据加载失败，请检查网络后重试', { error: true });
+  setLoadStatus('价格数据无法加载，请检查网络后重试。', { error: true });
   setFiltersDisabled(true);
   elements.fxStatus.textContent = '';
   if (elements.minimumSummary) {
     const unavailable = document.createElement('p');
     unavailable.className = 'minimum-unavailable';
-    unavailable.textContent = '最低价暂不可用';
+    unavailable.textContent = '参考最低价暂不可用';
     elements.minimumSummary.replaceChildren(unavailable);
     elements.minimumSummary.setAttribute('aria-busy', 'false');
   }
@@ -1376,35 +1410,47 @@ async function initialize({ forceRefresh = false } = {}) {
 
   let fallbackData = state.data;
   if (!forceRefresh) {
-    const cached = readValidatedPriceCache();
+    const cached = readPriceCache();
     if (cached) {
-      fallbackData = cached;
-      applyPriceData(cached);
-      setLoadStatus('\u5df2\u663e\u793a\u7ecf\u9a8c\u8bc1\u7f13\u5b58\uff0c\u6b63\u5728\u68c0\u67e5\u7f51\u7edc\u66f4\u65b0\u2026');
+      fallbackData = cached.data;
+      applyPriceData(cached.data, { origin: cached.stale ? 'cache-stale' : 'cache-fresh' });
+      setLoadStatus(cached.stale
+        ? '已显示过期本地缓存，正在检查网络更新…'
+        : '已显示本地缓存，正在检查网络更新…');
     }
   }
 
   slowLoadingTimer = setTimeout(() => {
-    setLoadStatus(fallbackData ? '\u7f51\u7edc\u8f83\u6162\uff0c\u5f53\u524d\u7ee7\u7eed\u663e\u793a\u5df2\u9a8c\u8bc1\u7f13\u5b58\u2026' : '\u7f51\u7edc\u8f83\u6162\uff0c\u4ecd\u5728\u52a0\u8f7d\u4ef7\u683c\u6570\u636e\u2026');
+    const fallbackLabel = state.dataOrigin?.startsWith('cache') ? '本地缓存' : '当前数据';
+    setLoadStatus(fallbackData ? `网络较慢，当前继续显示${fallbackLabel}…` : '\u7f51\u7edc\u8f83\u6162\uff0c\u4ecd\u5728\u52a0\u8f7d\u4ef7\u683c\u6570\u636e\u2026');
   }, SLOW_LOADING_MS);
 
   try {
     const networkData = await fetchJson('prices.json', { forceRefresh });
     if (forceRefresh || !priceSnapshotsEqual(state.data, networkData)) {
-      writeValidatedPriceCache(networkData);
-      applyPriceData(networkData);
+      writePriceCache(networkData);
+      applyPriceData(networkData, { origin: 'network' });
+    } else if (state.dataOrigin === 'cache-stale') {
+      writePriceCache(networkData);
+      applyPriceData(networkData, { origin: 'network' });
+    } else {
+      state.dataOrigin = 'network';
     }
     setLoadStatus('', { hidden: true });
   } catch (error) {
     if (fallbackData) {
-      console.warn(`\u7f51\u7edc\u4ef7\u683c\u5237\u65b0\u5931\u8d25\uff0c\u7ee7\u7eed\u663e\u793a\u5df2\u9a8c\u8bc1\u6570\u636e\uff1a${error.message}`);
-      if (state.data !== fallbackData) applyPriceData(fallbackData);
+      console.warn(`网络价格刷新失败，继续显示现有数据：${error.message}`);
+      if (state.data !== fallbackData) applyPriceData(fallbackData, { origin: state.dataOrigin ?? 'network' });
       elements.dataStatus.classList.add('is-stale');
       const warning = document.createElement('span');
       warning.className = 'freshness-warning cache-warning';
-      warning.textContent = '\u6b63\u5728\u663e\u793a\u5df2\u9a8c\u8bc1\u7f13\u5b58 \u00b7 \u7f51\u7edc\u5237\u65b0\u5931\u8d25';
+      warning.textContent = state.dataOrigin?.startsWith('cache')
+        ? '正在显示本地缓存 · 网络刷新失败'
+        : '网络刷新失败 · 继续显示当前数据';
       elements.updatedAt.append(warning);
-      setLoadStatus('\u7f51\u7edc\u5237\u65b0\u5931\u8d25\uff0c\u5f53\u524d\u663e\u793a\u5df2\u9a8c\u8bc1\u7f13\u5b58', { error: true });
+      setLoadStatus(state.dataOrigin?.startsWith('cache')
+        ? '网络刷新失败，当前显示本地缓存'
+        : '网络刷新失败，继续显示当前数据', { error: true });
       setFiltersDisabled(false);
     } else {
       showLoadError(error);
