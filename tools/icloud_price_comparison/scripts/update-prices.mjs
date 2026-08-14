@@ -288,14 +288,16 @@ export function validateFxSanity(previousData, fx, {
 } = {}) {
   const warnings = [];
   const checks = [];
+  const previousFxFetchedAtMs = Date.parse(previousData?.fx?.fetchedAt);
   const previousGeneratedAtMs = Date.parse(previousData?.generatedAt);
+  const baselineAtMs = Number.isFinite(previousFxFetchedAtMs) ? previousFxFetchedAtMs : previousGeneratedAtMs;
   const nowMs = now instanceof Date ? now.getTime() : Number.NaN;
-  if (!previousData || !Number.isFinite(previousGeneratedAtMs) || !Number.isFinite(nowMs)) {
+  if (!previousData || !Number.isFinite(baselineAtMs) || !Number.isFinite(nowMs)) {
     warnings.push('FX_SANITY_SKIPPED_NO_BASELINE');
     return { status: 'skipped', warnings, checks };
   }
 
-  const elapsedHours = Math.max(0, nowMs - previousGeneratedAtMs) / (60 * 60 * 1_000);
+  const elapsedHours = Math.max(0, nowMs - baselineAtMs) / (60 * 60 * 1_000);
   if (elapsedHours > maxBaselineAgeDays * 24) {
     warnings.push('FX_SANITY_SKIPPED_OLD_BASELINE');
     return { status: 'skipped', warnings, checks };
@@ -357,7 +359,7 @@ export function validateFxSanity(previousData, fx, {
         `FX sanity failed for ${currency}: dailyized symmetric change ${(dailyizedChange * 100).toFixed(2)}% exceeds ${(maxDailyChange * 100).toFixed(2)}%`
       );
     }
-    checks.push({ currency, status: 'passed', points: points.length, previousRate, currentRate, dailyizedChange });
+    checks.push({ currency, status: 'passed', points: points.length, previousRate, currentRate, days, dailyizedChange });
   }
   return { status: 'passed', warnings, checks };
 }
