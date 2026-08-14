@@ -1,10 +1,10 @@
 import * as cheerio from 'cheerio';
-import { readFileSync } from 'node:fs';
 import { canonicalTierDefinition } from '../data-contract.js';
 import { VALID_REGIONS } from '../data-model.js';
+import { MARKET_REGISTRY } from './market-registry.mjs';
 
-const OFFICIAL_COUNTRIES = new Set(Object.keys(JSON.parse(
-  readFileSync(new URL('./country-names.zh.json', import.meta.url), 'utf8')
+const OFFICIAL_COUNTRIES = new Set(Object.values(MARKET_REGISTRY).flatMap((market) => (
+  [market.canonicalName, ...(market.aliases ?? [])]
 )));
 
 export const TIERS = [

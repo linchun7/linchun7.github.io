@@ -17,7 +17,13 @@ import {
   validatePricePayload
 } from '../data-contract.js';
 import { describeTriggerSource, formatBeijingDate, resolveTriggerSource } from './run-context.mjs';
-import { attachMarketIdentity, validateMarketIdentityContinuity, validateMarketRegistry } from './market-registry.mjs';
+import {
+  MARKET_REGISTRY,
+  attachMarketIdentity,
+  createPublishedMarketResolver,
+  validateMarketIdentityContinuity,
+  validateMarketRegistry
+} from './market-registry.mjs';
 
 const APPLE_URL = 'https://support.apple.com/en-us/108047';
 const FX_AUTH_URL = 'https://v6.exchangerate-api.com/v6/latest/USD';
@@ -701,15 +707,20 @@ function isSafeMappingText(value) {
     && !hasUnpairedSurrogate(value);
 }
 
-export function validateCountryNameMapping(mapping) {
+export function validateCountryNameMapping(mapping, registry = MARKET_REGISTRY) {
   if (!isPlainObject(mapping)) throw new Error('Chinese country-name mapping has an unsupported structure');
   const entries = Object.entries(mapping);
-  if (entries.length < 60 || entries.length > 500) {
-    throw new Error('Chinese country-name mapping is missing, incomplete, or oversized');
+  if (entries.length === 0 || entries.length > 500) {
+    throw new Error('Chinese country-name mapping is missing or oversized');
   }
-  for (const [country, displayName] of entries) {
-    if (UNSAFE_OBJECT_KEYS.has(country) || !isSafeMappingText(country) || !isSafeMappingText(displayName)) {
-      throw new Error(`Chinese country-name mapping has an unsafe entry: ${logInline(country)}`);
+  for (const [marketId, displayName] of entries) {
+    if (UNSAFE_OBJECT_KEYS.has(marketId) || !isSafeMappingText(marketId) || !isSafeMappingText(displayName)) {
+      throw new Error(`Chinese country-name mapping has an unsafe entry: ${logInline(marketId)}`);
+    }
+  }
+  for (const market of Object.values(registry)) {
+    if (!Object.hasOwn(mapping, market.id)) {
+      throw new Error(`Chinese country-name mapping is incomplete; missing marketId ${market.id}`);
     }
   }
   return mapping;
@@ -1523,6 +1534,43 @@ export function confirmAppleSemanticChange(firstParsed, secondParsed, previousDa
   }
   const changes = appleStructuralChanges(previousData, firstParsed);
   return { changes, confirmedRemovedCountries: changes.removedCountries };
+}
+
+function localPriceVector(country) {
+  return Object.entries(country?.plans ?? {})
+    .map(([tierId, plan]) => [tierId, snapshotPlanPrice(plan)])
+    .sort(([first], [second]) => first.localeCompare(second));
+}
+
+export function validateAppleMarketRenameReview(previousData, confirmedCountries, resolve) {
+  if (!previousData?.countries?.length) return { status: 'passed' };
+  const currentNames = new Set(confirmedCountries.map(({ country }) => country));
+  const removed = previousData.countries.filter(({ country }) => !currentNames.has(country));
+  const candidates = [];
+  for (const added of confirmedCountries) {
+    const market = resolve(added.country);
+    if (!market.unknown || market.published) continue;
+    const addedVector = JSON.stringify(localPriceVector(added));
+    for (const old of removed) {
+      if (old.region === added.region
+        && old.currency === added.currency
+        && JSON.stringify(localPriceVector(old)) === addedVector) {
+        candidates.push({ old, added });
+      }
+    }
+  }
+  if (!candidates.length) return { status: 'passed' };
+  const details = candidates
+    .map(({ old, added }) => `${old.country} (${old.marketId}) -> ${added.country}`)
+    .join('; ');
+  const error = new Error(`MARKET_IDENTITY_RENAME_REVIEW_REQUIRED: ${details}. Add the new Apple source name as an alias for the published marketId, then rerun.`);
+  error.code = 'MARKET_IDENTITY_RENAME_REVIEW_REQUIRED';
+  error.candidates = candidates.map(({ old, added }) => ({
+    oldSourceName: old.country,
+    newSourceName: added.country,
+    oldMarketId: old.marketId
+  }));
+  throw error;
 }
 
 export function removedCountryNames(previousCountries = [], currentCountries = []) {
@@ -2361,7 +2409,11 @@ export async function main({
     ));
   }
   const unknownMarkets = [];
+  const marketResolver = createPublishedMarketResolver(previousData, previousHistory);
+  validateAppleMarketRenameReview(previousData, parsed.countries, marketResolver);
   const parsedCountries = attachMarketIdentity(parsed.countries, {
+    resolve: marketResolver,
+    chineseNames: countryNames,
     onUnknown: (market, country) => {
       const warning = {
         sourceName: market.sourceName,
@@ -2376,10 +2428,7 @@ export async function main({
         console.log(`::warning title=Unknown Apple market requires registry review::${escapeGitHubCommandMessage(message)}`);
       }
     }
-  }).map((country) => ({
-    ...country,
-    nameZh: Object.hasOwn(countryNames, country.country) ? countryNames[country.country] : country.nameZh
-  }));
+  });
 
   const fx = await getExchangeRates(previousData, {
     requiredCurrencies: [...new Set(parsedCountries.map(({ currency }) => currency))],
