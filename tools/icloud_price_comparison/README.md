@@ -12,7 +12,7 @@
 ## 功能
 
 - 展示 Apple 页面解析出的地区、分区、币种、容量和当地月费，以及人民币参考价。
-- 汇总每个容量的最低价和对应地区，支持地区搜索、分区筛选、容量/地区排序和 URL 状态恢复。
+- 汇总每个容量按人民币参考汇率折算后的参考最低价和所有并列地区，支持地区搜索、分区筛选、容量/地区排序和 URL 状态恢复。
 - 点击地区查看当地月费、人民币参考价、价格历史和涨跌比例；Chart.js 仅在需要绘图时延迟加载。
 - 展示 Apple `Published Date`，并记录发布日期变化时的容量、地区、分区、币种和价格差异。
 - 记录新增或移除的地区和容量；地区恢复后继续使用原有历史。
@@ -47,7 +47,7 @@
 
 | 文件 | 内容 | 保留策略 |
 | --- | --- | --- |
-| `data/prices.json` | schema 3 当前价格、来源、运行元数据、汇率来源/时间/状态，以及每个套餐两位小数的 `cnyPrice` | 只保留最新有效快照；不公开 raw FX rates、API key 状态或密钥 |
+| `data/prices.json` | schema 4 当前价格、稳定市场 ID、来源、运行元数据、汇率来源/时间/状态，以及每个套餐的 `cnyPrice`/`cnyRank` | 只保留最新有效快照；不公开 raw FX rates、内部全精度换算值、API key 状态或密钥 |
 | `data/history.json` | 地区价格/币种事件和 Apple 发布日期事件 | 真实变化才追加；同一发布日期不重复 |
 | `data/run-log.json` | 成功运行的来源、数量、耗时、非凭据汇率状态和差异 | 最近 90 条成功运行；不公开 API Key 配置/状态 |
 | `data/apple-snapshots/` | Apple 页面解析后的规范化 JSON 证据和索引 | 不保存原始 HTML；同日修订不覆盖，见目录 README |
@@ -56,7 +56,9 @@
 
 为保持数据来源透明，公共 FX 元数据仍会说明本次成功结果来自认证 endpoint、开放 endpoint 或受控 stale 回退；这可能间接表明某次运行成功使用了认证来源，但不会公开 Key 值、Key 是否配置、失败原因、有效性或额度状态。若连成功来源模式也被视为敏感，应在下一版契约中统一为供应商级 provenance。
 
-前端只接受当前公共 schema 3，并要求精确字段集合、受控来源 URL、合法时间关系、完整套餐和两位小数正值 `cnyPrice`。网络优先；通过同一契约校验的 `localStorage` 本地缓存可在网络失败时显示：36 小时内保留完整比较功能，36 小时至 7 天只作为历史参考且隐藏最低价提示，超过 7 天自动删除。历史文件是可选增强：历史加载失败不阻断当前价格，但损坏的生产历史会阻断下一次自动更新。
+前端只接受当前公共 schema 4，并要求稳定 `marketId`、生成器提供的 `cnyRank`、精确字段集合、受控来源 URL、合法时间关系、完整套餐和两位小数正值 `cnyPrice`。参考最低价只由 `cnyRank === 1` 决定。网络优先；通过同一契约校验的 `localStorage` 本地缓存可在网络失败时显示：36 小时内保留完整比较功能，36 小时至 7 天只作为历史参考且隐藏参考最低价提示，超过 7 天自动删除。历史文件是可选增强：历史加载失败不阻断当前价格，但损坏的生产历史会阻断下一次自动更新。
+
+`scripts/market-registry.mjs` 固化当前市场 ID、中文名和历史别名。Apple 新增未登记市场时会生成可复现且防冲突的 `apple-…-<hash>` ID、记录 `UNKNOWN_APPLE_MARKET` 警告并继续发布；后续补录 registry 必须沿用已发布 ID，除非通过显式迁移同时更新当前价格和全部历史键。
 
 ## 变化、失败关闭与工件保护
 
@@ -164,7 +166,7 @@ node scripts/import-apple-archives.mjs --input <包含完整历史快照的目�
 - Cloudflare 代理自动注入 Web Analytics Beacon，并回传同源 `/cdn-cgi/rum`。按 [Cloudflare 官方说明](https://developers.cloudflare.com/web-analytics/about/)，该服务不收集或使用访问者个人数据；其他 Cloudflare 安全功能可能有独立的必要 Cookie/披露要求，应由站点隐私负责人核对。
 - 初始脚本会在价格数据请求及分析 Beacon 执行前删除 `q`、未知/重复/非法查询参数和未知 fragment；搜索词最多 160 个 Unicode code point，只留在内存。URL 只保留规范的 `tier`、`sort`、`dir`、`region`。更早发出的样式/脚本等子资源请求由 meta Referrer Policy `origin` 保护，Referer 不包含路径或查询参数。
 - 客户端无法清理首次文档请求：用户输入的原始 URL 仍可能被浏览器历史、代理、Cloudflare/GitHub Pages 和源站看到，因此不要把 Secret 或个人信息放进 URL。
-- 应用自身不写 Cookie、sessionStorage 或 IndexedDB；GA4 加载后可能按 Google 的实现写入 `_ga` 系列 Cookie。localStorage 只保存通过 schema 3 验证的公共当前价格缓存。因为同一 origin 的其他页面可以写同一存储，网络失败时的缓存不能视为防篡改证据；若该边界不可接受，应使用独立 origin 或移除持久缓存。
+- 应用自身不写 Cookie、sessionStorage 或 IndexedDB；GA4 加载后可能按 Google 的实现写入 `_ga` 系列 Cookie。localStorage 只保存通过 schema 4 验证的公共当前价格缓存。因为同一 origin 的其他页面可以写同一存储，网络失败时的缓存不能视为防篡改证据；若该边界不可接受，应使用独立 origin 或移除持久缓存。
 - 所有动态数据使用 `textContent`、`createTextNode` 和 DOM API 渲染；不使用 `innerHTML`、`eval`、`document.write` 或字符串事件处理器。外链新窗口均带 `noopener noreferrer`。
 - Cloudflare HTTP CSP 与 HTML meta CSP 必须保持一致。脚本只允许本站、`www.googletagmanager.com` 和 `static.cloudflareinsights.com`；GA4 连接/像素只允许 `*.google-analytics.com`、`*.analytics.google.com` 和 `www.googletagmanager.com`，其他类型继续使用最小来源。`base-uri`、form/object/frame/worker/media/manifest 均为 `none`，HTTP header 另需 `frame-ancestors 'none'`。精确策略见 [OPERATIONS.md](OPERATIONS.md)。
 - HTTP 层还应保持 `X-Content-Type-Options: nosniff`、frame deny、设备权限关闭、HSTS、最低 TLS 1.2，以及可验证的证书/DNS/跳转/404/缓存行为。具体基线见 [OPERATIONS.md](OPERATIONS.md)。

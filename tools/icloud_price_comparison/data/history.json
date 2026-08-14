@@ -1,8 +1,9 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 4,
   "updatedAt": "2026-08-11T00:06:34.089Z",
-  "countries": {
-    "Bahamas": {
+  "markets": {
+    "bs": {
+      "country": "Bahamas",
       "nameZh": "巴哈马",
       "region": "Americas",
       "events": [
@@ -19,7 +20,8 @@
         }
       ]
     },
-    "Barbados": {
+    "bb": {
+      "country": "Barbados",
       "nameZh": "巴巴多斯",
       "region": "Americas",
       "events": [
@@ -36,7 +38,8 @@
         }
       ]
     },
-    "Brazil": {
+    "br": {
+      "country": "Brazil",
       "nameZh": "巴西",
       "region": "Americas",
       "events": [
@@ -64,7 +67,8 @@
         }
       ]
     },
-    "Canada": {
+    "ca": {
+      "country": "Canada",
       "nameZh": "加拿大",
       "region": "Americas",
       "events": [
@@ -81,7 +85,8 @@
         }
       ]
     },
-    "Chile": {
+    "cl": {
+      "country": "Chile",
       "nameZh": "智利",
       "region": "Americas",
       "events": [
@@ -109,7 +114,8 @@
         }
       ]
     },
-    "Colombia": {
+    "co": {
+      "country": "Colombia",
       "nameZh": "哥伦比亚",
       "region": "Americas",
       "events": [
@@ -126,7 +132,8 @@
         }
       ]
     },
-    "Mexico": {
+    "mx": {
+      "country": "Mexico",
       "nameZh": "墨西哥",
       "region": "Americas",
       "events": [
@@ -143,7 +150,8 @@
         }
       ]
     },
-    "Peru": {
+    "pe": {
+      "country": "Peru",
       "nameZh": "秘鲁",
       "region": "Americas",
       "events": [
@@ -171,7 +179,8 @@
         }
       ]
     },
-    "Suriname": {
+    "sr": {
+      "country": "Suriname",
       "nameZh": "苏里南",
       "region": "Americas",
       "events": [
@@ -188,7 +197,8 @@
         }
       ]
     },
-    "United States": {
+    "us": {
+      "country": "United States",
       "nameZh": "美国",
       "region": "Americas",
       "events": [
@@ -205,7 +215,8 @@
         }
       ]
     },
-    "Albania": {
+    "al": {
+      "country": "Albania",
       "nameZh": "阿尔巴尼亚",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -222,7 +233,8 @@
         }
       ]
     },
-    "Bahrain": {
+    "bh": {
+      "country": "Bahrain",
       "nameZh": "巴林",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -239,7 +251,8 @@
         }
       ]
     },
-    "Belarus": {
+    "by": {
+      "country": "Belarus",
       "nameZh": "白俄罗斯",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -256,7 +269,8 @@
         }
       ]
     },
-    "Benin": {
+    "bj": {
+      "country": "Benin",
       "nameZh": "贝宁",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -273,7 +287,8 @@
         }
       ]
     },
-    "Bulgaria": {
+    "bg": {
+      "country": "Bulgaria",
       "nameZh": "保加利亚",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -290,7 +305,8 @@
         }
       ]
     },
-    "Cameroon": {
+    "cm": {
+      "country": "Cameroon",
       "nameZh": "喀麦隆",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -307,7 +323,8 @@
         }
       ]
     },
-    "Croatia": {
+    "hr": {
+      "country": "Croatia",
       "nameZh": "克罗地亚",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -324,7 +341,8 @@
         }
       ]
     },
-    "Czechia": {
+    "cz": {
+      "country": "Czechia",
       "nameZh": "捷克",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -341,7 +359,8 @@
         }
       ]
     },
-    "Denmark": {
+    "dk": {
+      "country": "Denmark",
       "nameZh": "丹麦",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -358,7 +377,8 @@
         }
       ]
     },
-    "Egypt": {
+    "eg": {
+      "country": "Egypt",
       "nameZh": "埃及",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -386,7 +406,8 @@
         }
       ]
     },
-    "Euro Zone": {
+    "euro-zone": {
+      "country": "Euro Zone",
       "nameZh": "欧盟",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -403,7 +424,8 @@
         }
       ]
     },
-    "Georgia": {
+    "ge": {
+      "country": "Georgia",
       "nameZh": "格鲁吉亚",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -420,7 +442,8 @@
         }
       ]
     },
-    "Ghana": {
+    "gh": {
+      "country": "Ghana",
       "nameZh": "加纳",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -437,7 +460,8 @@
         }
       ]
     },
-    "Hungary": {
+    "hu": {
+      "country": "Hungary",
       "nameZh": "匈牙利",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -454,7 +478,8 @@
         }
       ]
     },
-    "Iceland": {
+    "is": {
+      "country": "Iceland",
       "nameZh": "冰岛",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -471,7 +496,8 @@
         }
       ]
     },
-    "Israel": {
+    "il": {
+      "country": "Israel",
       "nameZh": "以色列",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -488,7 +514,8 @@
         }
       ]
     },
-    "Ivory Coast": {
+    "ci": {
+      "country": "Ivory Coast",
       "nameZh": "科特迪瓦",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -505,7 +532,8 @@
         }
       ]
     },
-    "Kenya": {
+    "ke": {
+      "country": "Kenya",
       "nameZh": "肯尼亚",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -522,7 +550,8 @@
         }
       ]
     },
-    "Moldova": {
+    "md": {
+      "country": "Moldova",
       "nameZh": "摩尔多瓦",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -539,7 +568,8 @@
         }
       ]
     },
-    "Nigeria": {
+    "ng": {
+      "country": "Nigeria",
       "nameZh": "尼日利亚",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -567,7 +597,8 @@
         }
       ]
     },
-    "Norway": {
+    "no": {
+      "country": "Norway",
       "nameZh": "挪威",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -584,7 +615,8 @@
         }
       ]
     },
-    "Pakistan": {
+    "pk": {
+      "country": "Pakistan",
       "nameZh": "巴基斯坦",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -601,7 +633,8 @@
         }
       ]
     },
-    "Poland": {
+    "pl": {
+      "country": "Poland",
       "nameZh": "波兰",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -618,7 +651,8 @@
         }
       ]
     },
-    "Qatar": {
+    "qa": {
+      "country": "Qatar",
       "nameZh": "卡塔尔",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -635,7 +669,8 @@
         }
       ]
     },
-    "Romania": {
+    "ro": {
+      "country": "Romania",
       "nameZh": "罗马尼亚",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -652,7 +687,8 @@
         }
       ]
     },
-    "Russia": {
+    "ru": {
+      "country": "Russia",
       "nameZh": "俄罗斯",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -669,7 +705,8 @@
         }
       ]
     },
-    "Saudi Arabia": {
+    "sa": {
+      "country": "Saudi Arabia",
       "nameZh": "沙特阿拉伯",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -686,7 +723,8 @@
         }
       ]
     },
-    "Senegal": {
+    "sn": {
+      "country": "Senegal",
       "nameZh": "塞内加尔",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -703,7 +741,8 @@
         }
       ]
     },
-    "South Africa": {
+    "za": {
+      "country": "South Africa",
       "nameZh": "南非",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -720,7 +759,8 @@
         }
       ]
     },
-    "Sweden": {
+    "se": {
+      "country": "Sweden",
       "nameZh": "瑞典",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -737,7 +777,8 @@
         }
       ]
     },
-    "Switzerland": {
+    "ch": {
+      "country": "Switzerland",
       "nameZh": "瑞士",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -754,7 +795,8 @@
         }
       ]
     },
-    "Tanzania": {
+    "tz": {
+      "country": "Tanzania",
       "nameZh": "坦桑尼亚",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -771,7 +813,8 @@
         }
       ]
     },
-    "Türkiye": {
+    "tr": {
+      "country": "Türkiye",
       "nameZh": "土耳其",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -810,7 +853,8 @@
         }
       ]
     },
-    "Uganda": {
+    "ug": {
+      "country": "Uganda",
       "nameZh": "乌干达",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -827,7 +871,8 @@
         }
       ]
     },
-    "United Arab Emirates": {
+    "ae": {
+      "country": "United Arab Emirates",
       "nameZh": "阿拉伯联合酋长国",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -844,7 +889,8 @@
         }
       ]
     },
-    "United Kingdom": {
+    "gb": {
+      "country": "United Kingdom",
       "nameZh": "英国",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -861,7 +907,8 @@
         }
       ]
     },
-    "Zambia": {
+    "zm": {
+      "country": "Zambia",
       "nameZh": "赞比亚",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -878,7 +925,8 @@
         }
       ]
     },
-    "Zimbabwe": {
+    "zw": {
+      "country": "Zimbabwe",
       "nameZh": "津巴布韦",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -895,7 +943,8 @@
         }
       ]
     },
-    "Australia": {
+    "au": {
+      "country": "Australia",
       "nameZh": "澳大利亚",
       "region": "Asia Pacific",
       "events": [
@@ -912,7 +961,8 @@
         }
       ]
     },
-    "Cambodia": {
+    "kh": {
+      "country": "Cambodia",
       "nameZh": "柬埔寨",
       "region": "Asia Pacific",
       "events": [
@@ -929,7 +979,8 @@
         }
       ]
     },
-    "China mainland": {
+    "cn": {
+      "country": "China mainland",
       "nameZh": "中国大陆",
       "region": "Asia Pacific",
       "events": [
@@ -946,7 +997,8 @@
         }
       ]
     },
-    "Hong Kong": {
+    "hk": {
+      "country": "Hong Kong",
       "nameZh": "香港",
       "region": "Asia Pacific",
       "events": [
@@ -963,7 +1015,8 @@
         }
       ]
     },
-    "India": {
+    "in": {
+      "country": "India",
       "nameZh": "印度",
       "region": "Asia Pacific",
       "events": [
@@ -980,7 +1033,8 @@
         }
       ]
     },
-    "Indonesia": {
+    "id": {
+      "country": "Indonesia",
       "nameZh": "印度尼西亚",
       "region": "Asia Pacific",
       "events": [
@@ -1008,7 +1062,8 @@
         }
       ]
     },
-    "Japan": {
+    "jp": {
+      "country": "Japan",
       "nameZh": "日本",
       "region": "Asia Pacific",
       "events": [
@@ -1036,7 +1091,8 @@
         }
       ]
     },
-    "Kazakhstan": {
+    "kz": {
+      "country": "Kazakhstan",
       "nameZh": "哈萨克斯坦",
       "region": "Asia Pacific",
       "events": [
@@ -1053,7 +1109,8 @@
         }
       ]
     },
-    "Kyrgyzstan": {
+    "kg": {
+      "country": "Kyrgyzstan",
       "nameZh": "吉尔吉斯斯坦",
       "region": "Asia Pacific",
       "events": [
@@ -1070,7 +1127,8 @@
         }
       ]
     },
-    "Malaysia": {
+    "my": {
+      "country": "Malaysia",
       "nameZh": "马来西亚",
       "region": "Asia Pacific",
       "events": [
@@ -1087,7 +1145,8 @@
         }
       ]
     },
-    "Nepal": {
+    "np": {
+      "country": "Nepal",
       "nameZh": "尼泊尔",
       "region": "Asia Pacific",
       "events": [
@@ -1104,7 +1163,8 @@
         }
       ]
     },
-    "New Zealand": {
+    "nz": {
+      "country": "New Zealand",
       "nameZh": "新西兰",
       "region": "Asia Pacific",
       "events": [
@@ -1132,7 +1192,8 @@
         }
       ]
     },
-    "Philippines": {
+    "ph": {
+      "country": "Philippines",
       "nameZh": "菲律宾",
       "region": "Asia Pacific",
       "events": [
@@ -1160,7 +1221,8 @@
         }
       ]
     },
-    "Republic of Korea": {
+    "kr": {
+      "country": "Republic of Korea",
       "nameZh": "韩国",
       "region": "Asia Pacific",
       "events": [
@@ -1177,7 +1239,8 @@
         }
       ]
     },
-    "Singapore": {
+    "sg": {
+      "country": "Singapore",
       "nameZh": "新加坡",
       "region": "Asia Pacific",
       "events": [
@@ -1194,7 +1257,8 @@
         }
       ]
     },
-    "Taiwan": {
+    "tw": {
+      "country": "Taiwan",
       "nameZh": "台湾",
       "region": "Asia Pacific",
       "events": [
@@ -1211,7 +1275,8 @@
         }
       ]
     },
-    "Tajikistan": {
+    "tj": {
+      "country": "Tajikistan",
       "nameZh": "塔吉克斯坦",
       "region": "Asia Pacific",
       "events": [
@@ -1228,7 +1293,8 @@
         }
       ]
     },
-    "Thailand": {
+    "th": {
+      "country": "Thailand",
       "nameZh": "泰国",
       "region": "Asia Pacific",
       "events": [
@@ -1245,7 +1311,8 @@
         }
       ]
     },
-    "Uzbekistan": {
+    "uz": {
+      "country": "Uzbekistan",
       "nameZh": "乌兹别克斯坦",
       "region": "Asia Pacific",
       "events": [
@@ -1262,7 +1329,8 @@
         }
       ]
     },
-    "Vietnam": {
+    "vn": {
+      "country": "Vietnam",
       "nameZh": "越南",
       "region": "Asia Pacific",
       "events": [
@@ -1290,7 +1358,8 @@
         }
       ]
     },
-    "Armenia": {
+    "am": {
+      "country": "Armenia",
       "nameZh": "亚美尼亚",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -1307,7 +1376,8 @@
         }
       ]
     },
-    "Azerbaijan": {
+    "az": {
+      "country": "Azerbaijan",
       "nameZh": "阿塞拜疆",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -1324,7 +1394,8 @@
         }
       ]
     },
-    "Mauritius": {
+    "mu": {
+      "country": "Mauritius",
       "nameZh": "毛里求斯",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -1341,7 +1412,8 @@
         }
       ]
     },
-    "Republic of Congo": {
+    "cg": {
+      "country": "Republic of Congo",
       "nameZh": "刚果共和国",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -1358,7 +1430,8 @@
         }
       ]
     },
-    "Laos": {
+    "la": {
+      "country": "Laos",
       "nameZh": "老挝",
       "region": "Asia Pacific",
       "events": [

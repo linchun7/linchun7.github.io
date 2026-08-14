@@ -39,6 +39,7 @@ test('rejects undeclared price tiers and truncated browser payloads', async () =
 
   const truncated = structuredClone(prices);
   truncated.countries = truncated.countries.slice(0, 1);
+  for (const plan of Object.values(truncated.countries[0].plans)) plan.cnyRank = 1;
   truncated.run.countries = truncated.countries.length;
   truncated.run.pricePoints = truncated.countries.length * truncated.tiers.length;
   assert.doesNotThrow(() => validatePricePayload(truncated), 'the low-level contract remains usable for isolated fixtures');
@@ -79,7 +80,7 @@ test('rejects tier labels or capacities that disagree with their canonical ident
 test('rejects non-tier plan keys in every historical event', async () => {
   const { prices, history } = await productionFixtures();
   const payload = structuredClone(history);
-  Object.values(payload.countries)[0].events[0].plans.EVIL = 1;
+  Object.values(payload.markets)[0].events[0].plans.EVIL = 1;
   assert.throws(() => validateHistoryPayload(payload), /invalid event/);
   assert.throws(() => validateExistingHistory(payload, prices), /invalid event/);
 });
@@ -97,7 +98,7 @@ test('binds every formatted local price to its numeric value', async () => {
 test('rejects history observations later than the artifact update date', async () => {
   const { prices, history } = await productionFixtures();
   const payload = structuredClone(history);
-  Object.values(payload.countries)[0].events.at(-1).observedAt = '2099-01-01';
+  Object.values(payload.markets)[0].events.at(-1).observedAt = '2099-01-01';
   assert.throws(() => validateHistoryPayload(payload), /invalid event/);
   assert.throws(() => validateExistingHistory(payload, prices), /invalid event/);
 
@@ -158,8 +159,8 @@ test('rejects unsafe display text and Unicode controls in public data', async ()
   }
 
   for (const mutate of [
-    (payload) => { Object.values(payload.countries)[0].nameZh += '\u202e'; },
-    (payload) => { Object.values(payload.countries)[0].region = '\ud800'; },
+    (payload) => { Object.values(payload.markets)[0].nameZh += '\u202e'; },
+    (payload) => { Object.values(payload.markets)[0].region = '\ud800'; },
     (payload) => {
       payload.sourcePublishedDates.find((entry) => entry.changes.addedCountries.length)
         .changes.addedCountries[0].nameZh += '\ufeff';
@@ -195,10 +196,10 @@ test('caps public arrays before rendering or retaining oversized evidence', asyn
 
   for (const mutate of [
     (payload) => {
-      const countryName = Object.keys(payload.countries)[0];
-      payload.countries[countryName].events = Array.from(
+      const marketId = Object.keys(payload.markets)[0];
+      payload.markets[marketId].events = Array.from(
         { length: 1001 },
-        () => structuredClone(payload.countries[countryName].events[0])
+        () => structuredClone(payload.markets[marketId].events[0])
       );
     },
     (payload) => {
@@ -296,6 +297,27 @@ test('requires complete two-decimal derived CNY prices in the public schema', as
   }
 });
 
+test('requires stable unique market IDs and dense producer ranks in schema 4', async () => {
+  const { prices } = await productionFixtures();
+  const mutations = [
+    (payload) => { delete payload.countries[0].marketId; },
+    (payload) => { payload.countries[0].marketId = 'Unsafe Market ID'; },
+    (payload) => { payload.countries[1].marketId = payload.countries[0].marketId; },
+    (payload) => { delete payload.countries[0].plans[payload.tiers[0].id].cnyRank; },
+    (payload) => { payload.countries[0].plans[payload.tiers[0].id].cnyRank = 0; },
+    (payload) => {
+      const tierId = payload.tiers[0].id;
+      for (const country of payload.countries) country.plans[tierId].cnyRank += 1;
+    }
+  ];
+  for (const mutate of mutations) {
+    const payload = structuredClone(prices);
+    mutate(payload);
+    assert.throws(() => validatePricePayload(payload));
+    assert.throws(() => validatePayload('prices.json', payload));
+  }
+});
+
 test('keeps legacy schema readable only for updater migration, never for the browser', async () => {
   const { prices } = await productionFixtures();
   const legacy = structuredClone(prices);
@@ -320,15 +342,19 @@ test('keeps legacy history readable only for updater migration and binds current
   const legacy = structuredClone(history);
   legacy.schemaVersion = 1;
   delete legacy.updatedAt;
+  legacy.countries = Object.fromEntries(Object.values(legacy.markets).map(({ country, ...record }) => [country, record]));
+  delete legacy.markets;
   assert.doesNotThrow(() => validateHistoryPayload(legacy));
   assert.doesNotThrow(() => validateExistingHistory(legacy, prices));
   assert.throws(() => validatePayload('history.json', legacy), /current public schema/);
 
-  const mismatched = structuredClone(history);
-  mismatched.updatedAt = new Date(Date.parse(prices.generatedAt) - 1).toISOString();
-  assert.doesNotThrow(() => validateHistoryPayload(mismatched));
-  assert.throws(() => validatePriceHistoryConsistency(prices, mismatched), /different update timestamps/);
-  assert.throws(() => validateExistingHistory(mismatched, prices), /different update timestamps/);
+  const older = structuredClone(history);
+  older.updatedAt = new Date(Date.parse(prices.generatedAt) - 1).toISOString();
+  assert.doesNotThrow(() => validatePriceHistoryConsistency(prices, older));
+  const future = structuredClone(history);
+  future.updatedAt = new Date(Date.parse(prices.generatedAt) + 1).toISOString();
+  assert.throws(() => validatePriceHistoryConsistency(prices, future), /updated after/);
+  assert.throws(() => validateExistingHistory(future, prices), /updated after/);
 });
 
 test('shared browser and updater contracts reject invalid publication kind and changes', async () => {
@@ -339,14 +365,14 @@ test('shared browser and updater contracts reject invalid publication kind and c
     (payload) => { payload.sourcePublishedDates[0].changes.addedTiers = [{ id: '__proto__' }]; },
     (payload) => { payload.sourcePublishedDates[0].observedAt = '2024-12-04'; },
     (payload) => {
-      const event = Object.values(payload.countries)[0].events[0];
+      const event = Object.values(payload.markets)[0].events[0];
       const nextDay = new Date(`${event.observedAt}T00:00:00.000Z`);
       nextDay.setUTCDate(nextDay.getUTCDate() + 1);
       event.observedAtUtc = nextDay.toISOString();
       event.observedAtBeijing = event.observedAt;
     },
     (payload) => {
-      const event = Object.values(payload.countries)[0].events[0];
+      const event = Object.values(payload.markets)[0].events[0];
       event.observedAtBeijing = event.observedAt;
     },
     (payload) => {
@@ -407,7 +433,7 @@ test('accepts a metadata-only country change without synthetic tier changes', as
 
 test('rejects every unexpected field in public history evidence', async () => {
   const { prices, history } = await productionFixtures();
-  const firstRecord = (payload) => Object.values(payload.countries)[0];
+  const firstRecord = (payload) => Object.values(payload.markets)[0];
   const firstPublicationWithAddedCountry = (payload) => payload.sourcePublishedDates
     .find((entry) => entry.changes?.addedCountries?.length);
   const firstPublicationWithRemovedCountry = (payload) => payload.sourcePublishedDates
@@ -446,13 +472,13 @@ test('rejects structurally valid prices/history mismatches in the shared cross-f
   const tierId = prices.tiers[0].id;
   const mutations = [
     ({ prices: changedPrices }) => { changedPrices.source.publishedDate = 'July 18, 2026'; },
-    ({ history: changedHistory }) => { delete changedHistory.countries[country.country]; },
-    ({ history: changedHistory }) => { changedHistory.countries[country.country].nameZh += '（旧）'; },
-    ({ history: changedHistory }) => { changedHistory.countries[country.country].region = 'Other'; },
-    ({ history: changedHistory }) => { changedHistory.countries[country.country].events.at(-1).currency = 'EUR'; },
-    ({ history: changedHistory }) => { delete changedHistory.countries[country.country].events.at(-1).plans[tierId]; },
-    ({ history: changedHistory }) => { changedHistory.countries[country.country].events.at(-1).plans.EXTRA = 1; },
-    ({ history: changedHistory }) => { changedHistory.countries[country.country].events.at(-1).plans[tierId] += 1; }
+    ({ history: changedHistory }) => { delete changedHistory.markets[country.marketId]; },
+    ({ history: changedHistory }) => { changedHistory.markets[country.marketId].nameZh += '（旧）'; },
+    ({ history: changedHistory }) => { changedHistory.markets[country.marketId].region = 'Other'; },
+    ({ history: changedHistory }) => { changedHistory.markets[country.marketId].events.at(-1).currency = 'EUR'; },
+    ({ history: changedHistory }) => { delete changedHistory.markets[country.marketId].events.at(-1).plans[tierId]; },
+    ({ history: changedHistory }) => { changedHistory.markets[country.marketId].events.at(-1).plans.EXTRA = 1; },
+    ({ history: changedHistory }) => { changedHistory.markets[country.marketId].events.at(-1).plans[tierId] += 1; }
   ];
 
   for (const mutate of mutations) {

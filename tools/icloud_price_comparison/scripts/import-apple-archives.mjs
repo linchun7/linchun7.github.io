@@ -19,6 +19,7 @@ import {
   updateHistory
 } from './update-prices.mjs';
 import { formatBeijingDate } from './run-context.mjs';
+import { attachMarketIdentity } from './market-registry.mjs';
 
 const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const HISTORY_PATH = path.join(PROJECT_DIR, 'data/history.json');
@@ -315,7 +316,7 @@ async function importAppleArchivesUnlocked(inputDir, paths = {}) {
     || a.fileName.localeCompare(b.fileName)
   ));
 
-  const rebuilt = { schemaVersion: 2, updatedAt: new Date().toISOString(), countries: {}, sourcePublishedDates: [] };
+  const rebuilt = { schemaVersion: 4, updatedAt: new Date().toISOString(), markets: {}, sourcePublishedDates: [] };
   let previousData = null;
   let snapshotIndex = normalizeAppleSnapshotIndex(migratedSnapshotIndex);
   const currentPublishedDate = publicationDateKey(currentData.source.publishedDate);
@@ -375,7 +376,7 @@ async function importAppleArchivesUnlocked(inputDir, paths = {}) {
       }
       stagedFiles.push(entry.dataFile);
     }
-    updateHistory(rebuilt, archive.parsed.countries, archive.publishedDate, archive.parsed.tiers);
+    updateHistory(rebuilt, attachMarketIdentity(archive.parsed.countries), archive.publishedDate, archive.parsed.tiers);
     const changes = previousData ? buildSnapshotChanges(previousData, archive.parsed.countries, archive.parsed.tiers) : emptyChanges();
     const sourceEntry = {
       publishedDate: archive.parsed.sourcePublishedDate,
@@ -403,7 +404,7 @@ async function importAppleArchivesUnlocked(inputDir, paths = {}) {
   const lastArchiveDate = archives.at(-1)?.publishedDate ?? '0000-00-00';
   const currentEventDate = currentData.run?.observedAtBeijing
     ?? currentData.generatedAt.slice(0, 10);
-  updateHistory(rebuilt, currentData.countries, currentEventDate, currentData.tiers);
+  updateHistory(rebuilt, attachMarketIdentity(currentData.countries), currentEventDate, currentData.tiers);
   const currentChanges = buildSnapshotChanges(previousData, currentData.countries, currentData.tiers);
   if (currentPublishedDate > lastArchiveDate) {
     rebuilt.sourcePublishedDates.push({

@@ -23,7 +23,7 @@ ExchangeRate-API ───┘        │
 
 - 页面是静态 HTML/CSS/JavaScript，没有自建应用服务器或数据库。
 - 当前价格、历史、成功运行日志和规范化 Apple 快照均在 `data/`；生产发布始终替换完整目录，不单独拼接 JSON。
-- `data/prices.json` 是 schema 3 公共契约：只含当地价格、每个套餐的两位小数 `cnyPrice` 和 allowlist 汇率元数据，不含 raw FX rates、API Key 值或 API Key 配置/状态。
+- `data/prices.json` 是 schema 4 公共契约：包含稳定 `marketId`、当地价格、每个套餐的两位小数 `cnyPrice`/`cnyRank` 和 allowlist 汇率元数据，不含 raw FX rates、内部全精度换算值、API Key 值或 API Key 配置/状态。
 - `data/run-log.json` 仅保留最近 90 次成功运行，且同样不得公开 API Key 配置/状态。
 - FX provenance 会公开本次成功使用的是认证 endpoint、开放 endpoint 或 stale 回退；它不公开 Key 值、失败/额度状态，但成功认证模式可能间接表明运行时存在可用凭据。若该元数据也被定义为敏感，需通过下一版 schema 迁移统一为供应商级来源。
 - Cloudflare 提供 HTTPS、响应头、缓存和自动注入的 Web Analytics；仓库内不手工嵌入其 Beacon。前端另以延迟动态脚本启用 GA4（`G-K2S9L4CHNP`）。
@@ -265,7 +265,7 @@ https://www.linchun.com.cn/tools/icloud_price_comparison/?q=privateSearchMarker&
 - GA4 配置队列只有一条该测量 ID 的 `config`，其 `page_location` 是清洗后的 URL，且 `allow_google_signals`、`allow_ad_personalization_signals` 都为 `false`。
 - 应用自身不写 Cookie、sessionStorage/IndexedDB；GA4 可能写 `_ga` 系列 Cookie，验收时检查其来源和数量，不把正常 GA4 Cookie 误判为应用数据泄漏。
 - 控制台无应用 error/CSP violation；对话框、键盘、缓存回退和错误态正常。
-- 生产 JSON 是 schema 3，且 `prices.json`、`run-log.json` 都不含 raw rates 或 API Key 状态。
+- 生产 JSON 是 schema 4，且 `prices.json`、`run-log.json` 都不含 raw rates、内部全精度换算值或 API Key 状态。
 
 隐私边界：bootstrap 只能在 HTML 开始执行后清理地址。最初的 document URL 仍可能进入浏览器历史、代理、Cloudflare/GitHub Pages 和访问日志；任何 Secret、Token 或个人信息都不得放进 URL。`localStorage` 也不是防篡改存储：同一 origin 的其他页面可写入格式合法但内容伪造的缓存。工具只在网络失败时使用并明确标记该缓存；高隔离要求应使用独立 origin 或禁用持久缓存。
 

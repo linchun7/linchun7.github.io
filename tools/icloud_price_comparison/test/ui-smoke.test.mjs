@@ -63,6 +63,35 @@ function canRenderExpectedChart(series) {
   return series.length > 1 && new Set(series.map(({ currency }) => currency)).size === 1;
 }
 
+function historyRecords(history) {
+  return history.markets ?? history.countries;
+}
+
+function historyRecordForCountry(history, data, countryName) {
+  const country = data.countries.find((entry) => entry.country === countryName);
+  return historyRecords(history)[country?.marketId ?? countryName];
+}
+
+function rerankPriceFixture(data) {
+  for (const { id } of data.tiers) {
+    const ordered = [...data.countries].sort((first, second) => (
+      first.plans[id].cnyPrice - second.plans[id].cnyPrice
+      || first.marketId.localeCompare(second.marketId, 'en')
+    ));
+    let rank = 0;
+    let previousPrice = null;
+    for (const country of ordered) {
+      const price = country.plans[id].cnyPrice;
+      if (previousPrice === null || Math.abs(price - previousPrice) > 1e-9) {
+        rank += 1;
+        previousPrice = price;
+      }
+      country.plans[id].cnyRank = rank;
+    }
+  }
+  return data;
+}
+
 async function findChrome() {
   const candidates = [
     process.env.CHROME_PATH,
@@ -189,7 +218,7 @@ test('starts price data early and deprioritizes optional third-party work', asyn
   ]);
   const eagerPriceFetch = '<script data-cfasync="false" src="price-bootstrap.js?v=10"></script>';
   assert.ok(html.includes(eagerPriceFetch), 'prices.json bootstrap should run during HTML parsing');
-  assert.ok(html.indexOf(eagerPriceFetch) < html.indexOf('<script data-cfasync="false" type="module" src="script.js?v=21"></script>'), 'the initial price request should precede module execution');
+  assert.ok(html.indexOf(eagerPriceFetch) < html.indexOf('<script data-cfasync="false" type="module" src="script.js?v=22"></script>'), 'the initial price request should precede module execution');
   assert.doesNotMatch(html, /rel="preload" href="data\/prices\.json"/, 'cross-browser loading should not rely on a fetch preload that WebKit may duplicate');
   assert.doesNotMatch(html, /<script[^>]+src="https:\/\/www\.googletagmanager\.com/, 'analytics must not block HTML parsing');
   assert.doesNotMatch(html, /analyticsConsent|privacySettings|允许匿名统计/, 'analytics consent overlay and its settings entry must be absent');
@@ -464,10 +493,10 @@ test('renders current prices, sorting, and country history in a real browser', {
 
   const expectedData = await readFixture('prices.json');
   const expectedHistory = await readFixture('history.json');
-  const historyCountry = Object.entries(expectedHistory.countries)
-    .find(([, record]) => expectedData.tiers.some(({ id }) => (
+  const historyCountry = Object.values(historyRecords(expectedHistory))
+    .find((record) => expectedData.tiers.some(({ id }) => (
       canRenderExpectedChart(compactExpectedSeries(record.events, id))
-    )))?.[0];
+    )))?.country;
   const server = await startServer();
   const { port } = server.address();
   const baseUrl = `http://127.0.0.1:${port}`;
@@ -542,7 +571,7 @@ test('renders current prices, sorting, and country history in a real browser', {
         assert.equal(await page.locator('#searchInput').isEnabled(), true);
         assert.equal(await page.locator('#regionSelect').isEnabled(), true);
         assert.equal(await page.locator('.app-brand h1').textContent(), 'iCloud+ 全球价格对比');
-        assert.equal(await page.locator('#overviewTitle').textContent(), '各容量最低价');
+        assert.equal(await page.locator('#overviewTitle').textContent(), '各容量参考最低价');
         assert.equal(await page.locator('.workspace-heading h2').textContent(), '各地区 iCloud+ 价格');
         assert.equal(await page.locator('button[data-sort-tier]').count(), expectedData.tiers.length);
         if (viewport.width > 900) {
@@ -580,17 +609,12 @@ test('renders current prices, sorting, and country history in a real browser', {
         assert.equal(new Set(statCards.map(({ borderColor }) => borderColor)).size, 1, `${viewport.name} stat borders should have equal emphasis`);
         assert.equal(await page.locator('#minimumSummary > button').count(), expectedData.tiers.length);
         for (const tier of expectedData.tiers) {
-          const lowest = expectedData.countries
-            .map((country) => ({
-              country,
-              cny: country.plans[tier.id].cnyPrice
-            }))
-            .sort((first, second) => first.cny - second.cny)[0];
+          const lowest = expectedData.countries.find((country) => country.plans[tier.id].cnyRank === 1);
           const summaryText = await page.locator('#minimumSummary > button').evaluateAll((items, label) => {
             const item = items.find((element) => element.querySelector('.minimum-tier-label')?.textContent === label);
             return item?.textContent ?? '';
           }, tier.label);
-          assert.ok(summaryText.includes(lowest.country.nameZh || lowest.country.country));
+          assert.ok(summaryText.includes(lowest.nameZh || lowest.country));
         }
         const minimumCountrySize = await page.locator('#minimumSummary .minimum-country').first().evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
         const minimumPriceSize = await page.locator('#minimumSummary .minimum-price').first().evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
@@ -653,7 +677,7 @@ test('renders current prices, sorting, and country history in a real browser', {
           text: badge.textContent
         }));
         assert.equal(minimumBadgePosition.badgeIndex, 0, 'minimum badge should sit directly before the price');
-        assert.equal(minimumBadgePosition.text, '最低');
+        assert.equal(minimumBadgePosition.text, '参考最低');
         assert.ok(minimumBadgePosition.gapToPrice >= 0 && minimumBadgePosition.gapToPrice <= 6, `${viewport.name} minimum badge should stay close to the price`);
         const minimumCellBackground = await page.locator('.price-cell.is-minimum').first().evaluate((cell) => getComputedStyle(cell).backgroundColor);
         const standardCellBackground = await page.locator('.price-cell:not(.is-minimum):not(.is-sorted)').first().evaluate((cell) => getComputedStyle(cell).backgroundColor);
@@ -720,7 +744,7 @@ test('renders current prices, sorting, and country history in a real browser', {
         );
 
         const historySearch = historyCountry ?? firstCountry;
-        const expectedRecord = expectedHistory.countries[historySearch];
+        const expectedRecord = historyRecordForCountry(expectedHistory, expectedData, historySearch);
         await page.locator('#searchInput').fill(historySearch);
         await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length === 1);
         const historyRow = page.locator('#priceRows tr[data-country]').first();
@@ -935,7 +959,7 @@ test('excludes history events from before a tier was introduced', { timeout: 30_
   const countryName = '\u0054\u00fcrkiye';
   const tierId = '200GB';
   const patchedHistory = structuredClone(history);
-  const targetRecord = patchedHistory.countries[countryName];
+  const targetRecord = historyRecordForCountry(patchedHistory, expectedData, countryName);
   assert.ok(targetRecord?.events.length >= 3, 'the regression fixture needs multiple history events');
   delete targetRecord.events[0].plans[tierId];
   const expectedSeries = compactExpectedSeries(targetRecord.events, tierId);
@@ -1013,7 +1037,7 @@ test('adapts table and history controls to a different tier count', { timeout: 3
   }
   threeTierData.run.pricePoints = threeTierData.countries.length * threeTierData.tiers.length;
   const threeTierHistory = structuredClone(expectedHistory);
-  for (const record of Object.values(threeTierHistory.countries)) {
+  for (const record of Object.values(historyRecords(threeTierHistory))) {
     for (const event of record.events) {
       event.plans = Object.fromEntries(
         Object.entries(event.plans).filter(([tierId]) => retainedTierIds.has(tierId))
@@ -1052,6 +1076,39 @@ test('adapts table and history controls to a different tier count', { timeout: 3
   } finally {
     await browser.close();
     await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test('renders every rank-one market without inventing a single winner', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the tied reference-minimum UI test');
+  if (!browserConfig) return;
+  const data = await readFixture('prices.json');
+  const tier = data.tiers[0];
+  const winners = [...data.countries]
+    .sort((first, second) => first.marketId.localeCompare(second.marketId, 'en'))
+    .slice(0, 4);
+  for (const country of winners) country.plans[tier.id].cnyPrice = 1;
+  rerankPriceFixture(data);
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  const page = await browser.newPage({ viewport: { width: 1365, height: 900 } });
+  await page.route('https://**/*', (route) => route.abort());
+  await page.route('**/data/prices.json*', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify(data)
+  }));
+  try {
+    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, data.countries.length);
+    const expectedNames = winners.slice(0, 3).map((country) => country.nameZh || country.country).join('、');
+    const card = page.locator(`#minimumSummary button[data-tier="${tier.id}"]`);
+    assert.match(await card.locator('.minimum-country').textContent(), new RegExp(`^${expectedNames}等 4 个地区$`));
+    assert.equal(await page.locator(`.price-cell[data-tier="${tier.id}"].is-minimum`).count(), 4);
+  } finally {
+    await page.close();
+    await browser.close();
   }
 });
 
@@ -1100,7 +1157,7 @@ test('keeps current prices usable when optional history data is unavailable or m
   const staleHistory = structuredClone(validHistory);
   staleHistory.sourcePublishedDates = staleHistory.sourcePublishedDates.slice(0, 1);
   const reversedHistory = structuredClone(validHistory);
-  const reversibleRecord = Object.values(reversedHistory.countries).find((record) => record.events.length > 1);
+  const reversibleRecord = Object.values(historyRecords(reversedHistory)).find((record) => record.events.length > 1);
   reversibleRecord.events.reverse();
   const server = await startServer();
   const { port } = server.address();
@@ -1356,7 +1413,8 @@ test('ignores stale history responses after a price retry', { timeout: 30_000 },
   const validData = await readFixture('prices.json');
   const validHistory = await readFixture('history.json');
   const staleHistory = structuredClone(validHistory);
-  staleHistory.countries.Brazil.events = [staleHistory.countries.Brazil.events[0]];
+  const brazilHistory = historyRecordForCountry(staleHistory, validData, 'Brazil');
+  brazilHistory.events = [brazilHistory.events[0]];
   const server = await startServer();
   const { port } = server.address();
   const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
@@ -1393,7 +1451,7 @@ test('ignores stale history responses after a price retry', { timeout: 30_000 },
     await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, validData.countries.length);
     await page.waitForTimeout(1_200);
     assert.equal(await page.locator('#historyDialog').evaluate((element) => element.open), true);
-    assert.equal(await page.locator('#historyRows tr').count(), validHistory.countries.Brazil.events.length);
+    assert.equal(await page.locator('#historyRows tr').count(), historyRecordForCountry(validHistory, validData, 'Brazil').events.length);
     assert.deepEqual(pageErrors, []);
     assert.equal(priceCalls, 2);
     assert.equal(historyCalls, 2);
@@ -1436,7 +1494,7 @@ test('keeps history dialog usable when Chart construction fails', { timeout: 30_
     await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, validData.countries.length);
     await page.locator('#priceRows tr[data-country="Brazil"]').click();
     assert.equal(await page.locator('#historyDialog').evaluate((element) => element.open), true);
-    assert.equal(await page.locator('#historyRows tr').count(), validHistory.countries.Brazil.events.length);
+    assert.equal(await page.locator('#historyRows tr').count(), historyRecordForCountry(validHistory, validData, 'Brazil').events.length);
     await page.waitForFunction(() => (
       document.querySelector('#chartWrap')?.hidden === true
       && document.querySelector('#emptyHistory')?.hidden === false
@@ -1505,7 +1563,7 @@ test('keeps the page and publication history bounded with a single-tier table on
         cellRight: cellBox.right
       };
     });
-    assert.equal(minimumBadgeLayout.text, '\u6700\u4f4e');
+    assert.equal(minimumBadgeLayout.text, '参考最低');
     assert.ok(minimumBadgeLayout.badgeLeft >= minimumBadgeLayout.cellLeft - 1, 'minimum badge must stay inside the active price cell on narrow screens');
     assert.ok(minimumBadgeLayout.badgeRight <= minimumBadgeLayout.cellRight + 1, 'minimum badge must not overflow the table on narrow screens');
 
@@ -1625,9 +1683,10 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
     };
   });
   const history = {
-    schemaVersion: 2,
+    schemaVersion: 4,
     updatedAt: data.generatedAt,
-    countries: Object.fromEntries(data.countries.map((entry) => [entry.country, {
+    markets: Object.fromEntries(data.countries.map((entry) => [entry.marketId, {
+      country: entry.country,
       nameZh: entry.nameZh,
       region: entry.region,
       events: entry.country === country.country ? priceEvents : [{
@@ -1836,6 +1895,7 @@ test('resets a removed region filter after a successful price retry', { timeout:
   const replacement = structuredClone(fullData);
   const removedRegion = fullData.countries[0].region;
   replacement.countries = replacement.countries.filter(({ region }) => region !== removedRegion);
+  rerankPriceFixture(replacement);
   replacement.run.countries = replacement.countries.length;
   replacement.run.pricePoints = replacement.countries.length * replacement.tiers.length;
   const server = await startServer();
@@ -1894,6 +1954,7 @@ test('rebinds or closes an open history dialog after country replacement', { tim
   changedData.run.pricePoints = changedData.countries.length * changedData.tiers.length;
   const removedData = structuredClone(changedData);
   removedData.countries = removedData.countries.filter(({ country }) => country !== activeCountry.country);
+  rerankPriceFixture(removedData);
   removedData.run.countries = removedData.countries.length;
   removedData.run.pricePoints = removedData.countries.length * removedData.tiers.length;
   const scenarios = [
@@ -1980,7 +2041,7 @@ test('keeps the minimum-price overview stable and the desktop table header stick
     assert.equal(await page.locator('h1').count(), 1);
     assert.equal(await page.locator('h1').textContent(), 'iCloud+ \u5168\u7403\u4ef7\u683c\u5bf9\u6bd4');
     assert.equal(await page.locator('#overviewTitle').evaluate((element) => element.tagName), 'H2');
-    assert.equal(await page.locator('head script[type="module"][src="script.js?v=21"][data-cfasync="false"]').count(), 1);
+    assert.equal(await page.locator('head script[type="module"][src="script.js?v=22"][data-cfasync="false"]').count(), 1);
     assert.equal(await page.locator('head link[rel="modulepreload"]').count(), 3);
     const before = await page.locator('#minimumSummary').boundingBox();
     const loadingLayout = await page.evaluate(() => ({
