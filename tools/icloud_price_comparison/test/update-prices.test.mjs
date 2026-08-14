@@ -27,6 +27,9 @@ import {
   classifyHealthcheckFailure,
   fetchResource,
   getExchangeRates,
+  validateFxSanity,
+  FX_SANITY_MAX_DAILY_CHANGE,
+  MIN_FX_SANITY_POINTS,
   logInline,
   main,
   publicationDateKey,
@@ -787,6 +790,76 @@ function buildAppleHtml(data, publishedDate = data.source.publishedDate) {
   return `<!doctype html><html><body>${sectionHtml}${publication}<!--${'x'.repeat(20_000)}--></body></html>`;
 }
 
+function fxSanityFixture({
+  currency = 'JPY',
+  points = MIN_FX_SANITY_POINTS,
+  generatedAt = '2026-08-10T00:00:00.000Z'
+} = {}) {
+  return {
+    generatedAt,
+    countries: [{
+      country: 'Alpha',
+      currency,
+      plans: Object.fromEntries(Array.from({ length: points }, (_, index) => {
+        const price = (index + 1) * 100;
+        return [`T${index + 1}`, { price, cnyPrice: price * 0.1 }];
+      }))
+    }]
+  };
+}
+
+function fxForCnyPerCurrency(currency, rate) {
+  return { rates: { USD: 1, CNY: 1, [currency]: 1 / rate } };
+}
+
+test('FX sanity enforces the 12% dailyized symmetric threshold', () => {
+  const previousData = fxSanityFixture();
+  const now = new Date('2026-08-11T00:00:00.000Z');
+  for (const currentRate of [0.105, 0.1 / 1.05, 0.1 * 1.119]) {
+    const result = validateFxSanity(previousData, fxForCnyPerCurrency('JPY', currentRate), { now });
+    assert.equal(result.status, 'passed');
+  }
+  for (const currentRate of [0.1 * 1.121, 0.1 / 1.121]) {
+    assert.throws(
+      () => validateFxSanity(previousData, fxForCnyPerCurrency('JPY', currentRate), { now }),
+      (error) => error.code === 'FX_SANITY_FAILURE'
+    );
+  }
+  assert.equal(FX_SANITY_MAX_DAILY_CHANGE, 0.12);
+});
+
+test('FX sanity dailyizes multi-day changes and skips unusable baselines explicitly', () => {
+  const previousData = fxSanityFixture();
+  const threeDay = validateFxSanity(
+    previousData,
+    fxForCnyPerCurrency('JPY', 0.12),
+    { now: new Date('2026-08-13T00:00:00.000Z') }
+  );
+  assert.equal(threeDay.status, 'passed');
+  assert.ok(threeDay.checks.find(({ currency }) => currency === 'JPY').dailyizedChange < 0.12);
+
+  const oldBaseline = validateFxSanity(
+    previousData,
+    fxForCnyPerCurrency('JPY', 1),
+    { now: new Date('2026-08-18T00:00:00.001Z') }
+  );
+  assert.deepEqual(oldBaseline.warnings, ['FX_SANITY_SKIPPED_OLD_BASELINE']);
+
+  const insufficient = validateFxSanity(
+    fxSanityFixture({ points: 2 }),
+    fxForCnyPerCurrency('JPY', 0.1),
+    { now: new Date('2026-08-11T00:00:00.000Z') }
+  );
+  assert.ok(insufficient.warnings.includes('FX_SANITY_SKIPPED_INSUFFICIENT_POINTS:JPY:2'));
+
+  const cny = validateFxSanity(
+    fxSanityFixture({ currency: 'CNY' }),
+    { rates: { USD: 1, CNY: 1 } },
+    { now: new Date('2026-08-11T00:00:00.000Z') }
+  );
+  assert.equal(cny.checks.find(({ currency }) => currency === 'CNY').status, 'skipped-cny');
+});
+
 test('derives rounded plan-level CNY prices without publishing source rates', () => {
   const countries = [
     {
@@ -1071,6 +1144,43 @@ test('runs the production write path against isolated files', async () => {
   } finally {
     if (originalSummary === undefined) delete process.env.GITHUB_STEP_SUMMARY;
     else process.env.GITHUB_STEP_SUMMARY = originalSummary;
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('FX sanity failure preserves every production data file', async (t) => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  t.mock.timers.enable({ apis: ['Date'], now: new Date(Date.parse(data.generatedAt) + 24 * 60 * 60 * 1_000) });
+  const rates = compatibleExchangeRates(data);
+  rates.JPY /= 2;
+  const fxPayload = {
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: recentFxTimestamp(),
+    rates
+  };
+  const before = await Promise.all([
+    readFile(paths.currentDataPath, 'utf8'),
+    readFile(paths.historyPath, 'utf8'),
+    readFile(paths.runLogPath, 'utf8')
+  ]);
+  const snapshotStoreBefore = await readSnapshotStoreState(paths);
+  try {
+    await withMockedFetch(
+      { html: buildAppleHtml(data), fxPayload },
+      () => assert.rejects(
+        main({ dryRun: false, paths, stepSummaryPath: null }),
+        (error) => error.code === 'FX_SANITY_FAILURE'
+      )
+    );
+    assert.deepEqual(await Promise.all([
+      readFile(paths.currentDataPath, 'utf8'),
+      readFile(paths.historyPath, 'utf8'),
+      readFile(paths.runLogPath, 'utf8')
+    ]), before);
+    assert.deepEqual(await readSnapshotStoreState(paths), snapshotStoreBefore);
+  } finally {
     await rm(root, { recursive: true, force: true });
   }
 });
@@ -2678,6 +2788,12 @@ test('keeps successful Action summaries concise and promotes warnings', () => {
   assert.match(stale, /汇率降级/);
   assert.doesNotMatch(stale, /API Key|汇率认证|未配置/i);
   assert.match(stale, /缺少汇率.*JPY/);
+
+  const sanitySkipped = buildActionSummaryLines(data, {
+    ...summary,
+    fxSanityWarnings: ['FX_SANITY_SKIPPED_OLD_BASELINE']
+  }, 'schedule').join('\n');
+  assert.match(sanitySkipped, /FX sanity.*FX\\_SANITY\\_SKIPPED\\_OLD\\_BASELINE/);
 
   const noSecret = buildActionSummaryLines({
     ...data,

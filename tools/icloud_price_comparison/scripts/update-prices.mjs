@@ -37,6 +37,9 @@ const MAX_APPLE_RESPONSE_BYTES = 5 * 1024 * 1024;
 const MAX_FX_RESPONSE_BYTES = 1024 * 1024;
 const FX_MAX_AGE_MS = 36 * 60 * 60 * 1_000;
 const FX_MAX_FUTURE_SKEW_MS = 5 * 60 * 1_000;
+export const MIN_FX_SANITY_POINTS = 3;
+export const FX_SANITY_MAX_DAILY_CHANGE = 0.12;
+const FX_SANITY_MAX_BASELINE_AGE_DAYS = 7;
 const UPDATE_LOCK_STALE_MS = 30 * 60 * 1_000;
 const TEMPORARY_FILE_PATTERN = /\.tmp-\d+-\d+-[a-z0-9]+$/i;
 const UNSAFE_OBJECT_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
@@ -221,6 +224,12 @@ function exchangeRateError(message, reason = 'invalid-response') {
   return error;
 }
 
+function fxSanityError(message) {
+  const error = new Error(message);
+  error.code = 'FX_SANITY_FAILURE';
+  return error;
+}
+
 function parseExchangeRatePayload(payload, ratesField) {
   const serviceError = typeof payload?.['error-type'] === 'string' ? payload['error-type'] : null;
   if (payload?.result !== 'success') {
@@ -258,6 +267,88 @@ export function selectRequiredRates(rates, requiredCurrencies = []) {
     selected[currency] = rate;
   }
   return selected;
+}
+
+function median(values) {
+  const sorted = [...values].sort((first, second) => first - second);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[middle - 1] + sorted[middle]) / 2
+    : sorted[middle];
+}
+
+export function validateFxSanity(previousData, fx, {
+  now = new Date(),
+  minPoints = MIN_FX_SANITY_POINTS,
+  maxDailyChange = FX_SANITY_MAX_DAILY_CHANGE,
+  maxBaselineAgeDays = FX_SANITY_MAX_BASELINE_AGE_DAYS
+} = {}) {
+  const warnings = [];
+  const checks = [];
+  const previousGeneratedAtMs = Date.parse(previousData?.generatedAt);
+  const nowMs = now instanceof Date ? now.getTime() : Number.NaN;
+  if (!previousData || !Number.isFinite(previousGeneratedAtMs) || !Number.isFinite(nowMs)) {
+    warnings.push('FX_SANITY_SKIPPED_NO_BASELINE');
+    return { status: 'skipped', warnings, checks };
+  }
+
+  const elapsedHours = Math.max(0, nowMs - previousGeneratedAtMs) / (60 * 60 * 1_000);
+  if (elapsedHours > maxBaselineAgeDays * 24) {
+    warnings.push('FX_SANITY_SKIPPED_OLD_BASELINE');
+    return { status: 'skipped', warnings, checks };
+  }
+  if (fx?.stale || !fx?.rates) {
+    warnings.push('FX_SANITY_SKIPPED_NO_CURRENT_RATES');
+    return { status: 'skipped', warnings, checks };
+  }
+
+  const pointsByCurrency = new Map();
+  for (const country of previousData.countries ?? []) {
+    if (country.currency === 'CNY') continue;
+    const points = pointsByCurrency.get(country.currency) ?? [];
+    for (const plan of Object.values(country.plans ?? {})) {
+      if (Number.isFinite(plan?.price) && plan.price > 0
+        && Number.isFinite(plan.cnyPrice) && plan.cnyPrice > 0) {
+        points.push(plan.cnyPrice / plan.price);
+      }
+    }
+    pointsByCurrency.set(country.currency, points);
+  }
+
+  const days = Math.min(Math.max(1, elapsedHours / 24), maxBaselineAgeDays);
+  const currencies = [...new Set([
+    ...(previousData.countries ?? []).map(({ currency }) => currency),
+    ...Object.keys(fx.rates)
+  ])].sort();
+  for (const currency of currencies) {
+    if (currency === 'CNY') {
+      checks.push({ currency, status: 'skipped-cny' });
+      continue;
+    }
+    const points = pointsByCurrency.get(currency) ?? [];
+    if (points.length < minPoints) {
+      warnings.push(`FX_SANITY_SKIPPED_INSUFFICIENT_POINTS:${currency}:${points.length}`);
+      checks.push({ currency, status: 'skipped-insufficient-points', points: points.length });
+      continue;
+    }
+    const currentCurrencyRate = fx.rates[currency];
+    const currentCnyRate = fx.rates.CNY;
+    if (!Number.isFinite(currentCurrencyRate) || currentCurrencyRate <= 0
+      || !Number.isFinite(currentCnyRate) || currentCnyRate <= 0) {
+      throw fxSanityError(`FX sanity cannot calculate a current CNY/${currency} rate`);
+    }
+    const previousRate = median(points);
+    const currentRate = currentCnyRate / currentCurrencyRate;
+    const symmetricRatio = Math.max(currentRate / previousRate, previousRate / currentRate);
+    const dailyizedChange = Math.pow(symmetricRatio, 1 / days) - 1;
+    if (!Number.isFinite(dailyizedChange) || dailyizedChange > maxDailyChange) {
+      throw fxSanityError(
+        `FX sanity failed for ${currency}: dailyized symmetric change ${(dailyizedChange * 100).toFixed(2)}% exceeds ${(maxDailyChange * 100).toFixed(2)}%`
+      );
+    }
+    checks.push({ currency, status: 'passed', points: points.length, previousRate, currentRate, dailyizedChange });
+  }
+  return { status: 'passed', warnings, checks };
 }
 
 function validateExchangeRateFreshness(fetchedAt, now = new Date()) {
@@ -2036,6 +2127,9 @@ export function buildActionSummaryLines(data, summary, trigger = resolveTriggerS
   if (data.source.parser !== 'cross-checked') warnings.push(`- **解析降级**：${describeParser(data)}`);
   if (data.fx.stale) warnings.push('- **汇率降级**：本次获取失败，沿用上次成功结果');
   if (summary.missingRates.length) warnings.push(`- **缺少汇率**：${summary.missingRates.map((currency) => markdownInline(currency)).join('、')}`);
+  for (const warning of summary.fxSanityWarnings ?? []) {
+    warnings.push(`- **FX sanity**：${markdownInline(warning)}`);
+  }
 
   const lines = [
     '## iCloud+ 价格更新',
@@ -2178,6 +2272,8 @@ export async function main({
     requiredCurrencies: [...new Set(parsedCountries.map(({ currency }) => currency))],
     networkBudget
   });
+  const fxSanity = validateFxSanity(previousData, fx);
+  for (const warning of fxSanity.warnings) console.warn(warning);
   const countries = attachDerivedCnyPrices(parsedCountries, { fx, previousData });
   if (process.env.GITHUB_ACTIONS === 'true' && fx.fallbackUsed && !fx.stale) {
     console.log('::notice title=汇率来源自动回退::认证汇率来源不可用，已使用开放接口。');
@@ -2236,6 +2332,7 @@ export async function main({
   const summary = {
     history,
     missingRates,
+    fxSanityWarnings: fxSanity.warnings,
     publishedDateHistory,
     publicationDateChanged: publishedDateUpdate.changed,
     publicationChanges,
