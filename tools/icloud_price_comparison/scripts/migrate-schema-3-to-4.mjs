@@ -39,7 +39,7 @@ export function migratePricesSchema3To4(prices) {
     return {
       marketId: market.id,
       ...structuredClone(country),
-      nameZh: country.nameZh || market.zh
+      nameZh: country.nameZh || market.nameZh || country.country
     };
   });
   const migrated = { ...structuredClone(prices), schemaVersion: 4, countries: assignRanks(countries, prices.tiers) };

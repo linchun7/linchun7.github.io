@@ -273,15 +273,20 @@ test('keeps pull-request validation read-only, complete, and SHA-pinned', async 
   assert.match(ciWorkflow, /name: 启用并校验 pnpm[\s\S]*?corepack enable[\s\S]*?pnpm --version/);
   assert.doesNotMatch(ciWorkflow, /npm install[^\n]*pnpm/);
   assert.match(ciWorkflow, /pnpm install --frozen-lockfile --ignore-scripts/);
-  assert.match(ciWorkflow, /pnpm exec playwright install --with-deps chromium firefox webkit/);
+  assert.match(ciWorkflow, /strategy:[\s\S]*?fail-fast: false[\s\S]*?browser: \[chromium, firefox, webkit\]/);
+  assert.match(ciWorkflow, /pnpm exec playwright install --with-deps \$\{\{ matrix\.browser \}\}/);
   assert.match(ciWorkflow, /run: pnpm test:core/);
   assert.match(ciWorkflow, /run: pnpm validate:artifact/);
   assert.match(ciWorkflow, /schedule:[\s\S]*?cron:\s*['"]5 22 \* \* 0['"]/);
   assert.match(ciWorkflow, /run: pnpm validate:snapshots/);
   assert.doesNotMatch(ciWorkflow, /if: github.event_name == 'schedule' \\|\\| github.event_name == 'workflow_dispatch'/);
   assert.match(ciWorkflow, /cancel-in-progress: false/);
-  assert.match(ciWorkflow, /run: pnpm test:browsers/);
+  assert.doesNotMatch(ciWorkflow, /run: pnpm test:browsers/);
+  assert.match(ciWorkflow, /PLAYWRIGHT_BROWSER: \$\{\{ matrix\.browser \}\}[\s\S]*?node --test test\/ui-smoke\.test\.mjs/);
+  const coreJob = ciWorkflow.match(/\n  core:[\s\S]*?(?=\n  browser:)/)?.[0] ?? '';
+  assert.doesNotMatch(coreJob, /playwright install|test:browsers|ui-smoke/);
   assert.match(ciWorkflow, /run: pnpm audit --audit-level low/);
+  assert.match(coreJob, /run: git diff --check/);
 });
 
 test('runs the same UI acceptance suite in Chromium, Firefox, and WebKit', async () => {
@@ -297,7 +302,8 @@ test('runs the same UI acceptance suite in Chromium, Firefox, and WebKit', async
     packageJson.packageManager,
     'pnpm@10.14.0+sha512.ad27a79641b49c3e481a16a805baa71817a04bbe06a38d17e60e2eaee83f6a146c6a688125f5792e48dd5ba30e7da52a5cda4c3992b9ccf333f9ce223af84748'
   );
-  assert.match(browserRunner, /\['chromium', 'firefox', 'webkit'\]\.map\(runBrowserSuite\)/);
+  assert.match(browserRunner, /for \(const browser of \['chromium', 'firefox', 'webkit'\]\)[\s\S]*?await runBrowserSuite\(browser\)/);
+  assert.doesNotMatch(browserRunner, /Promise\.all/);
   assert.equal(packageJson.scripts['test:firefox'], 'node --test scripts/test-firefox.mjs');
   assert.equal(packageJson.scripts['test:webkit'], 'node --test scripts/test-webkit.mjs');
   assert.match(firefoxRunner, /PLAYWRIGHT_BROWSER = 'firefox'[\s\S]*?import\('\.\.\/test\/ui-smoke\.test\.mjs'\)/);

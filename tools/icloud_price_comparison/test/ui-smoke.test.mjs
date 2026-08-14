@@ -1639,6 +1639,10 @@ test('shows an explicit expired state when lifecycle refresh fails', { timeout: 
     }, Date.parse(payload.generatedAt) + (7 * 24 * 60 * 60 * 1_000) + 1);
     await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
     assert.equal(await page.locator('#historyDialog').evaluate((dialog) => dialog.open), false);
+    const expiredHistoryButton = page.locator('.country-history-button').first();
+    assert.equal(await expiredHistoryButton.isDisabled(), true);
+    await expiredHistoryButton.evaluate((button) => button.click());
+    assert.equal(await page.locator('#historyDialog').evaluate((dialog) => dialog.open), false);
     assert.match(await page.locator('#loadStatusText').textContent(), /超过 7 天有效期.*请重新加载/);
     assert.equal(await page.locator('#searchInput').isDisabled(), true);
     assert.equal(await page.locator('.minimum-badge').count(), 0);

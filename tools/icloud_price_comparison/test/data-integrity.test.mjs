@@ -40,8 +40,8 @@ test('committed prices and history form a complete usable snapshot', async () =>
     assert.match(data.run.observedAtUtc, /^\d{4}-\d{2}-\d{2}T/);
     assert.match(data.run.observedAtBeijing, /^\d{4}-\d{2}-\d{2}$/);
   }
-  assert.equal(names['Euro Zone'], '欧盟');
-  assert.equal(names['United Arab Emirates'], '阿拉伯联合酋长国');
+  assert.equal(names['euro-zone'], '欧盟');
+  assert.equal(names.ae, '阿拉伯联合酋长国');
   assert.ok(Array.isArray(history.sourcePublishedDates) && history.sourcePublishedDates.length);
   assert.equal(history.schemaVersion, 4);
   assert.ok(history.updatedAt <= data.generatedAt);
@@ -86,7 +86,7 @@ test('committed prices and history form a complete usable snapshot', async () =>
     seen.add(country.country);
     assert.ok(!seenMarketIds.has(country.marketId), `duplicate marketId: ${country.marketId}`);
     seenMarketIds.add(country.marketId);
-    assert.equal(country.nameZh, names[country.country] ?? country.country);
+    assert.equal(country.nameZh, names[country.marketId] ?? country.country);
     for (const { id } of data.tiers) {
       const plan = country.plans[id];
       assert.ok(plan && Number.isFinite(plan.price) && plan.price > 0, `invalid ${id}: ${country.country}`);

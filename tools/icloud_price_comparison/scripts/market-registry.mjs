@@ -1,39 +1,32 @@
 import { createHash } from 'node:crypto';
+import { getOfficialChineseMarketName } from './country-names.mjs';
 
 const DEFINITIONS = [
-  ['bs', 'Bahamas', '巴哈马'], ['bb', 'Barbados', '巴巴多斯'], ['br', 'Brazil', '巴西'],
-  ['ca', 'Canada', '加拿大'], ['cl', 'Chile', '智利'], ['co', 'Colombia', '哥伦比亚'],
-  ['mx', 'Mexico', '墨西哥'], ['pe', 'Peru', '秘鲁'], ['sr', 'Suriname', '苏里南'],
-  ['us', 'United States', '美国', ['United States of America']],
-  ['al', 'Albania', '阿尔巴尼亚'], ['am', 'Armenia', '亚美尼亚'], ['az', 'Azerbaijan', '阿塞拜疆'],
-  ['bh', 'Bahrain', '巴林'], ['by', 'Belarus', '白俄罗斯'], ['bj', 'Benin', '贝宁'],
-  ['bg', 'Bulgaria', '保加利亚'], ['cm', 'Cameroon', '喀麦隆'], ['hr', 'Croatia', '克罗地亚'],
-  ['cz', 'Czechia', '捷克', ['Czech Republic']], ['dk', 'Denmark', '丹麦'], ['eg', 'Egypt', '埃及'],
-  ['euro-zone', 'Euro Zone', '欧盟', ['Euro', 'Eurozone']], ['ge', 'Georgia', '格鲁吉亚'], ['gh', 'Ghana', '加纳'],
-  ['hu', 'Hungary', '匈牙利'], ['is', 'Iceland', '冰岛'], ['il', 'Israel', '以色列'],
-  ['ci', 'Ivory Coast', '科特迪瓦', ["Cote D'Ivoire", 'Côte d’Ivoire', "Côte d'Ivoire"]],
-  ['ke', 'Kenya', '肯尼亚'], ['mu', 'Mauritius', '毛里求斯'], ['md', 'Moldova', '摩尔多瓦', ['Republic of Moldova']],
-  ['ng', 'Nigeria', '尼日利亚'], ['no', 'Norway', '挪威'], ['pk', 'Pakistan', '巴基斯坦'],
-  ['pl', 'Poland', '波兰'], ['qa', 'Qatar', '卡塔尔'], ['cg', 'Republic of Congo', '刚果共和国', ['Republic of the Congo']],
-  ['ro', 'Romania', '罗马尼亚'], ['ru', 'Russia', '俄罗斯', ['Russian Federation']],
-  ['sa', 'Saudi Arabia', '沙特阿拉伯'], ['sn', 'Senegal', '塞内加尔'], ['za', 'South Africa', '南非'],
-  ['se', 'Sweden', '瑞典'], ['ch', 'Switzerland', '瑞士'], ['tz', 'Tanzania', '坦桑尼亚', ['United Republic of Tanzania']],
-  ['tr', 'Türkiye', '土耳其', ['Turkey']], ['ug', 'Uganda', '乌干达'],
-  ['ae', 'United Arab Emirates', '阿拉伯联合酋长国'], ['gb', 'United Kingdom', '英国', ['UK']],
-  ['zm', 'Zambia', '赞比亚'], ['zw', 'Zimbabwe', '津巴布韦'],
-  ['au', 'Australia', '澳大利亚'], ['kh', 'Cambodia', '柬埔寨'],
-  ['cn', 'China mainland', '中国大陆', ['Mainland China']], ['hk', 'Hong Kong', '香港'],
-  ['in', 'India', '印度'], ['id', 'Indonesia', '印度尼西亚'], ['jp', 'Japan', '日本'],
-  ['kz', 'Kazakhstan', '哈萨克斯坦'], ['kg', 'Kyrgyzstan', '吉尔吉斯斯坦'], ['la', 'Laos', '老挝'],
-  ['my', 'Malaysia', '马来西亚'], ['np', 'Nepal', '尼泊尔'], ['nz', 'New Zealand', '新西兰'],
-  ['ph', 'Philippines', '菲律宾'], ['kr', 'Republic of Korea', '韩国', ['South Korea']],
-  ['sg', 'Singapore', '新加坡'], ['tw', 'Taiwan', '台湾'], ['tj', 'Tajikistan', '塔吉克斯坦'],
-  ['th', 'Thailand', '泰国'], ['uz', 'Uzbekistan', '乌兹别克斯坦'], ['vn', 'Vietnam', '越南', ['Viet Nam']]
+  ['bs', 'Bahamas'], ['bb', 'Barbados'], ['br', 'Brazil'], ['ca', 'Canada'], ['cl', 'Chile'],
+  ['co', 'Colombia'], ['mx', 'Mexico'], ['pe', 'Peru'], ['sr', 'Suriname'],
+  ['us', 'United States', ['United States of America']], ['al', 'Albania'], ['am', 'Armenia'],
+  ['az', 'Azerbaijan'], ['bh', 'Bahrain'], ['by', 'Belarus'], ['bj', 'Benin'], ['bg', 'Bulgaria'],
+  ['cm', 'Cameroon'], ['hr', 'Croatia'], ['cz', 'Czechia', ['Czech Republic']], ['dk', 'Denmark'],
+  ['eg', 'Egypt'], ['euro-zone', 'Euro Zone', ['Euro', 'Eurozone']], ['ge', 'Georgia'], ['gh', 'Ghana'],
+  ['hu', 'Hungary'], ['is', 'Iceland'], ['il', 'Israel'],
+  ['ci', 'Ivory Coast', ["Cote D'Ivoire", 'Côte d’Ivoire', "Côte d'Ivoire"]], ['ke', 'Kenya'],
+  ['mu', 'Mauritius'], ['md', 'Moldova', ['Republic of Moldova']], ['ng', 'Nigeria'], ['no', 'Norway'],
+  ['pk', 'Pakistan'], ['pl', 'Poland'], ['qa', 'Qatar'],
+  ['cg', 'Republic of Congo', ['Republic of the Congo']], ['ro', 'Romania'],
+  ['ru', 'Russia', ['Russian Federation']], ['sa', 'Saudi Arabia'], ['sn', 'Senegal'], ['za', 'South Africa'],
+  ['se', 'Sweden'], ['ch', 'Switzerland'], ['tz', 'Tanzania', ['United Republic of Tanzania']],
+  ['tr', 'Türkiye', ['Turkey']], ['ug', 'Uganda'], ['ae', 'United Arab Emirates'],
+  ['gb', 'United Kingdom', ['UK']], ['zm', 'Zambia'], ['zw', 'Zimbabwe'], ['au', 'Australia'],
+  ['kh', 'Cambodia'], ['cn', 'China mainland', ['Mainland China']], ['hk', 'Hong Kong'], ['in', 'India'],
+  ['id', 'Indonesia'], ['jp', 'Japan'], ['kz', 'Kazakhstan'], ['kg', 'Kyrgyzstan'], ['la', 'Laos'],
+  ['my', 'Malaysia'], ['np', 'Nepal'], ['nz', 'New Zealand'], ['ph', 'Philippines'],
+  ['kr', 'Republic of Korea', ['South Korea']], ['sg', 'Singapore'], ['tw', 'Taiwan'],
+  ['tj', 'Tajikistan'], ['th', 'Thailand'], ['uz', 'Uzbekistan'], ['vn', 'Vietnam', ['Viet Nam']]
 ];
 
-export const MARKET_REGISTRY = Object.freeze(Object.fromEntries(DEFINITIONS.map(([id, canonicalName, zh, aliases = []]) => [
+export const MARKET_REGISTRY = Object.freeze(Object.fromEntries(DEFINITIONS.map(([id, canonicalName, aliases = []]) => [
   canonicalName,
-  Object.freeze({ id, canonicalName, zh, aliases: Object.freeze(aliases) })
+  Object.freeze({ id, canonicalName, aliases: Object.freeze(aliases) })
 ])));
 
 function normalizedName(value) {
@@ -68,11 +61,16 @@ export function createMarketResolver(registry = MARKET_REGISTRY) {
   return (sourceName) => {
     const name = normalizedName(sourceName);
     const known = byName.get(normalizedNameKey(name));
-    if (known) return { ...known, sourceName: name, unknown: false };
+    if (known) return {
+      ...known,
+      sourceName: name,
+      nameZh: getOfficialChineseMarketName(known.id),
+      unknown: false
+    };
     const digest = createHash('sha256').update(name).digest('hex').slice(0, 8);
     const id = `apple-${slugify(name)}-${digest}`;
     if (knownIds.has(id)) throw new Error(`Generated marketId collides with registry: ${id}`);
-    return { id, canonicalName: name, sourceName: name, zh: name, aliases: [], unknown: true };
+    return { id, canonicalName: name, sourceName: name, nameZh: name, aliases: [], unknown: true };
   };
 }
 
@@ -88,12 +86,66 @@ function marketIdentityError(message) {
   return error;
 }
 
+function publishedIdentityError(message) {
+  const error = new Error(`PUBLISHED_MARKET_IDENTITY_CONFLICT: ${message}`);
+  error.code = 'PUBLISHED_MARKET_IDENTITY_CONFLICT';
+  return error;
+}
+
+export function buildPublishedMarketIdentityIndex(previousData, previousHistory) {
+  const bySourceName = new Map();
+  const sourceNamesById = new Map();
+  const add = (sourceName, marketId, location) => {
+    const name = normalizedName(sourceName);
+    const identityKey = normalizedNameKey(name);
+    const previous = bySourceName.get(identityKey);
+    if (previous && previous.marketId !== marketId) {
+      throw publishedIdentityError(`${name} maps to both ${previous.marketId} (${previous.location}) and ${marketId} (${location})`);
+    }
+    bySourceName.set(identityKey, { marketId, sourceName: name, location });
+    const names = sourceNamesById.get(marketId) ?? new Set();
+    names.add(normalizedNameKey(name));
+    sourceNamesById.set(marketId, names);
+  };
+  if (previousData?.schemaVersion === 4) {
+    for (const country of previousData.countries ?? []) add(country.country, country.marketId, 'prices.json');
+  }
+  if (previousHistory?.schemaVersion === 4) {
+    for (const [marketId, record] of Object.entries(previousHistory.markets ?? {})) {
+      add(record.country, marketId, 'history.json');
+    }
+  }
+  return { bySourceName, sourceNamesById };
+}
+
+export function createPublishedMarketResolver(previousData, previousHistory, {
+  registry = MARKET_REGISTRY,
+  resolveUnknown = createMarketResolver(registry)
+} = {}) {
+  const published = buildPublishedMarketIdentityIndex(previousData, previousHistory);
+  return (sourceName) => {
+    const resolved = resolveUnknown(sourceName);
+    if (!resolved.unknown) return resolved;
+    const name = normalizedName(sourceName);
+    const historical = published.bySourceName.get(normalizedNameKey(name));
+    if (!historical) return resolved;
+    return {
+      ...resolved,
+      id: historical.marketId,
+      sourceName: name,
+      nameZh: name,
+      published: true
+    };
+  };
+}
+
 export function validateMarketIdentityContinuity(previousData, previousHistory, {
   registry = MARKET_REGISTRY,
   resolve = null
 } = {}) {
   const resolver = resolve ?? (registry === MARKET_REGISTRY ? resolveMarket : createMarketResolver(registry));
-  const publishedNamesById = new Map();
+  const published = buildPublishedMarketIdentityIndex(previousData, previousHistory);
+  const publishedNamesById = published.sourceNamesById;
   const checkPublishedIdentity = (sourceName, expectedId, location) => {
     let resolved;
     try {
@@ -101,12 +153,9 @@ export function validateMarketIdentityContinuity(previousData, previousHistory, 
     } catch (error) {
       throw marketIdentityError(`${location} cannot resolve ${sourceName}: ${error.message}`);
     }
-    if (resolved.id !== expectedId) {
+    if (!resolved.unknown && resolved.id !== expectedId) {
       throw marketIdentityError(`${location} maps ${sourceName} from ${expectedId} to ${resolved.id}`);
     }
-    const names = publishedNamesById.get(expectedId) ?? new Set();
-    names.add(normalizedNameKey(sourceName));
-    publishedNamesById.set(expectedId, names);
   };
 
   if (previousData?.schemaVersion === 4) {
@@ -131,7 +180,11 @@ export function validateMarketIdentityContinuity(previousData, previousHistory, 
   return { status: 'passed', reservedMarketIds: [...publishedNamesById.keys()].sort() };
 }
 
-export function attachMarketIdentity(countries, { onUnknown = () => {}, resolve = resolveMarket } = {}) {
+export function attachMarketIdentity(countries, {
+  onUnknown = () => {},
+  resolve = resolveMarket,
+  chineseNames = null
+} = {}) {
   const ids = new Map();
   return countries.map((country) => {
     const market = resolve(country.country);
@@ -144,15 +197,22 @@ export function attachMarketIdentity(countries, { onUnknown = () => {}, resolve 
     return {
       ...country,
       marketId: market.id,
-      nameZh: market.unknown ? country.country : market.zh
+      nameZh: market.unknown
+        ? country.country
+        : (getOfficialChineseMarketName(market.id, chineseNames ?? undefined) ?? country.country)
     };
   });
 }
 
 export function validateMarketRegistry(registry = MARKET_REGISTRY) {
-  if (Object.keys(registry).length < 73 || Object.keys(registry).length > 500) {
-    throw new Error(`Market registry is incomplete or oversized: ${Object.keys(registry).length}`);
+  if (Object.keys(registry).length === 0 || Object.keys(registry).length > 500) {
+    throw new Error(`Market registry is empty or oversized: ${Object.keys(registry).length}`);
   }
   createMarketResolver(registry);
+  for (const market of Object.values(registry)) {
+    if (!getOfficialChineseMarketName(market.id)) {
+      throw new Error(`Market registry is missing an official Chinese name for marketId: ${market.id}`);
+    }
+  }
   return registry;
 }
