@@ -12,6 +12,8 @@ import {
   defaultUpdateLockPath,
   defaultUpdateTransactionPath,
   appleSnapshotContentHash,
+  appleSemanticChanged,
+  appleSemanticHash,
   appleStructuralChanges,
   acquireUpdateLock,
   attachDerivedCnyPrices,
@@ -21,6 +23,7 @@ import {
   createNetworkBudget,
   confirmCountryRemovals,
   confirmAppleStructuralChanges,
+  confirmAppleSemanticChange,
   classifyHealthcheckFailure,
   fetchResource,
   getExchangeRates,
@@ -134,6 +137,38 @@ test('Apple snapshot semantic hash ignores formatted price text', () => {
   const reformatted = structuredClone(parsed);
   reformatted.countries[0].plans['50GB'].formattedPrice = 'USD 0.99';
   assert.equal(appleSnapshotContentHash(parsed), appleSnapshotContentHash(reformatted));
+});
+
+test('Apple semantic hash covers every business-semantic field and ignores ordering or presentation', () => {
+  const baseline = {
+    source: { publishedDate: 'July 17, 2026' },
+    tiers: [TIER_200, TIER_50],
+    countries: [
+      { country: 'Beta', region: 'Asia Pacific', currency: 'JPY', plans: { '200GB': { price: 400, formattedPrice: '¥400' }, '50GB': { price: 100, formattedPrice: '¥100' } } },
+      { country: 'Alpha', region: 'Americas', currency: 'USD', plans: { '200GB': { price: 2.99, formattedPrice: '$2.99' }, '50GB': { price: 0.99, formattedPrice: '$0.99' } } }
+    ]
+  };
+  const reordered = structuredClone(baseline);
+  reordered.tiers.reverse();
+  reordered.countries.reverse();
+  reordered.countries[1].plans['50GB'].formattedPrice = 'USD 0.99';
+  assert.equal(appleSemanticHash(baseline), appleSemanticHash(reordered));
+
+  const mutations = [
+    (value) => { value.countries[0].plans['50GB'].price += 1; },
+    (value) => { value.countries[0].currency = 'CNY'; },
+    (value) => { value.source.publishedDate = 'July 18, 2026'; },
+    (value) => { value.countries.push({ country: 'Gamma', region: 'Europe, Middle East & Africa', currency: 'EUR', plans: { '50GB': { price: 1 }, '200GB': { price: 3 } } }); },
+    (value) => { value.countries.pop(); },
+    (value) => { value.tiers.push(TIER_1TB); value.countries.forEach((country) => { country.plans['1TB'] = { price: 10 }; }); },
+    (value) => { value.tiers = value.tiers.filter(({ id }) => id !== '200GB'); value.countries.forEach((country) => { delete country.plans['200GB']; }); },
+    (value) => { value.countries[0].region = 'Americas'; }
+  ];
+  for (const mutate of mutations) {
+    const changed = structuredClone(baseline);
+    mutate(changed);
+    assert.equal(appleSemanticChanged(baseline, changed), true);
+  }
 });
 
 test('rejects malformed Apple snapshot indexes before writing', () => {
@@ -279,7 +314,7 @@ test('requires an identical independent confirmation for global storage-tier cha
   assert.equal(classifyHealthcheckFailure(mismatchError), 'severe');
 });
 
-test('does not perform a second Apple fetch for an ordinary price-only change', async () => {
+test('performs a no-store second Apple fetch for an ordinary price-only change', async () => {
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
   const changed = structuredClone(data);
   const tierId = changed.tiers[0].id;
@@ -295,10 +330,15 @@ test('does not perform a second Apple fetch for an ordinary price-only change', 
   const originalApiKey = process.env.EXCHANGE_RATE_API_KEY;
   let appleRequests = 0;
   delete process.env.EXCHANGE_RATE_API_KEY;
-  globalThis.fetch = async (url) => {
+  globalThis.fetch = async (url, options = {}) => {
     const target = String(url);
     if (target.includes('support.apple.com')) {
       appleRequests += 1;
+      if (appleRequests === 2) {
+        assert.equal(options.cache, 'no-store');
+        assert.equal(options.headers['cache-control'], 'no-cache');
+        assert.equal(options.headers.pragma, 'no-cache');
+      }
       return new Response(buildAppleHtml(changed), { status: 200 });
     }
     if (target.includes('open.er-api.com')) {
@@ -308,7 +348,7 @@ test('does not perform a second Apple fetch for an ordinary price-only change', 
   };
   try {
     await main({ dryRun: true, stepSummaryPath: null });
-    assert.equal(appleRequests, 1);
+    assert.equal(appleRequests, 2);
   } finally {
     globalThis.fetch = originalFetch;
     if (originalApiKey === undefined) delete process.env.EXCHANGE_RATE_API_KEY;
@@ -316,7 +356,113 @@ test('does not perform a second Apple fetch for an ordinary price-only change', 
   }
 });
 
-test('classifies an unavailable structural confirmation as transient and preserves stable production data', async () => {
+test('does not perform a second Apple fetch when the semantic snapshot is unchanged', async () => {
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const result = await runAppleConfirmationScenario({ firstHtml: buildAppleHtml(data) });
+  assert.equal(result.appleRequests, 1);
+});
+
+test('performs a second Apple fetch when only the published date changes', async () => {
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const html = buildAppleHtml(data, 'August 12, 2026');
+  const result = await runAppleConfirmationScenario({ firstHtml: html, secondHtml: html });
+  assert.equal(result.appleRequests, 2);
+});
+
+test('accepts different confirmation markup when canonical Apple semantics are identical', async () => {
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const changed = structuredClone(data);
+  const tierId = changed.tiers[0].id;
+  changed.countries[0].plans[tierId].price += 0.01;
+  changed.countries[0].plans[tierId].formattedPrice = `$${changed.countries[0].plans[tierId].price.toFixed(2)}`;
+  const firstHtml = buildAppleHtml(changed);
+  const secondHtml = firstHtml.replace('<body>', '<body><div data-unrelated="true"></div>');
+  assert.notEqual(firstHtml, secondHtml);
+  const result = await runAppleConfirmationScenario({ firstHtml, secondHtml });
+  assert.equal(result.appleRequests, 2);
+});
+
+test('fails closed with APPLE_CONFIRMATION_MISMATCH when the two semantic snapshots differ', async () => {
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const first = structuredClone(data);
+  const second = structuredClone(data);
+  const tierId = data.tiers[0].id;
+  first.countries[0].plans[tierId].price += 0.01;
+  second.countries[0].plans[tierId].price += 0.02;
+  first.countries[0].plans[tierId].formattedPrice = `$${first.countries[0].plans[tierId].price.toFixed(2)}`;
+  second.countries[0].plans[tierId].formattedPrice = `$${second.countries[0].plans[tierId].price.toFixed(2)}`;
+  assert.throws(
+    () => confirmAppleSemanticChange({ ...first, sourcePublishedDate: first.source.publishedDate, parser: 'cross-checked' }, { ...second, sourcePublishedDate: second.source.publishedDate, parser: 'cross-checked' }, data),
+    (error) => {
+      assert.equal(error.code, 'APPLE_CONFIRMATION_MISMATCH');
+      assert.match(error.message, /not reproduced/);
+      return true;
+    }
+  );
+});
+
+test('preserves prices and history when independent Apple price confirmation differs', async () => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const first = structuredClone(data);
+  const second = structuredClone(data);
+  const tierId = data.tiers[0].id;
+  first.countries[0].plans[tierId].price += 0.01;
+  second.countries[0].plans[tierId].price += 0.02;
+  first.countries[0].plans[tierId].formattedPrice = `$${first.countries[0].plans[tierId].price.toFixed(2)}`;
+  second.countries[0].plans[tierId].formattedPrice = `$${second.countries[0].plans[tierId].price.toFixed(2)}`;
+  const before = await Promise.all([
+    readFile(paths.currentDataPath, 'utf8'),
+    readFile(paths.historyPath, 'utf8'),
+    readFile(paths.runLogPath, 'utf8')
+  ]);
+  const originalFetch = globalThis.fetch;
+  let appleRequests = 0;
+  globalThis.fetch = async (url) => {
+    const target = String(url);
+    if (!target.includes('support.apple.com')) throw new Error(`Unexpected URL before confirmation completed: ${target}`);
+    appleRequests += 1;
+    return new Response(buildAppleHtml(appleRequests === 1 ? first : second), { status: 200 });
+  };
+  try {
+    await assert.rejects(
+      () => main({ dryRun: false, paths, stepSummaryPath: null }),
+      (error) => error.code === 'APPLE_CONFIRMATION_MISMATCH'
+    );
+    assert.equal(appleRequests, 2);
+    assert.deepEqual(await Promise.all([
+      readFile(paths.currentDataPath, 'utf8'),
+      readFile(paths.historyPath, 'utf8'),
+      readFile(paths.runLogPath, 'utf8')
+    ]), before);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('fails closed before FX when the second Apple parse loses parser redundancy', async () => {
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const changed = structuredClone(data);
+  const tierId = changed.tiers[0].id;
+  changed.countries[0].plans[tierId].price += 0.01;
+  changed.countries[0].plans[tierId].formattedPrice = `$${changed.countries[0].plans[tierId].price.toFixed(2)}`;
+  const firstHtml = buildAppleHtml(changed);
+  const secondHtml = firstHtml.replace(
+    '<h3 id="emea">',
+    '<h5>Decoy Market (USD)</h5><ul>' + changed.tiers.map((tier) => `<li>${tier.label}: $1.00</li>`).join('') + '</ul><h3 id="emea">'
+  );
+  await assert.rejects(
+    () => runAppleConfirmationScenario({ firstHtml, secondHtml }),
+    (error) => {
+      assert.equal(error.code, 'APPLE_CONFIRMATION_MISMATCH');
+      assert.match(error.cause?.message ?? '', /Apple parser disagreement/);
+      return true;
+    }
+  );
+});
+
+test('classifies an unavailable semantic confirmation as transient and preserves stable production data', async () => {
   const { root, paths } = await createTemporaryProductionPaths();
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
   const changed = structuredClone(data);
@@ -365,6 +511,56 @@ test('classifies an unavailable structural confirmation as transient and preserv
   } finally {
     globalThis.fetch = originalFetch;
     await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('fails closed without production writes when semantic confirmation returns HTTP 500 or times out', async (t) => {
+  for (const scenario of [
+    { name: 'HTTP 500', respond: () => new Response('server error', { status: 500 }) },
+    { name: 'timeout', respond: () => { throw new DOMException('simulated timeout', 'TimeoutError'); } }
+  ]) {
+    await t.test(scenario.name, async () => {
+      const { root, paths } = await createTemporaryProductionPaths();
+      const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+      const changed = structuredClone(data);
+      changed.countries = changed.countries.slice(1);
+      const before = await Promise.all([
+        readFile(paths.currentDataPath, 'utf8'),
+        readFile(paths.historyPath, 'utf8'),
+        readFile(paths.runLogPath, 'utf8')
+      ]);
+      const snapshotStoreBefore = await readSnapshotStoreState(paths);
+      const originalFetch = globalThis.fetch;
+      let appleRequests = 0;
+      globalThis.fetch = async (url) => {
+        const target = String(url);
+        if (!target.includes('support.apple.com')) throw new Error(`Unexpected URL before confirmation completed: ${target}`);
+        appleRequests += 1;
+        return appleRequests === 1 ? new Response(buildAppleHtml(changed), { status: 200 }) : scenario.respond();
+      };
+      const networkBudget = createNetworkBudget({
+        budgetMs: 5 * 60 * 1_000,
+        now: () => 0,
+        sleep: async () => {},
+        createTimeoutSignal: () => undefined
+      });
+      try {
+        await assert.rejects(
+          () => main({ dryRun: false, paths, stepSummaryPath: null, networkBudget }),
+          (error) => error.code === 'APPLE_CONFIRMATION_UNAVAILABLE'
+        );
+        assert.equal(appleRequests, 6);
+        assert.deepEqual(await Promise.all([
+          readFile(paths.currentDataPath, 'utf8'),
+          readFile(paths.historyPath, 'utf8'),
+          readFile(paths.runLogPath, 'utf8')
+        ]), before);
+        assert.deepEqual(await readSnapshotStoreState(paths), snapshotStoreBefore);
+      } finally {
+        globalThis.fetch = originalFetch;
+        await rm(root, { recursive: true, force: true });
+      }
+    });
   }
 });
 
@@ -714,6 +910,44 @@ async function runDryMain({ html, fxPayload, apiKey = '', authenticatedFxPayload
   }
 }
 
+async function runAppleConfirmationScenario({ firstHtml, secondHtml = firstHtml }) {
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const fxPayload = {
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: recentFxTimestamp(),
+    rates: compatibleExchangeRates(data)
+  };
+  const originalFetch = globalThis.fetch;
+  const originalApiKey = process.env.EXCHANGE_RATE_API_KEY;
+  let appleRequests = 0;
+  delete process.env.EXCHANGE_RATE_API_KEY;
+  globalThis.fetch = async (url) => {
+    const target = String(url);
+    if (target.includes('support.apple.com')) {
+      appleRequests += 1;
+      if (appleRequests === 1) return new Response(firstHtml, { status: 200 });
+      return new Response(secondHtml, { status: 200 });
+    }
+    if (target.includes('open.er-api.com')) return new Response(JSON.stringify(fxPayload), { status: 200 });
+    throw new Error(`Unexpected URL in Apple confirmation scenario: ${target}`);
+  };
+  const networkBudget = createNetworkBudget({
+    budgetMs: 5 * 60 * 1_000,
+    now: () => 0,
+    sleep: async () => {},
+    createTimeoutSignal: () => undefined
+  });
+  try {
+    await main({ dryRun: true, stepSummaryPath: null, networkBudget });
+    return { appleRequests };
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalApiKey === undefined) delete process.env.EXCHANGE_RATE_API_KEY;
+    else process.env.EXCHANGE_RATE_API_KEY = originalApiKey;
+  }
+}
+
 async function withMockedFetch({ html, fxPayload }, callback) {
   const originalFetch = globalThis.fetch;
   const originalSummary = process.env.GITHUB_STEP_SUMMARY;
@@ -800,7 +1034,7 @@ test('runs the production write path against isolated files', async () => {
   const fxPayload = {
     result: 'success',
     base_code: 'USD',
-    time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
+    time_last_update_unix: recentFxTimestamp(),
     rates: compatibleExchangeRates(data)
   };
   const snapshotStoreBefore = await readSnapshotStoreState(paths);
@@ -904,7 +1138,7 @@ test('removes unambiguous updater temporary files before a production run', asyn
   const fxPayload = {
     result: 'success',
     base_code: 'USD',
-    time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
+    time_last_update_unix: recentFxTimestamp(),
     rates: compatibleExchangeRates(data)
   };
   const staleFiles = [
@@ -985,7 +1219,7 @@ test('does not write a snapshot when publication-date validation fails', async (
   const fxPayload = {
     result: 'success',
     base_code: 'USD',
-    time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
+    time_last_update_unix: recentFxTimestamp(),
     rates: compatibleExchangeRates(data)
   };
   const before = await Promise.all([
@@ -1046,7 +1280,7 @@ test('recreates a missing run log after a valid production update', async () => 
   const fxPayload = {
     result: 'success',
     base_code: 'USD',
-    time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
+    time_last_update_unix: recentFxTimestamp(),
     rates: compatibleExchangeRates(data)
   };
   await rm(paths.runLogPath);
@@ -1143,7 +1377,7 @@ test('rolls back prices, history, logs, and snapshots when a production write fa
   const fxPayload = {
     result: 'success',
     base_code: 'USD',
-    time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
+    time_last_update_unix: recentFxTimestamp(),
     rates: compatibleExchangeRates(data)
   };
   const before = await Promise.all([
@@ -1334,7 +1568,7 @@ test('does not write production files when a price anomaly is rejected', async (
   const fxPayload = {
     result: 'success',
     base_code: 'USD',
-    time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
+    time_last_update_unix: recentFxTimestamp(),
     rates: compatibleExchangeRates(data)
   };
   const before = await Promise.all([
@@ -2102,7 +2336,7 @@ test('runs the complete updater in dry-run mode without modifying committed data
       fxPayload: {
         result: 'success',
         base_code: 'USD',
-        time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
+        time_last_update_unix: recentFxTimestamp(),
         rates: compatibleExchangeRates(data)
       }
     });
@@ -2119,7 +2353,7 @@ test('accepts compact Apple 50GB labels during the fetch preflight', async () =>
   const fxPayload = {
     result: 'success',
     base_code: 'USD',
-    time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
+    time_last_update_unix: recentFxTimestamp(),
     rates: compatibleExchangeRates(data)
   };
   await runDryMain({
@@ -2145,15 +2379,16 @@ test('fails closed before FX processing when only one Apple parser succeeds', as
   );
 });
 
-test('complete dry-run keeps previous derived CNY prices for an incomplete online response and rejects a missing Apple publication date', async () => {
+test('complete dry-run keeps previous derived CNY prices for an incomplete online response and rejects a missing Apple publication date', async (t) => {
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  t.mock.timers.enable({ apis: ['Date'], now: new Date(data.generatedAt) });
   const missingCurrency = data.countries.find(({ currency }) => currency !== 'USD').currency;
   const incompleteRates = { ...compatibleExchangeRates(data) };
   delete incompleteRates[missingCurrency];
   const fxPayload = {
     result: 'success',
     base_code: 'USD',
-    time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
+    time_last_update_unix: recentFxTimestamp(),
     rates: incompleteRates
   };
 
@@ -2506,7 +2741,7 @@ test('keeps credential configuration and failure details out of public Action no
   const fxPayload = {
     result: 'success',
     base_code: 'USD',
-    time_last_update_unix: Math.floor(Date.parse(data.fx.fetchedAt) / 1000),
+    time_last_update_unix: recentFxTimestamp(),
     rates: compatibleExchangeRates(data)
   };
   const messages = [];
