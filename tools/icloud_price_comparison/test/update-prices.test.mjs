@@ -27,6 +27,7 @@ import {
   confirmAppleSemanticChange,
   classifyHealthcheckFailure,
   fetchResource,
+  escapeGitHubCommandMessage,
   getExchangeRates,
   validateFxSanity,
   FX_SANITY_MAX_DAILY_CHANGE,
@@ -85,6 +86,13 @@ test('bounds and flattens untrusted workflow log text', () => {
   const bounded = logInline('x'.repeat(2_500));
   assert.equal([...bounded].length, 2_001);
   assert.match(bounded, /…$/);
+});
+
+test('escapes untrusted GitHub workflow command messages', () => {
+  assert.equal(
+    escapeGitHubCommandMessage('market%\r\n::warning::'),
+    'market%25%0D%0A%3A%3Awarning%3A%3A'
+  );
 });
 
 test('builds a deduplicated Apple snapshot index by published date', () => {
@@ -457,11 +465,16 @@ test('publishes a confirmed unknown Apple market with a deterministic identity a
   const summaryPath = path.join(root, 'summary.md');
   const originalFetch = globalThis.fetch;
   const originalWarn = console.warn;
+  const originalLog = console.log;
   const originalApiKey = process.env.EXCHANGE_RATE_API_KEY;
+  const originalGithubActions = process.env.GITHUB_ACTIONS;
   const warnings = [];
+  const logs = [];
   let appleRequests = 0;
   delete process.env.EXCHANGE_RATE_API_KEY;
+  process.env.GITHUB_ACTIONS = 'true';
   console.warn = (message) => warnings.push(String(message));
+  console.log = (message) => logs.push(String(message));
   globalThis.fetch = async (url, options = {}) => {
     const target = String(url);
     if (target.includes('support.apple.com')) {
@@ -484,13 +497,23 @@ test('publishes a confirmed unknown Apple market with a deterministic identity a
       && warning.includes(unknown.region)
       && warning.includes(unknown.currency)
     )));
+    assert.ok(logs.some((message) => (
+      message.startsWith('::warning title=Unknown Apple market requires registry review::')
+      && message.includes('sourceName=New Apple Market')
+      && message.includes(`generatedMarketId=${publishedUnknown.marketId}`)
+      && message.includes(`region=${unknown.region}`)
+      && message.includes(`currency=${unknown.currency}`)
+    )));
     const summary = await readFile(summaryPath, 'utf8');
     assert.match(summary, new RegExp(`UNKNOWN_APPLE_MARKET.*${publishedUnknown.marketId}.*${unknown.region}.*${unknown.currency}`, 's'));
   } finally {
     globalThis.fetch = originalFetch;
     console.warn = originalWarn;
+    console.log = originalLog;
     if (originalApiKey === undefined) delete process.env.EXCHANGE_RATE_API_KEY;
     else process.env.EXCHANGE_RATE_API_KEY = originalApiKey;
+    if (originalGithubActions === undefined) delete process.env.GITHUB_ACTIONS;
+    else process.env.GITHUB_ACTIONS = originalGithubActions;
     await rm(root, { recursive: true, force: true });
   }
 });

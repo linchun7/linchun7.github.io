@@ -640,6 +640,14 @@ export function logInline(value, maxCodePoints = 2_000) {
     .replaceAll('::', ': :');
 }
 
+export function escapeGitHubCommandMessage(value, maxCodePoints = 2_000) {
+  return [...String(value)].slice(0, maxCodePoints).join('')
+    .replaceAll('%', '%25')
+    .replaceAll('\r', '%0D')
+    .replaceAll('\n', '%0A')
+    .replaceAll('::', '%3A%3A');
+}
+
 function markdownInline(value, maxCodePoints = 1_000) {
   return logInline(value, maxCodePoints)
     .replaceAll('\\', '\\\\')
@@ -2363,6 +2371,10 @@ export async function main({
       };
       unknownMarkets.push(warning);
       console.warn(`UNKNOWN_APPLE_MARKET:${logInline(warning.sourceName)}:${warning.generatedMarketId}:${logInline(warning.region)}:${logInline(warning.currency)}`);
+      if (process.env.GITHUB_ACTIONS === 'true') {
+        const message = `sourceName=${warning.sourceName}; generatedMarketId=${warning.generatedMarketId}; region=${warning.region}; currency=${warning.currency}; requires registry review`;
+        console.log(`::warning title=Unknown Apple market requires registry review::${escapeGitHubCommandMessage(message)}`);
+      }
     }
   }).map((country) => ({
     ...country,
