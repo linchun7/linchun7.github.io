@@ -121,6 +121,37 @@ test('rejects history observations later than the artifact update date', async (
   assert.throws(() => validateHistoryPayload(publication), /invalid publication history/);
 });
 
+test('bounds history observations by the Beijing calendar date across UTC midnight', async () => {
+  const { history } = await productionFixtures();
+  const priceHistory = structuredClone(history);
+  priceHistory.updatedAt = '2026-08-14T16:02:00.000Z';
+  const event = Object.values(priceHistory.markets)[0].events.at(-1);
+  event.observedAt = '2026-08-15';
+  event.observedAtBeijing = '2026-08-15';
+  event.observedAtUtc = priceHistory.updatedAt;
+  assert.doesNotThrow(() => validateHistoryPayload(priceHistory));
+
+  const publicationHistory = structuredClone(history);
+  publicationHistory.updatedAt = '2026-08-14T16:02:00.000Z';
+  const publication = publicationHistory.sourcePublishedDates.at(-1);
+  publication.observedAt = '2026-08-15';
+  publication.observedAtBeijing = '2026-08-15';
+  publication.observedAtUtc = publicationHistory.updatedAt;
+  assert.doesNotThrow(() => validateHistoryPayload(publicationHistory));
+
+  event.observedAt = '2026-08-16';
+  event.observedAtBeijing = '2026-08-16';
+  assert.throws(() => validateHistoryPayload(priceHistory), /invalid event/);
+
+  const beforeMidnight = structuredClone(history);
+  beforeMidnight.updatedAt = '2026-08-14T15:59:59.000Z';
+  const premature = Object.values(beforeMidnight.markets)[0].events.at(-1);
+  premature.observedAt = '2026-08-15';
+  premature.observedAtBeijing = '2026-08-15';
+  premature.observedAtUtc = beforeMidnight.updatedAt;
+  assert.throws(() => validateHistoryPayload(beforeMidnight), /invalid event/);
+});
+
 test('shared browser and updater contracts reject the same price schema divergences', async () => {
   const { prices } = await productionFixtures();
   const mutations = [

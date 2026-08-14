@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import {
   assertArchiveCountriesAreKnown,
+  currentPriceObservationDate,
   importAppleArchives,
   recoverAppleArchiveImport,
   rollbackAppleArchiveImport
@@ -208,6 +209,17 @@ test('uses the Beijing calendar date for Wayback confirmation dates', async () =
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test('uses the Beijing calendar date when current prices omit explicit observation metadata', () => {
+  assert.equal(currentPriceObservationDate({
+    generatedAt: '2026-08-14T16:02:00.000Z',
+    run: { observedAtUtc: '2026-08-14T16:02:00.000Z' }
+  }), '2026-08-15');
+  assert.equal(currentPriceObservationDate({
+    generatedAt: '2026-08-14T16:02:00.000Z',
+    run: { observedAtBeijing: '2026-08-14' }
+  }), '2026-08-14');
 });
 
 test('keeps separate evidence for different publication dates with identical content', async () => {
