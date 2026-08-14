@@ -71,16 +71,16 @@ export function resolveMarket(sourceName) {
   return { id, canonicalName: name, sourceName: name, zh: name, aliases: [], unknown: true };
 }
 
-export function attachMarketIdentity(countries, { onUnknown = () => {} } = {}) {
+export function attachMarketIdentity(countries, { onUnknown = () => {}, resolve = resolveMarket } = {}) {
   const ids = new Map();
   return countries.map((country) => {
-    const market = resolveMarket(country.country);
+    const market = resolve(country.country);
     const previousName = ids.get(market.id);
     if (previousName && previousName !== country.country) {
       throw new Error(`marketId collision between ${previousName} and ${country.country}: ${market.id}`);
     }
     ids.set(market.id, country.country);
-    if (market.unknown) onUnknown(market);
+    if (market.unknown) onUnknown(market, country);
     return {
       ...country,
       marketId: market.id,

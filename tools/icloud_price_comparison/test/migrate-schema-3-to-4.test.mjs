@@ -45,6 +45,32 @@ test('registry covers all current Apple markets and unknown markets get stable n
   assert.equal(warnings.length, 1);
 });
 
+test('unknown market identity is stable, distinct, and fails closed on a generated-ID collision', () => {
+  const first = resolveMarket('New Apple Market');
+  const repeated = resolveMarket('New Apple Market');
+  const different = resolveMarket('Another Apple Market');
+  assert.equal(repeated.id, first.id);
+  assert.notEqual(different.id, first.id);
+
+  const collisionId = 'apple-forced-collision-12345678';
+  assert.throws(
+    () => attachMarketIdentity([
+      { country: 'First Unknown' },
+      { country: 'Second Unknown' }
+    ], {
+      resolve: (sourceName) => ({
+        id: collisionId,
+        canonicalName: sourceName,
+        sourceName,
+        zh: sourceName,
+        aliases: [],
+        unknown: true
+      })
+    }),
+    /marketId collision.*apple-forced-collision-12345678/
+  );
+});
+
 test('schema migration preserves every local price, timestamp, and Apple source field', async () => {
   const { prices, history } = await schema3Fixtures();
   const migratedPrices = migratePricesSchema3To4(prices);

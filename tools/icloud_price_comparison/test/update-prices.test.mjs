@@ -3,6 +3,7 @@ import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, utimes, writeFile } fr
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { resolveMarket } from '../scripts/market-registry.mjs';
 import {
   buildSnapshotChanges,
   buildRunLog,
@@ -365,11 +366,151 @@ test('does not perform a second Apple fetch when the semantic snapshot is unchan
   assert.equal(result.appleRequests, 1);
 });
 
+test('requires an identical no-store confirmation before establishing the first Apple baseline', async () => {
+  const { root, paths } = await createTemporaryBootstrapPaths();
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const fxPayload = {
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: recentFxTimestamp(),
+    rates: compatibleExchangeRates(data)
+  };
+  const originalFetch = globalThis.fetch;
+  const originalApiKey = process.env.EXCHANGE_RATE_API_KEY;
+  let appleRequests = 0;
+  delete process.env.EXCHANGE_RATE_API_KEY;
+  globalThis.fetch = async (url, options = {}) => {
+    const target = String(url);
+    if (target.includes('support.apple.com')) {
+      appleRequests += 1;
+      if (appleRequests === 2) {
+        assert.equal(options.cache, 'no-store');
+        assert.equal(options.headers['cache-control'], 'no-cache');
+        assert.equal(options.headers.pragma, 'no-cache');
+      }
+      return new Response(buildAppleHtml(data), { status: 200 });
+    }
+    if (target.includes('open.er-api.com')) return new Response(JSON.stringify(fxPayload), { status: 200 });
+    throw new Error(`Unexpected URL in initial-baseline test: ${target}`);
+  };
+  try {
+    await main({ dryRun: true, paths, stepSummaryPath: null });
+    assert.equal(appleRequests, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalApiKey === undefined) delete process.env.EXCHANGE_RATE_API_KEY;
+    else process.env.EXCHANGE_RATE_API_KEY = originalApiKey;
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('fails closed when the two first-baseline Apple responses differ', async () => {
+  const { root, paths } = await createTemporaryBootstrapPaths();
+  const first = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const second = structuredClone(first);
+  const tierId = second.tiers[0].id;
+  second.countries[0].plans[tierId].price += 0.01;
+  second.countries[0].plans[tierId].formattedPrice = `$${second.countries[0].plans[tierId].price.toFixed(2)}`;
+  const originalFetch = globalThis.fetch;
+  let appleRequests = 0;
+  globalThis.fetch = async (url) => {
+    const target = String(url);
+    if (!target.includes('support.apple.com')) throw new Error(`Unexpected URL before initial confirmation: ${target}`);
+    appleRequests += 1;
+    return new Response(buildAppleHtml(appleRequests === 1 ? first : second), { status: 200 });
+  };
+  try {
+    await assert.rejects(
+      () => main({ dryRun: true, paths, stepSummaryPath: null }),
+      (error) => error.code === 'APPLE_CONFIRMATION_MISMATCH'
+    );
+    assert.equal(appleRequests, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('performs a second Apple fetch when only the published date changes', async () => {
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
   const html = buildAppleHtml(data, 'August 12, 2026');
   const result = await runAppleConfirmationScenario({ firstHtml: html, secondHtml: html });
   assert.equal(result.appleRequests, 2);
+});
+
+test('publishes a confirmed unknown Apple market with a deterministic identity and structured warning', async () => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const changed = structuredClone(data);
+  const unknown = structuredClone(changed.countries[0]);
+  unknown.country = 'New Apple Market';
+  delete unknown.marketId;
+  delete unknown.nameZh;
+  changed.countries.push(unknown);
+  const html = buildAppleHtml(changed);
+  const fxPayload = {
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: recentFxTimestamp(),
+    rates: compatibleExchangeRates(changed)
+  };
+  const summaryPath = path.join(root, 'summary.md');
+  const originalFetch = globalThis.fetch;
+  const originalWarn = console.warn;
+  const originalApiKey = process.env.EXCHANGE_RATE_API_KEY;
+  const warnings = [];
+  let appleRequests = 0;
+  delete process.env.EXCHANGE_RATE_API_KEY;
+  console.warn = (message) => warnings.push(String(message));
+  globalThis.fetch = async (url, options = {}) => {
+    const target = String(url);
+    if (target.includes('support.apple.com')) {
+      appleRequests += 1;
+      if (appleRequests === 2) assert.equal(options.cache, 'no-store');
+      return new Response(html, { status: 200 });
+    }
+    if (target.includes('open.er-api.com')) return new Response(JSON.stringify(fxPayload), { status: 200 });
+    throw new Error(`Unexpected URL in unknown-market publication test: ${target}`);
+  };
+  try {
+    await main({ dryRun: false, paths, stepSummaryPath: summaryPath });
+    assert.equal(appleRequests, 2);
+    const published = JSON.parse(await readFile(paths.currentDataPath, 'utf8'));
+    const publishedUnknown = published.countries.find(({ country }) => country === 'New Apple Market');
+    assert.match(publishedUnknown.marketId, /^apple-new-apple-market-[0-9a-f]{8}$/);
+    assert.equal(publishedUnknown.marketId, resolveMarket('New Apple Market').id);
+    assert.ok(warnings.some((warning) => (
+      warning.includes(`UNKNOWN_APPLE_MARKET:New Apple Market:${publishedUnknown.marketId}`)
+      && warning.includes(unknown.region)
+      && warning.includes(unknown.currency)
+    )));
+    const summary = await readFile(summaryPath, 'utf8');
+    assert.match(summary, new RegExp(`UNKNOWN_APPLE_MARKET.*${publishedUnknown.marketId}.*${unknown.region}.*${unknown.currency}`, 's'));
+  } finally {
+    globalThis.fetch = originalFetch;
+    console.warn = originalWarn;
+    if (originalApiKey === undefined) delete process.env.EXCHANGE_RATE_API_KEY;
+    else process.env.EXCHANGE_RATE_API_KEY = originalApiKey;
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('fails closed when an unknown Apple market changes during confirmation', async () => {
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const first = structuredClone(data);
+  const unknown = structuredClone(first.countries[0]);
+  unknown.country = 'New Apple Market';
+  delete unknown.marketId;
+  delete unknown.nameZh;
+  first.countries.push(unknown);
+  const second = structuredClone(first);
+  const tierId = second.tiers[0].id;
+  second.countries.at(-1).plans[tierId].price += 0.01;
+  second.countries.at(-1).plans[tierId].formattedPrice = `$${second.countries.at(-1).plans[tierId].price.toFixed(2)}`;
+  await assert.rejects(
+    () => runAppleConfirmationScenario({ firstHtml: buildAppleHtml(first), secondHtml: buildAppleHtml(second) }),
+    (error) => error.code === 'APPLE_CONFIRMATION_MISMATCH'
+  );
 });
 
 test('accepts different confirmation markup when canonical Apple semantics are identical', async () => {
@@ -860,6 +1001,37 @@ test('FX sanity dailyizes multi-day changes and skips unusable baselines explici
   assert.equal(cny.checks.find(({ currency }) => currency === 'CNY').status, 'skipped-cny');
 });
 
+test('FX sanity checks only active currencies with a previous baseline', () => {
+  const previousData = fxSanityFixture({ currency: 'XYZ' });
+  const now = new Date('2026-08-11T00:00:00.000Z');
+  const removed = validateFxSanity(previousData, { rates: { USD: 1, CNY: 1 } }, {
+    now,
+    currentCurrencies: ['CNY']
+  });
+  assert.equal(removed.status, 'passed');
+  assert.ok(removed.warnings.includes('FX_SANITY_SKIPPED_REMOVED_CURRENCY:XYZ'));
+
+  const added = validateFxSanity(previousData, { rates: { USD: 1, CNY: 1, ABC: 2 } }, {
+    now,
+    currentCurrencies: ['ABC']
+  });
+  assert.equal(added.checks.find(({ currency }) => currency === 'ABC').status, 'skipped-new-currency');
+
+  assert.throws(
+    () => validateFxSanity(previousData, { rates: { USD: 1, CNY: 1 } }, {
+      now,
+      currentCurrencies: ['XYZ']
+    }),
+    (error) => error.code === 'FX_SANITY_FAILURE'
+  );
+
+  const cny = validateFxSanity(previousData, { rates: { USD: 1, CNY: 1 } }, {
+    now,
+    currentCurrencies: ['CNY']
+  });
+  assert.equal(cny.checks.find(({ currency }) => currency === 'CNY').status, 'skipped-cny');
+});
+
 test('derives rounded plan-level CNY prices without publishing source rates', () => {
   const countries = [
     {
@@ -900,38 +1072,45 @@ test('ranks with full precision and uses dense ranks only for true ties', () => 
   assert.deepEqual(derived.map((country) => country.plans['50GB'].cnyRank), [1, 2, 1]);
 });
 
-test('reuses schema 3 CNY values only for unchanged country, currency, tier, and local price', () => {
+test('reuses schema 4 CNY prices and ranks without reranking rounded ties', () => {
   const previousData = {
-    schemaVersion: 3,
-    countries: [{
-      country: 'Alpha',
-      region: 'Americas',
-      currency: 'USD',
-      plans: { '50GB': { price: 0.99, formattedPrice: '$0.99', cnyPrice: 7.13 } }
-    }]
+    schemaVersion: 4,
+    countries: [
+      { marketId: 'a', country: 'Alpha', region: 'Americas', currency: 'USD', plans: { '50GB': { price: 0.99, formattedPrice: '$0.99', cnyPrice: 7.06, cnyRank: 1 } } },
+      { marketId: 'b', country: 'Beta', region: 'Americas', currency: 'USD', plans: { '50GB': { price: 1, formattedPrice: '$1.00', cnyPrice: 7.06, cnyRank: 2 } } }
+    ]
   };
   const staleFx = { rates: null, reusePreviousCny: true };
-  const unchanged = [{
-    country: 'Alpha',
-    region: 'Americas',
-    currency: 'USD',
-    plans: { '50GB': { price: 0.99, formattedPrice: '$0.99' } }
-  }];
-  assert.equal(
-    attachDerivedCnyPrices(unchanged, { fx: staleFx, previousData })[0].plans['50GB'].cnyPrice,
-    7.13
-  );
+  const unchanged = previousData.countries.map(({ plans, ...country }) => ({
+    ...country,
+    plans: Object.fromEntries(Object.entries(plans).map(([tierId, plan]) => [tierId, {
+      price: plan.price,
+      formattedPrice: plan.formattedPrice
+    }]))
+  }));
+  const reused = attachDerivedCnyPrices(unchanged, { fx: staleFx, previousData });
+  assert.deepEqual(reused.map((country) => country.plans['50GB'].cnyPrice), [7.06, 7.06]);
+  assert.deepEqual(reused.map((country) => country.plans['50GB'].cnyRank), [1, 2]);
 
   const invalidChanges = [
     [{ ...unchanged[0], plans: { '50GB': { price: 1.09, formattedPrice: '$1.09' } } }],
     [{ ...unchanged[0], currency: 'CAD' }],
-    [{ ...unchanged[0], country: 'New Alpha' }],
+    [{ ...unchanged[0], marketId: 'missing' }],
     [{ ...unchanged[0], plans: { ...unchanged[0].plans, '200GB': { price: 2.99, formattedPrice: '$2.99' } } }]
   ];
   for (const countries of invalidChanges) {
     assert.throws(
       () => attachDerivedCnyPrices(countries, { fx: staleFx, previousData }),
-      /Cannot derive .* CNY price/
+      /Cannot reuse .*CNY price/
+    );
+  }
+
+  for (const invalidRank of [undefined, 0, 1.5, Number.NaN, 3]) {
+    const invalidPrevious = structuredClone(previousData);
+    invalidPrevious.countries[0].plans['50GB'].cnyRank = invalidRank;
+    assert.throws(
+      () => attachDerivedCnyPrices([unchanged[0]], { fx: staleFx, previousData: invalidPrevious }),
+      /Cannot reuse .* CNY price and rank/
     );
   }
 });
@@ -1092,6 +1271,22 @@ async function createTemporaryProductionPaths({ copySnapshots = true } = {}) {
     copyFile(namesUrl, paths.namesPath)
   ]);
   if (copySnapshots) await copyCommittedSnapshotStore(paths);
+  return { root, paths };
+}
+
+async function createTemporaryBootstrapPaths() {
+  const root = await mkdtemp(path.join(tmpdir(), 'icloud-bootstrap-'));
+  const dataDir = path.join(root, 'data');
+  const paths = {
+    currentDataPath: path.join(dataDir, 'prices.json'),
+    historyPath: path.join(dataDir, 'history.json'),
+    runLogPath: path.join(dataDir, 'run-log.json'),
+    namesPath: path.join(root, 'country-names.zh.json'),
+    snapshotsDir: path.join(dataDir, 'apple-snapshots'),
+    snapshotIndexPath: path.join(dataDir, 'apple-snapshots', 'index.json')
+  };
+  await mkdir(dataDir, { recursive: true });
+  await copyFile(namesUrl, paths.namesPath);
   return { root, paths };
 }
 
