@@ -15,6 +15,8 @@ const gitignoreUrl = new URL('../../../.gitignore', import.meta.url);
 const notFoundUrl = new URL('../../../404.html', import.meta.url);
 const packageUrl = new URL('../package.json', import.meta.url);
 const browserRunnerUrl = new URL('../scripts/test-browsers.mjs', import.meta.url);
+const productionVerifierUrl = new URL('../scripts/verify-production-deployment.mjs', import.meta.url);
+const updaterUrl = new URL('../scripts/update-prices.mjs', import.meta.url);
 const firefoxRunnerUrl = new URL('../scripts/test-firefox.mjs', import.meta.url);
 const webkitRunnerUrl = new URL('../scripts/test-webkit.mjs', import.meta.url);
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
@@ -61,7 +63,11 @@ test('keeps updater locks, recovery journals, temporary writes, and diagnostics 
 });
 
 test('keeps the scheduled update workflow guarded and ordered', async () => {
-  const workflow = await readFile(workflowUrl, 'utf8');
+  const [workflow, verifier, updater] = await Promise.all([
+    readFile(workflowUrl, 'utf8'),
+    readFile(productionVerifierUrl, 'utf8'),
+    readFile(updaterUrl, 'utf8')
+  ]);
   assert.match(
     workflow,
     /cron:\s*['"](?:[0-5]?\d) (?:[01]?\d|2[0-3]) \* \* \*['"]/,
@@ -82,6 +88,8 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /permissions:\s+contents: read/, 'the workflow must default to read-only repository access');
   assert.match(workflow, /update:[\s\S]*?permissions:\s+contents: read/, 'generation and tests must remain read-only');
   assert.match(workflow, /publish:[\s\S]*?permissions:\s+contents: write/, 'only the dependency-free publisher may write committed data');
+  assert.match(workflow, /verify-production:[\s\S]*?permissions:\s+contents: read/);
+  assert.match(workflow, /notify:[\s\S]*?permissions: \{\}/);
   assert.match(workflow, /persist-credentials: false/g);
   assert.match(workflow, /name: 启用并校验 pnpm[\s\S]*?corepack enable[\s\S]*?pnpm --version/);
   assert.doesNotMatch(workflow, /npm install[^\n]*pnpm/);
@@ -105,7 +113,7 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.doesNotMatch(workflow, /git pull --rebase origin main/);
   assert.doesNotMatch(workflow, /git push --force/);
   assert.doesNotMatch(workflow, /fetch-depth: 0|git count-objects|git_kib >=/, 'daily jobs must not fetch or audit full history');
-  assert.equal((workflow.match(/fetch-depth: 1/g) ?? []).length, 2, 'update and publish checkouts must be shallow');
+  assert.equal((workflow.match(/fetch-depth: 1/g) ?? []).length, 3, 'update, publish, and production verification checkouts must be shallow');
   assert.match(workflow, /name: 补充未报告的失败摘要[\s\S]*if: failure\(\)/);
   assert.match(workflow, /steps\.update_data\.outcome[\s\S]*artifacts\/run-report\.json[\s\S]*Updater already wrote a detailed failure summary/);
   assert.match(workflow, /::error title=iCloud\+ 价格更新失败/);
@@ -115,7 +123,16 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /classify_prepare[\s\S]*?steps\.validate_main_data\.outcome[\s\S]*?steps\.daily_guard\.outcome[\s\S]*?severe_failure/);
   assert.match(workflow, /classify_update[\s\S]*?steps\.package_data\.outcome[\s\S]*?update_failure_severe=true[\s\S]*?report\.healthcheckSeverity === "transient"[\s\S]*?2>\/dev\/null[\s\S]*?source\?\.parser[\s\S]*?2>\/dev\/null[\s\S]*?cross-checked/);
   assert.match(workflow, /classify_publish[\s\S]*?steps\.validate_data_artifact\.outcome[\s\S]*?severe_failure/);
+  assert.match(workflow, /publish_outcome=main_advanced[\s\S]*?PUBLISH_MAIN_ADVANCED[\s\S]*?exit 1/);
+  assert.match(workflow, /steps\.push_data\.outcome[^]*?failure[^]*?severe_failure=true[^]*?publish_outcome=push_failed/);
+  assert.match(workflow, /publish_candidate=no_data_changes[\s\S]*?publish_outcome=no_data_changes/);
+  assert.match(workflow, /steps\.prepare_publish\.outputs\.should_push == 'true'/, 'main advancement and no-data paths must skip the push');
+  assert.match(workflow, /verify-production:[\s\S]*?needs:[\s\S]*?- publish[\s\S]*?publish_outcome == 'published'[\s\S]*?publish_outcome == 'no_data_changes'/);
+  assert.match(workflow, /validate_expected_artifact[\s\S]*?sha256sum --check[\s\S]*?--archive[\s\S]*?--data-dir[\s\S]*?verify-production-deployment\.mjs/);
+  assert.match(workflow, /verify_production\.outcome[^]*?failure[^]*?severe_failure=true[^]*?production_not_updated[\s\S]*?PUBLISH_PRODUCTION_NOT_UPDATED/);
   assert.match(workflow, /PREPARE_SEVERE_FAILURE:[\s\S]*?UPDATE_SEVERE_FAILURE:[\s\S]*?PUBLISH_SEVERE_FAILURE:/);
+  assert.match(workflow, /VERIFY_RESULT:\s*\$\{\{ needs\.verify-production\.result \}\}/);
+  assert.match(workflow, /VERIFY_SEVERE_FAILURE:\s*\$\{\{ needs\.verify-production\.outputs\.severe_failure \}\}/);
   assert.match(workflow, /PREPARE_SEVERE_FAILURE[\s\S]*?status=1[\s\S]*?PREPARE_RESULT[\s\S]*?status=0[\s\S]*?单次暂时故障[\s\S]*?exit 0/);
   assert.doesNotMatch(
     workflow,
@@ -130,6 +147,15 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /git add --all tools\/icloud_price_comparison\/data/);
   assert.doesNotMatch(workflow, /cp -a .*data\/\." tools\/icloud_price_comparison\/data\//, 'publisher must replace the complete validated data directory');
   assert.match(workflow, /GITHUB_TOKEN:\s*\$\{\{ github\.token \}\}[\s\S]*?push origin HEAD:main/);
+  assert.match(verifier, /https:\/\/www\.linchun\.com\.cn\/tools\/icloud_price_comparison\/data\/prices\.json/);
+  assert.match(verifier, /DEFAULT_MAX_WAIT_MS = 5 \* 60 \* 1_000/);
+  assert.match(verifier, /DEFAULT_INTERVAL_MS = 15 \* 1_000/);
+  assert.match(verifier, /DEFAULT_REQUEST_TIMEOUT_MS = 10 \* 1_000/);
+  assert.match(verifier, /cache: 'no-store'[\s\S]*?'cache-control': 'no-cache'[\s\S]*?pragma: 'no-cache'/);
+  assert.match(verifier, /schemaVersion !== 4[\s\S]*?parser !== 'cross-checked'/);
+  assert.match(verifier, /observed\.generatedAt === expected\.generatedAt[\s\S]*?observed\.run\.finishedAtUtc === expected\.run\.finishedAtUtc/);
+  assert.match(updater, /::warning title=Unknown Apple market requires registry review::/);
+  assert.doesNotMatch(updater, /UNKNOWN_APPLE_MARKET[^\n]*(?:throw|fail)/i);
 
   const firstCoreTest = workflow.indexOf('run: pnpm test:core');
   const duplicateCoreTest = workflow.indexOf('run: pnpm test:core', firstCoreTest + 1);
@@ -138,12 +164,15 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   const browserTest = workflow.indexOf('run: pnpm test:ui');
   const duplicateBrowserTest = workflow.indexOf('pnpm test:ui', browserTest + 'pnpm test:ui'.length);
   const packageData = workflow.indexOf('name: 打包已测试的数据工件');
+  const productionVerification = workflow.indexOf('id: verify_production');
+  const healthcheckSuccess = workflow.indexOf('status=0');
   assert.ok(firstCoreTest >= 0 && firstCoreTest < update, 'core tests must run before the live update');
   assert.equal(duplicateCoreTest, -1, 'the workflow must not repeat unchanged fixture and workflow tests after the update');
   assert.ok(update < dataTest, 'the updated snapshot must pass data validation');
   assert.ok(dataTest < browserTest, 'updated data must pass before the browser tests');
   assert.equal(duplicateBrowserTest, -1, 'the workflow must run the system Chrome suite only once');
   assert.ok(browserTest < packageData, 'the updated browser tests must finish before packaging for publication');
+  assert.ok(productionVerification > packageData && healthcheckSuccess > productionVerification, 'Healthcheck success must follow production verification');
 
   const uiStepBlock = workflow.slice(browserTest, workflow.indexOf('name: 上传诊断信息'));
   assert.doesNotMatch(uiStepBlock, /continue-on-error|\|\|/, 'the updated UI validation must block production commits');
