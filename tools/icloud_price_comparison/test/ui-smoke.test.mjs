@@ -1525,6 +1525,81 @@ test('reclassifies long-lived pages across lifecycle boundaries without replacin
   }
 });
 
+test('normalizes transient network warnings after an equal-snapshot retry', { timeout: 45_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the equal-snapshot retry normalization test');
+  if (!browserConfig) return;
+  const fixture = await readFixture('prices.json');
+  const history = await readFixture('history.json');
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  try {
+    const scenarios = [
+      {
+        label: 'fresh',
+        nowMs: Date.parse(fixture.generatedAt) + (60 * 60 * 1_000),
+        expectedWarning: null
+      },
+      {
+        label: 'price-stale',
+        nowMs: Date.parse(fixture.generatedAt) + (48 * 60 * 60 * 1_000),
+        expectedWarning: /超过 36 小时/
+      }
+    ];
+    for (const scenario of scenarios) {
+      const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+      let priceCalls = 0;
+      let historyCalls = 0;
+      await page.addInitScript((nowMs) => { Date.now = () => nowMs; }, scenario.nowMs);
+      await page.route('https://**/*', (route) => route.abort());
+      await page.route('**/data/prices.json*', (route) => {
+        priceCalls += 1;
+        if (priceCalls === 2) return route.fulfill({ status: 503, contentType: 'application/json', body: '{}' });
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(fixture) });
+      });
+      await page.route('**/data/history.json*', (route) => {
+        historyCalls += 1;
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(history) });
+      });
+      try {
+        await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+        await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, fixture.countries.length);
+        await page.locator('#priceRows tr[data-market-id]').first().click();
+        await page.waitForFunction(() => document.querySelectorAll('#historyRows tr').length > 0);
+        await page.locator('#closeHistory').click();
+        const loadedHistoryCalls = historyCalls;
+
+        await page.locator('#retryButton').dispatchEvent('click');
+        await page.waitForFunction(() => document.querySelector('.cache-warning') !== null);
+        assert.equal(await page.locator('#retryButton').isVisible(), true, scenario.label);
+
+        await page.locator('#retryButton').click();
+        await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
+        assert.equal(await page.locator('.cache-warning').count(), 0, scenario.label);
+        assert.equal(await page.locator('#retryButton').isHidden(), true, scenario.label);
+        assert.equal(
+          await page.locator('.data-status').evaluate((element) => element.classList.contains('is-stale')),
+          scenario.expectedWarning !== null,
+          scenario.label
+        );
+        if (scenario.expectedWarning) {
+          assert.match(await page.locator('.freshness-warning').textContent(), scenario.expectedWarning, scenario.label);
+        } else {
+          assert.equal(await page.locator('.freshness-warning').count(), 0, scenario.label);
+        }
+        await page.locator('#priceRows tr[data-market-id]').first().click();
+        await page.waitForFunction(() => document.querySelectorAll('#historyRows tr').length > 0);
+        assert.equal(historyCalls, loadedHistoryCalls, `${scenario.label} equal snapshot must retain loaded history`);
+      } finally {
+        await page.close();
+      }
+    }
+  } finally {
+    await browser.close();
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
 test('shows an explicit expired state when lifecycle refresh fails', { timeout: 30_000 }, async (context) => {
   const browserConfig = await resolveBrowser(context, 'the expired lifecycle failure test');
   if (!browserConfig) return;
@@ -1549,6 +1624,8 @@ test('shows an explicit expired state when lifecycle refresh fails', { timeout: 
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, payload.countries.length);
     assert.equal(await page.locator('#overviewTitle').textContent(), '历史参考价格', 'exactly seven days remains degraded');
+    await page.locator('#priceRows tr[data-market-id]').first().click();
+    await page.waitForFunction(() => document.querySelector('#historyDialog')?.open === true);
     failRefresh = true;
     await page.evaluate((nowMs) => {
       Date.now = () => nowMs;
@@ -1556,6 +1633,7 @@ test('shows an explicit expired state when lifecycle refresh fails', { timeout: 
       document.dispatchEvent(new Event('visibilitychange'));
     }, Date.parse(payload.generatedAt) + (7 * 24 * 60 * 60 * 1_000) + 1);
     await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
+    assert.equal(await page.locator('#historyDialog').evaluate((dialog) => dialog.open), false);
     assert.match(await page.locator('#loadStatusText').textContent(), /超过 7 天有效期.*请重新加载/);
     assert.equal(await page.locator('#searchInput').isDisabled(), true);
     assert.equal(await page.locator('.minimum-badge').count(), 0);

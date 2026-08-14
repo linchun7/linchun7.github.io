@@ -1288,7 +1288,7 @@ function scheduleFreshnessBoundary() {
   }, nextBoundary - nowMs);
 }
 
-function renderCurrentPriceFreshness() {
+function normalizeCurrentPriceFreshnessUi() {
   const freshness = state.dataFreshness;
   state.minimumCuesReason = freshness.reason;
   state.minimumCuesEnabled = freshness.status === 'fresh';
@@ -1304,7 +1304,6 @@ function renderCurrentPriceFreshness() {
         ? '人民币换算沿用上次成功汇率'
         : '按人民币参考汇率换算，便于横向比较。人民币金额显示保留两位小数，排序及参考排名按四舍五入前的内部换算结果计算。');
   }
-  calculateMinimumPrices();
   const dataUpdatedAt = formatBeijingDateTime(state.data.generatedAt);
   const fxUpdatedAt = formatBeijingDateTime(state.data.fx.fetchedAt);
   elements.updatedAt.textContent = `\u6570\u636e\u66f4\u65b0\u65f6\u95f4\uff1a${dataUpdatedAt}\uff08\u5317\u4eac\u65f6\u95f4\uff09`;
@@ -1320,6 +1319,11 @@ function renderCurrentPriceFreshness() {
     warning.textContent = freshnessWarning;
     elements.updatedAt.append(warning);
   }
+}
+
+function renderCurrentPriceFreshness() {
+  normalizeCurrentPriceFreshnessUi();
+  calculateMinimumPrices();
   renderSortHeaders({ refresh: false });
   renderMinimumSummary();
   renderTable();
@@ -1494,6 +1498,7 @@ function showUnusableDataError(reason) {
     ? '价格数据生成时间超过允许的未来偏差，无法作为当前比较数据使用。请重新加载。'
     : '价格数据已超过 7 天有效期，无法继续作为当前比较数据使用。请重新加载。';
   elements.dataStatus.classList.add('is-error');
+  if (elements.historyDialog.open) elements.historyDialog.close();
   elements.updatedAt.textContent = message;
   setLoadStatus(message, { error: true });
   state.minimumCuesEnabled = false;
@@ -1549,6 +1554,7 @@ async function initialize({ forceRefresh = false } = {}) {
     } else {
       state.dataOrigin = 'network';
       applyCurrentPriceFreshness();
+      normalizeCurrentPriceFreshnessUi();
     }
     setLoadStatus('', { hidden: true });
   } catch (error) {
