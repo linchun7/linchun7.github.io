@@ -45,7 +45,7 @@
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   globalThis.__icloudInitialPriceRequest = fetch('data/prices.json', {
-    cache: 'default',
+    cache: 'no-cache',
     redirect: 'error',
     signal: controller.signal
   }).then(
