@@ -2,11 +2,12 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { migrateHistoryToSchema4, migratePricesSchema3To4 } from '../scripts/migrate-schema-3-to-4.mjs';
-import { attachMarketIdentity, resolveMarket, validateMarketRegistry } from '../scripts/market-registry.mjs';
+import { MARKET_REGISTRY, attachMarketIdentity, resolveMarket, validateMarketRegistry } from '../scripts/market-registry.mjs';
 import { validatePriceHistoryConsistency } from '../data-contract.js';
 
 const pricesUrl = new URL('../data/prices.json', import.meta.url);
 const historyUrl = new URL('../data/history.json', import.meta.url);
+const namesUrl = new URL('../scripts/country-names.zh.json', import.meta.url);
 
 async function schema3Fixtures() {
   const [schema4Prices, schema4History] = await Promise.all([
@@ -43,6 +44,16 @@ test('registry covers all current Apple markets and unknown markets get stable n
   assert.equal(unknown.marketId, first.id);
   assert.equal(unknown.nameZh, 'New Apple Market');
   assert.equal(warnings.length, 1);
+});
+
+test('canonical registry Chinese names match the confirmed Apple Chinese mapping', async () => {
+  const names = JSON.parse(await readFile(namesUrl, 'utf8'));
+  for (const market of Object.values(MARKET_REGISTRY)) {
+    if (Object.hasOwn(names, market.canonicalName)) {
+      assert.equal(market.zh, names[market.canonicalName], market.canonicalName);
+    }
+  }
+  assert.equal(MARKET_REGISTRY['Euro Zone'].zh, '欧盟');
 });
 
 test('unknown market identity is stable, distinct, and fails closed on a generated-ID collision', () => {

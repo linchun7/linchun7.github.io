@@ -17,8 +17,8 @@ const FIXED_PRICE_TABLE_COLUMN_COUNT = 2;
 const PRICE_CACHE_KEY = 'icloud-price-comparison:validated-prices:v2';
 const LEGACY_PRICE_CACHE_KEYS = ['icloud-price-comparison:validated-prices:v1'];
 const MAX_PRICE_CACHE_CHARACTERS = 1024 * 1024;
-const CACHE_FRESH_MAX_AGE_MS = 36 * 60 * 60 * 1_000;
-const CACHE_HARD_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1_000;
+const PRICE_FRESH_MAX_AGE_MS = 36 * 60 * 60 * 1_000;
+const PRICE_HARD_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1_000;
 const MAX_PRICE_FUTURE_SKEW_MS = 5 * 60 * 1_000;
 const MAX_RESPONSE_BYTES = Object.freeze({
   'prices.json': 1024 * 1024,
@@ -52,6 +52,7 @@ const state = {
   minimumPrices: {},
   minimumCountries: {},
   dataOrigin: null,
+  dataFreshness: null,
   minimumCuesEnabled: true,
   minimumCuesReason: null,
   chart: null,
@@ -355,12 +356,22 @@ async function fetchJson(fileName, { forceRefresh = false } = {}) {
   throw lastError;
 }
 
+export function classifyPriceFreshness(data, nowMs = Date.now()) {
+  const ageMs = nowMs - Date.parse(data?.generatedAt);
+  if (!Number.isFinite(ageMs)) return { status: 'unusable', reason: 'price-expired', ageMs };
+  if (ageMs < -MAX_PRICE_FUTURE_SKEW_MS) return { status: 'unusable', reason: 'future-data', ageMs };
+  if (ageMs > PRICE_HARD_MAX_AGE_MS) return { status: 'unusable', reason: 'price-expired', ageMs };
+  if (ageMs > PRICE_FRESH_MAX_AGE_MS) return { status: 'degraded', reason: 'price-stale', ageMs };
+  if (data?.fx?.stale) return { status: 'degraded', reason: 'fx-stale', ageMs };
+  return { status: 'fresh', reason: null, ageMs };
+}
+
 function validatePriceFreshness(data) {
-  const ageMs = Date.now() - Date.parse(data.generatedAt);
-  if (!Number.isFinite(ageMs)) throw new Error('价格数据生成时间无效');
-  if (ageMs < -MAX_PRICE_FUTURE_SKEW_MS) throw new Error('价格数据生成时间超过允许的未来偏差');
-  if (ageMs > CACHE_HARD_MAX_AGE_MS) throw new Error('价格数据已超过七天有效期');
-  return ageMs;
+  const freshness = classifyPriceFreshness(data);
+  if (!Number.isFinite(freshness.ageMs)) throw new Error('价格数据生成时间无效');
+  if (freshness.reason === 'future-data') throw new Error('价格数据生成时间超过允许的未来偏差');
+  if (freshness.reason === 'price-expired') throw new Error('价格数据已超过七天有效期');
+  return freshness;
 }
 
 function removeLegacyPriceCaches() {
@@ -375,9 +386,9 @@ function readPriceCache() {
     if (!cached) return null;
     if (cached.length > MAX_PRICE_CACHE_CHARACTERS) throw new Error('价格缓存超过允许大小');
     const data = validatePayload('prices.json', JSON.parse(cached));
-    let ageMs;
+    let freshness;
     try {
-      ageMs = validatePriceFreshness(data);
+      freshness = validatePriceFreshness(data);
     } catch (error) {
       localStorage.removeItem(PRICE_CACHE_KEY);
       console.warn('CACHE_EXPIRED');
@@ -385,7 +396,7 @@ function readPriceCache() {
     }
     return {
       data,
-      stale: ageMs > CACHE_FRESH_MAX_AGE_MS
+      freshness
     };
   } catch (error) {
     console.warn(`已忽略无效价格缓存：${error.message}`);
@@ -432,8 +443,8 @@ function renderMinimumSummary() {
     const unavailable = document.createElement('p');
     unavailable.className = 'minimum-unavailable cache-stale-notice';
     unavailable.textContent = state.minimumCuesReason === 'fx-stale'
-      ? '当前汇率沿用上次成功结果，参考最低价排名暂不展示。汇率刷新成功后自动恢复。'
-      : '当前价格数据已过期，价格仅供历史参考。获取有效数据后恢复参考最低价排名。';
+      ? '当前人民币换算沿用上次成功汇率，参考最低价排名暂不展示。汇率刷新成功后自动恢复。'
+      : '当前价格数据已超过 36 小时，以下价格仅供历史参考。获取新数据后恢复参考最低价排名。';
     elements.minimumSummary.replaceChildren(unavailable);
     elements.minimumSummary.setAttribute('aria-busy', 'false');
     return;
@@ -650,7 +661,7 @@ function renderTable() {
       row.dataset.marketId = country.marketId;
 
       const displayedRank = state.sortKey === 'tier' ? country.plans[state.sortTier].cnyRank : index + 1;
-      const rank = createCell(String(displayedRank), displayedRank <= 3 && state.sortKey === 'tier' && state.sortDirection === 'asc' ? 'rank-top' : '');
+      const rank = createCell(String(displayedRank), state.minimumCuesEnabled && displayedRank <= 3 && state.sortKey === 'tier' && state.sortDirection === 'asc' ? 'rank-top' : '');
       const nameCell = document.createElement('td');
       const historyButton = document.createElement('button');
       historyButton.type = 'button';
@@ -1244,15 +1255,24 @@ function scheduleBackToTableUpdate() {
 }
 
 function applyPriceData(data, { origin = 'network' } = {}) {
+  const freshness = classifyPriceFreshness(data);
+  if (freshness.status === 'unusable') throw new Error(`价格数据不可用：${freshness.reason}`);
   state.data = data;
   state.dataOrigin = origin;
-  state.minimumCuesReason = data.fx.stale ? 'fx-stale' : (origin === 'cache-stale' ? 'price-stale' : null);
-  state.minimumCuesEnabled = state.minimumCuesReason === null;
-  if (elements.overviewTitle) elements.overviewTitle.textContent = state.minimumCuesEnabled ? '各容量参考最低价' : '历史缓存价格';
+  state.dataFreshness = freshness;
+  state.minimumCuesReason = freshness.reason;
+  state.minimumCuesEnabled = freshness.status === 'fresh';
+  if (elements.overviewTitle) {
+    elements.overviewTitle.textContent = freshness.reason === 'price-stale'
+      ? '历史参考价格'
+      : (freshness.reason === 'fx-stale' ? '人民币参考价格' : '各容量参考最低价');
+  }
   if (elements.overviewNote) {
-    elements.overviewNote.textContent = state.minimumCuesEnabled
-      ? '按人民币参考汇率换算，便于横向比较'
-      : '过期缓存仅保留价格查询、筛选与排序功能';
+    elements.overviewNote.textContent = freshness.reason === 'price-stale'
+      ? '价格数据已超过 36 小时，仍可查询、筛选与排序'
+      : (freshness.reason === 'fx-stale'
+        ? '人民币换算沿用上次成功汇率'
+        : '按人民币参考汇率换算，便于横向比较。人民币金额显示保留两位小数，排序及参考排名按四舍五入前的内部换算结果计算。');
   }
   if (!state.data.tiers.some(({ id }) => id === state.sortTier)) {
     state.sortTier = state.data.tiers.find(({ id }) => id === DEFAULT_SORT_TIER)?.id || state.data.tiers[0].id;
@@ -1423,8 +1443,8 @@ async function initialize({ forceRefresh = false } = {}) {
     const cached = readPriceCache();
     if (cached) {
       fallbackData = cached.data;
-      applyPriceData(cached.data, { origin: cached.stale ? 'cache-stale' : 'cache-fresh' });
-      setLoadStatus(cached.stale
+      applyPriceData(cached.data, { origin: 'cache' });
+      setLoadStatus(cached.freshness.status === 'degraded'
         ? '已显示过期本地缓存，正在检查网络更新…'
         : '已显示本地缓存，正在检查网络更新…');
     }
@@ -1438,9 +1458,6 @@ async function initialize({ forceRefresh = false } = {}) {
   try {
     const networkData = await fetchJson('prices.json', { forceRefresh });
     if (forceRefresh || !priceSnapshotsEqual(state.data, networkData)) {
-      writePriceCache(networkData);
-      applyPriceData(networkData, { origin: 'network' });
-    } else if (state.dataOrigin === 'cache-stale') {
       writePriceCache(networkData);
       applyPriceData(networkData, { origin: 'network' });
     } else {

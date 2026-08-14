@@ -243,8 +243,8 @@ test('starts price data early and deprioritizes optional third-party work', asyn
   assert.match(moduleSource, /TextDecoder\('utf-8', \{ fatal: true \}\)/, 'network JSON must use strict UTF-8 decoding');
   assert.match(moduleSource, /fetch\(url,[\s\S]*?redirect:\s*'error'/, 'all later data requests must reject redirects');
   assert.match(moduleSource, /serialized\.length > MAX_PRICE_CACHE_CHARACTERS/, 'oversized price payloads must not be persisted');
-  assert.match(moduleSource, /CACHE_FRESH_MAX_AGE_MS = 36 \* 60 \* 60 \* 1_000/);
-  assert.match(moduleSource, /CACHE_HARD_MAX_AGE_MS = 7 \* 24 \* 60 \* 60 \* 1_000/);
+  assert.match(moduleSource, /PRICE_FRESH_MAX_AGE_MS = 36 \* 60 \* 60 \* 1_000/);
+  assert.match(moduleSource, /PRICE_HARD_MAX_AGE_MS = 7 \* 24 \* 60 \* 60 \* 1_000/);
   assert.match(bootstrapSource, /cache:\s*'no-cache'/, 'the eager prices request must revalidate its HTTP cache');
   assert.match(moduleSource, /fileName === 'prices\.json' \? 'no-cache' : 'default'/, 'ordinary prices requests must revalidate while preserving HTTP caching');
   assert.match(moduleSource, /const ANALYTICS_ID = 'G-K2S9L4CHNP'/, 'the approved GA4 measurement ID must remain configured');
@@ -1320,29 +1320,50 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
   const browserConfig = await resolveBrowser(context, 'the stale-data UI test');
   if (!browserConfig) return;
   const validData = await readFixture('prices.json');
+  const referenceNow = Date.now();
   const scenarios = [
     {
       label: 'old snapshot',
       mutate: (data) => {
-        setPayloadGeneratedAt(data, new Date(Date.now() - (48 * 60 * 60 * 1_000)).toISOString());
+        setPayloadGeneratedAt(data, new Date(referenceNow - (48 * 60 * 60 * 1_000)).toISOString());
         data.fx.fetchedAt = data.generatedAt;
         data.fx.stale = false;
       },
-      expected: /超过 36 小时/
+      expected: /超过 36 小时/,
+      minimumDegraded: true
     },
     {
       label: 'future snapshot',
       mutate: (data) => {
-        setPayloadGeneratedAt(data, new Date(Date.now() + (4 * 60 * 1_000)).toISOString());
+        setPayloadGeneratedAt(data, new Date(referenceNow + (4 * 60 * 1_000)).toISOString());
         data.fx.fetchedAt = data.generatedAt;
         data.fx.stale = false;
       },
       expected: /数据生成时间在未来/
     },
     {
+      label: 'maximum allowed future skew',
+      mutate: (data) => {
+        setPayloadGeneratedAt(data, new Date(referenceNow + (5 * 60 * 1_000)).toISOString());
+        data.fx.fetchedAt = data.generatedAt;
+        data.fx.stale = false;
+      },
+      expected: /数据生成时间在未来/
+    },
+    {
+      label: 'maximum usable historical age',
+      mutate: (data) => {
+        setPayloadGeneratedAt(data, new Date(referenceNow - (7 * 24 * 60 * 60 * 1_000)).toISOString());
+        data.fx.fetchedAt = data.generatedAt;
+        data.fx.stale = false;
+      },
+      expected: /超过 36 小时/,
+      minimumDegraded: true
+    },
+    {
       label: 'fallback rates',
       mutate: (data) => {
-        setPayloadGeneratedAt(data, new Date().toISOString());
+        setPayloadGeneratedAt(data, new Date(referenceNow).toISOString());
         data.fx.fetchedAt = data.generatedAt;
         data.fx.stale = true;
         data.fx.fallbackReason = 'request-failed';
@@ -1353,7 +1374,7 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
     {
       label: 'old snapshot with fallback rates',
       mutate: (data) => {
-        setPayloadGeneratedAt(data, new Date(Date.now() - (48 * 60 * 60 * 1_000)).toISOString());
+        setPayloadGeneratedAt(data, new Date(referenceNow - (48 * 60 * 60 * 1_000)).toISOString());
         data.fx.fetchedAt = data.generatedAt;
         data.fx.stale = true;
         data.fx.fallbackReason = 'request-failed';
@@ -1368,6 +1389,7 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
   try {
     for (const { label, mutate, expected, expectedPublishedDate, minimumDegraded = false } of scenarios) {
       const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+      await page.addInitScript((nowMs) => { Date.now = () => nowMs; }, referenceNow);
       const payload = structuredClone(validData);
       mutate(payload);
       await page.route('https://**/*', (route) => route.abort());
@@ -1385,8 +1407,15 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
         }
         assert.equal(await page.locator('.data-status').evaluate((element) => element.classList.contains('is-stale')), true, label);
         assert.equal(await page.locator('.minimum-badge').count(), minimumDegraded ? 0 : validData.tiers.length, label);
+        assert.equal(await page.locator('.rank-top').count(), minimumDegraded ? 0 : 3, label);
         if (minimumDegraded) {
-          assert.match(await page.locator('#minimumSummary').textContent(), /汇率沿用上次成功结果.*最低价排名暂不展示/, label);
+          assert.match(
+            await page.locator('#minimumSummary').textContent(),
+            label.includes('snapshot') || label.includes('historical')
+              ? /价格数据已超过 36 小时/
+              : /人民币换算沿用上次成功汇率.*最低价排名暂不展示/,
+            label
+          );
         }
         const statusLayout = await page.evaluate(() => {
           const rect = document.querySelector('.data-status').getBoundingClientRect();
@@ -2410,18 +2439,23 @@ test('enforces fresh, stale, and expired local price cache behavior', { timeout:
       localStorage.setItem('icloud-price-comparison:validated-prices:v2', JSON.stringify(payload));
     }, { payload: validData, nowMs: Date.parse(validData.generatedAt) + (36 * 60 * 60 * 1_000) + 1 });
     await stalePage.route('https://**/*', (route) => route.abort());
-    await stalePage.route('**/data/prices.json*', (route) => route.fulfill({ status: 503, body: '{}' }));
+    await stalePage.route('**/data/prices.json*', (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(validData)
+    }));
     await stalePage.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
     await stalePage.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, validData.countries.length);
-    await stalePage.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
+    await stalePage.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
     assert.equal(await stalePage.locator('#searchInput').isEnabled(), true);
     assert.equal(await stalePage.locator('#regionSelect').isEnabled(), true);
     assert.equal(await stalePage.locator('.minimum-badge').count(), 0);
     assert.equal(await stalePage.locator('.price-cell.is-minimum').count(), 0);
-    assert.equal(await stalePage.locator('#overviewTitle').textContent(), '历史缓存价格');
+    assert.equal(await stalePage.locator('.rank-top').count(), 0);
+    assert.equal(await stalePage.locator('#overviewTitle').textContent(), '历史参考价格');
     assert.equal(
       await stalePage.locator('#minimumSummary').textContent(),
-      '当前价格数据已过期，价格仅供历史参考。获取有效数据后恢复参考最低价排名。'
+      '当前价格数据已超过 36 小时，以下价格仅供历史参考。获取新数据后恢复参考最低价排名。'
     );
     await stalePage.locator('button[data-sort-tier]:visible').first().click();
     assert.ok(await stalePage.locator('#priceRows tr[data-market-id]').count() > 0, 'stale-cache sorting remains usable');
