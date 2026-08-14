@@ -19,6 +19,7 @@ const LEGACY_PRICE_CACHE_KEYS = ['icloud-price-comparison:validated-prices:v1'];
 const MAX_PRICE_CACHE_CHARACTERS = 1024 * 1024;
 const CACHE_FRESH_MAX_AGE_MS = 36 * 60 * 60 * 1_000;
 const CACHE_HARD_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1_000;
+const MAX_PRICE_FUTURE_SKEW_MS = 5 * 60 * 1_000;
 const MAX_RESPONSE_BYTES = Object.freeze({
   'prices.json': 1024 * 1024,
   'history.json': 8 * 1024 * 1024
@@ -52,6 +53,7 @@ const state = {
   minimumCountries: {},
   dataOrigin: null,
   minimumCuesEnabled: true,
+  minimumCuesReason: null,
   chart: null,
   eventsBound: false,
   loading: false,
@@ -340,7 +342,9 @@ async function fetchJson(fileName, { forceRefresh = false } = {}) {
         });
       }
       if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-      return validatePayload(fileName, await readBoundedJsonResponse(response, fileName));
+      const payload = validatePayload(fileName, await readBoundedJsonResponse(response, fileName));
+      if (fileName === 'prices.json') validatePriceFreshness(payload);
+      return payload;
     } catch (error) {
       lastError = error;
     } finally {
@@ -349,6 +353,14 @@ async function fetchJson(fileName, { forceRefresh = false } = {}) {
     }
   }
   throw lastError;
+}
+
+function validatePriceFreshness(data) {
+  const ageMs = Date.now() - Date.parse(data.generatedAt);
+  if (!Number.isFinite(ageMs)) throw new Error('价格数据生成时间无效');
+  if (ageMs < -MAX_PRICE_FUTURE_SKEW_MS) throw new Error('价格数据生成时间超过允许的未来偏差');
+  if (ageMs > CACHE_HARD_MAX_AGE_MS) throw new Error('价格数据已超过七天有效期');
+  return ageMs;
 }
 
 function removeLegacyPriceCaches() {
@@ -363,8 +375,10 @@ function readPriceCache() {
     if (!cached) return null;
     if (cached.length > MAX_PRICE_CACHE_CHARACTERS) throw new Error('价格缓存超过允许大小');
     const data = validatePayload('prices.json', JSON.parse(cached));
-    const ageMs = Date.now() - Date.parse(data.generatedAt);
-    if (!Number.isFinite(ageMs) || ageMs > CACHE_HARD_MAX_AGE_MS) {
+    let ageMs;
+    try {
+      ageMs = validatePriceFreshness(data);
+    } catch (error) {
       localStorage.removeItem(PRICE_CACHE_KEY);
       console.warn('CACHE_EXPIRED');
       return null;
@@ -417,7 +431,9 @@ function renderMinimumSummary() {
   if (!state.minimumCuesEnabled) {
     const unavailable = document.createElement('p');
     unavailable.className = 'minimum-unavailable cache-stale-notice';
-    unavailable.textContent = '当前使用的是过期本地缓存，价格仅供历史参考。联网刷新成功后恢复参考最低价排名。';
+    unavailable.textContent = state.minimumCuesReason === 'fx-stale'
+      ? '当前汇率沿用上次成功结果，参考最低价排名暂不展示。汇率刷新成功后自动恢复。'
+      : '当前价格数据已过期，价格仅供历史参考。获取有效数据后恢复参考最低价排名。';
     elements.minimumSummary.replaceChildren(unavailable);
     elements.minimumSummary.setAttribute('aria-busy', 'false');
     return;
@@ -451,7 +467,7 @@ function renderMinimumSummary() {
     action.className = 'visually-hidden';
     action.textContent = '，在价格表中定位';
     item.append(tierLabel, country, price, action);
-    item.addEventListener('click', () => focusMinimumCountry(tier.id, winners[0]?.country));
+    item.addEventListener('click', () => focusMinimumCountry(tier.id, winners[0]?.marketId));
     fragment.append(item);
   }
   elements.minimumSummary.replaceChildren(fragment);
@@ -631,7 +647,7 @@ function renderTable() {
   } else {
     countries.forEach((country, index) => {
       const row = document.createElement('tr');
-      row.dataset.country = country.country;
+      row.dataset.marketId = country.marketId;
 
       const displayedRank = state.sortKey === 'tier' ? country.plans[state.sortTier].cnyRank : index + 1;
       const rank = createCell(String(displayedRank), displayedRank <= 3 && state.sortKey === 'tier' && state.sortDirection === 'asc' ? 'rank-top' : '');
@@ -1112,7 +1128,7 @@ function openHistory(country, returnFocus = null) {
   const record = getHistoryRecord(country);
   state.activeCountry = country;
   state.historyReturnFocus = returnFocus;
-  state.historyReturnCountry = country.country;
+  state.historyReturnCountry = country.marketId;
   state.historyTier = state.sortTier;
   elements.historyTitle.textContent = country.nameZh || country.country;
   renderHistorySubtitle(country, record);
@@ -1123,9 +1139,9 @@ function openHistory(country, returnFocus = null) {
 }
 
 function syncActiveHistoryCountry() {
-  const activeCountryId = state.activeCountry?.country;
-  if (!activeCountryId) return;
-  const currentCountry = state.data.countries.find(({ country }) => country === activeCountryId);
+  const activeMarketId = state.activeCountry?.marketId;
+  if (!activeMarketId) return;
+  const currentCountry = state.data.countries.find(({ marketId }) => marketId === activeMarketId);
   if (!currentCountry) {
     state.activeCountry = null;
     if (elements.historyDialog.open) elements.historyDialog.close();
@@ -1179,7 +1195,7 @@ function scheduleQueryRender(value) {
   });
 }
 
-function focusMinimumCountry(tierId, countryId) {
+function focusMinimumCountry(tierId, marketId) {
   if (state.renderFrame) {
     cancelAnimationFrame(state.renderFrame);
     state.renderFrame = null;
@@ -1190,8 +1206,8 @@ function focusMinimumCountry(tierId, countryId) {
   elements.regionSelect.value = 'all';
   setTierSort(tierId, { forceAscending: true });
   requestAnimationFrame(() => requestAnimationFrame(() => {
-    const row = countryId
-      ? [...elements.priceRows.querySelectorAll('tr[data-country]')].find((item) => item.dataset.country === countryId)
+    const row = marketId
+      ? [...elements.priceRows.querySelectorAll('tr[data-market-id]')].find((item) => item.dataset.marketId === marketId)
       : null;
     if (!row) return;
     row.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
@@ -1230,7 +1246,8 @@ function scheduleBackToTableUpdate() {
 function applyPriceData(data, { origin = 'network' } = {}) {
   state.data = data;
   state.dataOrigin = origin;
-  state.minimumCuesEnabled = origin !== 'cache-stale';
+  state.minimumCuesReason = data.fx.stale ? 'fx-stale' : (origin === 'cache-stale' ? 'price-stale' : null);
+  state.minimumCuesEnabled = state.minimumCuesReason === null;
   if (elements.overviewTitle) elements.overviewTitle.textContent = state.minimumCuesEnabled ? '各容量参考最低价' : '历史缓存价格';
   if (elements.overviewNote) {
     elements.overviewNote.textContent = state.minimumCuesEnabled
@@ -1347,7 +1364,7 @@ function bindEvents() {
     state.historyReturnCountry = null;
     requestAnimationFrame(() => {
       const currentButton = returnCountry
-        ? [...elements.priceRows.querySelectorAll('tr[data-country]')].find((row) => row.dataset.country === returnCountry)?.querySelector('.country-history-button')
+        ? [...elements.priceRows.querySelectorAll('tr[data-market-id]')].find((row) => row.dataset.marketId === returnCountry)?.querySelector('.country-history-button')
         : null;
       if (returnFocus?.isConnected) returnFocus.focus();
       else if (currentButton) currentButton.focus();
