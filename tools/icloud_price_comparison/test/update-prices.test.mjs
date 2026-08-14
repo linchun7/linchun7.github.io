@@ -487,8 +487,8 @@ test('publishes a confirmed unknown Apple market with a deterministic identity a
   delete unknown.marketId;
   delete unknown.nameZh;
   changed.countries.push(unknown);
-  const html = buildAppleHtml(changed);
-  const fxPayload = {
+  let appleHtml = buildAppleHtml(changed);
+  let fxPayload = {
     result: 'success',
     base_code: 'USD',
     time_last_update_unix: recentFxTimestamp(),
@@ -512,7 +512,7 @@ test('publishes a confirmed unknown Apple market with a deterministic identity a
     if (target.includes('support.apple.com')) {
       appleRequests += 1;
       if (appleRequests === 2) assert.equal(options.cache, 'no-store');
-      return new Response(html, { status: 200 });
+      return new Response(appleHtml, { status: 200 });
     }
     if (target.includes('open.er-api.com')) return new Response(JSON.stringify(fxPayload), { status: 200 });
     throw new Error(`Unexpected URL in unknown-market publication test: ${target}`);
@@ -538,6 +538,25 @@ test('publishes a confirmed unknown Apple market with a deterministic identity a
     )));
     const summary = await readFile(summaryPath, 'utf8');
     assert.match(summary, new RegExp(`UNKNOWN_APPLE_MARKET.*${publishedUnknown.marketId}.*${unknown.region}.*${unknown.currency}`, 's'));
+
+    const caseChanged = structuredClone(changed);
+    const caseChangedUnknown = caseChanged.countries.at(-1);
+    caseChangedUnknown.country = 'new apple market';
+    const changedTier = caseChanged.tiers[0].id;
+    caseChangedUnknown.plans[changedTier].price += 0.01;
+    caseChangedUnknown.plans[changedTier].formattedPrice = `$${caseChangedUnknown.plans[changedTier].price.toFixed(2)}`;
+    appleHtml = buildAppleHtml(caseChanged);
+    fxPayload = {
+      ...fxPayload,
+      time_last_update_unix: recentFxTimestamp()
+    };
+    appleRequests = 0;
+    await main({ dryRun: false, paths, stepSummaryPath: summaryPath });
+    assert.equal(appleRequests, 2);
+    const republished = JSON.parse(await readFile(paths.currentDataPath, 'utf8'));
+    const caseOnlyUnknown = republished.countries.find(({ country }) => country === 'new apple market');
+    assert.equal(caseOnlyUnknown.marketId, publishedUnknown.marketId);
+    assert.notEqual(caseOnlyUnknown.marketId, resolveMarket('new apple market').id);
   } finally {
     globalThis.fetch = originalFetch;
     console.warn = originalWarn;

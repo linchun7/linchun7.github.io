@@ -185,14 +185,15 @@ test('published unknown identities come from schema 4 history instead of the cur
     })
   });
   assert.equal(resolver('New Apple Market').id, 'published-custom-id');
+  assert.equal(resolver('new apple market').id, 'published-custom-id');
   assert.equal(resolver('Brand New Market').id, 'generator-would-change-this');
 });
 
-test('published identity ledger fails closed when one exact source name has two IDs', () => {
+test('published identity ledger fails closed when one normalized source name has two IDs', () => {
   assert.throws(
     () => buildPublishedMarketIdentityIndex(
       { schemaVersion: 4, countries: [{ country: 'Conflicted Market', marketId: 'first-id' }] },
-      { schemaVersion: 4, markets: { 'second-id': { country: 'Conflicted Market' } } }
+      { schemaVersion: 4, markets: { 'second-id': { country: 'conflicted market' } } }
     ),
     (error) => error.code === 'PUBLISHED_MARKET_IDENTITY_CONFLICT'
   );

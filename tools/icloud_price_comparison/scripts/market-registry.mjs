@@ -97,11 +97,12 @@ export function buildPublishedMarketIdentityIndex(previousData, previousHistory)
   const sourceNamesById = new Map();
   const add = (sourceName, marketId, location) => {
     const name = normalizedName(sourceName);
-    const previous = bySourceName.get(name);
+    const identityKey = normalizedNameKey(name);
+    const previous = bySourceName.get(identityKey);
     if (previous && previous.marketId !== marketId) {
       throw publishedIdentityError(`${name} maps to both ${previous.marketId} (${previous.location}) and ${marketId} (${location})`);
     }
-    bySourceName.set(name, { marketId, sourceName: name, location });
+    bySourceName.set(identityKey, { marketId, sourceName: name, location });
     const names = sourceNamesById.get(marketId) ?? new Set();
     names.add(normalizedNameKey(name));
     sourceNamesById.set(marketId, names);
@@ -126,7 +127,7 @@ export function createPublishedMarketResolver(previousData, previousHistory, {
     const resolved = resolveUnknown(sourceName);
     if (!resolved.unknown) return resolved;
     const name = normalizedName(sourceName);
-    const historical = published.bySourceName.get(name);
+    const historical = published.bySourceName.get(normalizedNameKey(name));
     if (!historical) return resolved;
     return {
       ...resolved,
