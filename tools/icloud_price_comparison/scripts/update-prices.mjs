@@ -281,6 +281,7 @@ function median(values) {
 
 export function validateFxSanity(previousData, fx, {
   now = new Date(),
+  currentCurrencies = Object.keys(fx?.rates ?? {}),
   minPoints = MIN_FX_SANITY_POINTS,
   maxDailyChange = FX_SANITY_MAX_DAILY_CHANGE,
   maxBaselineAgeDays = FX_SANITY_MAX_BASELINE_AGE_DAYS
@@ -318,13 +319,21 @@ export function validateFxSanity(previousData, fx, {
   }
 
   const days = Math.min(Math.max(1, elapsedHours / 24), maxBaselineAgeDays);
-  const currencies = [...new Set([
-    ...(previousData.countries ?? []).map(({ currency }) => currency),
-    ...Object.keys(fx.rates)
-  ])].sort();
+  const previousCurrencies = new Set((previousData.countries ?? []).map(({ currency }) => currency));
+  const activeCurrencies = new Set(currentCurrencies);
+  for (const currency of previousCurrencies) {
+    if (currency !== 'CNY' && !activeCurrencies.has(currency)) {
+      warnings.push(`FX_SANITY_SKIPPED_REMOVED_CURRENCY:${currency}`);
+    }
+  }
+  const currencies = [...activeCurrencies].sort();
   for (const currency of currencies) {
     if (currency === 'CNY') {
       checks.push({ currency, status: 'skipped-cny' });
+      continue;
+    }
+    if (!previousCurrencies.has(currency)) {
+      checks.push({ currency, status: 'skipped-new-currency' });
       continue;
     }
     const points = pointsByCurrency.get(currency) ?? [];
@@ -516,21 +525,42 @@ function convertToFullPrecisionCny(price, currency, rates) {
 }
 
 export function attachDerivedCnyPrices(countries, { fx, previousData = null } = {}) {
-  const previousByMarket = new Map((previousData?.countries ?? []).map((country) => [country.marketId ?? country.country, country]));
+  const previousByMarket = new Map((previousData?.countries ?? []).map((country) => [country.marketId, country]));
+  if (fx?.reusePreviousCny) {
+    return countries.map((country) => {
+      const previousCountry = country.marketId ? previousByMarket.get(country.marketId) : null;
+      if (!previousCountry || previousCountry.currency !== country.currency) {
+        throw transientHealthcheckError(
+          `Cannot reuse CNY prices for ${country.country}: stable marketId and currency must match`,
+          { code: 'EXCHANGE_RATE_SOURCES_UNAVAILABLE' }
+        );
+      }
+      return {
+        ...country,
+        plans: Object.fromEntries(Object.entries(country.plans).map(([tierId, plan]) => {
+          const previousPlan = previousCountry.plans?.[tierId];
+          if (previousPlan?.price !== plan.price
+            || !Number.isFinite(previousPlan.cnyPrice) || previousPlan.cnyPrice <= 0
+            || !Number.isSafeInteger(previousPlan.cnyRank) || previousPlan.cnyRank <= 0
+            || previousPlan.cnyRank > previousData.countries.length) {
+            throw transientHealthcheckError(
+              `Cannot reuse ${tierId} CNY price and rank for ${country.country} while exchange-rate sources are unavailable`,
+              { code: 'EXCHANGE_RATE_SOURCES_UNAVAILABLE' }
+            );
+          }
+          return [tierId, {
+            ...plan,
+            cnyPrice: previousPlan.cnyPrice,
+            cnyRank: previousPlan.cnyRank
+          }];
+        }))
+      };
+    });
+  }
   const ranked = countries.map((country) => ({
     ...country,
     plans: Object.fromEntries(Object.entries(country.plans).map(([tierId, plan]) => {
       let fullPrecisionCnyPrice = convertToFullPrecisionCny(plan.price, country.currency, fx?.rates);
-      if (fullPrecisionCnyPrice == null && fx?.reusePreviousCny) {
-        const previousCountry = previousByMarket.get(country.marketId ?? country.country);
-        const previousPlan = previousCountry?.plans?.[tierId];
-        if (previousCountry?.currency === country.currency
-          && previousPlan?.price === plan.price
-          && Number.isFinite(previousPlan.cnyPrice)
-          && previousPlan.cnyPrice > 0) {
-          fullPrecisionCnyPrice = previousPlan.cnyPrice;
-        }
-      }
       if (!Number.isFinite(fullPrecisionCnyPrice) || fullPrecisionCnyPrice <= 0) {
         throw transientHealthcheckError(
           `Cannot derive ${tierId} CNY price for ${country.country} while exchange-rate sources are unavailable`,
@@ -2183,7 +2213,7 @@ export function buildActionSummaryLines(data, summary, trigger = resolveTriggerS
     warnings.push(`- **FX sanity**：${markdownInline(warning)}`);
   }
   for (const market of summary.unknownMarkets ?? []) {
-    warnings.push(`- **UNKNOWN_APPLE_MARKET**：${markdownInline(market.sourceName)} → ${markdownInline(market.id)}`);
+    warnings.push(`- **UNKNOWN_APPLE_MARKET**：${markdownInline(market.sourceName)} → ${markdownInline(market.generatedMarketId ?? market.id)}；分区 ${markdownInline(market.region ?? 'unknown')}；币种 ${markdownInline(market.currency ?? 'unknown')}`);
   }
 
   const lines = [
@@ -2292,7 +2322,7 @@ export async function main({
   }
   validatePrices(parsed.countries, { tiers: parsed.tiers });
   let confirmedRemovedCountries = [];
-  if (appleSemanticChanged(previousData, parsed)) {
+  if (!previousData || appleSemanticChanged(previousData, parsed)) {
     let confirmationHtml;
     try {
       confirmationHtml = await fetchResource(APPLE_URL, {
@@ -2321,9 +2351,15 @@ export async function main({
   }
   const unknownMarkets = [];
   const parsedCountries = attachMarketIdentity(parsed.countries, {
-    onUnknown: (market) => {
-      unknownMarkets.push(market);
-      console.warn(`UNKNOWN_APPLE_MARKET:${logInline(market.sourceName)}:${market.id}`);
+    onUnknown: (market, country) => {
+      const warning = {
+        sourceName: market.sourceName,
+        generatedMarketId: market.id,
+        region: country.region,
+        currency: country.currency
+      };
+      unknownMarkets.push(warning);
+      console.warn(`UNKNOWN_APPLE_MARKET:${logInline(warning.sourceName)}:${warning.generatedMarketId}:${logInline(warning.region)}:${logInline(warning.currency)}`);
     }
   }).map((country) => ({
     ...country,
@@ -2334,7 +2370,9 @@ export async function main({
     requiredCurrencies: [...new Set(parsedCountries.map(({ currency }) => currency))],
     networkBudget
   });
-  const fxSanity = validateFxSanity(previousData, fx);
+  const fxSanity = validateFxSanity(previousData, fx, {
+    currentCurrencies: parsedCountries.map(({ currency }) => currency)
+  });
   for (const warning of fxSanity.warnings) console.warn(warning);
   const countries = attachDerivedCnyPrices(parsedCountries, { fx, previousData });
   if (process.env.GITHUB_ACTIONS === 'true' && fx.fallbackUsed && !fx.stale) {
