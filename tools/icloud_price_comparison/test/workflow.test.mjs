@@ -78,7 +78,9 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.doesNotMatch(workflow, /cron:\s*['"]5 0 \* \* \*['"]/, 'Cloudflare owns the 08:05 primary trigger');
   assert.match(workflow, /workflow_dispatch:[\s\S]*?trigger_source:[\s\S]*?default: manual[\s\S]*?options:[\s\S]*?- manual[\s\S]*?- cloudflare/);
   assert.match(workflow, /name: 检查每日幂等状态[\s\S]*?id: daily_guard[\s\S]*?node scripts\/daily-run-guard\.mjs/);
-  assert.match(workflow, /name: 读取并深验最新 main 的每日幂等状态[\s\S]*?id: validate_main_data[\s\S]*?git archive --format=tar origin\/main tools\/icloud_price_comparison\/data[\s\S]*?tar --extract --file=-/);
+  assert.match(workflow, /name: 读取并深验最新 main 的每日幂等状态[\s\S]*?id: validate_main_data[\s\S]*?git archive --format=tar "\$validated_main_sha" tools\/icloud_price_comparison\/data[\s\S]*?tar --extract --file=-/);
+  assert.match(workflow, /validated_main_sha=\$\(git rev-parse origin\/main\)[\s\S]*?git archive --format=tar "\$validated_main_sha"[\s\S]*?validate-data-artifact\.mjs[\s\S]*?validated_main_sha=\$validated_main_sha/);
+  assert.match(workflow, /validated_main_sha:\s*\$\{\{ steps\.validate_main_data\.outputs\.validated_main_sha \}\}/);
   assert.match(workflow, /validate-data-artifact\.mjs[\s\S]*?--data-dir "\$main_snapshot\/tools\/icloud_price_comparison\/data"/);
   assert.match(workflow, /ICLOUD_RUN_LOG_PATH:\s*\$\{\{ runner\.temp \}\}\/icloud-main-snapshot\/tools\/icloud_price_comparison\/data\/run-log\.json/);
   assert.match(workflow, /update:[\s\S]*?needs: prepare[\s\S]*?if: needs\.prepare\.outputs\.should_run == 'true'/);
@@ -89,6 +91,7 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /update:[\s\S]*?permissions:\s+contents: read/, 'generation and tests must remain read-only');
   assert.match(workflow, /publish:[\s\S]*?permissions:\s+contents: write/, 'only the dependency-free publisher may write committed data');
   assert.match(workflow, /verify-production:[\s\S]*?permissions:\s+contents: read/);
+  assert.match(workflow, /verify-existing-production:[\s\S]*?permissions:\s+contents: read/);
   assert.match(workflow, /notify:[\s\S]*?permissions: \{\}/);
   assert.match(workflow, /persist-credentials: false/g);
   assert.match(workflow, /name: 启用并校验 pnpm[\s\S]*?corepack enable[\s\S]*?pnpm --version/);
@@ -113,7 +116,7 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.doesNotMatch(workflow, /git pull --rebase origin main/);
   assert.doesNotMatch(workflow, /git push --force/);
   assert.doesNotMatch(workflow, /fetch-depth: 0|git count-objects|git_kib >=/, 'daily jobs must not fetch or audit full history');
-  assert.equal((workflow.match(/fetch-depth: 1/g) ?? []).length, 3, 'update, publish, and production verification checkouts must be shallow');
+  assert.equal((workflow.match(/fetch-depth: 1/g) ?? []).length, 4, 'update, publish, and both production verification checkouts must be shallow');
   assert.match(workflow, /name: 补充未报告的失败摘要[\s\S]*if: failure\(\)/);
   assert.match(workflow, /steps\.update_data\.outcome[\s\S]*artifacts\/run-report\.json[\s\S]*Updater already wrote a detailed failure summary/);
   assert.match(workflow, /::error title=iCloud\+ 价格更新失败/);
@@ -130,7 +133,7 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /verify-production:[\s\S]*?needs:[\s\S]*?- publish[\s\S]*?publish_outcome == 'published'[\s\S]*?publish_outcome == 'no_data_changes'/);
   const verifyProductionJob = workflow.slice(
     workflow.indexOf('\n  verify-production:'),
-    workflow.indexOf('\n  notify:')
+    workflow.indexOf('\n  verify-existing-production:')
   );
   assert.match(verifyProductionJob, /name: 检出验证脚本[\s\S]*?ref: \$\{\{ needs\.update\.outputs\.generation_base_sha \}\}[\s\S]*?fetch-depth: 1[\s\S]*?persist-credentials: false/);
   assert.doesNotMatch(verifyProductionJob, /ref: main/, 'verification code must never come from mutable main');
@@ -184,6 +187,59 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   const uiStepBlock = workflow.slice(browserTest, workflow.indexOf('name: 上传诊断信息'));
   assert.doesNotMatch(uiStepBlock, /continue-on-error|\|\|/, 'the updated UI validation must block production commits');
 
+});
+
+test('requires production proof before an idempotent run reports success', async () => {
+  const workflow = await readFile(workflowUrl, 'utf8');
+  const existingVerificationJob = workflow.slice(
+    workflow.indexOf('\n  verify-existing-production:'),
+    workflow.indexOf('\n  notify:')
+  );
+  const notifyJob = workflow.slice(workflow.indexOf('\n  notify:'));
+
+  assert.match(
+    existingVerificationJob,
+    /needs: prepare[\s\S]*?if: needs\.prepare\.result == 'success' && needs\.prepare\.outputs\.should_run != 'true' && needs\.prepare\.outputs\.trigger_source != 'manual'/,
+    'only a successful automatic idempotent prepare may enter existing-production verification'
+  );
+  assert.match(
+    existingVerificationJob,
+    /name: 检出已验证 main 快照[\s\S]*?ref: \$\{\{ needs\.prepare\.outputs\.validated_main_sha \}\}[\s\S]*?fetch-depth: 1[\s\S]*?persist-credentials: false/,
+    'verifier and validator code must be pinned to the validated main commit'
+  );
+  assert.match(existingVerificationJob, /validate-data-artifact\.mjs[\s\S]*?--data-dir tools\/icloud_price_comparison\/data/);
+  assert.match(
+    existingVerificationJob,
+    /verify-production-deployment\.mjs[\s\S]*?--expected-file tools\/icloud_price_comparison\/data\/prices\.json/,
+    'the exact validated checkout must remain the expected production payload'
+  );
+  assert.match(
+    existingVerificationJob,
+    /git fetch origin main --depth=1[\s\S]*?git show origin\/main:tools\/icloud_price_comparison\/data\/prices\.json[\s\S]*?current-main-prices\.json[\s\S]*?--current-main-file "\$RUNNER_TEMP\/current-main-prices\.json"/,
+    'mutable main may be read only as the newer-deployment proof'
+  );
+  assert.doesNotMatch(existingVerificationJob, /pnpm update:data|EXCHANGE_RATE_API_KEY|support\.apple\.com|git commit|git push/);
+  assert.match(existingVerificationJob, /verify_production\.outcome[\s\S]*?severe_failure=true[\s\S]*?production_not_updated[\s\S]*?PUBLISH_PRODUCTION_NOT_UPDATED/);
+
+  assert.match(notifyJob, /EXISTING_VERIFY_RESULT:\s*\$\{\{ needs\.verify-existing-production\.result \}\}/);
+  assert.match(notifyJob, /EXISTING_VERIFY_SEVERE_FAILURE:\s*\$\{\{ needs\.verify-existing-production\.outputs\.severe_failure \}\}/);
+  assert.match(notifyJob, /EXISTING_VERIFY_SEVERE_FAILURE[^]*?status=1/,
+    'an idempotent verification failure must send /1');
+  assert.match(
+    notifyJob,
+    /SHOULD_RUN" != true[\s\S]*?TRIGGER_SOURCE" != manual[\s\S]*?EXISTING_VERIFY_RESULT" == success[\s\S]*?status=0/,
+    'an idempotent run may send /0 only after production proof succeeds'
+  );
+  assert.match(
+    notifyJob,
+    /SHOULD_RUN" == true[\s\S]*?UPDATE_RESULT" == success[\s\S]*?PUBLISH_RESULT" == success[\s\S]*?VERIFY_RESULT" == success[\s\S]*?PUBLISH_OUTCOME" == published[\s\S]*?PUBLISH_OUTCOME" == no_data_changes/,
+    'the ordinary update success path must retain its full production proof'
+  );
+  assert.doesNotMatch(
+    notifyJob,
+    /\[\[ "\$SHOULD_RUN" != true \]\]\s*\\\s*\|\|/,
+    'should_run=false must never be an unconditional Healthcheck success condition'
+  );
 });
 
 test('moves full-history growth checks into a weekly read-only workflow', async () => {
