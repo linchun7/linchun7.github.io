@@ -180,6 +180,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   font-weight: 650;
 }
 
+.cache-stale-notice {
+  padding: 14px 18px;
+  color: #674500;
+  background: #fff8e6;
+  border-color: #e7c873;
+  text-align: center;
+}
+
 .minimum-tier-label {
   position: absolute;
   top: 7px;

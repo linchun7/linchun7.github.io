@@ -187,9 +187,9 @@ test('starts price data early and deprioritizes optional third-party work', asyn
     readFile(path.join(PROJECT_DIR, 'script.js'), 'utf8'),
     readFile(path.join(PROJECT_DIR, 'style.css'), 'utf8')
   ]);
-  const eagerPriceFetch = '<script data-cfasync="false" src="price-bootstrap.js?v=9"></script>';
+  const eagerPriceFetch = '<script data-cfasync="false" src="price-bootstrap.js?v=10"></script>';
   assert.ok(html.includes(eagerPriceFetch), 'prices.json bootstrap should run during HTML parsing');
-  assert.ok(html.indexOf(eagerPriceFetch) < html.indexOf('<script data-cfasync="false" type="module" src="script.js?v=20"></script>'), 'the initial price request should precede module execution');
+  assert.ok(html.indexOf(eagerPriceFetch) < html.indexOf('<script data-cfasync="false" type="module" src="script.js?v=21"></script>'), 'the initial price request should precede module execution');
   assert.doesNotMatch(html, /rel="preload" href="data\/prices\.json"/, 'cross-browser loading should not rely on a fetch preload that WebKit may duplicate');
   assert.doesNotMatch(html, /<script[^>]+src="https:\/\/www\.googletagmanager\.com/, 'analytics must not block HTML parsing');
   assert.doesNotMatch(html, /analyticsConsent|privacySettings|允许匿名统计/, 'analytics consent overlay and its settings entry must be absent');
@@ -212,6 +212,10 @@ test('starts price data early and deprioritizes optional third-party work', asyn
   assert.match(moduleSource, /TextDecoder\('utf-8', \{ fatal: true \}\)/, 'network JSON must use strict UTF-8 decoding');
   assert.match(moduleSource, /fetch\(url,[\s\S]*?redirect:\s*'error'/, 'all later data requests must reject redirects');
   assert.match(moduleSource, /serialized\.length > MAX_PRICE_CACHE_CHARACTERS/, 'oversized price payloads must not be persisted');
+  assert.match(moduleSource, /CACHE_FRESH_MAX_AGE_MS = 36 \* 60 \* 60 \* 1_000/);
+  assert.match(moduleSource, /CACHE_HARD_MAX_AGE_MS = 7 \* 24 \* 60 \* 60 \* 1_000/);
+  assert.match(bootstrapSource, /cache:\s*'no-cache'/, 'the eager prices request must revalidate its HTTP cache');
+  assert.match(moduleSource, /fileName === 'prices\.json' \? 'no-cache' : 'default'/, 'ordinary prices requests must revalidate while preserving HTTP caching');
   assert.match(moduleSource, /const ANALYTICS_ID = 'G-K2S9L4CHNP'/, 'the approved GA4 measurement ID must remain configured');
   assert.match(moduleSource, /page_location:\s*analyticsUrl\.href/, 'GA4 must receive only the sanitized page location');
   assert.match(moduleSource, /allow_google_signals:\s*false/, 'Google Signals must remain disabled');
@@ -1075,7 +1079,7 @@ test('shows an actionable error and recovers after a temporary price-data outage
     assert.equal(await page.locator('#loadStatus').isVisible(), true);
     assert.equal(await page.locator('.workspace').getAttribute('aria-busy'), 'false');
     assert.equal(await page.locator('#searchInput').isDisabled(), true);
-    assert.match(await page.locator('#loadStatusText').textContent(), /加载失败/);
+    assert.equal(await page.locator('#loadStatusText').textContent(), '价格数据无法加载，请检查网络后重试。');
     assert.equal(await page.locator('#retryButton').textContent(), '重新加载');
     await page.locator('#retryButton').click();
     await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, expectedData.countries.length);
@@ -1195,7 +1199,7 @@ test('rejects malformed price payloads and recovers without a full-page refresh'
       try {
         await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
         await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
-        assert.match(await page.locator('#loadStatusText').textContent(), /加载失败/, label);
+        assert.equal(await page.locator('#loadStatusText').textContent(), '价格数据无法加载，请检查网络后重试。', label);
         assert.equal(await page.locator('#searchInput').isDisabled(), true, label);
         serveValidData = true;
         await page.locator('#retryButton').click();
@@ -1976,7 +1980,7 @@ test('keeps the minimum-price overview stable and the desktop table header stick
     assert.equal(await page.locator('h1').count(), 1);
     assert.equal(await page.locator('h1').textContent(), 'iCloud+ \u5168\u7403\u4ef7\u683c\u5bf9\u6bd4');
     assert.equal(await page.locator('#overviewTitle').evaluate((element) => element.tagName), 'H2');
-    assert.equal(await page.locator('head script[type="module"][src="script.js?v=20"][data-cfasync="false"]').count(), 1);
+    assert.equal(await page.locator('head script[type="module"][src="script.js?v=21"][data-cfasync="false"]').count(), 1);
     assert.equal(await page.locator('head link[rel="modulepreload"]').count(), 3);
     const before = await page.locator('#minimumSummary').boundingBox();
     const loadingLayout = await page.evaluate(() => ({
@@ -2196,9 +2200,10 @@ test('keeps the cached table DOM when the network snapshot is unchanged', { time
   let releaseRequest;
   let requestSeen = false;
   const requestReleased = new Promise((resolve) => { releaseRequest = resolve; });
-  await page.addInitScript((payload) => {
+  await page.addInitScript(({ payload, nowMs }) => {
+    Date.now = () => nowMs;
     localStorage.setItem('icloud-price-comparison:validated-prices:v2', JSON.stringify(payload));
-  }, validData);
+  }, { payload: validData, nowMs: Date.parse(validData.generatedAt) + 60 * 60 * 1_000 });
   await page.route('https://**/*', (route) => route.abort());
   await page.route('**/data/prices.json*', async (route) => {
     requestSeen = true;
@@ -2271,7 +2276,7 @@ test('rejects redirected, oversized, and malformed UTF-8 price responses before 
   }
 });
 
-test('uses only validated cached prices when the network refresh fails', { timeout: 30_000 }, async (context) => {
+test('enforces fresh, stale, and expired local price cache behavior', { timeout: 30_000 }, async (context) => {
   const browserConfig = await resolveBrowser(context, 'the validated-cache UI test');
   if (!browserConfig) return;
   const validData = await readFixture('prices.json');
@@ -2280,18 +2285,57 @@ test('uses only validated cached prices when the network refresh fails', { timeo
   const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
   try {
     const cachedPage = await browser.newPage({ viewport: { width: 1024, height: 768 } });
-    await cachedPage.addInitScript((payload) => {
+    await cachedPage.addInitScript(({ payload, nowMs }) => {
+      Date.now = () => nowMs;
       localStorage.setItem('icloud-price-comparison:validated-prices:v2', JSON.stringify(payload));
-    }, validData);
+    }, { payload: validData, nowMs: Date.parse(validData.generatedAt) + 36 * 60 * 60 * 1_000 });
     await cachedPage.route('https://**/*', (route) => route.abort());
     await cachedPage.route('**/data/prices.json*', (route) => route.fulfill({ status: 503, body: '{}' }));
     await cachedPage.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
     await cachedPage.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, validData.countries.length);
     await cachedPage.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
     assert.equal(await cachedPage.locator('#searchInput').isEnabled(), true);
-    assert.match(await cachedPage.locator('#loadStatusText').textContent(), /\u5df2\u9a8c\u8bc1\u7f13\u5b58/);
+    assert.match(await cachedPage.locator('#loadStatusText').textContent(), /本地缓存/);
     assert.match(await cachedPage.locator('#updatedAt').textContent(), /\u7f51\u7edc\u5237\u65b0\u5931\u8d25/);
+    assert.ok(await cachedPage.locator('.minimum-badge').count() > 0, 'a cache exactly 36 hours old keeps minimum cues');
     await cachedPage.close();
+
+    const stalePage = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    await stalePage.addInitScript(({ payload, nowMs }) => {
+      Date.now = () => nowMs;
+      localStorage.setItem('icloud-price-comparison:validated-prices:v2', JSON.stringify(payload));
+    }, { payload: validData, nowMs: Date.parse(validData.generatedAt) + (36 * 60 * 60 * 1_000) + 1 });
+    await stalePage.route('https://**/*', (route) => route.abort());
+    await stalePage.route('**/data/prices.json*', (route) => route.fulfill({ status: 503, body: '{}' }));
+    await stalePage.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+    await stalePage.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, validData.countries.length);
+    await stalePage.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
+    assert.equal(await stalePage.locator('#searchInput').isEnabled(), true);
+    assert.equal(await stalePage.locator('#regionSelect').isEnabled(), true);
+    assert.equal(await stalePage.locator('.minimum-badge').count(), 0);
+    assert.equal(await stalePage.locator('.price-cell.is-minimum').count(), 0);
+    assert.equal(await stalePage.locator('#overviewTitle').textContent(), '历史缓存价格');
+    assert.equal(
+      await stalePage.locator('#minimumSummary').textContent(),
+      '当前使用的是过期本地缓存，价格仅供历史参考。联网刷新成功后恢复参考最低价排名。'
+    );
+    await stalePage.locator('button[data-sort-tier]:visible').first().click();
+    assert.ok(await stalePage.locator('#priceRows tr[data-country]').count() > 0, 'stale-cache sorting remains usable');
+    await stalePage.close();
+
+    const expiredPage = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    await expiredPage.addInitScript(({ payload, nowMs }) => {
+      Date.now = () => nowMs;
+      localStorage.setItem('icloud-price-comparison:validated-prices:v2', JSON.stringify(payload));
+    }, { payload: validData, nowMs: Date.parse(validData.generatedAt) + (7 * 24 * 60 * 60 * 1_000) + 1 });
+    await expiredPage.route('https://**/*', (route) => route.abort());
+    await expiredPage.route('**/data/prices.json*', (route) => route.fulfill({ status: 503, body: '{}' }));
+    await expiredPage.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+    await expiredPage.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
+    assert.equal(await expiredPage.locator('#priceRows tr[data-country]').count(), 0);
+    assert.equal(await expiredPage.locator('#loadStatusText').textContent(), '价格数据无法加载，请检查网络后重试。');
+    assert.equal(await expiredPage.evaluate(() => localStorage.getItem('icloud-price-comparison:validated-prices:v2')), null);
+    await expiredPage.close();
 
     const invalidPage = await browser.newPage({ viewport: { width: 1024, height: 768 } });
     await invalidPage.addInitScript(() => {
