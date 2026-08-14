@@ -2,7 +2,14 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { migrateHistoryToSchema4, migratePricesSchema3To4 } from '../scripts/migrate-schema-3-to-4.mjs';
-import { MARKET_REGISTRY, attachMarketIdentity, resolveMarket, validateMarketRegistry } from '../scripts/market-registry.mjs';
+import {
+  MARKET_REGISTRY,
+  attachMarketIdentity,
+  createMarketResolver,
+  resolveMarket,
+  validateMarketIdentityContinuity,
+  validateMarketRegistry
+} from '../scripts/market-registry.mjs';
 import { validatePriceHistoryConsistency } from '../data-contract.js';
 
 const pricesUrl = new URL('../data/prices.json', import.meta.url);
@@ -54,6 +61,71 @@ test('canonical registry Chinese names match the confirmed Apple Chinese mapping
     }
   }
   assert.equal(MARKET_REGISTRY['Euro Zone'].zh, '欧盟');
+});
+
+test('committed schema 4 market identities remain continuous with the registry', async () => {
+  const [prices, history] = await Promise.all([
+    readFile(pricesUrl, 'utf8').then(JSON.parse),
+    readFile(historyUrl, 'utf8').then(JSON.parse)
+  ]);
+  const result = validateMarketIdentityContinuity(prices, history);
+  assert.equal(result.status, 'passed');
+  assert.ok(result.reservedMarketIds.includes('jp'));
+});
+
+test('market identity continuity protects published and historical IDs', () => {
+  const identity = (id, canonicalName, aliases = []) => ({ id, canonicalName, zh: canonicalName, aliases });
+  const prices = (country, marketId) => ({ schemaVersion: 4, countries: [{ country, marketId }] });
+  const history = (country, marketId) => ({ schemaVersion: 4, markets: { [marketId]: { country } } });
+  const validateWith = (previousData, previousHistory, registry) => validateMarketIdentityContinuity(
+    previousData,
+    previousHistory,
+    { registry, resolve: createMarketResolver(registry) }
+  );
+
+  assert.doesNotThrow(() => validateMarketIdentityContinuity(prices('Japan', 'jp'), history('Japan', 'jp')));
+  const rekeyedJapan = { Japan: identity('jpn', 'Japan') };
+  assert.throws(
+    () => validateWith(prices('Japan', 'jp'), history('Japan', 'jp'), rekeyedJapan),
+    (error) => error.code === 'MARKET_IDENTITY_REKEY'
+  );
+
+  const unknown = resolveMarket('New Apple Market');
+  const registeredUnknown = { 'New Apple Market': identity(unknown.id, 'New Apple Market') };
+  assert.doesNotThrow(() => validateWith(
+    prices('New Apple Market', unknown.id),
+    history('New Apple Market', unknown.id),
+    registeredUnknown
+  ));
+  const rekeyedUnknown = { 'New Apple Market': identity('new-market', 'New Apple Market') };
+  assert.throws(
+    () => validateWith(prices('New Apple Market', unknown.id), history('New Apple Market', unknown.id), rekeyedUnknown),
+    (error) => error.code === 'MARKET_IDENTITY_REKEY'
+  );
+
+  const removedRegistry = { 'Removed Market': identity('removed', 'Removed Market') };
+  assert.doesNotThrow(() => validateWith(null, history('Removed Market', 'removed'), removedRegistry));
+  const reservedUnknown = resolveMarket('Removed Unknown Market');
+  const stolenRegistry = { 'Different New Market': identity(reservedUnknown.id, 'Different New Market') };
+  assert.throws(
+    () => validateWith(null, history('Removed Unknown Market', reservedUnknown.id), stolenRegistry),
+    (error) => error.code === 'MARKET_IDENTITY_REKEY'
+  );
+
+  const renamedRegistry = { 'New Source Name': identity('stable-id', 'New Source Name', ['Old Source Name']) };
+  assert.doesNotThrow(() => validateWith(
+    prices('New Source Name', 'stable-id'),
+    history('Old Source Name', 'stable-id'),
+    renamedRegistry
+  ));
+});
+
+test('Euro aliases preserve the euro-zone identity and Apple Chinese display name', () => {
+  for (const sourceName of ['Euro', 'Euro Zone', 'Eurozone']) {
+    const market = resolveMarket(sourceName);
+    assert.equal(market.id, 'euro-zone');
+    assert.equal(market.zh, '欧盟');
+  }
 });
 
 test('unknown market identity is stable, distinct, and fails closed on a generated-ID collision', () => {

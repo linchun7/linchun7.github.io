@@ -9,7 +9,7 @@ const DEFINITIONS = [
   ['bh', 'Bahrain', '巴林'], ['by', 'Belarus', '白俄罗斯'], ['bj', 'Benin', '贝宁'],
   ['bg', 'Bulgaria', '保加利亚'], ['cm', 'Cameroon', '喀麦隆'], ['hr', 'Croatia', '克罗地亚'],
   ['cz', 'Czechia', '捷克', ['Czech Republic']], ['dk', 'Denmark', '丹麦'], ['eg', 'Egypt', '埃及'],
-  ['euro-zone', 'Euro Zone', '欧盟', ['Eurozone']], ['ge', 'Georgia', '格鲁吉亚'], ['gh', 'Ghana', '加纳'],
+  ['euro-zone', 'Euro Zone', '欧盟', ['Euro', 'Eurozone']], ['ge', 'Georgia', '格鲁吉亚'], ['gh', 'Ghana', '加纳'],
   ['hu', 'Hungary', '匈牙利'], ['is', 'Iceland', '冰岛'], ['il', 'Israel', '以色列'],
   ['ci', 'Ivory Coast', '科特迪瓦', ["Cote D'Ivoire", 'Côte d’Ivoire', "Côte d'Ivoire"]],
   ['ke', 'Kenya', '肯尼亚'], ['mu', 'Mauritius', '毛里求斯'], ['md', 'Moldova', '摩尔多瓦', ['Republic of Moldova']],
@@ -36,20 +36,12 @@ export const MARKET_REGISTRY = Object.freeze(Object.fromEntries(DEFINITIONS.map(
   Object.freeze({ id, canonicalName, zh, aliases: Object.freeze(aliases) })
 ])));
 
-const BY_NAME = new Map();
-const KNOWN_IDS = new Set();
-for (const market of Object.values(MARKET_REGISTRY)) {
-  if (KNOWN_IDS.has(market.id)) throw new Error(`Duplicate marketId in registry: ${market.id}`);
-  KNOWN_IDS.add(market.id);
-  for (const name of [market.canonicalName, ...market.aliases]) {
-    const key = name.normalize('NFKC').trim().toLocaleLowerCase('en-US');
-    if (BY_NAME.has(key)) throw new Error(`Duplicate market name or alias in registry: ${name}`);
-    BY_NAME.set(key, market);
-  }
-}
-
 function normalizedName(value) {
   return String(value ?? '').normalize('NFKC').trim();
+}
+
+function normalizedNameKey(value) {
+  return normalizedName(value).toLocaleLowerCase('en-US');
 }
 
 function slugify(value) {
@@ -61,14 +53,81 @@ function slugify(value) {
     .replace(/^-+|-+$/g, '') || 'market';
 }
 
+export function createMarketResolver(registry = MARKET_REGISTRY) {
+  const byName = new Map();
+  const knownIds = new Set();
+  for (const market of Object.values(registry)) {
+    if (knownIds.has(market.id)) throw new Error(`Duplicate marketId in registry: ${market.id}`);
+    knownIds.add(market.id);
+    for (const name of [market.canonicalName, ...(market.aliases ?? [])]) {
+      const key = normalizedNameKey(name);
+      if (byName.has(key)) throw new Error(`Duplicate market name or alias in registry: ${name}`);
+      byName.set(key, market);
+    }
+  }
+  return (sourceName) => {
+    const name = normalizedName(sourceName);
+    const known = byName.get(normalizedNameKey(name));
+    if (known) return { ...known, sourceName: name, unknown: false };
+    const digest = createHash('sha256').update(name).digest('hex').slice(0, 8);
+    const id = `apple-${slugify(name)}-${digest}`;
+    if (knownIds.has(id)) throw new Error(`Generated marketId collides with registry: ${id}`);
+    return { id, canonicalName: name, sourceName: name, zh: name, aliases: [], unknown: true };
+  };
+}
+
+const defaultResolver = createMarketResolver();
+
 export function resolveMarket(sourceName) {
-  const name = normalizedName(sourceName);
-  const known = BY_NAME.get(name.toLocaleLowerCase('en-US'));
-  if (known) return { ...known, sourceName: name, unknown: false };
-  const digest = createHash('sha256').update(name).digest('hex').slice(0, 8);
-  const id = `apple-${slugify(name)}-${digest}`;
-  if (KNOWN_IDS.has(id)) throw new Error(`Generated marketId collides with registry: ${id}`);
-  return { id, canonicalName: name, sourceName: name, zh: name, aliases: [], unknown: true };
+  return defaultResolver(sourceName);
+}
+
+function marketIdentityError(message) {
+  const error = new Error(`MARKET_IDENTITY_REKEY: ${message}`);
+  error.code = 'MARKET_IDENTITY_REKEY';
+  return error;
+}
+
+export function validateMarketIdentityContinuity(previousData, previousHistory, {
+  registry = MARKET_REGISTRY,
+  resolve = resolveMarket
+} = {}) {
+  const publishedNamesById = new Map();
+  const checkPublishedIdentity = (sourceName, expectedId, location) => {
+    let resolved;
+    try {
+      resolved = resolve(sourceName);
+    } catch (error) {
+      throw marketIdentityError(`${location} cannot resolve ${sourceName}: ${error.message}`);
+    }
+    if (resolved.id !== expectedId) {
+      throw marketIdentityError(`${location} maps ${sourceName} from ${expectedId} to ${resolved.id}`);
+    }
+    const names = publishedNamesById.get(expectedId) ?? new Set();
+    names.add(normalizedNameKey(sourceName));
+    publishedNamesById.set(expectedId, names);
+  };
+
+  if (previousData?.schemaVersion === 4) {
+    for (const country of previousData.countries ?? []) {
+      checkPublishedIdentity(country.country, country.marketId, 'prices.json');
+    }
+  }
+  if (previousHistory?.schemaVersion === 4) {
+    for (const [marketId, record] of Object.entries(previousHistory.markets ?? {})) {
+      checkPublishedIdentity(record.country, marketId, 'history.json');
+    }
+  }
+
+  for (const market of Object.values(registry)) {
+    const publishedNames = publishedNamesById.get(market.id);
+    if (!publishedNames) continue;
+    const registryNames = [market.canonicalName, ...(market.aliases ?? [])].map(normalizedNameKey);
+    if (!registryNames.some((name) => publishedNames.has(name))) {
+      throw marketIdentityError(`registry market ${market.canonicalName} occupies reserved marketId ${market.id}`);
+    }
+  }
+  return { status: 'passed', reservedMarketIds: [...publishedNamesById.keys()].sort() };
 }
 
 export function attachMarketIdentity(countries, { onUnknown = () => {}, resolve = resolveMarket } = {}) {
@@ -89,9 +148,10 @@ export function attachMarketIdentity(countries, { onUnknown = () => {}, resolve 
   });
 }
 
-export function validateMarketRegistry() {
-  if (Object.keys(MARKET_REGISTRY).length < 73 || Object.keys(MARKET_REGISTRY).length > 500) {
-    throw new Error(`Market registry is incomplete or oversized: ${Object.keys(MARKET_REGISTRY).length}`);
+export function validateMarketRegistry(registry = MARKET_REGISTRY) {
+  if (Object.keys(registry).length < 73 || Object.keys(registry).length > 500) {
+    throw new Error(`Market registry is incomplete or oversized: ${Object.keys(registry).length}`);
   }
-  return MARKET_REGISTRY;
+  createMarketResolver(registry);
+  return registry;
 }
