@@ -114,6 +114,8 @@ const moneyFormatter = new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2
 const percentFormatter = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 });
 const collator = new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base' });
 let slowLoadingTimer = null;
+let freshnessBoundaryTimer = null;
+let freshnessRefreshPromise = null;
 let chartLibraryPromise = null;
 let analyticsScheduled = false;
 let initialPriceRequest = globalThis.__icloudInitialPriceRequest ?? null;
@@ -444,7 +446,11 @@ function renderMinimumSummary() {
     unavailable.className = 'minimum-unavailable cache-stale-notice';
     unavailable.textContent = state.minimumCuesReason === 'fx-stale'
       ? '当前人民币换算沿用上次成功汇率，参考最低价排名暂不展示。汇率刷新成功后自动恢复。'
-      : '当前价格数据已超过 36 小时，以下价格仅供历史参考。获取新数据后恢复参考最低价排名。';
+      : (state.minimumCuesReason === 'price-expired'
+        ? '价格数据已超过 7 天有效期，当前参考最低价不可用。'
+        : (state.minimumCuesReason === 'future-data'
+          ? '价格数据生成时间无效，当前参考最低价不可用。'
+          : '当前价格数据已超过 36 小时，以下价格仅供历史参考。获取新数据后恢复参考最低价排名。'));
     elements.minimumSummary.replaceChildren(unavailable);
     elements.minimumSummary.setAttribute('aria-busy', 'false');
     return;
@@ -948,9 +954,15 @@ function ensureHistoryLoaded() {
   state.historyStatus = 'loading';
   refreshOpenHistoryViews();
   const request = fetchJson('history.json')
-    .then((historyData) => {
+    .then(async (historyData) => {
       if (requestId !== state.historyRequestId) return null;
-      validatePriceHistoryConsistency(state.data, historyData);
+      try {
+        validatePriceHistoryConsistency(state.data, historyData);
+      } catch {
+        historyData = await fetchJson('history.json', { forceRefresh: true });
+        if (requestId !== state.historyRequestId) return null;
+        validatePriceHistoryConsistency(state.data, historyData);
+      }
       state.history = historyData;
       state.historyStatus = 'ready';
       refreshOpenHistoryViews();
@@ -1254,12 +1266,30 @@ function scheduleBackToTableUpdate() {
   });
 }
 
-function applyPriceData(data, { origin = 'network' } = {}) {
-  const freshness = classifyPriceFreshness(data);
-  if (freshness.status === 'unusable') throw new Error(`价格数据不可用：${freshness.reason}`);
-  state.data = data;
-  state.dataOrigin = origin;
-  state.dataFreshness = freshness;
+function clearFreshnessBoundary() {
+  clearTimeout(freshnessBoundaryTimer);
+  freshnessBoundaryTimer = null;
+}
+
+function scheduleFreshnessBoundary() {
+  clearFreshnessBoundary();
+  if (!state.data || state.dataFreshness?.status === 'unusable') return;
+  const generatedAtMs = Date.parse(state.data.generatedAt);
+  const nowMs = Date.now();
+  const boundaries = [
+    generatedAtMs + PRICE_FRESH_MAX_AGE_MS + 1,
+    generatedAtMs + PRICE_HARD_MAX_AGE_MS + 1
+  ];
+  const nextBoundary = boundaries.find((boundary) => boundary > nowMs);
+  if (!nextBoundary) return;
+  freshnessBoundaryTimer = setTimeout(() => {
+    freshnessBoundaryTimer = null;
+    void refreshPriceFreshnessLifecycle();
+  }, nextBoundary - nowMs);
+}
+
+function normalizeCurrentPriceFreshnessUi() {
+  const freshness = state.dataFreshness;
   state.minimumCuesReason = freshness.reason;
   state.minimumCuesEnabled = freshness.status === 'fresh';
   if (elements.overviewTitle) {
@@ -1274,13 +1304,69 @@ function applyPriceData(data, { origin = 'network' } = {}) {
         ? '人民币换算沿用上次成功汇率'
         : '按人民币参考汇率换算，便于横向比较。人民币金额显示保留两位小数，排序及参考排名按四舍五入前的内部换算结果计算。');
   }
+  const dataUpdatedAt = formatBeijingDateTime(state.data.generatedAt);
+  const fxUpdatedAt = formatBeijingDateTime(state.data.fx.fetchedAt);
+  elements.updatedAt.textContent = `\u6570\u636e\u66f4\u65b0\u65f6\u95f4\uff1a${dataUpdatedAt}\uff08\u5317\u4eac\u65f6\u95f4\uff09`;
+  elements.fxStatus.textContent = `\u66f4\u65b0\u65f6\u95f4\uff1a${fxUpdatedAt}\uff08\u5317\u4eac\u65f6\u95f4\uff09`;
+  elements.dataStatus.classList.remove('is-error', 'is-stale');
+  const freshnessWarning = freshness.reason === 'price-stale'
+    ? '\u8d85\u8fc7 36 \u5c0f\u65f6'
+    : (freshness.reason === 'fx-stale' ? '\u6c47\u7387\u6cbf\u7528\u4e0a\u6b21\u6210\u529f\u7ed3\u679c' : null);
+  if (freshnessWarning) {
+    elements.dataStatus.classList.add('is-stale');
+    const warning = document.createElement('span');
+    warning.className = 'freshness-warning';
+    warning.textContent = freshnessWarning;
+    elements.updatedAt.append(warning);
+  }
+}
+
+function renderCurrentPriceFreshness() {
+  normalizeCurrentPriceFreshnessUi();
+  calculateMinimumPrices();
+  renderSortHeaders({ refresh: false });
+  renderMinimumSummary();
+  renderTable();
+  updateUrlState();
+  scheduleBackToTableUpdate();
+  refreshIcons();
+}
+
+function applyCurrentPriceFreshness() {
+  const previousFreshness = state.dataFreshness;
+  const freshness = classifyPriceFreshness(state.data);
+  state.dataFreshness = freshness;
+  if (freshness.status === 'unusable') {
+    clearFreshnessBoundary();
+    return freshness;
+  }
+  if (previousFreshness?.status !== freshness.status || previousFreshness?.reason !== freshness.reason) {
+    renderCurrentPriceFreshness();
+  }
+  scheduleFreshnessBoundary();
+  return freshness;
+}
+
+function resetHistoryForPriceSnapshot() {
+  state.historyRequestId += 1;
+  state.history = null;
+  state.historyStatus = 'idle';
+  state.historyPromise = null;
+}
+
+function applyPriceData(data, { origin = 'network' } = {}) {
+  const freshness = classifyPriceFreshness(data);
+  if (freshness.status === 'unusable') throw new Error(`价格数据不可用：${freshness.reason}`);
+  const snapshotChanged = !priceSnapshotsEqual(state.data, data);
+  if (snapshotChanged) resetHistoryForPriceSnapshot();
+  clearFreshnessBoundary();
+  state.data = data;
+  state.dataOrigin = origin;
   if (!state.data.tiers.some(({ id }) => id === state.sortTier)) {
     state.sortTier = state.data.tiers.find(({ id }) => id === DEFAULT_SORT_TIER)?.id || state.data.tiers[0].id;
   }
   state.historyTier = state.sortTier;
   syncActiveHistoryCountry();
-  if (elements.historyDialog.open || elements.publishedDateDialog.open) void ensureHistoryLoaded();
-  calculateMinimumPrices();
   populateFilters();
   bindEvents();
   setFiltersDisabled(false);
@@ -1290,29 +1376,10 @@ function applyPriceData(data, { origin = 'network' } = {}) {
   renderTierHeaders();
   renderMobileTierButtons();
   renderPublishedDateHistory();
-  const dataUpdatedAt = formatBeijingDateTime(state.data.generatedAt);
-  const fxUpdatedAt = formatBeijingDateTime(state.data.fx.fetchedAt);
-  elements.updatedAt.textContent = `\u6570\u636e\u66f4\u65b0\u65f6\u95f4\uff1a${dataUpdatedAt}\uff08\u5317\u4eac\u65f6\u95f4\uff09`;
-  elements.fxStatus.textContent = `\u66f4\u65b0\u65f6\u95f4\uff1a${fxUpdatedAt}\uff08\u5317\u4eac\u65f6\u95f4\uff09`;
-  elements.dataStatus.classList.remove('is-error', 'is-stale');
-  const priceAgeHours = (Date.now() - new Date(state.data.generatedAt).getTime()) / 3_600_000;
-  const freshnessWarnings = [];
-  if (priceAgeHours < 0) freshnessWarnings.push('\u6570\u636e\u751f\u6210\u65f6\u95f4\u5728\u672a\u6765');
-  if (priceAgeHours > 36) freshnessWarnings.push('\u8d85\u8fc7 36 \u5c0f\u65f6');
-  if (state.data.fx.stale) freshnessWarnings.push('\u6c47\u7387\u6cbf\u7528\u4e0a\u6b21\u6210\u529f\u7ed3\u679c');
-  if (freshnessWarnings.length) {
-    elements.dataStatus.classList.add('is-stale');
-    const warning = document.createElement('span');
-    warning.className = 'freshness-warning';
-    warning.textContent = freshnessWarnings.join(' \u00b7 ');
-    elements.updatedAt.append(warning);
-  }
-  renderSortHeaders({ refresh: false });
-  renderMinimumSummary();
-  renderTable();
-  updateUrlState();
-  scheduleBackToTableUpdate();
-  refreshIcons();
+  state.dataFreshness = freshness;
+  renderCurrentPriceFreshness();
+  scheduleFreshnessBoundary();
+  if (elements.historyDialog.open || elements.publishedDateDialog.open) void ensureHistoryLoaded();
 }
 
 const DIALOG_FOCUSABLE_SELECTOR = [
@@ -1426,13 +1493,37 @@ function showLoadError(error) {
   elements.priceRows.append(row);
 }
 
+function showUnusableDataError(reason) {
+  const message = reason === 'future-data'
+    ? '价格数据生成时间超过允许的未来偏差，无法作为当前比较数据使用。请重新加载。'
+    : '价格数据已超过 7 天有效期，无法继续作为当前比较数据使用。请重新加载。';
+  elements.dataStatus.classList.add('is-error');
+  if (elements.historyDialog.open) elements.historyDialog.close();
+  elements.updatedAt.textContent = message;
+  setLoadStatus(message, { error: true });
+  state.minimumCuesEnabled = false;
+  state.minimumCuesReason = reason;
+  calculateMinimumPrices();
+  renderMinimumSummary();
+  renderTable();
+  setFiltersDisabled(true);
+}
+
+async function refreshPriceFreshnessLifecycle() {
+  if (!state.data) return;
+  const freshness = applyCurrentPriceFreshness();
+  if (freshness.status !== 'unusable') return;
+  showUnusableDataError(freshness.reason);
+  if (!freshnessRefreshPromise) {
+    freshnessRefreshPromise = initialize({ forceRefresh: true })
+      .finally(() => { freshnessRefreshPromise = null; });
+  }
+  await freshnessRefreshPromise;
+}
+
 async function initialize({ forceRefresh = false } = {}) {
   if (state.loading) return;
   state.loading = true;
-  state.historyRequestId += 1;
-  state.history = null;
-  state.historyStatus = 'idle';
-  state.historyPromise = null;
   clearTimeout(slowLoadingTimer);
   setLoadStatus(forceRefresh ? '\u6b63\u5728\u91cd\u65b0\u52a0\u8f7d\u4ef7\u683c\u6570\u636e\uff0c\u8bf7\u7a0d\u5019\u2026' : '\u6b63\u5728\u52a0\u8f7d\u4ef7\u683c\u6570\u636e\uff0c\u8bf7\u7a0d\u5019\u2026');
   setFiltersDisabled(true);
@@ -1457,15 +1548,24 @@ async function initialize({ forceRefresh = false } = {}) {
 
   try {
     const networkData = await fetchJson('prices.json', { forceRefresh });
-    if (forceRefresh || !priceSnapshotsEqual(state.data, networkData)) {
+    if (!priceSnapshotsEqual(state.data, networkData)) {
       writePriceCache(networkData);
       applyPriceData(networkData, { origin: 'network' });
     } else {
       state.dataOrigin = 'network';
+      applyCurrentPriceFreshness();
+      normalizeCurrentPriceFreshnessUi();
+      setFiltersDisabled(false);
     }
     setLoadStatus('', { hidden: true });
   } catch (error) {
     if (fallbackData) {
+      const fallbackFreshness = classifyPriceFreshness(fallbackData);
+      if (fallbackFreshness.status === 'unusable') {
+        state.dataFreshness = fallbackFreshness;
+        showUnusableDataError(fallbackFreshness.reason);
+        return;
+      }
       console.warn(`网络价格刷新失败，继续显示现有数据：${error.message}`);
       if (state.data !== fallbackData) applyPriceData(fallbackData, { origin: state.dataOrigin ?? 'network' });
       elements.dataStatus.classList.add('is-stale');
@@ -1493,6 +1593,13 @@ elements.retryButton?.addEventListener('click', () => {
   elements.retryButton.hidden = true;
   setLoadStatus('正在重新加载价格数据，请稍候…');
   initialize({ forceRefresh: true });
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') void refreshPriceFreshnessLifecycle();
+});
+window.addEventListener('pageshow', () => {
+  void refreshPriceFreshnessLifecycle();
 });
 
 removeLegacyPriceCaches();
