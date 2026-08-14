@@ -249,6 +249,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       severe_failure: ${{ steps.classify_publish.outputs.severe_failure }}
+      publish_outcome: ${{ steps.classify_publish.outputs.publish_outcome }}
     steps:
       - name: 检出精确生成基线
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -282,42 +283,54 @@ jobs:
           node "$validator" --data-dir unpacked/tools/icloud_price_comparison/data
 
       - name: 确认 main 未前进并准备提交
+        id: prepare_publish
         shell: bash
         env:
           GENERATION_BASE_SHA: ${{ needs.update.outputs.generation_base_sha }}
         run: |
           set -euo pipefail
+          echo "main_advanced=false" >> "$GITHUB_OUTPUT"
+          echo "should_push=false" >> "$GITHUB_OUTPUT"
           git fetch origin main --depth=1
           if [[ "$(git rev-parse origin/main)" != "$GENERATION_BASE_SHA" ]]; then
             echo "::error title=main 已在生成期间前进::远端 main 已变化；本次不发布，下一次运行会重新生成。"
-            exit 1
+            echo "main_advanced=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
           validated_data="$RUNNER_TEMP/icloud-price-data/unpacked/tools/icloud_price_comparison/data"
           rm -rf tools/icloud_price_comparison/data
           cp -a "$validated_data" tools/icloud_price_comparison/data
           if git diff --quiet -- tools/icloud_price_comparison/data; then
-            echo "NO_DATA_CHANGES=true" >> "$GITHUB_ENV"
+            echo "publish_candidate=no_data_changes" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add --all tools/icloud_price_comparison/data
           git commit -m "chore: update iCloud prices"
+          echo "publish_candidate=commit_ready" >> "$GITHUB_OUTPUT"
+          echo "should_push=true" >> "$GITHUB_OUTPUT"
 
       - name: 仅在最终步骤推送
-        if: env.NO_DATA_CHANGES != 'true'
+        id: push_data
+        if: steps.prepare_publish.outputs.should_push == 'true'
+        continue-on-error: true
         shell: bash
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          echo "main_advanced=false" >> "$GITHUB_OUTPUT"
+          echo "pushed=false" >> "$GITHUB_OUTPUT"
           git fetch origin main --depth=1
           if [[ "$(git rev-parse origin/main)" != "${{ needs.update.outputs.generation_base_sha }}" ]]; then
             echo "::error title=main 已在提交前前进::本次不推送，下一次运行会重新生成。"
-            exit 1
+            echo "main_advanced=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
           auth_header=$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)
           git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" push origin HEAD:main
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
 
       - name: 分类发布故障
         id: classify_publish
@@ -325,10 +338,122 @@ jobs:
         shell: bash
         run: |
           severe_failure=false
+          publish_outcome=push_failed
           if [[ "${{ steps.validate_data_artifact.outcome }}" == "failure" ]]; then
             severe_failure=true
+            publish_outcome=artifact_invalid
+          elif [[ "${{ steps.prepare_publish.outputs.main_advanced }}" == "true" ]] \
+            || [[ "${{ steps.push_data.outputs.main_advanced }}" == "true" ]]; then
+            publish_outcome=main_advanced
+          elif [[ "${{ steps.prepare_publish.outputs.publish_candidate }}" == "no_data_changes" ]]; then
+            publish_outcome=no_data_changes
+          elif [[ "${{ steps.push_data.outcome }}" == "failure" ]]; then
+            severe_failure=true
+            publish_outcome=push_failed
+          elif [[ "${{ steps.push_data.outputs.pushed }}" == "true" ]]; then
+            publish_outcome=published
+          else
+            severe_failure=true
+            publish_outcome=push_failed
           fi
           echo "severe_failure=$severe_failure" >> "$GITHUB_OUTPUT"
+          echo "publish_outcome=$publish_outcome" >> "$GITHUB_OUTPUT"
+          if [[ "$publish_outcome" == "main_advanced" ]]; then
+            echo "::error title=PUBLISH_MAIN_ADVANCED::main 已前进；本次不覆盖、不发布。"
+            exit 1
+          fi
+          if [[ "$severe_failure" == "true" ]]; then
+            if [[ "$publish_outcome" == "artifact_invalid" ]]; then
+              echo "::error title=PUBLISH_ARTIFACT_INVALID::已测试的数据工件未通过发布边界校验。"
+            else
+              echo "::error title=PUBLISH_PUSH_FAILED::待发布提交未能推送到 main。"
+            fi
+            exit 1
+          fi
+
+  verify-production:
+    name: 验证真实生产部署
+    needs:
+      - update
+      - publish
+    if: needs.publish.result == 'success' && (needs.publish.outputs.publish_outcome == 'published' || needs.publish.outputs.publish_outcome == 'no_data_changes')
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    outputs:
+      severe_failure: ${{ steps.classify_verification.outputs.severe_failure }}
+      verification_status: ${{ steps.classify_verification.outputs.verification_status }}
+    steps:
+      - name: 检出验证脚本
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.update.outputs.generation_base_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: 配置 Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: 下载已测试的数据工件
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: icloud-price-data-${{ github.run_id }}
+          path: ${{ runner.temp }}/icloud-price-data
+
+      - name: 重新校验并展开已测试工件
+        id: validate_expected_artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/icloud-price-data"
+          sha256sum --check icloud-price-data.tar.sha256
+          validator="$GITHUB_WORKSPACE/tools/icloud_price_comparison/scripts/validate-data-artifact.mjs"
+          node "$validator" --archive icloud-price-data.tar
+          mkdir unpacked
+          tar --extract --file icloud-price-data.tar --directory unpacked --no-same-owner --no-same-permissions
+          node "$validator" --data-dir unpacked/tools/icloud_price_comparison/data
+          git -C "$GITHUB_WORKSPACE" fetch origin main --depth=1
+          git -C "$GITHUB_WORKSPACE" show origin/main:tools/icloud_price_comparison/data/prices.json \
+            > "$RUNNER_TEMP/current-main-prices.json"
+
+      - name: 轮询真实生产 URL
+        id: verify_production
+        continue-on-error: true
+        shell: bash
+        run: |
+          node tools/icloud_price_comparison/scripts/verify-production-deployment.mjs \
+            --expected-file "$RUNNER_TEMP/icloud-price-data/unpacked/tools/icloud_price_comparison/data/prices.json" \
+            --current-main-file "$RUNNER_TEMP/current-main-prices.json" \
+            --run-id "${{ github.run_id }}" \
+            --summary-file "$GITHUB_STEP_SUMMARY"
+
+      - name: 分类生产验证结果
+        id: classify_verification
+        if: always()
+        shell: bash
+        run: |
+          severe_failure=false
+          verification_status=passed
+          if [[ "${{ steps.validate_expected_artifact.outcome }}" == "failure" ]]; then
+            severe_failure=true
+            verification_status=artifact_invalid
+          elif [[ "${{ steps.verify_production.outcome }}" == "failure" ]]; then
+            severe_failure=true
+            verification_status=production_not_updated
+          fi
+          echo "severe_failure=$severe_failure" >> "$GITHUB_OUTPUT"
+          echo "verification_status=$verification_status" >> "$GITHUB_OUTPUT"
+          if [[ "$severe_failure" == "true" ]]; then
+            if [[ "$verification_status" == "artifact_invalid" ]]; then
+              echo "::error title=PUBLISH_ARTIFACT_INVALID::production verifier 拒绝了未通过重新校验的 expected artifact。"
+            else
+              echo "::error title=PUBLISH_PRODUCTION_NOT_UPDATED::真实生产 URL 未返回已验证的发布数据。"
+            fi
+            exit 1
+          fi
 
   notify:
     name: 外部心跳告警
@@ -336,7 +461,9 @@ jobs:
       - prepare
       - update
       - publish
+      - verify-production
     if: always() && needs.prepare.result != 'skipped'
+    permissions: {}
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -348,9 +475,12 @@ jobs:
           SHOULD_RUN: ${{ needs.prepare.outputs.should_run }}
           UPDATE_RESULT: ${{ needs.update.result }}
           PUBLISH_RESULT: ${{ needs.publish.result }}
+          PUBLISH_OUTCOME: ${{ needs.publish.outputs.publish_outcome }}
+          VERIFY_RESULT: ${{ needs.verify-production.result }}
           PREPARE_SEVERE_FAILURE: ${{ needs.prepare.outputs.severe_failure }}
           UPDATE_SEVERE_FAILURE: ${{ needs.update.outputs.severe_failure }}
           PUBLISH_SEVERE_FAILURE: ${{ needs.publish.outputs.severe_failure }}
+          VERIFY_SEVERE_FAILURE: ${{ needs.verify-production.outputs.severe_failure }}
         shell: bash
         run: |
           if [[ -z "$HEALTHCHECK_PING_URL" ]]; then
@@ -359,11 +489,15 @@ jobs:
           fi
           if [[ "$PREPARE_SEVERE_FAILURE" == true ]] \
             || [[ "$UPDATE_SEVERE_FAILURE" == true ]] \
-            || [[ "$PUBLISH_SEVERE_FAILURE" == true ]]; then
+            || [[ "$PUBLISH_SEVERE_FAILURE" == true ]] \
+            || [[ "$VERIFY_SEVERE_FAILURE" == true ]]; then
             status=1
           elif [[ "$PREPARE_RESULT" == success ]] \
             && { [[ "$SHOULD_RUN" != true ]] \
-              || { [[ "$UPDATE_RESULT" == success ]] && [[ "$PUBLISH_RESULT" == success ]]; }; }; then
+              || { [[ "$UPDATE_RESULT" == success ]] \
+                && [[ "$PUBLISH_RESULT" == success ]] \
+                && [[ "$VERIFY_RESULT" == success ]] \
+                && { [[ "$PUBLISH_OUTCOME" == published ]] || [[ "$PUBLISH_OUTCOME" == no_data_changes ]]; }; }; }; then
             status=0
           else
             echo "本次属于单次暂时故障，不发送失败信号；由 Healthchecks 连续缺少成功心跳的宽限期处理。"
