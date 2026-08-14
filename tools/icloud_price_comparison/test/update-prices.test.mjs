@@ -3,6 +3,7 @@ import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, utimes, writeFile } fr
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { validateHistoryPayload, validatePriceHistoryConsistency } from '../data-contract.js';
 import { resolveMarket } from '../scripts/market-registry.mjs';
 import {
   buildSnapshotChanges,
@@ -445,6 +446,46 @@ test('performs a second Apple fetch when only the published date changes', async
   const html = buildAppleHtml(data, 'August 12, 2026');
   const result = await runAppleConfirmationScenario({ firstHtml: html, secondHtml: html });
   assert.equal(result.appleRequests, 2);
+});
+
+test('publishes price and publication history at Beijing midnight with a previous-day UTC timestamp', async (t) => {
+  const fixedNow = new Date('2026-08-14T16:02:00.000Z');
+  t.mock.timers.enable({ apis: ['Date'], now: fixedNow });
+  const { root, paths } = await createTemporaryProductionPaths();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const previous = JSON.parse(await readFile(paths.currentDataPath, 'utf8'));
+  const changed = structuredClone(previous);
+  const changedCountry = changed.countries.find(({ country }) => country === 'Bahamas');
+  changedCountry.plans['50GB'] = { ...changedCountry.plans['50GB'], price: 1, formattedPrice: '$1.00' };
+  const fxPayload = {
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: Math.floor(fixedNow.getTime() / 1_000),
+    rates: compatibleExchangeRates(previous)
+  };
+
+  await withMockedFetch(
+    { html: buildAppleHtml(changed, 'August 12, 2026'), fxPayload },
+    () => main({ dryRun: false, paths, stepSummaryPath: null })
+  );
+
+  const [prices, history] = await Promise.all([
+    readFile(paths.currentDataPath, 'utf8').then(JSON.parse),
+    readFile(paths.historyPath, 'utf8').then(JSON.parse)
+  ]);
+  assert.equal(prices.generatedAt, '2026-08-14T16:02:00.000Z');
+  assert.equal(prices.run.observedAtBeijing, '2026-08-15');
+  assert.equal(history.updatedAt, prices.generatedAt);
+  const priceEvent = history.markets.bs.events.at(-1);
+  assert.equal(priceEvent.observedAt, '2026-08-15');
+  assert.equal(priceEvent.observedAtBeijing, '2026-08-15');
+  assert.equal(priceEvent.observedAtUtc, prices.generatedAt);
+  const publicationEvent = history.sourcePublishedDates.at(-1);
+  assert.equal(publicationEvent.observedAt, '2026-08-15');
+  assert.equal(publicationEvent.observedAtBeijing, '2026-08-15');
+  assert.equal(publicationEvent.observedAtUtc, prices.generatedAt);
+  assert.doesNotThrow(() => validateHistoryPayload(history));
+  assert.doesNotThrow(() => validatePriceHistoryConsistency(prices, history));
 });
 
 test('requires explicit alias review for an exact removed-to-unknown Apple rename candidate', () => {

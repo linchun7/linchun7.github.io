@@ -31,6 +31,10 @@ const SNAPSHOT_INDEX_PATH = path.join(SNAPSHOTS_DIR, 'index.json');
 const IMPORT_TRANSACTION_PATH = path.join(PROJECT_DIR, 'data/.apple-archive-import-transaction.json');
 const APPLE_URL = 'https://support.apple.com/en-us/108047';
 
+export function currentPriceObservationDate(currentData) {
+  return currentData.run?.observedAtBeijing ?? formatBeijingDate(currentData.generatedAt);
+}
+
 async function writeTextAtomic(filePath, text) {
   await mkdir(path.dirname(filePath), { recursive: true });
   const temporaryPath = `${filePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -412,8 +416,7 @@ async function importAppleArchivesUnlocked(inputDir, paths = {}) {
   }
 
   const lastArchiveDate = archives.at(-1)?.publishedDate ?? '0000-00-00';
-  const currentEventDate = currentData.run?.observedAtBeijing
-    ?? currentData.generatedAt.slice(0, 10);
+  const currentEventDate = currentPriceObservationDate(currentData);
   updateHistory(rebuilt, attachMarketIdentity(currentData.countries, { chineseNames: names }), currentEventDate, currentData.tiers);
   const currentChanges = buildSnapshotChanges(previousData, currentData.countries, currentData.tiers);
   if (currentPublishedDate > lastArchiveDate) {
