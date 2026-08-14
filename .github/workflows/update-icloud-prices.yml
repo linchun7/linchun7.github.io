@@ -95,7 +95,7 @@ jobs:
       - name: 检出仓库
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
+          fetch-depth: 1
           persist-credentials: false
 
       - name: 固定本次生成基线
@@ -103,34 +103,10 @@ jobs:
         working-directory: .
         shell: bash
         run: |
-          git fetch origin main
+          git fetch origin main --depth=1
           git checkout --detach origin/main
           echo "GENERATION_BASE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - name: 检查仓库容量
-        working-directory: .
-        shell: bash
-        run: |
-          git_kib=$(du -sk .git | cut -f1)
-          git_mib=$(( (git_kib + 1023) / 1024 ))
-          history_bytes=$(wc -c < tools/icloud_price_comparison/data/history.json)
-          history_kib=$(( (history_bytes + 1023) / 1024 ))
-          {
-            echo "### 容量监控"
-            echo "- Git 历史：${git_mib} MiB"
-            echo "- 价格历史：${history_kib} KiB"
-          } > "$RUNNER_TEMP/icloud-storage-summary.md"
-          if (( git_kib >= 819200 )); then
-            echo "::warning title=Git 历史体积较高::Git 历史已达 ${git_mib} MiB，请尽快安排人工维护。"
-            echo "- **警告**：Git 历史体积较高，请尽快安排人工维护。" >> "$RUNNER_TEMP/icloud-storage-summary.md"
-          elif (( git_kib >= 512000 )); then
-            echo "::warning title=Git 历史体积::Git 历史已达 ${git_mib} MiB，请在达到 1 GiB 前安排人工审查。"
-            echo "- **警告**：Git 历史已达 ${git_mib} MiB，请安排人工审查。" >> "$RUNNER_TEMP/icloud-storage-summary.md"
-          fi
-          if (( history_bytes >= 2097152 )); then
-            echo "::warning title=价格历史体积::history.json 已达 ${history_kib} KiB，请考虑按年份或地区拆分。"
-            echo "- **警告**：价格历史已达 ${history_kib} KiB，请考虑按年份或地区拆分。" >> "$RUNNER_TEMP/icloud-storage-summary.md"
-          fi
 
       - name: 配置 Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -175,15 +151,6 @@ jobs:
           path: tools/icloud_price_comparison/artifacts
           if-no-files-found: ignore
           retention-days: 14
-
-      - name: 追加仓库容量摘要
-        if: always()
-        working-directory: .
-        shell: bash
-        run: |
-          if [[ -f "$RUNNER_TEMP/icloud-storage-summary.md" ]]; then
-            cat "$RUNNER_TEMP/icloud-storage-summary.md" >> "$GITHUB_STEP_SUMMARY"
-          fi
 
       - name: 打包已测试的数据工件
         id: package_data
@@ -287,7 +254,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.update.outputs.generation_base_sha }}
-          fetch-depth: 0
+          fetch-depth: 1
           persist-credentials: false
 
       - name: 配置 Node.js
