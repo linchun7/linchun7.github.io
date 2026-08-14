@@ -9,6 +9,7 @@ import {
   validatePricePayload
 } from '../data-contract.js';
 import { validateExistingHistory, validateExistingPrices } from '../scripts/update-prices.mjs';
+import { VALID_REGIONS } from '../data-model.js';
 
 const pricesUrl = new URL('../data/prices.json', import.meta.url);
 const historyUrl = new URL('../data/history.json', import.meta.url);
@@ -28,6 +29,19 @@ test('shared browser and updater contracts accept the committed production paylo
   assert.equal(validatePayload('history.json', history), history);
   assert.doesNotThrow(() => validateExistingPrices(prices));
   assert.doesNotThrow(() => validateExistingHistory(history, prices));
+});
+
+test('producer and browser contracts share the exact region allowlist', async () => {
+  const { prices, history } = await productionFixtures();
+  assert.deepEqual([...new Set(prices.countries.map(({ region }) => region))].sort(), [...VALID_REGIONS].sort());
+  const invalidPrices = structuredClone(prices);
+  invalidPrices.countries[0].region = 'Unknown Region';
+  assert.throws(() => validatePricePayload(invalidPrices), /invalid country entry/);
+  assert.throws(() => validateExistingPrices(invalidPrices), /invalid country|invalid country entry/);
+  const invalidHistory = structuredClone(history);
+  Object.values(invalidHistory.markets)[0].region = 'Unknown Region';
+  assert.throws(() => validateHistoryPayload(invalidHistory), /invalid record/);
+  assert.throws(() => validateExistingHistory(invalidHistory, prices), /invalid record/);
 });
 
 test('rejects undeclared price tiers and truncated browser payloads', async () => {
@@ -426,7 +440,7 @@ test('accepts a metadata-only country change without synthetic tier changes', as
     .flatMap((entry) => entry.changes?.changedCountries ?? [])[0];
   assert.ok(change, 'production history must include a changed-country fixture');
   change.tiers = [];
-  change.toRegion = `${change.fromRegion} (renamed)`;
+  change.toRegion = VALID_REGIONS.find((region) => region !== change.fromRegion);
   assert.doesNotThrow(() => validateHistoryPayload(payload));
   assert.doesNotThrow(() => validateExistingHistory(payload, prices));
 });

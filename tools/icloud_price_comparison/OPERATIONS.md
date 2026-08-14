@@ -222,7 +222,7 @@ Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
 
 ### 缓存
 
-当前运维目标：HTML/JSON 最长约 10 分钟，带版本号静态资源约 30 分钟。修改 JS/CSS/数据契约时必须同步提升 HTML 中 query version。部署后可按工具路径定向 purge；不要全站清缓存，除非事故范围确实是全站。
+当前运维目标：HTML/JSON 最长约 10 分钟，带内容哈希版本的静态资源约 30 分钟。修改浏览器 JS/CSS/数据契约后运行 `pnpm assets:update`，提交前用 `pnpm assets:check` 验证引用与内容一致；不要手工填写 query version。部署后可按工具路径定向 purge；不要全站清缓存，除非事故范围确实是全站。
 
 Cloudflare 可能自动修改 HTML 注入 Beacon，因此 HTML 响应字节 hash 不一定与仓库文件相同。JS、CSS、vendor 和 JSON 不应被改写，可直接比较 SHA-256；HTML 应同时检查候选资源版本、CSP、页脚和脚本列表。
 
