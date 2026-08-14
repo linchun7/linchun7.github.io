@@ -355,10 +355,10 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
 
 .price-table tbody tr { height: 64px; }
 .price-table tbody tr:last-child td { border-bottom: 0; }
-.price-table tbody tr[data-country] { cursor: pointer; }
-.price-table tbody tr[data-country] td { transition: background-color 180ms ease, color 180ms ease, box-shadow 180ms ease; }
-.price-table tbody tr[data-country]:hover td, .price-table tbody tr[data-country]:focus-within td { background: #f8fbfe; }
-.price-table tbody tr[data-country]:hover .country-name { color: var(--accent-dark); }
+.price-table tbody tr[data-market-id] { cursor: pointer; }
+.price-table tbody tr[data-market-id] td { transition: background-color 180ms ease, color 180ms ease, box-shadow 180ms ease; }
+.price-table tbody tr[data-market-id]:hover td, .price-table tbody tr[data-market-id]:focus-within td { background: #f8fbfe; }
+.price-table tbody tr[data-market-id]:hover .country-name { color: var(--accent-dark); }
 
 .country-history-button { width: 100%; min-width: 0; padding: 4px 0; color: inherit; background: transparent; border: 0; text-align: left; }
 .country-history-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
@@ -368,9 +368,9 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
 
 .price-cell { min-width: 0; overflow: hidden; font-variant-numeric: tabular-nums; }
 .price-cell.is-sorted { background: #f5faff; box-shadow: inset 1px 0 #e3eef9, inset -1px 0 #e3eef9; }
-.price-table tbody tr[data-country]:hover .price-cell.is-sorted { background: #edf6ff; }
-.price-table tbody tr[data-country] .price-cell.is-minimum { background: var(--green-soft); box-shadow: inset 1px 0 #d5ecdf, inset -1px 0 #d5ecdf; }
-.price-table tbody tr[data-country]:hover .price-cell.is-minimum { background: #e5f6ed; }
+.price-table tbody tr[data-market-id]:hover .price-cell.is-sorted { background: #edf6ff; }
+.price-table tbody tr[data-market-id] .price-cell.is-minimum { background: var(--green-soft); box-shadow: inset 1px 0 #d5ecdf, inset -1px 0 #d5ecdf; }
+.price-table tbody tr[data-market-id]:hover .price-cell.is-minimum { background: #e5f6ed; }
 .price-cny { min-width: 0; display: flex; align-items: baseline; justify-content: flex-end; gap: 2px; overflow: hidden; color: var(--ink); font-size: 15px; font-weight: 740; line-height: 1.2; }
 .price-symbol { flex: 0 0 auto; color: var(--ink-soft); font-size: 11px; font-weight: 650; }
 .price-amount { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
