@@ -3,7 +3,7 @@ import {
   publicationDateKey,
   validatePayload,
   validatePriceHistoryConsistency
-} from './data-contract.js?v=a3f395f0';
+} from './data-contract.js?v=f8779a1b';
 import { createIcons } from './vendor/lucide-subset.js?v=657f4f9d';
 import { VALID_REGIONS } from './data-model.js?v=1df20253';
 

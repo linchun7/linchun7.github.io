@@ -449,7 +449,7 @@ export function validateHistoryPayload(payload) {
     throw new Error('history.json has an unsupported structure');
   }
 
-  const latestHistoryDate = payload.updatedAt?.slice(0, 10) ?? null;
+  const latestHistoryDate = payload.updatedAt ? formatBeijingDate(payload.updatedAt) : null;
 
   for (const [recordKey, record] of Object.entries(records)) {
     if (UNSAFE_OBJECT_KEYS.has(recordKey)
