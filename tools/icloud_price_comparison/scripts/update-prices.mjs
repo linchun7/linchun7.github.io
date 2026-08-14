@@ -58,9 +58,15 @@ function transientHealthcheckError(message, { code = null, cause = null } = {}) 
 
 function appleConfirmationUnavailableError(cause) {
   return transientHealthcheckError(
-    'Apple structural-change confirmation is temporarily unavailable; stable data was preserved and the next run must retry',
+    'Apple semantic-change confirmation is temporarily unavailable; stable data was preserved and the next run must retry',
     { code: 'APPLE_CONFIRMATION_UNAVAILABLE', cause }
   );
+}
+
+function appleConfirmationMismatchError(message, cause = null) {
+  const error = new Error(message, cause ? { cause } : undefined);
+  error.code = 'APPLE_CONFIRMATION_MISMATCH';
+  return error;
 }
 
 export function classifyHealthcheckFailure(error) {
@@ -139,6 +145,7 @@ async function readBoundedResponseText(response, maxResponseBytes, resourceName)
 export async function fetchResource(url, {
   json = false,
   attempts = RETRY_DELAYS_MS.length,
+  cache,
   headers = {},
   resourceName = url,
   retryDelaysMs = RETRY_DELAYS_MS,
@@ -166,6 +173,7 @@ export async function fetchResource(url, {
     try {
       const timeoutMs = Math.max(1, Math.min(requestTimeoutMs, remainingMs));
       const response = await fetch(url, {
+        ...(cache ? { cache } : {}),
         headers: {
           accept: json ? 'application/json' : 'text/html,application/xhtml+xml',
           'accept-language': 'en-US,en;q=0.9',
@@ -1297,6 +1305,46 @@ export function appleSnapshotContentHash(parsed) {
   return createHash('sha256').update(JSON.stringify(normalizeApplePricing(parsed))).digest('hex');
 }
 
+export function normalizeAppleSemanticSnapshot(parsed) {
+  const tiers = [...(parsed?.tiers ?? [])].sort((a, b) => a.capacityGb - b.capacityGb);
+  const tierOrder = new Map(tiers.map(({ id }, index) => [id, index]));
+  return {
+    publishedDate: publicationDateKey(parsed?.sourcePublishedDate ?? parsed?.source?.publishedDate),
+    markets: (parsed?.countries ?? []).map(({ country, region, currency, plans }) => ({
+      country,
+      region,
+      currency,
+      plans: Object.fromEntries(Object.entries(plans ?? {})
+        .map(([tier, value]) => [tier, snapshotPlanPrice(value)])
+        .sort(([first], [second]) => (tierOrder.get(first) ?? Number.MAX_SAFE_INTEGER)
+          - (tierOrder.get(second) ?? Number.MAX_SAFE_INTEGER)
+          || first.localeCompare(second)))
+    })).sort((first, second) => first.country.localeCompare(second.country))
+  };
+}
+
+export function appleSemanticHash(parsed) {
+  return createHash('sha256')
+    .update(JSON.stringify(normalizeAppleSemanticSnapshot(parsed)))
+    .digest('hex');
+}
+
+export function appleSemanticChanged(previousData, parsed) {
+  return previousData ? appleSemanticHash(previousData) !== appleSemanticHash(parsed) : false;
+}
+
+export function confirmAppleSemanticChange(firstParsed, secondParsed, previousData) {
+  if (firstParsed.parser !== 'cross-checked' || secondParsed.parser !== 'cross-checked') {
+    throw appleConfirmationMismatchError('Apple semantic changes require two fully cross-checked parses');
+  }
+  validatePrices(secondParsed.countries, { tiers: secondParsed.tiers });
+  if (appleSemanticHash(firstParsed) !== appleSemanticHash(secondParsed)) {
+    throw appleConfirmationMismatchError('Apple semantic change was not reproduced by the independent confirmation fetch');
+  }
+  const changes = appleStructuralChanges(previousData, firstParsed);
+  return { changes, confirmedRemovedCountries: changes.removedCountries };
+}
+
 export function removedCountryNames(previousCountries = [], currentCountries = []) {
   const currentNames = new Set(currentCountries.map(({ country }) => country));
   return previousCountries
@@ -2094,20 +2142,28 @@ export async function main({
   }
   validatePrices(parsed.countries, { tiers: parsed.tiers });
   let confirmedRemovedCountries = [];
-  const structuralChanges = appleStructuralChanges(previousData, parsed);
-  if (previousData && Object.values(structuralChanges).some((items) => items.length > 0)) {
+  if (appleSemanticChanged(previousData, parsed)) {
     let confirmationHtml;
     try {
       confirmationHtml = await fetchResource(APPLE_URL, {
         networkBudget,
-        headers: { 'cache-control': 'no-cache, no-store', pragma: 'no-cache' },
-        resourceName: 'Apple iCloud+ pricing structural-change confirmation'
+        cache: 'no-store',
+        headers: { 'cache-control': 'no-cache', pragma: 'no-cache' },
+        resourceName: 'Apple iCloud+ pricing semantic-change confirmation'
       });
     } catch (error) {
       throw appleConfirmationUnavailableError(error);
     }
-    const confirmationParsed = parseApplePrices(confirmationHtml, { allowUnknownCountries: true });
-    ({ confirmedRemovedCountries } = confirmAppleStructuralChanges(
+    let confirmationParsed;
+    try {
+      confirmationParsed = parseApplePrices(confirmationHtml, { allowUnknownCountries: true });
+    } catch (error) {
+      throw appleConfirmationMismatchError(
+        'Apple confirmation did not produce two matching parser results',
+        error
+      );
+    }
+    ({ confirmedRemovedCountries } = confirmAppleSemanticChange(
       parsed,
       confirmationParsed,
       previousData
