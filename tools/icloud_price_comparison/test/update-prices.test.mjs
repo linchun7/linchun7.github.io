@@ -881,7 +881,23 @@ test('derives rounded plan-level CNY prices without publishing source rates', ()
 
   assert.equal(derived[0].plans['50GB'].cnyPrice, 14.33);
   assert.equal(derived[1].plans['50GB'].cnyPrice, 7.2);
+  assert.equal(derived[1].plans['50GB'].cnyRank, 1);
+  assert.equal(derived[0].plans['50GB'].cnyRank, 2);
   assert.equal(Object.hasOwn(derived[0].plans['50GB'], 'sourceRate'), false);
+  assert.equal(Object.hasOwn(derived[0].plans['50GB'], 'fullPrecisionCnyPrice'), false);
+});
+
+test('ranks with full precision and uses dense ranks only for true ties', () => {
+  const countries = [
+    { marketId: 'a', country: 'Alpha', region: 'Americas', currency: 'USD', plans: { '50GB': { price: 1, formattedPrice: '$1.00' } } },
+    { marketId: 'b', country: 'Beta', region: 'Americas', currency: 'USD', plans: { '50GB': { price: 1.00005, formattedPrice: '$1.00005' } } },
+    { marketId: 'c', country: 'Gamma', region: 'Americas', currency: 'USD', plans: { '50GB': { price: 1, formattedPrice: '$1.00' } } }
+  ];
+  const derived = attachDerivedCnyPrices(countries, {
+    fx: { rates: { USD: 1, CNY: 7.0637 }, reusePreviousCny: false }
+  });
+  assert.deepEqual(derived.map((country) => country.plans['50GB'].cnyPrice), [7.06, 7.06, 7.06]);
+  assert.deepEqual(derived.map((country) => country.plans['50GB'].cnyRank), [1, 2, 1]);
 });
 
 test('reuses schema 3 CNY values only for unchanged country, currency, tier, and local price', () => {
@@ -1127,7 +1143,7 @@ test('runs the production write path against isolated files', async () => {
       snapshot.revisions[0].firstConfirmedDate,
       JSON.parse(snapshotStoreBefore.index).snapshots.at(-1).revisions[0].firstConfirmedDate
     );
-    assert.equal(writtenData.schemaVersion, 3);
+    assert.equal(writtenData.schemaVersion, 4);
     assert.equal(writtenData.source.publishedDate, data.source.publishedDate);
     assert.equal(writtenData.countries.length, data.countries.length);
     assert.equal(writtenData.fx.derivedCurrency, 'CNY');
@@ -2795,6 +2811,12 @@ test('keeps successful Action summaries concise and promotes warnings', () => {
   }, 'schedule').join('\n');
   assert.match(sanitySkipped, /FX sanity.*FX\\_SANITY\\_SKIPPED\\_OLD\\_BASELINE/);
 
+  const unknownMarket = buildActionSummaryLines(data, {
+    ...summary,
+    unknownMarkets: [{ sourceName: 'New Apple Market', id: 'apple-new-apple-market-1234abcd' }]
+  }, 'schedule').join('\n');
+  assert.match(unknownMarket, /UNKNOWN_APPLE_MARKET.*New Apple Market.*apple-new-apple-market-1234abcd/);
+
   const noSecret = buildActionSummaryLines({
     ...data,
     fx: {
@@ -3226,7 +3248,7 @@ test('rejects structurally valid cross-file production mismatches', async (t) =>
       mutate({ prices, history }) {
         const country = prices.countries[0];
         const tierId = prices.tiers[0].id;
-        history.countries[country.country].events.at(-1).plans[tierId] += 1;
+        history.markets[country.marketId].events.at(-1).plans[tierId] += 1;
       },
       error: /Existing history\.json latest values do not match/i
     },
@@ -3294,7 +3316,7 @@ test('rejects current prices that disagree with the active snapshot evidence', a
   const changedPrice = country.plans[tierId].price + 1;
   country.plans[tierId].price = changedPrice;
   country.plans[tierId].formattedPrice = `${country.currency} ${changedPrice}`;
-  history.countries[country.country].events.at(-1).plans[tierId] = changedPrice;
+  history.markets[country.marketId].events.at(-1).plans[tierId] = changedPrice;
   await Promise.all([
     writeFile(paths.currentDataPath, `${JSON.stringify(prices, null, 2)}\n`, 'utf8'),
     writeFile(paths.historyPath, `${JSON.stringify(history, null, 2)}\n`, 'utf8')

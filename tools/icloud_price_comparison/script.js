@@ -3,7 +3,7 @@ import {
   publicationDateKey,
   validatePayload,
   validatePriceHistoryConsistency
-} from './data-contract.js?v=11';
+} from './data-contract.js?v=12';
 import { createIcons } from './vendor/lucide-subset.js?v=5';
 
 const REQUEST_TIMEOUT_MS = 8_000;
@@ -403,22 +403,11 @@ function calculateMinimumPrices() {
   state.minimumCountries = {};
   if (!state.minimumCuesEnabled) return;
   for (const { id } of state.data.tiers) {
-    let minimumValue = null;
-    let minimumCountry = null;
-    for (const country of state.data.countries) {
-      const value = country.plans[id].cnyPrice;
-      if (value == null) continue;
-      const countryName = country.nameZh || country.country;
-      const minimumCountryName = minimumCountry?.nameZh || minimumCountry?.country;
-      if (minimumValue == null
-        || value < minimumValue
-        || (value === minimumValue && collator.compare(countryName, minimumCountryName) < 0)) {
-        minimumValue = value;
-        minimumCountry = country;
-      }
-    }
-    state.minimumPrices[id] = minimumValue;
-    state.minimumCountries[id] = minimumCountry;
+    const minimumCountries = state.data.countries
+      .filter((country) => country.plans[id].cnyRank === 1)
+      .sort((first, second) => first.marketId.localeCompare(second.marketId, 'en'));
+    state.minimumCountries[id] = minimumCountries;
+    state.minimumPrices[id] = minimumCountries[0]?.plans[id].cnyPrice ?? null;
   }
 }
 
@@ -434,8 +423,11 @@ function renderMinimumSummary() {
   }
   const fragment = document.createDocumentFragment();
   for (const tier of state.data.tiers) {
-    const winner = state.minimumCountries[tier.id];
-    const countryName = winner?.nameZh || winner?.country || '暂无地区';
+    const winners = state.minimumCountries[tier.id] ?? [];
+    const winnerNames = winners.map((winner) => winner.nameZh || winner.country);
+    const countryName = winnerNames.length > 3
+      ? `${winnerNames.slice(0, 3).join('、')}等 ${winnerNames.length} 个地区`
+      : winnerNames.join('、') || '暂无地区';
     const item = document.createElement('button');
     const isActiveTier = state.sortKey === 'tier' && state.sortTier === tier.id && state.sortDirection === 'asc';
     item.type = 'button';
@@ -443,7 +435,7 @@ function renderMinimumSummary() {
     item.classList.toggle('is-active-tier', isActiveTier);
     item.dataset.tier = tier.id;
     item.setAttribute('aria-pressed', String(isActiveTier));
-    item.title = `查看 ${tier.label} 最低价地区`;
+    item.title = `查看 ${tier.label} 参考最低价地区`;
 
     const tierLabel = document.createElement('span');
     tierLabel.className = 'minimum-tier-label';
@@ -458,7 +450,7 @@ function renderMinimumSummary() {
     action.className = 'visually-hidden';
     action.textContent = '，在价格表中定位';
     item.append(tierLabel, country, price, action);
-    item.addEventListener('click', () => focusMinimumCountry(tier.id, winner?.country));
+    item.addEventListener('click', () => focusMinimumCountry(tier.id, winners[0]?.country));
     fragment.append(item);
   }
   elements.minimumSummary.replaceChildren(fragment);
@@ -551,7 +543,7 @@ function filteredCountries() {
 
 function sortValue(country) {
   if (state.sortKey === 'country') return country.nameZh || country.country;
-  return country.plans[state.sortTier].cnyPrice ?? Number.POSITIVE_INFINITY;
+  return country.plans[state.sortTier].cnyRank ?? Number.POSITIVE_INFINITY;
 }
 
 function sortedCountries() {
@@ -559,7 +551,8 @@ function sortedCountries() {
     const first = sortValue(a);
     const second = sortValue(b);
     const comparison = typeof first === 'string' ? collator.compare(first, second) : first - second;
-    return state.sortDirection === 'asc' ? comparison : -comparison;
+    if (comparison !== 0) return state.sortDirection === 'asc' ? comparison : -comparison;
+    return a.marketId.localeCompare(b.marketId, 'en');
   });
 }
 
@@ -579,9 +572,7 @@ function createPriceCell(country, tierId) {
   cell.classList.toggle('is-active-tier', state.sortTier === tierId);
   if (state.sortKey === 'tier' && state.sortTier === tierId) cell.classList.add('is-sorted');
   const isMinimum = state.minimumCuesEnabled
-    && cny != null
-    && state.minimumPrices[tierId] != null
-    && Math.abs(cny - state.minimumPrices[tierId]) < 0.000001;
+    && plan.cnyRank === 1;
   if (isMinimum) cell.classList.add('is-minimum');
 
   const converted = document.createElement('strong');
@@ -598,8 +589,8 @@ function createPriceCell(country, tierId) {
     if (isMinimum) {
       const badge = document.createElement('span');
       badge.className = 'minimum-badge';
-      badge.textContent = '最低';
-      badge.title = '该容量人民币换算价最低';
+      badge.textContent = '参考最低';
+      badge.title = '按本次人民币参考汇率折算后的最低标价';
       converted.append(badge);
     }
     converted.append(symbol, amount);
@@ -641,7 +632,8 @@ function renderTable() {
       const row = document.createElement('tr');
       row.dataset.country = country.country;
 
-      const rank = createCell(String(index + 1), index < 3 && state.sortKey === 'tier' && state.sortDirection === 'asc' ? 'rank-top' : '');
+      const displayedRank = state.sortKey === 'tier' ? country.plans[state.sortTier].cnyRank : index + 1;
+      const rank = createCell(String(displayedRank), displayedRank <= 3 && state.sortKey === 'tier' && state.sortDirection === 'asc' ? 'rank-top' : '');
       const nameCell = document.createElement('td');
       const historyButton = document.createElement('button');
       historyButton.type = 'button';
@@ -899,7 +891,7 @@ function renderHistoryRows(record) {
 }
 
 function getHistoryRecord(country) {
-  const record = state.history?.countries?.[country.country];
+  const record = state.history?.markets?.[country.marketId];
   if (record?.events?.length) return record;
   return {
     nameZh: country.nameZh,
@@ -1238,7 +1230,7 @@ function applyPriceData(data, { origin = 'network' } = {}) {
   state.data = data;
   state.dataOrigin = origin;
   state.minimumCuesEnabled = origin !== 'cache-stale';
-  if (elements.overviewTitle) elements.overviewTitle.textContent = state.minimumCuesEnabled ? '各容量最低价' : '历史缓存价格';
+  if (elements.overviewTitle) elements.overviewTitle.textContent = state.minimumCuesEnabled ? '各容量参考最低价' : '历史缓存价格';
   if (elements.overviewNote) {
     elements.overviewNote.textContent = state.minimumCuesEnabled
       ? '按人民币参考汇率换算，便于横向比较'

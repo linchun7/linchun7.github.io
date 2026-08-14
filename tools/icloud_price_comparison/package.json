@@ -10,9 +10,10 @@
   "scripts": {
     "check:live": "node scripts/update-prices.mjs --dry-run",
     "update:data": "node scripts/update-prices.mjs",
+    "migrate:schema4": "node scripts/migrate-schema-3-to-4.mjs",
     "validate:artifact": "node scripts/validate-data-artifact.mjs --data-dir data",
     "test": "pnpm test:core && pnpm test:browsers",
-    "test:core": "pnpm test:vendor && node --test test/auto-merge-official-actions.test.mjs test/daily-run-guard.test.mjs test/data-contract.test.mjs test/data-integrity.test.mjs test/parse-legacy-archive.test.mjs test/parse-prices.test.mjs test/import-apple-archives.test.mjs test/update-prices.test.mjs test/validate-data-artifact.test.mjs test/workflow.test.mjs",
+    "test:core": "pnpm test:vendor && node --test test/auto-merge-official-actions.test.mjs test/daily-run-guard.test.mjs test/data-contract.test.mjs test/data-integrity.test.mjs test/migrate-schema-3-to-4.test.mjs test/parse-legacy-archive.test.mjs test/parse-prices.test.mjs test/import-apple-archives.test.mjs test/update-prices.test.mjs test/validate-data-artifact.test.mjs test/workflow.test.mjs",
     "test:data": "node --test test/data-integrity.test.mjs",
     "validate:snapshots": "node --test test/snapshot-deep-audit.test.mjs",
     "test:browsers": "node scripts/test-browsers.mjs",
