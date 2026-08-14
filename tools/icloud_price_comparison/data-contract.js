@@ -1,3 +1,5 @@
+import { isValidRegion } from './data-model.js?v=1df20253';
+
 export const APPLE_SUPPORT_URL = 'https://support.apple.com/en-us/108047';
 
 const ALLOWED_FX_SOURCE_URLS = new Set([
@@ -206,7 +208,7 @@ export function isValidPublicationChanges(changes) {
     && (tier.to === null || tier.to <= Number.MAX_SAFE_INTEGER)
     && (tier.from !== null || tier.to !== null);
   const validCurrency = (value) => typeof value === 'string' && /^[A-Z]{3}$/.test(value);
-  const validRegion = (value) => hasSafeText(value, 160);
+  const validRegion = (value) => isValidRegion(value);
   if ((changes.addedTiers ?? []).some((tier) => !validListedTier(tier))) return false;
   if ((changes.removedTiers ?? []).some((tier) => !validListedTier(tier))) return false;
   if ((changes.addedCountries ?? []).some((country) => !validCountry(country))) return false;
@@ -343,7 +345,7 @@ export function validatePricePayload(payload, { minCountries = 1 } = {}) {
       || countryNames.has(country.country)
       || UNSAFE_OBJECT_KEYS.has(country.country)
       || !hasSafeText(country.nameZh, 160)
-      || !hasSafeText(country.region, 160)
+      || !isValidRegion(country.region)
       || typeof country.currency !== 'string'
       || !/^[A-Z]{3}$/.test(country.currency)
       || !isPlainObject(country.plans)) {
@@ -456,7 +458,7 @@ export function validateHistoryPayload(payload) {
       || !hasExactKeys(record, usesMarketIds ? PUBLIC_HISTORY_RECORD_KEYS : PUBLIC_HISTORY_LEGACY_RECORD_KEYS)
       || (usesMarketIds && !hasSafeText(record.country, 160))
       || !hasSafeText(record.nameZh, 160)
-      || !hasSafeText(record.region, 160)
+      || !isValidRegion(record.region)
       || !Array.isArray(record.events)
       || !record.events.length
       || record.events.length > MAX_HISTORY_EVENTS_PER_COUNTRY) {

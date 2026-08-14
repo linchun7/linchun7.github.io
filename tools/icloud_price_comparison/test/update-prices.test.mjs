@@ -1164,6 +1164,35 @@ test('runs the production write path against isolated files', async () => {
   }
 });
 
+test('does not rewrite history when an observation has no historical changes', async () => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const fxPayload = {
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: recentFxTimestamp(),
+    rates: compatibleExchangeRates(data)
+  };
+  const historyBefore = await readFile(paths.historyPath, 'utf8');
+  const writtenPaths = [];
+  const trackWrites = async (filePath, value) => {
+    writtenPaths.push(filePath);
+    await writeJsonAtomic(filePath, value);
+  };
+  try {
+    await withMockedFetch(
+      { html: buildAppleHtml(data), fxPayload },
+      () => main({ dryRun: false, paths, stepSummaryPath: null, writeJson: trackWrites })
+    );
+    assert.equal(writtenPaths.includes(paths.currentDataPath), true);
+    assert.equal(writtenPaths.includes(paths.runLogPath), true);
+    assert.equal(writtenPaths.includes(paths.historyPath), false);
+    assert.equal(await readFile(paths.historyPath, 'utf8'), historyBefore);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('FX sanity failure preserves every production data file', async (t) => {
   const { root, paths } = await createTemporaryProductionPaths();
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
@@ -2380,8 +2409,10 @@ test('keeps removed-country history and appends complete events for a new tier',
     /UTC observation timestamp is invalid/
   );
 
-  const repeated = updateHistory(result.history, [alphaWithNewTier], '2026-08-02', [TIER_50, TIER_1TB]);
+  const repeated = updateHistory(result.history, [alphaWithNewTier], '2026-08-02', [TIER_50, TIER_1TB], '2026-08-01T16:00:00.000Z');
   assert.equal(repeated.history.countries.Alpha.events.length, 2, 'unchanged prices should not duplicate history');
+  assert.equal(repeated.history.updatedAt, '2026-07-31T16:00:00.000Z', 'unchanged history must keep its last structural update time');
+  assert.equal(repeated.changed, false);
 });
 
 test('rejects a price event whose observation date moves backwards', () => {

@@ -37,7 +37,7 @@
 
 1. 固定远端 `main` 生成基线，安装 lockfile 中的依赖并运行 `pnpm test:core`。
 2. 在共享 5 分钟网络预算内抓取 Apple 页面；同一份 HTML 由 `document-order` 和 `apple-markers` 两条结构关联路径分别解析并逐字段交叉核对，两个解析器本身不分别发起网络请求。
-3. 校验发布日期、地区、分区、容量、价格、汇率时间和异常调价。价格、币种、分区或发布日期变化只使用第一次抓取；只有地区或容量集合新增/移除时，才在共享网络预算内执行第二次可重试的独立无缓存抓取。第二份 HTML 也必须通过双解析器核对，并与第一份完整结果一致。确认抓取暂时不可用时保留上一份稳定数据，等待下一次运行重试，不发布部分结构。
+3. 校验发布日期、地区、分区、容量、价格、汇率时间和异常调价。Apple 业务语义发生任何变化时，都在共享网络预算内执行第二次可重试的独立无缓存抓取；第二份 HTML 也必须通过双解析器核对，并与第一份规范化语义完全一致。确认抓取暂时不可用时保留上一份稳定数据，等待下一次运行重试，不发布部分结构。
 4. 以事务方式生成 `prices.json`、`history.json`、`run-log.json` 和规范化 Apple JSON 快照，再运行数据与 runner Chrome 验收。
 5. 深验整个 `data/`，打包 ustar 并上传只读工件；独立发布 job 重新检查 tar、展开目录和远端基线，只在最后一步提交并推送完整 `data/`。
 
@@ -48,7 +48,7 @@
 | 文件 | 内容 | 保留策略 |
 | --- | --- | --- |
 | `data/prices.json` | schema 4 当前价格、稳定市场 ID、来源、运行元数据、汇率来源/时间/状态，以及每个套餐的 `cnyPrice`/`cnyRank` | 只保留最新有效快照；不公开 raw FX rates、内部全精度换算值、API key 状态或密钥 |
-| `data/history.json` | 地区价格/币种事件和 Apple 发布日期事件 | 真实变化才追加；同一发布日期不重复 |
+| `data/history.json` | 以 `marketId` 为键的地区价格/币种事件和 Apple 发布日期事件 | 只有事件、迁移或结构变化时才改写 `updatedAt` 和文件；同一发布日期不重复 |
 | `data/run-log.json` | 成功运行的来源、数量、耗时、非凭据汇率状态和差异 | 最近 90 条成功运行；不公开 API Key 配置/状态 |
 | `data/apple-snapshots/` | Apple 页面解析后的规范化 JSON 证据和索引 | 不保存原始 HTML；同日修订不覆盖，见目录 README |
 
@@ -92,6 +92,7 @@
 - 每日数据任务使用 runner 预装 Chrome；自动数据提交不会再次触发完整三浏览器工作流，因此发布工件在推送前必须已通过每日 job 自身的 core/data/Chrome 验收。
 - Dependabot 每周检查 npm 与 GitHub Actions。只有官方 `actions/*`、最多 20 个 workflow 文件、完整 40 位 SHA、一对一替换、精确 tested head/base 且 SHA 与注释中的官方 semver tag 一致的变更可以自动合并；第三方 Action、可变 tag、业务文件或额外 YAML 改动会拒绝。
 - vendored Chart.js 和 Lucide subset 的版本、精确文件集、SHA-256、上游字节/icon node、实际使用集和许可 notice 由 `pnpm test:vendor` 校验。
+- `pnpm assets:update` 按依赖顺序计算浏览器资源 SHA-256 前 8 位并更新 HTML/模块引用；`pnpm assets:check` 在 CI 中拒绝陈旧或手工版本号。
 - lockfile 中所有直接版本均精确固定，所有 npm 包 resolution 都有 SHA-512 integrity；`packageManager` 还固定 pnpm 10.14.0 的 Corepack SHA-512。CI 使用 Corepack、`pnpm install --frozen-lockfile --ignore-scripts`，并显式安装浏览器，避免全局安装漂移和依赖生命周期脚本。
 
 仓库 ruleset、required checks、Cloudflare 配置和 Secret 值属于外部状态，代码测试无法代替项目所有者的发布前验收；这些控制面应按内部发布清单逐项核对，仓库不保存 Secret 或内部签字记录。

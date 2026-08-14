@@ -3,11 +3,12 @@ import {
   publicationDateKey,
   validatePayload,
   validatePriceHistoryConsistency
-} from './data-contract.js?v=12';
-import { createIcons } from './vendor/lucide-subset.js?v=5';
+} from './data-contract.js?v=a3f395f0';
+import { createIcons } from './vendor/lucide-subset.js?v=657f4f9d';
+import { VALID_REGIONS } from './data-model.js?v=1df20253';
 
 const REQUEST_TIMEOUT_MS = 8_000;
-const CHART_SCRIPT_URL = './vendor/chart.umd.min.js?v=4';
+const CHART_SCRIPT_URL = './vendor/chart.umd.min.js?v=48444a82';
 const ANALYTICS_ID = 'G-K2S9L4CHNP';
 const SLOW_LOADING_MS = 1_500;
 const DEFAULT_SORT_TIER = '200GB';
@@ -28,7 +29,7 @@ const REGION_LABELS = {
   'Europe, Middle East & Africa': '欧洲、中东和非洲',
   'Asia Pacific': '亚太'
 };
-const URL_STATE_REGIONS = new Set(Object.keys(REGION_LABELS));
+const URL_STATE_REGIONS = new Set(VALID_REGIONS);
 const initialUrlState = new URLSearchParams(location.search);
 const initialQuery = boundedSearchQuery(globalThis.__icloudInitialQuery ?? initialUrlState.get('q') ?? '');
 delete globalThis.__icloudInitialQuery;

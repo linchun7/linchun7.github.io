@@ -1,6 +1,7 @@
 import * as cheerio from 'cheerio';
 import { readFileSync } from 'node:fs';
 import { canonicalTierDefinition } from '../data-contract.js';
+import { VALID_REGIONS } from '../data-model.js';
 
 const OFFICIAL_COUNTRIES = new Set(Object.keys(JSON.parse(
   readFileSync(new URL('./country-names.zh.json', import.meta.url), 'utf8')
@@ -15,11 +16,11 @@ export const TIERS = [
 ];
 
 const REGIONS = {
-  nasalac: 'Americas',
-  emea: 'Europe, Middle East & Africa',
-  ap: 'Asia Pacific'
+  nasalac: VALID_REGIONS[0],
+  emea: VALID_REGIONS[1],
+  ap: VALID_REGIONS[2]
 };
-const EXPECTED_REGIONS = new Set(Object.values(REGIONS));
+const EXPECTED_REGIONS = new Set(VALID_REGIONS);
 const MAX_PRICE_TIERS = 20;
 const MAX_PRICE_COUNTRIES = 250;
 const UNSAFE_COUNTRY_NAMES = new Set(['__proto__', 'prototype', 'constructor']);
