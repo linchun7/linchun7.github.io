@@ -128,6 +128,13 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /publish_candidate=no_data_changes[\s\S]*?publish_outcome=no_data_changes/);
   assert.match(workflow, /steps\.prepare_publish\.outputs\.should_push == 'true'/, 'main advancement and no-data paths must skip the push');
   assert.match(workflow, /verify-production:[\s\S]*?needs:[\s\S]*?- publish[\s\S]*?publish_outcome == 'published'[\s\S]*?publish_outcome == 'no_data_changes'/);
+  const verifyProductionJob = workflow.slice(
+    workflow.indexOf('\n  verify-production:'),
+    workflow.indexOf('\n  notify:')
+  );
+  assert.match(verifyProductionJob, /name: 检出验证脚本[\s\S]*?ref: \$\{\{ needs\.update\.outputs\.generation_base_sha \}\}[\s\S]*?fetch-depth: 1[\s\S]*?persist-credentials: false/);
+  assert.doesNotMatch(verifyProductionJob, /ref: main/, 'verification code must never come from mutable main');
+  assert.match(verifyProductionJob, /git -C "\$GITHUB_WORKSPACE" fetch origin main --depth=1[\s\S]*?git -C "\$GITHUB_WORKSPACE" show origin\/main:tools\/icloud_price_comparison\/data\/prices\.json[\s\S]*?current-main-prices\.json/);
   assert.match(workflow, /validate_expected_artifact[\s\S]*?sha256sum --check[\s\S]*?--archive[\s\S]*?--data-dir[\s\S]*?verify-production-deployment\.mjs/);
   assert.match(workflow, /verify_production\.outcome[^]*?failure[^]*?severe_failure=true[^]*?production_not_updated[\s\S]*?PUBLISH_PRODUCTION_NOT_UPDATED/);
   assert.match(workflow, /PREPARE_SEVERE_FAILURE:[\s\S]*?UPDATE_SEVERE_FAILURE:[\s\S]*?PUBLISH_SEVERE_FAILURE:/);

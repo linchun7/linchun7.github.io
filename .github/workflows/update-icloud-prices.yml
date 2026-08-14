@@ -388,7 +388,7 @@ jobs:
       - name: 检出验证脚本
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
+          ref: ${{ needs.update.outputs.generation_base_sha }}
           fetch-depth: 1
           persist-credentials: false
 
