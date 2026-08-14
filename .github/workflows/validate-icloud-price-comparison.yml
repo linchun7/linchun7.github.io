@@ -7,8 +7,7 @@ on:
       - '.github/workflows/**'
       - 'tools/icloud_price_comparison/**'
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - '.github/dependabot.yml'
       - '.github/workflows/**'
@@ -26,8 +25,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  test:
-    name: 核心、Chromium、Firefox 与 WebKit 测试
+  core:
+    name: 核心、数据与依赖安全测试
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -38,34 +37,57 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-
       - name: 配置 Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
-
       - name: 启用并校验 pnpm
         run: |
           corepack enable
           pnpm --version
-
       - name: 安装项目依赖
         run: pnpm install --frozen-lockfile --ignore-scripts
-
-      - name: 安装 Chromium、Firefox 与 WebKit
-        run: pnpm exec playwright install --with-deps chromium firefox webkit
-
       - name: 运行核心与数据测试
         run: pnpm test:core
-
       - name: 深度验证当前完整数据工件
         run: pnpm validate:artifact
-
       - name: 深度审计全部 Apple 快照
         run: pnpm validate:snapshots
-
-      - name: 并行运行 Chromium、Firefox 与 WebKit 测试
-        run: pnpm test:browsers
-
       - name: 检查依赖漏洞
         run: pnpm audit --audit-level low
+      - name: 检查工作区差异格式
+        working-directory: .
+        run: git diff --check
+
+  browser:
+    name: 浏览器测试 (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    defaults:
+      run:
+        working-directory: tools/icloud_price_comparison
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: 配置 Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: 启用并校验 pnpm
+        run: |
+          corepack enable
+          pnpm --version
+      - name: 安装项目依赖
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: 安装 ${{ matrix.browser }}
+        run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+      - name: 运行 ${{ matrix.browser }} 测试
+        env:
+          PLAYWRIGHT_BROWSER: ${{ matrix.browser }}
+        run: node --test test/ui-smoke.test.mjs

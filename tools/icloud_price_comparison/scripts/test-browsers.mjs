@@ -18,5 +18,8 @@ function runBrowserSuite(browser) {
   });
 }
 
-const results = await Promise.all(['chromium', 'firefox', 'webkit'].map(runBrowserSuite));
+const results = [];
+for (const browser of ['chromium', 'firefox', 'webkit']) {
+  results.push(await runBrowserSuite(browser));
+}
 if (results.some((code) => code !== 0)) process.exitCode = 1;
