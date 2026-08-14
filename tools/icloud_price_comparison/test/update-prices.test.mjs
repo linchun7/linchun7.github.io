@@ -39,6 +39,7 @@ import {
   redactDiagnosticText,
   selectRequiredRates,
   validateCountryNameMapping,
+  validateAppleMarketRenameReview,
   writeFailureDiagnostics,
   updateHistory,
   updatePublishedDateHistory,
@@ -444,6 +445,37 @@ test('performs a second Apple fetch when only the published date changes', async
   const html = buildAppleHtml(data, 'August 12, 2026');
   const result = await runAppleConfirmationScenario({ firstHtml: html, secondHtml: html });
   assert.equal(result.appleRequests, 2);
+});
+
+test('requires explicit alias review for an exact removed-to-unknown Apple rename candidate', () => {
+  const old = {
+    country: 'Old Apple Market', marketId: 'old-id', region: 'Asia Pacific', currency: 'USD',
+    plans: { '50GB': { price: 1 }, '200GB': { price: 3 } }
+  };
+  const added = { ...structuredClone(old), country: 'New Apple Market' };
+  delete added.marketId;
+  const unknownResolver = (sourceName) => ({
+    id: `generated-${sourceName}`, sourceName, canonicalName: sourceName, unknown: true
+  });
+  assert.throws(
+    () => validateAppleMarketRenameReview({ countries: [old] }, [added], unknownResolver),
+    (error) => error.code === 'MARKET_IDENTITY_RENAME_REVIEW_REQUIRED'
+      && error.message.includes('Old Apple Market')
+      && error.message.includes('New Apple Market')
+      && error.message.includes('old-id')
+  );
+  assert.doesNotThrow(() => validateAppleMarketRenameReview(
+    { countries: [old] }, [added], () => ({ id: 'old-id', unknown: false })
+  ));
+  assert.doesNotThrow(() => validateAppleMarketRenameReview(
+    { countries: [old] }, [{ ...added, currency: 'EUR' }], unknownResolver
+  ));
+  assert.doesNotThrow(() => validateAppleMarketRenameReview(
+    { countries: [old] }, [{ ...added, region: 'Europe' }], unknownResolver
+  ));
+  const changedPrice = structuredClone(added);
+  changedPrice.plans['50GB'].price = 2;
+  assert.doesNotThrow(() => validateAppleMarketRenameReview({ countries: [old] }, [changedPrice], unknownResolver));
 });
 
 test('publishes a confirmed unknown Apple market with a deterministic identity and structured warning', async () => {

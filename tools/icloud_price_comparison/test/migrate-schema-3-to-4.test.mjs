@@ -5,12 +5,15 @@ import { migrateHistoryToSchema4, migratePricesSchema3To4 } from '../scripts/mig
 import {
   MARKET_REGISTRY,
   attachMarketIdentity,
+  buildPublishedMarketIdentityIndex,
   createMarketResolver,
+  createPublishedMarketResolver,
   resolveMarket,
   validateMarketIdentityContinuity,
   validateMarketRegistry
 } from '../scripts/market-registry.mjs';
 import { validatePriceHistoryConsistency } from '../data-contract.js';
+import { getOfficialChineseMarketName } from '../scripts/country-names.mjs';
 
 const pricesUrl = new URL('../data/prices.json', import.meta.url);
 const historyUrl = new URL('../data/history.json', import.meta.url);
@@ -36,11 +39,10 @@ async function schema3Fixtures() {
   return { prices, history };
 }
 
-test('registry covers all current Apple markets and unknown markets get stable non-colliding IDs', async () => {
+test('registry resolves current known markets without requiring an active-set equality', async () => {
   const registry = validateMarketRegistry();
-  assert.equal(Object.keys(registry).length, 73);
   const { prices } = await schema3Fixtures();
-  assert.deepEqual(new Set(prices.countries.map(({ country }) => country)), new Set(Object.keys(registry)));
+  for (const country of prices.countries) assert.equal(resolveMarket(country.country).unknown, false);
   const first = resolveMarket('New Apple Market');
   const second = resolveMarket('New Apple Market');
   assert.equal(first.id, second.id);
@@ -53,14 +55,13 @@ test('registry covers all current Apple markets and unknown markets get stable n
   assert.equal(warnings.length, 1);
 });
 
-test('canonical registry Chinese names match the confirmed Apple Chinese mapping', async () => {
+test('every registry identity has one marketId-keyed official Chinese name', async () => {
   const names = JSON.parse(await readFile(namesUrl, 'utf8'));
   for (const market of Object.values(MARKET_REGISTRY)) {
-    if (Object.hasOwn(names, market.canonicalName)) {
-      assert.equal(market.zh, names[market.canonicalName], market.canonicalName);
-    }
+    assert.equal(typeof names[market.id], 'string', market.id);
+    assert.equal(Object.hasOwn(market, 'zh'), false, market.canonicalName);
   }
-  assert.equal(MARKET_REGISTRY['Euro Zone'].zh, '欧盟');
+  assert.equal(names['euro-zone'], '欧盟');
 });
 
 test('committed schema 4 market identities remain continuous with the registry', async () => {
@@ -143,7 +144,8 @@ test('Euro aliases preserve the euro-zone identity and Apple Chinese display nam
   for (const sourceName of ['Euro', 'Euro Zone', 'Eurozone']) {
     const market = resolveMarket(sourceName);
     assert.equal(market.id, 'euro-zone');
-    assert.equal(market.zh, '欧盟');
+    assert.equal(market.nameZh, '欧盟');
+    assert.equal(getOfficialChineseMarketName(market.id), '欧盟');
   }
 });
 
@@ -170,6 +172,29 @@ test('unknown market identity is stable, distinct, and fails closed on a generat
       })
     }),
     /marketId collision.*apple-forced-collision-12345678/
+  );
+});
+
+test('published unknown identities come from schema 4 history instead of the current generator', () => {
+  const previousData = { schemaVersion: 4, countries: [{ country: 'New Apple Market', marketId: 'published-custom-id' }] };
+  const previousHistory = { schemaVersion: 4, markets: { 'published-custom-id': { country: 'New Apple Market' } } };
+  const resolver = createPublishedMarketResolver(previousData, previousHistory, {
+    resolveUnknown: (sourceName) => ({
+      id: 'generator-would-change-this', canonicalName: sourceName, sourceName,
+      nameZh: sourceName, aliases: [], unknown: true
+    })
+  });
+  assert.equal(resolver('New Apple Market').id, 'published-custom-id');
+  assert.equal(resolver('Brand New Market').id, 'generator-would-change-this');
+});
+
+test('published identity ledger fails closed when one exact source name has two IDs', () => {
+  assert.throws(
+    () => buildPublishedMarketIdentityIndex(
+      { schemaVersion: 4, countries: [{ country: 'Conflicted Market', marketId: 'first-id' }] },
+      { schemaVersion: 4, markets: { 'second-id': { country: 'Conflicted Market' } } }
+    ),
+    (error) => error.code === 'PUBLISHED_MARKET_IDENTITY_CONFLICT'
   );
 });
 
