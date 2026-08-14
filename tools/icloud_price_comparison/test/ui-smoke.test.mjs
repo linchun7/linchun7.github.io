@@ -216,9 +216,11 @@ test('starts price data early and deprioritizes optional third-party work', asyn
     readFile(path.join(PROJECT_DIR, 'script.js'), 'utf8'),
     readFile(path.join(PROJECT_DIR, 'style.css'), 'utf8')
   ]);
-  const eagerPriceFetch = '<script data-cfasync="false" src="price-bootstrap.js?v=10"></script>';
-  assert.ok(html.includes(eagerPriceFetch), 'prices.json bootstrap should run during HTML parsing');
-  assert.ok(html.indexOf(eagerPriceFetch) < html.indexOf('<script data-cfasync="false" type="module" src="script.js?v=22"></script>'), 'the initial price request should precede module execution');
+  const eagerPriceFetch = html.match(/<script data-cfasync="false" src="price-bootstrap\.js\?v=[0-9a-f]{8}"><\/script>/)?.[0];
+  const moduleScript = html.match(/<script data-cfasync="false" type="module" src="script\.js\?v=[0-9a-f]{8}"><\/script>/)?.[0];
+  assert.ok(eagerPriceFetch, 'prices.json bootstrap should run during HTML parsing with a content hash');
+  assert.ok(moduleScript, 'the application module should use a content hash');
+  assert.ok(html.indexOf(eagerPriceFetch) < html.indexOf(moduleScript), 'the initial price request should precede module execution');
   assert.doesNotMatch(html, /rel="preload" href="data\/prices\.json"/, 'cross-browser loading should not rely on a fetch preload that WebKit may duplicate');
   assert.doesNotMatch(html, /<script[^>]+src="https:\/\/www\.googletagmanager\.com/, 'analytics must not block HTML parsing');
   assert.doesNotMatch(html, /analyticsConsent|privacySettings|允许匿名统计/, 'analytics consent overlay and its settings entry must be absent');
@@ -1237,6 +1239,7 @@ test('rejects malformed price payloads and recovers without a full-page refresh'
     ['invalid FX timestamp', (data) => { data.fx.fetchedAt = '2026-02-30'; }],
     ['invalid Apple publication date', (data) => { data.source.publishedDate = 'February 30, 2026'; }],
     ['missing region', (data) => { data.countries[0].region = ''; }],
+    ['unknown region', (data) => { data.countries[0].region = 'Unknown Region'; }],
     ['empty formatted price', (data) => { data.countries[0].plans[data.tiers[0].id].formattedPrice = '   '; }]
   ];
   const server = await startServer();
@@ -2041,8 +2044,9 @@ test('keeps the minimum-price overview stable and the desktop table header stick
     assert.equal(await page.locator('h1').count(), 1);
     assert.equal(await page.locator('h1').textContent(), 'iCloud+ \u5168\u7403\u4ef7\u683c\u5bf9\u6bd4');
     assert.equal(await page.locator('#overviewTitle').evaluate((element) => element.tagName), 'H2');
-    assert.equal(await page.locator('head script[type="module"][src="script.js?v=22"][data-cfasync="false"]').count(), 1);
-    assert.equal(await page.locator('head link[rel="modulepreload"]').count(), 3);
+    const moduleSource = await page.locator('head script[type="module"][src^="script.js?v="][data-cfasync="false"]').getAttribute('src');
+    assert.match(moduleSource, /^script\.js\?v=[0-9a-f]{8}$/);
+    assert.equal(await page.locator('head link[rel="modulepreload"]').count(), 4);
     const before = await page.locator('#minimumSummary').boundingBox();
     const loadingLayout = await page.evaluate(() => ({
       footerTop: document.querySelector('.workspace-footer').getBoundingClientRect().top,

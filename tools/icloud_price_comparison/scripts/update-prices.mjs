@@ -678,6 +678,7 @@ export function validateCountryNameMapping(mapping) {
 export function updateHistory(previousHistory, countries, observedAt, tiers, observedAtUtc = null) {
   const history = previousHistory ?? { schemaVersion: 4, markets: {} };
   const usesMarketIds = history.schemaVersion === 4;
+  const targetSchemaVersion = usesMarketIds ? 4 : 2;
   const records = usesMarketIds ? history.markets : history.countries;
   if (!isPlainObject(history) || !isPlainObject(records)) {
     throw new Error('Price history has an unsupported market structure');
@@ -685,8 +686,8 @@ export function updateHistory(previousHistory, countries, observedAt, tiers, obs
   if (observedAtUtc !== null && !isIsoDateTime(observedAtUtc)) {
     throw new Error('Price history UTC observation timestamp is invalid');
   }
-  history.schemaVersion = usesMarketIds ? 4 : 2;
-  history.updatedAt = observedAtUtc ?? new Date().toISOString();
+  let changed = history.schemaVersion !== targetSchemaVersion;
+  history.schemaVersion = targetSchemaVersion;
   let changedCountries = 0;
 
   for (const country of countries) {
@@ -696,6 +697,10 @@ export function updateHistory(previousHistory, countries, observedAt, tiers, obs
       throw new Error(`Price history is missing marketId for ${country.country}`);
     }
     const existingRecord = Object.hasOwn(records, recordKey) ? records[recordKey] : null;
+    if (!existingRecord
+      || (usesMarketIds && existingRecord.country !== country.country)
+      || existingRecord?.nameZh !== country.nameZh
+      || existingRecord?.region !== country.region) changed = true;
     const record = existingRecord ?? {
       ...(usesMarketIds ? { country: country.country } : {}),
       nameZh: country.nameZh,
@@ -712,6 +717,7 @@ export function updateHistory(previousHistory, countries, observedAt, tiers, obs
       throw new Error(`Price history observation date moved backwards for ${country.country}`);
     }
     if (priceChanged) {
+      changed = true;
       changedCountries += 1;
       record.events.push({
         observedAt,
@@ -723,7 +729,8 @@ export function updateHistory(previousHistory, countries, observedAt, tiers, obs
     }
     records[recordKey] = record;
   }
-  return { history, changedCountries };
+  if (changed) history.updatedAt = observedAtUtc ?? new Date().toISOString();
+  return { history, changedCountries, changed };
 }
 
 export function publicationDateKey(value) {
@@ -806,6 +813,7 @@ export function buildSnapshotChanges(previousData, countries, tiers) {
 export function updatePublishedDateHistory(history, previousData, publishedDate, observedAt, changes, observedAtUtc = null) {
   const entries = [];
   const existingEntries = history.sourcePublishedDates;
+  const previousEntriesJson = JSON.stringify(existingEntries ?? null);
   if (existingEntries !== undefined && !Array.isArray(existingEntries)) {
     throw new Error('Apple publication history has an invalid structure');
   }
@@ -871,7 +879,7 @@ export function updatePublishedDateHistory(history, previousData, publishedDate,
     changed = true;
   }
   history.sourcePublishedDates = entries;
-  return { entries, changed };
+  return { entries, changed, historyChanged: JSON.stringify(entries) !== previousEntriesJson };
 }
 
 async function writeTextAtomic(filePath, text) {
@@ -2382,9 +2390,14 @@ export async function main({
   const historyUpdate = updateHistory(previousHistory, countries, observedAt, parsed.tiers, generatedAt);
   const history = historyUpdate.history;
   const publishedDateUpdate = updatePublishedDateHistory(history, previousData, parsed.sourcePublishedDate, observedAt, publicationChanges, generatedAt);
+  const historyChanged = historyUpdate.changed || publishedDateUpdate.historyChanged;
+  if (historyChanged && history.updatedAt !== generatedAt) {
+    history.updatedAt = generatedAt;
+  }
   const publishedDateHistory = publishedDateUpdate.entries;
   const summary = {
     history,
+    historyChanged,
     missingRates,
     fxSanityWarnings: fxSanity.warnings,
     unknownMarkets,
@@ -2431,7 +2444,7 @@ export async function main({
         indexPath: snapshotIndexPath
       });
       await writeJson(currentDataPath, data);
-      await writeJson(historyPath, history);
+      if (historyChanged) await writeJson(historyPath, history);
       await writeJson(runLogPath, runLog);
       await writeJsonAtomic(transactionPath, { ...transaction, phase: 'committed' });
     } catch (error) {
