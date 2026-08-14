@@ -19,7 +19,8 @@ import {
   updateHistory
 } from './update-prices.mjs';
 import { formatBeijingDate } from './run-context.mjs';
-import { attachMarketIdentity } from './market-registry.mjs';
+import { attachMarketIdentity, resolveMarket } from './market-registry.mjs';
+import { getOfficialChineseMarketName } from './country-names.mjs';
 
 const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const HISTORY_PATH = path.join(PROJECT_DIR, 'data/history.json');
@@ -153,7 +154,9 @@ function withNames(parsed, names) {
     ...parsed,
     countries: parsed.countries.map((country) => ({
       ...country,
-      nameZh: names[country.country] ?? country.country
+      nameZh: getOfficialChineseMarketName(resolveMarket(country.country).id, names)
+        ?? names[country.country]
+        ?? country.country
     }))
   };
 }
@@ -161,7 +164,11 @@ function withNames(parsed, names) {
 export function assertArchiveCountriesAreKnown(parsed, names, fileName = 'archive') {
   const unknownCountries = parsed.countries
     .map(({ country }) => country)
-    .filter((country) => typeof names[country] !== 'string' || !names[country].trim());
+    .filter((country) => {
+      const market = resolveMarket(country);
+      const displayName = getOfficialChineseMarketName(market.id, names) ?? names[country];
+      return typeof displayName !== 'string' || !displayName.trim();
+    });
   if (unknownCountries.length) {
     throw new Error(`${fileName} contains countries outside the reviewed Apple country list: ${unknownCountries.join(', ')}`);
   }
@@ -280,6 +287,9 @@ async function importAppleArchivesUnlocked(inputDir, paths = {}) {
     ...Object.fromEntries(Object.entries(existingHistory.countries ?? {}).map(([country, record]) => (
       [country, record.nameZh || country]
     ))),
+    ...Object.fromEntries(Object.values(existingHistory.markets ?? {}).map((record) => (
+      [record.country, record.nameZh || record.country]
+    ))),
     ...Object.fromEntries((currentData.countries ?? []).map(({ country, nameZh }) => (
       [country, nameZh || country]
     )))
@@ -376,7 +386,7 @@ async function importAppleArchivesUnlocked(inputDir, paths = {}) {
       }
       stagedFiles.push(entry.dataFile);
     }
-    updateHistory(rebuilt, attachMarketIdentity(archive.parsed.countries), archive.publishedDate, archive.parsed.tiers);
+    updateHistory(rebuilt, attachMarketIdentity(archive.parsed.countries, { chineseNames: names }), archive.publishedDate, archive.parsed.tiers);
     const changes = previousData ? buildSnapshotChanges(previousData, archive.parsed.countries, archive.parsed.tiers) : emptyChanges();
     const sourceEntry = {
       publishedDate: archive.parsed.sourcePublishedDate,
@@ -404,7 +414,7 @@ async function importAppleArchivesUnlocked(inputDir, paths = {}) {
   const lastArchiveDate = archives.at(-1)?.publishedDate ?? '0000-00-00';
   const currentEventDate = currentData.run?.observedAtBeijing
     ?? currentData.generatedAt.slice(0, 10);
-  updateHistory(rebuilt, attachMarketIdentity(currentData.countries), currentEventDate, currentData.tiers);
+  updateHistory(rebuilt, attachMarketIdentity(currentData.countries, { chineseNames: names }), currentEventDate, currentData.tiers);
   const currentChanges = buildSnapshotChanges(previousData, currentData.countries, currentData.tiers);
   if (currentPublishedDate > lastArchiveDate) {
     rebuilt.sourcePublishedDates.push({

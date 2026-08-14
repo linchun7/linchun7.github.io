@@ -213,7 +213,7 @@ function setFiltersDisabled(disabled) {
   elements.searchInput.disabled = disabled;
   elements.regionSelect.disabled = disabled;
   if (elements.backToTableButton) elements.backToTableButton.disabled = disabled;
-  document.querySelectorAll('button[data-sort], button[data-sort-tier], #publishedDateButton, #mobileTierControl button').forEach((button) => {
+  document.querySelectorAll('button[data-sort], button[data-sort-tier], #publishedDateButton, #mobileTierControl button, .country-history-button').forEach((button) => {
     button.disabled = disabled;
   });
 }
@@ -672,6 +672,7 @@ function renderTable() {
       const historyButton = document.createElement('button');
       historyButton.type = 'button';
       historyButton.className = 'country-history-button';
+      historyButton.disabled = state.dataFreshness?.status === 'unusable';
       const displayName = country.nameZh || country.country;
       const secondaryName = country.nameZh && country.nameZh !== country.country
         ? `${country.country} · ${country.currency}`
@@ -1147,6 +1148,7 @@ function renderHistoryContent() {
 }
 
 function openHistory(country, returnFocus = null) {
+  if (state.dataFreshness?.status === 'unusable') return;
   void ensureHistoryLoaded();
   const record = getHistoryRecord(country);
   state.activeCountry = country;
