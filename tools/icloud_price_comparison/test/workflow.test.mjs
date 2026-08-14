@@ -8,6 +8,7 @@ import test from 'node:test';
 
 const workflowUrl = new URL('../../../.github/workflows/update-icloud-prices.yml', import.meta.url);
 const ciWorkflowUrl = new URL('../../../.github/workflows/validate-icloud-price-comparison.yml', import.meta.url);
+const maintenanceWorkflowUrl = new URL('../../../.github/workflows/icloud-repository-maintenance.yml', import.meta.url);
 const autoMergeWorkflowUrl = new URL('../../../.github/workflows/auto-merge-official-actions.yml', import.meta.url);
 const dependabotUrl = new URL('../../../.github/dependabot.yml', import.meta.url);
 const gitignoreUrl = new URL('../../../.gitignore', import.meta.url);
@@ -103,13 +104,12 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   );
   assert.doesNotMatch(workflow, /git pull --rebase origin main/);
   assert.doesNotMatch(workflow, /git push --force/);
-  assert.match(workflow, /RUNNER_TEMP\/icloud-storage-summary\.md/);
-  assert.match(workflow, /name: 追加仓库容量摘要[\s\S]*if: always\(\)/);
+  assert.doesNotMatch(workflow, /fetch-depth: 0|git count-objects|git_kib >=/, 'daily jobs must not fetch or audit full history');
+  assert.equal((workflow.match(/fetch-depth: 1/g) ?? []).length, 2, 'update and publish checkouts must be shallow');
   assert.match(workflow, /name: 补充未报告的失败摘要[\s\S]*if: failure\(\)/);
   assert.match(workflow, /steps\.update_data\.outcome[\s\S]*artifacts\/run-report\.json[\s\S]*Updater already wrote a detailed failure summary/);
   assert.match(workflow, /::error title=iCloud\+ 价格更新失败/);
   assert.match(workflow, /上一份有效数据继续保留/);
-  assert.match(workflow, /git_kib >= 819200[\s\S]*elif \(\( git_kib >= 512000 \)\)/);
   assert.match(workflow, /ICLOUD_HEALTHCHECK_PING_URL[\s\S]*?HEALTHCHECK_PING_URL%\/\}\/\$status/);
   assert.match(workflow, /prepare:[\s\S]*?runs-on: ubuntu-latest\s+timeout-minutes: 5[\s\S]*?\n  update:/);
   assert.match(workflow, /classify_prepare[\s\S]*?steps\.validate_main_data\.outcome[\s\S]*?steps\.daily_guard\.outcome[\s\S]*?severe_failure/);
@@ -148,17 +148,28 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   const uiStepBlock = workflow.slice(browserTest, workflow.indexOf('name: 上传诊断信息'));
   assert.doesNotMatch(uiStepBlock, /continue-on-error|\|\|/, 'the updated UI validation must block production commits');
 
-  const summaryAppend = workflow.indexOf('name: 追加仓库容量摘要');
-  assert.ok(browserTest < summaryAppend, 'the main update summary must be written before capacity details');
+});
+
+test('moves full-history growth checks into a weekly read-only workflow', async () => {
+  const workflow = await readFile(maintenanceWorkflowUrl, 'utf8');
+  assert.match(workflow, /schedule:[\s\S]*?cron:\s*['"]15 22 \* \* 6['"]/);
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /permissions:\s+contents: read/);
+  assert.doesNotMatch(workflow, /contents: write|secrets\.|pnpm install|npm install/);
+  assert.match(workflow, /actions\/checkout@[a-f0-9]{40} # v\d+[\s\S]*?fetch-depth: 0[\s\S]*?persist-credentials: false/);
+  assert.match(workflow, /git count-objects -vH/);
+  assert.match(workflow, /history\.json/);
+  assert.match(workflow, /git_kib >= 819200[\s\S]*?::error[\s\S]*?exit 1[\s\S]*?git_kib >= 512000[\s\S]*?::warning/);
 });
 
 test('keeps pull-request validation read-only, complete, and SHA-pinned', async () => {
-  const [updateWorkflow, ciWorkflow, autoMergeWorkflow] = await Promise.all([
+  const [updateWorkflow, ciWorkflow, maintenanceWorkflow, autoMergeWorkflow] = await Promise.all([
     readFile(workflowUrl, 'utf8'),
     readFile(ciWorkflowUrl, 'utf8'),
+    readFile(maintenanceWorkflowUrl, 'utf8'),
     readFile(autoMergeWorkflowUrl, 'utf8'),
   ]);
-  const workflows = `${updateWorkflow}\n${ciWorkflow}\n${autoMergeWorkflow}`;
+  const workflows = `${updateWorkflow}\n${ciWorkflow}\n${maintenanceWorkflow}\n${autoMergeWorkflow}`;
   const actionReferences = [...workflows.matchAll(/uses:\s*[^@\s]+@([^\s#]+)/g)].map(([, reference]) => reference);
   assert.ok(actionReferences.length >= 5);
   assert.ok(actionReferences.every((reference) => /^[a-f0-9]{40}$/.test(reference)), 'all third-party actions must use full commit SHAs');

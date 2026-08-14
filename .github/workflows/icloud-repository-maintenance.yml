@@ -1,0 +1,57 @@
+name: Audit iCloud repository growth
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 北京时间每周日 06:15；GitHub cron 使用 UTC，因此为周六 22:15。
+    - cron: '15 22 * * 6'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: audit-icloud-repository-growth
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: 审计完整 Git 历史与数据增长
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 检出完整历史
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: 检查仓库与价格历史体积
+        shell: bash
+        run: |
+          set -euo pipefail
+          git_kib=$(du -sk .git | cut -f1)
+          git_mib=$(( (git_kib + 1023) / 1024 ))
+          history_bytes=$(wc -c < tools/icloud_price_comparison/data/history.json)
+          history_kib=$(( (history_bytes + 1023) / 1024 ))
+          object_report=$(git count-objects -vH)
+          {
+            echo "## iCloud 仓库每周容量审计"
+            echo ""
+            echo "- 完整 Git 历史：${git_mib} MiB"
+            echo "- 价格历史：${history_kib} KiB"
+            echo ""
+            echo '```text'
+            echo "$object_report"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if (( history_bytes >= 2097152 )); then
+            echo "::warning title=价格历史体积::history.json 已达 ${history_kib} KiB，请考虑按年份或地区拆分。"
+          fi
+          if (( git_kib >= 819200 )); then
+            echo "::error title=Git 历史体积超过硬阈值::完整 Git 历史已达 ${git_mib} MiB，超过 800 MiB，必须人工维护。"
+            exit 1
+          fi
+          if (( git_kib >= 512000 )); then
+            echo "::warning title=Git 历史体积::完整 Git 历史已达 ${git_mib} MiB，请在达到 800 MiB 前安排人工审查。"
+          fi
