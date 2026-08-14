@@ -5,16 +5,20 @@ const ALLOWED_FX_SOURCE_URLS = new Set([
   'https://open.er-api.com/v6/latest/USD'
 ]);
 const ALLOWED_PARSERS = new Set(['cross-checked', 'document-order', 'apple-markers-fallback']);
-export const PUBLIC_PRICE_SCHEMA_VERSION = 3;
+export const PUBLIC_PRICE_SCHEMA_VERSION = 4;
 const PUBLIC_PRICE_TOP_LEVEL_KEYS = new Set(['schemaVersion', 'generatedAt', 'source', 'run', 'fx', 'tiers', 'countries']);
 const PUBLIC_PRICE_SOURCE_KEYS = new Set(['name', 'url', 'publishedDate', 'parser', 'parserStatus']);
 const PUBLIC_PRICE_RUN_KEYS = new Set(['startedAtUtc', 'finishedAtUtc', 'observedAtBeijing', 'observedAtUtc', 'countries', 'pricePoints']);
 const PUBLIC_PRICE_FX_KEYS = new Set(['sourceUrl', 'sourceMode', 'fallbackUsed', 'fallbackReason', 'base', 'fetchedAt', 'stale', 'derivedCurrency']);
 const PUBLIC_PRICE_TIER_KEYS = new Set(['id', 'label', 'capacityGb']);
-const PUBLIC_PRICE_COUNTRY_KEYS = new Set(['country', 'region', 'currency', 'plans', 'nameZh']);
-const PUBLIC_PRICE_PLAN_KEYS = new Set(['price', 'formattedPrice', 'cnyPrice']);
-const PUBLIC_HISTORY_TOP_LEVEL_KEYS = new Set(['schemaVersion', 'updatedAt', 'countries', 'sourcePublishedDates']);
-const PUBLIC_HISTORY_RECORD_KEYS = new Set(['nameZh', 'region', 'events']);
+const PUBLIC_PRICE_V3_COUNTRY_KEYS = new Set(['country', 'region', 'currency', 'plans', 'nameZh']);
+const PUBLIC_PRICE_COUNTRY_KEYS = new Set(['marketId', 'country', 'region', 'currency', 'plans', 'nameZh']);
+const PUBLIC_PRICE_V3_PLAN_KEYS = new Set(['price', 'formattedPrice', 'cnyPrice']);
+const PUBLIC_PRICE_PLAN_KEYS = new Set(['price', 'formattedPrice', 'cnyPrice', 'cnyRank']);
+const PUBLIC_HISTORY_LEGACY_TOP_LEVEL_KEYS = new Set(['schemaVersion', 'updatedAt', 'countries', 'sourcePublishedDates']);
+const PUBLIC_HISTORY_TOP_LEVEL_KEYS = new Set(['schemaVersion', 'updatedAt', 'markets', 'sourcePublishedDates']);
+const PUBLIC_HISTORY_LEGACY_RECORD_KEYS = new Set(['nameZh', 'region', 'events']);
+const PUBLIC_HISTORY_RECORD_KEYS = new Set(['country', 'nameZh', 'region', 'events']);
 const PUBLIC_HISTORY_EVENT_KEYS = new Set(['observedAt', 'observedAtUtc', 'observedAtBeijing', 'currency', 'plans']);
 const PUBLIC_HISTORY_PUBLICATION_KEYS = new Set(['publishedDate', 'observedAt', 'observedAtUtc', 'observedAtBeijing', 'kind', 'changes']);
 const PUBLIC_HISTORY_CHANGE_KEYS = new Set(['addedTiers', 'removedTiers', 'addedCountries', 'removedCountries', 'changedCountries']);
@@ -24,6 +28,7 @@ const PUBLIC_HISTORY_CHANGED_COUNTRY_KEYS = new Set(['country', 'nameZh', 'fromC
 const PUBLIC_HISTORY_CHANGED_TIER_KEYS = new Set(['id', 'from', 'to']);
 const UNSAFE_OBJECT_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 const TIER_ID_PATTERN = /^\d+(?:\.\d+)?(?:GB|TB)$/;
+const MARKET_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const MAX_TIER_CAPACITY_GB = 1024 * 1024;
 const MAX_PUBLIC_TIERS = 20;
 const MAX_PUBLIC_COUNTRIES = 250;
@@ -243,7 +248,7 @@ function isValidObservationMetadata(value) {
 
 export function validatePricePayload(payload, { minCountries = 1 } = {}) {
   if (!isPlainObject(payload)
-    || ![1, 2, PUBLIC_PRICE_SCHEMA_VERSION].includes(payload.schemaVersion)
+    || ![1, 2, 3, PUBLIC_PRICE_SCHEMA_VERSION].includes(payload.schemaVersion)
     || !Array.isArray(payload.tiers)
     || payload.tiers.length > MAX_PUBLIC_TIERS
     || !Array.isArray(payload.countries)
@@ -261,7 +266,8 @@ export function validatePricePayload(payload, { minCountries = 1 } = {}) {
     || !isValidIsoTimestamp(payload.fx.fetchedAt)) {
     throw new Error('prices.json has an unsupported or unsafe structure');
   }
-  const usesDerivedCnyPrices = payload.schemaVersion === PUBLIC_PRICE_SCHEMA_VERSION;
+  const usesDerivedCnyPrices = payload.schemaVersion >= 3;
+  const usesMarketIds = payload.schemaVersion === PUBLIC_PRICE_SCHEMA_VERSION;
   if (usesDerivedCnyPrices) {
     const sourceModeMatchesUrl = (payload.fx.sourceMode === 'api-key' && payload.fx.sourceUrl === 'https://v6.exchangerate-api.com/v6/latest/USD')
       || (payload.fx.sourceMode === 'open-access' && payload.fx.sourceUrl === 'https://open.er-api.com/v6/latest/USD');
@@ -325,10 +331,14 @@ export function validatePricePayload(payload, { minCountries = 1 } = {}) {
   }
 
   const countryNames = new Set();
+  const marketIds = new Set();
   const requiredCurrencies = usesDerivedCnyPrices ? null : new Set(['USD', 'CNY']);
   for (const country of payload.countries) {
     if (!isPlainObject(country)
-      || (usesDerivedCnyPrices && !hasExactKeys(country, PUBLIC_PRICE_COUNTRY_KEYS))
+      || (usesMarketIds && !hasExactKeys(country, PUBLIC_PRICE_COUNTRY_KEYS))
+      || (payload.schemaVersion === 3 && !hasExactKeys(country, PUBLIC_PRICE_V3_COUNTRY_KEYS))
+      || (usesMarketIds && (!hasSafeText(country.marketId, 160) || !MARKET_ID_PATTERN.test(country.marketId) || UNSAFE_OBJECT_KEYS.has(country.marketId)))
+      || (usesMarketIds && marketIds.has(country.marketId))
       || !hasSafeText(country.country, 160)
       || countryNames.has(country.country)
       || UNSAFE_OBJECT_KEYS.has(country.country)
@@ -340,6 +350,7 @@ export function validatePricePayload(payload, { minCountries = 1 } = {}) {
       throw new Error('prices.json has an invalid country entry');
     }
     countryNames.add(country.country);
+    if (usesMarketIds) marketIds.add(country.marketId);
     requiredCurrencies?.add(country.currency);
     const actualPlanIds = new Set(Object.keys(country.plans));
     if (actualPlanIds.size !== tierIds.size || [...tierIds].some((tierId) => !actualPlanIds.has(tierId))) {
@@ -360,14 +371,33 @@ export function validatePricePayload(payload, { minCountries = 1 } = {}) {
         && Math.abs(plan.cnyPrice * 100 - Math.round(plan.cnyPrice * 100)) < 1e-7
       );
       if (!isPlainObject(plan)
-        || (usesDerivedCnyPrices && !hasExactKeys(plan, PUBLIC_PRICE_PLAN_KEYS))
+        || (usesMarketIds && !hasExactKeys(plan, PUBLIC_PRICE_PLAN_KEYS))
+        || (payload.schemaVersion === 3 && !hasExactKeys(plan, PUBLIC_PRICE_V3_PLAN_KEYS))
         || !Number.isFinite(plan.price)
         || plan.price <= 0
         || plan.price > Number.MAX_SAFE_INTEGER
         || !hasSafeText(plan.formattedPrice, 100)
         || formattedPriceNumber(plan.formattedPrice) !== plan.price
-        || !cnyPriceIsValid) {
+        || !cnyPriceIsValid
+        || (usesMarketIds && (!Number.isInteger(plan.cnyRank) || plan.cnyRank < 1 || plan.cnyRank > payload.countries.length))) {
         throw new Error(`prices.json has invalid ${tierId} pricing for ${country.country}`);
+      }
+    }
+  }
+
+  if (usesMarketIds) {
+    for (const tierId of tierIds) {
+      const ordered = payload.countries
+        .map((country) => ({ price: country.plans[tierId].cnyPrice, rank: country.plans[tierId].cnyRank }))
+        .sort((first, second) => first.rank - second.rank || first.price - second.price);
+      const ranks = [...new Set(ordered.map(({ rank }) => rank))];
+      if (ranks[0] !== 1 || ranks.some((rank, index) => rank !== index + 1)) {
+        throw new Error(`prices.json has non-dense CNY ranks for ${tierId}`);
+      }
+      for (let index = 1; index < ordered.length; index += 1) {
+        if (ordered[index].rank > ordered[index - 1].rank && ordered[index].price < ordered[index - 1].price) {
+          throw new Error(`prices.json has CNY ranks inconsistent with public prices for ${tierId}`);
+        }
       }
     }
   }
@@ -399,32 +429,38 @@ export function validatePricePayload(payload, { minCountries = 1 } = {}) {
 }
 
 export function validateHistoryPayload(payload) {
+  const usesMarketIds = payload?.schemaVersion === 4;
+  const records = usesMarketIds ? payload?.markets : payload?.countries;
   if (!isPlainObject(payload)
-    || !hasAllowedKeys(payload, PUBLIC_HISTORY_TOP_LEVEL_KEYS, ['schemaVersion', 'countries', 'sourcePublishedDates'])
-    || ![1, 2].includes(payload.schemaVersion)
-    || !isPlainObject(payload.countries)
-    || !Object.keys(payload.countries).length
-    || Object.keys(payload.countries).length > MAX_HISTORY_COUNTRIES
+    || !(usesMarketIds
+      ? hasExactKeys(payload, PUBLIC_HISTORY_TOP_LEVEL_KEYS)
+      : hasAllowedKeys(payload, PUBLIC_HISTORY_LEGACY_TOP_LEVEL_KEYS, ['schemaVersion', 'countries', 'sourcePublishedDates']))
+    || ![1, 2, 4].includes(payload.schemaVersion)
+    || !isPlainObject(records)
+    || !Object.keys(records).length
+    || Object.keys(records).length > MAX_HISTORY_COUNTRIES
     || !Array.isArray(payload.sourcePublishedDates)
     || !payload.sourcePublishedDates.length
     || payload.sourcePublishedDates.length > MAX_PUBLICATION_HISTORY_ENTRIES
-    || (payload.schemaVersion === 2 && !isValidIsoTimestamp(payload.updatedAt))
+    || ([2, 4].includes(payload.schemaVersion) && !isValidIsoTimestamp(payload.updatedAt))
     || (payload.schemaVersion === 1 && payload.updatedAt != null && !isValidIsoTimestamp(payload.updatedAt))) {
     throw new Error('history.json has an unsupported structure');
   }
 
   const latestHistoryDate = payload.updatedAt?.slice(0, 10) ?? null;
 
-  for (const [countryName, record] of Object.entries(payload.countries)) {
-    if (UNSAFE_OBJECT_KEYS.has(countryName)
-      || !hasSafeText(countryName, 160)
-      || !hasExactKeys(record, PUBLIC_HISTORY_RECORD_KEYS)
+  for (const [recordKey, record] of Object.entries(records)) {
+    if (UNSAFE_OBJECT_KEYS.has(recordKey)
+      || !hasSafeText(recordKey, 160)
+      || (usesMarketIds && !MARKET_ID_PATTERN.test(recordKey))
+      || !hasExactKeys(record, usesMarketIds ? PUBLIC_HISTORY_RECORD_KEYS : PUBLIC_HISTORY_LEGACY_RECORD_KEYS)
+      || (usesMarketIds && !hasSafeText(record.country, 160))
       || !hasSafeText(record.nameZh, 160)
       || !hasSafeText(record.region, 160)
       || !Array.isArray(record.events)
       || !record.events.length
       || record.events.length > MAX_HISTORY_EVENTS_PER_COUNTRY) {
-      throw new Error(`history.json has an invalid record for ${countryName}`);
+      throw new Error(`history.json has an invalid record for ${recordKey}`);
     }
     let previousObservedAt = '';
     for (const event of record.events) {
@@ -439,7 +475,7 @@ export function validateHistoryPayload(payload) {
         || Object.keys(event.plans).some((tierId) => canonicalTierDefinition(tierId) === null)
         || Object.values(event.plans).some((price) => !Number.isFinite(price) || price <= 0 || price > Number.MAX_SAFE_INTEGER)
         || !isValidObservationMetadata(event)) {
-        throw new Error(`history.json has an invalid event for ${countryName}`);
+        throw new Error(`history.json has an invalid event for ${recordKey}`);
       }
       previousObservedAt = event.observedAt;
     }
@@ -474,8 +510,11 @@ export function validateHistoryPayload(payload) {
 export function validatePriceHistoryConsistency(prices, history) {
   validatePricePayload(prices);
   validateHistoryPayload(history);
-  if (history.schemaVersion >= 2 && history.updatedAt !== prices.generatedAt) {
-    throw new Error('prices.json and history.json have different update timestamps');
+  if (history.schemaVersion < 4 && history.schemaVersion >= 2 && history.updatedAt !== prices.generatedAt) {
+    throw new Error('prices.json and legacy history.json have different update timestamps');
+  }
+  if (history.schemaVersion === 4 && history.updatedAt > prices.generatedAt) {
+    throw new Error('history.json was updated after prices.json was generated');
   }
   const currentPublishedDate = publicationDateKey(prices.source.publishedDate);
   const latestPublishedDate = publicationDateKey(history.sourcePublishedDates.at(-1)?.publishedDate);
@@ -484,10 +523,13 @@ export function validatePriceHistoryConsistency(prices, history) {
   }
   const tierIds = new Set(prices.tiers.map(({ id }) => id));
   for (const country of prices.countries) {
-    const record = history.countries[country.country];
+    const record = history.schemaVersion === 4
+      ? history.markets[country.marketId]
+      : history.countries[country.country];
     const latestEvent = record?.events?.at(-1);
     const eventTierIds = new Set(Object.keys(latestEvent?.plans ?? {}));
     if (!record
+      || (history.schemaVersion === 4 && record.country !== country.country)
       || record.nameZh !== country.nameZh
       || record.region !== country.region
       || latestEvent?.currency !== country.currency
@@ -502,7 +544,7 @@ export function validatePriceHistoryConsistency(prices, history) {
 
 export function validatePayload(fileName, payload) {
   if (fileName === 'history.json') {
-    if (payload?.schemaVersion !== 2) throw new Error('history.json must use the current public schema');
+    if (payload?.schemaVersion !== 4) throw new Error('history.json must use the current public schema');
     return validateHistoryPayload(payload);
   }
   if (payload?.schemaVersion !== PUBLIC_PRICE_SCHEMA_VERSION) {

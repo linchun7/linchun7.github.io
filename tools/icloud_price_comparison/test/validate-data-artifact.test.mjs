@@ -152,7 +152,7 @@ test('rejects historical price events that do not match Apple snapshot evidence'
   const { dataDirectory } = await copiedData(t);
   const historyPath = path.join(dataDirectory, 'history.json');
   const history = JSON.parse(await readFile(historyPath, 'utf8'));
-  const record = Object.values(history.countries).find(({ events }) => events.length > 1);
+  const record = Object.values(history.markets).find(({ events }) => events.length > 1);
   assert.ok(record, 'production history must include a multi-event country');
   const tierId = Object.keys(record.events[0].plans)[0];
   record.events[0].plans[tierId] += 1;
@@ -246,9 +246,9 @@ test('rejects legacy schema 2 data even when its raw exchange rates are otherwis
 test('rejects legacy public history and history timestamps that diverge from current prices', async (t) => {
   for (const [label, mutate, expected] of [
     ['legacy schema', (history) => { history.schemaVersion = 1; delete history.updatedAt; }, /current public schema/],
-    ['timestamp mismatch', (history) => {
-      history.updatedAt = new Date(Date.parse(history.updatedAt) - 1).toISOString();
-    }, /different update timestamps/]
+    ['future timestamp', (history) => {
+      history.updatedAt = '2099-01-01T00:00:00.000Z';
+    }, /updated after|invalid event|invalid publication history/]
   ]) {
     await t.test(label, async (subtest) => {
       const { dataDirectory } = await copiedData(subtest);

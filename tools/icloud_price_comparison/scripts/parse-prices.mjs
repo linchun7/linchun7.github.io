@@ -593,9 +593,9 @@ export function validatePrices(countries, {
     }
   }
 
-  const previousByCountry = new Map(previousCountries.map((entry) => [entry.country, entry]));
+  const previousByCountry = new Map(previousCountries.map((entry) => [entry.marketId ?? entry.country, entry]));
   for (const entry of countries) {
-    const previous = previousByCountry.get(entry.country);
+    const previous = previousByCountry.get(entry.marketId ?? entry.country);
     if (!previous) continue;
     for (const tier of tiers) {
       if (!previous.plans[tier.id]) continue;
@@ -672,10 +672,10 @@ export function validatePriceChangeAnomalies(countries, {
 } = {}) {
   validateCurrentMarketOutliers(countries, tiers, currentRates, thresholds);
   if (!previousData?.countries?.length) return true;
-  const previousByCountry = new Map(previousData.countries.map((entry) => [entry.country, entry]));
+  const previousByCountry = new Map(previousData.countries.map((entry) => [entry.marketId ?? entry.country, entry]));
 
   for (const entry of countries) {
-    const previous = previousByCountry.get(entry.country);
+    const previous = previousByCountry.get(entry.marketId ?? entry.country);
     if (!previous) continue;
     for (const tier of tiers) {
       const currentPlan = entry.plans[tier.id];

@@ -153,7 +153,7 @@ test('keeps same-date archive revisions as separate normalized JSON evidence', a
       await access(path.join(snapshotsDir, revision.dataFile));
       assert.equal('file' in revision, false);
     }
-    assert.equal(result.history.countries['Alpha 1'].events.length, 3);
+    assert.equal(Object.values(result.history.markets).find(({ country }) => country === 'Alpha 1').events.length, 3);
     assert.equal(result.history.sourcePublishedDates.length, 1);
     assert.equal(result.history.sourcePublishedDates[0].changes.changedCountries[0].country, 'Alpha 1');
     assert.deepEqual(result.history.sourcePublishedDates[0].changes.changedCountries[0].tiers, [

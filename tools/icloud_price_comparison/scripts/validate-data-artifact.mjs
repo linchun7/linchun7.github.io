@@ -398,6 +398,7 @@ function samePlans(first, second) {
 
 function validateHistoryAgainstSnapshotEvidence(history, snapshotIndex, normalizedSnapshots) {
   const expectedByCountry = new Map();
+  const actualByCountry = new Map(Object.values(history.markets).map((record) => [record.country, record]));
   for (const snapshot of snapshotIndex.snapshots) {
     for (const revision of snapshot.revisions) {
       const pricing = normalizedSnapshots.get(revision.dataFile);
@@ -418,7 +419,7 @@ function validateHistoryAgainstSnapshotEvidence(history, snapshotIndex, normaliz
   }
 
   for (const [countryName, expectedEvents] of expectedByCountry) {
-    const actualEvents = history.countries[countryName]?.events;
+    const actualEvents = actualByCountry.get(countryName)?.events;
     if (!Array.isArray(actualEvents) || actualEvents.length !== expectedEvents.length) {
       fail(`history events do not match snapshot evidence for ${countryName}`);
     }
@@ -432,7 +433,7 @@ function validateHistoryAgainstSnapshotEvidence(history, snapshotIndex, normaliz
       }
     }
   }
-  const unexpectedCountries = Object.keys(history.countries)
+  const unexpectedCountries = [...actualByCountry.keys()]
     .filter((countryName) => !expectedByCountry.has(countryName));
   if (unexpectedCountries.length) {
     fail(`history contains countries without snapshot evidence: ${unexpectedCountries.join(', ')}`);
