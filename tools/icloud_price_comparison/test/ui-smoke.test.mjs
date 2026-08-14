@@ -273,7 +273,7 @@ test('preserves sorting, selection and minimum-price cues in forced-colors mode'
   await page.route('https://**/*', (route) => route.abort());
   try {
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length > 0);
+    await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length > 0);
     assert.equal(await page.evaluate(() => matchMedia('(forced-colors: active)').matches), true);
     const sortedHeader = page.locator('th[aria-sort="ascending"], th[aria-sort="descending"]').first();
     const activeCard = page.locator('.minimum-card.is-active-tier').first();
@@ -441,7 +441,7 @@ test('keeps keyboard focus inside modal dialogs and exposes the skip link in bot
 
   try {
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(() => document.querySelector('#priceRows tr[data-country]'));
+    await page.waitForFunction(() => document.querySelector('#priceRows tr[data-market-id]'));
 
     await page.keyboard.press('Tab');
     assert.equal(await page.locator('.skip-link').evaluate((element) => document.activeElement === element), true, 'the first Tab stop must be the skip link');
@@ -483,7 +483,7 @@ test('shows a usable explanation when JavaScript is disabled', { timeout: 30_000
     await notice.waitFor({ state: 'visible' });
     assert.equal(await notice.isVisible(), true);
     assert.match(await notice.innerText(), /JavaScript/);
-    assert.equal(await page.locator('#priceRows tr[data-country]').count(), 0);
+    assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), 0);
   } finally {
     await browser.close();
   }
@@ -556,7 +556,7 @@ test('renders current prices, sorting, and country history in a real browser', {
         }
         releasePriceRequest();
         await page.waitForFunction(
-          (count) => document.querySelectorAll('#priceRows tr[data-country]').length === count,
+          (count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count,
           expectedData.countries.length
         );
         assert.equal(await page.locator('th[data-tier-placeholder]').count(), 0, `${viewport.name} price header placeholders must be replaced after data validation`);
@@ -659,8 +659,8 @@ test('renders current prices, sorting, and country history in a real browser', {
           rankHeader: getComputedStyle(document.querySelector('.price-table .rank-column')).textAlign,
           countryHeader: getComputedStyle(document.querySelector('.price-table th:nth-child(2)')).textAlign,
           priceHeader: getComputedStyle(document.querySelector('.price-table th[data-tier-header]')).textAlign,
-          countryCell: getComputedStyle(document.querySelector('#priceRows tr[data-country] td:nth-child(2)')).textAlign,
-          priceCell: getComputedStyle(document.querySelector('#priceRows tr[data-country] .price-cell')).textAlign
+          countryCell: getComputedStyle(document.querySelector('#priceRows tr[data-market-id] td:nth-child(2)')).textAlign,
+          priceCell: getComputedStyle(document.querySelector('#priceRows tr[data-market-id] .price-cell')).textAlign
         }));
         assert.deepEqual(semanticAlignments, {
           minimumCard: 'left',
@@ -718,19 +718,19 @@ test('renders current prices, sorting, and country history in a real browser', {
           ? page.locator(`#mobileTierControl button[data-tier="${firstTier}"]`)
           : page.locator(`button[data-sort-tier="${firstTier}"]`);
         await page.locator('#searchInput').fill(searchableCountry.nameZh || firstCountry);
-        await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length === 1);
+        await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length === 1);
         await page.locator('#searchInput').fill('不存在的国家或币种');
-        await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length === 0);
+        await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length === 0);
         const emptyResultCell = page.locator('#priceRows .empty-cell');
         assert.match(await emptyResultCell.textContent(), /没有符合当前条件的结果/);
         assert.equal(await emptyResultCell.isVisible(), true, `${viewport.name} empty-result message must remain visible`);
         await page.locator('#searchInput').fill('');
-        await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, expectedData.countries.length);
+        await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, expectedData.countries.length);
         await page.locator('#regionSelect').selectOption(searchableCountry.region);
         await page.locator('#searchInput').fill(searchableCountry.nameZh || firstCountry);
-        await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length === 1);
+        await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length === 1);
         await tierSortControl.click();
-        assert.equal(await page.locator('#priceRows tr[data-country]').count(), 1, 'combined search, region, and tier sorting should retain the matching country');
+        assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), 1, 'combined search, region, and tier sorting should retain the matching country');
         await page.locator('#searchInput').fill('');
         await page.locator('#regionSelect').selectOption('all');
 
@@ -748,8 +748,8 @@ test('renders current prices, sorting, and country history in a real browser', {
         const historySearch = historyCountry ?? firstCountry;
         const expectedRecord = historyRecordForCountry(expectedHistory, expectedData, historySearch);
         await page.locator('#searchInput').fill(historySearch);
-        await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length === 1);
-        const historyRow = page.locator('#priceRows tr[data-country]').first();
+        await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length === 1);
+        const historyRow = page.locator('#priceRows tr[data-market-id]').first();
         const historyButton = historyRow.locator('button.country-history-button');
         assert.equal(await historyRow.getAttribute('tabindex'), null, 'table rows should not masquerade as interactive controls');
         assert.equal(await historyButton.count(), 1, 'each country should expose a real history button');
@@ -990,9 +990,9 @@ test('excludes history events from before a tier was introduced', { timeout: 30_
 
   try {
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, expectedData.countries.length);
+    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, expectedData.countries.length);
     await page.locator('#searchInput').fill(countryName);
-    const historyButton = page.locator('#priceRows tr[data-country]').first().locator('button.country-history-button');
+    const historyButton = page.locator('#priceRows tr[data-market-id]').first().locator('button.country-history-button');
     await historyButton.click();
     await page.waitForFunction(() => document.querySelector('#historyDialog')?.open === true);
     await page.locator(`#historyTierControl button[data-tier="${tierId}"]`).click();
@@ -1103,7 +1103,7 @@ test('renders every rank-one market without inventing a single winner', { timeou
   }));
   try {
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, data.countries.length);
+    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, data.countries.length);
     const expectedNames = winners.slice(0, 3).map((country) => country.nameZh || country.country).join('、');
     const card = page.locator(`#minimumSummary button[data-tier="${tier.id}"]`);
     assert.match(await card.locator('.minimum-country').textContent(), new RegExp(`^${expectedNames}等 4 个地区$`));
@@ -1141,7 +1141,7 @@ test('shows an actionable error and recovers after a temporary price-data outage
     assert.equal(await page.locator('#loadStatusText').textContent(), '价格数据无法加载，请检查网络后重试。');
     assert.equal(await page.locator('#retryButton').textContent(), '重新加载');
     await page.locator('#retryButton').click();
-    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, expectedData.countries.length);
+    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, expectedData.countries.length);
     assert.equal(await page.locator('#loadStatus').isVisible(), false);
     assert.equal(await page.locator('.data-status').evaluate((element) => element.classList.contains('is-error')), false);
     assert.equal(attempts, 2);
@@ -1202,7 +1202,7 @@ test('keeps current prices usable when optional history data is unavailable or m
       }));
       try {
         await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-        await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, expectedData.countries.length);
+        await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, expectedData.countries.length);
         assert.equal(await page.locator('#loadStatus').isVisible(), false);
         assert.equal(await page.locator('#marketCount').textContent(), String(expectedData.countries.length));
         assert.equal(await page.locator('#publishedDateButton').isVisible(), true);
@@ -1210,7 +1210,7 @@ test('keeps current prices usable when optional history data is unavailable or m
           assert.equal(await page.locator('#applePublishedDate').textContent(), scenario.expectedPublishedDate);
         }
         if (scenario.unavailable) {
-          await page.locator('#priceRows tr[data-country]').first().click();
+          await page.locator('#priceRows tr[data-market-id]').first().click();
           await page.waitForFunction(() => document.querySelector('#historySubtitle')?.textContent.includes('历史数据暂不可用'));
           await page.locator('#closeHistory').click();
           await page.locator('#publishedDateButton').click();
@@ -1263,7 +1263,7 @@ test('rejects malformed price payloads and recovers without a full-page refresh'
         assert.equal(await page.locator('#searchInput').isDisabled(), true, label);
         serveValidData = true;
         await page.locator('#retryButton').click();
-        await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, validData.countries.length);
+        await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, validData.countries.length);
         assert.equal(await page.locator('#loadStatus').isVisible(), false, `${label} should recover after retry`);
       } finally {
         await page.close();
@@ -1301,7 +1301,7 @@ test('rebuilds tier headers and filters after a successful retry with changed ti
       await page.locator('#retryButton').dispatchEvent('click');
       await page.waitForFunction((count) => document.querySelector('#tierCount')?.textContent === String(count), reducedData.tiers.length);
       assert.equal(await page.locator('.price-table thead th').count(), reducedData.tiers.length + 2);
-      assert.equal(await page.locator('#priceRows tr[data-country]').first().locator('td').count(), reducedData.tiers.length + 2);
+      assert.equal(await page.locator('#priceRows tr[data-market-id]').first().locator('td').count(), reducedData.tiers.length + 2);
       assert.deepEqual(
         await page.locator('.price-table thead button[data-sort-tier]').evaluateAll((buttons) => buttons.map((button) => button.dataset.sortTier)),
         reducedData.tiers.map(({ id }) => id)
@@ -1324,18 +1324,16 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
     {
       label: 'old snapshot',
       mutate: (data) => {
-        setPayloadGeneratedAt(data, '2020-01-01T00:00:00.000Z');
+        setPayloadGeneratedAt(data, new Date(Date.now() - (48 * 60 * 60 * 1_000)).toISOString());
         data.fx.fetchedAt = data.generatedAt;
         data.fx.stale = false;
-        data.source.publishedDate = 'Published Date: December 17, 2019';
       },
-      expected: /超过 36 小时/,
-      expectedPublishedDate: '2019/12/17'
+      expected: /超过 36 小时/
     },
     {
       label: 'future snapshot',
       mutate: (data) => {
-        setPayloadGeneratedAt(data, '2099-01-01T00:00:00.000Z');
+        setPayloadGeneratedAt(data, new Date(Date.now() + (4 * 60 * 1_000)).toISOString());
         data.fx.fetchedAt = data.generatedAt;
         data.fx.stale = false;
       },
@@ -1349,25 +1347,26 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
         data.fx.stale = true;
         data.fx.fallbackReason = 'request-failed';
       },
-      expected: /汇率沿用上次成功结果/
+      expected: /汇率沿用上次成功结果/,
+      minimumDegraded: true
     },
     {
       label: 'old snapshot with fallback rates',
       mutate: (data) => {
-        setPayloadGeneratedAt(data, '2020-01-01T00:00:00.000Z');
+        setPayloadGeneratedAt(data, new Date(Date.now() - (48 * 60 * 60 * 1_000)).toISOString());
         data.fx.fetchedAt = data.generatedAt;
         data.fx.stale = true;
         data.fx.fallbackReason = 'request-failed';
-        data.source.publishedDate = 'Published Date: December 17, 2019';
       },
-      expected: /超过 36 小时 · 汇率沿用上次成功结果/
+      expected: /超过 36 小时 · 汇率沿用上次成功结果/,
+      minimumDegraded: true
     }
   ];
   const server = await startServer();
   const { port } = server.address();
   const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
   try {
-    for (const { label, mutate, expected, expectedPublishedDate } of scenarios) {
+    for (const { label, mutate, expected, expectedPublishedDate, minimumDegraded = false } of scenarios) {
       const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
       const payload = structuredClone(validData);
       mutate(payload);
@@ -1379,12 +1378,16 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
       }));
       try {
         await page.goto(`http://127.0.0.1:${port}/?tier=not-a-real-tier`, { waitUntil: 'domcontentloaded' });
-        await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, validData.countries.length);
+        await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, validData.countries.length);
         assert.match(await page.locator('#updatedAt').textContent(), expected, label);
         if (expectedPublishedDate) {
           assert.equal(await page.locator('#applePublishedDate').textContent(), expectedPublishedDate, label);
         }
         assert.equal(await page.locator('.data-status').evaluate((element) => element.classList.contains('is-stale')), true, label);
+        assert.equal(await page.locator('.minimum-badge').count(), minimumDegraded ? 0 : validData.tiers.length, label);
+        if (minimumDegraded) {
+          assert.match(await page.locator('#minimumSummary').textContent(), /汇率沿用上次成功结果.*最低价排名暂不展示/, label);
+        }
         const statusLayout = await page.evaluate(() => {
           const rect = document.querySelector('.data-status').getBoundingClientRect();
           return {
@@ -1447,11 +1450,11 @@ test('ignores stale history responses after a price retry', { timeout: 30_000 },
   });
   try {
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, validData.countries.length);
-    await page.locator('#priceRows tr[data-country="Brazil"]').click();
+    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, validData.countries.length);
+    await page.locator('#priceRows tr[data-market-id="br"]').click();
     await page.waitForFunction(() => document.querySelector('#historyDialog')?.open === true);
     await page.locator('#retryButton').dispatchEvent('click');
-    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, validData.countries.length);
+    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, validData.countries.length);
     await page.waitForTimeout(1_200);
     assert.equal(await page.locator('#historyDialog').evaluate((element) => element.open), true);
     assert.equal(await page.locator('#historyRows tr').count(), historyRecordForCountry(validHistory, validData, 'Brazil').events.length);
@@ -1494,8 +1497,8 @@ test('keeps history dialog usable when Chart construction fails', { timeout: 30_
   }));
   try {
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, validData.countries.length);
-    await page.locator('#priceRows tr[data-country="Brazil"]').click();
+    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, validData.countries.length);
+    await page.locator('#priceRows tr[data-market-id="br"]').click();
     assert.equal(await page.locator('#historyDialog').evaluate((element) => element.open), true);
     assert.equal(await page.locator('#historyRows tr').count(), historyRecordForCountry(validHistory, validData, 'Brazil').events.length);
     await page.waitForFunction(() => (
@@ -1534,7 +1537,7 @@ test('keeps the page and publication history bounded with a single-tier table on
   }));
   try {
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, validData.countries.length);
+    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, validData.countries.length);
     const layout = await page.evaluate(() => {
       const table = document.querySelector('.table-scroll');
       return {
@@ -1543,7 +1546,7 @@ test('keeps the page and publication history bounded with a single-tier table on
         tableWidth: table.scrollWidth,
         tableClientWidth: table.clientWidth,
         visibleTierHeaders: [...document.querySelectorAll('th[data-tier]')].filter((header) => getComputedStyle(header).display !== 'none').length,
-        visibleTierCells: [...document.querySelector('#priceRows tr[data-country]').querySelectorAll('td[data-tier]')].filter((cell) => getComputedStyle(cell).display !== 'none').length,
+        visibleTierCells: [...document.querySelector('#priceRows tr[data-market-id]').querySelectorAll('td[data-tier]')].filter((cell) => getComputedStyle(cell).display !== 'none').length,
         tierButtons: document.querySelectorAll('#mobileTierControl button').length
       };
     });
@@ -1575,7 +1578,7 @@ test('keeps the page and publication history bounded with a single-tier table on
     assert.equal(await page.locator('th[data-tier].is-active-tier').getAttribute('data-tier'), nextTier.id);
     assert.equal(new URL(page.url()).searchParams.get('tier'), nextTier.id);
 
-    await page.locator('#priceRows tr[data-country]').nth(35).scrollIntoViewIfNeeded();
+    await page.locator('#priceRows tr[data-market-id]').nth(35).scrollIntoViewIfNeeded();
     await page.evaluate(() => scrollBy(0, 180));
     const stickyHeaders = await page.locator('.price-table th:nth-child(2), .price-table th[data-tier].is-active-tier').evaluateAll((headers) => (
       headers.map((header) => ({
@@ -1779,11 +1782,11 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
       });
       try {
         await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-        await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, data.countries.length);
+        await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, data.countries.length);
 
         await page.locator('#searchInput').fill(country.country);
-        await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length === 1);
-        await page.locator('#priceRows tr[data-country]').click();
+        await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length === 1);
+        await page.locator('#priceRows tr[data-market-id]').click();
         await page.waitForFunction(() => document.querySelectorAll('#historyRows tr').length === 100);
         await assertScrollableDialog(page, '#historyDialog', '#closeHistory', `${viewport.name} price history`);
         const priceTableScroller = page.locator('#historyDialog .history-table-scroll');
@@ -1920,12 +1923,12 @@ test('resets a removed region filter after a successful price retry', { timeout:
     });
     try {
       await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-      await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, fullData.countries.length);
+      await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, fullData.countries.length);
       await page.locator('#regionSelect').selectOption(removedRegion);
-      assert.equal(await page.locator('#priceRows tr[data-country]').count(), fullData.countries.filter(({ region }) => region === removedRegion).length);
+      assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), fullData.countries.filter(({ region }) => region === removedRegion).length);
       await page.locator('#retryButton').dispatchEvent('click');
       await page.waitForFunction((count) => document.querySelector('#marketCount')?.textContent === String(count), replacement.countries.length);
-      await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, replacement.countries.length);
+      await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, replacement.countries.length);
       assert.equal(await page.locator('#regionSelect').inputValue(), 'all');
       assert.equal(priceCalls, 2);
       assert.deepEqual(errors, []);
@@ -1992,15 +1995,15 @@ test('rebinds or closes an open history dialog after country replacement', { tim
       });
       try {
         await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-        await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, fullData.countries.length);
-        await page.locator(`#priceRows tr[data-country="${activeCountry.country}"]`).click();
+        await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, fullData.countries.length);
+        await page.locator(`#priceRows tr[data-market-id="${activeCountry.marketId}"]`).click();
         await page.waitForFunction(() => document.querySelector('#historyDialog')?.open === true);
         await page.locator('#retryButton').dispatchEvent('click');
         await page.waitForFunction((count) => document.querySelector('#marketCount')?.textContent === String(count), scenario.replacement.countries.length);
         if (scenario.expectedOpen) {
           await page.waitForFunction((title) => document.querySelector('#historyTitle')?.textContent === title, scenario.expectedTitle);
           await page.locator('#closeHistory').click();
-          await page.waitForFunction((country) => document.activeElement?.closest('tr[data-country]')?.dataset.country === country, activeCountry.country);
+          await page.waitForFunction((marketId) => document.activeElement?.closest('tr[data-market-id]')?.dataset.marketId === marketId, activeCountry.marketId);
         } else {
           assert.equal(await page.locator('#historyDialog').evaluate((dialog) => dialog.open), false, scenario.label);
           await page.waitForFunction(() => document.activeElement?.id === 'priceWorkspace');
@@ -2054,7 +2057,7 @@ test('keeps the minimum-price overview stable and the desktop table header stick
     }));
     assert.ok(loadingLayout.footerTop >= loadingLayout.viewportHeight, `the loading table must keep the footer below the desktop viewport; footer=${loadingLayout.footerTop}, viewport=${loadingLayout.viewportHeight}`);
     releaseRequest();
-    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, validData.countries.length);
+    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, validData.countries.length);
     const afterBox = await page.locator('#minimumSummary').boundingBox();
     assert.ok(before && afterBox && Math.abs(before.height - afterBox.height) <= 2, 'minimum summary height should stay stable across loading');
     assert.equal(await page.locator('#minimumSummary .minimum-card.is-loading').count(), 0);
@@ -2075,7 +2078,7 @@ test('keeps the minimum-price overview stable and the desktop table header stick
     };
     await page.setViewportSize({ width: 390, height: 844 });
     await assertMinimumCardSpacing('mobile');
-    const mobileTableInsets = await page.locator('#priceRows tr[data-country]').first().evaluate((row) => {
+    const mobileTableInsets = await page.locator('#priceRows tr[data-market-id]').first().evaluate((row) => {
       const tableBox = row.closest('.price-table').getBoundingClientRect();
       const countryBox = row.querySelector('.country-name').getBoundingClientRect();
       const priceBox = row.querySelector('td[data-tier].is-active-tier .price-cny').getBoundingClientRect();
@@ -2089,19 +2092,19 @@ test('keeps the minimum-price overview stable and the desktop table header stick
 
     await page.setViewportSize({ width: 1440, height: 800 });
     await assertMinimumCardSpacing('desktop');
-    await page.locator('#priceRows tr[data-country]').nth(35).scrollIntoViewIfNeeded();
+    await page.locator('#priceRows tr[data-market-id]').nth(35).scrollIntoViewIfNeeded();
     await page.evaluate(() => scrollBy(0, 220));
     const stickyTop = await page.locator('.price-table thead th').first().evaluate((header) => header.getBoundingClientRect().top);
     assert.ok(stickyTop >= -1 && stickyTop <= 1, `desktop header should remain sticky at the viewport top, got ${stickyTop}`);
     const tableChrome = await page.evaluate(() => {
       const header = document.querySelector('.price-table th[data-tier]');
       const lastHeader = document.querySelector('.price-table th:last-child');
-      const lastCell = document.querySelector('#priceRows tr[data-country] td:last-child');
+      const lastCell = document.querySelector('#priceRows tr[data-market-id] td:last-child');
       const headerStyle = getComputedStyle(header);
       return {
         fontSize: Number.parseFloat(headerStyle.fontSize),
         background: headerStyle.backgroundColor,
-        rowBackground: getComputedStyle(document.querySelector('#priceRows tr[data-country] td')).backgroundColor,
+        rowBackground: getComputedStyle(document.querySelector('#priceRows tr[data-market-id] td')).backgroundColor,
         lastHeaderPadding: Number.parseFloat(getComputedStyle(lastHeader).paddingRight),
         lastCellPadding: Number.parseFloat(getComputedStyle(lastCell).paddingRight)
       };
@@ -2195,12 +2198,12 @@ test('restores URL state, removes the floating search bar, and supports table re
 
     await page.locator('#searchInput').fill('');
     await page.locator('#regionSelect').selectOption('all');
-    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, validData.countries.length);
+    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, validData.countries.length);
 
     const backToTableButton = page.locator('#backToTableButton');
     assert.equal(await backToTableButton.count(), 1);
     assert.equal(await backToTableButton.getAttribute('aria-hidden'), 'true');
-    await page.evaluate(() => document.querySelectorAll('#priceRows tr[data-country]')[35]?.scrollIntoView());
+    await page.evaluate(() => document.querySelectorAll('#priceRows tr[data-market-id]')[35]?.scrollIntoView());
     await page.evaluate(() => scrollBy(0, 180));
     await page.waitForFunction(() => document.querySelector('#backToTableButton')?.classList.contains('is-visible'));
     assert.equal(await backToTableButton.getAttribute('aria-hidden'), 'false');
@@ -2215,7 +2218,7 @@ test('restores URL state, removes the floating search bar, and supports table re
 
     await page.locator('#searchInput').fill(initialCountry.nameZh || initialCountry.country);
     await page.locator('#regionSelect').selectOption(initialCountry.region);
-    await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-country]').length === 1);
+    await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length === 1);
     const minimumCard = page.locator('#minimumSummary .minimum-card').filter({ hasText: '200 GB' });
     const minimumTier = await minimumCard.getAttribute('data-tier');
     await minimumCard.click();
@@ -2236,8 +2239,8 @@ test('restores URL state, removes the floating search bar, and supports table re
         country,
         cny: country.plans[minimumTier].cnyPrice
       }))
-      .sort((first, second) => first.cny - second.cny)[0].country.country;
-    assert.equal(await highlightedRow.getAttribute('data-country'), expectedWinner);
+      .sort((first, second) => first.cny - second.cny)[0].country.marketId;
+    assert.equal(await highlightedRow.getAttribute('data-market-id'), expectedWinner);
     assert.equal(await highlightedRow.locator('.country-history-button').evaluate((element) => document.activeElement === element), true, 'minimum navigation should move focus to the located country');
     await page.waitForFunction(() => {
       const row = document.querySelector('#priceRows tr.is-highlighted');
@@ -2281,8 +2284,8 @@ test('keeps the cached table DOM when the network snapshot is unchanged', { time
   });
   try {
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, validData.countries.length);
-    await page.locator('#priceRows tr[data-country]').first().evaluate((row) => { row.dataset.renderMarker = 'cached'; });
+    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, validData.countries.length);
+    await page.locator('#priceRows tr[data-market-id]').first().evaluate((row) => { row.dataset.renderMarker = 'cached'; });
     releaseRequest();
     await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
     assert.equal(requestSeen, true, 'the cached view must still check for a network update');
@@ -2341,6 +2344,42 @@ test('rejects redirected, oversized, and malformed UTF-8 price responses before 
   }
 });
 
+test('rejects network price data older than seven days or more than five minutes in the future', { timeout: 60_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the network freshness boundary test');
+  if (!browserConfig) return;
+  const validData = await readFixture('prices.json');
+  const scenarios = [
+    { label: 'expired network data', generatedAt: new Date(Date.now() - (7 * 24 * 60 * 60 * 1_000) - 60_000).toISOString() },
+    { label: 'future network data', generatedAt: new Date(Date.now() + (6 * 60 * 1_000)).toISOString() }
+  ];
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  try {
+    for (const { label, generatedAt } of scenarios) {
+      const payload = structuredClone(validData);
+      setPayloadGeneratedAt(payload, generatedAt);
+      payload.fx.fetchedAt = generatedAt;
+      payload.fx.stale = false;
+      const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+      await page.route('https://**/*', (route) => route.abort());
+      await page.route('**/data/prices.json*', (route) => route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(payload)
+      }));
+      await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+      await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
+      assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), 0, label);
+      assert.match(await page.locator('#updatedAt').textContent(), /价格数据无法加载/, label);
+      await page.close();
+    }
+  } finally {
+    await browser.close();
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
 test('enforces fresh, stale, and expired local price cache behavior', { timeout: 30_000 }, async (context) => {
   const browserConfig = await resolveBrowser(context, 'the validated-cache UI test');
   if (!browserConfig) return;
@@ -2357,7 +2396,7 @@ test('enforces fresh, stale, and expired local price cache behavior', { timeout:
     await cachedPage.route('https://**/*', (route) => route.abort());
     await cachedPage.route('**/data/prices.json*', (route) => route.fulfill({ status: 503, body: '{}' }));
     await cachedPage.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-    await cachedPage.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, validData.countries.length);
+    await cachedPage.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, validData.countries.length);
     await cachedPage.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
     assert.equal(await cachedPage.locator('#searchInput').isEnabled(), true);
     assert.match(await cachedPage.locator('#loadStatusText').textContent(), /本地缓存/);
@@ -2373,7 +2412,7 @@ test('enforces fresh, stale, and expired local price cache behavior', { timeout:
     await stalePage.route('https://**/*', (route) => route.abort());
     await stalePage.route('**/data/prices.json*', (route) => route.fulfill({ status: 503, body: '{}' }));
     await stalePage.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-    await stalePage.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-country]').length === count, validData.countries.length);
+    await stalePage.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, validData.countries.length);
     await stalePage.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
     assert.equal(await stalePage.locator('#searchInput').isEnabled(), true);
     assert.equal(await stalePage.locator('#regionSelect').isEnabled(), true);
@@ -2382,10 +2421,10 @@ test('enforces fresh, stale, and expired local price cache behavior', { timeout:
     assert.equal(await stalePage.locator('#overviewTitle').textContent(), '历史缓存价格');
     assert.equal(
       await stalePage.locator('#minimumSummary').textContent(),
-      '当前使用的是过期本地缓存，价格仅供历史参考。联网刷新成功后恢复参考最低价排名。'
+      '当前价格数据已过期，价格仅供历史参考。获取有效数据后恢复参考最低价排名。'
     );
     await stalePage.locator('button[data-sort-tier]:visible').first().click();
-    assert.ok(await stalePage.locator('#priceRows tr[data-country]').count() > 0, 'stale-cache sorting remains usable');
+    assert.ok(await stalePage.locator('#priceRows tr[data-market-id]').count() > 0, 'stale-cache sorting remains usable');
     await stalePage.close();
 
     const expiredPage = await browser.newPage({ viewport: { width: 1024, height: 768 } });
@@ -2397,7 +2436,7 @@ test('enforces fresh, stale, and expired local price cache behavior', { timeout:
     await expiredPage.route('**/data/prices.json*', (route) => route.fulfill({ status: 503, body: '{}' }));
     await expiredPage.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
     await expiredPage.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
-    assert.equal(await expiredPage.locator('#priceRows tr[data-country]').count(), 0);
+    assert.equal(await expiredPage.locator('#priceRows tr[data-market-id]').count(), 0);
     assert.equal(await expiredPage.locator('#loadStatusText').textContent(), '价格数据无法加载，请检查网络后重试。');
     assert.equal(await expiredPage.evaluate(() => localStorage.getItem('icloud-price-comparison:validated-prices:v2')), null);
     await expiredPage.close();
