@@ -1555,6 +1555,7 @@ async function initialize({ forceRefresh = false } = {}) {
       state.dataOrigin = 'network';
       applyCurrentPriceFreshness();
       normalizeCurrentPriceFreshnessUi();
+      setFiltersDisabled(false);
     }
     setLoadStatus('', { hidden: true });
   } catch (error) {

@@ -1508,6 +1508,7 @@ test('reclassifies long-lived pages across lifecycle boundaries without replacin
     await page.locator('#retryButton').dispatchEvent('click');
     await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
     assert.equal(await page.locator('#overviewTitle').textContent(), '历史参考价格', 'an equal network snapshot must still use current time');
+    assert.equal(await page.locator('#searchInput').isEnabled(), true);
     assert.equal(historyCalls, historyCallsAfterLoad, 'an equal snapshot freshness change must retain loaded history');
 
     serveRefreshed = true;
@@ -1577,6 +1578,10 @@ test('normalizes transient network warnings after an equal-snapshot retry', { ti
         await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
         assert.equal(await page.locator('.cache-warning').count(), 0, scenario.label);
         assert.equal(await page.locator('#retryButton').isHidden(), true, scenario.label);
+        assert.equal(await page.locator('#searchInput').isEnabled(), true, scenario.label);
+        assert.equal(await page.locator('#regionSelect').isEnabled(), true, scenario.label);
+        assert.equal(await page.locator('button[data-sort]').first().isEnabled(), true, scenario.label);
+        assert.equal(await page.locator('#publishedDateButton').isEnabled(), true, scenario.label);
         assert.equal(
           await page.locator('.data-status').evaluate((element) => element.classList.contains('is-stale')),
           scenario.expectedWarning !== null,
