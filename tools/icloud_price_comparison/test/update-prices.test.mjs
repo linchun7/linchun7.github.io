@@ -1304,6 +1304,26 @@ async function createTemporaryBootstrapPaths() {
   return { root, paths };
 }
 
+test('production preflight rejects a market identity re-key before any network request', async (t) => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const [prices, history] = await Promise.all([
+    readFile(paths.currentDataPath, 'utf8').then(JSON.parse),
+    readFile(paths.historyPath, 'utf8').then(JSON.parse)
+  ]);
+  const japan = prices.countries.find(({ marketId }) => marketId === 'jp');
+  japan.country = 'Japan Legacy';
+  history.markets.jp.country = 'Japan Legacy';
+  await Promise.all([
+    writeFile(paths.currentDataPath, `${JSON.stringify(prices, null, 2)}\n`, 'utf8'),
+    writeFile(paths.historyPath, `${JSON.stringify(history, null, 2)}\n`, 'utf8')
+  ]);
+  await assertRejectsBeforeFetch(
+    () => main({ dryRun: true, paths, stepSummaryPath: null }),
+    (error) => error.code === 'MARKET_IDENTITY_REKEY'
+  );
+});
+
 async function copyCommittedSnapshotStore(paths) {
   const index = JSON.parse(await readFile(snapshotIndexUrl, 'utf8'));
   await mkdir(paths.snapshotsDir, { recursive: true });
