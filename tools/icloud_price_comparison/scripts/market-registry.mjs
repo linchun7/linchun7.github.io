@@ -90,13 +90,14 @@ function marketIdentityError(message) {
 
 export function validateMarketIdentityContinuity(previousData, previousHistory, {
   registry = MARKET_REGISTRY,
-  resolve = resolveMarket
+  resolve = null
 } = {}) {
+  const resolver = resolve ?? (registry === MARKET_REGISTRY ? resolveMarket : createMarketResolver(registry));
   const publishedNamesById = new Map();
   const checkPublishedIdentity = (sourceName, expectedId, location) => {
     let resolved;
     try {
-      resolved = resolve(sourceName);
+      resolved = resolver(sourceName);
     } catch (error) {
       throw marketIdentityError(`${location} cannot resolve ${sourceName}: ${error.message}`);
     }

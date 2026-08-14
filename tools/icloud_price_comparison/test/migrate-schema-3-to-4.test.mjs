@@ -120,6 +120,25 @@ test('market identity continuity protects published and historical IDs', () => {
   ));
 });
 
+test('custom registry injection automatically selects its resolver unless explicitly overridden', () => {
+  const identity = (id, canonicalName) => ({ id, canonicalName, zh: canonicalName, aliases: [] });
+  const prices = { schemaVersion: 4, countries: [{ country: 'Custom Market', marketId: 'custom-id' }] };
+  const history = { schemaVersion: 4, markets: { 'custom-id': { country: 'Custom Market' } } };
+  const validRegistry = { 'Custom Market': identity('custom-id', 'Custom Market') };
+  assert.doesNotThrow(() => validateMarketIdentityContinuity(prices, history, { registry: validRegistry }));
+
+  const rekeyedRegistry = { 'Custom Market': identity('different-id', 'Custom Market') };
+  assert.throws(
+    () => validateMarketIdentityContinuity(prices, history, { registry: rekeyedRegistry }),
+    (error) => error.code === 'MARKET_IDENTITY_REKEY'
+  );
+
+  assert.doesNotThrow(() => validateMarketIdentityContinuity(prices, history, {
+    registry: rekeyedRegistry,
+    resolve: () => ({ ...identity('custom-id', 'Custom Market'), sourceName: 'Custom Market', unknown: false })
+  }));
+});
+
 test('Euro aliases preserve the euro-zone identity and Apple Chinese display name', () => {
   for (const sourceName of ['Euro', 'Euro Zone', 'Eurozone']) {
     const market = resolveMarket(sourceName);
