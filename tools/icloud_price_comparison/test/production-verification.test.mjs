@@ -16,6 +16,9 @@ function shiftedPayload(payload, hours) {
   shifted.run.startedAtUtc = shift(shifted.run.startedAtUtc);
   shifted.run.finishedAtUtc = shift(shifted.run.finishedAtUtc);
   shifted.run.observedAtUtc = shifted.run.finishedAtUtc;
+  shifted.run.observedAtBeijing = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(new Date(shifted.run.finishedAtUtc));
   shifted.fx.fetchedAt = shift(shifted.fx.fetchedAt);
   return shifted;
 }

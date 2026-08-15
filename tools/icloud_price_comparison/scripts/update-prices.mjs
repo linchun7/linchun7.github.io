@@ -714,7 +714,9 @@ export function validateCountryNameMapping(mapping, registry = MARKET_REGISTRY) 
     throw new Error('Chinese country-name mapping is missing or oversized');
   }
   for (const [marketId, displayName] of entries) {
-    if (UNSAFE_OBJECT_KEYS.has(marketId) || !isSafeMappingText(marketId) || !isSafeMappingText(displayName)) {
+    if (UNSAFE_OBJECT_KEYS.has(marketId)
+      || !isSafeMappingText(marketId)
+      || (displayName !== null && !isSafeMappingText(displayName))) {
       throw new Error(`Chinese country-name mapping has an unsafe entry: ${logInline(marketId)}`);
     }
   }
@@ -1542,6 +1544,10 @@ function localPriceVector(country) {
     .sort(([first], [second]) => first.localeCompare(second));
 }
 
+function canonicalTierIdSet(country) {
+  return Object.keys(country?.plans ?? {}).sort().join('\u0000');
+}
+
 export function validateAppleMarketRenameReview(previousData, confirmedCountries, resolve) {
   if (!previousData?.countries?.length) return { status: 'passed' };
   const currentNames = new Set(confirmedCountries.map(({ country }) => country));
@@ -1550,12 +1556,15 @@ export function validateAppleMarketRenameReview(previousData, confirmedCountries
   for (const added of confirmedCountries) {
     const market = resolve(added.country);
     if (!market.unknown || market.published) continue;
-    const addedVector = JSON.stringify(localPriceVector(added));
     for (const old of removed) {
       if (old.region === added.region
         && old.currency === added.currency
-        && JSON.stringify(localPriceVector(old)) === addedVector) {
-        candidates.push({ old, added });
+        && canonicalTierIdSet(old) === canonicalTierIdSet(added)) {
+        candidates.push({
+          old,
+          added,
+          pricesMatch: JSON.stringify(localPriceVector(old)) === JSON.stringify(localPriceVector(added))
+        });
       }
     }
   }
@@ -1565,10 +1574,11 @@ export function validateAppleMarketRenameReview(previousData, confirmedCountries
     .join('; ');
   const error = new Error(`MARKET_IDENTITY_RENAME_REVIEW_REQUIRED: ${details}. Add the new Apple source name as an alias for the published marketId, then rerun.`);
   error.code = 'MARKET_IDENTITY_RENAME_REVIEW_REQUIRED';
-  error.candidates = candidates.map(({ old, added }) => ({
+  error.candidates = candidates.map(({ old, added, pricesMatch }) => ({
     oldSourceName: old.country,
     newSourceName: added.country,
-    oldMarketId: old.marketId
+    oldMarketId: old.marketId,
+    pricesMatch
   }));
   throw error;
 }
@@ -2275,6 +2285,9 @@ export function buildActionSummaryLines(data, summary, trigger = resolveTriggerS
   for (const market of summary.unknownMarkets ?? []) {
     warnings.push(`- **UNKNOWN_APPLE_MARKET**：${markdownInline(market.sourceName)} → ${markdownInline(market.generatedMarketId ?? market.id)}；分区 ${markdownInline(market.region ?? 'unknown')}；币种 ${markdownInline(market.currency ?? 'unknown')}`);
   }
+  for (const market of summary.chineseNamePendingMarkets ?? []) {
+    warnings.push(`- **CHINESE_MARKET_NAME_PENDING**：marketId=${markdownInline(market.marketId)}；sourceName=${markdownInline(market.sourceName)}；暂用 Apple 英文名称显示`);
+  }
 
   const lines = [
     '## iCloud+ 价格更新',
@@ -2409,6 +2422,7 @@ export async function main({
     ));
   }
   const unknownMarkets = [];
+  const chineseNamePendingMarkets = [];
   const marketResolver = createPublishedMarketResolver(previousData, previousHistory);
   validateAppleMarketRenameReview(previousData, parsed.countries, marketResolver);
   const parsedCountries = attachMarketIdentity(parsed.countries, {
@@ -2426,6 +2440,15 @@ export async function main({
       if (process.env.GITHUB_ACTIONS === 'true') {
         const message = `sourceName=${warning.sourceName}; generatedMarketId=${warning.generatedMarketId}; region=${warning.region}; currency=${warning.currency}; requires registry review`;
         console.log(`::warning title=Unknown Apple market requires registry review::${escapeGitHubCommandMessage(message)}`);
+      }
+    },
+    onChineseNamePending: (market, country) => {
+      const warning = { marketId: market.id, sourceName: country.country };
+      chineseNamePendingMarkets.push(warning);
+      console.warn(`CHINESE_MARKET_NAME_PENDING:marketId=${logInline(warning.marketId)}:sourceName=${logInline(warning.sourceName)}`);
+      if (process.env.GITHUB_ACTIONS === 'true') {
+        const message = `marketId=${warning.marketId}; sourceName=${warning.sourceName}; using Apple English sourceName until zh-CN wording is approved`;
+        console.log(`::warning title=Apple Chinese market name pending::${escapeGitHubCommandMessage(message)}`);
       }
     }
   });
@@ -2503,6 +2526,7 @@ export async function main({
     missingRates,
     fxSanityWarnings: fxSanity.warnings,
     unknownMarkets,
+    chineseNamePendingMarkets,
     publishedDateHistory,
     publicationDateChanged: publishedDateUpdate.changed,
     publicationChanges,

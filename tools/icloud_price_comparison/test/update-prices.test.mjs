@@ -68,6 +68,8 @@ test('redacts credentials from diagnostic text', () => {
 test('strictly validates the committed country-name mapping and rejects unsafe entries', async () => {
   const mapping = JSON.parse(await readFile(namesUrl, 'utf8'));
   assert.equal(validateCountryNameMapping(mapping), mapping);
+  assert.equal(mapping.mu, null);
+  assert.equal(mapping.cg, null);
   assert.throws(() => validateCountryNameMapping([]), /unsupported structure/);
   assert.throws(() => validateCountryNameMapping({ Alpha: '甲' }), /incomplete/);
 
@@ -78,6 +80,9 @@ test('strictly validates the committed country-name mapping and rejects unsafe e
   const unsafeValue = structuredClone(mapping);
   unsafeValue.Australia = '澳大利亚\u202e';
   assert.throws(() => validateCountryNameMapping(unsafeValue), /unsafe entry/);
+  const invalidPending = structuredClone(mapping);
+  invalidPending.mu = false;
+  assert.throws(() => validateCountryNameMapping(invalidPending), /unsafe entry/);
 });
 
 test('bounds and flattens untrusted workflow log text', () => {
@@ -449,7 +454,7 @@ test('performs a second Apple fetch when only the published date changes', async
 });
 
 test('publishes price and publication history at Beijing midnight with a previous-day UTC timestamp', async (t) => {
-  const fixedNow = new Date('2026-08-14T16:02:00.000Z');
+  const fixedNow = new Date('2026-08-15T16:02:00.000Z');
   t.mock.timers.enable({ apis: ['Date'], now: fixedNow });
   const { root, paths } = await createTemporaryProductionPaths();
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -473,22 +478,22 @@ test('publishes price and publication history at Beijing midnight with a previou
     readFile(paths.currentDataPath, 'utf8').then(JSON.parse),
     readFile(paths.historyPath, 'utf8').then(JSON.parse)
   ]);
-  assert.equal(prices.generatedAt, '2026-08-14T16:02:00.000Z');
-  assert.equal(prices.run.observedAtBeijing, '2026-08-15');
+  assert.equal(prices.generatedAt, '2026-08-15T16:02:00.000Z');
+  assert.equal(prices.run.observedAtBeijing, '2026-08-16');
   assert.equal(history.updatedAt, prices.generatedAt);
   const priceEvent = history.markets.bs.events.at(-1);
-  assert.equal(priceEvent.observedAt, '2026-08-15');
-  assert.equal(priceEvent.observedAtBeijing, '2026-08-15');
+  assert.equal(priceEvent.observedAt, '2026-08-16');
+  assert.equal(priceEvent.observedAtBeijing, '2026-08-16');
   assert.equal(priceEvent.observedAtUtc, prices.generatedAt);
   const publicationEvent = history.sourcePublishedDates.at(-1);
-  assert.equal(publicationEvent.observedAt, '2026-08-15');
-  assert.equal(publicationEvent.observedAtBeijing, '2026-08-15');
+  assert.equal(publicationEvent.observedAt, '2026-08-16');
+  assert.equal(publicationEvent.observedAtBeijing, '2026-08-16');
   assert.equal(publicationEvent.observedAtUtc, prices.generatedAt);
   assert.doesNotThrow(() => validateHistoryPayload(history));
   assert.doesNotThrow(() => validatePriceHistoryConsistency(prices, history));
 });
 
-test('requires explicit alias review for an exact removed-to-unknown Apple rename candidate', () => {
+test('requires explicit alias review for removed-to-unknown candidates despite repricing', () => {
   const old = {
     country: 'Old Apple Market', marketId: 'old-id', region: 'Asia Pacific', currency: 'USD',
     plans: { '50GB': { price: 1 }, '200GB': { price: 3 } }
@@ -498,13 +503,22 @@ test('requires explicit alias review for an exact removed-to-unknown Apple renam
   const unknownResolver = (sourceName) => ({
     id: `generated-${sourceName}`, sourceName, canonicalName: sourceName, unknown: true
   });
-  assert.throws(
-    () => validateAppleMarketRenameReview({ countries: [old] }, [added], unknownResolver),
-    (error) => error.code === 'MARKET_IDENTITY_RENAME_REVIEW_REQUIRED'
-      && error.message.includes('Old Apple Market')
-      && error.message.includes('New Apple Market')
-      && error.message.includes('old-id')
-  );
+  const requiresReview = (current, candidateCount = 1) => {
+    let captured;
+    assert.throws(
+      () => validateAppleMarketRenameReview({ countries: [old] }, current, unknownResolver),
+      (error) => {
+        captured = error;
+        return error.code === 'MARKET_IDENTITY_RENAME_REVIEW_REQUIRED'
+          && error.message.includes('Old Apple Market')
+          && error.message.includes('old-id')
+          && error.candidates.length === candidateCount;
+      }
+    );
+    return captured;
+  };
+  const exactError = requiresReview([added]);
+  assert.equal(exactError.candidates[0].pricesMatch, true);
   assert.doesNotThrow(() => validateAppleMarketRenameReview(
     { countries: [old] }, [added], () => ({ id: 'old-id', unknown: false })
   ));
@@ -516,7 +530,69 @@ test('requires explicit alias review for an exact removed-to-unknown Apple renam
   ));
   const changedPrice = structuredClone(added);
   changedPrice.plans['50GB'].price = 2;
-  assert.doesNotThrow(() => validateAppleMarketRenameReview({ countries: [old] }, [changedPrice], unknownResolver));
+  const oneTierError = requiresReview([changedPrice]);
+  assert.equal(oneTierError.candidates[0].pricesMatch, false);
+  const allPricesChanged = structuredClone(added);
+  for (const plan of Object.values(allPricesChanged.plans)) plan.price += 10;
+  requiresReview([allPricesChanged]);
+
+  const differentTiers = structuredClone(added);
+  delete differentTiers.plans['200GB'];
+  assert.doesNotThrow(() => validateAppleMarketRenameReview({ countries: [old] }, [differentTiers], unknownResolver));
+  assert.doesNotThrow(() => validateAppleMarketRenameReview(
+    { countries: [old] }, [old, added], unknownResolver
+  ), 'a genuinely additional unknown has no removed candidate');
+  assert.doesNotThrow(() => validateAppleMarketRenameReview(
+    { countries: [old] }, [{ ...added, country: 'old apple market' }],
+    () => ({ id: 'old-id', sourceName: 'old apple market', unknown: true, published: true })
+  ));
+
+  const secondOld = { ...structuredClone(old), country: 'Another Old Market', marketId: 'another-old-id' };
+  assert.throws(
+    () => validateAppleMarketRenameReview({ countries: [old, secondOld] }, [added], unknownResolver),
+    (error) => error.code === 'MARKET_IDENTITY_RENAME_REVIEW_REQUIRED'
+      && error.candidates.length === 2
+      && new Set(error.candidates.map(({ oldMarketId }) => oldMarketId)).size === 2
+  );
+});
+
+test('full updater stops a confirmed Apple rename plus repricing before FX or production writes', async (t) => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const previousText = await readFile(paths.currentDataPath, 'utf8');
+  const previous = JSON.parse(previousText);
+  const changed = structuredClone(previous);
+  const renamed = changed.countries.find(({ country }) => country === 'Bahamas');
+  renamed.country = 'Renamed Bahamas Market';
+  renamed.plans['50GB'].price = 1;
+  renamed.plans['50GB'].formattedPrice = '$1.00';
+  const html = buildAppleHtml(changed);
+  const originalFetch = globalThis.fetch;
+  let appleRequests = 0;
+  let fxRequests = 0;
+  globalThis.fetch = async (url) => {
+    const target = String(url);
+    if (target.includes('support.apple.com')) {
+      appleRequests += 1;
+      return new Response(html, { status: 200 });
+    }
+    fxRequests += 1;
+    throw new Error(`FX must not be requested before identity review: ${target}`);
+  };
+  try {
+    await assert.rejects(
+      () => main({ dryRun: false, paths, stepSummaryPath: null }),
+      (error) => error.code === 'MARKET_IDENTITY_RENAME_REVIEW_REQUIRED'
+        && error.candidates.some(({ oldMarketId, newSourceName, pricesMatch }) => (
+          oldMarketId === 'bs' && newSourceName === 'Renamed Bahamas Market' && pricesMatch === false
+        ))
+    );
+    assert.equal(appleRequests, 2);
+    assert.equal(fxRequests, 0);
+    assert.equal(await readFile(paths.currentDataPath, 'utf8'), previousText);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test('publishes a confirmed unknown Apple market with a deterministic identity and structured warning', async () => {
@@ -579,6 +655,11 @@ test('publishes a confirmed unknown Apple market with a deterministic identity a
     )));
     const summary = await readFile(summaryPath, 'utf8');
     assert.match(summary, new RegExp(`UNKNOWN_APPLE_MARKET.*${publishedUnknown.marketId}.*${unknown.region}.*${unknown.currency}`, 's'));
+    assert.match(summary, new RegExp(`CHINESE_MARKET_NAME_PENDING.*${publishedUnknown.marketId}.*New Apple Market`, 's'));
+    assert.ok(warnings.some((warning) => warning.includes(`CHINESE_MARKET_NAME_PENDING:marketId=${publishedUnknown.marketId}:sourceName=New Apple Market`)));
+    assert.ok(logs.some((message) => message.startsWith('::warning title=Apple Chinese market name pending::')
+      && message.includes(`marketId=${publishedUnknown.marketId}`)
+      && message.includes('sourceName=New Apple Market')));
 
     const caseChanged = structuredClone(changed);
     const caseChangedUnknown = caseChanged.countries.at(-1);
@@ -1511,6 +1592,15 @@ test('runs the production write path against isolated files', async () => {
 test('does not rewrite history when an observation has no historical changes', async () => {
   const { root, paths } = await createTemporaryProductionPaths();
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const history = JSON.parse(await readFile(paths.historyPath, 'utf8'));
+  for (const [marketId, sourceName] of [['mu', 'Mauritius'], ['cg', 'Republic of Congo']]) {
+    data.countries.find((country) => country.marketId === marketId).nameZh = sourceName;
+    history.markets[marketId].nameZh = sourceName;
+  }
+  await Promise.all([
+    writeFile(paths.currentDataPath, `${JSON.stringify(data, null, 2)}\n`, 'utf8'),
+    writeFile(paths.historyPath, `${JSON.stringify(history, null, 2)}\n`, 'utf8')
+  ]);
   const fxPayload = {
     result: 'success',
     base_code: 'USD',
@@ -3192,6 +3282,12 @@ test('keeps successful Action summaries concise and promotes warnings', () => {
   }, 'schedule').join('\n');
   assert.match(unknownMarket, /UNKNOWN_APPLE_MARKET.*New Apple Market.*apple-new-apple-market-1234abcd/);
 
+  const pendingChineseName = buildActionSummaryLines(data, {
+    ...summary,
+    chineseNamePendingMarkets: [{ marketId: 'mu', sourceName: 'Mauritius' }]
+  }, 'schedule').join('\n');
+  assert.match(pendingChineseName, /CHINESE_MARKET_NAME_PENDING.*marketId=mu.*sourceName=Mauritius/);
+
   const noSecret = buildActionSummaryLines({
     ...data,
     fx: {
@@ -3277,7 +3373,12 @@ test('keeps credential configuration and failure details out of public Action no
   assert.match(output, /::notice title=汇率来源自动回退::认证汇率来源不可用，已使用开放接口。/);
   assert.equal((output.match(/::notice title=汇率来源自动回退::/g) ?? []).length, 1);
   assert.doesNotMatch(output, /API Key|未配置|无效|invalid-key|quota-reached/i);
-  assert.doesNotMatch(output, /::warning/);
+  assert.equal(
+    output.split('\n').filter((line) => line.startsWith('::warning')).every(
+      (line) => line.startsWith('::warning title=Apple Chinese market name pending::')
+    ),
+    true
+  );
 });
 
 test('shows price, currency, region, country, tier, and publication-date changes separately', () => {
