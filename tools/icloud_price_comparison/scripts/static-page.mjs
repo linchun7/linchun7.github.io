@@ -4,14 +4,20 @@ import { validatePricePayload } from '../data-contract.js';
 export const STATIC_FRAGMENT_NAMES = Object.freeze([
   'META',
   'STATUS',
+  'WORKSPACE_META',
   'OVERVIEW',
   'MINIMUMS',
   'TABLE_HEAD',
   'TABLE_BODY',
-  'SOURCE_META'
+  'APPLE_META',
+  'FX_META'
 ]);
 
 const DEFAULT_TIER_ID = '200GB';
+
+export function preferredDefaultTier(payload) {
+  return payload.tiers.find(({ id }) => id === DEFAULT_TIER_ID) ?? payload.tiers[0];
+}
 
 function canonicalize(value) {
   if (Array.isArray(value)) return value.map(canonicalize);
@@ -59,7 +65,7 @@ function displayName(country) {
   return country.nameZh || country.country;
 }
 
-function renderMinimumCard(tier, countries) {
+function renderMinimumCard(tier, countries, defaultTierId) {
   const winners = countries
     .filter((country) => country.plans[tier.id].cnyRank === 1)
     .sort((first, second) => first.marketId.localeCompare(second.marketId, 'en'));
@@ -69,24 +75,24 @@ function renderMinimumCard(tier, countries) {
     : winnerNames.join('、');
   const price = winners[0]?.plans[tier.id].cnyPrice;
   return [
-    `          <button class="minimum-card${tier.id === DEFAULT_TIER_ID ? ' is-active-tier' : ''}" type="button" data-tier="${escapeHtml(tier.id)}" data-market-id="${escapeHtml(winners[0]?.marketId ?? '')}" aria-pressed="${tier.id === DEFAULT_TIER_ID}" disabled>`,
+    `          <button class="minimum-card${tier.id === defaultTierId ? ' is-active-tier' : ''}" type="button" data-tier="${escapeHtml(tier.id)}" data-market-id="${escapeHtml(winners[0]?.marketId ?? '')}" aria-pressed="${tier.id === defaultTierId}" disabled>`,
     `            <span class="minimum-tier-label">${escapeHtml(tier.label)}</span>`,
     `            <strong class="minimum-country">${escapeHtml(names || '暂无地区')}</strong>`,
     `            <small class="minimum-price">¥${formatNumber(price)}</small>`,
-    '            <span class="visually-hidden">，启用 JavaScript 后可在价格表中定位</span>',
+    '            <span class="visually-hidden">，在价格表中定位</span>',
     '          </button>'
   ].join('\n');
 }
 
-function renderPriceCell(country, tier) {
+function renderPriceCell(country, tier, { defaultTierId, minimumCuesEnabled }) {
   const plan = country.plans[tier.id];
   const classes = ['price-cell'];
-  if (tier.id === DEFAULT_TIER_ID) classes.push('is-active-tier', 'is-sorted');
-  if (plan.cnyRank === 1) classes.push('is-minimum');
+  if (tier.id === defaultTierId) classes.push('is-active-tier', 'is-sorted');
+  if (minimumCuesEnabled && plan.cnyRank === 1) classes.push('is-minimum');
   return [
     `            <td class="${classes.join(' ')}" data-tier="${escapeHtml(tier.id)}">`,
     '              <strong class="price-cny">',
-    ...(plan.cnyRank === 1 ? ['                <span class="minimum-badge">最低</span>'] : []),
+    ...(minimumCuesEnabled && plan.cnyRank === 1 ? ['                <span class="minimum-badge">最低</span>'] : []),
     `                <span class="price-symbol">¥</span><span class="price-amount">${formatNumber(plan.cnyPrice)}</span>`,
     '              </strong>',
     `              <span class="price-local">${escapeHtml(plan.formattedPrice)}</span>`,
@@ -94,22 +100,23 @@ function renderPriceCell(country, tier) {
   ].join('\n');
 }
 
-function renderCountryRow(country, tiers) {
+function renderCountryRow(country, tiers, options) {
+  const rank = country.plans[options.defaultTierId]?.cnyRank ?? '--';
   const secondary = country.nameZh && country.nameZh !== country.country
     ? `              <span class="country-name-en">${escapeHtml(country.country)} · ${escapeHtml(country.currency)}</span>\n`
     : `              <span class="country-name-en">${escapeHtml(country.currency)}</span>\n`;
   return [
     `          <tr data-market-id="${escapeHtml(country.marketId)}">`,
-    `            <td${country.plans[DEFAULT_TIER_ID]?.cnyRank <= 3 ? ' class="rank-top"' : ''}>${country.plans[DEFAULT_TIER_ID]?.cnyRank ?? '--'}</td>`,
+    `            <td${options.minimumCuesEnabled && rank <= 3 ? ' class="rank-top"' : ''}>${rank}</td>`,
     '            <td>',
     '              <button class="country-history-button" type="button" disabled>',
     `              <span class="country-name">${escapeHtml(displayName(country))}</span>`,
     secondary.trimEnd(),
     '              <span class="history-affordance" aria-hidden="true">历史 ›</span>',
-    '              <span class="visually-hidden">，启用 JavaScript 后可查看 Apple 当地标价历史</span>',
+    '              <span class="visually-hidden">，查看 Apple 当地标价历史</span>',
     '              </button>',
     '            </td>',
-    ...tiers.map((tier) => renderPriceCell(country, tier)),
+    ...tiers.map((tier) => renderPriceCell(country, tier, options)),
     '          </tr>'
   ].join('\n');
 }
@@ -117,15 +124,20 @@ function renderCountryRow(country, tiers) {
 export function renderStaticFragments(payload) {
   validatePricePayload(payload);
   const fingerprint = publicPayloadFingerprint(payload);
-  const defaultTier = payload.tiers.find(({ id }) => id === DEFAULT_TIER_ID) ?? payload.tiers[0];
+  const defaultTier = preferredDefaultTier(payload);
+  const fxStale = payload.fx.stale === true;
   const countries = [...payload.countries].sort((first, second) => (
     first.plans[defaultTier.id].cnyRank - second.plans[defaultTier.id].cnyRank
     || first.marketId.localeCompare(second.marketId, 'en')
   ));
   const currencyCount = new Set(payload.countries.map(({ currency }) => currency)).size;
   return {
-    META: `  <meta name="icloud-price-snapshot" content="${escapeHtml(payload.generatedAt)}" data-fingerprint="${fingerprint}">`,
+    META: `  <meta name="icloud-price-snapshot" content="${escapeHtml(payload.generatedAt)}" data-fingerprint="${fingerprint}" data-fx-stale="${fxStale}">`,
     STATUS: `        <span id="updatedAt" title="北京时间">更新于 ${beijingDateTime(payload.generatedAt)}</span>`,
+    WORKSPACE_META: [
+      `          <p id="resultSummary" aria-live="polite">${payload.countries.length} 个地区 · ${escapeHtml(defaultTier.id)} 从低到高</p>`,
+      `          <p id="rankingScopeNote" class="ranking-scope-note"${fxStale ? '' : ' hidden'}>${fxStale ? '排名基于最近一次可用汇率，仅供参考。' : '排名仍为全部地区中的全球参考排名'}</p>`
+    ].join('\n'),
     OVERVIEW: [
       '      <dl class="overview-stats overview-stat-list" aria-label="价格覆盖概览">',
       `        <div><dt>覆盖</dt><dd id="marketCount">${payload.countries.length} 个地区</dd></div>`,
@@ -133,17 +145,20 @@ export function renderStaticFragments(payload) {
       `        <div><dt>容量</dt><dd id="tierCount">${payload.tiers.length} 档</dd></div>`,
       '      </dl>'
     ].join('\n'),
-    MINIMUMS: payload.tiers.map((tier) => renderMinimumCard(tier, payload.countries)).join('\n'),
+    MINIMUMS: fxStale
+      ? '        <p class="minimum-unavailable cache-stale-notice">参考汇率暂未更新，人民币金额使用最近一次可用汇率。</p>'
+      : payload.tiers.map((tier) => renderMinimumCard(tier, payload.countries, defaultTier.id)).join('\n'),
     TABLE_HEAD: payload.tiers.map((tier) => [
       `              <th data-tier-header="true" data-tier="${escapeHtml(tier.id)}" class="${tier.id === defaultTier.id ? 'is-active-tier' : ''}" scope="col" aria-sort="${tier.id === defaultTier.id ? 'ascending' : 'none'}">`,
-      `                <button type="button" data-sort-tier="${escapeHtml(tier.id)}" disabled>${escapeHtml(tier.label)} / 月 <span aria-hidden="true">↕</span></button>`,
+      `                <button type="button" data-sort-tier="${escapeHtml(tier.id)}" disabled>${escapeHtml(tier.label)} / 月 <i data-lucide="${tier.id === defaultTier.id ? 'arrow-up' : 'arrow-up-down'}" aria-hidden="true"></i></button>`,
       '              </th>'
     ].join('\n')).join('\n'),
-    TABLE_BODY: countries.map((country) => renderCountryRow(country, payload.tiers)).join('\n'),
-    SOURCE_META: [
-      `              <span>Apple 价格页更新：<strong id="applePublishedDate">${appleDate(payload.source.publishedDate)}</strong></span>`,
-      `              <span id="fxStatus"><i data-lucide="clock-3" aria-hidden="true"></i>汇率更新：${beijingDateTime(payload.fx.fetchedAt)}</span>`
-    ].join('\n')
+    TABLE_BODY: countries.map((country) => renderCountryRow(country, payload.tiers, {
+      defaultTierId: defaultTier.id,
+      minimumCuesEnabled: !fxStale
+    })).join('\n'),
+    APPLE_META: `            <span>Apple 价格页更新：<strong id="applePublishedDate">${appleDate(payload.source.publishedDate)}</strong></span>`,
+    FX_META: `            <span id="fxStatus"><i data-lucide="clock-3" aria-hidden="true"></i>汇率更新：${beijingDateTime(payload.fx.fetchedAt)}</span>`
   };
 }
 

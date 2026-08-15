@@ -125,6 +125,7 @@ let initialPriceRequest = globalThis.__icloudInitialPriceRequest ?? null;
 delete globalThis.__icloudInitialPriceRequest;
 const staticSnapshotMeta = document.querySelector('meta[name="icloud-price-snapshot"]');
 const staticSnapshotGeneratedAt = staticSnapshotMeta?.content ?? null;
+const staticSnapshotFxStale = staticSnapshotMeta?.dataset.fxStale === 'true';
 const hasStaticSnapshot = /^\d{4}-\d{2}-\d{2}T/.test(staticSnapshotGeneratedAt ?? '')
   && /^[a-f0-9]{64}$/.test(staticSnapshotMeta?.dataset.fingerprint ?? '');
 
@@ -685,12 +686,8 @@ function renderTable() {
     ? `按名称${state.sortDirection === 'asc' ? '排序' : '倒序'}`
     : `${tier.label.replace(' ', '')} ${direction}`;
   elements.resultSummary.textContent = [regionLabel, countLabel, sortLabel].filter(Boolean).join(' · ');
-  if (elements.rankingScopeNote) elements.rankingScopeNote.hidden = !(filtered && state.sortKey === 'tier');
+  updateRankingPresentation({ filtered });
   if (elements.clearFiltersButton) elements.clearFiltersButton.hidden = !filtered;
-  if (elements.rankHeaderLabel) {
-    elements.rankHeaderLabel.textContent = state.sortKey === 'tier' ? '全球排名' : '序号';
-    elements.rankHeaderLabel.closest('th')?.setAttribute('title', state.sortKey === 'tier' ? '全球参考排名' : '序号');
-  }
 
   if (!countries.length) {
     const row = document.createElement('tr');
@@ -703,7 +700,9 @@ function renderTable() {
       const row = document.createElement('tr');
       row.dataset.marketId = country.marketId;
 
-      const displayedRank = state.sortKey === 'tier' ? country.plans[state.sortTier].cnyRank : index + 1;
+      const displayedRank = state.dataFreshness?.status === 'unusable'
+        ? '—'
+        : (state.sortKey === 'tier' ? country.plans[state.sortTier].cnyRank : index + 1);
       const rank = createCell(String(displayedRank), state.minimumCuesEnabled && displayedRank <= 3 && state.sortKey === 'tier' && state.sortDirection === 'asc' ? 'rank-top' : '');
       const nameCell = document.createElement('td');
       const historyButton = document.createElement('button');
@@ -724,10 +723,14 @@ function renderTable() {
         nameEn.textContent = secondaryName;
         historyButton.append(nameEn);
       }
+      const affordance = document.createElement('span');
+      affordance.className = 'history-affordance';
+      affordance.setAttribute('aria-hidden', 'true');
+      affordance.textContent = '历史 ›';
       const historyAction = document.createElement('span');
       historyAction.className = 'visually-hidden';
       historyAction.textContent = '，查看 Apple 当地标价历史';
-      historyButton.append(historyAction);
+      historyButton.append(affordance, historyAction);
       nameCell.append(historyButton);
 
       row.append(rank, nameCell, ...state.data.tiers.map(({ id }) => createPriceCell(country, id)));
@@ -746,7 +749,7 @@ function bindRenderedPriceRows() {
     if (row.dataset.interactive === 'true') continue;
     const country = state.data?.countries.find(({ marketId }) => marketId === row.dataset.marketId);
     const historyButton = row.querySelector('.country-history-button');
-    if (!country || !historyButton) continue;
+    if (!country || !historyButton || historyButton.disabled) continue;
     row.dataset.interactive = 'true';
     historyButton.addEventListener('click', (event) => {
       event.stopPropagation();
@@ -757,6 +760,37 @@ function bindRenderedPriceRows() {
       openHistory(country, historyButton);
     });
   }
+}
+
+function updateRankingPresentation({ filtered = Boolean(state.query.trim() || state.region !== 'all') } = {}) {
+  const unusable = state.dataFreshness?.status === 'unusable';
+  const tierRanking = state.sortKey === 'tier';
+  const notes = [];
+  if (unusable) notes.push('排名暂不可用。');
+  else if (state.dataFreshness?.reason === 'fx-stale') notes.push('排名基于最近一次可用汇率，仅供参考。');
+  else if (state.dataFreshness?.reason === 'price-stale') notes.push('排名为最近一次获取价格时的全球参考排名。');
+  if (!unusable && filtered && tierRanking) notes.push('筛选结果中的排名仍对应全部地区。');
+  if (elements.rankingScopeNote) {
+    elements.rankingScopeNote.textContent = notes.join(' ');
+    elements.rankingScopeNote.hidden = notes.length === 0;
+  }
+  if (!elements.rankHeaderLabel) return;
+  if (!tierRanking) {
+    elements.rankHeaderLabel.textContent = '序号';
+    return;
+  }
+  if (unusable) {
+    elements.rankHeaderLabel.textContent = '排名暂不可用';
+    return;
+  }
+  elements.rankHeaderLabel.replaceChildren();
+  const visible = document.createElement('span');
+  visible.setAttribute('aria-hidden', 'true');
+  visible.textContent = '全球排名';
+  const accessible = document.createElement('span');
+  accessible.className = 'visually-hidden';
+  accessible.textContent = '全球参考排名';
+  elements.rankHeaderLabel.append(visible, accessible);
 }
 
 function bindStaticControls() {
@@ -1380,6 +1414,7 @@ function normalizeCurrentPriceFreshnessUi() {
     warning.textContent = freshnessWarning;
     elements.updatedAt.append(warning);
   }
+  updateRankingPresentation();
 }
 
 function renderCurrentPriceFreshness() {
@@ -1449,6 +1484,9 @@ function hydrateStaticPriceData(data) {
   state.data = data;
   state.dataOrigin = 'static-network';
   state.dataFreshness = freshness;
+  if (!state.data.tiers.some(({ id }) => id === state.sortTier)) {
+    state.sortTier = state.data.tiers.find(({ id }) => id === DEFAULT_SORT_TIER)?.id || state.data.tiers[0].id;
+  }
   state.historyTier = state.sortTier;
   populateFilters();
   bindEvents();
@@ -1457,7 +1495,9 @@ function hydrateStaticPriceData(data) {
   renderMobileTierButtons();
   renderPublishedDateHistory();
   setFiltersDisabled(false);
-  if (freshness.status !== 'fresh' || state.query || state.region !== 'all' || state.sortKey !== 'tier' || state.sortTier !== DEFAULT_SORT_TIER || state.sortDirection !== 'asc') {
+  bindRenderedPriceRows();
+  const preferredTier = state.data.tiers.find(({ id }) => id === DEFAULT_SORT_TIER)?.id || state.data.tiers[0].id;
+  if (freshness.status !== 'fresh' || state.query || state.region !== 'all' || state.sortKey !== 'tier' || state.sortTier !== preferredTier || state.sortDirection !== 'asc') {
     renderCurrentPriceFreshness();
   } else {
     normalizeCurrentPriceFreshnessUi();
@@ -1674,7 +1714,7 @@ async function initialize({ forceRefresh = false } = {}) {
       setFiltersDisabled(false);
     } else if (hasStaticSnapshot) {
       console.warn(`网络价格刷新失败，继续显示静态价格：${error.message}`);
-      const staticFreshness = classifyPriceFreshness({ generatedAt: staticSnapshotGeneratedAt, fx: { stale: false } });
+      const staticFreshness = classifyPriceFreshness({ generatedAt: staticSnapshotGeneratedAt, fx: { stale: staticSnapshotFxStale } });
       if (staticFreshness.status === 'unusable') {
         const message = staticFreshness.reason === 'future-data'
           ? '数据时间异常，暂不作为当前价格展示。请稍后重试。'
@@ -1683,8 +1723,22 @@ async function initialize({ forceRefresh = false } = {}) {
         elements.updatedAt.textContent = message;
         document.querySelectorAll('.minimum-badge').forEach((badge) => badge.remove());
         document.querySelectorAll('.is-minimum, .rank-top').forEach((element) => element.classList.remove('is-minimum', 'rank-top'));
+        document.querySelectorAll('.price-table tbody tr[data-market-id] > td:first-child').forEach((cell) => { cell.textContent = '—'; });
+        if (elements.rankHeaderLabel) elements.rankHeaderLabel.textContent = '排名暂不可用';
+        if (elements.rankingScopeNote) {
+          elements.rankingScopeNote.textContent = '排名暂不可用。';
+          elements.rankingScopeNote.hidden = false;
+        }
         setLoadStatus(message, { error: true });
         return;
+      }
+      if (staticFreshness.reason === 'fx-stale') {
+        document.querySelectorAll('.minimum-badge').forEach((badge) => badge.remove());
+        document.querySelectorAll('.is-minimum, .rank-top').forEach((element) => element.classList.remove('is-minimum', 'rank-top'));
+        if (elements.rankingScopeNote) {
+          elements.rankingScopeNote.textContent = '排名基于最近一次可用汇率，仅供参考。';
+          elements.rankingScopeNote.hidden = false;
+        }
       }
       elements.dataStatus.classList.add('is-stale');
       const warning = document.createElement('span');

@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium, firefox, webkit } from 'playwright';
 
 import { validatePriceHistoryConsistency } from '../data-contract.js';
+import { renderStaticFragments, replaceStaticFragments } from '../scripts/static-page.mjs';
 
 const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REPOSITORY_DIR = path.resolve(PROJECT_DIR, '../..');
@@ -489,9 +490,44 @@ test('shows a usable explanation when JavaScript is disabled', { timeout: 30_000
     assert.match(await notice.innerText(), /JavaScript/);
     assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), 73);
     assert.equal(await page.locator('#minimumSummary .minimum-card').count(), 5);
+    assert.equal(await page.locator('#loadStatus').isHidden(), true);
+    assert.equal(await page.locator('#priceWorkspace').getAttribute('aria-busy'), 'false');
+    assert.equal(await page.locator('#minimumSummary').getAttribute('aria-busy'), 'false');
+    assert.equal(await page.locator('.spinner:visible').count(), 0);
     assert.equal(await page.getByText('中国大陆', { exact: true }).count(), 1);
     assert.equal(await page.getByText('日本', { exact: true }).count(), 1);
     assert.equal(await page.getByText('美国', { exact: true }).count(), 1);
+  } finally {
+    await browser.close();
+  }
+});
+
+test('keeps stale-FX static safety cues when the network refresh fails', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the stale-FX static fallback test');
+  if (!browserConfig) return;
+  const [shell, current] = await Promise.all([
+    readFile(path.join(PROJECT_DIR, 'index.html'), 'utf8'),
+    readFixture('prices.json')
+  ]);
+  const payload = structuredClone(current);
+  payload.fx.stale = true;
+  payload.fx.fallbackReason = 'request-failed';
+  const html = replaceStaticFragments(shell, renderStaticFragments(payload));
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await page.route(`http://127.0.0.1:${port}/`, (route) => route.fulfill({ status: 200, contentType: 'text/html', body: html }));
+  await page.route('**/data/prices.json*', (route) => route.fulfill({ status: 503, body: '{}' }));
+  await page.route('https://**/*', (route) => route.abort());
+  try {
+    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
+    assert.equal(await page.locator('.minimum-card, .minimum-badge, .is-minimum, .rank-top').count(), 0);
+    assert.match(await page.locator('#minimumSummary').innerText(), /参考汇率暂未更新/);
+    assert.match(await page.locator('#rankingScopeNote').innerText(), /最近一次可用汇率/);
+    assert.ok(await page.locator('.price-local').count() > 0);
+    assert.ok(await page.locator('.price-cny').count() > 0);
   } finally {
     await browser.close();
   }
@@ -568,6 +604,7 @@ test('renders current prices, sorting, and country history in a real browser', {
           (count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count,
           expectedData.countries.length
         );
+        await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
         assert.equal(await page.locator('th[data-tier-placeholder]').count(), 0, `${viewport.name} price header placeholders must be replaced after data validation`);
         const initialResources = await page.evaluate(() => performance.getEntriesByType('resource').map(({ name }) => name));
         assert.equal(initialResources.some((url) => url.includes('/data/history.json')), false, `${viewport.name} must defer history data`);
@@ -581,6 +618,9 @@ test('renders current prices, sorting, and country history in a real browser', {
         assert.equal(await page.locator('.workspace').getAttribute('aria-busy'), 'false');
         assert.equal(await page.locator('#searchInput').isEnabled(), true);
         assert.equal(await page.locator('#regionSelect').isEnabled(), true);
+        assert.equal(await page.locator('#priceRows .history-affordance').count(), expectedData.countries.length);
+        const hydratedAccessibleCopy = await page.locator('#minimumSummary, #priceRows').allInnerTexts();
+        assert.equal(hydratedAccessibleCopy.join(' ').includes('启用 JavaScript 后'), false);
         assert.equal(await page.locator('.app-brand h1').textContent(), 'iCloud+ 全球价格对比');
         assert.equal(await page.locator('#overviewTitle').textContent(), '各容量全球最低价');
         assert.equal(await page.locator('.workspace-heading h2').textContent(), '全球 iCloud+ 月费');
@@ -654,6 +694,25 @@ test('renders current prices, sorting, and country history in a real browser', {
         if (viewport.width <= 640) {
           const sourceTargetHeights = await page.locator('.source-item, .source-meta-button').evaluateAll((targets) => targets.map((target) => target.getBoundingClientRect().height));
           assert.ok(sourceTargetHeights.every((height) => height >= 44), `${viewport.name} source actions must retain comfortable touch targets`);
+          const mobileTypography = await page.evaluate(() => ({
+            status: Number.parseFloat(getComputedStyle(document.querySelector('.data-status')).fontSize),
+            local: Number.parseFloat(getComputedStyle(document.querySelector('.price-local')).fontSize),
+            tier: Number.parseFloat(getComputedStyle(document.querySelector('.minimum-tier-label')).fontSize)
+          }));
+          assert.ok(Object.values(mobileTypography).every((size) => size >= 12), `${viewport.name} core mobile text must be at least 12px`);
+          const touchTargets = await page.evaluate(() => {
+            const retry = document.querySelector('#retryButton');
+            const clear = document.querySelector('#clearFiltersButton');
+            document.querySelector('#loadStatus').hidden = false;
+            retry.hidden = false;
+            clear.hidden = false;
+            const heights = [retry, clear].map((button) => button.getBoundingClientRect().height);
+            document.querySelector('#loadStatus').hidden = true;
+            retry.hidden = true;
+            clear.hidden = true;
+            return heights;
+          });
+          assert.ok(touchTargets.every((height) => height >= 44), `${viewport.name} retry and clear-filter targets must be at least 44px`);
         }
         if (viewport.name === 'narrow-mobile') {
           const metricLabels = await page.locator('.overview-stats dt > span:last-child').evaluateAll((labels) => labels.map((label) => ({
@@ -695,6 +754,12 @@ test('renders current prices, sorting, and country history in a real browser', {
         assert.notEqual(minimumCellBackground, standardCellBackground, 'minimum cell should use a restrained green tint');
         const sourceText = await page.locator('#sourceLinks').innerText();
         assert.equal(await page.locator('#sourceLinks .source-group').count(), 2);
+        const sourceGroups = await page.locator('#sourceLinks .source-group').allInnerTexts();
+        assert.match(sourceGroups[0], /价格来源：Apple/);
+        assert.match(sourceGroups[0], /Apple 价格页更新：/);
+        assert.match(sourceGroups[0], /查看更新记录/);
+        assert.doesNotMatch(sourceGroups[1], /Apple 价格页更新：/);
+        assert.match(sourceGroups[1], /参考汇率：ExchangeRate-API/);
         assert.ok(await page.locator('#sourceLinks svg').count() >= 4);
         assert.match(sourceText, /价格来源：Apple/);
         assert.match(sourceText, /Apple 价格页更新/);

@@ -5,6 +5,7 @@ import { load } from 'cheerio';
 import {
   assertStaticPageMatches,
   extractStaticFragments,
+  preferredDefaultTier,
   publicPayloadFingerprint,
   renderStaticFragments,
   replaceStaticFragments
@@ -27,11 +28,57 @@ test('committed raw HTML is the deterministic projection of validated prices', a
   assert.equal($('.minimum-card').length, payload.tiers.length);
   assert.equal($('meta[name="icloud-price-snapshot"]').attr('content'), payload.generatedAt);
   assert.equal($('meta[name="icloud-price-snapshot"]').attr('data-fingerprint'), publicPayloadFingerprint(payload));
+  assert.equal($('meta[name="icloud-price-snapshot"]').attr('data-fx-stale'), String(payload.fx.stale === true));
+  assert.equal($('#resultSummary').text(), `${payload.countries.length} 个地区 · ${preferredDefaultTier(payload).id} 从低到高`);
+  assert.equal($('.price-table thead th[aria-sort="ascending"] i[data-lucide="arrow-up"]').length, 1);
+  assert.equal(html.includes('↕'), false);
   for (const sourceName of ['China mainland', 'Japan', 'United States']) {
     assert.ok($(`.country-name-en:contains("${sourceName}")`).length, `${sourceName} must be visible in raw HTML`);
   }
   assert.ok($('#priceRows .price-local').first().text());
   assert.ok($('#priceRows .price-cny').first().text().includes('¥'));
+});
+
+test('static rendering removes minimum cues and explains rankings when FX is stale', async () => {
+  const [html, current] = await Promise.all([
+    readFile(indexUrl, 'utf8'),
+    readFile(pricesUrl, 'utf8').then(JSON.parse)
+  ]);
+  const payload = structuredClone(current);
+  payload.fx.stale = true;
+  payload.fx.fallbackReason = 'request-failed';
+  const rendered = replaceStaticFragments(html, renderStaticFragments(payload));
+  const $ = load(rendered);
+  assert.equal(assertStaticPageMatches(rendered, payload), true);
+  assert.equal($('.minimum-card, .minimum-badge, .is-minimum, .rank-top').length, 0);
+  assert.match($('#minimumSummary').text(), /参考汇率暂未更新/);
+  assert.match($('#rankingScopeNote').text(), /最近一次可用汇率/);
+  assert.ok($('.price-local').first().text());
+  assert.ok($('.price-cny').first().text().includes('¥'));
+  assert.equal($('meta[name="icloud-price-snapshot"]').attr('data-fingerprint'), publicPayloadFingerprint(payload));
+  assert.equal($('meta[name="icloud-price-snapshot"]').attr('data-fx-stale'), 'true');
+});
+
+test('static rendering uses the first tier consistently when 200GB is absent', async () => {
+  const [html, current] = await Promise.all([
+    readFile(indexUrl, 'utf8'),
+    readFile(pricesUrl, 'utf8').then(JSON.parse)
+  ]);
+  const payload = structuredClone(current);
+  payload.tiers = payload.tiers.filter(({ id }) => id !== '200GB');
+  for (const country of payload.countries) delete country.plans['200GB'];
+  payload.run.pricePoints = payload.countries.length * payload.tiers.length;
+  const defaultTier = preferredDefaultTier(payload);
+  const rendered = replaceStaticFragments(html, renderStaticFragments(payload));
+  const $ = load(rendered);
+  assert.equal(assertStaticPageMatches(rendered, payload), true);
+  assert.equal(defaultTier.id, payload.tiers[0].id);
+  assert.equal($('.minimum-card.is-active-tier').length, 1);
+  assert.equal($('.price-table thead th[aria-sort="ascending"]').attr('data-tier'), defaultTier.id);
+  assert.equal($(`.price-cell[data-tier="${defaultTier.id}"].is-active-tier.is-sorted`).length, payload.countries.length);
+  assert.equal($('#priceRows > tr > td:first-child').filter((_, cell) => load(cell).text() === '--').length, 0);
+  assert.equal($('#resultSummary').text(), `${payload.countries.length} 个地区 · ${defaultTier.id} 从低到高`);
+  assert.equal(rendered.includes('200GB 从低到高'), false);
 });
 
 test('static renderer rejects missing, duplicate, and hand-edited generated regions', async () => {
