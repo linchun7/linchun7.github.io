@@ -65,7 +65,7 @@ function displayName(country) {
   return country.nameZh || country.country;
 }
 
-function renderMinimumCard(tier, countries, defaultTierId) {
+function renderMinimumCard(tier, countries) {
   const winners = countries
     .filter((country) => country.plans[tier.id].cnyRank === 1)
     .sort((first, second) => first.marketId.localeCompare(second.marketId, 'en'));
@@ -75,11 +75,11 @@ function renderMinimumCard(tier, countries, defaultTierId) {
     : winnerNames.join('、');
   const price = winners[0]?.plans[tier.id].cnyPrice;
   return [
-    `          <button class="minimum-card${tier.id === defaultTierId ? ' is-active-tier' : ''}" type="button" data-tier="${escapeHtml(tier.id)}" data-market-id="${escapeHtml(winners[0]?.marketId ?? '')}" aria-pressed="${tier.id === defaultTierId}" disabled>`,
+    `          <button class="minimum-card" type="button" data-tier="${escapeHtml(tier.id)}" data-market-id="${escapeHtml(winners[0]?.marketId ?? '')}" disabled>`,
     `            <span class="minimum-tier-label">${escapeHtml(tier.label)}</span>`,
     `            <strong class="minimum-country">${escapeHtml(names || '暂无地区')}</strong>`,
     `            <small class="minimum-price">¥${formatNumber(price)}</small>`,
-    '            <span class="visually-hidden">，在价格表中定位</span>',
+    '            <span class="visually-hidden">，按该容量从低到高排序并在价格表中定位</span>',
     '          </button>'
   ].join('\n');
 }
@@ -147,7 +147,7 @@ export function renderStaticFragments(payload) {
     ].join('\n'),
     MINIMUMS: fxStale
       ? '        <p class="minimum-unavailable cache-stale-notice">参考汇率暂未更新，人民币金额使用最近一次可用汇率。</p>'
-      : payload.tiers.map((tier) => renderMinimumCard(tier, payload.countries, defaultTier.id)).join('\n'),
+      : payload.tiers.map((tier) => renderMinimumCard(tier, payload.countries)).join('\n'),
     TABLE_HEAD: payload.tiers.map((tier) => [
       `              <th data-tier-header="true" data-tier="${escapeHtml(tier.id)}" class="${tier.id === defaultTier.id ? 'is-active-tier' : ''}" scope="col" aria-sort="${tier.id === defaultTier.id ? 'ascending' : 'none'}">`,
       `                <button type="button" data-sort-tier="${escapeHtml(tier.id)}" disabled>${escapeHtml(tier.label)} / 月 <i data-lucide="${tier.id === defaultTier.id ? 'arrow-up' : 'arrow-up-down'}" aria-hidden="true"></i></button>`,

@@ -59,7 +59,8 @@ const state = {
   historyReturnCountry: null,
   publishedDateReturnFocus: null,
   renderFrame: null,
-  scrollFrame: null
+  scrollFrame: null,
+  minimumHighlightTimer: null
 };
 
 const elements = {
@@ -428,13 +429,11 @@ function renderMinimumSummary() {
       ? `${winnerNames.slice(0, 3).join('、')}等 ${winnerNames.length} 个地区`
       : winnerNames.join('、') || '暂无地区';
     const item = document.createElement('button');
-    const isActiveTier = state.sortKey === 'tier' && state.sortTier === tier.id && state.sortDirection === 'asc';
     item.type = 'button';
     item.className = 'minimum-card';
-    item.classList.toggle('is-active-tier', isActiveTier);
     item.dataset.tier = tier.id;
-    if (winners[0]?.marketId) item.dataset.marketId = winners[0].marketId;
-    item.setAttribute('aria-pressed', String(isActiveTier));
+    const marketId = winners[0]?.marketId;
+    if (marketId) item.dataset.marketId = marketId;
     item.title = `查看 ${tier.label} 全球最低价地区`;
 
     const tierLabel = document.createElement('span');
@@ -448,9 +447,9 @@ function renderMinimumSummary() {
     price.textContent = formatConverted(state.minimumPrices[tier.id], '¥');
     const action = document.createElement('span');
     action.className = 'visually-hidden';
-    action.textContent = '，在价格表中定位';
+    action.textContent = '，按该容量从低到高排序并在价格表中定位';
     item.append(tierLabel, country, price, action);
-    item.addEventListener('click', () => focusMinimumCountry(tier.id, winners[0]?.marketId));
+    item.addEventListener('click', () => focusMinimumCountry(tier.id, marketId));
     fragment.append(item);
   }
   elements.minimumSummary.replaceChildren(fragment);
@@ -602,7 +601,7 @@ function alignActiveTierColumn() {
   });
 }
 
-function renderTable() {
+function renderTable({ alignTierColumn = true } = {}) {
   const countries = sortedCountries();
   const fragment = document.createDocumentFragment();
   const tier = state.data.tiers.find(({ id }) => id === state.sortTier);
@@ -668,7 +667,9 @@ function renderTable() {
   elements.priceRows.replaceChildren(fragment);
   bindRenderedPriceRows();
   updateTierPresentation();
-  alignActiveTierColumn();
+  if (alignTierColumn) {
+    alignActiveTierColumn();
+  }
 }
 
 function bindRenderedPriceRows() {
@@ -765,12 +766,11 @@ function setCountrySort() {
     state.sortDirection = 'asc';
   }
   updateUrlState();
-  renderMinimumSummary();
   renderSortHeaders();
   renderTable();
 }
 
-function setTierSort(tier, { forceAscending = false } = {}) {
+function setTierSort(tier, { forceAscending = false, alignTierColumn = true } = {}) {
   if (!forceAscending && state.sortKey === 'tier' && state.sortTier === tier) {
     state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
   } else {
@@ -779,10 +779,9 @@ function setTierSort(tier, { forceAscending = false } = {}) {
     state.sortDirection = 'asc';
   }
   updateUrlState();
-  renderMinimumSummary();
   renderMobileTierButtons();
   renderSortHeaders();
-  renderTable();
+  renderTable({ alignTierColumn });
 }
 
 function renderHistoryTierButtons() {
@@ -1134,38 +1133,96 @@ function scheduleQueryRender(value) {
   });
 }
 
+function clearMinimumHighlight() {
+  if (state.minimumHighlightTimer !== null) {
+    clearTimeout(state.minimumHighlightTimer);
+    state.minimumHighlightTimer = null;
+  }
+
+  elements.priceRows
+    .querySelectorAll('tr.is-highlighted')
+    .forEach((row) => {
+      row.classList.remove('is-highlighted');
+    });
+}
+
 function focusMinimumCountry(tierId, marketId) {
+  if (!state.data || !tierId || !marketId) return;
+
+  const tierExists = state.data.tiers.some(
+    ({ id }) => id === tierId
+  );
+
+  const marketExists = state.data.countries.some(
+    (country) => country.marketId === marketId
+  );
+
+  if (!tierExists || !marketExists) return;
+
   if (state.renderFrame) {
     cancelAnimationFrame(state.renderFrame);
     state.renderFrame = null;
   }
+
   state.query = '';
   state.region = 'all';
+
   elements.searchInput.value = '';
   elements.regionSelect.value = 'all';
-  setTierSort(tierId, { forceAscending: true });
-  requestAnimationFrame(() => focusRenderedMinimum(tierId, marketId));
-}
 
-function focusRenderedMinimum(tierId, marketId) {
-  const row = marketId
-    ? [...elements.priceRows.querySelectorAll('tr[data-market-id]')].find((item) => item.dataset.marketId === marketId)
-    : null;
-  if (!row) return;
-
-  const targetCell = row.querySelector(`.price-cell[data-tier="${tierId}"]`);
-  const scrollTarget = targetCell ?? row;
-  scrollTarget.scrollIntoView({
-    behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
-    block: 'center',
-    inline: 'center'
+  setTierSort(tierId, {
+    forceAscending: true,
+    alignTierColumn: false
   });
 
-  const previousHighlight = elements.priceRows.querySelector('tr.is-highlighted');
-  if (previousHighlight && previousHighlight !== row) previousHighlight.classList.remove('is-highlighted');
+  revealMinimumTarget(tierId, marketId);
+}
+
+function revealMinimumTarget(tierId, marketId) {
+  if (!marketId) return false;
+
+  const row = [
+    ...elements.priceRows.querySelectorAll(
+      'tr[data-market-id]'
+    )
+  ].find(
+    (item) => item.dataset.marketId === marketId
+  );
+
+  if (!row) return false;
+
+  const targetCell = row.querySelector(
+    `.price-cell[data-tier="${tierId}"]`
+  );
+
+  if (!targetCell) return false;
+
+  clearMinimumHighlight();
+
   row.classList.add('is-highlighted');
-  row.querySelector('.country-history-button')?.focus({ preventScroll: true });
-  setTimeout(() => row.classList.remove('is-highlighted'), 1800);
+
+  row.scrollIntoView({
+    behavior: 'auto',
+    block: 'center',
+    inline: 'nearest'
+  });
+
+  const historyButton =
+    row.querySelector('.country-history-button');
+
+  historyButton?.focus({
+    preventScroll: true
+  });
+
+  state.minimumHighlightTimer = setTimeout(() => {
+    row.classList.remove('is-highlighted');
+
+    if (state.minimumHighlightTimer !== null) {
+      state.minimumHighlightTimer = null;
+    }
+  }, 1800);
+
+  return true;
 }
 
 function setBackToTableVisible(visible) {
