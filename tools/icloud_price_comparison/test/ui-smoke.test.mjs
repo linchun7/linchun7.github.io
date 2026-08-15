@@ -2500,9 +2500,13 @@ test('restores URL state, removes the floating search bar, and supports table re
     const backToTableButton = page.locator('#backToTableButton');
     assert.equal(await backToTableButton.count(), 1);
     assert.equal(await backToTableButton.getAttribute('aria-hidden'), 'true');
-    await page.evaluate(() => document.querySelectorAll('#priceRows tr[data-market-id]')[35]?.scrollIntoView());
-    await page.evaluate(() => scrollBy(0, 180));
-    await page.waitForFunction(() => document.querySelector('#backToTableButton')?.classList.contains('is-visible'));
+    await page.evaluate(() => {
+      scrollTo(0, document.scrollingElement?.scrollHeight ?? 0);
+    });
+    await page.waitForFunction(() => {
+      const button = document.querySelector('#backToTableButton');
+      return button?.classList.contains('is-visible') && button.getAttribute('aria-hidden') === 'false';
+    });
     assert.equal(await backToTableButton.getAttribute('aria-hidden'), 'false');
     await backToTableButton.click();
     assert.equal(await page.locator('#priceWorkspace').evaluate((element) => document.activeElement === element), true, 'table return should move keyboard focus to the visible workspace');
