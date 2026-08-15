@@ -25,6 +25,7 @@ test('committed raw HTML is the deterministic projection of validated prices', a
   assert.equal($('#priceRows > tr[data-market-id]').length, payload.countries.length);
   assert.equal($('.price-table thead th[data-tier-header]').length, payload.tiers.length);
   assert.equal($('.price-cell').length, payload.countries.length * payload.tiers.length);
+  assert.equal($('#priceRows > tr[data-cny-ranks]').length, payload.countries.length);
   assert.equal($('.minimum-card').length, payload.tiers.length);
   assert.equal($('.minimum-card.is-active-tier').length, 0);
   assert.equal($('.minimum-card[aria-pressed]').length, 0);
@@ -41,6 +42,12 @@ test('committed raw HTML is the deterministic projection of validated prices', a
   }
   assert.ok($('#priceRows .price-local').first().text());
   assert.ok($('#priceRows .price-cny').first().text().includes('¥'));
+  for (const country of payload.countries) {
+    assert.equal(
+      $(`#priceRows tr[data-market-id="${country.marketId}"]`).attr('data-cny-ranks'),
+      payload.tiers.map(({ id }) => country.plans[id].cnyRank).join(',')
+    );
+  }
 });
 
 test('static rendering removes minimum cues and explains rankings when FX is stale', async () => {

@@ -383,6 +383,7 @@ function staticDomMatchesPayload(data) {
   return rows.every((row) => {
     const country = countries.get(row.dataset.marketId);
     if (!country) return false;
+    if (row.dataset.cnyRanks !== data.tiers.map(({ id }) => country.plans[id].cnyRank).join(',')) return false;
     const cells = [...row.querySelectorAll('.price-cell')];
     return cells.length === data.tiers.length && cells.every((cell) => {
       const plan = country.plans[cell.dataset.tier];
@@ -390,6 +391,42 @@ function staticDomMatchesPayload(data) {
         && cell.querySelector('.price-local')?.textContent === plan.formattedPrice;
     });
   });
+}
+
+function reconcileStaticTierState() {
+  if (!hasStaticSnapshot
+    || state.sortTier === DEFAULT_SORT_TIER
+    || state.sortKey !== 'tier'
+    || state.sortDirection !== 'asc'
+    || state.query
+    || state.region !== 'all') return false;
+
+  const tier = canonicalTierDefinition(state.sortTier);
+  const tierIds = [...document.querySelectorAll('th[data-tier]')].map(({ dataset }) => dataset.tier);
+  const tierIndex = tierIds.indexOf(state.sortTier);
+  const rankedRows = [...elements.priceRows.querySelectorAll('tr[data-market-id]')].map((row) => {
+    const rank = Number(row.dataset.cnyRanks?.split(',')[tierIndex]);
+    return Number.isSafeInteger(rank) && rank > 0 ? { rank, row } : null;
+  });
+  if (!tier || tierIndex < 0 || !rankedRows.length || rankedRows.some((entry) => entry === null)) return false;
+
+  rankedRows.sort((first, second) => (
+    first.rank - second.rank
+    || first.row.dataset.marketId.localeCompare(second.row.dataset.marketId, 'en')
+  ));
+  elements.priceRows.append(...rankedRows.map(({ row }) => row));
+  for (const { rank, row } of rankedRows) {
+    const rankCell = row.cells[0];
+    rankCell.textContent = String(rank);
+    rankCell.classList.toggle('rank-top', !staticSnapshotFxStale && rank <= 3);
+  }
+  elements.resultSummary.textContent = `${rankedRows.length} 个地区 · ${tier.label} 从低到高`;
+  renderSortHeaders({ refresh: false });
+  updateTierPresentation();
+  for (const cell of elements.priceRows.querySelectorAll('.price-cell[data-tier]')) {
+    cell.classList.toggle('is-sorted', cell.dataset.tier === state.sortTier);
+  }
+  return true;
 }
 
 function calculateMinimumPrices() {
@@ -1640,4 +1677,5 @@ window.addEventListener('pageshow', () => {
   void refreshPriceFreshnessLifecycle();
 });
 
+reconcileStaticTierState();
 initialize();
