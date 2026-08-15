@@ -136,6 +136,22 @@ async function rejectsWithReason(expected, sequence, reason, options = {}) {
 
 const expected = await loadVerificationArtifact(dataDirectory, 'committed fixture');
 
+function supersessionFixtures() {
+  const previous = shiftedArtifact(expected, -1);
+  const current = withRawWhitespace(expected, 'history');
+
+  assert.ok(
+    Date.parse(current.prices.generatedAt)
+      > Date.parse(previous.prices.generatedAt),
+    'supersession fixture must keep current production newer than the previous expected artifact'
+  );
+
+  return {
+    previous,
+    current
+  };
+}
+
 test('uses fixed trusted production URLs for all four resources', () => {
   assert.equal(PRODUCTION_PRICES_URL, 'https://www.linchun.com.cn/tools/icloud_price_comparison/data/prices.json');
   assert.equal(PRODUCTION_HISTORY_URL, 'https://www.linchun.com.cn/tools/icloud_price_comparison/data/history.json');
@@ -198,29 +214,153 @@ test('accepts an exactly matching history whose updatedAt predates prices.genera
 });
 
 test('accepts a newer deployment only when current main proves the full artifact', async (t) => {
-  const newer = withRawWhitespace(shiftedArtifact(expected, 1), 'history');
-  const server = await startSequenceServer([{ artifact: newer }]);
+  const {
+    previous,
+    current
+  } = supersessionFixtures();
+
+  const server = await startSequenceServer([
+    {
+      artifact: current
+    }
+  ]);
+
   t.after(() => server.close());
-  const result = await verifyProductionDeployment(expected, fastOptions(server, { getCurrentMainArtifact: async () => newer }));
+
+  const result = await verifyProductionDeployment(
+    previous,
+    fastOptions(server, {
+      getCurrentMainArtifact: async () => current
+    })
+  );
+
   assert.equal(result.status, 'superseded');
+
+  assert.equal(
+    result.expectedGeneratedAt,
+    previous.prices.generatedAt
+  );
+
+  assert.equal(
+    result.observedGeneratedAt,
+    current.prices.generatedAt
+  );
 });
 
 test('does not accept supersession when production history is still expected A', () => {
-  const newer = withRawWhitespace(shiftedArtifact(expected, 1), 'history');
-  const mixed = { ...newer, raw: { ...newer.raw, history: expected.raw.history }, history: expected.history };
-  return rejectsWithReason(expected, [{ artifact: mixed }], 'history-not-deployed', { getCurrentMainArtifact: async () => newer });
+  const {
+    previous,
+    current
+  } = supersessionFixtures();
+
+  const mixed = {
+    ...current,
+    raw: {
+      ...current.raw,
+      history: previous.raw.history
+    },
+    history: previous.history
+  };
+
+  return rejectsWithReason(
+    previous,
+    [
+      {
+        artifact: mixed
+      }
+    ],
+    'history-not-deployed',
+    {
+      getCurrentMainArtifact: async () => current
+    }
+  );
 });
 
 test('does not accept supersession when production run-log is still expected A', () => {
-  const newer = withRawWhitespace(shiftedArtifact(expected, 1), 'history');
-  const mixed = { ...newer, raw: { ...newer.raw, runLog: expected.raw.runLog }, runLog: expected.runLog };
-  return rejectsWithReason(expected, [{ artifact: mixed }], 'run-log-invalid', { getCurrentMainArtifact: async () => newer });
+  const {
+    previous,
+    current
+  } = supersessionFixtures();
+
+  const mixed = {
+    ...current,
+    raw: {
+      ...current.raw,
+      runLog: previous.raw.runLog
+    },
+    runLog: previous.runLog
+  };
+
+  return rejectsWithReason(
+    previous,
+    [
+      {
+        artifact: mixed
+      }
+    ],
+    'run-log-invalid',
+    {
+      getCurrentMainArtifact: async () => current
+    }
+  );
 });
 
 test('invalid current-main data cannot prove supersession', () => {
-  const newer = shiftedArtifact(expected, 1);
-  const invalid = { prices: newer.prices, history: newer.history, runLog: { ...newer.runLog, untrusted: true } };
-  return rejectsWithReason(expected, [{ artifact: newer }], 'current-main-invalid', { getCurrentMainArtifact: async () => invalid });
+  const previous = shiftedArtifact(
+    expected,
+    -1
+  );
+
+  const current = expected;
+
+  const invalid = {
+    prices: current.prices,
+    history: current.history,
+    runLog: {
+      ...current.runLog,
+      untrusted: true
+    }
+  };
+
+  return rejectsWithReason(
+    previous,
+    [
+      {
+        artifact: current
+      }
+    ],
+    'current-main-invalid',
+    {
+      getCurrentMainArtifact: async () => invalid
+    }
+  );
+});
+
+test('supersession fixtures never synthesize a future deployment', () => {
+  const {
+    previous,
+    current
+  } = supersessionFixtures();
+
+  assert.ok(
+    Date.parse(previous.prices.generatedAt)
+      < Date.parse(current.prices.generatedAt)
+  );
+
+  assert.equal(
+    current.prices.generatedAt,
+    expected.prices.generatedAt
+  );
+
+  assert.equal(
+    current.prices.run.finishedAtUtc,
+    expected.prices.run.finishedAtUtc
+  );
+
+  assert.equal(
+    current.runLog.updatedAtUtc,
+    expected.runLog.updatedAtUtc
+  );
 });
 
 test('applies cache bypass headers and a unique query to every resource and attempt', async (t) => {
