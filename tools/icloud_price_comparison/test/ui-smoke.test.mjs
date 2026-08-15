@@ -253,7 +253,7 @@ test('shows static prices immediately and refreshes them without blocking first 
   assert.doesNotMatch(styleSource, /\.workspace\s*\{[^}]*overflow:\s*visible/);
 });
 
-test('preserves sorting, selection and minimum-price cues in forced-colors mode', { timeout: 30_000 }, async (context) => {
+test('preserves sorting and minimum-price cues in forced-colors mode', { timeout: 30_000 }, async (context) => {
   if (BROWSER_UNDER_TEST !== 'chromium') {
     context.skip('forced-colors emulation is covered in Chromium');
     return;
@@ -275,20 +275,17 @@ test('preserves sorting, selection and minimum-price cues in forced-colors mode'
     await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length > 0);
     assert.equal(await page.evaluate(() => matchMedia('(forced-colors: active)').matches), true);
     const sortedHeader = page.locator('th[aria-sort="ascending"], th[aria-sort="descending"]').first();
-    const activeCard = page.locator('.minimum-card.is-active-tier').first();
     const minimumCell = page.locator('.price-cell.is-minimum').first();
     assert.equal(await sortedHeader.count(), 1, 'the active sort must remain exposed semantically');
-    assert.equal(await activeCard.count(), 1, 'the active tier card must be present');
+    assert.equal(await page.locator('.minimum-card.is-active-tier').count(), 0, 'minimum cards must remain neutral action buttons');
+    assert.equal(await page.locator('.minimum-card[aria-pressed]').count(), 0, 'minimum cards must not expose a pressed state');
     assert.equal(await minimumCell.count(), 1, 'the minimum-price cell must be present');
     const cues = await page.evaluate(() => {
       const sorted = document.querySelector('th[aria-sort="ascending"], th[aria-sort="descending"]');
-      const active = document.querySelector('.minimum-card.is-active-tier');
       const minimum = document.querySelector('.price-cell.is-minimum');
       return {
         sortedBorder: getComputedStyle(sorted).borderBottomStyle,
         sortedBorderWidth: getComputedStyle(sorted).borderBottomWidth,
-        activeOutline: getComputedStyle(active).outlineStyle,
-        activeOutlineWidth: getComputedStyle(active).outlineWidth,
         minimumOutline: getComputedStyle(minimum).outlineStyle,
         minimumOutlineWidth: getComputedStyle(minimum).outlineWidth
       };
@@ -296,8 +293,6 @@ test('preserves sorting, selection and minimum-price cues in forced-colors mode'
     assert.deepEqual(cues, {
       sortedBorder: 'solid',
       sortedBorderWidth: '3px',
-      activeOutline: 'solid',
-      activeOutlineWidth: '2px',
       minimumOutline: 'solid',
       minimumOutlineWidth: '1px'
     });
@@ -2528,8 +2523,10 @@ test('restores URL state, removes the floating search bar, and supports table re
 
     const initialTier = params.get('tier');
     const initialMinimumCard = page.locator(`#minimumSummary .minimum-card[data-tier="${initialTier}"]`);
-    assert.equal(await initialMinimumCard.getAttribute('aria-pressed'), 'true');
-    assert.equal(await initialMinimumCard.evaluate((card) => card.classList.contains('is-active-tier')), true);
+    assert.equal(await initialMinimumCard.getAttribute('aria-pressed'), null);
+    assert.equal(await initialMinimumCard.evaluate((card) => card.classList.contains('is-active-tier')), false);
+    assert.equal(await page.locator('#minimumSummary .minimum-card[aria-pressed]').count(), 0);
+    assert.equal(await page.locator('#minimumSummary .minimum-card.is-active-tier').count(), 0);
 
     const alternateTier = validData.tiers.find(({ id }) => id !== initialTier).id;
     const alternateMinimumCard = page.locator(`#minimumSummary .minimum-card[data-tier="${alternateTier}"]`);
@@ -2537,20 +2534,20 @@ test('restores URL state, removes the floating search bar, and supports table re
     assert.equal(await page.locator(`th[data-tier="${alternateTier}"]`).getAttribute('aria-sort'), 'ascending');
     assert.equal(new URL(page.url()).searchParams.has('sort'), false);
     assert.equal(new URL(page.url()).searchParams.has('dir'), false);
-    assert.equal(await alternateMinimumCard.getAttribute('aria-pressed'), 'true');
-    assert.equal(await alternateMinimumCard.evaluate((card) => card.classList.contains('is-active-tier')), true);
-    assert.equal(await initialMinimumCard.getAttribute('aria-pressed'), 'false');
-    assert.equal(await initialMinimumCard.evaluate((card) => card.classList.contains('is-active-tier')), false);
+    assert.equal(await alternateMinimumCard.getAttribute('aria-pressed'), null);
+    assert.equal(await alternateMinimumCard.evaluate((card) => card.classList.contains('is-active-tier')), false);
+    assert.equal(await page.locator('#minimumSummary .minimum-card[aria-pressed]').count(), 0);
+    assert.equal(await page.locator('#minimumSummary .minimum-card.is-active-tier').count(), 0);
 
     await page.locator(`th[data-tier="${alternateTier}"] button`).click();
     assert.equal(await page.locator(`th[data-tier="${alternateTier}"]`).getAttribute('aria-sort'), 'descending');
     assert.equal(new URL(page.url()).searchParams.get('dir'), 'desc');
-    assert.equal(await alternateMinimumCard.getAttribute('aria-pressed'), 'false');
+    assert.equal(await alternateMinimumCard.getAttribute('aria-pressed'), null);
     assert.equal(await alternateMinimumCard.evaluate((card) => card.classList.contains('is-active-tier')), false);
-    assert.equal(await page.locator('#minimumSummary .minimum-card[aria-pressed="true"]').count(), 0);
+    assert.equal(await page.locator('#minimumSummary .minimum-card[aria-pressed]').count(), 0);
 
     await page.locator('button[data-sort="country"]').click();
-    assert.equal(await page.locator('#minimumSummary .minimum-card[aria-pressed="true"]').count(), 0);
+    assert.equal(await page.locator('#minimumSummary .minimum-card[aria-pressed]').count(), 0);
     assert.equal(new URL(page.url()).searchParams.get('sort'), 'country');
     assert.equal(new URL(page.url()).searchParams.has('dir'), false);
     assert.equal(new URL(page.url()).searchParams.get('tier'), alternateTier, 'country sorting must retain the selected comparison tier');
@@ -2592,6 +2589,7 @@ test('restores URL state, removes the floating search bar, and supports table re
     await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length === 1);
     const minimumCard = page.locator('#minimumSummary .minimum-card').filter({ hasText: '200 GB' });
     const minimumTier = await minimumCard.getAttribute('data-tier');
+    const minimumMarketId = await minimumCard.getAttribute('data-market-id');
     await minimumCard.click();
     assert.equal(minimumTier, '200GB');
     assert.equal(new URL(page.url()).searchParams.has('tier'), false);
@@ -2602,26 +2600,26 @@ test('restores URL state, removes the floating search bar, and supports table re
     assert.equal(await page.locator('#searchInput').inputValue(), '');
     assert.equal(await page.locator('#regionSelect').inputValue(), 'all');
     assert.equal(await page.locator(`th[data-tier="${minimumTier}"]`).getAttribute('aria-sort'), 'ascending');
-    assert.equal(await minimumCard.getAttribute('aria-pressed'), 'true');
-    assert.equal(await minimumCard.evaluate((card) => card.classList.contains('is-active-tier')), true);
-    await page.waitForFunction(() => document.querySelectorAll('#priceRows tr.is-highlighted').length === 1);
-    const highlightedRow = page.locator('#priceRows tr.is-highlighted');
-    const expectedWinner = validData.countries
-      .map((country) => ({
-        country,
-        cny: country.plans[minimumTier].cnyPrice
-      }))
-      .sort((first, second) => first.cny - second.cny)[0].country.marketId;
-    assert.equal(await highlightedRow.getAttribute('data-market-id'), expectedWinner);
-    assert.equal(await highlightedRow.locator('.country-history-button').evaluate((element) => document.activeElement === element), true, 'minimum navigation should move focus to the located country');
-    await page.waitForFunction(() => {
-      const row = document.querySelector('#priceRows tr.is-highlighted');
+    assert.equal(await minimumCard.getAttribute('aria-pressed'), null);
+    assert.equal(await minimumCard.evaluate((card) => card.classList.contains('is-active-tier')), false);
+    assert.equal(await page.locator('#minimumSummary .minimum-card[aria-pressed]').count(), 0);
+    assert.equal(await page.locator('#minimumSummary .minimum-card.is-active-tier').count(), 0);
+    await page.waitForFunction(({ marketId, tierId }) => {
+      const row = [...document.querySelectorAll('#priceRows tr[data-market-id]')].find((item) => item.dataset.marketId === marketId);
       if (!row) return false;
-      const box = row.getBoundingClientRect();
-      return box.bottom > 0 && box.top < innerHeight;
-    });
-    const rowBox = await highlightedRow.boundingBox();
-    assert.ok(rowBox && rowBox.y + rowBox.height > 0 && rowBox.y < 760, 'minimum-price winner should be positioned in the viewport');
+      const cell = row.querySelector(`.price-cell[data-tier="${tierId}"]`);
+      const historyButton = row.querySelector('.country-history-button');
+      if (!cell || !historyButton) return false;
+      const rowRect = row.getBoundingClientRect();
+      const cellRect = cell.getBoundingClientRect();
+      const rowCenter = rowRect.top + rowRect.height / 2;
+      const fullyVisible = rowRect.top >= 0 && rowRect.bottom <= innerHeight;
+      const meaningfullyPositioned = rowCenter >= innerHeight * 0.25 && rowCenter <= innerHeight * 0.75;
+      const targetCellVisible = cellRect.right > 0 && cellRect.left < innerWidth;
+      const focused = document.activeElement === historyButton;
+      const highlighted = row.classList.contains('is-highlighted');
+      return fullyVisible && meaningfullyPositioned && targetCellVisible && focused && highlighted;
+    }, { marketId: minimumMarketId, tierId: minimumTier });
   } finally {
     await page.close();
     await browser.close();
@@ -2896,6 +2894,12 @@ async function waitForInteractiveMinimumCards(page) {
   });
 }
 
+async function assertMinimumCardsNeutral(page) {
+  assert.equal(await page.locator('#minimumSummary .minimum-card').count() > 0, true);
+  assert.equal(await page.locator('#minimumSummary .minimum-card.is-active-tier').count(), 0);
+  assert.equal(await page.locator('#minimumSummary .minimum-card[aria-pressed]').count(), 0);
+}
+
 async function assertMinimumNavigation(page, marketId, tierId, { tierInUrl }) {
   const parsed = new URL(page.url());
   if (tierInUrl) {
@@ -2910,25 +2914,80 @@ async function assertMinimumNavigation(page, marketId, tierId, { tierInUrl }) {
   assert.equal(await page.locator('#searchInput').inputValue(), '');
   assert.equal(await page.locator('#regionSelect').inputValue(), 'all');
   assert.equal(await page.locator('th[data-tier="' + tierId + '"]').getAttribute('aria-sort'), 'ascending');
-  const activeCard = page.locator('#minimumSummary .minimum-card[data-tier="' + tierId + '"]');
-  assert.equal(await activeCard.getAttribute('aria-pressed'), 'true');
-  assert.equal(await activeCard.evaluate((card) => card.classList.contains('is-active-tier')), true);
+  assert.equal(await page.locator('#minimumSummary .minimum-card[aria-pressed]').count(), 0);
+  assert.equal(await page.locator('#minimumSummary .minimum-card.is-active-tier').count(), 0);
   await page.waitForFunction(({ marketId, tierId }) => {
-    const row = document.querySelector('#priceRows tr[data-market-id="' + marketId + '"]');
-    const cell = row && row.querySelector('.price-cell[data-tier="' + tierId + '"]');
-    if (!row || !cell) return false;
-    const scroller = document.querySelector('.table-scroll');
+    const row = [...document.querySelectorAll('#priceRows tr[data-market-id]')].find((item) => item.dataset.marketId === marketId);
+    if (!row) return false;
+    const cell = row.querySelector(`.price-cell[data-tier="${tierId}"]`);
+    const historyButton = row.querySelector('.country-history-button');
+    if (!cell || !historyButton) return false;
     const rowRect = row.getBoundingClientRect();
     const cellRect = cell.getBoundingClientRect();
-    const scrollerRect = scroller ? scroller.getBoundingClientRect() : null;
-    const rowVisible = rowRect.bottom > 0 && rowRect.top < innerHeight;
-    const cellVisible = !scrollerRect || (cellRect.right > scrollerRect.left && cellRect.left < scrollerRect.right);
-    return rowVisible && cellVisible && document.activeElement === row.querySelector('.country-history-button');
+    const rowCenter = rowRect.top + rowRect.height / 2;
+    const fullyVisible = rowRect.top >= 0 && rowRect.bottom <= innerHeight;
+    const meaningfullyPositioned = rowCenter >= innerHeight * 0.25 && rowCenter <= innerHeight * 0.75;
+    const targetCellVisible = cellRect.right > 0 && cellRect.left < innerWidth;
+    const focused = document.activeElement === historyButton;
+    const highlighted = row.classList.contains('is-highlighted');
+    return fullyVisible && meaningfullyPositioned && targetCellVisible && focused && highlighted;
   }, { marketId, tierId });
   const row = page.locator('#priceRows tr[data-market-id="' + marketId + '"]');
   assert.equal(await row.evaluate((element) => element.classList.contains('is-highlighted')), true);
   assert.equal(await row.locator('.price-cell[data-tier="' + tierId + '"]').evaluate((cell) => cell.classList.contains('is-minimum')), true);
 }
+
+test('clean homepage keeps minimum actions neutral while the table defaults to 200GB ascending', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the clean-home minimum action regression');
+  if (!browserConfig) return;
+  const validData = await readFixture('prices.json');
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  try {
+    await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded' });
+    await waitForInteractiveMinimumCards(page);
+    assert.equal(new URL(page.url()).search, '');
+    assert.equal(await page.locator('th[data-tier="200GB"]').getAttribute('aria-sort'), 'ascending');
+    assert.match(await page.locator('#resultSummary').textContent(), /200 GB 从低到高/);
+    await assertMinimumCardsNeutral(page);
+    const expectedWinner = validData.countries
+      .filter((country) => country.plans['200GB']?.cnyRank === 1)
+      .sort((first, second) => first.marketId.localeCompare(second.marketId, 'en'))[0]?.marketId;
+    assert.ok(expectedWinner);
+    assert.equal(await page.locator('#priceRows tr[data-market-id]').first().getAttribute('data-market-id'), expectedWinner);
+  } finally {
+    await page.close();
+    await browser.close();
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test('manual sorting does not activate minimum cards', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the manual-sort minimum action regression');
+  if (!browserConfig) return;
+  const validData = await readFixture('prices.json');
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  try {
+    await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded' });
+    await waitForInteractiveMinimumCards(page);
+    const nonDefaultTier = validData.tiers.find(({ id }) => id !== '200GB').id;
+    await page.locator(`th[data-tier="${nonDefaultTier}"] button`).click();
+    assert.equal(await page.locator(`th[data-tier="${nonDefaultTier}"]`).getAttribute('aria-sort'), 'ascending');
+    await assertMinimumCardsNeutral(page);
+    await page.locator('button[data-sort="country"]').click();
+    assert.equal(await page.locator('th:has(button[data-sort="country"])').getAttribute('aria-sort'), 'ascending');
+    await assertMinimumCardsNeutral(page);
+  } finally {
+    await page.close();
+    await browser.close();
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
 
 test('minimum-card click clears conflicting filters and reveals the target market on desktop', { timeout: 30_000 }, async (context) => {
   const browserConfig = await resolveBrowser(context, 'the minimum-card desktop navigation regression');
@@ -2965,6 +3024,7 @@ test('minimum-card navigation works on mobile for a non-default tier', { timeout
     const marketId = await card.getAttribute('data-market-id');
     await card.click();
     await assertMinimumNavigation(page, marketId, '50GB', { tierInUrl: true });
+    assert.equal(await page.locator('#mobileTierControl button[data-tier="50GB"]').getAttribute('aria-pressed'), 'true');
   } finally {
     await page.close();
     await browser.close();
@@ -2986,7 +3046,8 @@ test('minimum-card controls stay enabled after returning to default home', { tim
     await page.locator('.app-brand').click();
     await page.waitForURL((url) => url.origin === origin && url.pathname === '/' && url.search === '');
     await waitForInteractiveMinimumCards(page);
-    assert.equal(await page.locator('#minimumSummary .minimum-card').evaluateAll((cards) => cards.every((card) => !card.disabled)), true);
+    assert.equal(await page.locator('th[data-tier="200GB"]').getAttribute('aria-sort'), 'ascending');
+    await assertMinimumCardsNeutral(page);
     const card = page.locator('#minimumSummary .minimum-card[data-tier="50GB"]');
     const marketId = await card.getAttribute('data-market-id');
     await card.click();

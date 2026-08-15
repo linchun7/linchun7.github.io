@@ -26,11 +26,15 @@ test('committed raw HTML is the deterministic projection of validated prices', a
   assert.equal($('.price-table thead th[data-tier-header]').length, payload.tiers.length);
   assert.equal($('.price-cell').length, payload.countries.length * payload.tiers.length);
   assert.equal($('.minimum-card').length, payload.tiers.length);
+  assert.equal($('.minimum-card.is-active-tier').length, 0);
+  assert.equal($('.minimum-card[aria-pressed]').length, 0);
   assert.equal($('meta[name="icloud-price-snapshot"]').attr('content'), payload.generatedAt);
   assert.equal($('meta[name="icloud-price-snapshot"]').attr('data-fingerprint'), publicPayloadFingerprint(payload));
   assert.equal($('meta[name="icloud-price-snapshot"]').attr('data-fx-stale'), String(payload.fx.stale === true));
   assert.equal($('#resultSummary').text(), `${payload.countries.length} 个地区 · ${preferredDefaultTier(payload).label} 从低到高`);
   assert.equal($('.price-table thead th[aria-sort="ascending"] i[data-lucide="arrow-up"]').length, 1);
+  assert.equal($('.price-table thead th[aria-sort="ascending"]').attr('data-tier'), preferredDefaultTier(payload).id);
+  assert.equal($(`.price-cell[data-tier="${preferredDefaultTier(payload).id}"].is-active-tier.is-sorted`).length, payload.countries.length);
   assert.equal(html.includes('↕'), false);
   for (const sourceName of ['China mainland', 'Japan', 'United States']) {
     assert.ok($(`.country-name-en:contains("${sourceName}")`).length, `${sourceName} must be visible in raw HTML`);
@@ -73,7 +77,8 @@ test('static rendering uses the first tier consistently when 200GB is absent', a
   const $ = load(rendered);
   assert.equal(assertStaticPageMatches(rendered, payload), true);
   assert.equal(defaultTier.id, payload.tiers[0].id);
-  assert.equal($('.minimum-card.is-active-tier').length, 1);
+  assert.equal($('.minimum-card.is-active-tier').length, 0);
+  assert.equal($('.minimum-card[aria-pressed]').length, 0);
   assert.equal($('.price-table thead th[aria-sort="ascending"]').attr('data-tier'), defaultTier.id);
   assert.equal($(`.price-cell[data-tier="${defaultTier.id}"].is-active-tier.is-sorted`).length, payload.countries.length);
   assert.equal($('#priceRows > tr > td:first-child').filter((_, cell) => load(cell).text() === '--').length, 0);
