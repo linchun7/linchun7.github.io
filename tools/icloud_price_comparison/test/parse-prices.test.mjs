@@ -644,6 +644,29 @@ test('still rejects a very large price move when exchange rates do not explain i
   );
 });
 
+test('returns structured warnings for independently confirmed heuristic price anomalies', () => {
+  const previousData = {
+    countries: [{ marketId: 'example-id', country: 'Example', currency: 'USD', plans: { '50GB': { price: 1 } } }],
+    fx: { rates: { USD: 1, CNY: 7 } }
+  };
+  const current = [{ marketId: 'example-id', country: 'Example', currency: 'USD', plans: { '50GB': { price: 3.5 } } }];
+  const warnings = validatePriceChangeAnomalies(current, {
+    previousData,
+    currentRates: previousData.fx.rates,
+    tiers: [{ id: '50GB' }],
+    confirmed: true
+  });
+  assert.deepEqual(warnings, [{
+    code: 'PRICE_CHANGE_ANOMALY_CONFIRMED',
+    type: 'combined-local-price',
+    marketId: 'example-id',
+    sourceName: 'Example',
+    tier: '50GB',
+    previous: 1,
+    current: 3.5
+  }]);
+});
+
 test('rejects a cross-currency price change when its converted value is implausible', () => {
   const previousData = {
     countries: [{ country: 'Example', currency: 'USD', plans: { '50GB': { price: 1 } } }],

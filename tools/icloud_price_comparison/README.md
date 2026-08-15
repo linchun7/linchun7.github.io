@@ -60,7 +60,9 @@
 
 `scripts/market-registry.mjs` 是永久市场 identity catalog，只保存稳定 `marketId`、Apple 英文 canonical name 和历史 aliases；`scripts/country-names.zh.json` 是唯一的 Apple 简体中文名称事实源，字符串表示已审核 wording，`null` 表示仍待 Apple zh-CN authority 确认。pending 时 `nameZh` 使用 Apple 英文 `sourceName` 并记录 `CHINESE_MARKET_NAME_PENDING`，不会阻断英文价格更新。
 
-Apple 第一次出现未登记市场时会生成可复现的 `apple-…-<hash>` ID、记录 `UNKNOWN_APPLE_MARKET` 后继续发布；发布之后，schema 4 prices/history 中的 identity ledger 优先于生成器。registry 后续收录必须沿用已发布 ID，历史中已移除市场的 ID 也永久保留；不同新 identity 撞到 registry 或完整历史保留 ID 时失败关闭。项目坚持 automatic-first：已发布市场消失且出现同 region、currency、tier ID structure、完整当地价格向量也完全相同的全新 unknown name 时，属于高置信度 identity ambiguity，要求维护者把新 Apple 英文名显式加入旧 ID aliases 后重跑；若结构相同但发生 repricing，则只记录非阻断 `MARKET_IDENTITY_RENAME_SUSPECTED` 并继续自动发布。两种情况都不进行模糊匹配或自动迁移。
+**Automatic-first**：机器可安全确认的事实自动发布；heuristic suspicion 记录 warning 后继续；暂时不确定时优先自动 retry/fallback；只有高置信 ambiguity、contract corruption 或继续执行可能造成不可逆数据/identity 错误时才 fail closed。Apple 语义变化通常由 initial + 一次 no-store confirmation 确认；仅在 mismatch/confirmation parse degradation 时追加第三样本。A/B/B 或 A/degraded/A 可自动恢复，A/B/A、A/B/C 或无法取得第三样本按 transient 停止并留待后续自动任务重试。已独立确认且仍在 0.1x–10x 硬边界内的大幅历史变价产生 `PRICE_CHANGE_ANOMALY_CONFIRMED` 后继续；非法价格、parser disagreement、20x 当前市场 outlier 等硬约束不放松。FX candidate 未通过 sanity 时自动尝试 open source，再安全回退到 36 小时内的 previous FX/CNY 数据，绝不发布异常新汇率。
+
+Apple 第一次出现未登记市场时会生成可复现的 `apple-…-<hash>` ID、记录 `UNKNOWN_APPLE_MARKET` 后继续发布；发布之后，schema 4 prices/history 中的 identity ledger 优先于生成器。registry 后续收录必须沿用已发布 ID，历史中已移除市场的 ID 也永久保留；不同新 identity 撞到 registry 或完整历史保留 ID 时失败关闭。只有 removed 与 added unknown 形成双向唯一，且 region、currency、tier ID structure、完整当地价格向量都完全相同，才属于高置信度 identity ambiguity 并要求维护者显式增加 alias；repricing 或多个 exact candidates 都只记录非阻断 `MARKET_IDENTITY_RENAME_SUSPECTED` 并继续自动发布。两种情况都不进行模糊匹配或自动迁移。
 
 ## 变化、失败关闭与工件保护
 

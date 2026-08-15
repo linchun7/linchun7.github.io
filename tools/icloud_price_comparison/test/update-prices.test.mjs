@@ -419,7 +419,7 @@ test('requires an identical no-store confirmation before establishing the first 
   }
 });
 
-test('fails closed when the two first-baseline Apple responses differ', async () => {
+test('recovers the first Apple baseline when the second and third samples match', async () => {
   const { root, paths } = await createTemporaryBootstrapPaths();
   const first = JSON.parse(await readFile(pricesUrl, 'utf8'));
   const second = structuredClone(first);
@@ -427,21 +427,29 @@ test('fails closed when the two first-baseline Apple responses differ', async ()
   second.countries[0].plans[tierId].price += 0.01;
   second.countries[0].plans[tierId].formattedPrice = `$${second.countries[0].plans[tierId].price.toFixed(2)}`;
   const originalFetch = globalThis.fetch;
+  const originalApiKey = process.env.EXCHANGE_RATE_API_KEY;
   let appleRequests = 0;
+  delete process.env.EXCHANGE_RATE_API_KEY;
+  const fxPayload = {
+    result: 'success', base_code: 'USD', time_last_update_unix: recentFxTimestamp(),
+    rates: compatibleExchangeRates(first)
+  };
   globalThis.fetch = async (url) => {
     const target = String(url);
-    if (!target.includes('support.apple.com')) throw new Error(`Unexpected URL before initial confirmation: ${target}`);
-    appleRequests += 1;
-    return new Response(buildAppleHtml(appleRequests === 1 ? first : second), { status: 200 });
+    if (target.includes('support.apple.com')) {
+      appleRequests += 1;
+      return new Response(buildAppleHtml(appleRequests === 1 ? first : second), { status: 200 });
+    }
+    if (target.includes('open.er-api.com')) return new Response(JSON.stringify(fxPayload), { status: 200 });
+    throw new Error(`Unexpected URL during initial confirmation: ${target}`);
   };
   try {
-    await assert.rejects(
-      () => main({ dryRun: true, paths, stepSummaryPath: null }),
-      (error) => error.code === 'APPLE_CONFIRMATION_MISMATCH'
-    );
-    assert.equal(appleRequests, 2);
+    await main({ dryRun: true, paths, stepSummaryPath: null });
+    assert.equal(appleRequests, 3);
   } finally {
     globalThis.fetch = originalFetch;
+    if (originalApiKey === undefined) delete process.env.EXCHANGE_RATE_API_KEY;
+    else process.env.EXCHANGE_RATE_API_KEY = originalApiKey;
     await rm(root, { recursive: true, force: true });
   }
 });
@@ -577,12 +585,18 @@ test('blocks only exact-price rename ambiguity and reports repriced structural c
       && error.candidates.length === 1
       && error.candidates[0].oldMarketId === 'old-id'
   );
-  assert.throws(
-    () => validateAppleMarketRenameReview({ countries: [old, secondOld] }, [added], unknownResolver),
-    (error) => error.code === 'MARKET_IDENTITY_RENAME_REVIEW_REQUIRED'
-      && error.candidates.length === 2
-      && new Set(error.candidates.map(({ oldMarketId }) => oldMarketId)).size === 2
+  const ambiguousExact = validateAppleMarketRenameReview(
+    { countries: [old, secondOld] }, [added], unknownResolver
   );
+  assert.equal(ambiguousExact.status, 'suspected');
+  assert.equal(ambiguousExact.warnings.length, 2);
+  assert.ok(ambiguousExact.warnings.every(({ pricesMatch }) => pricesMatch));
+
+  const secondAdded = { ...structuredClone(added), country: 'Second New Apple Market' };
+  const sharedOld = validateAppleMarketRenameReview({ countries: [old] }, [added, secondAdded], unknownResolver);
+  assert.equal(sharedOld.status, 'suspected');
+  assert.equal(sharedOld.warnings.length, 2);
+  assert.ok(sharedOld.warnings.every(({ oldMarketId, pricesMatch }) => oldMarketId === 'old-id' && pricesMatch));
 });
 
 test('full updater blocks an exact-price rename candidate before FX or production writes', async (t) => {
@@ -688,6 +702,99 @@ test('full updater warns but publishes a confirmed rename candidate with reprici
   }
 });
 
+test('full updater warns and publishes ambiguous exact rename candidates', async (t) => {
+  for (const scenario of [
+    {
+      name: 'multiple removed candidates for one new unknown',
+      removedNames: ['Barbados', 'Suriname'],
+      additions: [{ source: 'Barbados', name: 'New Shared Price Market' }],
+      expectedWarnings: 2
+    },
+    {
+      name: 'multiple new unknowns for one removed candidate',
+      removedNames: ['Bahamas'],
+      additions: [
+        { source: 'Bahamas', name: 'First Shared Price Market' },
+        { source: 'Bahamas', name: 'Second Shared Price Market' }
+      ],
+      expectedWarnings: 2
+    }
+  ]) {
+    await t.test(scenario.name, async () => {
+      const { root, paths } = await createTemporaryProductionPaths();
+      const previous = JSON.parse(await readFile(paths.currentDataPath, 'utf8'));
+      const changed = structuredClone(previous);
+      changed.countries = changed.countries.filter(({ country }) => !scenario.removedNames.includes(country));
+      for (const addition of scenario.additions) {
+        const added = structuredClone(previous.countries.find(({ country }) => country === addition.source));
+        added.country = addition.name;
+        delete added.marketId;
+        delete added.nameZh;
+        changed.countries.push(added);
+      }
+      const fxPayload = {
+        result: 'success', base_code: 'USD', time_last_update_unix: recentFxTimestamp(),
+        rates: compatibleExchangeRates(previous)
+      };
+      const originalWarn = console.warn;
+      const warnings = [];
+      console.warn = (message) => warnings.push(String(message));
+      try {
+        await withMockedFetch(
+          { html: buildAppleHtml(changed), fxPayload },
+          () => main({ dryRun: false, paths, stepSummaryPath: null })
+        );
+        const published = JSON.parse(await readFile(paths.currentDataPath, 'utf8'));
+        for (const { name } of scenario.additions) {
+          assert.ok(published.countries.some(({ country }) => country === name));
+        }
+        assert.equal(
+          warnings.filter((warning) => warning.startsWith('MARKET_IDENTITY_RENAME_SUSPECTED:')).length,
+          scenario.expectedWarnings
+        );
+      } finally {
+        console.warn = originalWarn;
+        await rm(root, { recursive: true, force: true });
+      }
+    });
+  }
+});
+
+test('publishes an independently confirmed large Apple repricing as a warning', async (t) => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const previous = JSON.parse(await readFile(paths.currentDataPath, 'utf8'));
+  const changed = structuredClone(previous);
+  const repriced = changed.countries.find(({ country }) => country === 'Bahamas');
+  repriced.plans['50GB'].price = 3.5;
+  repriced.plans['50GB'].formattedPrice = '$3.50';
+  const fxPayload = {
+    result: 'success', base_code: 'USD', time_last_update_unix: recentFxTimestamp(),
+    rates: compatibleExchangeRates(previous)
+  };
+  const summaryPath = path.join(root, 'summary.md');
+  const originalWarn = console.warn;
+  const warnings = [];
+  console.warn = (message) => warnings.push(String(message));
+  try {
+    await withMockedFetch(
+      { html: buildAppleHtml(changed), fxPayload },
+      () => main({ dryRun: false, paths, stepSummaryPath: summaryPath })
+    );
+    const [published, history] = await Promise.all([
+      readFile(paths.currentDataPath, 'utf8').then(JSON.parse),
+      readFile(paths.historyPath, 'utf8').then(JSON.parse)
+    ]);
+    assert.equal(published.countries.find(({ marketId }) => marketId === 'bs').plans['50GB'].price, 3.5);
+    assert.equal(history.markets.bs.events.at(-1).plans['50GB'], 3.5);
+    assert.ok(warnings.some((warning) => warning.includes('PRICE_CHANGE_ANOMALY_CONFIRMED')
+      && warning.includes('marketId=bs') && warning.includes('tier=50GB')));
+    assert.match(await readFile(summaryPath, 'utf8'), /PRICE_CHANGE_ANOMALY_CONFIRMED.*marketId=bs.*tier=50GB.*previous=.*current=3\\\.5.*自动发布继续/s);
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
 test('publishes a confirmed unknown Apple market with a deterministic identity and structured warning', async () => {
   const { root, paths } = await createTemporaryProductionPaths();
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
@@ -784,7 +891,7 @@ test('publishes a confirmed unknown Apple market with a deterministic identity a
   }
 });
 
-test('fails closed when an unknown Apple market changes during confirmation', async () => {
+test('recovers a changing unknown Apple market when the second and third samples match', async () => {
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
   const first = structuredClone(data);
   const unknown = structuredClone(first.countries[0]);
@@ -796,10 +903,8 @@ test('fails closed when an unknown Apple market changes during confirmation', as
   const tierId = second.tiers[0].id;
   second.countries.at(-1).plans[tierId].price += 0.01;
   second.countries.at(-1).plans[tierId].formattedPrice = `$${second.countries.at(-1).plans[tierId].price.toFixed(2)}`;
-  await assert.rejects(
-    () => runAppleConfirmationScenario({ firstHtml: buildAppleHtml(first), secondHtml: buildAppleHtml(second) }),
-    (error) => error.code === 'APPLE_CONFIRMATION_MISMATCH'
-  );
+  const result = await runAppleConfirmationScenario({ firstHtml: buildAppleHtml(first), secondHtml: buildAppleHtml(second) });
+  assert.equal(result.appleRequests, 3);
 });
 
 test('accepts different confirmation markup when canonical Apple semantics are identical', async () => {
@@ -813,6 +918,105 @@ test('accepts different confirmation markup when canonical Apple semantics are i
   assert.notEqual(firstHtml, secondHtml);
   const result = await runAppleConfirmationScenario({ firstHtml, secondHtml });
   assert.equal(result.appleRequests, 2);
+});
+
+test('publishes Apple A/B/B using the confirmed B payload and matching snapshot', async () => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  const previous = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const first = structuredClone(previous);
+  const second = structuredClone(previous);
+  const tierId = previous.tiers[0].id;
+  first.countries[0].plans[tierId].price += 0.01;
+  second.countries[0].plans[tierId].price += 0.02;
+  first.countries[0].plans[tierId].formattedPrice = `$${first.countries[0].plans[tierId].price.toFixed(2)}`;
+  second.countries[0].plans[tierId].formattedPrice = `$${second.countries[0].plans[tierId].price.toFixed(2)}`;
+  const fxPayload = {
+    result: 'success', base_code: 'USD', time_last_update_unix: recentFxTimestamp(),
+    rates: compatibleExchangeRates(previous)
+  };
+  const originalFetch = globalThis.fetch;
+  const originalApiKey = process.env.EXCHANGE_RATE_API_KEY;
+  let appleRequests = 0;
+  delete process.env.EXCHANGE_RATE_API_KEY;
+  globalThis.fetch = async (url) => {
+    const target = String(url);
+    if (target.includes('support.apple.com')) {
+      appleRequests += 1;
+      return new Response(buildAppleHtml(appleRequests === 1 ? first : second));
+    }
+    if (target.includes('open.er-api.com')) return new Response(JSON.stringify(fxPayload));
+    throw new Error(`Unexpected A/B/B URL: ${target}`);
+  };
+  try {
+    await main({ dryRun: false, paths, stepSummaryPath: null });
+    assert.equal(appleRequests, 3);
+    const published = JSON.parse(await readFile(paths.currentDataPath, 'utf8'));
+    assert.equal(published.countries[0].plans[tierId].price, second.countries[0].plans[tierId].price);
+    const index = JSON.parse(await readFile(paths.snapshotIndexPath, 'utf8'));
+    const active = index.snapshots.find(({ publishedDate }) => publishedDate === publicationDateKey(second.source.publishedDate));
+    const snapshot = JSON.parse(await readFile(path.join(paths.snapshotsDir, active.activeDataFile), 'utf8'));
+    assert.equal(
+      snapshot.countries.find(({ country }) => country === second.countries[0].country).plans[tierId],
+      second.countries[0].plans[tierId].price
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalApiKey === undefined) delete process.env.EXCHANGE_RATE_API_KEY;
+    else process.env.EXCHANGE_RATE_API_KEY = originalApiKey;
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('treats Apple A/B/C confirmation as transient unstable', async () => {
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const versions = [0.01, 0.02, 0.03].map((delta) => {
+    const version = structuredClone(data);
+    const tierId = version.tiers[0].id;
+    version.countries[0].plans[tierId].price += delta;
+    version.countries[0].plans[tierId].formattedPrice = `$${version.countries[0].plans[tierId].price.toFixed(2)}`;
+    return buildAppleHtml(version);
+  });
+  await assert.rejects(
+    () => runAppleConfirmationScenario({ firstHtml: versions[0], secondHtml: versions[1], thirdHtml: versions[2] }),
+    (error) => error.code === 'APPLE_CONFIRMATION_UNSTABLE'
+      && classifyHealthcheckFailure(error) === 'transient'
+  );
+});
+
+test('treats an unavailable third Apple tie-break sample as transient', async () => {
+  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const first = structuredClone(data);
+  const second = structuredClone(data);
+  const tierId = data.tiers[0].id;
+  first.countries[0].plans[tierId].price += 0.01;
+  second.countries[0].plans[tierId].price += 0.02;
+  first.countries[0].plans[tierId].formattedPrice = `$${first.countries[0].plans[tierId].price.toFixed(2)}`;
+  second.countries[0].plans[tierId].formattedPrice = `$${second.countries[0].plans[tierId].price.toFixed(2)}`;
+  const originalFetch = globalThis.fetch;
+  let appleRequests = 0;
+  globalThis.fetch = async (url) => {
+    if (!String(url).includes('support.apple.com')) throw new Error(`Unexpected URL before Apple tie-break: ${url}`);
+    appleRequests += 1;
+    if (appleRequests === 1) return new Response(buildAppleHtml(first));
+    if (appleRequests === 2) return new Response(buildAppleHtml(second));
+    throw new Error('third sample temporarily unavailable');
+  };
+  const networkBudget = createNetworkBudget({
+    budgetMs: 5 * 60 * 1_000,
+    now: () => 0,
+    sleep: async () => {},
+    createTimeoutSignal: () => undefined
+  });
+  try {
+    await assert.rejects(
+      () => main({ dryRun: true, stepSummaryPath: null, networkBudget }),
+      (error) => error.code === 'APPLE_CONFIRMATION_UNAVAILABLE'
+        && classifyHealthcheckFailure(error) === 'transient'
+    );
+    assert.equal(appleRequests, 7);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test('fails closed with APPLE_CONFIRMATION_MISMATCH when the two semantic snapshots differ', async () => {
@@ -834,7 +1038,7 @@ test('fails closed with APPLE_CONFIRMATION_MISMATCH when the two semantic snapsh
   );
 });
 
-test('preserves prices and history when independent Apple price confirmation differs', async () => {
+test('treats Apple A/B/A confirmation as transient unstable and preserves production', async () => {
   const { root, paths } = await createTemporaryProductionPaths();
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
   const first = structuredClone(data);
@@ -855,14 +1059,15 @@ test('preserves prices and history when independent Apple price confirmation dif
     const target = String(url);
     if (!target.includes('support.apple.com')) throw new Error(`Unexpected URL before confirmation completed: ${target}`);
     appleRequests += 1;
-    return new Response(buildAppleHtml(appleRequests === 1 ? first : second), { status: 200 });
+    return new Response(buildAppleHtml(appleRequests === 2 ? second : first), { status: 200 });
   };
   try {
     await assert.rejects(
       () => main({ dryRun: false, paths, stepSummaryPath: null }),
-      (error) => error.code === 'APPLE_CONFIRMATION_MISMATCH'
+      (error) => error.code === 'APPLE_CONFIRMATION_UNSTABLE'
+        && classifyHealthcheckFailure(error) === 'transient'
     );
-    assert.equal(appleRequests, 2);
+    assert.equal(appleRequests, 3);
     assert.deepEqual(await Promise.all([
       readFile(paths.currentDataPath, 'utf8'),
       readFile(paths.historyPath, 'utf8'),
@@ -874,7 +1079,7 @@ test('preserves prices and history when independent Apple price confirmation dif
   }
 });
 
-test('fails closed before FX when the second Apple parse loses parser redundancy', async () => {
+test('recovers when the second Apple parse degrades but the third matches the initial sample', async () => {
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
   const changed = structuredClone(data);
   const tierId = changed.tiers[0].id;
@@ -885,14 +1090,8 @@ test('fails closed before FX when the second Apple parse loses parser redundancy
     '<h3 id="emea">',
     '<h5>Decoy Market (USD)</h5><ul>' + changed.tiers.map((tier) => `<li>${tier.label}: $1.00</li>`).join('') + '</ul><h3 id="emea">'
   );
-  await assert.rejects(
-    () => runAppleConfirmationScenario({ firstHtml, secondHtml }),
-    (error) => {
-      assert.equal(error.code, 'APPLE_CONFIRMATION_MISMATCH');
-      assert.match(error.cause?.message ?? '', /Apple parser disagreement/);
-      return true;
-    }
-  );
+  const result = await runAppleConfirmationScenario({ firstHtml, secondHtml, thirdHtml: firstHtml });
+  assert.equal(result.appleRequests, 3);
 });
 
 test('classifies an unavailable semantic confirmation as transient and preserves stable production data', async () => {
@@ -1481,7 +1680,7 @@ async function runDryMain({ html, fxPayload, apiKey = '', authenticatedFxPayload
   }
 }
 
-async function runAppleConfirmationScenario({ firstHtml, secondHtml = firstHtml }) {
+async function runAppleConfirmationScenario({ firstHtml, secondHtml = firstHtml, thirdHtml = secondHtml }) {
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
   const fxPayload = {
     result: 'success',
@@ -1498,7 +1697,8 @@ async function runAppleConfirmationScenario({ firstHtml, secondHtml = firstHtml 
     if (target.includes('support.apple.com')) {
       appleRequests += 1;
       if (appleRequests === 1) return new Response(firstHtml, { status: 200 });
-      return new Response(secondHtml, { status: 200 });
+      if (appleRequests === 2) return new Response(secondHtml, { status: 200 });
+      return new Response(thirdHtml, { status: 200 });
     }
     if (target.includes('open.er-api.com')) return new Response(JSON.stringify(fxPayload), { status: 200 });
     throw new Error(`Unexpected URL in Apple confirmation scenario: ${target}`);
@@ -1682,6 +1882,54 @@ test('runs the production write path against isolated files', async () => {
   }
 });
 
+test('migrates pending Chinese names in prices and history without price events', async () => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  const data = JSON.parse(await readFile(paths.currentDataPath, 'utf8'));
+  const history = JSON.parse(await readFile(paths.historyPath, 'utf8'));
+  const previousEventCounts = {};
+  for (const [marketId, legacyName] of [['mu', '毛里求斯'], ['cg', '刚果共和国']]) {
+    data.countries.find((country) => country.marketId === marketId).nameZh = legacyName;
+    history.markets[marketId].nameZh = legacyName;
+    previousEventCounts[marketId] = history.markets[marketId].events.length;
+  }
+  await Promise.all([
+    writeFile(paths.currentDataPath, `${JSON.stringify(data, null, 2)}\n`, 'utf8'),
+    writeFile(paths.historyPath, `${JSON.stringify(history, null, 2)}\n`, 'utf8')
+  ]);
+  const fxPayload = {
+    result: 'success', base_code: 'USD', time_last_update_unix: recentFxTimestamp(),
+    rates: compatibleExchangeRates(data)
+  };
+  const writtenPaths = [];
+  const trackWrites = async (filePath, value) => {
+    writtenPaths.push(filePath);
+    await writeJsonAtomic(filePath, value);
+  };
+  try {
+    await withMockedFetch(
+      { html: buildAppleHtml(data), fxPayload },
+      () => main({ dryRun: false, paths, stepSummaryPath: null, writeJson: trackWrites })
+    );
+    const [published, publishedHistory, names] = await Promise.all([
+      readFile(paths.currentDataPath, 'utf8').then(JSON.parse),
+      readFile(paths.historyPath, 'utf8').then(JSON.parse),
+      readFile(namesUrl, 'utf8').then(JSON.parse)
+    ]);
+    assert.equal(writtenPaths.includes(paths.historyPath), true);
+    for (const current of published.countries) {
+      const expectedName = typeof names[current.marketId] === 'string' ? names[current.marketId] : current.country;
+      assert.equal(current.nameZh, expectedName);
+      assert.equal(publishedHistory.markets[current.marketId].nameZh, expectedName);
+    }
+    for (const marketId of ['mu', 'cg']) {
+      assert.equal(publishedHistory.markets[marketId].events.length, previousEventCounts[marketId]);
+    }
+    assert.doesNotThrow(() => validatePriceHistoryConsistency(published, publishedHistory));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('does not rewrite history when an observation has no historical changes', async () => {
   const { root, paths } = await createTemporaryProductionPaths();
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
@@ -1720,7 +1968,7 @@ test('does not rewrite history when an observation has no historical changes', a
   }
 });
 
-test('FX sanity failure preserves every production data file', async (t) => {
+test('rejects anomalous online FX when the previous safe fallback is expired', async (t) => {
   const { root, paths } = await createTemporaryProductionPaths();
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
   t.mock.timers.enable({ apis: ['Date'], now: new Date(Date.parse(data.generatedAt) + 24 * 60 * 60 * 1_000) });
@@ -1743,7 +1991,8 @@ test('FX sanity failure preserves every production data file', async (t) => {
       { html: buildAppleHtml(data), fxPayload },
       () => assert.rejects(
         main({ dryRun: false, paths, stepSummaryPath: null }),
-        (error) => error.code === 'FX_SANITY_FAILURE'
+        (error) => error.code === 'EXCHANGE_RATE_SOURCES_UNAVAILABLE'
+          && classifyHealthcheckFailure(error) === 'transient'
       )
     );
     assert.deepEqual(await Promise.all([
@@ -1752,6 +2001,34 @@ test('FX sanity failure preserves every production data file', async (t) => {
       readFile(paths.runLogPath, 'utf8')
     ]), before);
     assert.deepEqual(await readSnapshotStoreState(paths), snapshotStoreBefore);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('publishes with stale previous CNY values when every online FX candidate fails sanity', async () => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  const data = JSON.parse(await readFile(paths.currentDataPath, 'utf8'));
+  const rates = compatibleExchangeRates(data);
+  rates.JPY /= 2;
+  const fxPayload = {
+    result: 'success', base_code: 'USD', time_last_update_unix: recentFxTimestamp(), rates
+  };
+  try {
+    await withMockedFetch(
+      { html: buildAppleHtml(data), fxPayload },
+      () => main({ dryRun: false, paths, stepSummaryPath: null })
+    );
+    const published = JSON.parse(await readFile(paths.currentDataPath, 'utf8'));
+    assert.equal(published.fx.stale, true);
+    assert.equal(published.fx.fallbackReason, 'source-unavailable');
+    for (const previousCountry of data.countries) {
+      const current = published.countries.find(({ marketId }) => marketId === previousCountry.marketId);
+      for (const tier of data.tiers) {
+        assert.equal(current.plans[tier.id].cnyPrice, previousCountry.plans[tier.id].cnyPrice);
+        assert.equal(current.plans[tier.id].cnyRank, previousCountry.plans[tier.id].cnyRank);
+      }
+    }
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -2520,6 +2797,77 @@ test('falls back when the authenticated response omits a required currency', asy
   }
 });
 
+test('falls back from an FX candidate that fails sanity to a sane open candidate', async () => {
+  const previous = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const saneRates = compatibleExchangeRates(previous);
+  const anomalousRates = { ...saneRates, JPY: saneRates.JPY / 2 };
+  const now = new Date();
+  const timestamp = Math.floor(now.getTime() / 1_000);
+  const originalFetch = globalThis.fetch;
+  let authenticatedRequests = 0;
+  let openRequests = 0;
+  globalThis.fetch = async (url) => {
+    const target = String(url);
+    if (target.includes('v6.exchangerate-api.com')) {
+      authenticatedRequests += 1;
+      return new Response(JSON.stringify({ result: 'success', base_code: 'USD', time_last_update_unix: timestamp, conversion_rates: anomalousRates }));
+    }
+    if (target.includes('open.er-api.com')) {
+      openRequests += 1;
+      return new Response(JSON.stringify({ result: 'success', base_code: 'USD', time_last_update_unix: timestamp, rates: saneRates }));
+    }
+    throw new Error(`Unexpected FX URL: ${target}`);
+  };
+  try {
+    const fx = await getExchangeRates(previous, {
+      apiKey: 'test-key',
+      requiredCurrencies: [...new Set(previous.countries.map(({ currency }) => currency))],
+      now
+    });
+    assert.equal(authenticatedRequests, 1);
+    assert.equal(openRequests, 1);
+    assert.equal(fx.sourceMode, 'open-access');
+    assert.equal(fx.fallbackUsed, true);
+    assert.equal(fx.fallbackReason, 'sanity-failed');
+    assert.equal(fx.stale, false);
+    assert.equal(fx.sanity.status, 'passed');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('falls back to fresh previous FX when every online candidate fails sanity', async () => {
+  const previous = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const saneRates = compatibleExchangeRates(previous);
+  previous.fx = { ...previous.fx, fetchedAt: new Date().toISOString(), rates: saneRates };
+  const anomalousRates = { ...saneRates, JPY: saneRates.JPY / 2 };
+  const now = new Date();
+  const timestamp = Math.floor(now.getTime() / 1_000);
+  const originalFetch = globalThis.fetch;
+  let requests = 0;
+  globalThis.fetch = async (url) => {
+    requests += 1;
+    const authenticated = String(url).includes('v6.exchangerate-api.com');
+    return new Response(JSON.stringify({
+      result: 'success', base_code: 'USD', time_last_update_unix: timestamp,
+      ...(authenticated ? { conversion_rates: anomalousRates } : { rates: anomalousRates })
+    }));
+  };
+  try {
+    const fx = await getExchangeRates(previous, {
+      apiKey: 'test-key',
+      requiredCurrencies: [...new Set(previous.countries.map(({ currency }) => currency))],
+      now
+    });
+    assert.equal(requests, 2);
+    assert.equal(fx.stale, true);
+    assert.deepEqual(fx.rates, selectRequiredRates(saneRates, previous.countries.map(({ currency }) => currency)));
+    assert.deepEqual(fx.sanity.warnings, ['FX_SANITY_FALLBACK_TO_PREVIOUS']);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('does not expose the exchange-rate key when both online sources fail', async () => {
   const originalFetch = globalThis.fetch;
   const originalSetTimeout = globalThis.setTimeout;
@@ -2940,6 +3288,57 @@ test('keeps removed-country history and appends complete events for a new tier',
   assert.equal(repeated.history.countries.Alpha.events.length, 2, 'unchanged prices should not duplicate history');
   assert.equal(repeated.history.updatedAt, '2026-07-31T16:00:00.000Z', 'unchanged history must keep its last structural update time');
   assert.equal(repeated.changed, false);
+});
+
+test('persists schema 4 metadata-only changes without appending price events', () => {
+  const makeHistory = (marketId, sourceName, nameZh, region = 'Africa, Middle East and India') => ({
+    schemaVersion: 4,
+    updatedAt: '2026-08-14T00:00:00.000Z',
+    markets: {
+      [marketId]: {
+        country: sourceName,
+        nameZh,
+        region,
+        events: [{ observedAt: '2026-08-14', currency: 'USD', plans: { '50GB': 1 } }]
+      }
+    }
+  });
+  const updateMetadata = ({ marketId, fromSource, toSource = fromSource, fromZh, toZh, fromRegion = 'Americas', toRegion = fromRegion }) => {
+    const history = makeHistory(marketId, fromSource, fromZh, fromRegion);
+    const current = {
+      ...country(toSource, { nameZh: toZh, region: toRegion, prices: { '50GB': 1 } }),
+      marketId
+    };
+    const result = updateHistory(
+      history, [current], '2026-08-15', [TIER_50], '2026-08-14T16:02:00.000Z'
+    );
+    assert.equal(result.changed, true);
+    assert.equal(result.metadataChanged, true);
+    assert.equal(result.changedCountries, 0, 'metadata changes must not change the price-event count');
+    assert.equal(result.history.updatedAt, '2026-08-14T16:02:00.000Z');
+    assert.equal(result.history.markets[marketId].events.length, 1);
+    assert.equal(result.history.markets[marketId].country, toSource);
+    assert.equal(result.history.markets[marketId].nameZh, toZh);
+    assert.equal(result.history.markets[marketId].region, toRegion);
+  };
+
+  updateMetadata({ marketId: 'mu', fromSource: 'Mauritius', fromZh: '毛里求斯', toZh: 'Mauritius' });
+  updateMetadata({ marketId: 'cg', fromSource: 'Republic of Congo', fromZh: '刚果共和国', toZh: 'Republic of Congo' });
+  updateMetadata({ marketId: 'approved', fromSource: 'Approved Market', fromZh: 'Approved Market', toZh: '官方中文名' });
+  updateMetadata({ marketId: 'alias', fromSource: 'Old Apple Name', toSource: 'New Apple Name', fromZh: '官方名', toZh: '官方名' });
+  updateMetadata({
+    marketId: 'region', fromSource: 'Region Market', fromZh: '地区市场', toZh: '地区市场',
+    fromRegion: 'Americas', toRegion: 'Asia Pacific'
+  });
+
+  const unchangedHistory = makeHistory('same', 'Same Market', '相同市场', 'Americas');
+  const unchanged = updateHistory(unchangedHistory, [{
+    ...country('Same Market', { nameZh: '相同市场', region: 'Americas', prices: { '50GB': 1 } }),
+    marketId: 'same'
+  }], '2026-08-15', [TIER_50], '2026-08-14T16:02:00.000Z');
+  assert.equal(unchanged.changed, false);
+  assert.equal(unchanged.metadataChanged, false);
+  assert.equal(unchanged.history.updatedAt, '2026-08-14T00:00:00.000Z');
 });
 
 test('rejects a price event whose observation date moves backwards', () => {
@@ -3394,6 +3793,16 @@ test('keeps successful Action summaries concise and promotes warnings', () => {
   }, 'schedule').join('\n');
   assert.match(renameSuspected, /MARKET_IDENTITY_RENAME_SUSPECTED.*New Market.*old-id.*pricesMatch=false.*自动发布继续/s);
   assert.doesNotMatch(renameSuspected, /\n::warning::/);
+
+  const confirmedPriceWarning = buildActionSummaryLines(data, {
+    ...summary,
+    confirmedPriceAnomalies: [{
+      marketId: 'example-id', sourceName: 'Example\n::warning::', tier: '50GB',
+      type: 'combined-local-price', previous: 1, current: 3.5
+    }]
+  }, 'schedule').join('\n');
+  assert.match(confirmedPriceWarning, /PRICE_CHANGE_ANOMALY_CONFIRMED.*example-id.*50GB.*combined-local-price.*自动发布继续/s);
+  assert.doesNotMatch(confirmedPriceWarning, /\n::warning::/);
 
   const noSecret = buildActionSummaryLines({
     ...data,
