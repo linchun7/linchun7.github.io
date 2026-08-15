@@ -55,13 +55,30 @@ test('registry resolves current known markets without requiring an active-set eq
   assert.equal(warnings.length, 1);
 });
 
-test('every registry identity has one marketId-keyed official Chinese name', async () => {
+test('every registry identity has one marketId-keyed Chinese naming authority record', async () => {
   const names = JSON.parse(await readFile(namesUrl, 'utf8'));
   for (const market of Object.values(MARKET_REGISTRY)) {
-    assert.equal(typeof names[market.id], 'string', market.id);
+    assert.ok(Object.hasOwn(names, market.id), market.id);
+    assert.ok(names[market.id] === null || typeof names[market.id] === 'string', market.id);
     assert.equal(Object.hasOwn(market, 'zh'), false, market.canonicalName);
   }
   assert.equal(names['euro-zone'], '欧盟');
+  assert.equal(names.la, '老挝', 'reviewed Apple zh-CN wording remains approved');
+  assert.equal(names.mu, null);
+  assert.equal(names.cg, null);
+  assert.equal(getOfficialChineseMarketName('mu'), null);
+  assert.equal(getOfficialChineseMarketName('cg'), null);
+});
+
+test('pending Chinese names fall back to Apple English without blocking identity attachment', () => {
+  const pending = [];
+  const countries = attachMarketIdentity([
+    { country: 'Mauritius' },
+    { country: 'Republic of Congo' },
+    { country: 'New Apple Market' }
+  ], { onChineseNamePending: (market, country) => pending.push({ marketId: market.id, sourceName: country.country }) });
+  assert.deepEqual(countries.map(({ nameZh }) => nameZh), ['Mauritius', 'Republic of Congo', 'New Apple Market']);
+  assert.deepEqual(pending.map(({ marketId }) => marketId), ['mu', 'cg', resolveMarket('New Apple Market').id]);
 });
 
 test('committed schema 4 market identities remain continuous with the registry', async () => {
@@ -187,6 +204,27 @@ test('published unknown identities come from schema 4 history instead of the cur
   assert.equal(resolver('New Apple Market').id, 'published-custom-id');
   assert.equal(resolver('new apple market').id, 'published-custom-id');
   assert.equal(resolver('Brand New Market').id, 'generator-would-change-this');
+});
+
+test('historical removed unknown IDs remain reserved against a different generated identity', () => {
+  const reservedId = 'apple-test-deadbeef';
+  const resolver = createPublishedMarketResolver(null, {
+    schemaVersion: 4,
+    markets: { [reservedId]: { country: 'Old Unknown' } }
+  }, {
+    resolveUnknown: (sourceName) => ({
+      id: reservedId, canonicalName: sourceName, sourceName,
+      nameZh: sourceName, aliases: [], unknown: true
+    })
+  });
+  assert.equal(resolver('old unknown').id, reservedId);
+  assert.throws(
+    () => resolver('Totally Different Market'),
+    (error) => error.code === 'MARKET_IDENTITY_RESERVED_ID_COLLISION'
+      && error.generatedMarketId === reservedId
+      && error.newSourceName === 'Totally Different Market'
+      && error.reservedOwners.some(({ sourceName, location }) => sourceName === 'Old Unknown' && location === 'history.json')
+  );
 });
 
 test('published identity ledger fails closed when one normalized source name has two IDs', () => {
