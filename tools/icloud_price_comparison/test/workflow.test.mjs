@@ -137,7 +137,7 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   );
   assert.match(verifyProductionJob, /name: 检出验证脚本[\s\S]*?ref: \$\{\{ needs\.update\.outputs\.generation_base_sha \}\}[\s\S]*?fetch-depth: 1[\s\S]*?persist-credentials: false/);
   assert.doesNotMatch(verifyProductionJob, /ref: main/, 'verification code must never come from mutable main');
-  assert.match(verifyProductionJob, /git -C "\$GITHUB_WORKSPACE" fetch origin main --depth=1[\s\S]*?git -C "\$GITHUB_WORKSPACE" show origin\/main:tools\/icloud_price_comparison\/data\/prices\.json[\s\S]*?current-main-prices\.json/);
+  assert.match(verifyProductionJob, /git -C "\$GITHUB_WORKSPACE" fetch origin main --depth=1[\s\S]*?CURRENT_MAIN_SHA=\$\(git -C "\$GITHUB_WORKSPACE" rev-parse origin\/main\)[\s\S]*?git -C "\$GITHUB_WORKSPACE" archive --format=tar "\$CURRENT_MAIN_SHA" tools\/icloud_price_comparison\/data[\s\S]*?--data-dir "\$current_main_root\/tools\/icloud_price_comparison\/data"/);
   assert.match(workflow, /validate_expected_artifact[\s\S]*?sha256sum --check[\s\S]*?--archive[\s\S]*?--data-dir[\s\S]*?verify-production-deployment\.mjs/);
   assert.match(workflow, /verify_production\.outcome[^]*?failure[^]*?severe_failure=true[^]*?production_not_updated[\s\S]*?PUBLISH_PRODUCTION_NOT_UPDATED/);
   assert.match(workflow, /PREPARE_SEVERE_FAILURE:[\s\S]*?UPDATE_SEVERE_FAILURE:[\s\S]*?PUBLISH_SEVERE_FAILURE:/);
@@ -162,14 +162,17 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.doesNotMatch(workflow, /cp -a .*data\/\." tools\/icloud_price_comparison\/data\//, 'publisher must replace the complete validated data directory');
   assert.match(workflow, /GITHUB_TOKEN:\s*\$\{\{ github\.token \}\}[\s\S]*?push origin HEAD:main/);
   assert.match(verifier, /https:\/\/www\.linchun\.com\.cn\/tools\/icloud_price_comparison\/data\/prices\.json/);
+  assert.match(verifier, /https:\/\/www\.linchun\.com\.cn\/tools\/icloud_price_comparison\/data\/history\.json/);
+  assert.match(verifier, /https:\/\/www\.linchun\.com\.cn\/tools\/icloud_price_comparison\/data\/run-log\.json/);
   assert.match(verifier, /https:\/\/www\.linchun\.com\.cn\/tools\/icloud_price_comparison\//);
-  assert.match(verifier, /assertStaticPageMatches\(productionHtml, observed\)/);
+  assert.match(verifier, /assertStaticPageMatches\(productionHtml, observed\.prices\)/);
   assert.match(verifier, /DEFAULT_MAX_WAIT_MS = 5 \* 60 \* 1_000/);
   assert.match(verifier, /DEFAULT_INTERVAL_MS = 15 \* 1_000/);
   assert.match(verifier, /DEFAULT_REQUEST_TIMEOUT_MS = 10 \* 1_000/);
   assert.match(verifier, /cache: 'no-store'[\s\S]*?'cache-control': 'no-cache'[\s\S]*?pragma: 'no-cache'/);
   assert.match(verifier, /schemaVersion !== 4[\s\S]*?parser !== 'cross-checked'/);
-  assert.match(verifier, /observed\.generatedAt === expected\.generatedAt[\s\S]*?observed\.run\.finishedAtUtc === expected\.run\.finishedAtUtc/);
+  assert.match(verifier, /observed\.prices\.generatedAt === expected\.prices\.generatedAt[\s\S]*?observed\.prices\.run\.finishedAtUtc === expected\.prices\.run\.finishedAtUtc/);
+  assert.match(verifier, /observed\.hashes\.history === expected\.hashes\.history[\s\S]*?observed\.hashes\.runLog === expected\.hashes\.runLog/);
   assert.match(updater, /::warning title=Unknown Apple market requires registry review::/);
   assert.doesNotMatch(updater, /UNKNOWN_APPLE_MARKET[^\n]*(?:throw|fail)/i);
 
@@ -216,12 +219,12 @@ test('requires production proof before an idempotent run reports success', async
   assert.match(existingVerificationJob, /validate-data-artifact\.mjs[\s\S]*?--data-dir tools\/icloud_price_comparison\/data/);
   assert.match(
     existingVerificationJob,
-    /verify-production-deployment\.mjs[\s\S]*?--expected-file tools\/icloud_price_comparison\/data\/prices\.json/,
+    /verify-production-deployment\.mjs[\s\S]*?--expected-data-dir tools\/icloud_price_comparison\/data/,
     'the exact validated checkout must remain the expected production payload'
   );
   assert.match(
     existingVerificationJob,
-    /git fetch origin main --depth=1[\s\S]*?git show origin\/main:tools\/icloud_price_comparison\/data\/prices\.json[\s\S]*?current-main-prices\.json[\s\S]*?--current-main-file "\$RUNNER_TEMP\/current-main-prices\.json"/,
+    /git fetch origin main --depth=1[\s\S]*?CURRENT_MAIN_SHA=\$\(git rev-parse origin\/main\)[\s\S]*?git archive --format=tar "\$CURRENT_MAIN_SHA" tools\/icloud_price_comparison\/data[\s\S]*?--data-dir "\$current_main_root\/tools\/icloud_price_comparison\/data"[\s\S]*?--current-main-data-dir "\$RUNNER_TEMP\/current-main-artifact\/tools\/icloud_price_comparison\/data"/,
     'mutable main may be read only as the newer-deployment proof'
   );
   assert.doesNotMatch(existingVerificationJob, /pnpm update:data|EXCHANGE_RATE_API_KEY|support\.apple\.com|git commit|git push/);

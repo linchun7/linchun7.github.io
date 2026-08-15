@@ -349,8 +349,7 @@ async function listExtractedEntries(rootPath) {
   return entries;
 }
 
-async function readJsonStrict(filePath, label) {
-  const buffer = await readFile(filePath).catch((error) => fail(`cannot read ${label}: ${error.message}`));
+export function parseJsonStrictBytes(buffer, label) {
   if (buffer.length >= 3 && buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf) {
     fail(`${label} must not contain a UTF-8 byte-order mark`);
   }
@@ -368,7 +367,12 @@ async function readJsonStrict(filePath, label) {
   }
   assertNoDuplicateJsonKeys(text, label);
   assertSafeJsonStrings(value, label);
-  return { value, buffer };
+  return value;
+}
+
+async function readJsonStrict(filePath, label) {
+  const buffer = await readFile(filePath).catch((error) => fail(`cannot read ${label}: ${error.message}`));
+  return { value: parseJsonStrictBytes(buffer, label), buffer };
 }
 
 function sha256(value) {
@@ -784,6 +788,19 @@ function validateRunLog(runLog, prices) {
     fail('run-log.json latest run does not match prices.json');
   }
 }
+
+export function validateCoreDataArtifact({ prices, history, runLog }) {
+  try {
+    validatePayload('prices.json', prices);
+    validatePayload('history.json', history);
+    validatePriceHistoryConsistency(prices, history);
+  } catch (error) {
+    fail(error.message);
+  }
+  validateRunLog(runLog, prices);
+  return { prices, history, runLog };
+}
+
 export async function validateExtractedDataArtifact(dataDirectory) {
   const rootStats = await lstat(dataDirectory).catch((error) => fail(`cannot stat data directory: ${error.message}`));
   if (!rootStats.isDirectory() || rootStats.isSymbolicLink()) fail('data root must be a real directory');
@@ -803,14 +820,7 @@ export async function validateExtractedDataArtifact(dataDirectory) {
     readJsonStrict(path.join(dataDirectory, 'run-log.json'), 'run-log.json'),
     readJsonStrict(path.join(dataDirectory, 'apple-snapshots', 'index.json'), 'apple-snapshots/index.json')
   ]);
-  try {
-    validatePayload('prices.json', prices);
-    validatePayload('history.json', history);
-    validatePriceHistoryConsistency(prices, history);
-  } catch (error) {
-    fail(error.message);
-  }
-  validateRunLog(runLog, prices);
+  validateCoreDataArtifact({ prices, history, runLog });
 
   const normalizedIndex = validateSnapshotIndex(index);
   const expectedFiles = new Set(REQUIRED_FILES);

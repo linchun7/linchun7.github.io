@@ -4,7 +4,7 @@ import {
   validatePayload,
   validatePriceHistoryConsistency
 } from './data-contract.js?v=f8779a1b';
-import { createIcons } from './vendor/lucide-subset.js?v=c5106146';
+import { createIcons } from './vendor/lucide-subset.js?v=1afb95ee';
 import { VALID_REGIONS } from './data-model.js?v=1df20253';
 
 const REQUEST_TIMEOUT_MS = 8_000;
@@ -143,24 +143,29 @@ function canonicalUrlRegion(value) {
   return URL_STATE_REGIONS.has(value) ? value : null;
 }
 
+function serializePriceStateUrl(url, { sortTier, sortKey, sortDirection, region }) {
+  const serialized = new URL(url);
+  const tier = canonicalUrlTier(sortTier);
+  const canonicalRegion = canonicalUrlRegion(region);
+
+  serialized.search = '';
+  if (tier !== null && tier !== DEFAULT_SORT_TIER) serialized.searchParams.set('tier', tier);
+  if (sortKey === 'country') serialized.searchParams.set('sort', 'country');
+  if (sortDirection === 'desc') serialized.searchParams.set('dir', 'desc');
+  if (canonicalRegion !== null) serialized.searchParams.set('region', canonicalRegion);
+  if (serialized.hash && serialized.hash !== '#priceWorkspace') serialized.hash = '';
+  return serialized;
+}
+
 function createSanitizedStateUrl() {
   const url = new URL(location.href);
-  const tier = canonicalUrlTier(url.searchParams.get('tier'));
-  const sort = ['tier', 'country'].includes(url.searchParams.get('sort'))
-    ? url.searchParams.get('sort')
-    : null;
-  const direction = ['asc', 'desc'].includes(url.searchParams.get('dir'))
-    ? url.searchParams.get('dir')
-    : null;
-  const region = canonicalUrlRegion(url.searchParams.get('region'));
-
-  url.search = '';
-  if (tier !== null) url.searchParams.set('tier', tier);
-  if (sort !== null) url.searchParams.set('sort', sort);
-  if (direction !== null) url.searchParams.set('dir', direction);
-  if (region !== null) url.searchParams.set('region', region);
-  if (url.hash && url.hash !== '#priceWorkspace') url.hash = '';
-  return url;
+  const serialized = serializePriceStateUrl(url, {
+    sortTier: canonicalUrlTier(url.searchParams.get('tier')) ?? DEFAULT_SORT_TIER,
+    sortKey: url.searchParams.get('sort') === 'country' ? 'country' : 'tier',
+    sortDirection: url.searchParams.get('dir') === 'desc' ? 'desc' : 'asc',
+    region: canonicalUrlRegion(url.searchParams.get('region')) ?? 'all'
+  });
+  return serialized;
 }
 
 function loadAnalytics() {
@@ -461,7 +466,7 @@ function createTierButtons(container, selectedTier, handler) {
   for (const tier of state.data.tiers) {
     const button = document.createElement('button');
     button.type = 'button';
-    button.textContent = tier.label.replace(' ', '');
+    button.textContent = tier.label;
     button.dataset.tier = tier.id;
     button.setAttribute('aria-pressed', String(tier.id === selectedTier));
     button.addEventListener('click', () => handler(tier.id));
@@ -650,7 +655,7 @@ function renderTable() {
       affordance.textContent = '›';
       const historyAction = document.createElement('span');
       historyAction.className = 'visually-hidden';
-      historyAction.textContent = '，查看 Apple 当地标价历史';
+      historyAction.textContent = '，查看价格历史';
       historyButton.append(affordance, historyAction);
       nameCell.append(historyButton);
 
@@ -1094,14 +1099,12 @@ function syncActiveHistoryCountry() {
 
 
 function updateUrlState() {
-  const url = new URL(location.href);
-  url.search = '';
-  url.searchParams.set('tier', canonicalUrlTier(state.sortTier) ?? DEFAULT_SORT_TIER);
-  url.searchParams.set('sort', state.sortKey === 'country' ? 'country' : 'tier');
-  url.searchParams.set('dir', state.sortDirection === 'desc' ? 'desc' : 'asc');
-  const region = canonicalUrlRegion(state.region);
-  if (region !== null) url.searchParams.set('region', region);
-  if (url.hash && url.hash !== '#priceWorkspace') url.hash = '';
+  const url = serializePriceStateUrl(location.href, {
+    sortTier: state.sortTier,
+    sortKey: state.sortKey,
+    sortDirection: state.sortDirection,
+    region: state.region
+  });
   history.replaceState(null, '', url);
 }
 

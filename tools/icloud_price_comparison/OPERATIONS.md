@@ -233,7 +233,7 @@ Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
 
 当前运维目标：HTML/JSON 最长约 10 分钟，带内容哈希版本的静态资源约 30 分钟。修改浏览器 JS/CSS/数据契约后运行 `pnpm assets:update`，提交前用 `pnpm assets:check` 验证引用与内容一致；不要手工填写 query version。部署后可按工具路径定向 purge；不要全站清缓存，除非事故范围确实是全站。
 
-production verification 同时请求真实 `prices.json` 与首页 HTML：前者必须通过 schema 4、parser、时间和完整 fingerprint 校验，后者的所有生成区域必须与同一次 JSON 精确一致。duplicate automatic 与 superseded newer-main 路径复用同一 verifier；JSON/HTML 任一代际不一致都不能发送成功心跳。
+production verification 每次以 no-store 方式请求真实 `prices.json`、`history.json`、`run-log.json` 与首页 HTML。三个 JSON 必须先通过现有完整数据契约，再以原始字节 SHA-256 与已测试工件一致；首页所有生成区域必须与 production `prices.json` 精确一致。`history.json` 可以因本次无历史变化而保持较早的 `updatedAt`，verifier 只要求它与 expected 工件的完整内容一致。duplicate automatic 与 superseded newer-main 路径复用同一四资源 verifier；superseded 证明中的实时 main 数据必须从单一固定 SHA 一次性提取并完整深验，任一资源代际不一致都不能发送成功心跳。
 
 Cloudflare 可能自动修改 HTML 注入 Beacon，因此 HTML 响应字节 hash 不一定与仓库文件相同。JS、CSS、vendor 和 JSON 不应被改写，可直接比较 SHA-256；HTML 应同时检查候选资源版本、CSP、页脚和脚本列表。
 
