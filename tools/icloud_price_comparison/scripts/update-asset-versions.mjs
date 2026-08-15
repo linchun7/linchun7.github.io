@@ -27,15 +27,13 @@ async function readProjectFile(projectDir, relativePath) {
 export async function computeAssetUpdates(projectDir = PROJECT_DIR) {
   const names = [
     'index.html', 'script.js', 'data-contract.js', 'data-model.js',
-    'price-bootstrap.js', 'style.css', 'vendor/lucide-subset.js', 'vendor/chart.umd.min.js'
+    'style.css', 'vendor/lucide-subset.js'
   ];
   const originals = Object.fromEntries(await Promise.all(names.map(async (name) => [name, await readProjectFile(projectDir, name)])));
   const versions = {
     'data-model.js': hash8(originals['data-model.js']),
-    'price-bootstrap.js': hash8(originals['price-bootstrap.js']),
     'style.css': hash8(originals['style.css']),
-    'vendor/lucide-subset.js': hash8(originals['vendor/lucide-subset.js']),
-    'vendor/chart.umd.min.js': hash8(originals['vendor/chart.umd.min.js'])
+    'vendor/lucide-subset.js': hash8(originals['vendor/lucide-subset.js'])
   };
 
   let contract = replaceVersion(originals['data-contract.js'], './data-model.js', versions['data-model.js']);
@@ -44,11 +42,10 @@ export async function computeAssetUpdates(projectDir = PROJECT_DIR) {
   let script = replaceVersion(originals['script.js'], './data-contract.js', versions['data-contract.js']);
   script = replaceVersion(script, './data-model.js', versions['data-model.js']);
   script = replaceVersion(script, './vendor/lucide-subset.js', versions['vendor/lucide-subset.js']);
-  script = replaceVersion(script, './vendor/chart.umd.min.js', versions['vendor/chart.umd.min.js']);
   versions['script.js'] = hash8(script);
 
   let html = originals['index.html'];
-  for (const name of ['price-bootstrap.js', 'style.css', 'script.js', 'data-contract.js', 'data-model.js', 'vendor/lucide-subset.js']) {
+  for (const name of ['style.css', 'script.js', 'data-contract.js', 'data-model.js', 'vendor/lucide-subset.js']) {
     html = replaceVersion(html, name, versions[name]);
   }
 

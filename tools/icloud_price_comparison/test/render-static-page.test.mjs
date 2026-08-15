@@ -29,7 +29,7 @@ test('committed raw HTML is the deterministic projection of validated prices', a
   assert.equal($('meta[name="icloud-price-snapshot"]').attr('content'), payload.generatedAt);
   assert.equal($('meta[name="icloud-price-snapshot"]').attr('data-fingerprint'), publicPayloadFingerprint(payload));
   assert.equal($('meta[name="icloud-price-snapshot"]').attr('data-fx-stale'), String(payload.fx.stale === true));
-  assert.equal($('#resultSummary').text(), `${payload.countries.length} 个地区 · ${preferredDefaultTier(payload).id} 从低到高`);
+  assert.equal($('#resultSummary').text(), `${payload.countries.length} 个地区 · ${preferredDefaultTier(payload).label} 从低到高`);
   assert.equal($('.price-table thead th[aria-sort="ascending"] i[data-lucide="arrow-up"]').length, 1);
   assert.equal(html.includes('↕'), false);
   for (const sourceName of ['China mainland', 'Japan', 'United States']) {
@@ -77,7 +77,7 @@ test('static rendering uses the first tier consistently when 200GB is absent', a
   assert.equal($('.price-table thead th[aria-sort="ascending"]').attr('data-tier'), defaultTier.id);
   assert.equal($(`.price-cell[data-tier="${defaultTier.id}"].is-active-tier.is-sorted`).length, payload.countries.length);
   assert.equal($('#priceRows > tr > td:first-child').filter((_, cell) => load(cell).text() === '--').length, 0);
-  assert.equal($('#resultSummary').text(), `${payload.countries.length} 个地区 · ${defaultTier.id} 从低到高`);
+  assert.equal($('#resultSummary').text(), `${payload.countries.length} 个地区 · ${defaultTier.label} 从低到高`);
   assert.equal(rendered.includes('200GB 从低到高'), false);
 });
 
@@ -96,7 +96,7 @@ test('raw product copy avoids engineering-only loading and cache language', asyn
   for (const forbidden of ['等待价格数据', '正在加载价格数据', '本地缓存', '7 天有效期', '允许的未来偏差', 'Rates By Exchange Rate API', '页面发布日期', '累计价格变更']) {
     assert.ok(!html.includes(forbidden), `raw HTML must not contain ${forbidden}`);
   }
-  for (const required of ['各容量全球最低价', '全球参考排名', 'Apple 当地标价历史', '约合人民币', '价格变动次数', '数据来源与说明']) {
+  for (const required of ['各容量全球最低价', '全球参考排名', 'Apple 当地标价历史', '约合人民币', '价格变动次数', '数据来源', 'Apple 实际结算为准']) {
     assert.ok(html.includes(required), `raw HTML must contain ${required}`);
   }
 });

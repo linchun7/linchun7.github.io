@@ -40,7 +40,7 @@ for (const asset of manifest.assets) {
   const bytes = await readFile(path.join(projectDir, 'vendor', asset.file));
   const sha256 = createHash('sha256').update(bytes).digest('hex');
   if (sha256 !== asset.sha256) throw new Error(`${asset.file} does not match its reviewed SHA-256`);
-  if (!notices.includes(`${asset.package === 'chart.js' ? 'Chart.js' : 'Lucide'} ${asset.version}`)) {
+  if (!notices.includes(`Lucide ${asset.version}`)) {
     throw new Error(`${asset.package} ${asset.version} is missing from THIRD_PARTY_NOTICES.md`);
   }
 }
@@ -51,14 +51,6 @@ const vendoredScripts = vendorEntries
   .sort();
 if (JSON.stringify(vendoredScripts) !== JSON.stringify([...manifestFiles].sort())) {
   throw new Error('Vendor manifest and served JavaScript files do not exactly match');
-}
-
-const chartAsset = manifest.assets.find(({ package: packageName }) => packageName === 'chart.js');
-const chartPackageEntry = fileURLToPath(import.meta.resolve('chart.js'));
-const reviewedChartBytes = await readFile(path.join(projectDir, 'vendor', chartAsset.file));
-const installedChartBytes = await readFile(path.join(path.dirname(chartPackageEntry), 'chart.umd.min.js'));
-if (!reviewedChartBytes.equals(installedChartBytes)) {
-  throw new Error('Vendored Chart.js does not exactly match the pinned package distribution');
 }
 
 const lucideAsset = manifest.assets.find(({ package: packageName }) => packageName === 'lucide');
