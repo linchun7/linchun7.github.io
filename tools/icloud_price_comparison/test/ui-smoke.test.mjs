@@ -206,18 +206,16 @@ after(async () => {
   await Promise.allSettled(cleanup);
 });
 
-test('starts price data early and deprioritizes optional third-party work', async () => {
-  const [html, bootstrapSource, moduleSource, styleSource] = await Promise.all([
+test('shows static prices immediately and refreshes them without blocking first paint', async () => {
+  const [html, moduleSource, styleSource] = await Promise.all([
     readFile(path.join(PROJECT_DIR, 'index.html'), 'utf8'),
-    readFile(path.join(PROJECT_DIR, 'price-bootstrap.js'), 'utf8'),
     readFile(path.join(PROJECT_DIR, 'script.js'), 'utf8'),
     readFile(path.join(PROJECT_DIR, 'style.css'), 'utf8')
   ]);
-  const eagerPriceFetch = html.match(/<script data-cfasync="false" src="price-bootstrap\.js\?v=[0-9a-f]{8}"><\/script>/)?.[0];
   const moduleScript = html.match(/<script data-cfasync="false" type="module" src="script\.js\?v=[0-9a-f]{8}"><\/script>/)?.[0];
-  assert.ok(eagerPriceFetch, 'prices.json bootstrap should run during HTML parsing with a content hash');
   assert.ok(moduleScript, 'the application module should use a content hash');
-  assert.ok(html.indexOf(eagerPriceFetch) < html.indexOf(moduleScript), 'the initial price request should precede module execution');
+  assert.doesNotMatch(html, /price-bootstrap\.js/, 'static first paint must not require a separate price bootstrap');
+  assert.match(html, /<tbody id="priceRows">[\s\S]*?<tr data-market-id=/, 'validated static prices must be present before module or network work');
   assert.doesNotMatch(html, /rel="preload" href="data\/prices\.json"/, 'cross-browser loading should not rely on a fetch preload that WebKit may duplicate');
   assert.doesNotMatch(html, /<script[^>]+src="https:\/\/www\.googletagmanager\.com/, 'analytics must not block HTML parsing');
   assert.doesNotMatch(html, /analyticsConsent|privacySettings|允许匿名统计/, 'analytics consent overlay and its settings entry must be absent');
@@ -232,10 +230,7 @@ test('starts price data early and deprioritizes optional third-party work', asyn
   assert.doesNotMatch(html, /raw\.githubusercontent\.com/, 'frontend data must not fall back to a mutable branch URL');
   assert.match(html, /参考汇率：ExchangeRate-API/);
   assert.match(html, /data-cfasync="false" type="module"/, 'Rocket Loader must not rewrite the module entry point');
-  assert.match(bootstrapSource, /redirect:\s*'error'/, 'the eager price request must reject redirects');
-  assert.match(bootstrapSource, /String\(amount\) === match\[1\]/, 'bootstrap URL tiers must use the same canonical numeric spelling as the module');
-  assert.match(bootstrapSource, /finish:\s*\(\) => clearTimeout\(timeout\)/, 'the eager timeout must remain active while its body is read');
-  assert.doesNotMatch(bootstrapSource, /\.finally\(\(\) => clearTimeout\(timeout\)\)/, 'receiving response headers must not clear the eager body timeout');
+  assert.doesNotMatch(moduleSource, /__icloudInitialPriceRequest|__icloudInitialQuery|initialPriceRequest|finishInitialRequest/, 'the module must not retain a bootstrap bridge');
   assert.match(moduleSource, /MAX_RESPONSE_BYTES[\s\S]*?'prices\.json': 1024 \* 1024[\s\S]*?'history\.json': 8 \* 1024 \* 1024/);
   assert.match(moduleSource, /TextDecoder\('utf-8', \{ fatal: true \}\)/, 'network JSON must use strict UTF-8 decoding');
   assert.match(moduleSource, /fetch\(url,[\s\S]*?redirect:\s*'error'/, 'all later data requests must reject redirects');
@@ -245,7 +240,6 @@ test('starts price data early and deprioritizes optional third-party work', asyn
   assert.doesNotMatch(moduleSource, /setInterval\(/, 'freshness lifecycle must use one-shot boundaries, not polling');
   assert.match(moduleSource, /document\.addEventListener\('visibilitychange'/);
   assert.match(moduleSource, /window\.addEventListener\('pageshow'/);
-  assert.match(bootstrapSource, /cache:\s*'no-cache'/, 'the eager prices request must revalidate its HTTP cache');
   assert.match(moduleSource, /fileName === 'prices\.json' \? 'no-cache' : 'default'/, 'ordinary prices requests must revalidate while preserving HTTP caching');
   assert.match(moduleSource, /const ANALYTICS_ID = 'G-K2S9L4CHNP'/, 'the approved GA4 measurement ID must remain configured');
   assert.match(moduleSource, /page_location:\s*analyticsUrl\.href/, 'GA4 must receive only the sanitized page location');
@@ -848,7 +842,7 @@ test('renders current prices, sorting, and country history in a real browser', {
         if (expectedRecord) {
           await page.waitForFunction((count) => document.querySelectorAll('#historyRows tr').length === count, expectedRecord.events.length);
         }
-        assert.equal(await page.locator('th[data-history-tier-placeholder]').count(), 0, `${viewport.name} history header placeholders must be replaced before the dialog is announced`);
+        assert.equal(await page.locator('#historyDialog thead th').count(), 3, `${viewport.name} history table must use one selected-tier column`);
         const expectedDialogName = expectedData.countries.find(({ country }) => country === historySearch)?.nameZh || historySearch;
         assert.equal(await page.getByRole('dialog', { name: expectedDialogName }).count(), 1, 'history dialog must have an accessible name');
         assert.ok(await page.locator('#historyRows tr').count() > 0);
@@ -859,8 +853,8 @@ test('renders current prices, sorting, and country history in a real browser', {
         );
         assert.deepEqual(
           await page.locator('#historyDialog thead th').evaluateAll((headers) => headers.map((header) => header.getAttribute('scope'))),
-          Array.from({ length: expectedData.tiers.length + 2 }, () => 'col'),
-          'all generated history headers need column scope'
+          ['col', 'col', 'col'],
+          'all three history headers need column scope'
         );
         assert.equal(await page.locator('#historyTierControl button').count(), expectedData.tiers.length);
         if (viewport.width <= 1100) {
@@ -870,17 +864,11 @@ test('renders current prices, sorting, and country history in a real browser', {
           })));
           assert.ok(dialogTouchTargets.every(({ width, height }) => width >= 44 && height >= 44), `${viewport.name} history dialog controls must retain comfortable touch targets`);
         }
-        if (viewport.width <= 640) {
-          const mobileHistoryLayout = await page.locator('#historyDialog .history-table-scroll').evaluate((scroller) => ({
-            clientWidth: scroller.clientWidth,
-            scrollWidth: scroller.scrollWidth,
-            visibleHeaders: [...scroller.querySelectorAll('thead th')].filter((header) => getComputedStyle(header).display !== 'none').length,
-            visibleTierHeaders: [...scroller.querySelectorAll('thead th[data-history-tier-header]')].filter((header) => getComputedStyle(header).display !== 'none').map((header) => header.dataset.tier)
-          }));
-          assert.ok(mobileHistoryLayout.scrollWidth <= mobileHistoryLayout.clientWidth + 1, `${viewport.name} history table must not require horizontal scrolling`);
-          assert.equal(mobileHistoryLayout.visibleHeaders, 3, `${viewport.name} history table should show date, currency, and the active tier`);
-          assert.deepEqual(mobileHistoryLayout.visibleTierHeaders, [firstTier], `${viewport.name} history table should only show the selected tier`);
-        }
+        const historyLayout = await page.locator('#historyDialog .history-table-scroll').evaluate((scroller) => ({
+          clientWidth: scroller.clientWidth,
+          scrollWidth: scroller.scrollWidth
+        }));
+        assert.ok(historyLayout.scrollWidth <= historyLayout.clientWidth + 1, `${viewport.name} history table must not require horizontal scrolling`);
         const tierLayout = await page.locator('#historyTierControl').evaluate((control) => ({
           declaredCount: control.style.getPropertyValue('--tier-count'),
           renderedColumns: getComputedStyle(control).gridTemplateColumns.trim().split(/\s+/).filter(Boolean).length
@@ -888,22 +876,33 @@ test('renders current prices, sorting, and country history in a real browser', {
         assert.equal(tierLayout.declaredCount, String(expectedData.tiers.length));
         assert.equal(tierLayout.renderedColumns, expectedData.tiers.length);
         const expectedCountry = expectedData.countries.find(({ country }) => country === historySearch);
-        if (expectedCountry) {
-          assert.match(await page.locator('#historyLocalPrice').textContent(), new RegExp(expectedCountry.plans[firstTier].formattedPrice.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-        }
-        if (expectedRecord) {
-          const expectedRows = [...expectedRecord.events].reverse().map((event) => [
-            formatUiDate(event.observedAt),
-            event.currency,
-            ...expectedData.tiers.map(({ id }) => Number.isFinite(event.plans[id]) ? uiNumberFormatter.format(event.plans[id]) : '--')
-          ]);
+        for (const tier of expectedData.tiers) {
+          await page.locator(`#historyTierControl button[data-tier="${tier.id}"]`).click();
           assert.deepEqual(
-            await page.locator('#historyRows tr').evaluateAll((rows) => rows.map((row) => (
-              [...row.cells].map((cell) => cell.textContent.trim())
-            ))),
-            expectedRows,
-            'every history row must preserve its exact date, currency, and tier prices'
+            await page.locator('#historyDialog thead th').allTextContents(),
+            ['记录日期', '币种', tier.label],
+            `${viewport.name} history header must identify only the selected tier`
           );
+          if (expectedCountry) {
+            assert.match(await page.locator('#historyLocalPrice').textContent(), new RegExp(expectedCountry.plans[tier.id].formattedPrice.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+            assert.match(await page.locator('#historyCnyPrice').textContent(), new RegExp(uiNumberFormatter.format(expectedCountry.plans[tier.id].cnyPrice).replace('.', '\\.')));
+          }
+          if (expectedRecord) {
+            const expectedRows = [...expectedRecord.events].reverse().map((event) => [
+              formatUiDate(event.observedAt),
+              event.currency,
+              Number.isFinite(event.plans[tier.id]) ? uiNumberFormatter.format(event.plans[tier.id]) : '--'
+            ]);
+            assert.deepEqual(
+              await page.locator('#historyRows tr').evaluateAll((rows) => rows.map((row) => (
+                [...row.cells].map((cell) => cell.textContent.trim())
+              ))),
+              expectedRows,
+              `${viewport.name} history rows must project only ${tier.id}`
+            );
+            assert.equal(await page.locator('#historyEventCount').textContent(), `${Math.max(0, compactExpectedSeries(expectedRecord.events, tier.id).length - 1)} 次`);
+          }
+          assert.equal(await page.locator('#historyRows tr td').count(), (expectedRecord?.events.length ?? 1) * 3, `${viewport.name} history rows must contain exactly three cells`);
         }
         assert.equal(await page.locator('#historyDialog canvas').count(), 0, `${viewport.name} history dialog must not contain a chart canvas`);
         if (viewport.name === 'desktop') await page.keyboard.press('Escape');
@@ -1068,7 +1067,7 @@ test('excludes history events from before a tier was introduced', { timeout: 30_
     const oldEventDate = formatUiDate(targetRecord.events[0].observedAt);
     const oldEventTierCell = await page.locator('#historyRows tr').evaluateAll((rows, date) => {
       const row = rows.find((candidate) => candidate.cells[0]?.textContent.trim() === date);
-      return row?.querySelector('[data-history-tier="200GB"]')?.textContent.trim();
+      return row?.cells[2]?.textContent.trim();
     }, oldEventDate);
     assert.equal(oldEventTierCell, '--', 'pre-introduction events should remain visibly unavailable in the table');
     assert.deepEqual(errors, []);

@@ -278,7 +278,7 @@ https://www.linchun.com.cn/tools/icloud_price_comparison/?q=privateSearchMarker&
 - 控制台无应用 error/CSP violation；对话框、键盘、缓存回退和错误态正常。
 - 生产 JSON 是 schema 4，且 `prices.json`、`run-log.json` 都不含 raw rates、内部全精度换算值或 API Key 状态。
 
-隐私边界：bootstrap 只能在 HTML 开始执行后清理地址。最初的 document URL 仍可能进入浏览器历史、代理、Cloudflare/GitHub Pages 和访问日志；任何 Secret、Token 或个人信息都不得放进 URL。工具不使用 `localStorage`、`sessionStorage`、IndexedDB 或 Service Worker 保存价格；当前价格只从经 `prices.json` 生成的静态 HTML 与通过契约校验的网络 JSON 读取。
+隐私边界：页面模块只能在 HTML 开始执行后清理地址。最初的 document URL 仍可能进入浏览器历史、代理、Cloudflare/GitHub Pages 和访问日志；任何 Secret、Token 或个人信息都不得放进 URL。工具不使用 `localStorage`、`sessionStorage`、IndexedDB 或 Service Worker 保存价格；当前价格只从经 `prices.json` 生成的静态 HTML 与通过契约校验的网络 JSON 读取。
 
 GA4 可能使用域级 `_ga` Cookie，主站其他 GA 页面也可能复用该 Cookie。本工具的隐私边界是：站内搜索词和未知 URL 状态不得进入 GA4 的 `page_location` 或后续 Referer；若业务要求完全无 Cookie 或与主站分析身份隔离，应改用独立 origin 或另行设计同意/无 Cookie 方案。
 

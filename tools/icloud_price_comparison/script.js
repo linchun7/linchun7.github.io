@@ -28,8 +28,7 @@ const REGION_LABELS = {
 };
 const URL_STATE_REGIONS = new Set(VALID_REGIONS);
 const initialUrlState = new URLSearchParams(location.search);
-const initialQuery = boundedSearchQuery(globalThis.__icloudInitialQuery ?? initialUrlState.get('q') ?? '');
-delete globalThis.__icloudInitialQuery;
+const initialQuery = boundedSearchQuery(initialUrlState.get('q') ?? '');
 const sanitizedInitialUrl = createSanitizedStateUrl();
 if (sanitizedInitialUrl.href !== location.href) history.replaceState(null, '', sanitizedInitialUrl);
 const initialSortKey = initialUrlState.get('sort') === 'country' ? 'country' : 'tier';
@@ -110,8 +109,6 @@ let slowLoadingTimer = null;
 let freshnessBoundaryTimer = null;
 let freshnessRefreshPromise = null;
 let analyticsScheduled = false;
-let initialPriceRequest = globalThis.__icloudInitialPriceRequest ?? null;
-delete globalThis.__icloudInitialPriceRequest;
 const staticSnapshotMeta = document.querySelector('meta[name="icloud-price-snapshot"]');
 const staticSnapshotGeneratedAt = staticSnapshotMeta?.content ?? null;
 const staticSnapshotFxStale = staticSnapshotMeta?.dataset.fxStale === 'true';
@@ -322,25 +319,14 @@ async function fetchJson(fileName, { forceRefresh = false } = {}) {
   let lastError;
   for (const url of urls) {
     let timeout = null;
-    let finishInitialRequest = null;
     try {
-      let response;
-      if (!forceRefresh && fileName === 'prices.json' && url === localUrl && initialPriceRequest) {
-        const request = initialPriceRequest;
-        initialPriceRequest = null;
-        const result = await request;
-        finishInitialRequest = result.finish ?? null;
-        if (result.error) throw result.error;
-        response = result.response;
-      } else {
-        const controller = new AbortController();
-        timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-        response = await fetch(url, {
-          cache: forceRefresh ? 'reload' : (fileName === 'prices.json' ? 'no-cache' : 'default'),
-          redirect: 'error',
-          signal: controller.signal
-        });
-      }
+      const controller = new AbortController();
+      timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+      const response = await fetch(url, {
+        cache: forceRefresh ? 'reload' : (fileName === 'prices.json' ? 'no-cache' : 'default'),
+        redirect: 'error',
+        signal: controller.signal
+      });
       if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
       const payload = validatePayload(fileName, await readBoundedJsonResponse(response, fileName));
       if (fileName === 'prices.json') validatePriceFreshness(payload);
@@ -349,7 +335,6 @@ async function fetchJson(fileName, { forceRefresh = false } = {}) {
       lastError = error;
     } finally {
       clearTimeout(timeout);
-      finishInitialRequest?.();
     }
   }
   throw lastError;
@@ -526,19 +511,9 @@ function renderTierHeaders() {
 }
 
 function renderHistoryHeaders() {
-  const row = elements.historyRows.closest('table')?.querySelector('thead tr');
-  if (!row) return;
-  row.querySelectorAll('[data-history-tier-placeholder]').forEach((header) => header.remove());
-  row.querySelectorAll('th[data-history-tier-header]').forEach((header) => header.remove());
-  for (const tier of state.data.tiers) {
-    const header = document.createElement('th');
-    header.dataset.historyTierHeader = 'true';
-    header.dataset.tier = tier.id;
-    header.classList.toggle('is-active-tier', tier.id === state.historyTier);
-    header.scope = 'col';
-    header.textContent = tier.label;
-    row.append(header);
-  }
+  const header = elements.historyRows.closest('table')?.querySelector('#historyTierHeader');
+  if (!header) return;
+  header.textContent = state.data.tiers.find(({ id }) => id === state.historyTier)?.label ?? state.historyTier;
 }
 
 function filteredCountries() {
@@ -860,13 +835,8 @@ function renderHistoryRows(record) {
   [...record.events].reverse().forEach((event) => {
     const row = document.createElement('tr');
     row.append(createCell(formatDate(event.observedAt)), createCell(event.currency, 'currency-code'));
-    for (const tier of state.data.tiers) {
-      const price = event.plans[tier.id];
-      const cell = createCell(Number.isFinite(price) ? numberFormatter.format(price) : '--');
-      cell.dataset.historyTier = tier.id;
-      cell.classList.toggle('is-active-tier', tier.id === state.historyTier);
-      row.append(cell);
-    }
+    const price = event.plans[state.historyTier];
+    row.append(createCell(Number.isFinite(price) ? numberFormatter.format(price) : '--'));
     elements.historyRows.append(row);
   });
 }
