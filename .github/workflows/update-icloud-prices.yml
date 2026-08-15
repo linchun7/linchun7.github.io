@@ -441,8 +441,13 @@ jobs:
           tar --extract --file icloud-price-data.tar --directory unpacked --no-same-owner --no-same-permissions
           node "$validator" --data-dir unpacked/tools/icloud_price_comparison/data
           git -C "$GITHUB_WORKSPACE" fetch origin main --depth=1
-          git -C "$GITHUB_WORKSPACE" show origin/main:tools/icloud_price_comparison/data/prices.json \
-            > "$RUNNER_TEMP/current-main-prices.json"
+          CURRENT_MAIN_SHA=$(git -C "$GITHUB_WORKSPACE" rev-parse origin/main)
+          current_main_root="$RUNNER_TEMP/current-main-artifact"
+          mkdir -p "$current_main_root"
+          git -C "$GITHUB_WORKSPACE" archive --format=tar "$CURRENT_MAIN_SHA" tools/icloud_price_comparison/data \
+            | tar --extract --file=- --directory="$current_main_root"
+          node "$validator" --data-dir "$current_main_root/tools/icloud_price_comparison/data"
+          echo "Current main artifact validated from $CURRENT_MAIN_SHA"
 
       - name: 轮询真实生产 URL
         id: verify_production
@@ -450,8 +455,8 @@ jobs:
         shell: bash
         run: |
           node tools/icloud_price_comparison/scripts/verify-production-deployment.mjs \
-            --expected-file "$RUNNER_TEMP/icloud-price-data/unpacked/tools/icloud_price_comparison/data/prices.json" \
-            --current-main-file "$RUNNER_TEMP/current-main-prices.json" \
+            --expected-data-dir "$RUNNER_TEMP/icloud-price-data/unpacked/tools/icloud_price_comparison/data" \
+            --current-main-data-dir "$RUNNER_TEMP/current-main-artifact/tools/icloud_price_comparison/data" \
             --run-id "${{ github.run_id }}" \
             --summary-file "$GITHUB_STEP_SUMMARY"
 
@@ -512,8 +517,14 @@ jobs:
           node tools/icloud_price_comparison/scripts/validate-data-artifact.mjs \
             --data-dir tools/icloud_price_comparison/data
           git fetch origin main --depth=1
-          git show origin/main:tools/icloud_price_comparison/data/prices.json \
-            > "$RUNNER_TEMP/current-main-prices.json"
+          CURRENT_MAIN_SHA=$(git rev-parse origin/main)
+          current_main_root="$RUNNER_TEMP/current-main-artifact"
+          mkdir -p "$current_main_root"
+          git archive --format=tar "$CURRENT_MAIN_SHA" tools/icloud_price_comparison/data \
+            | tar --extract --file=- --directory="$current_main_root"
+          node tools/icloud_price_comparison/scripts/validate-data-artifact.mjs \
+            --data-dir "$current_main_root/tools/icloud_price_comparison/data"
+          echo "Current main artifact validated from $CURRENT_MAIN_SHA"
 
       - name: 轮询真实生产 URL
         id: verify_production
@@ -521,8 +532,8 @@ jobs:
         shell: bash
         run: |
           node tools/icloud_price_comparison/scripts/verify-production-deployment.mjs \
-            --expected-file tools/icloud_price_comparison/data/prices.json \
-            --current-main-file "$RUNNER_TEMP/current-main-prices.json" \
+            --expected-data-dir tools/icloud_price_comparison/data \
+            --current-main-data-dir "$RUNNER_TEMP/current-main-artifact/tools/icloud_price_comparison/data" \
             --run-id "${{ github.run_id }}-existing" \
             --summary-file "$GITHUB_STEP_SUMMARY"
 
