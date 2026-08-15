@@ -2,18 +2,11 @@
   "schemaVersion": 1,
   "assets": [
     {
-      "file": "chart.umd.min.js",
-      "package": "chart.js",
-      "version": "4.5.1",
-      "license": "MIT",
-      "sha256": "48444a82d4edcb5bec0f1965faacdde18d9c17db3063d042abada2f705c9f54a"
-    },
-    {
       "file": "lucide-subset.js",
       "package": "lucide",
       "version": "1.30.0",
       "license": "ISC",
-      "sha256": "657f4f9d9d869448312fd4e56132206c9196f36a44e59206c4ab121e21b00653"
+      "sha256": "c51061469a886f6442f1c905dce9b04976fb36d09068a90e27ae5569d9243cb2"
     }
   ]
 }

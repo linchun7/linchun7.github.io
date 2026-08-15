@@ -11,7 +11,7 @@ const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 test('content hashes cover direct and transitive browser assets in check and write modes', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'icloud-assets-'));
   try {
-    for (const name of ['index.html', 'script.js', 'data-contract.js', 'data-model.js', 'price-bootstrap.js', 'style.css']) {
+    for (const name of ['index.html', 'script.js', 'data-contract.js', 'data-model.js', 'style.css']) {
       await cp(path.join(PROJECT_DIR, name), path.join(root, name));
     }
     await cp(path.join(PROJECT_DIR, 'vendor'), path.join(root, 'vendor'), { recursive: true });

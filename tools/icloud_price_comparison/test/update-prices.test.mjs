@@ -461,12 +461,36 @@ test('performs a second Apple fetch when only the published date changes', async
   assert.equal(result.appleRequests, 2);
 });
 
+function nextBeijingMidnightAfter(timestamp) {
+  const baseline = new Date(timestamp);
+  assert.ok(Number.isFinite(baseline.getTime()), 'baseline timestamp must be valid');
+  const beijing = new Date(baseline.getTime() + 8 * 60 * 60 * 1_000);
+  return new Date(Date.UTC(beijing.getUTCFullYear(), beijing.getUTCMonth(), beijing.getUTCDate(), 16, 2));
+}
+
+test('derives the next Beijing 00:02 deterministically across calendar boundaries', () => {
+  for (const [baseline, expected] of [
+    ['2026-08-14T16:42:14.114Z', '2026-08-15T16:02:00.000Z'],
+    ['2026-08-31T04:00:00.000Z', '2026-08-31T16:02:00.000Z'],
+    ['2026-12-31T04:00:00.000Z', '2026-12-31T16:02:00.000Z']
+  ]) {
+    const result = nextBeijingMidnightAfter(baseline);
+    assert.ok(result.getTime() > Date.parse(baseline));
+    const beijing = new Date(result.getTime() + 8 * 60 * 60 * 1_000);
+    assert.equal(`${String(beijing.getUTCHours()).padStart(2, '0')}:${String(beijing.getUTCMinutes()).padStart(2, '0')}`, '00:02');
+    assert.equal(`${String(result.getUTCHours()).padStart(2, '0')}:${String(result.getUTCMinutes()).padStart(2, '0')}`, '16:02');
+    assert.equal(result.toISOString(), expected);
+    assert.notEqual(result.toISOString().slice(0, 10), beijing.toISOString().slice(0, 10));
+  }
+});
+
 test('publishes price and publication history at Beijing midnight with a previous-day UTC timestamp', async (t) => {
-  const fixedNow = new Date('2026-08-15T16:02:00.000Z');
-  t.mock.timers.enable({ apis: ['Date'], now: fixedNow });
-  const { root, paths } = await createTemporaryProductionPaths();
+  const { root, paths } = await createTemporaryProductionPaths({ copyRunLog: false });
   t.after(() => rm(root, { recursive: true, force: true }));
   const previous = JSON.parse(await readFile(paths.currentDataPath, 'utf8'));
+  const fixedNow = nextBeijingMidnightAfter(previous.generatedAt);
+  t.mock.timers.enable({ apis: ['Date'], now: fixedNow });
+  const beijingDate = new Date(fixedNow.getTime() + 8 * 60 * 60 * 1_000).toISOString().slice(0, 10);
   const changed = structuredClone(previous);
   const changedCountry = changed.countries.find(({ country }) => country === 'Bahamas');
   changedCountry.plans['50GB'] = { ...changedCountry.plans['50GB'], price: 1, formattedPrice: '$1.00' };
@@ -486,16 +510,16 @@ test('publishes price and publication history at Beijing midnight with a previou
     readFile(paths.currentDataPath, 'utf8').then(JSON.parse),
     readFile(paths.historyPath, 'utf8').then(JSON.parse)
   ]);
-  assert.equal(prices.generatedAt, '2026-08-15T16:02:00.000Z');
-  assert.equal(prices.run.observedAtBeijing, '2026-08-16');
+  assert.equal(prices.generatedAt, fixedNow.toISOString());
+  assert.equal(prices.run.observedAtBeijing, beijingDate);
   assert.equal(history.updatedAt, prices.generatedAt);
   const priceEvent = history.markets.bs.events.at(-1);
-  assert.equal(priceEvent.observedAt, '2026-08-16');
-  assert.equal(priceEvent.observedAtBeijing, '2026-08-16');
+  assert.equal(priceEvent.observedAt, beijingDate);
+  assert.equal(priceEvent.observedAtBeijing, beijingDate);
   assert.equal(priceEvent.observedAtUtc, prices.generatedAt);
   const publicationEvent = history.sourcePublishedDates.at(-1);
-  assert.equal(publicationEvent.observedAt, '2026-08-16');
-  assert.equal(publicationEvent.observedAtBeijing, '2026-08-16');
+  assert.equal(publicationEvent.observedAt, beijingDate);
+  assert.equal(publicationEvent.observedAtBeijing, beijingDate);
   assert.equal(publicationEvent.observedAtUtc, prices.generatedAt);
   assert.doesNotThrow(() => validateHistoryPayload(history));
   assert.doesNotThrow(() => validatePriceHistoryConsistency(prices, history));
@@ -1860,7 +1884,7 @@ async function assertRejectsBeforeFetch(callback, expected) {
   }
 }
 
-async function createTemporaryProductionPaths({ copySnapshots = true } = {}) {
+async function createTemporaryProductionPaths({ copySnapshots = true, copyRunLog = true } = {}) {
   const root = await mkdtemp(path.join(tmpdir(), 'icloud-production-'));
   const dataDir = path.join(root, 'data');
   const paths = {
@@ -1875,7 +1899,7 @@ async function createTemporaryProductionPaths({ copySnapshots = true } = {}) {
   await Promise.all([
     copyFile(pricesUrl, paths.currentDataPath),
     copyFile(historyUrl, paths.historyPath),
-    copyFile(runLogUrl, paths.runLogPath),
+    copyRunLog ? copyFile(runLogUrl, paths.runLogPath) : null,
     copyFile(namesUrl, paths.namesPath)
   ]);
   if (copySnapshots) await copyCommittedSnapshotStore(paths);
@@ -2076,7 +2100,7 @@ test('does not rewrite history when an observation has no historical changes', a
 test('rejects anomalous online FX when the previous safe fallback is expired', async (t) => {
   const { root, paths } = await createTemporaryProductionPaths();
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
-  t.mock.timers.enable({ apis: ['Date'], now: new Date(Date.parse(data.generatedAt) + 24 * 60 * 60 * 1_000) });
+  t.mock.timers.enable({ apis: ['Date'], now: new Date(Date.parse(data.fx.fetchedAt) + 37 * 60 * 60 * 1_000) });
   const rates = compatibleExchangeRates(data);
   rates.JPY /= 2;
   const fxPayload = {

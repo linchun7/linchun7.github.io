@@ -112,7 +112,7 @@ function renderCountryRow(country, tiers, options) {
     '              <button class="country-history-button" type="button" disabled>',
     `              <span class="country-name">${escapeHtml(displayName(country))}</span>`,
     secondary.trimEnd(),
-    '              <span class="history-affordance" aria-hidden="true">历史 ›</span>',
+    '              <span class="history-affordance" aria-hidden="true">›</span>',
     '              <span class="visually-hidden">，查看 Apple 当地标价历史</span>',
     '              </button>',
     '            </td>',
@@ -135,7 +135,7 @@ export function renderStaticFragments(payload) {
     META: `  <meta name="icloud-price-snapshot" content="${escapeHtml(payload.generatedAt)}" data-fingerprint="${fingerprint}" data-fx-stale="${fxStale}">`,
     STATUS: `        <span id="updatedAt" title="北京时间">更新于 ${beijingDateTime(payload.generatedAt)}</span>`,
     WORKSPACE_META: [
-      `          <p id="resultSummary" aria-live="polite">${payload.countries.length} 个地区 · ${escapeHtml(defaultTier.id)} 从低到高</p>`,
+      `          <p id="resultSummary" aria-live="polite">${payload.countries.length} 个地区 · ${escapeHtml(defaultTier.label)} 从低到高</p>`,
       `          <p id="rankingScopeNote" class="ranking-scope-note"${fxStale ? '' : ' hidden'}>${fxStale ? '排名基于最近一次可用汇率，仅供参考。' : '排名仍为全部地区中的全球参考排名'}</p>`
     ].join('\n'),
     OVERVIEW: [
