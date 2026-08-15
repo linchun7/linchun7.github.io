@@ -1006,7 +1006,7 @@ test('keeps the simplified price table hierarchy and affordances consistent', { 
     assert.equal(await page.locator('#sourceLinks svg').count(), 0);
     assert.equal(
       (await page.locator('.data-disclaimer > p').textContent()).trim(),
-      '价格来自 Apple 官方支持页，人民币金额按参考汇率换算，仅用于比较。实际扣费可能受税费、账号地区等因素影响，请以 Apple 实际结算为准。'
+      '价格来自 Apple 官方支持页，人民币金额按参考汇率换算，仅用于比较。实际费用可能受税费、账号地区等因素影响，请以 Apple 实际结算为准。'
     );
     assert.equal(await page.locator('.data-disclaimer details').count(), 0);
   } finally {
