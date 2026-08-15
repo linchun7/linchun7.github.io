@@ -212,7 +212,7 @@ function setFiltersDisabled(disabled) {
   elements.searchInput.disabled = disabled;
   elements.regionSelect.disabled = disabled;
   if (elements.backToTableButton) elements.backToTableButton.disabled = disabled;
-  document.querySelectorAll('button[data-sort], button[data-sort-tier], #publishedDateButton, #mobileTierControl button, .country-history-button').forEach((button) => {
+  document.querySelectorAll('button[data-sort], button[data-sort-tier], #publishedDateButton, #mobileTierControl button, .country-history-button, .minimum-card').forEach((button) => {
     button.disabled = disabled;
   });
 }
@@ -433,6 +433,7 @@ function renderMinimumSummary() {
     item.className = 'minimum-card';
     item.classList.toggle('is-active-tier', isActiveTier);
     item.dataset.tier = tier.id;
+    if (winners[0]?.marketId) item.dataset.marketId = winners[0].marketId;
     item.setAttribute('aria-pressed', String(isActiveTier));
     item.title = `查看 ${tier.label} 全球最低价地区`;
 
@@ -988,7 +989,7 @@ function createPublishedDateChangesCell(changes, isInitial = false) {
     }
     cell.append(group);
   }
-  if (!cell.childElementCount) cell.textContent = '页面日期发生变化，未检测到价格、地区或容量变化';
+  if (!cell.childElementCount) cell.textContent = '页面发布日期发生变化，未检测到价格、地区或容量变化';
   return cell;
 }
 
@@ -1004,8 +1005,8 @@ function renderPublishedDateHistory() {
   if (state.historyStatus !== 'ready') {
     const row = document.createElement('tr');
     const message = state.historyStatus === 'loading'
-      ? '更新记录正在读取'
-      : '暂时无法读取更新记录';
+      ? '发布日期记录正在读取'
+      : '暂时无法读取发布日期记录';
     const cell = createCell(message, 'empty-cell');
     cell.colSpan = 2;
     row.append(cell);
@@ -1015,7 +1016,7 @@ function renderPublishedDateHistory() {
 
   if (!entries.length) {
     const row = document.createElement('tr');
-    const cell = createCell('暂无页面更新记录', 'empty-cell');
+    const cell = createCell('暂无页面发布日期记录', 'empty-cell');
     cell.colSpan = 2;
     row.append(cell);
     elements.publishedDateRows.append(row);
@@ -1143,16 +1144,28 @@ function focusMinimumCountry(tierId, marketId) {
   elements.searchInput.value = '';
   elements.regionSelect.value = 'all';
   setTierSort(tierId, { forceAscending: true });
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    const row = marketId
-      ? [...elements.priceRows.querySelectorAll('tr[data-market-id]')].find((item) => item.dataset.marketId === marketId)
-      : null;
-    if (!row) return;
-    row.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
-    row.querySelector('.country-history-button')?.focus({ preventScroll: true });
-    row.classList.add('is-highlighted');
-    setTimeout(() => row.classList.remove('is-highlighted'), 1800);
-  }));
+  requestAnimationFrame(() => focusRenderedMinimum(tierId, marketId));
+}
+
+function focusRenderedMinimum(tierId, marketId) {
+  const row = marketId
+    ? [...elements.priceRows.querySelectorAll('tr[data-market-id]')].find((item) => item.dataset.marketId === marketId)
+    : null;
+  if (!row) return;
+
+  const targetCell = row.querySelector(`.price-cell[data-tier="${tierId}"]`);
+  const scrollTarget = targetCell ?? row;
+  scrollTarget.scrollIntoView({
+    behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    block: 'center',
+    inline: 'center'
+  });
+
+  const previousHighlight = elements.priceRows.querySelector('tr.is-highlighted');
+  if (previousHighlight && previousHighlight !== row) previousHighlight.classList.remove('is-highlighted');
+  row.classList.add('is-highlighted');
+  row.querySelector('.country-history-button')?.focus({ preventScroll: true });
+  setTimeout(() => row.classList.remove('is-highlighted'), 1800);
 }
 
 function setBackToTableVisible(visible) {
@@ -1547,7 +1560,6 @@ async function initialize({ forceRefresh = false } = {}) {
       warning.textContent = '暂时无法获取更新';
       elements.updatedAt.append(warning);
       setLoadStatus('暂时无法获取更新，当前显示最近一次可用价格', { error: true });
-      setFiltersDisabled(false);
     } else {
       showLoadError(error);
     }

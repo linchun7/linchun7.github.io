@@ -157,7 +157,7 @@ export function renderStaticFragments(payload) {
       defaultTierId: defaultTier.id,
       minimumCuesEnabled: !fxStale
     })).join('\n'),
-    APPLE_META: `            <span>Apple 价格页更新：<strong id="applePublishedDate">${appleDate(payload.source.publishedDate)}</strong></span>`,
+    APPLE_META: `            <span>页面发布日期：<strong id="applePublishedDate">${appleDate(payload.source.publishedDate)}</strong></span>`,
     FX_META: `            <span id="fxStatus">汇率更新：${beijingDateTime(payload.fx.fetchedAt)}</span>`
   };
 }

@@ -22,11 +22,11 @@
   <meta name="icloud-price-snapshot" content="2026-08-15T09:57:54.236Z" data-fingerprint="2af620e8951af142daef5786f0244208b01f68ea05634373841c80c27dd8a030" data-fx-stale="false">
 <!-- ICLOUD_STATIC_META:END -->
   <link rel="stylesheet" href="style.css?v=c0b5be82">
-  <link rel="modulepreload" href="script.js?v=56b8a172">
+  <link rel="modulepreload" href="script.js?v=730bcb82">
   <link rel="modulepreload" href="data-contract.js?v=f8779a1b">
   <link rel="modulepreload" href="data-model.js?v=1df20253">
   <link rel="modulepreload" href="vendor/lucide-subset.js?v=1afb95ee">
-  <script data-cfasync="false" type="module" src="script.js?v=56b8a172"></script>
+  <script data-cfasync="false" type="module" src="script.js?v=730bcb82"></script>
   <link rel="shortcut icon" href="/images/favicon.ico">
   <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
   <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
@@ -3174,12 +3174,12 @@
           <div class="source-group">
             <span>价格来源：<a class="source-item" href="https://support.apple.com/en-us/108047" target="_blank" rel="noopener noreferrer">Apple</a></span>
 <!-- ICLOUD_STATIC_APPLE_META:START -->
-            <span>Apple 价格页更新：<strong id="applePublishedDate">2026/07/17</strong></span>
+            <span>页面发布日期：<strong id="applePublishedDate">2026/07/17</strong></span>
 <!-- ICLOUD_STATIC_APPLE_META:END -->
-            <button class="source-meta-button" id="publishedDateButton" type="button" disabled title="查看 Apple 价格页更新记录" aria-describedby="publishedDateHint">
-              <span>查看更新记录</span>
+            <button class="source-meta-button" id="publishedDateButton" type="button" disabled title="查看 Apple 页面发布日期记录" aria-describedby="publishedDateHint">
+              <span>查看发布日期记录</span>
             </button>
-            <span id="publishedDateHint" class="visually-hidden">打开 Apple 价格页更新记录</span>
+            <span id="publishedDateHint" class="visually-hidden">打开 Apple 页面发布日期记录</span>
           </div>
           <span class="source-separator" aria-hidden="true"></span>
           <div class="source-group">
@@ -3231,22 +3231,22 @@
   <dialog id="publishedDateDialog" class="history-dialog source-history-dialog" aria-labelledby="publishedDateDialogTitle">
     <div class="dialog-header">
       <div>
-        <h2 id="publishedDateDialogTitle">Apple 价格页更新记录</h2>
-        <p>当 Apple 支持页更新日期发生变化时，这里会记录我们检测到的价格、地区或容量变化。</p>
+        <h2 id="publishedDateDialogTitle">Apple 页面发布日期记录</h2>
+        <p>当 Apple 支持页发布日期发生变化时，这里会记录我们检测到的价格、地区或容量变化。</p>
       </div>
       <button class="icon-button" id="closePublishedDate" type="button" aria-label="关闭发布日期记录" title="关闭"><i data-lucide="x" aria-hidden="true"></i></button>
     </div>
 
     <div class="published-date-current">
-      <span>Apple 页面最近更新</span>
+      <span>当前页面发布日期：</span>
       <strong id="publishedDateDialogCurrent">--</strong>
     </div>
 
     <section class="history-list published-date-list" aria-labelledby="publishedDateListTitle">
-      <div class="section-heading"><h3 id="publishedDateListTitle">更新记录</h3></div>
+      <div class="section-heading"><h3 id="publishedDateListTitle">发布日期记录</h3></div>
       <div class="history-table-scroll">
         <table>
-          <thead><tr><th scope="col">Apple 页面日期</th><th scope="col">检测到的变化</th></tr></thead>
+          <thead><tr><th scope="col">Apple 页面发布日期</th><th scope="col">检测到的变化</th></tr></thead>
           <tbody id="publishedDateRows"></tbody>
         </table>
       </div>
