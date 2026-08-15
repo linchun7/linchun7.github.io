@@ -3,11 +3,14 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import {
+  PRODUCTION_INDEX_URL,
   PRODUCTION_PRICES_URL,
   verifyProductionDeployment
 } from '../scripts/verify-production-deployment.mjs';
+import { renderStaticFragments, replaceStaticFragments } from '../scripts/static-page.mjs';
 
 const pricesUrl = new URL('../data/prices.json', import.meta.url);
+const indexUrl = new URL('../index.html', import.meta.url);
 
 function shiftedPayload(payload, hours) {
   const shifted = structuredClone(payload);
@@ -25,14 +28,25 @@ function shiftedPayload(payload, hours) {
 
 async function startSequenceServer(sequence) {
   let requests = 0;
+  let currentItem = sequence[0];
+  const indexTemplate = await readFile(indexUrl, 'utf8');
   const observedRequests = [];
   const server = createServer(async (request, response) => {
-    const item = sequence[Math.min(requests, sequence.length - 1)];
-    requests += 1;
+    const isHtml = request.url.startsWith('/index.html');
+    const item = isHtml ? currentItem : sequence[Math.min(requests, sequence.length - 1)];
+    if (!isHtml) {
+      currentItem = item;
+      requests += 1;
+    }
     observedRequests.push({ url: request.url, cacheControl: request.headers['cache-control'], pragma: request.headers.pragma });
     if (item.delayMs) await new Promise((resolve) => setTimeout(resolve, item.delayMs));
-    response.writeHead(item.status ?? 200, { 'content-type': item.contentType ?? 'application/json' });
-    response.end(item.body ?? JSON.stringify(item.payload));
+    if (isHtml && (item.htmlPayload ?? item.payload)) {
+      response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      response.end(replaceStaticFragments(indexTemplate, renderStaticFragments(item.htmlPayload ?? item.payload)));
+    } else {
+      response.writeHead(item.status ?? 200, { 'content-type': item.contentType ?? 'application/json' });
+      response.end(item.body ?? JSON.stringify(item.payload));
+    }
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   return {
@@ -47,6 +61,7 @@ function fastOptions(server, overrides = {}) {
   let nowMs = 0;
   return {
     productionUrl: server.url,
+    productionIndexUrl: server.url.replace('/prices.json', '/index.html'),
     runId: 'test-run',
     maxWaitMs: 4,
     intervalMs: 1,
@@ -60,6 +75,7 @@ function fastOptions(server, overrides = {}) {
 
 test('production verifier uses the fixed trusted production URL by default', () => {
   assert.equal(PRODUCTION_PRICES_URL, 'https://www.linchun.com.cn/tools/icloud_price_comparison/data/prices.json');
+  assert.equal(PRODUCTION_INDEX_URL, 'https://www.linchun.com.cn/tools/icloud_price_comparison/');
 });
 
 test('production verifier passes immediately with cache bypass headers and a unique query', async (t) => {
@@ -124,6 +140,16 @@ test('production verifier never accepts matching generatedAt with a different fi
   await assert.rejects(
     () => verifyProductionDeployment(expected, fastOptions(server, { maxWaitMs: 1 })),
     (error) => error.code === 'PUBLISH_PRODUCTION_NOT_UPDATED'
+  );
+});
+
+test('production verifier rejects visible HTML generated regions from another JSON snapshot', async (t) => {
+  const expected = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const server = await startSequenceServer([{ payload: expected, htmlPayload: shiftedPayload(expected, -1) }]);
+  t.after(() => server.close());
+  await assert.rejects(
+    () => verifyProductionDeployment(expected, fastOptions(server, { maxWaitMs: 1 })),
+    (error) => error.code === 'PUBLISH_PRODUCTION_NOT_UPDATED' && /STATIC_RENDER_MISMATCH/.test(error.details.lastReason)
   );
 });
 

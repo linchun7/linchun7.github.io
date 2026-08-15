@@ -38,10 +38,12 @@
 1. 固定远端 `main` 生成基线，安装 lockfile 中的依赖并运行 `pnpm test:core`。
 2. 在共享 5 分钟网络预算内抓取 Apple 页面；同一份 HTML 由 `document-order` 和 `apple-markers` 两条结构关联路径分别解析并逐字段交叉核对，两个解析器本身不分别发起网络请求。
 3. 校验发布日期、地区、分区、容量、价格、汇率时间和异常调价。Apple 业务语义发生任何变化时，都在共享网络预算内执行第二次可重试的独立无缓存抓取；第二份 HTML 也必须通过双解析器核对，并与第一份规范化语义完全一致。确认抓取暂时不可用时保留上一份稳定数据，等待下一次运行重试，不发布部分结构。
-4. 以事务方式生成 `prices.json`、`history.json`、`run-log.json` 和规范化 Apple JSON 快照，再运行数据与 runner Chrome 验收。
-5. 深验整个 `data/`，打包 ustar 并上传只读工件；独立发布 job 重新检查 tar、展开目录和远端基线，只在最后一步提交并推送完整 `data/`。
+4. 以事务方式生成 `prices.json`、`history.json`、`run-log.json` 和规范化 Apple JSON 快照，再从已验证的 `prices.json` 确定性生成 `index.html` 的价格区域并运行页面验收。
+5. 深验整个 `data/`，连同生成的静态首页上传只读工件；独立发布 job 重新检查数据、静态投影、生成区域边界和远端基线，只在最后一步提交并推送。
 
 生成与发布 job 权限隔离：抓取、依赖安装和测试 job 只有 `contents: read`；只有不安装项目依赖的发布 job 拥有 `contents: write`。远端 `main` 在生成或推送前前进时，本次发布失败关闭，等待下一次重新生成。
+
+`data/prices.json` 始终是公共价格的唯一事实源；`index.html` 只保存由它生成的可见投影。页面在 JavaScript 未运行、网络较慢或刷新失败时也能直接显示最近一次已发布价格，JavaScript 只负责校验更新并启用搜索、筛选、排序和历史。使用 `pnpm render:static` 更新生成区域，使用 `pnpm render:static:check` 检查同步；不要手工编辑 markers 内的价格。
 
 ## 数据文件与公共契约
 
