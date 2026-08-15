@@ -228,7 +228,7 @@ test('shows static prices immediately and refreshes them without blocking first 
   assert.match(html, /img-src[^;]+google-analytics\.com[^;]+www\.googletagmanager\.com/, 'GA4 image endpoints must be explicitly allowed by CSP');
   assert.doesNotMatch(html, /访问统计使用 Google Analytics 和 Cloudflare Web Analytics；站内搜索词不会发送给统计服务。/);
   assert.doesNotMatch(html, /raw\.githubusercontent\.com/, 'frontend data must not fall back to a mutable branch URL');
-  assert.match(html, /参考汇率：ExchangeRate-API/);
+  assert.match(html, /汇率来源：[\s\S]*?ExchangeRate-API/);
   assert.match(html, /data-cfasync="false" type="module"/, 'Rocket Loader must not rewrite the module entry point');
   assert.doesNotMatch(moduleSource, /__icloudInitialPriceRequest|__icloudInitialQuery|initialPriceRequest|finishInitialRequest/, 'the module must not retain a bootstrap bridge');
   assert.match(moduleSource, /MAX_RESPONSE_BYTES[\s\S]*?'prices\.json': 1024 \* 1024[\s\S]*?'history\.json': 8 \* 1024 \* 1024/);
@@ -361,12 +361,9 @@ test('loads deferred GA4 with a sanitized page location and no consent overlay',
     const sanitizedUrl = new URL(page.url());
     assert.equal(sanitizedUrl.searchParams.has('q'), false);
     assert.equal(sanitizedUrl.searchParams.has('privateToken'), false);
-    assert.equal(sanitizedUrl.searchParams.get('tier'), '200GB');
-    assert.equal(sanitizedUrl.searchParams.getAll('tier').length, 1, 'duplicate public state must be canonicalized');
-    assert.equal(sanitizedUrl.searchParams.get('sort'), 'tier');
-    assert.equal(sanitizedUrl.searchParams.getAll('sort').length, 1, 'duplicate sort state must be canonicalized');
-    assert.equal(sanitizedUrl.searchParams.get('dir'), 'asc');
-    assert.equal(sanitizedUrl.searchParams.getAll('dir').length, 1, 'duplicate direction state must be canonicalized');
+    assert.equal(sanitizedUrl.searchParams.has('tier'), false, 'the default tier must be omitted');
+    assert.equal(sanitizedUrl.searchParams.has('sort'), false, 'the default sort must be omitted');
+    assert.equal(sanitizedUrl.searchParams.has('dir'), false, 'the default direction must be omitted');
     assert.equal(sanitizedUrl.searchParams.has('region'), false, 'invalid values of public URL keys must be removed');
     assert.equal(sanitizedUrl.hash, '', 'unknown fragments must be removed before analytics can observe them');
     assert.doesNotMatch(page.url(), /privateSearchTerm|sensitive/i);
@@ -688,8 +685,8 @@ test('renders current prices, sorting, and country history in a real browser', {
           assert.ok(mobileTierHeights.every((height) => height >= 44), `${viewport.name} tier controls must retain comfortable touch targets`);
         }
         if (viewport.width <= 640) {
-          const sourceTargetHeights = await page.locator('.source-item, .source-meta-button').evaluateAll((targets) => targets.map((target) => target.getBoundingClientRect().height));
-          assert.ok(sourceTargetHeights.every((height) => height >= 44), `${viewport.name} source actions must retain comfortable touch targets`);
+          const sourceActionHeight = await page.locator('.source-meta-button').evaluate((target) => target.getBoundingClientRect().height);
+          assert.ok(sourceActionHeight >= 32, `${viewport.name} source action must remain comfortably clickable without restoring toolbar-like rows`);
           const mobileTypography = await page.evaluate(() => ({
             status: Number.parseFloat(getComputedStyle(document.querySelector('.data-status')).fontSize),
             local: Number.parseFloat(getComputedStyle(document.querySelector('.price-local')).fontSize),
@@ -752,14 +749,19 @@ test('renders current prices, sorting, and country history in a real browser', {
         assert.match(sourceGroups[0], /Apple 价格页更新：/);
         assert.match(sourceGroups[0], /查看更新记录/);
         assert.doesNotMatch(sourceGroups[1], /Apple 价格页更新：/);
-        assert.match(sourceGroups[1], /参考汇率：ExchangeRate-API/);
-        assert.ok(await page.locator('#sourceLinks svg').count() >= 4);
+        assert.match(sourceGroups[1], /汇率来源：ExchangeRate-API/);
+        assert.equal(await page.locator('#sourceLinks svg').count(), 0);
         assert.match(sourceText, /价格来源：Apple/);
         assert.match(sourceText, /Apple 价格页更新/);
-        const fxAttribution = page.locator('a[href="https://www.exchangerate-api.com"]');
-        assert.match((await fxAttribution.textContent()).trim(), /参考汇率：ExchangeRate-API$/);
+        const fxAttribution = page.locator('a[href="https://www.exchangerate-api.com/"]');
+        assert.equal((await fxAttribution.textContent()).trim(), 'ExchangeRate-API');
         assert.equal(await fxAttribution.getAttribute('aria-label'), null);
-        assert.equal(await page.getByRole('link', { name: /参考汇率：ExchangeRate-API/ }).count(), 1);
+        assert.equal(await page.getByRole('link', { name: 'ExchangeRate-API', exact: true }).count(), 1);
+        const appleAttribution = page.locator('a[href="https://support.apple.com/en-us/108047"]');
+        assert.equal(await appleAttribution.getAttribute('target'), '_blank');
+        assert.equal(await appleAttribution.getAttribute('rel'), 'noopener noreferrer');
+        assert.equal(await fxAttribution.getAttribute('target'), '_blank');
+        assert.equal(await fxAttribution.getAttribute('rel'), 'noopener noreferrer');
         assert.match(sourceText, /汇率更新：/);
         const labelInNameFailures = await page.locator('#minimumSummary .minimum-card, .country-history-button, #publishedDateButton').evaluateAll((controls) => controls.flatMap((control) => {
           const normalize = (value) => value.replace(/\s+/g, ' ').trim();
@@ -843,6 +845,9 @@ test('renders current prices, sorting, and country history in a real browser', {
           await page.waitForFunction((count) => document.querySelectorAll('#historyRows tr').length === count, expectedRecord.events.length);
         }
         assert.equal(await page.locator('#historyDialog thead th').count(), 3, `${viewport.name} history table must use one selected-tier column`);
+        assert.equal((await page.locator('#historyDialog .dialog-eyebrow').textContent()).trim(), '价格历史');
+        assert.equal(await page.locator('#historyDialog .history-explanation').count(), 0);
+        assert.equal((await page.locator('#historyEventCount').locator('xpath=preceding-sibling::*[1]').textContent()).trim(), '价格变更次数');
         const expectedDialogName = expectedData.countries.find(({ country }) => country === historySearch)?.nameZh || historySearch;
         assert.equal(await page.getByRole('dialog', { name: expectedDialogName }).count(), 1, 'history dialog must have an accessible name');
         assert.ok(await page.locator('#historyRows tr').count() > 0);
@@ -857,6 +862,7 @@ test('renders current prices, sorting, and country history in a real browser', {
           'all three history headers need column scope'
         );
         assert.equal(await page.locator('#historyTierControl button').count(), expectedData.tiers.length);
+        assert.deepEqual(await page.locator('#historyTierControl button').allTextContents(), expectedData.tiers.map(({ label }) => label));
         if (viewport.width <= 1100) {
           const dialogTouchTargets = await page.locator('#closeHistory, #historyTierControl button').evaluateAll((targets) => targets.map((target) => ({
             width: target.getBoundingClientRect().width,
@@ -916,12 +922,14 @@ test('renders current prices, sorting, and country history in a real browser', {
           iconCount: button.querySelectorAll('svg').length
         }));
         assert.equal(publishedDateAffordance.cursor, 'pointer');
-        assert.equal(publishedDateAffordance.iconCount, 1, 'publication-date control should only keep the leading calendar icon');
+        assert.equal(publishedDateAffordance.iconCount, 0, 'publication-date control should remain a text action');
 
         await page.locator('#publishedDateButton').focus();
         await page.locator('#publishedDateButton').click();
         await page.waitForFunction(() => document.querySelector('#publishedDateDialog')?.open === true);
         assert.equal(await page.getByRole('dialog', { name: 'Apple 价格页更新记录' }).count(), 1, 'publication-date dialog must have an accessible name');
+        assert.equal(await page.locator('#publishedDateDialog .dialog-eyebrow').count(), 0);
+        assert.equal(await page.locator('#publishedDateDialog').getByText('数据来源', { exact: true }).count(), 0);
         if (viewport.width <= 1100) {
           const closePublishedDateBox = await page.locator('#closePublishedDate').boundingBox();
           assert.ok(closePublishedDateBox && closePublishedDateBox.width >= 44 && closePublishedDateBox.height >= 44, `${viewport.name} publication dialog close control must retain a comfortable touch target`);
@@ -989,26 +997,17 @@ test('keeps the simplified price table hierarchy and affordances consistent', { 
     const historyButton = page.locator('.country-history-button').first();
     assert.equal((await historyButton.locator('.history-affordance').textContent()).trim(), '›');
     assert.doesNotMatch((await historyButton.locator(':scope > span:not(.visually-hidden)').allInnerTexts()).join(' '), /历史/);
-    assert.match(await historyButton.getAttribute('aria-label') ?? await historyButton.textContent(), /查看 Apple 当地标价历史/);
+    assert.match(await historyButton.getAttribute('aria-label') ?? await historyButton.textContent(), /查看价格历史/);
     await historyButton.click();
     assert.equal(await page.locator('#historyDialog').evaluate((dialog) => dialog.open), true);
     await page.locator('#closeHistory').click();
 
-    const sourceAlignment = await page.locator('.source-heading').evaluate((heading) => {
-      const icon = heading.querySelector('svg');
-      const headingRect = heading.getBoundingClientRect();
-      const iconRect = icon.getBoundingClientRect();
-      return {
-        display: getComputedStyle(heading).display,
-        alignItems: getComputedStyle(heading).alignItems,
-        centerDelta: Math.abs((headingRect.top + headingRect.height / 2) - (iconRect.top + iconRect.height / 2))
-      };
-    });
-    assert.ok(['flex', 'inline-flex'].includes(sourceAlignment.display));
-    assert.equal(sourceAlignment.alignItems, 'center');
-    assert.ok(sourceAlignment.centerDelta <= 1);
-    assert.equal(await page.locator('.source-heading').innerText(), '数据来源');
-    assert.match(await page.locator('.data-disclaimer > p').textContent(), /价格来自 Apple 官方支持页.*人民币金额按参考汇率换算.*实际扣费/);
+    assert.equal(await page.locator('.source-heading').count(), 0);
+    assert.equal(await page.locator('#sourceLinks svg').count(), 0);
+    assert.equal(
+      (await page.locator('.data-disclaimer > p').textContent()).trim(),
+      '价格来自 Apple 官方支持页，人民币金额按参考汇率换算，仅用于比较。实际费用可能受税费、账号地区等因素影响，请以 Apple 实际结算为准。'
+    );
     assert.equal(await page.locator('.data-disclaimer details').count(), 0);
   } finally {
     await page.close();
@@ -1882,7 +1881,7 @@ test('keeps the page and publication history bounded with a single-tier table on
     const nextTier = validData.tiers[1];
     await page.locator(`#mobileTierControl button[data-tier="${nextTier.id}"]`).click();
     assert.equal(await page.locator('th[data-tier].is-active-tier').getAttribute('data-tier'), nextTier.id);
-    assert.equal(new URL(page.url()).searchParams.get('tier'), nextTier.id);
+    assert.equal(new URL(page.url()).searchParams.get('tier'), nextTier.id === '200GB' ? null : nextTier.id);
 
     await page.locator('#priceRows tr[data-market-id]').nth(35).scrollIntoViewIfNeeded();
     await page.evaluate(() => scrollBy(0, 180));
@@ -2423,6 +2422,56 @@ test('keeps the minimum-price overview stable and the desktop table header stick
   }
 });
 
+test('canonicalizes default URL state and brand navigation returns to the clean home state', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the canonical URL and brand-home regression test');
+  if (!browserConfig) return;
+  const validData = await readFixture('prices.json');
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+  await page.route('https://**/*', (route) => route.abort());
+  await page.route('**/data/prices.json*', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify(validData)
+  }));
+  const openAndWait = async (query = '') => {
+    await page.goto(`http://127.0.0.1:${port}/${query}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#marketCount')?.textContent !== '--');
+  };
+  try {
+    await openAndWait();
+    assert.equal(new URL(page.url()).search, '');
+
+    await openAndWait('?tier=200GB&sort=tier&dir=asc');
+    assert.equal(new URL(page.url()).search, '');
+
+    await openAndWait('?tier=2TB&sort=tier&dir=asc');
+    assert.equal(new URL(page.url()).search, '?tier=2TB');
+
+    await openAndWait('?sort=country&dir=asc');
+    assert.equal(new URL(page.url()).search, '?sort=country');
+
+    await openAndWait('?tier=2TB&sort=country&dir=desc&region=Asia+Pacific#priceWorkspace');
+    const brand = page.locator('.app-brand');
+    assert.equal(await brand.getAttribute('href'), './');
+    await brand.click();
+    await page.waitForFunction(() => document.querySelector('#marketCount')?.textContent !== '--');
+    const cleanUrl = new URL(page.url());
+    assert.equal(cleanUrl.pathname, '/');
+    assert.equal(cleanUrl.search, '');
+    assert.equal(cleanUrl.hash, '');
+    assert.equal(await page.locator('#regionSelect').inputValue(), 'all');
+    assert.equal(await page.locator('#searchInput').inputValue(), '');
+    assert.equal(await page.locator('th[data-tier="200GB"]').getAttribute('aria-sort'), 'ascending');
+  } finally {
+    await page.close();
+    await browser.close();
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
 test('restores URL state, removes the floating search bar, and supports table return plus minimum navigation', { timeout: 30_000 }, async (context) => {
   const browserConfig = await resolveBrowser(context, 'the URL, table-return, and minimum-navigation UI test');
   if (!browserConfig) return;
@@ -2470,8 +2519,8 @@ test('restores URL state, removes the floating search bar, and supports table re
     const alternateMinimumCard = page.locator(`#minimumSummary .minimum-card[data-tier="${alternateTier}"]`);
     await page.locator(`th[data-tier="${alternateTier}"] button`).click();
     assert.equal(await page.locator(`th[data-tier="${alternateTier}"]`).getAttribute('aria-sort'), 'ascending');
-    assert.equal(new URL(page.url()).searchParams.get('sort'), 'tier');
-    assert.equal(new URL(page.url()).searchParams.get('dir'), 'asc');
+    assert.equal(new URL(page.url()).searchParams.has('sort'), false);
+    assert.equal(new URL(page.url()).searchParams.has('dir'), false);
     assert.equal(await alternateMinimumCard.getAttribute('aria-pressed'), 'true');
     assert.equal(await alternateMinimumCard.evaluate((card) => card.classList.contains('is-active-tier')), true);
     assert.equal(await initialMinimumCard.getAttribute('aria-pressed'), 'false');
@@ -2487,7 +2536,7 @@ test('restores URL state, removes the floating search bar, and supports table re
     await page.locator('button[data-sort="country"]').click();
     assert.equal(await page.locator('#minimumSummary .minimum-card[aria-pressed="true"]').count(), 0);
     assert.equal(new URL(page.url()).searchParams.get('sort'), 'country');
-    assert.equal(new URL(page.url()).searchParams.get('dir'), 'asc');
+    assert.equal(new URL(page.url()).searchParams.has('dir'), false);
     assert.equal(new URL(page.url()).searchParams.get('tier'), alternateTier, 'country sorting must retain the selected comparison tier');
     await page.locator('button[data-sort="country"]').click();
     assert.equal(await page.locator('th:has(button[data-sort="country"])').getAttribute('aria-sort'), 'descending');
@@ -2528,9 +2577,10 @@ test('restores URL state, removes the floating search bar, and supports table re
     const minimumCard = page.locator('#minimumSummary .minimum-card').filter({ hasText: '200 GB' });
     const minimumTier = await minimumCard.getAttribute('data-tier');
     await minimumCard.click();
-    assert.equal(new URL(page.url()).searchParams.get('tier'), minimumTier);
-    assert.equal(new URL(page.url()).searchParams.get('sort'), 'tier');
-    assert.equal(new URL(page.url()).searchParams.get('dir'), 'asc');
+    assert.equal(minimumTier, '200GB');
+    assert.equal(new URL(page.url()).searchParams.has('tier'), false);
+    assert.equal(new URL(page.url()).searchParams.has('sort'), false);
+    assert.equal(new URL(page.url()).searchParams.has('dir'), false);
     assert.equal(new URL(page.url()).searchParams.has('q'), false);
     assert.equal(new URL(page.url()).searchParams.has('region'), false);
     assert.equal(await page.locator('#searchInput').inputValue(), '');

@@ -113,7 +113,7 @@ function renderCountryRow(country, tiers, options) {
     `              <span class="country-name">${escapeHtml(displayName(country))}</span>`,
     secondary.trimEnd(),
     '              <span class="history-affordance" aria-hidden="true">›</span>',
-    '              <span class="visually-hidden">，查看 Apple 当地标价历史</span>',
+    '              <span class="visually-hidden">，查看价格历史</span>',
     '              </button>',
     '            </td>',
     ...tiers.map((tier) => renderPriceCell(country, tier, options)),
@@ -158,7 +158,7 @@ export function renderStaticFragments(payload) {
       minimumCuesEnabled: !fxStale
     })).join('\n'),
     APPLE_META: `            <span>Apple 价格页更新：<strong id="applePublishedDate">${appleDate(payload.source.publishedDate)}</strong></span>`,
-    FX_META: `            <span id="fxStatus"><i data-lucide="clock-3" aria-hidden="true"></i>汇率更新：${beijingDateTime(payload.fx.fetchedAt)}</span>`
+    FX_META: `            <span id="fxStatus">汇率更新：${beijingDateTime(payload.fx.fetchedAt)}</span>`
   };
 }
 
