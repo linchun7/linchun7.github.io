@@ -464,19 +464,22 @@ test('keeps keyboard focus inside modal dialogs and exposes the skip link in bot
 test('shows a usable explanation when JavaScript is disabled', { timeout: 30_000 }, async (context) => {
   const browserConfig = await resolveBrowser(context, 'the no-JavaScript fallback test');
   if (!browserConfig) return;
+  const validData = await readFixture('prices.json');
   const server = await startServer();
   const { port } = server.address();
   const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, javaScriptEnabled: false });
   await page.route('https://**/*', (route) => route.abort());
   try {
-    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`http://127.0.0.1:${port}/?tier=6TB`, { waitUntil: 'domcontentloaded' });
     const notice = page.locator('.noscript-notice');
     await notice.waitFor({ state: 'visible' });
     assert.equal(await notice.isVisible(), true);
     assert.match(await notice.innerText(), /JavaScript/);
-    assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), 73);
-    assert.equal(await page.locator('#minimumSummary .minimum-card').count(), 5);
+    assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), validData.countries.length);
+    assert.equal(await page.locator('#minimumSummary .minimum-card').count(), validData.tiers.length);
+    assert.equal(await page.locator('th[data-tier="200GB"]').getAttribute('aria-sort'), 'ascending');
+    assert.equal(await page.locator('.price-cell[data-tier="200GB"].is-active-tier.is-sorted').count(), validData.countries.length);
     assert.equal(await page.locator('#loadStatus').isHidden(), true);
     assert.equal(await page.locator('#priceWorkspace').getAttribute('aria-busy'), 'false');
     assert.equal(await page.locator('#minimumSummary').getAttribute('aria-busy'), 'false');
@@ -485,6 +488,56 @@ test('shows a usable explanation when JavaScript is disabled', { timeout: 30_000
     assert.equal(await page.getByText('日本', { exact: true }).count(), 1);
     assert.equal(await page.getByText('美国', { exact: true }).count(), 1);
   } finally {
+    await browser.close();
+  }
+});
+
+test('reconciles a non-default static tier before network hydration completes', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the non-default tier hydration regression');
+  if (!browserConfig) return;
+  const validData = await readFixture('prices.json');
+  const tierId = '6TB';
+  const tier = validData.tiers.find(({ id }) => id === tierId);
+  assert.ok(tier);
+  const expectedOrder = [...validData.countries].sort((first, second) => (
+    first.plans[tierId].cnyRank - second.plans[tierId].cnyRank
+    || first.marketId.localeCompare(second.marketId, 'en')
+  ));
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+  let releaseRequest;
+  let markRequestStarted;
+  const requestReleased = new Promise((resolve) => { releaseRequest = resolve; });
+  const requestStarted = new Promise((resolve) => { markRequestStarted = resolve; });
+  await page.route('https://**/*', (route) => route.abort());
+  await page.route('**/data/prices.json*', async (route) => {
+    markRequestStarted();
+    await requestReleased;
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(validData) });
+  });
+  try {
+    await page.goto(`http://127.0.0.1:${port}/?tier=${tierId}`, { waitUntil: 'domcontentloaded' });
+    await requestStarted;
+    assert.equal(await page.locator('#loadStatus').isVisible(), true, 'the network snapshot must still be pending');
+    assert.equal(new URL(page.url()).search, `?tier=${tierId}`);
+    assert.equal(await page.locator(`th[data-tier="${tierId}"]`).getAttribute('aria-sort'), 'ascending');
+    assert.equal(await page.locator('th[data-tier="200GB"]').getAttribute('aria-sort'), 'none');
+    assert.equal(await page.locator(`.price-cell[data-tier="${tierId}"].is-active-tier.is-sorted`).count(), validData.countries.length);
+    assert.equal(await page.locator('.price-cell[data-tier="200GB"].is-active-tier').count(), 0);
+    assert.equal(await page.locator('#priceRows tr[data-market-id]').first().getAttribute('data-market-id'), expectedOrder[0].marketId);
+    assert.equal(await page.locator('#priceRows tr[data-market-id]').first().locator('td').first().textContent(), String(expectedOrder[0].plans[tierId].cnyRank));
+    assert.equal(await page.locator('#resultSummary').textContent(), `${validData.countries.length} 个地区 · ${tier.label} 从低到高`);
+
+    releaseRequest();
+    await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
+    assert.equal(new URL(page.url()).search, `?tier=${tierId}`);
+    assert.equal(await page.locator(`th[data-tier="${tierId}"]`).getAttribute('aria-sort'), 'ascending');
+    assert.equal(await page.locator('#priceRows tr[data-market-id]').first().getAttribute('data-market-id'), expectedOrder[0].marketId);
+  } finally {
+    releaseRequest?.();
+    await page.close();
     await browser.close();
   }
 });
@@ -577,6 +630,9 @@ test('renders current prices, sorting, and country history in a real browser', {
         assert.equal(await page.locator('#searchInput').isDisabled(), true);
         assert.equal(await page.locator('#regionSelect').isDisabled(), true);
         assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), expectedData.countries.length, `${viewport.name} must show static prices before network hydration`);
+        assert.equal(new URL(page.url()).search, '?tier=200GB');
+        assert.equal(await page.locator('th[data-tier="200GB"]').getAttribute('aria-sort'), 'ascending');
+        assert.equal(await page.locator('.price-cell[data-tier="200GB"].is-active-tier.is-sorted').count(), expectedData.countries.length);
         if (viewport.name === 'narrow-mobile') {
           assert.equal(await page.locator('.spinner').first().evaluate((element) => getComputedStyle(element).animationName), 'none');
         }
@@ -2491,7 +2547,7 @@ test('canonicalizes URL state with an explicit current tier and resets brand nav
     await page.locator('button[data-sort="country"]').click();
     assert.equal(new URL(page.url()).search, '?tier=6TB&sort=country&dir=desc');
 
-    for (const tier of ['50GB', '200GB', '2TB', '6TB', '12TB']) {
+    for (const { id: tier } of validData.tiers) {
       await openAndWait(`?tier=${tier}`);
       assert.equal(new URL(page.url()).search, `?tier=${tier}`);
       await page.locator(`th[data-tier="${tier}"] button`).click();
@@ -2520,6 +2576,7 @@ test('canonicalizes URL state with an explicit current tier and resets brand nav
     const brand = page.locator('.app-brand');
     assert.equal(await brand.getAttribute('href'), './');
     await brand.click();
+    await page.waitForURL((current) => current.pathname === '/' && current.search === '?tier=200GB' && current.hash === '');
     await page.waitForFunction(() => document.querySelector('#marketCount')?.textContent !== '--');
     url = new URL(page.url());
     assert.equal(url.pathname, '/');

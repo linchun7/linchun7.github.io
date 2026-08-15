@@ -138,6 +138,7 @@ const expected = await loadVerificationArtifact(dataDirectory, 'committed fixtur
 
 function supersessionFixtures() {
   const previous = shiftedArtifact(expected, -1);
+  // Keep parsed history identical while making its raw hash distinct, so supersession proves exact current-main bytes.
   const current = withRawWhitespace(expected, 'history');
 
   assert.ok(
