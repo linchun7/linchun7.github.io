@@ -102,11 +102,12 @@ function renderPriceCell(country, tier, { defaultTierId, minimumCuesEnabled }) {
 
 function renderCountryRow(country, tiers, options) {
   const rank = country.plans[options.defaultTierId]?.cnyRank ?? '--';
+  const tierRanks = tiers.map((tier) => country.plans[tier.id].cnyRank).join(',');
   const secondary = country.nameZh && country.nameZh !== country.country
     ? `              <span class="country-name-en">${escapeHtml(country.country)} · ${escapeHtml(country.currency)}</span>\n`
     : `              <span class="country-name-en">${escapeHtml(country.currency)}</span>\n`;
   return [
-    `          <tr data-market-id="${escapeHtml(country.marketId)}">`,
+    `          <tr data-market-id="${escapeHtml(country.marketId)}" data-cny-ranks="${tierRanks}">`,
     `            <td${options.minimumCuesEnabled && rank <= 3 ? ' class="rank-top"' : ''}>${rank}</td>`,
     '            <td>',
     '              <button class="country-history-button" type="button" disabled>',
