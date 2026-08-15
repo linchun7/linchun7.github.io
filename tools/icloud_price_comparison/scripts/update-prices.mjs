@@ -2338,7 +2338,12 @@ export function buildActionSummaryLines(data, summary, trigger = resolveTriggerS
     warnings.push(`- **MARKET_IDENTITY_RENAME_SUSPECTED**：newSourceName=${markdownInline(suspicion.newSourceName)}；candidate oldSourceName=${markdownInline(suspicion.oldSourceName)}；candidate oldMarketId=${markdownInline(suspicion.oldMarketId)}；分区 ${markdownInline(suspicion.region)}；币种 ${markdownInline(suspicion.currency)}；pricesMatch=${suspicion.pricesMatch === true ? 'true' : 'false'}；自动发布继续`);
   }
   for (const anomaly of summary.confirmedPriceAnomalies ?? []) {
-    warnings.push(`- **PRICE_CHANGE_ANOMALY_CONFIRMED**：marketId=${markdownInline(anomaly.marketId ?? 'unknown')}；sourceName=${markdownInline(anomaly.sourceName)}；tier=${markdownInline(anomaly.tier)}；type=${markdownInline(anomaly.type)}；previous=${markdownInline(JSON.stringify(anomaly.previous))}；current=${markdownInline(JSON.stringify(anomaly.current))}；独立确认后自动发布继续`);
+    const authority = anomaly.code === 'PRICE_CHANGE_ANOMALY_CONFIRMED'
+      ? 'Apple 当地价格独立确认'
+      : anomaly.code === 'FX_DERIVED_CHANGE_ANOMALY_ACCEPTED'
+        ? `FX policy accepted（${markdownInline(anomaly.fxSanityStatus ?? 'unknown')}）`
+        : `Apple 币种确认 + FX sanity（${markdownInline(anomaly.fxSanityStatus ?? 'unknown')}）`;
+    warnings.push(`- **${anomaly.code}**：marketId=${markdownInline(anomaly.marketId ?? 'unknown')}；sourceName=${markdownInline(anomaly.sourceName)}；tier=${markdownInline(anomaly.tier)}；type=${markdownInline(anomaly.type)}；previous=${markdownInline(JSON.stringify(anomaly.previous))}；current=${markdownInline(JSON.stringify(anomaly.current))}；${authority}，自动发布继续`);
   }
 
   const lines = [
@@ -2446,6 +2451,7 @@ export async function main({
   }
   validatePrices(parsed.countries, { tiers: parsed.tiers });
   let confirmedRemovedCountries = [];
+  let appleSemanticConfirmed = false;
   if (!previousData || appleSemanticChanged(previousData, parsed)) {
     const fetchConfirmation = async (resourceName) => {
       try {
@@ -2503,6 +2509,7 @@ export async function main({
       matchingParsed,
       previousData
     ));
+    appleSemanticConfirmed = true;
     parsed = authoritativeParsed;
     html = authoritativeHtml;
     lastAppleSnapshot = normalizeAppleSnapshot(parsed);
@@ -2513,9 +2520,9 @@ export async function main({
   const renameReview = validateAppleMarketRenameReview(previousData, parsed.countries, marketResolver);
   const marketIdentityRenameSuspicions = renameReview.warnings;
   for (const warning of marketIdentityRenameSuspicions) {
-    console.warn(`MARKET_IDENTITY_RENAME_SUSPECTED:newSourceName=${logInline(warning.newSourceName)}:oldSourceName=${logInline(warning.oldSourceName)}:oldMarketId=${logInline(warning.oldMarketId)}:region=${logInline(warning.region)}:currency=${logInline(warning.currency)}:pricesMatch=false`);
+    console.warn(`MARKET_IDENTITY_RENAME_SUSPECTED:newSourceName=${logInline(warning.newSourceName)}:oldSourceName=${logInline(warning.oldSourceName)}:oldMarketId=${logInline(warning.oldMarketId)}:region=${logInline(warning.region)}:currency=${logInline(warning.currency)}:pricesMatch=${warning.pricesMatch === true ? 'true' : 'false'}`);
     if (process.env.GITHUB_ACTIONS === 'true') {
-      const message = `newSourceName=${warning.newSourceName}; candidate oldSourceName=${warning.oldSourceName}; candidate oldMarketId=${warning.oldMarketId}; region=${warning.region}; currency=${warning.currency}; pricesMatch=false; automatic publication continues`;
+      const message = `newSourceName=${warning.newSourceName}; candidate oldSourceName=${warning.oldSourceName}; candidate oldMarketId=${warning.oldMarketId}; region=${warning.region}; currency=${warning.currency}; pricesMatch=${warning.pricesMatch === true ? 'true' : 'false'}; automatic publication continues`;
       console.log(`::warning title=Apple market identity rename suspected::${escapeGitHubCommandMessage(message)}`);
     }
   }
@@ -2579,13 +2586,19 @@ export async function main({
     previousData,
     currentRates: fx.rates,
     tiers: parsed.tiers,
-    confirmed: true
+    appleSemanticConfirmed,
+    fxSanity
   });
   for (const warning of confirmedPriceAnomalies) {
-    const diagnostic = `marketId=${warning.marketId ?? 'unknown'}:sourceName=${logInline(warning.sourceName)}:tier=${logInline(warning.tier)}:type=${logInline(warning.type)}:previous=${logInline(JSON.stringify(warning.previous))}:current=${logInline(JSON.stringify(warning.current))}`;
-    console.warn(`PRICE_CHANGE_ANOMALY_CONFIRMED:${diagnostic}`);
+    const diagnostic = `marketId=${warning.marketId ?? 'unknown'}:sourceName=${logInline(warning.sourceName)}:tier=${logInline(warning.tier)}:type=${logInline(warning.type)}:previous=${logInline(JSON.stringify(warning.previous))}:current=${logInline(JSON.stringify(warning.current))}${warning.fxSanityStatus ? `:currency=${logInline(warning.currency)}:fxSanityStatus=${logInline(warning.fxSanityStatus)}` : ''}`;
+    console.warn(`${warning.code}:${diagnostic}`);
     if (process.env.GITHUB_ACTIONS === 'true') {
-      console.log(`::warning title=Confirmed Apple price anomaly::${escapeGitHubCommandMessage(diagnostic)}`);
+      const title = warning.code === 'PRICE_CHANGE_ANOMALY_CONFIRMED'
+        ? 'Confirmed Apple local-price anomaly'
+        : warning.code === 'FX_DERIVED_CHANGE_ANOMALY_ACCEPTED'
+          ? 'FX-derived change anomaly accepted'
+          : 'Confirmed currency change with validated FX';
+      console.log(`::warning title=${title}::${escapeGitHubCommandMessage(diagnostic)}`);
     }
   }
   let finishedAt = new Date();

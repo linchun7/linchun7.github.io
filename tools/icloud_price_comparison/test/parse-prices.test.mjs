@@ -654,7 +654,7 @@ test('returns structured warnings for independently confirmed heuristic price an
     previousData,
     currentRates: previousData.fx.rates,
     tiers: [{ id: '50GB' }],
-    confirmed: true
+    appleSemanticConfirmed: true
   });
   assert.deepEqual(warnings, [{
     code: 'PRICE_CHANGE_ANOMALY_CONFIRMED',
@@ -665,6 +665,66 @@ test('returns structured warnings for independently confirmed heuristic price an
     previous: 1,
     current: 3.5
   }]);
+});
+
+test('classifies FX-only anomalies by FX authority instead of Apple confirmation', () => {
+  const previousData = {
+    countries: [{ marketId: 'example-id', country: 'Example', currency: 'USD', plans: { '50GB': { price: 10 } } }],
+    fx: { rates: { USD: 1, CNY: 4 } }
+  };
+  const current = [{ marketId: 'example-id', country: 'Example', currency: 'USD', plans: { '50GB': { price: 10 } } }];
+  const warnings = validatePriceChangeAnomalies(current, {
+    previousData,
+    currentRates: { USD: 1, CNY: 7 },
+    tiers: [{ id: '50GB' }],
+    appleSemanticConfirmed: true,
+    fxSanity: { status: 'passed', checks: [{ currency: 'USD', status: 'passed' }] }
+  });
+  assert.equal(warnings[0].code, 'FX_DERIVED_CHANGE_ANOMALY_ACCEPTED');
+  assert.equal(warnings[0].fxSanityStatus, 'passed');
+  assert.ok(warnings.every(({ code }) => code !== 'PRICE_CHANGE_ANOMALY_CONFIRMED'));
+});
+
+test('requires validated FX authority for suspicious Apple currency changes', () => {
+  const previousData = {
+    countries: [{ marketId: 'example-id', country: 'Example', currency: 'USD', plans: { '50GB': { price: 10 } } }],
+    fx: { rates: { USD: 1, EUR: 1, CNY: 7 } }
+  };
+  const changed = (currency, price) => [{ marketId: 'example-id', country: 'Example', currency, plans: { '50GB': { price } } }];
+  const options = { previousData, tiers: [{ id: '50GB' }], appleSemanticConfirmed: true };
+
+  assert.throws(
+    () => validatePriceChangeAnomalies(changed('NEW', 100), {
+      ...options,
+      currentRates: { NEW: 1, CNY: 7 },
+      fxSanity: { status: 'passed', checks: [{ currency: 'NEW', status: 'skipped-new-currency' }] }
+    }),
+    (error) => error.code === 'CURRENCY_CHANGE_VALUE_REVIEW_REQUIRED'
+  );
+  assert.throws(
+    () => validatePriceChangeAnomalies(changed('NEW', 100), {
+      ...options,
+      currentRates: { NEW: 1, CNY: 7 },
+      fxSanity: { status: 'passed', checks: [] }
+    }),
+    (error) => error.code === 'CURRENCY_CHANGE_VALUE_REVIEW_REQUIRED'
+  );
+
+  const existingCurrency = validatePriceChangeAnomalies(changed('EUR', 100), {
+    ...options,
+    currentRates: { EUR: 1, CNY: 7 },
+    fxSanity: { status: 'passed', checks: [{ currency: 'EUR', status: 'passed' }] }
+  });
+  assert.equal(existingCurrency[0].code, 'CURRENCY_CHANGE_ANOMALY_ACCEPTED');
+  assert.equal(existingCurrency[0].fxSanityStatus, 'passed');
+
+  const cny = validatePriceChangeAnomalies(changed('CNY', 300), {
+    ...options,
+    currentRates: { CNY: 1 },
+    fxSanity: { status: 'passed', checks: [{ currency: 'CNY', status: 'skipped-cny' }] }
+  });
+  assert.equal(cny[0].code, 'CURRENCY_CHANGE_ANOMALY_ACCEPTED');
+  assert.equal(cny[0].fxSanityStatus, 'not-required-cny');
 });
 
 test('rejects a cross-currency price change when its converted value is implausible', () => {

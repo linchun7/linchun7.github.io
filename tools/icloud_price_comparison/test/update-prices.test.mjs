@@ -737,8 +737,13 @@ test('full updater warns and publishes ambiguous exact rename candidates', async
         rates: compatibleExchangeRates(previous)
       };
       const originalWarn = console.warn;
+      const originalLog = console.log;
+      const originalGithubActions = process.env.GITHUB_ACTIONS;
       const warnings = [];
+      const logs = [];
       console.warn = (message) => warnings.push(String(message));
+      console.log = (message) => logs.push(String(message));
+      process.env.GITHUB_ACTIONS = 'true';
       try {
         await withMockedFetch(
           { html: buildAppleHtml(changed), fxPayload },
@@ -752,8 +757,15 @@ test('full updater warns and publishes ambiguous exact rename candidates', async
           warnings.filter((warning) => warning.startsWith('MARKET_IDENTITY_RENAME_SUSPECTED:')).length,
           scenario.expectedWarnings
         );
+        assert.ok(warnings.filter((warning) => warning.startsWith('MARKET_IDENTITY_RENAME_SUSPECTED:'))
+          .every((warning) => warning.includes('pricesMatch=true')));
+        assert.ok(logs.filter((message) => message.startsWith('::warning title=Apple market identity rename suspected::'))
+          .every((message) => message.includes('pricesMatch=true')));
       } finally {
         console.warn = originalWarn;
+        console.log = originalLog;
+        if (originalGithubActions === undefined) delete process.env.GITHUB_ACTIONS;
+        else process.env.GITHUB_ACTIONS = originalGithubActions;
         await rm(root, { recursive: true, force: true });
       }
     });
@@ -790,6 +802,99 @@ test('publishes an independently confirmed large Apple repricing as a warning', 
     assert.ok(warnings.some((warning) => warning.includes('PRICE_CHANGE_ANOMALY_CONFIRMED')
       && warning.includes('marketId=bs') && warning.includes('tier=50GB')));
     assert.match(await readFile(summaryPath, 'utf8'), /PRICE_CHANGE_ANOMALY_CONFIRMED.*marketId=bs.*tier=50GB.*previous=.*current=3\\\.5.*自动发布继续/s);
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
+test('fails closed when a confirmed new currency has no FX sanity baseline', async (t) => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const previousText = await readFile(paths.currentDataPath, 'utf8');
+  const previous = JSON.parse(previousText);
+  const changed = structuredClone(previous);
+  const market = changed.countries.find(({ country }) => country === 'Bahamas');
+  market.currency = 'NEW';
+  for (const plan of Object.values(market.plans)) plan.formattedPrice = `${plan.price} NEW`;
+  const rates = compatibleExchangeRates(previous);
+  rates.NEW = 1 / 3.5;
+  const fxPayload = {
+    result: 'success', base_code: 'USD', time_last_update_unix: recentFxTimestamp(), rates
+  };
+  let appleRequests = 0;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    if (String(url).includes('support.apple.com')) {
+      appleRequests += 1;
+      return new Response(buildAppleHtml(changed), { status: 200 });
+    }
+    return new Response(JSON.stringify(fxPayload), { status: 200 });
+  };
+  try {
+    await assert.rejects(
+      () => main({ dryRun: false, paths, stepSummaryPath: null }),
+      (error) => error.code === 'CURRENCY_CHANGE_VALUE_REVIEW_REQUIRED'
+    );
+    assert.equal(appleRequests, 2);
+    assert.equal(await readFile(paths.currentDataPath, 'utf8'), previousText);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('publishes a confirmed currency anomaly only with a passed existing-currency FX check', async (t) => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const previous = JSON.parse(await readFile(paths.currentDataPath, 'utf8'));
+  const changed = structuredClone(previous);
+  const market = changed.countries.find(({ country }) => country === 'Bahamas');
+  market.currency = 'EUR';
+  for (const plan of Object.values(market.plans)) {
+    plan.price = Number((plan.price * 3.5).toFixed(2));
+    plan.formattedPrice = `${plan.price} EUR`;
+  }
+  const fxPayload = {
+    result: 'success', base_code: 'USD', time_last_update_unix: recentFxTimestamp(),
+    rates: compatibleExchangeRates(previous)
+  };
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (message) => warnings.push(String(message));
+  try {
+    await withMockedFetch(
+      { html: buildAppleHtml(changed), fxPayload },
+      () => main({ dryRun: false, paths, stepSummaryPath: null })
+    );
+    const published = JSON.parse(await readFile(paths.currentDataPath, 'utf8'));
+    assert.equal(published.countries.find(({ marketId }) => marketId === 'bs').currency, 'EUR');
+    assert.ok(warnings.some((warning) => warning.startsWith('CURRENCY_CHANGE_ANOMALY_ACCEPTED:')
+      && warning.includes('fxSanityStatus=passed')));
+  } finally {
+    console.warn = originalWarn;
+  }
+});
+
+test('publishes an FX-only anomaly under FX authority without claiming Apple confirmation', async (t) => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const previous = JSON.parse(await readFile(paths.currentDataPath, 'utf8'));
+  const fixedNow = new Date(Date.parse(previous.generatedAt) + 4 * 24 * 60 * 60 * 1_000);
+  t.mock.timers.enable({ apis: ['Date'], now: fixedNow });
+  const rates = compatibleExchangeRates(previous);
+  rates.CNY *= 1.5;
+  const fxPayload = {
+    result: 'success', base_code: 'USD', time_last_update_unix: Math.floor(fixedNow.getTime() / 1_000), rates
+  };
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (message) => warnings.push(String(message));
+  try {
+    await withMockedFetch(
+      { html: buildAppleHtml(previous), fxPayload },
+      () => main({ dryRun: false, paths, stepSummaryPath: null })
+    );
+    assert.ok(warnings.some((warning) => warning.startsWith('FX_DERIVED_CHANGE_ANOMALY_ACCEPTED:')));
+    assert.ok(warnings.every((warning) => !warning.startsWith('PRICE_CHANGE_ANOMALY_CONFIRMED:')));
   } finally {
     console.warn = originalWarn;
   }
@@ -3793,10 +3898,19 @@ test('keeps successful Action summaries concise and promotes warnings', () => {
   }, 'schedule').join('\n');
   assert.match(renameSuspected, /MARKET_IDENTITY_RENAME_SUSPECTED.*New Market.*old-id.*pricesMatch=false.*自动发布继续/s);
   assert.doesNotMatch(renameSuspected, /\n::warning::/);
+  const exactRenameSuspected = buildActionSummaryLines(data, {
+    ...summary,
+    marketIdentityRenameSuspicions: [{
+      oldSourceName: 'Old Market', newSourceName: 'New Market', oldMarketId: 'old-id',
+      region: 'Asia Pacific', currency: 'USD', pricesMatch: true
+    }]
+  }, 'schedule').join('\n');
+  assert.match(exactRenameSuspected, /MARKET_IDENTITY_RENAME_SUSPECTED.*pricesMatch=true.*自动发布继续/s);
 
   const confirmedPriceWarning = buildActionSummaryLines(data, {
     ...summary,
     confirmedPriceAnomalies: [{
+      code: 'PRICE_CHANGE_ANOMALY_CONFIRMED',
       marketId: 'example-id', sourceName: 'Example\n::warning::', tier: '50GB',
       type: 'combined-local-price', previous: 1, current: 3.5
     }]

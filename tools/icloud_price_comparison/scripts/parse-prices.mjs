@@ -670,24 +670,28 @@ export function validatePriceChangeAnomalies(countries, {
   currentRates,
   tiers = TIERS,
   thresholds = PRICE_CHANGE_THRESHOLDS,
-  confirmed = false
+  appleSemanticConfirmed = false,
+  fxSanity = null
 } = {}) {
   validateCurrentMarketOutliers(countries, tiers, currentRates, thresholds);
-  if (!previousData?.countries?.length) return confirmed ? [] : true;
+  if (!previousData?.countries?.length) return appleSemanticConfirmed || fxSanity ? [] : true;
   const previousByCountry = new Map(previousData.countries.map((entry) => [entry.marketId ?? entry.country, entry]));
   const warnings = [];
-  const reportHeuristic = (message, { type, entry, previous, tier, previousValue, currentValue }) => {
-    if (!confirmed) throw new Error(message);
+  const warningFor = (code, { type, entry, previous, tier, previousValue, currentValue, fxSanityStatus }) => {
     warnings.push({
-      code: 'PRICE_CHANGE_ANOMALY_CONFIRMED',
+      code,
       type,
       marketId: entry.marketId ?? previous.marketId ?? null,
       sourceName: entry.country,
       tier: tier.id,
       previous: previousValue,
-      current: currentValue
+      current: currentValue,
+      ...(fxSanityStatus ? { currency: entry.currency, fxSanityStatus } : {})
     });
   };
+  const currencySanityStatus = (currency) => (
+    fxSanity?.checks?.find((check) => check.currency === currency)?.status ?? null
+  );
 
   for (const entry of countries) {
     const previous = previousByCountry.get(entry.marketId ?? entry.country);
@@ -718,15 +722,15 @@ export function validatePriceChangeAnomalies(countries, {
         const fxRelative = thresholds.fxRelative ?? PRICE_CHANGE_THRESHOLDS.fxRelative;
         const cnyThreshold = Math.max(thresholds.cnyMinimum, previousCnyAtPreviousRate * fxRelative);
         if (percentageDelta >= fxRelative && percentageDelta > 0 && cnyDelta >= cnyThreshold && cnyDelta > 0) {
-          reportHeuristic(
-            `Suspicious FX-derived ${tier.id} CNY change for ${entry.country}: `
-              + `${(percentageDelta * 100).toFixed(1)}%, CNY ${cnyDelta.toFixed(2)}/${cnyThreshold.toFixed(2)}`,
-            {
-              type: 'fx-derived-cny', entry, previous, tier,
-              previousValue: previousCnyAtPreviousRate,
-              currentValue: currentCnyAtCurrentRate
-            }
-          );
+          const message = `Suspicious FX-derived ${tier.id} CNY change for ${entry.country}: `
+            + `${(percentageDelta * 100).toFixed(1)}%, CNY ${cnyDelta.toFixed(2)}/${cnyThreshold.toFixed(2)}`;
+          if (!fxSanity) throw new Error(message);
+          warningFor('FX_DERIVED_CHANGE_ANOMALY_ACCEPTED', {
+            type: 'fx-derived-cny', entry, previous, tier,
+            previousValue: previousCnyAtPreviousRate,
+            currentValue: currentCnyAtCurrentRate,
+            fxSanityStatus: currencySanityStatus(entry.currency) ?? fxSanity.status
+          });
         }
         continue;
       }
@@ -745,16 +749,22 @@ export function validatePriceChangeAnomalies(countries, {
         if (percentageDelta >= thresholds.percentage
           && cnyDelta >= fixedRateThreshold
           && cnyDelta >= marketAdjustedThreshold) {
-          reportHeuristic(
-            `Suspicious combined ${tier.id} price change for ${entry.country}: `
-              + `${previous.currency} to ${entry.currency}, ${(percentageDelta * 100).toFixed(1)}%, `
-              + `CNY ${cnyDelta.toFixed(2)}/${Math.max(fixedRateThreshold, marketAdjustedThreshold).toFixed(2)}`,
-            {
-              type: 'combined-currency', entry, previous, tier,
-              previousValue: { currency: previous.currency, price: previousPlan.price },
-              currentValue: { currency: entry.currency, price: currentPlan.price }
-            }
-          );
+          const message = `Suspicious combined ${tier.id} price change for ${entry.country}: `
+            + `${previous.currency} to ${entry.currency}, ${(percentageDelta * 100).toFixed(1)}%, `
+            + `CNY ${cnyDelta.toFixed(2)}/${Math.max(fixedRateThreshold, marketAdjustedThreshold).toFixed(2)}`;
+          const fxSanityStatus = entry.currency === 'CNY' ? 'not-required-cny' : currencySanityStatus(entry.currency);
+          if (!appleSemanticConfirmed) throw new Error(message);
+          if (entry.currency !== 'CNY' && fxSanityStatus !== 'passed') {
+            const error = new Error(`CURRENCY_CHANGE_VALUE_REVIEW_REQUIRED: ${message}; FX sanity status ${fxSanityStatus ?? 'missing'}`);
+            error.code = 'CURRENCY_CHANGE_VALUE_REVIEW_REQUIRED';
+            throw error;
+          }
+          warningFor('CURRENCY_CHANGE_ANOMALY_ACCEPTED', {
+            type: 'combined-currency', entry, previous, tier,
+            previousValue: { currency: previous.currency, price: previousPlan.price },
+            currentValue: { currency: entry.currency, price: currentPlan.price },
+            fxSanityStatus
+          });
         }
         continue;
       }
@@ -782,19 +792,18 @@ export function validatePriceChangeAnomalies(countries, {
         && localDelta >= localThreshold
         && fixedRateCnyDelta >= fixedRateThreshold
         && marketAdjustedCnyDelta >= marketAdjustedThreshold) {
-        reportHeuristic(
-          `Suspicious combined ${tier.id} price change for ${entry.country}: `
-            + `${(percentageDelta * 100).toFixed(1)}%, local ${localDelta.toFixed(2)}, `
-            + `fixed-rate CNY ${fixedRateCnyDelta.toFixed(2)}/${fixedRateThreshold.toFixed(2)}, `
-            + `market-adjusted CNY ${marketAdjustedCnyDelta.toFixed(2)}/${marketAdjustedThreshold.toFixed(2)}`,
-          {
-            type: 'combined-local-price', entry, previous, tier,
-            previousValue: previousPlan.price,
-            currentValue: currentPlan.price
-          }
-        );
+        const message = `Suspicious combined ${tier.id} price change for ${entry.country}: `
+          + `${(percentageDelta * 100).toFixed(1)}%, local ${localDelta.toFixed(2)}, `
+          + `fixed-rate CNY ${fixedRateCnyDelta.toFixed(2)}/${fixedRateThreshold.toFixed(2)}, `
+          + `market-adjusted CNY ${marketAdjustedCnyDelta.toFixed(2)}/${marketAdjustedThreshold.toFixed(2)}`;
+        if (!appleSemanticConfirmed) throw new Error(message);
+        warningFor('PRICE_CHANGE_ANOMALY_CONFIRMED', {
+          type: 'combined-local-price', entry, previous, tier,
+          previousValue: previousPlan.price,
+          currentValue: currentPlan.price
+        });
       }
     }
   }
-  return confirmed ? warnings : true;
+  return appleSemanticConfirmed || fxSanity ? warnings : true;
 }

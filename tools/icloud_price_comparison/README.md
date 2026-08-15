@@ -60,7 +60,7 @@
 
 `scripts/market-registry.mjs` 是永久市场 identity catalog，只保存稳定 `marketId`、Apple 英文 canonical name 和历史 aliases；`scripts/country-names.zh.json` 是唯一的 Apple 简体中文名称事实源，字符串表示已审核 wording，`null` 表示仍待 Apple zh-CN authority 确认。pending 时 `nameZh` 使用 Apple 英文 `sourceName` 并记录 `CHINESE_MARKET_NAME_PENDING`，不会阻断英文价格更新。
 
-**Automatic-first**：机器可安全确认的事实自动发布；heuristic suspicion 记录 warning 后继续；暂时不确定时优先自动 retry/fallback；只有高置信 ambiguity、contract corruption 或继续执行可能造成不可逆数据/identity 错误时才 fail closed。Apple 语义变化通常由 initial + 一次 no-store confirmation 确认；仅在 mismatch/confirmation parse degradation 时追加第三样本。A/B/B 或 A/degraded/A 可自动恢复，A/B/A、A/B/C 或无法取得第三样本按 transient 停止并留待后续自动任务重试。已独立确认且仍在 0.1x–10x 硬边界内的大幅历史变价产生 `PRICE_CHANGE_ANOMALY_CONFIRMED` 后继续；非法价格、parser disagreement、20x 当前市场 outlier 等硬约束不放松。FX candidate 未通过 sanity 时自动尝试 open source，再安全回退到 36 小时内的 previous FX/CNY 数据，绝不发布异常新汇率。
+**Automatic-first**：机器可安全确认的事实自动发布；heuristic suspicion 记录 warning 后继续；暂时不确定时优先自动 retry/fallback；只有高置信 ambiguity、contract corruption 或继续执行可能造成不可逆数据/identity 错误时才 fail closed。Apple 语义变化通常由 initial + 一次 no-store confirmation 确认；仅在 mismatch/confirmation parse degradation 时追加第三样本。A/B/B 或 A/degraded/A 可自动恢复，A/B/A、A/B/C 或无法取得第三样本按 transient 停止并留待后续自动任务重试。两份 Apple `cross-checked` 样本只为当地价格与币种提供 authority：同币种大幅变价在硬边界内以 `PRICE_CHANGE_ANOMALY_CONFIRMED` 继续；Apple 未变化而 FX 导致的 CNY 异常按已选 FX 的 sanity policy 以 `FX_DERIVED_CHANGE_ANOMALY_ACCEPTED` 继续，不能声称由 Apple 确认；换币种导致显著 CNY 变化时，新币种为 CNY 或其 FX check 为 `passed` 才自动继续，否则以 `CURRENCY_CHANGE_VALUE_REVIEW_REQUIRED` fail closed。FX candidate 未通过 sanity 时自动尝试 open source，再安全回退到 36 小时内的 previous FX/CNY 数据，绝不发布异常新汇率。
 
 Apple 第一次出现未登记市场时会生成可复现的 `apple-…-<hash>` ID、记录 `UNKNOWN_APPLE_MARKET` 后继续发布；发布之后，schema 4 prices/history 中的 identity ledger 优先于生成器。registry 后续收录必须沿用已发布 ID，历史中已移除市场的 ID 也永久保留；不同新 identity 撞到 registry 或完整历史保留 ID 时失败关闭。只有 removed 与 added unknown 形成双向唯一，且 region、currency、tier ID structure、完整当地价格向量都完全相同，才属于高置信度 identity ambiguity 并要求维护者显式增加 alias；repricing 或多个 exact candidates 都只记录非阻断 `MARKET_IDENTITY_RENAME_SUSPECTED` 并继续自动发布。两种情况都不进行模糊匹配或自动迁移。
 
@@ -70,7 +70,7 @@ Apple 第一次出现未登记市场时会生成可复现的 `apple-…-<hash>` 
 - 两条 Apple 关联路径只有逐字段一致时才标记 `cross-checked`，**生产发布强制要求该状态**；单路失败只可用于诊断，不再发布降级结果。两路共享数字/币种/容量规范化，因此不宣称是完全独立实现。
 - Apple 发布日期缺失、格式无效、倒退、晚于观测日期或与历史不一致时拒绝更新。
 - 拒绝重复地区、关键分区缺失、重复/非规范容量、未支持但像容量的 KB/MB/PB/EB/IEC 单位、价格点不完整和不安全对象键。
-- 同币种单项价格超过旧价 10 倍或低于旧价 1/10 时拒绝；换币种时使用新旧汇率分别折算并执行相同硬限制和联合异常阈值。当地价格/币种不变但派生 CNY 因 FX 变化至少 50% 时拒绝；新市场相对当前市场中位数超过 20 倍或低于 1/20 也拒绝。
+- 同币种单项价格超过旧价 10 倍或低于旧价 1/10 时拒绝；换币种时使用新旧汇率分别折算并执行相同硬比例限制。硬边界内的 Apple confirmed 当地价格异常、通过既定 FX policy 的 FX-only CNY 异常，以及具备 `passed` FX baseline（或直接为 CNY）的 confirmed currency change 会分别记录与其 authority 一致的 warning 后继续；显著 currency change 若缺少可靠新币种 FX baseline 则要求 review。当前市场相对 CNY 中位数超过 20 倍或低于 1/20 始终拒绝。
 - FX 时间最多允许相对生成时间未来 5 分钟，且不能早于生成时间 36 小时 + 5 分钟；在线与回退路径执行同一生产币种完整性校验。
 - 浏览器读取 `prices.json` / `history.json` 的上限分别为 1 MiB / 8 MiB；拒绝 redirect、超限和非法 UTF-8，8 秒超时覆盖响应体读完而不只是收到响应头。
 - 生产文件使用原子写入和持久事务日志；被强制终止后，下次运行先恢复未完成事务。
@@ -83,7 +83,7 @@ Apple 第一次出现未登记市场时会生成可复现的 `apple-…-<hash>` 
 在 **Actions > Update iCloud prices** 检查：
 
 - 成功摘要：解析状态、地区/价格点数量、Apple 日期、汇率时间/来源和本次变化。
-- 黄色提示：汇率回退需要立即复核；解析器降级会停止发布并按严重状态处理。
+- 黄色提示记录自动 fallback / anomaly；系统会按既定策略继续或由备用任务自动重试，只有持续异常或明确的 review-required 状态才需要人工处理。解析器冗余降级仍会停止发布。
 - 红色失败：查看第一个失败步骤，再下载 `icloud-price-diagnostics-*`。附件只含结构化报告和成功解析后的规范化 JSON，不保存失败响应、Apple 原始 HTML 或 Secret。
 
 可选 Healthchecks 心跳使用 Secret `ICLOUD_HEALTHCHECK_PING_URL`：完整发布并验证真实 production 后发送 `/0`；同日幂等路径也必须先证明已验证 main payload 与真实 production 一致，不能仅凭 skip 成功。数据损坏、解析降级、production proof 失败等严重故障发送 `/1`；单次暂时网络故障不立即发送失败，由 Healthchecks 的 Grace Time 判断连续缺失。Ping URL 不得进入仓库、Issue 或日志。
