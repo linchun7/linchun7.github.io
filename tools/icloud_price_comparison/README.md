@@ -60,7 +60,7 @@
 
 `scripts/market-registry.mjs` 是永久市场 identity catalog，只保存稳定 `marketId`、Apple 英文 canonical name 和历史 aliases；`scripts/country-names.zh.json` 是唯一的 Apple 简体中文名称事实源，字符串表示已审核 wording，`null` 表示仍待 Apple zh-CN authority 确认。pending 时 `nameZh` 使用 Apple 英文 `sourceName` 并记录 `CHINESE_MARKET_NAME_PENDING`，不会阻断英文价格更新。
 
-Apple 第一次出现未登记市场时会生成可复现的 `apple-…-<hash>` ID、记录 `UNKNOWN_APPLE_MARKET` 后继续发布；发布之后，schema 4 prices/history 中的 identity ledger 优先于生成器。registry 后续收录必须沿用已发布 ID，历史中已移除市场的 ID 也永久保留；不同新 identity 撞到 registry 或完整历史保留 ID 时失败关闭。已发布市场消失且出现同 region、currency、tier ID structure 的全新 unknown name 时，无论是否同时改价，都要求维护者把新 Apple 英文名显式加入旧 ID aliases 后重跑，不进行模糊匹配或自动迁移。
+Apple 第一次出现未登记市场时会生成可复现的 `apple-…-<hash>` ID、记录 `UNKNOWN_APPLE_MARKET` 后继续发布；发布之后，schema 4 prices/history 中的 identity ledger 优先于生成器。registry 后续收录必须沿用已发布 ID，历史中已移除市场的 ID 也永久保留；不同新 identity 撞到 registry 或完整历史保留 ID 时失败关闭。项目坚持 automatic-first：已发布市场消失且出现同 region、currency、tier ID structure、完整当地价格向量也完全相同的全新 unknown name 时，属于高置信度 identity ambiguity，要求维护者把新 Apple 英文名显式加入旧 ID aliases 后重跑；若结构相同但发生 repricing，则只记录非阻断 `MARKET_IDENTITY_RENAME_SUSPECTED` 并继续自动发布。两种情况都不进行模糊匹配或自动迁移。
 
 ## 变化、失败关闭与工件保护
 

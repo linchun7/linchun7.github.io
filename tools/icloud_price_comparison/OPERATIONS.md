@@ -97,7 +97,7 @@ ExchangeRate-API ───┘        │
 
 市场身份与中文命名是两条独立事实链：Apple 英文 108047 是 active market、price、currency、tier、Published Date 和语义确认 authority；Apple 简体中文 108047 只提供官方中文 wording，绝不驱动英文市场增删或价格事实。`market-registry.mjs` 只保存永久 `marketId` 和英文 aliases；唯一中文事实源 `country-names.zh.json` 以字符串表示 approved、以 `null` 表示 pending。pending（当前包括 `mu`、`cg`）使用 Apple 英文 source name 并产生非阻断 `CHINESE_MARKET_NAME_PENDING`；`la` 的“老挝”属于已审核 Apple zh-CN wording。禁止机器翻译、`Intl.DisplayNames`、第三方地名库或其他中文 locale 代替 authority。
 
-unknown market 第一次发布使用既有 deterministic ID generator；之后 prices 与完整 history ledger 是 authoritative identity，已从当前 Apple 页面移除的历史 ID 仍永久 reserved。新 unknown 撞到 registry 或任一历史 owner 时以 `MARKET_IDENTITY_RESERVED_ID_COLLISION` 失败关闭，不扩 hash、不随机换 ID。若旧市场移除且新 unknown 具有相同 region、currency 和 canonical tier ID set，即使同时 repricing，也以 `MARKET_IDENTITY_RENAME_REVIEW_REQUIRED` 停止；维护者只能把新 Apple 英文 source name 显式加入旧 marketId aliases 后重跑，不得按字符串、中文名或价格相似度自动绑定。没有 removed candidate 的真正新 unknown 继续自动发布。
+unknown market 第一次发布使用既有 deterministic ID generator；之后 prices 与完整 history ledger 是 authoritative identity，已从当前 Apple 页面移除的历史 ID 仍永久 reserved。新 unknown 撞到 registry 或任一历史 owner 时以 `MARKET_IDENTITY_RESERVED_ID_COLLISION` 失败关闭，不扩 hash、不随机换 ID。自动更新/发布是默认策略：若旧市场移除且新 unknown 同时具有相同 region、currency、canonical tier ID set 和完整当地价格向量，才作为高置信度 ambiguity 以 `MARKET_IDENTITY_RENAME_REVIEW_REQUIRED` 停止；维护者只能把新 Apple 英文 source name 显式加入旧 marketId aliases 后重跑。结构相同但已 repricing 的弱候选只产生非阻断 `MARKET_IDENTITY_RENAME_SUSPECTED`，FX、updater 与发布继续执行；不得按字符串、中文名、region/currency 或价格相似度自动绑定。没有 removed candidate 的真正新 unknown 继续自动发布。
 ### 完整只读验证
 
 工作流：`.github/workflows/validate-icloud-price-comparison.yml`

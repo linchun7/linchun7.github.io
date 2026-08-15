@@ -493,7 +493,7 @@ test('publishes price and publication history at Beijing midnight with a previou
   assert.doesNotThrow(() => validatePriceHistoryConsistency(prices, history));
 });
 
-test('requires explicit alias review for removed-to-unknown candidates despite repricing', () => {
+test('blocks only exact-price rename ambiguity and reports repriced structural candidates', () => {
   const old = {
     country: 'Old Apple Market', marketId: 'old-id', region: 'Asia Pacific', currency: 'USD',
     plans: { '50GB': { price: 1 }, '200GB': { price: 3 } }
@@ -503,10 +503,10 @@ test('requires explicit alias review for removed-to-unknown candidates despite r
   const unknownResolver = (sourceName) => ({
     id: `generated-${sourceName}`, sourceName, canonicalName: sourceName, unknown: true
   });
-  const requiresReview = (current, candidateCount = 1) => {
+  const requiresReview = (previousCountries, current, candidateCount = 1) => {
     let captured;
     assert.throws(
-      () => validateAppleMarketRenameReview({ countries: [old] }, current, unknownResolver),
+      () => validateAppleMarketRenameReview({ countries: previousCountries }, current, unknownResolver),
       (error) => {
         captured = error;
         return error.code === 'MARKET_IDENTITY_RENAME_REVIEW_REQUIRED'
@@ -517,37 +517,66 @@ test('requires explicit alias review for removed-to-unknown candidates despite r
     );
     return captured;
   };
-  const exactError = requiresReview([added]);
+  const exactError = requiresReview([old], [added]);
   assert.equal(exactError.candidates[0].pricesMatch, true);
-  assert.doesNotThrow(() => validateAppleMarketRenameReview(
+  assert.deepEqual(validateAppleMarketRenameReview(
     { countries: [old] }, [added], () => ({ id: 'old-id', unknown: false })
-  ));
-  assert.doesNotThrow(() => validateAppleMarketRenameReview(
+  ).warnings, []);
+  assert.deepEqual(validateAppleMarketRenameReview(
     { countries: [old] }, [{ ...added, currency: 'EUR' }], unknownResolver
-  ));
-  assert.doesNotThrow(() => validateAppleMarketRenameReview(
+  ).warnings, []);
+  assert.deepEqual(validateAppleMarketRenameReview(
     { countries: [old] }, [{ ...added, region: 'Europe' }], unknownResolver
-  ));
+  ).warnings, []);
   const changedPrice = structuredClone(added);
   changedPrice.plans['50GB'].price = 2;
-  const oneTierError = requiresReview([changedPrice]);
-  assert.equal(oneTierError.candidates[0].pricesMatch, false);
+  const oneTierResult = validateAppleMarketRenameReview({ countries: [old] }, [changedPrice], unknownResolver);
+  assert.equal(oneTierResult.status, 'suspected');
+  assert.deepEqual(oneTierResult.warnings, [{
+    oldSourceName: 'Old Apple Market',
+    newSourceName: 'New Apple Market',
+    oldMarketId: 'old-id',
+    region: 'Asia Pacific',
+    currency: 'USD',
+    pricesMatch: false
+  }]);
   const allPricesChanged = structuredClone(added);
   for (const plan of Object.values(allPricesChanged.plans)) plan.price += 10;
-  requiresReview([allPricesChanged]);
+  assert.equal(
+    validateAppleMarketRenameReview({ countries: [old] }, [allPricesChanged], unknownResolver).status,
+    'suspected'
+  );
 
   const differentTiers = structuredClone(added);
   delete differentTiers.plans['200GB'];
-  assert.doesNotThrow(() => validateAppleMarketRenameReview({ countries: [old] }, [differentTiers], unknownResolver));
-  assert.doesNotThrow(() => validateAppleMarketRenameReview(
+  assert.deepEqual(validateAppleMarketRenameReview({ countries: [old] }, [differentTiers], unknownResolver).warnings, []);
+  assert.deepEqual(validateAppleMarketRenameReview(
     { countries: [old] }, [old, added], unknownResolver
-  ), 'a genuinely additional unknown has no removed candidate');
-  assert.doesNotThrow(() => validateAppleMarketRenameReview(
+  ).warnings, [], 'a genuinely additional unknown has no removed candidate');
+  assert.deepEqual(validateAppleMarketRenameReview(
     { countries: [old] }, [{ ...added, country: 'old apple market' }],
     () => ({ id: 'old-id', sourceName: 'old apple market', unknown: true, published: true })
-  ));
+  ).warnings, []);
+  assert.deepEqual(validateAppleMarketRenameReview(
+    { countries: [old] }, [added],
+    () => ({ id: 'old-id', sourceName: 'New Apple Market', unknown: false })
+  ).warnings, [], 'an explicit registry alias resolves before rename heuristics');
 
   const secondOld = { ...structuredClone(old), country: 'Another Old Market', marketId: 'another-old-id' };
+  const multipleSuspicions = validateAppleMarketRenameReview(
+    { countries: [old, secondOld] }, [changedPrice], unknownResolver
+  );
+  assert.equal(multipleSuspicions.warnings.length, 2);
+  assert.equal(new Set(multipleSuspicions.warnings.map(({ oldMarketId }) => oldMarketId)).size, 2);
+
+  const secondRepriced = structuredClone(secondOld);
+  secondRepriced.plans['50GB'].price = 2;
+  assert.throws(
+    () => validateAppleMarketRenameReview({ countries: [old, secondRepriced] }, [added], unknownResolver),
+    (error) => error.code === 'MARKET_IDENTITY_RENAME_REVIEW_REQUIRED'
+      && error.candidates.length === 1
+      && error.candidates[0].oldMarketId === 'old-id'
+  );
   assert.throws(
     () => validateAppleMarketRenameReview({ countries: [old, secondOld] }, [added], unknownResolver),
     (error) => error.code === 'MARKET_IDENTITY_RENAME_REVIEW_REQUIRED'
@@ -556,7 +585,7 @@ test('requires explicit alias review for removed-to-unknown candidates despite r
   );
 });
 
-test('full updater stops a confirmed Apple rename plus repricing before FX or production writes', async (t) => {
+test('full updater blocks an exact-price rename candidate before FX or production writes', async (t) => {
   const { root, paths } = await createTemporaryProductionPaths();
   t.after(() => rm(root, { recursive: true, force: true }));
   const previousText = await readFile(paths.currentDataPath, 'utf8');
@@ -564,8 +593,6 @@ test('full updater stops a confirmed Apple rename plus repricing before FX or pr
   const changed = structuredClone(previous);
   const renamed = changed.countries.find(({ country }) => country === 'Bahamas');
   renamed.country = 'Renamed Bahamas Market';
-  renamed.plans['50GB'].price = 1;
-  renamed.plans['50GB'].formattedPrice = '$1.00';
   const html = buildAppleHtml(changed);
   const originalFetch = globalThis.fetch;
   let appleRequests = 0;
@@ -584,7 +611,7 @@ test('full updater stops a confirmed Apple rename plus repricing before FX or pr
       () => main({ dryRun: false, paths, stepSummaryPath: null }),
       (error) => error.code === 'MARKET_IDENTITY_RENAME_REVIEW_REQUIRED'
         && error.candidates.some(({ oldMarketId, newSourceName, pricesMatch }) => (
-          oldMarketId === 'bs' && newSourceName === 'Renamed Bahamas Market' && pricesMatch === false
+          oldMarketId === 'bs' && newSourceName === 'Renamed Bahamas Market' && pricesMatch === true
         ))
     );
     assert.equal(appleRequests, 2);
@@ -592,6 +619,72 @@ test('full updater stops a confirmed Apple rename plus repricing before FX or pr
     assert.equal(await readFile(paths.currentDataPath, 'utf8'), previousText);
   } finally {
     globalThis.fetch = originalFetch;
+  }
+});
+
+test('full updater warns but publishes a confirmed rename candidate with repricing', async (t) => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const previousText = await readFile(paths.currentDataPath, 'utf8');
+  const previous = JSON.parse(previousText);
+  const changed = structuredClone(previous);
+  const renamed = changed.countries.find(({ country }) => country === 'Bahamas');
+  renamed.country = 'Renamed Bahamas Market';
+  renamed.plans['50GB'].price += 1;
+  renamed.plans['50GB'].formattedPrice = `$${renamed.plans['50GB'].price.toFixed(2)}`;
+  const html = buildAppleHtml(changed);
+  const fxPayload = {
+    result: 'success',
+    base_code: 'USD',
+    time_last_update_unix: recentFxTimestamp(),
+    rates: compatibleExchangeRates(previous)
+  };
+  const summaryPath = path.join(root, 'summary.md');
+  const originalFetch = globalThis.fetch;
+  const originalWarn = console.warn;
+  const originalLog = console.log;
+  const originalApiKey = process.env.EXCHANGE_RATE_API_KEY;
+  const originalGithubActions = process.env.GITHUB_ACTIONS;
+  const warnings = [];
+  const logs = [];
+  let appleRequests = 0;
+  let fxRequests = 0;
+  delete process.env.EXCHANGE_RATE_API_KEY;
+  process.env.GITHUB_ACTIONS = 'true';
+  console.warn = (message) => warnings.push(String(message));
+  console.log = (message) => logs.push(String(message));
+  globalThis.fetch = async (url) => {
+    const target = String(url);
+    if (target.includes('support.apple.com')) {
+      appleRequests += 1;
+      return new Response(html, { status: 200 });
+    }
+    if (target.includes('open.er-api.com')) {
+      fxRequests += 1;
+      return new Response(JSON.stringify(fxPayload), { status: 200 });
+    }
+    throw new Error(`Unexpected URL in rename-suspicion test: ${target}`);
+  };
+  try {
+    await main({ dryRun: false, paths, stepSummaryPath: summaryPath });
+    assert.equal(appleRequests, 2);
+    assert.equal(fxRequests, 1);
+    assert.notEqual(await readFile(paths.currentDataPath, 'utf8'), previousText);
+    const published = JSON.parse(await readFile(paths.currentDataPath, 'utf8'));
+    assert.ok(published.countries.some(({ country }) => country === 'Renamed Bahamas Market'));
+    assert.ok(warnings.some((warning) => warning.includes('MARKET_IDENTITY_RENAME_SUSPECTED')
+      && warning.includes('oldMarketId=bs') && warning.includes('pricesMatch=false')));
+    assert.ok(logs.some((message) => message.startsWith('::warning title=Apple market identity rename suspected::')
+      && message.includes('oldMarketId=bs') && message.includes('pricesMatch=false')));
+    assert.match(await readFile(summaryPath, 'utf8'), /MARKET_IDENTITY_RENAME_SUSPECTED.*oldMarketId.*bs.*pricesMatch=false.*自动发布继续/s);
+  } finally {
+    globalThis.fetch = originalFetch;
+    console.warn = originalWarn;
+    console.log = originalLog;
+    if (originalApiKey === undefined) delete process.env.EXCHANGE_RATE_API_KEY;
+    else process.env.EXCHANGE_RATE_API_KEY = originalApiKey;
+    if (originalGithubActions === undefined) delete process.env.GITHUB_ACTIONS;
+    else process.env.GITHUB_ACTIONS = originalGithubActions;
   }
 });
 
@@ -3287,6 +3380,20 @@ test('keeps successful Action summaries concise and promotes warnings', () => {
     chineseNamePendingMarkets: [{ marketId: 'mu', sourceName: 'Mauritius' }]
   }, 'schedule').join('\n');
   assert.match(pendingChineseName, /CHINESE_MARKET_NAME_PENDING.*marketId=mu.*sourceName=Mauritius/);
+
+  const renameSuspected = buildActionSummaryLines(data, {
+    ...summary,
+    marketIdentityRenameSuspicions: [{
+      oldSourceName: 'Old [Market]\n::warning::',
+      newSourceName: 'New Market',
+      oldMarketId: 'old-id',
+      region: 'Asia Pacific',
+      currency: 'USD',
+      pricesMatch: false
+    }]
+  }, 'schedule').join('\n');
+  assert.match(renameSuspected, /MARKET_IDENTITY_RENAME_SUSPECTED.*New Market.*old-id.*pricesMatch=false.*自动发布继续/s);
+  assert.doesNotMatch(renameSuspected, /\n::warning::/);
 
   const noSecret = buildActionSummaryLines({
     ...data,
