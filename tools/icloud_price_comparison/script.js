@@ -150,7 +150,7 @@ function serializePriceStateUrl(url, { sortTier, sortKey, sortDirection, region 
   const canonicalRegion = canonicalUrlRegion(region);
 
   serialized.search = '';
-  if (tier !== null && tier !== DEFAULT_SORT_TIER) serialized.searchParams.set('tier', tier);
+  if (tier !== null) serialized.searchParams.set('tier', tier);
   if (sortKey === 'country') serialized.searchParams.set('sort', 'country');
   if (sortDirection === 'desc') serialized.searchParams.set('dir', 'desc');
   if (canonicalRegion !== null) serialized.searchParams.set('region', canonicalRegion);
