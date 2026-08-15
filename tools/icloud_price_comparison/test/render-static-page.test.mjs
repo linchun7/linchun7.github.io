@@ -93,10 +93,10 @@ test('static renderer rejects missing, duplicate, and hand-edited generated regi
 
 test('raw product copy avoids engineering-only loading and cache language', async () => {
   const html = await readFile(indexUrl, 'utf8');
-  for (const forbidden of ['等待价格数据', '正在加载价格数据', '本地缓存', '7 天有效期', '允许的未来偏差', 'Rates By Exchange Rate API', '页面发布日期', '累计价格变更']) {
+  for (const forbidden of ['等待价格数据', '正在加载价格数据', '本地缓存', '7 天有效期', '允许的未来偏差', 'Rates By Exchange Rate API', '累计价格变更']) {
     assert.ok(!html.includes(forbidden), `raw HTML must not contain ${forbidden}`);
   }
-  for (const required of ['各容量全球最低价', '全球参考排名', '价格历史', '约合人民币', '价格变更次数', '汇率来源：', 'Apple 实际结算为准']) {
+  for (const required of ['各容量全球最低价', '全球参考排名', '价格历史', '约合人民币', '价格变更次数', '汇率来源：', '页面发布日期', 'Apple 实际结算为准']) {
     assert.ok(html.includes(required), `raw HTML must contain ${required}`);
   }
   for (const removed of ['数据来源', '这里记录 Apple 当地月费变化，不记录日常汇率波动。']) {
