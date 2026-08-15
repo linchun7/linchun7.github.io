@@ -356,7 +356,7 @@ test('loads deferred GA4 with a sanitized page location and no consent overlay',
     const sanitizedUrl = new URL(page.url());
     assert.equal(sanitizedUrl.searchParams.has('q'), false);
     assert.equal(sanitizedUrl.searchParams.has('privateToken'), false);
-    assert.equal(sanitizedUrl.searchParams.has('tier'), false, 'the default tier must be omitted');
+    assert.equal(sanitizedUrl.searchParams.get('tier'), '200GB', 'the current tier must remain explicit');
     assert.equal(sanitizedUrl.searchParams.has('sort'), false, 'the default sort must be omitted');
     assert.equal(sanitizedUrl.searchParams.has('dir'), false, 'the default direction must be omitted');
     assert.equal(sanitizedUrl.searchParams.has('region'), false, 'invalid values of public URL keys must be removed');
@@ -367,6 +367,7 @@ test('loads deferred GA4 with a sanitized page location and no consent overlay',
     assert.ok(configCommand, 'GA4 config command must be queued before the deferred loader executes');
     assert.equal(configCommand[1], 'G-K2S9L4CHNP');
     assert.equal(configCommand[2].page_location, sanitizedUrl.href);
+    assert.match(configCommand[2].page_location, /[?&]tier=200GB(?:&|$)/);
     assert.equal(configCommand[2].allow_google_signals, false);
     assert.equal(configCommand[2].allow_ad_personalization_signals, false);
     assert.doesNotMatch(configCommand[2].page_location, /privateSearchTerm|privateToken|sensitive|[?&]q=/i);
@@ -1889,10 +1890,11 @@ test('keeps the page and publication history bounded with a single-tier table on
     assert.ok(minimumBadgeLayout.badgeLeft >= minimumBadgeLayout.cellLeft - 1, 'minimum badge must stay inside the active price cell on narrow screens');
     assert.ok(minimumBadgeLayout.badgeRight <= minimumBadgeLayout.cellRight + 1, 'minimum badge must not overflow the table on narrow screens');
 
-    const nextTier = validData.tiers[1];
+    const nextTier = validData.tiers.find(({ id }) => id === '200GB');
+    assert.ok(nextTier);
     await page.locator(`#mobileTierControl button[data-tier="${nextTier.id}"]`).click();
     assert.equal(await page.locator('th[data-tier].is-active-tier').getAttribute('data-tier'), nextTier.id);
-    assert.equal(new URL(page.url()).searchParams.get('tier'), nextTier.id === '200GB' ? null : nextTier.id);
+    assert.equal(new URL(page.url()).searchParams.get('tier'), nextTier.id);
 
     await page.locator('#priceRows tr[data-market-id]').nth(35).scrollIntoViewIfNeeded();
     await page.evaluate(() => scrollBy(0, 180));
@@ -2433,7 +2435,7 @@ test('keeps the minimum-price overview stable and the desktop table header stick
   }
 });
 
-test('canonicalizes default URL state and brand navigation returns to the clean home state', { timeout: 30_000 }, async (context) => {
+test('canonicalizes URL state with an explicit current tier and resets brand navigation to 200GB', { timeout: 60_000 }, async (context) => {
   const browserConfig = await resolveBrowser(context, 'the canonical URL and brand-home regression test');
   if (!browserConfig) return;
   const validData = await readFixture('prices.json');
@@ -2453,26 +2455,76 @@ test('canonicalizes default URL state and brand navigation returns to the clean 
   };
   try {
     await openAndWait();
-    assert.equal(new URL(page.url()).search, '');
+    let url = new URL(page.url());
+    assert.equal(url.search, '?tier=200GB');
+    assert.equal(url.searchParams.get('sort'), null);
+    assert.equal(url.searchParams.get('dir'), null);
+    assert.equal(url.searchParams.get('region'), null);
+    assert.equal(await page.locator('th[data-tier="200GB"]').getAttribute('aria-sort'), 'ascending');
 
     await openAndWait('?tier=200GB&sort=tier&dir=asc');
-    assert.equal(new URL(page.url()).search, '');
+    assert.equal(new URL(page.url()).search, '?tier=200GB');
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#marketCount')?.textContent !== '--');
+    assert.equal(new URL(page.url()).search, '?tier=200GB');
+    assert.equal(await page.locator('th[data-tier="200GB"]').getAttribute('aria-sort'), 'ascending');
+
+    await openAndWait('?dir=desc');
+    assert.equal(new URL(page.url()).search, '?tier=200GB&dir=desc');
+    assert.equal(await page.locator('th[data-tier="200GB"]').getAttribute('aria-sort'), 'descending');
 
     await openAndWait('?tier=2TB&sort=tier&dir=asc');
     assert.equal(new URL(page.url()).search, '?tier=2TB');
 
-    await openAndWait('?sort=country&dir=asc');
-    assert.equal(new URL(page.url()).search, '?sort=country');
+    await openAndWait('?sort=country&dir=desc');
+    assert.equal(new URL(page.url()).search, '?tier=200GB&sort=country&dir=desc');
+    assert.equal(await page.locator('th:has(button[data-sort="country"])').getAttribute('aria-sort'), 'descending');
+
+    await openAndWait('?sort=country');
+    assert.equal(new URL(page.url()).search, '?tier=200GB&sort=country');
+    assert.equal(await page.locator('th:has(button[data-sort="country"])').getAttribute('aria-sort'), 'ascending');
+
+    await openAndWait('?tier=6TB');
+    await page.locator('button[data-sort="country"]').click();
+    assert.equal(new URL(page.url()).search, '?tier=6TB&sort=country');
+    await page.locator('button[data-sort="country"]').click();
+    assert.equal(new URL(page.url()).search, '?tier=6TB&sort=country&dir=desc');
+
+    for (const tier of ['50GB', '200GB', '2TB', '6TB', '12TB']) {
+      await openAndWait(`?tier=${tier}`);
+      assert.equal(new URL(page.url()).search, `?tier=${tier}`);
+      await page.locator(`th[data-tier="${tier}"] button`).click();
+      assert.equal(new URL(page.url()).search, `?tier=${tier}&dir=desc`);
+      await page.locator(`th[data-tier="${tier}"] button`).click();
+      assert.equal(new URL(page.url()).search, `?tier=${tier}`);
+    }
+
+    await openAndWait('?tier=banana');
+    assert.equal(new URL(page.url()).search, '?tier=200GB');
+
+    await openAndWait('?tier=banana&dir=desc');
+    assert.equal(new URL(page.url()).search, '?tier=200GB&dir=desc');
+
+    await openAndWait('?tier=banana&sort=country');
+    assert.equal(new URL(page.url()).search, '?tier=200GB&sort=country');
+
+    await openAndWait('?tier=banana&sort=country&dir=desc&region=Asia+Pacific');
+    assert.equal(new URL(page.url()).search, '?tier=200GB&sort=country&dir=desc&region=Asia+Pacific');
+
+    await openAndWait('?q=Japan');
+    assert.equal(await page.locator('#searchInput').inputValue(), 'Japan');
+    assert.equal(new URL(page.url()).search, '?tier=200GB');
 
     await openAndWait('?tier=2TB&sort=country&dir=desc&region=Asia+Pacific#priceWorkspace');
     const brand = page.locator('.app-brand');
     assert.equal(await brand.getAttribute('href'), './');
     await brand.click();
     await page.waitForFunction(() => document.querySelector('#marketCount')?.textContent !== '--');
-    const cleanUrl = new URL(page.url());
-    assert.equal(cleanUrl.pathname, '/');
-    assert.equal(cleanUrl.search, '');
-    assert.equal(cleanUrl.hash, '');
+    url = new URL(page.url());
+    assert.equal(url.pathname, '/');
+    assert.equal(url.search, '?tier=200GB');
+    assert.equal(url.hash, '');
     assert.equal(await page.locator('#regionSelect').inputValue(), 'all');
     assert.equal(await page.locator('#searchInput').inputValue(), '');
     assert.equal(await page.locator('th[data-tier="200GB"]').getAttribute('aria-sort'), 'ascending');
@@ -2592,7 +2644,7 @@ test('restores URL state, removes the floating search bar, and supports table re
     const minimumMarketId = await minimumCard.getAttribute('data-market-id');
     await minimumCard.click();
     assert.equal(minimumTier, '200GB');
-    assert.equal(new URL(page.url()).searchParams.has('tier'), false);
+    assert.equal(new URL(page.url()).searchParams.get('tier'), '200GB');
     assert.equal(new URL(page.url()).searchParams.has('sort'), false);
     assert.equal(new URL(page.url()).searchParams.has('dir'), false);
     assert.equal(new URL(page.url()).searchParams.has('q'), false);
@@ -2900,13 +2952,9 @@ async function assertMinimumCardsNeutral(page) {
   assert.equal(await page.locator('#minimumSummary .minimum-card[aria-pressed]').count(), 0);
 }
 
-async function assertMinimumNavigation(page, marketId, tierId, { tierInUrl }) {
+async function assertMinimumNavigation(page, marketId, tierId) {
   const parsed = new URL(page.url());
-  if (tierInUrl) {
-    assert.equal(parsed.searchParams.get('tier'), tierId);
-  } else {
-    assert.equal(parsed.searchParams.has('tier'), false);
-  }
+  assert.equal(parsed.searchParams.get('tier'), tierId);
   assert.equal(parsed.searchParams.has('q'), false);
   assert.equal(parsed.searchParams.has('sort'), false);
   assert.equal(parsed.searchParams.has('dir'), false);
@@ -2937,8 +2985,8 @@ async function assertMinimumNavigation(page, marketId, tierId, { tierInUrl }) {
   assert.equal(await row.locator('.price-cell[data-tier="' + tierId + '"]').evaluate((cell) => cell.classList.contains('is-minimum')), true);
 }
 
-test('clean homepage keeps minimum actions neutral while the table defaults to 200GB ascending', { timeout: 30_000 }, async (context) => {
-  const browserConfig = await resolveBrowser(context, 'the clean-home minimum action regression');
+test('home canonicalizes to the explicit default 200GB tier while minimum actions stay neutral', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the explicit-default minimum action regression');
   if (!browserConfig) return;
   const validData = await readFixture('prices.json');
   const server = await startServer();
@@ -2948,7 +2996,7 @@ test('clean homepage keeps minimum actions neutral while the table defaults to 2
   try {
     await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded' });
     await waitForInteractiveMinimumCards(page);
-    assert.equal(new URL(page.url()).search, '');
+    assert.equal(new URL(page.url()).search, '?tier=200GB');
     assert.equal(await page.locator('th[data-tier="200GB"]').getAttribute('aria-sort'), 'ascending');
     assert.match(await page.locator('#resultSummary').textContent(), /200 GB 从低到高/);
     await assertMinimumCardsNeutral(page);
@@ -3002,7 +3050,7 @@ test('minimum-card click clears conflicting filters and reveals the target marke
     const card = page.locator('#minimumSummary .minimum-card[data-tier="200GB"]');
     const marketId = await card.getAttribute('data-market-id');
     await card.click();
-    await assertMinimumNavigation(page, marketId, '200GB', { tierInUrl: false });
+    await assertMinimumNavigation(page, marketId, '200GB');
   } finally {
     await page.close();
     await browser.close();
@@ -3023,7 +3071,7 @@ test('minimum-card navigation works on mobile for a non-default tier', { timeout
     const card = page.locator('#minimumSummary .minimum-card[data-tier="50GB"]');
     const marketId = await card.getAttribute('data-market-id');
     await card.click();
-    await assertMinimumNavigation(page, marketId, '50GB', { tierInUrl: true });
+    await assertMinimumNavigation(page, marketId, '50GB');
     assert.equal(await page.locator('#mobileTierControl button[data-tier="50GB"]').getAttribute('aria-pressed'), 'true');
   } finally {
     await page.close();
@@ -3044,14 +3092,14 @@ test('minimum-card controls stay enabled after returning to default home', { tim
     await page.goto(origin + '/?tier=2TB', { waitUntil: 'domcontentloaded' });
     await waitForInteractiveMinimumCards(page);
     await page.locator('.app-brand').click();
-    await page.waitForURL((url) => url.origin === origin && url.pathname === '/' && url.search === '');
+    await page.waitForURL((url) => url.origin === origin && url.pathname === '/' && url.search === '?tier=200GB');
     await waitForInteractiveMinimumCards(page);
     assert.equal(await page.locator('th[data-tier="200GB"]').getAttribute('aria-sort'), 'ascending');
     await assertMinimumCardsNeutral(page);
     const card = page.locator('#minimumSummary .minimum-card[data-tier="50GB"]');
     const marketId = await card.getAttribute('data-market-id');
     await card.click();
-    await assertMinimumNavigation(page, marketId, '50GB', { tierInUrl: true });
+    await assertMinimumNavigation(page, marketId, '50GB');
   } finally {
     await page.close();
     await browser.close();
