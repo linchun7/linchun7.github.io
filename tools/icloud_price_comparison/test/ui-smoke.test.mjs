@@ -60,10 +60,6 @@ function compactExpectedSeries(events, tier) {
   ));
 }
 
-function canRenderExpectedChart(series) {
-  return series.length > 1 && new Set(series.map(({ currency }) => currency)).size === 1;
-}
-
 function historyRecords(history) {
   return history.markets ?? history.countries;
 }
@@ -243,7 +239,6 @@ test('starts price data early and deprioritizes optional third-party work', asyn
   assert.match(moduleSource, /MAX_RESPONSE_BYTES[\s\S]*?'prices\.json': 1024 \* 1024[\s\S]*?'history\.json': 8 \* 1024 \* 1024/);
   assert.match(moduleSource, /TextDecoder\('utf-8', \{ fatal: true \}\)/, 'network JSON must use strict UTF-8 decoding');
   assert.match(moduleSource, /fetch\(url,[\s\S]*?redirect:\s*'error'/, 'all later data requests must reject redirects');
-  assert.match(moduleSource, /serialized\.length > MAX_PRICE_CACHE_CHARACTERS/, 'oversized price payloads must not be persisted');
   assert.match(moduleSource, /PRICE_FRESH_MAX_AGE_MS = 36 \* 60 \* 60 \* 1_000/);
   assert.match(moduleSource, /PRICE_HARD_MAX_AGE_MS = 7 \* 24 \* 60 \* 60 \* 1_000/);
   assert.match(moduleSource, /function scheduleFreshnessBoundary\(\)[\s\S]*?setTimeout\([\s\S]*?refreshPriceFreshnessLifecycle/);
@@ -275,7 +270,12 @@ test('preserves sorting, selection and minimum-price cues in forced-colors mode'
   const { port } = server.address();
   const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
   const page = await browser.newPage({ viewport: { width: 1365, height: 900 }, forcedColors: 'active' });
-  await page.route('https://**/*', (route) => route.abort());
+  await page.route('https://**/*', (route) => {
+    if (route.request().url().startsWith('https://www.googletagmanager.com/')) {
+      return route.fulfill({ status: 200, contentType: 'text/javascript', body: '' });
+    }
+    return route.abort();
+  });
   try {
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length > 0);
@@ -540,9 +540,7 @@ test('renders current prices, sorting, and country history in a real browser', {
   const expectedData = await readFixture('prices.json');
   const expectedHistory = await readFixture('history.json');
   const historyCountry = Object.values(historyRecords(expectedHistory))
-    .find((record) => expectedData.tiers.some(({ id }) => (
-      canRenderExpectedChart(compactExpectedSeries(record.events, id))
-    )))?.country;
+    .find((record) => record.events.length > 1)?.country;
   const server = await startServer();
   const { port } = server.address();
   const baseUrl = `http://127.0.0.1:${port}`;
@@ -608,7 +606,7 @@ test('renders current prices, sorting, and country history in a real browser', {
         assert.equal(await page.locator('th[data-tier-placeholder]').count(), 0, `${viewport.name} price header placeholders must be replaced after data validation`);
         const initialResources = await page.evaluate(() => performance.getEntriesByType('resource').map(({ name }) => name));
         assert.equal(initialResources.some((url) => url.includes('/data/history.json')), false, `${viewport.name} must defer history data`);
-        assert.equal(initialResources.some((url) => url.includes('/vendor/chart.umd.min.js')), false, `${viewport.name} must defer Chart.js`);
+        assert.equal(initialResources.some((url) => /chart/i.test(url)), false, `${viewport.name} must not request a chart dependency`);
         assert.equal(initialResources.some((url) => url.includes('/vendor/lucide.min.js')), false, `${viewport.name} must not load the full Lucide bundle`);
         assert.equal(initialResources.some((url) => url.includes('/vendor/lucide-subset.js')), true, `${viewport.name} must load the Lucide subset`);
 
@@ -622,6 +620,10 @@ test('renders current prices, sorting, and country history in a real browser', {
         const hydratedAccessibleCopy = await page.locator('#minimumSummary, #priceRows').allInnerTexts();
         assert.equal(hydratedAccessibleCopy.join(' ').includes('启用 JavaScript 后'), false);
         assert.equal(await page.locator('.app-brand h1').textContent(), 'iCloud+ 全球价格对比');
+        const brandUrl = new URL(await page.locator('.app-brand').getAttribute('href'), page.url());
+        assert.equal(brandUrl.pathname, '/');
+        assert.equal(brandUrl.search, '');
+        assert.equal(brandUrl.hash, '');
         assert.equal(await page.locator('#overviewTitle').textContent(), '各容量全球最低价');
         assert.equal(await page.locator('.workspace-heading h2').textContent(), '全球 iCloud+ 月费');
         assert.equal(await page.locator('button[data-sort-tier]').count(), expectedData.tiers.length);
@@ -702,17 +704,14 @@ test('renders current prices, sorting, and country history in a real browser', {
           assert.ok(Object.values(mobileTypography).every((size) => size >= 12), `${viewport.name} core mobile text must be at least 12px`);
           const touchTargets = await page.evaluate(() => {
             const retry = document.querySelector('#retryButton');
-            const clear = document.querySelector('#clearFiltersButton');
             document.querySelector('#loadStatus').hidden = false;
             retry.hidden = false;
-            clear.hidden = false;
-            const heights = [retry, clear].map((button) => button.getBoundingClientRect().height);
+            const heights = [retry].map((button) => button.getBoundingClientRect().height);
             document.querySelector('#loadStatus').hidden = true;
             retry.hidden = true;
-            clear.hidden = true;
             return heights;
           });
-          assert.ok(touchTargets.every((height) => height >= 44), `${viewport.name} retry and clear-filter targets must be at least 44px`);
+          assert.ok(touchTargets.every((height) => height >= 44), `${viewport.name} retry target must be at least 44px`);
         }
         if (viewport.name === 'narrow-mobile') {
           const metricLabels = await page.locator('.overview-stats dt > span:last-child').evaluateAll((labels) => labels.map((label) => ({
@@ -906,81 +905,7 @@ test('renders current prices, sorting, and country history in a real browser', {
             'every history row must preserve its exact date, currency, and tier prices'
           );
         }
-        if (historyCountry) {
-          const chartableTier = expectedData.tiers.find(({ id }) => (
-            canRenderExpectedChart(compactExpectedSeries(expectedRecord.events, id))
-          ));
-          assert.ok(chartableTier, `${historyCountry} must retain a chartable tier for the chart assertions`);
-          if (viewport.name === 'desktop') {
-            for (const [tierIndex, tier] of expectedData.tiers.entries()) {
-              await page.locator(`#historyTierControl button[data-tier="${tier.id}"]`).click();
-              const expectedSeries = compactExpectedSeries(expectedRecord.events, tier.id);
-              const canChart = canRenderExpectedChart(expectedSeries);
-              assert.equal(await page.locator('#chartWrap').isVisible(), canChart, `${tier.id} chart visibility must match its history series`);
-              if (!canChart) continue;
-
-              await page.waitForFunction((expectedLength) => {
-                const chart = window.Chart?.getChart?.(document.querySelector('#historyChart'));
-                return chart?.data?.datasets?.[0]?.data?.length === expectedLength;
-              }, expectedSeries.length);
-              const chartData = await page.locator('#historyChart').evaluate((canvas) => {
-                const chart = window.Chart.getChart(canvas);
-                return {
-                  labels: [...chart.data.labels],
-                  prices: [...chart.data.datasets[0].data]
-                };
-              });
-              const tableRows = await page.locator('#historyRows tr').evaluateAll((rows, columnIndex) => rows.map((row) => ({
-                date: row.cells[0].textContent.trim(),
-                currency: row.cells[1].textContent.trim(),
-                price: row.cells[columnIndex].textContent.trim()
-              })), tierIndex + 2);
-              const chronologicalRows = tableRows.reverse()
-                .filter(({ price }) => price !== '--')
-                .map((row) => ({ ...row, price: Number(row.price.replaceAll(',', '')) }));
-              const tableSeries = chronologicalRows.filter((row, index) => (
-                index === 0
-                || row.currency !== chronologicalRows[index - 1].currency
-                || row.price !== chronologicalRows[index - 1].price
-              ));
-
-              assert.deepEqual(chartData.labels, expectedSeries.map(({ observedAt }) => formatUiDate(observedAt)), `${tier.id} chart dates must match the source history`);
-              assert.deepEqual(chartData.prices, expectedSeries.map((event) => event.plans[tier.id]), `${tier.id} chart prices must match the source history`);
-              assert.deepEqual(chartData.labels, tableSeries.map(({ date }) => date), `${tier.id} chart dates must match the compacted table history`);
-              assert.deepEqual(chartData.prices, tableSeries.map(({ price }) => price), `${tier.id} chart prices must match the compacted table history`);
-            }
-          }
-          await page.locator(`#historyTierControl button[data-tier="${chartableTier.id}"]`).click();
-          await page.waitForFunction(() => !document.querySelector('#chartWrap')?.hidden);
-          await page.waitForFunction(() => {
-            const canvas = document.querySelector('#historyChart');
-            const context = canvas?.getContext('2d');
-            if (!context || !canvas.width || !canvas.height) return false;
-            const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
-            for (let index = 3; index < pixels.length; index += 4) {
-              if (pixels[index] > 0) return true;
-            }
-            return false;
-          }, undefined, { timeout: 5_000 });
-          const chartPixels = await page.locator('#historyChart').evaluate((canvas) => {
-            const context = canvas.getContext('2d');
-            if (!context || !canvas.width || !canvas.height) return 0;
-            const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
-            let nonTransparent = 0;
-            for (let index = 3; index < pixels.length; index += 4) {
-              if (pixels[index] > 0) nonTransparent += 1;
-            }
-            return nonTransparent;
-          });
-          assert.ok(chartPixels > 0, `${viewport.name} chart canvas is blank`);
-          const chartAccessibility = await page.locator('#historyChart').evaluate((canvas) => ({
-            label: canvas.getAttribute('aria-label'),
-            animationDuration: window.Chart.getChart(canvas)?.options?.animation?.duration
-          }));
-          assert.match(chartAccessibility.label, new RegExp(expectedDialogName), `${viewport.name} chart must identify the active country`);
-          assert.match(chartAccessibility.label, new RegExp(chartableTier.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${viewport.name} chart must identify the active tier`);
-          if (viewport.name === 'narrow-mobile') assert.equal(chartAccessibility.animationDuration, 0, 'reduced motion must disable chart animation');
-        }
+        assert.equal(await page.locator('#historyDialog canvas').count(), 0, `${viewport.name} history dialog must not contain a chart canvas`);
         if (viewport.name === 'desktop') await page.keyboard.press('Escape');
         else await page.locator('#closeHistory').click();
         await page.waitForFunction(() => document.querySelector('#historyDialog')?.open === false);
@@ -1018,6 +943,76 @@ test('renders current prices, sorting, and country history in a real browser', {
       }
     }
   } finally {
+    await browser.close();
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test('keeps the simplified price table hierarchy and affordances consistent', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the simplified price-table presentation test');
+  if (!browserConfig) return;
+  const data = await readFixture('prices.json');
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  const page = await browser.newPage({ viewport: { width: 1365, height: 900 } });
+  await page.route('https://**/*', (route) => route.abort());
+  try {
+    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, data.countries.length);
+    assert.equal(await page.locator('.price-table caption').count(), 0);
+    assert.equal(await page.locator('#resultSummary').textContent(), `${data.countries.length} 个地区 · 200 GB 从低到高`);
+    assert.equal(await page.locator('#rankHeaderLabel > [aria-hidden="true"]').textContent(), '排名');
+    assert.equal(await page.locator('#rankHeaderLabel .visually-hidden').textContent(), '全球参考排名');
+
+    for (const tier of data.tiers) {
+      const button = page.locator(`button[data-sort-tier="${tier.id}"]`);
+      await button.click();
+      const coverage = await button.evaluate((element) => {
+        const buttonRect = element.getBoundingClientRect();
+        const headerRect = element.closest('th').getBoundingClientRect();
+        return {
+          left: Math.abs(buttonRect.left - headerRect.left),
+          right: Math.abs(buttonRect.right - headerRect.right),
+          top: Math.abs(buttonRect.top - headerRect.top),
+          bottom: Math.abs(buttonRect.bottom - headerRect.bottom),
+          ariaSort: element.closest('th').getAttribute('aria-sort')
+        };
+      });
+      assert.ok(Math.max(coverage.left, coverage.right, coverage.top, coverage.bottom) <= 1, `${tier.id} sort control must cover its header cell`);
+      assert.equal(coverage.ariaSort, 'ascending');
+    }
+
+    await page.locator('button[data-sort="country"]').click();
+    assert.equal(await page.locator('#rankHeaderLabel > [aria-hidden="true"]').textContent(), '序号');
+    assert.equal(await page.locator('#rankHeaderLabel .visually-hidden').textContent(), '当前列表序号');
+
+    const historyButton = page.locator('.country-history-button').first();
+    assert.equal((await historyButton.locator('.history-affordance').textContent()).trim(), '›');
+    assert.doesNotMatch((await historyButton.locator(':scope > span:not(.visually-hidden)').allInnerTexts()).join(' '), /历史/);
+    assert.match(await historyButton.getAttribute('aria-label') ?? await historyButton.textContent(), /查看 Apple 当地标价历史/);
+    await historyButton.click();
+    assert.equal(await page.locator('#historyDialog').evaluate((dialog) => dialog.open), true);
+    await page.locator('#closeHistory').click();
+
+    const sourceAlignment = await page.locator('.source-heading').evaluate((heading) => {
+      const icon = heading.querySelector('svg');
+      const headingRect = heading.getBoundingClientRect();
+      const iconRect = icon.getBoundingClientRect();
+      return {
+        display: getComputedStyle(heading).display,
+        alignItems: getComputedStyle(heading).alignItems,
+        centerDelta: Math.abs((headingRect.top + headingRect.height / 2) - (iconRect.top + iconRect.height / 2))
+      };
+    });
+    assert.ok(['flex', 'inline-flex'].includes(sourceAlignment.display));
+    assert.equal(sourceAlignment.alignItems, 'center');
+    assert.ok(sourceAlignment.centerDelta <= 1);
+    assert.equal(await page.locator('.source-heading').innerText(), '数据来源');
+    assert.match(await page.locator('.data-disclaimer > p').textContent(), /价格来自 Apple 官方支持页.*人民币金额按参考汇率换算.*实际扣费/);
+    assert.equal(await page.locator('.data-disclaimer details').count(), 0);
+  } finally {
+    await page.close();
     await browser.close();
     await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }
@@ -1067,20 +1062,8 @@ test('excludes history events from before a tier was introduced', { timeout: 30_
     await historyButton.click();
     await page.waitForFunction(() => document.querySelector('#historyDialog')?.open === true);
     await page.locator(`#historyTierControl button[data-tier="${tierId}"]`).click();
-    await page.waitForFunction(() => !document.querySelector('#chartWrap')?.hidden);
-    await page.waitForFunction(() => window.Chart?.getChart?.(document.querySelector('#historyChart'))?.data?.labels?.length === 2);
-
-    const chartData = await page.locator('#historyChart').evaluate((canvas) => {
-      const chart = window.Chart.getChart(canvas);
-      return {
-        labels: [...chart.data.labels],
-        prices: [...chart.data.datasets[0].data],
-        ariaLabel: canvas.getAttribute('aria-label')
-      };
-    });
-    assert.deepEqual(chartData.labels, expectedSeries.map(({ observedAt }) => formatUiDate(observedAt)));
-    assert.deepEqual(chartData.prices, expectedSeries.map((event) => event.plans[tierId]));
-    assert.doesNotMatch(chartData.ariaLabel, /NaN|undefined/);
+    assert.equal(await page.locator('#historyEventCount').textContent(), `${expectedSeries.length - 1} 次`);
+    assert.equal(await page.locator('#historyDialog canvas').count(), 0);
 
     const oldEventDate = formatUiDate(targetRecord.events[0].observedAt);
     const oldEventTierCell = await page.locator('#historyRows tr').evaluateAll((rows, date) => {
@@ -1208,7 +1191,7 @@ test('shows an actionable error and recovers after a temporary price-data outage
     await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
     assert.equal(await page.locator('#loadStatus').isVisible(), true);
     assert.equal(await page.locator('.workspace').getAttribute('aria-busy'), 'false');
-    assert.equal(await page.locator('#searchInput').isDisabled(), true);
+    assert.equal(await page.locator('#searchInput').isEnabled(), true);
     assert.equal(await page.locator('#loadStatusText').textContent(), '暂时无法获取更新，当前显示最近一次可用价格');
     assert.equal(await page.locator('#retryButton').textContent(), '重试');
     await page.locator('#retryButton').click();
@@ -1332,7 +1315,7 @@ test('rejects malformed price payloads and recovers without a full-page refresh'
         await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
         await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
         assert.equal(await page.locator('#loadStatusText').textContent(), '暂时无法获取更新，当前显示最近一次可用价格', label);
-        assert.equal(await page.locator('#searchInput').isDisabled(), true, label);
+        assert.equal(await page.locator('#searchInput').isEnabled(), true, label);
         serveValidData = true;
         await page.locator('#retryButton').click();
         await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
@@ -1467,6 +1450,9 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
       await page.addInitScript((nowMs) => { Date.now = () => nowMs; }, referenceNow);
       const payload = structuredClone(validData);
       mutate(payload);
+      const shell = await readFile(path.join(PROJECT_DIR, 'index.html'), 'utf8');
+      const html = replaceStaticFragments(shell, renderStaticFragments(payload));
+      await page.route(`http://127.0.0.1:${port}/?tier=not-a-real-tier`, (route) => route.fulfill({ status: 200, contentType: 'text/html', body: html }));
       await page.route('https://**/*', (route) => route.abort());
       await page.route('**/data/prices.json*', (route) => route.fulfill({
         status: 200,
@@ -1503,7 +1489,7 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
         assert.ok(statusLayout.right <= statusLayout.viewportWidth + 1, `${label} status text must stay inside the viewport`);
         assert.ok(statusLayout.documentWidth <= statusLayout.viewportWidth + 1, `${label} must not create page-level horizontal overflow`);
         assert.equal(await page.locator('button[data-sort-tier="200GB"]').locator('xpath=ancestor::th').getAttribute('aria-sort'), 'ascending');
-        assert.match(await page.locator('#resultSummary').textContent(), /200GB/);
+        assert.match(await page.locator('#resultSummary').textContent(), /200 GB/);
         if (process.env.SCREENSHOT_DIR && label === 'old snapshot with fallback rates') {
           await page.screenshot({ path: path.join(process.env.SCREENSHOT_DIR, 'stale-combined.png') });
         }
@@ -1535,10 +1521,13 @@ test('reclassifies long-lived pages across lifecycle boundaries without replacin
   const { port } = server.address();
   const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
   const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+  const shell = await readFile(path.join(PROJECT_DIR, 'index.html'), 'utf8');
+  const html = replaceStaticFragments(shell, renderStaticFragments(original));
   let serveRefreshed = false;
   let priceCalls = 0;
   let historyCalls = 0;
   await page.addInitScript((nowMs) => { Date.now = () => nowMs; }, referenceNow);
+  await page.route(`http://127.0.0.1:${port}/`, (route) => route.fulfill({ status: 200, contentType: 'text/html', body: html }));
   await page.route('https://**/*', (route) => route.abort());
   await page.route('**/data/prices.json*', (route) => {
     priceCalls += 1;
@@ -1686,8 +1675,11 @@ test('shows an explicit expired state when lifecycle refresh fails', { timeout: 
   const { port } = server.address();
   const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
   const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+  const shell = await readFile(path.join(PROJECT_DIR, 'index.html'), 'utf8');
+  const html = replaceStaticFragments(shell, renderStaticFragments(payload));
   let failRefresh = false;
   await page.addInitScript((nowMs) => { Date.now = () => nowMs; }, referenceNow);
+  await page.route(`http://127.0.0.1:${port}/`, (route) => route.fulfill({ status: 200, contentType: 'text/html', body: html }));
   await page.route('https://**/*', (route) => route.abort());
   await page.route('**/data/prices.json*', (route) => (
     failRefresh
@@ -1823,53 +1815,6 @@ test('ignores stale history responses after a price retry', { timeout: 30_000 },
     assert.deepEqual(pageErrors, []);
     assert.equal(priceCalls, 2);
     assert.equal(historyCalls, 2);
-  } finally {
-    await page.close();
-    await browser.close();
-    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
-  }
-});
-
-test('keeps history dialog usable when Chart construction fails', { timeout: 30_000 }, async (context) => {
-  const browserConfig = await resolveBrowser(context, 'the Chart-failure UI test');
-  if (!browserConfig) return;
-  const validData = await readFixture('prices.json');
-  const validHistory = await readFixture('history.json');
-  const server = await startServer();
-  const { port } = server.address();
-  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
-  const page = await browser.newPage({ viewport: { width: 1365, height: 900 } });
-  const pageErrors = [];
-  page.on('pageerror', (error) => pageErrors.push(error.message));
-  await page.route('https://**/*', (route) => route.abort());
-  await page.route('**/data/prices.json*', (route) => route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify(validData)
-  }));
-  await page.route('**/data/history.json*', (route) => route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify(validHistory)
-  }));
-  await page.route('**/vendor/chart.umd.min.js*', (route) => route.fulfill({
-    status: 200,
-    contentType: 'application/javascript',
-    body: 'window.Chart = class { constructor() { throw new Error("chart-bomb"); } };'
-  }));
-  try {
-    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, validData.countries.length);
-    await page.locator('#priceRows tr[data-market-id="br"]').click();
-    assert.equal(await page.locator('#historyDialog').evaluate((element) => element.open), true);
-    assert.equal(await page.locator('#historyRows tr').count(), historyRecordForCountry(validHistory, validData, 'Brazil').events.length);
-    await page.waitForFunction(() => (
-      document.querySelector('#chartWrap')?.hidden === true
-      && document.querySelector('#emptyHistory')?.hidden === false
-    ));
-    assert.equal(await page.locator('#chartWrap').isVisible(), false);
-    assert.equal(await page.locator('#emptyHistory').isVisible(), true);
-    assert.deepEqual(pageErrors, []);
   } finally {
     await page.close();
     await browser.close();
@@ -2138,10 +2083,6 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
         contentType: 'application/json',
         body: JSON.stringify(history)
       }));
-      await page.route('**/vendor/chart.umd.min.js*', async (route) => {
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        await route.continue();
-      });
       try {
         await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
         await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, data.countries.length);
@@ -2467,7 +2408,7 @@ test('keeps the minimum-price overview stable and the desktop table header stick
         fontSize: Number.parseFloat(headerStyle.fontSize),
         background: headerStyle.backgroundColor,
         rowBackground: getComputedStyle(document.querySelector('#priceRows tr[data-market-id] td')).backgroundColor,
-        lastHeaderPadding: Number.parseFloat(getComputedStyle(lastHeader).paddingRight),
+        lastHeaderPadding: Number.parseFloat(getComputedStyle(lastHeader.querySelector('button')).paddingRight),
         lastCellPadding: Number.parseFloat(getComputedStyle(lastCell).paddingRight)
       };
     });
@@ -2623,8 +2564,8 @@ test('restores URL state, removes the floating search bar, and supports table re
   }
 });
 
-test('keeps the cached table DOM when the network snapshot is unchanged', { timeout: 30_000 }, async (context) => {
-  const browserConfig = await resolveBrowser(context, 'the unchanged-cache performance test');
+test('keeps the static table DOM when the network snapshot is unchanged', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the unchanged-static-snapshot performance test');
   if (!browserConfig) return;
   const validData = await readFixture('prices.json');
   const server = await startServer();
@@ -2634,10 +2575,9 @@ test('keeps the cached table DOM when the network snapshot is unchanged', { time
   let releaseRequest;
   let requestSeen = false;
   const requestReleased = new Promise((resolve) => { releaseRequest = resolve; });
-  await page.addInitScript(({ payload, nowMs }) => {
+  await page.addInitScript(({ nowMs }) => {
     Date.now = () => nowMs;
-    localStorage.setItem('icloud-price-comparison:validated-prices:v2', JSON.stringify(payload));
-  }, { payload: validData, nowMs: Date.parse(validData.generatedAt) + 60 * 60 * 1_000 });
+  }, { nowMs: Date.parse(validData.generatedAt) + 60 * 60 * 1_000 });
   await page.route('https://**/*', (route) => route.abort());
   await page.route('**/data/prices.json*', async (route) => {
     requestSeen = true;
@@ -2651,13 +2591,150 @@ test('keeps the cached table DOM when the network snapshot is unchanged', { time
   try {
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, validData.countries.length);
-    await page.locator('#priceRows tr[data-market-id]').first().evaluate((row) => { row.dataset.renderMarker = 'cached'; });
+    await page.locator('#priceRows tr[data-market-id]').first().evaluate((row) => { row.dataset.renderMarker = 'static'; });
     releaseRequest();
     await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
-    assert.equal(requestSeen, true, 'the cached view must still check for a network update');
-    assert.equal(await page.locator('#priceRows tr[data-render-marker="cached"]').count(), 1, 'an identical network snapshot should not rebuild the rendered table');
+    assert.equal(requestSeen, true, 'the static view must still check for a network update');
+    assert.equal(await page.locator('#priceRows tr[data-render-marker="static"]').count(), 1, 'an identical network snapshot should not rebuild the rendered table');
   } finally {
     releaseRequest?.();
+    await page.close();
+    await browser.close();
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test('arbitrates static and network snapshots without a third state layer', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the two-layer price loading test');
+  if (!browserConfig) return;
+  const fixture = await readFixture('prices.json');
+  const shell = await readFile(path.join(PROJECT_DIR, 'index.html'), 'utf8');
+  const noStaticFragments = renderStaticFragments(fixture);
+  noStaticFragments.META = '';
+  noStaticFragments.TABLE_BODY = `          <tr><td class="loading-cell" colspan="${fixture.tiers.length + 2}">正在检查最新价格…</td></tr>`;
+  const emptyStaticHtml = replaceStaticFragments(shell, noStaticFragments);
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  try {
+    for (const { label, html, response, expectRows, expectEnabled, expectRetry } of [
+      {
+        label: 'older network keeps static',
+        html: shell,
+        response: (() => {
+          const data = structuredClone(fixture);
+          setPayloadGeneratedAt(data, new Date(Date.parse(fixture.generatedAt) - 60 * 60 * 1_000).toISOString());
+          data.fx.fetchedAt = data.generatedAt;
+          return { status: 200, contentType: 'application/json', body: JSON.stringify(data) };
+        })(),
+        expectRows: fixture.countries.length,
+        expectEnabled: true,
+        expectRetry: true
+      },
+      {
+        label: 'newer network replaces static',
+        html: shell,
+        response: (() => {
+          const data = structuredClone(fixture);
+          setPayloadGeneratedAt(data, new Date(Date.parse(fixture.generatedAt) + 60 * 1_000).toISOString());
+          data.fx.fetchedAt = data.generatedAt;
+          return { status: 200, contentType: 'application/json', body: JSON.stringify(data) };
+        })(),
+        expectRows: fixture.countries.length,
+        expectEnabled: true,
+        expectRetry: false
+      },
+      {
+        label: 'network builds a page without static prices',
+        html: emptyStaticHtml,
+        response: { status: 200, contentType: 'application/json', body: JSON.stringify(fixture) },
+        expectRows: fixture.countries.length,
+        expectEnabled: true,
+        expectRetry: false
+      },
+      {
+        label: 'failed network without static prices shows an error',
+        html: emptyStaticHtml,
+        response: { status: 503, contentType: 'application/json', body: '{}' },
+        expectRows: 0,
+        expectEnabled: false,
+        expectRetry: true
+      }
+    ]) {
+      const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+      await page.route(`http://127.0.0.1:${port}/`, (route) => route.fulfill({ status: 200, contentType: 'text/html', body: html }));
+      await page.route('https://**/*', (route) => route.abort());
+      await page.route('**/data/prices.json*', (route) => route.fulfill(response));
+      try {
+        await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+        if (expectRows > 0) {
+          await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, expectRows);
+        } else {
+          await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
+        }
+        await page.waitForFunction((visible) => document.querySelector('#retryButton')?.hidden === !visible, expectRetry);
+        assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), expectRows, label);
+        assert.equal(await page.locator('#searchInput').isEnabled(), expectEnabled, label);
+        if (label === 'older network keeps static') {
+          assert.match(await page.locator('#loadStatusText').textContent(), /当前显示最近一次可用价格/);
+        }
+      } finally {
+        await page.close();
+      }
+    }
+  } finally {
+    await browser.close();
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test('does not depend on browser storage for static hydration or controls', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the storage-disabled UI test');
+  if (!browserConfig) return;
+  const validData = await readFixture('prices.json');
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(message.text());
+  });
+  await page.addInitScript(() => {
+    for (const method of ['getItem', 'setItem', 'removeItem']) {
+      Object.defineProperty(Storage.prototype, method, {
+        configurable: true,
+        value() { throw new Error(`storage-disabled:${method}`); }
+      });
+    }
+  });
+  await page.route('https://**/*', (route) => {
+    if (route.request().url().startsWith('https://www.googletagmanager.com/')) {
+      return route.fulfill({ status: 200, contentType: 'text/javascript', body: '' });
+    }
+    return route.abort();
+  });
+  await page.route('**/data/prices.json*', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify(validData)
+  }));
+  try {
+    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, validData.countries.length);
+    await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
+    assert.equal(await page.locator('#searchInput').isEnabled(), true);
+    assert.equal(await page.locator('#regionSelect').isEnabled(), true);
+    assert.equal(await page.locator('button[data-sort-tier]:visible').first().isEnabled(), true);
+    const country = validData.countries[0];
+    await page.locator('#searchInput').fill(country.nameZh || country.country);
+    await page.locator('#regionSelect').selectOption(country.region);
+    await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length === 1);
+    await page.locator('button[data-sort-tier]:visible').first().click();
+    assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), 1);
+    assert.deepEqual(errors, []);
+  } finally {
     await page.close();
     await browser.close();
     await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
@@ -2700,7 +2777,7 @@ test('rejects redirected, oversized, and malformed UTF-8 price responses before 
       }
       await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
       await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
-      assert.equal(await page.locator('#searchInput').isDisabled(), true, `${testCase.name} data must not render`);
+      assert.equal(await page.locator('#searchInput').isEnabled(), true, `${testCase.name} data must not replace the usable static snapshot`);
       assert.equal(redirectTargetRequested, false, 'price fetch must not follow redirects');
       await page.close();
     }
@@ -2741,126 +2818,6 @@ test('rejects network price data older than seven days or more than five minutes
       assert.match(await page.locator('#loadStatusText').textContent(), /当前显示最近一次可用价格/, label);
       await page.close();
     }
-  } finally {
-    await browser.close();
-    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
-  }
-});
-
-test('enforces fresh, stale, and expired local price cache behavior', { timeout: 30_000 }, async (context) => {
-  const browserConfig = await resolveBrowser(context, 'the validated-cache UI test');
-  if (!browserConfig) return;
-  const validData = await readFixture('prices.json');
-  const server = await startServer();
-  const { port } = server.address();
-  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
-  try {
-    const cachedPage = await browser.newPage({ viewport: { width: 1024, height: 768 } });
-    await cachedPage.addInitScript(({ payload, nowMs }) => {
-      Date.now = () => nowMs;
-      localStorage.setItem('icloud-price-comparison:validated-prices:v2', JSON.stringify(payload));
-    }, { payload: validData, nowMs: Date.parse(validData.generatedAt) + 36 * 60 * 60 * 1_000 });
-    await cachedPage.route('https://**/*', (route) => route.abort());
-    await cachedPage.route('**/data/prices.json*', (route) => route.fulfill({ status: 503, body: '{}' }));
-    await cachedPage.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-    await cachedPage.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, validData.countries.length);
-    await cachedPage.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
-    assert.equal(await cachedPage.locator('#searchInput').isEnabled(), true);
-    assert.match(await cachedPage.locator('#loadStatusText').textContent(), /当前显示最近一次可用价格/);
-    assert.match(await cachedPage.locator('#updatedAt').textContent(), /暂时无法获取更新/);
-    assert.ok(await cachedPage.locator('.minimum-badge').count() > 0, 'a cache exactly 36 hours old keeps minimum cues');
-    await cachedPage.close();
-
-    const stalePage = await browser.newPage({ viewport: { width: 1024, height: 768 } });
-    await stalePage.addInitScript(({ payload, nowMs }) => {
-      Date.now = () => nowMs;
-      localStorage.setItem('icloud-price-comparison:validated-prices:v2', JSON.stringify(payload));
-    }, { payload: validData, nowMs: Date.parse(validData.generatedAt) + (36 * 60 * 60 * 1_000) + 1 });
-    await stalePage.route('https://**/*', (route) => route.abort());
-    await stalePage.route('**/data/prices.json*', (route) => route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(validData)
-    }));
-    await stalePage.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-    await stalePage.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, validData.countries.length);
-    await stalePage.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
-    assert.equal(await stalePage.locator('#searchInput').isEnabled(), true);
-    assert.equal(await stalePage.locator('#regionSelect').isEnabled(), true);
-    assert.equal(await stalePage.locator('.minimum-badge').count(), 0);
-    assert.equal(await stalePage.locator('.price-cell.is-minimum').count(), 0);
-    assert.equal(await stalePage.locator('.rank-top').count(), 0);
-    assert.equal(await stalePage.locator('#overviewTitle').textContent(), '各容量全球最低价');
-    assert.equal(
-      await stalePage.locator('#minimumSummary').textContent(),
-      '价格暂未更新，当前显示最近一次获取的 Apple 标价。'
-    );
-    await stalePage.locator('button[data-sort-tier]:visible').first().click();
-    assert.ok(await stalePage.locator('#priceRows tr[data-market-id]').count() > 0, 'stale-cache sorting remains usable');
-    await stalePage.close();
-
-    const expiredPage = await browser.newPage({ viewport: { width: 1024, height: 768 } });
-    await expiredPage.addInitScript(({ payload, nowMs }) => {
-      Date.now = () => nowMs;
-      localStorage.setItem('icloud-price-comparison:validated-prices:v2', JSON.stringify(payload));
-    }, { payload: validData, nowMs: Date.parse(validData.generatedAt) + (7 * 24 * 60 * 60 * 1_000) + 1 });
-    await expiredPage.route('https://**/*', (route) => route.abort());
-    await expiredPage.route('**/data/prices.json*', (route) => route.fulfill({ status: 503, body: '{}' }));
-    await expiredPage.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-    await expiredPage.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
-    assert.equal(await expiredPage.locator('#priceRows tr[data-market-id]').count(), validData.countries.length);
-    assert.match(await expiredPage.locator('#loadStatusText').textContent(), /价格已经较久没有更新/);
-    assert.equal(await expiredPage.evaluate(() => localStorage.getItem('icloud-price-comparison:validated-prices:v2')), null);
-    await expiredPage.close();
-
-    const invalidPage = await browser.newPage({ viewport: { width: 1024, height: 768 } });
-    await invalidPage.addInitScript(() => {
-      localStorage.setItem('icloud-price-comparison:validated-prices:v2', JSON.stringify({ schemaVersion: 999 }));
-    });
-    await invalidPage.route('https://**/*', (route) => route.abort());
-    await invalidPage.route('**/data/prices.json*', (route) => route.fulfill({ status: 503, body: '{}' }));
-    await invalidPage.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-    await invalidPage.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
-    const retryBox = await invalidPage.locator('#retryButton').boundingBox();
-    assert.ok(
-      retryBox && retryBox.height >= 43.99,
-      `the retry action must retain a comfortable touch target (actual: ${retryBox?.height ?? 'missing'}px)`
-    );
-    assert.equal(await invalidPage.locator('#searchInput').isDisabled(), true);
-    assert.equal(await invalidPage.evaluate(() => localStorage.getItem('icloud-price-comparison:validated-prices:v2')), null);
-    await invalidPage.close();
-
-    const oversizedPage = await browser.newPage({ viewport: { width: 1024, height: 768 } });
-    await oversizedPage.addInitScript(() => {
-      localStorage.setItem('icloud-price-comparison:validated-prices:v2', ' '.repeat((1024 * 1024) + 1));
-    });
-    await oversizedPage.route('https://**/*', (route) => route.abort());
-    await oversizedPage.route('**/data/prices.json*', (route) => route.fulfill({ status: 503, body: '{}' }));
-    await oversizedPage.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-    await oversizedPage.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
-    assert.equal(await oversizedPage.locator('#searchInput').isDisabled(), true, 'oversized cache must never render');
-    assert.equal(await oversizedPage.evaluate(() => localStorage.getItem('icloud-price-comparison:validated-prices:v2')), null);
-    await oversizedPage.close();
-
-    const legacyData = structuredClone(validData);
-    legacyData.schemaVersion = 2;
-    legacyData.fx.rates = { USD: 1, CNY: 7 };
-    delete legacyData.fx.derivedCurrency;
-    for (const country of legacyData.countries) {
-      for (const tier of legacyData.tiers) delete country.plans[tier.id].cnyPrice;
-    }
-    const legacyPage = await browser.newPage({ viewport: { width: 1024, height: 768 } });
-    await legacyPage.addInitScript((payload) => {
-      localStorage.setItem('icloud-price-comparison:validated-prices:v1', JSON.stringify(payload));
-    }, legacyData);
-    await legacyPage.route('https://**/*', (route) => route.abort());
-    await legacyPage.route('**/data/prices.json*', (route) => route.fulfill({ status: 503, body: '{}' }));
-    await legacyPage.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-    await legacyPage.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
-    assert.equal(await legacyPage.locator('#searchInput').isDisabled(), true, 'legacy schema cache must never render');
-    assert.equal(await legacyPage.evaluate(() => localStorage.getItem('icloud-price-comparison:validated-prices:v1')), null, 'legacy cache key must be removed during startup');
-    assert.equal(await legacyPage.evaluate(() => localStorage.getItem('icloud-price-comparison:validated-prices:v2')), null);
-    await legacyPage.close();
   } finally {
     await browser.close();
     await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));

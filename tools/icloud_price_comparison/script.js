@@ -4,19 +4,15 @@ import {
   validatePayload,
   validatePriceHistoryConsistency
 } from './data-contract.js?v=f8779a1b';
-import { createIcons } from './vendor/lucide-subset.js?v=657f4f9d';
+import { createIcons } from './vendor/lucide-subset.js?v=c5106146';
 import { VALID_REGIONS } from './data-model.js?v=1df20253';
 
 const REQUEST_TIMEOUT_MS = 8_000;
-const CHART_SCRIPT_URL = './vendor/chart.umd.min.js?v=48444a82';
 const ANALYTICS_ID = 'G-K2S9L4CHNP';
 const SLOW_LOADING_MS = 1_500;
 const DEFAULT_SORT_TIER = '200GB';
 const DEFAULT_TIER_COLUMN_COUNT = 5;
 const FIXED_PRICE_TABLE_COLUMN_COUNT = 2;
-const PRICE_CACHE_KEY = 'icloud-price-comparison:validated-prices:v2';
-const LEGACY_PRICE_CACHE_KEYS = ['icloud-price-comparison:validated-prices:v1'];
-const MAX_PRICE_CACHE_CHARACTERS = 1024 * 1024;
 const PRICE_FRESH_MAX_AGE_MS = 36 * 60 * 60 * 1_000;
 const PRICE_HARD_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1_000;
 const MAX_PRICE_FUTURE_SKEW_MS = 5 * 60 * 1_000;
@@ -55,13 +51,11 @@ const state = {
   dataFreshness: null,
   minimumCuesEnabled: true,
   minimumCuesReason: null,
-  chart: null,
   eventsBound: false,
   loading: false,
   historyStatus: 'idle',
   historyRequestId: 0,
   historyPromise: null,
-  chartRequestId: 0,
   historyReturnFocus: null,
   historyReturnCountry: null,
   publishedDateReturnFocus: null,
@@ -74,7 +68,6 @@ const elements = {
   mobileTierControl: document.querySelector('#mobileTierControl'),
   searchInput: document.querySelector('#searchInput'),
   regionSelect: document.querySelector('#regionSelect'),
-  clearFiltersButton: document.querySelector('#clearFiltersButton'),
   resultSummary: document.querySelector('#resultSummary'),
   rankingScopeNote: document.querySelector('#rankingScopeNote'),
   rankHeaderLabel: document.querySelector('#rankHeaderLabel'),
@@ -102,9 +95,6 @@ const elements = {
   historyLocalPrice: document.querySelector('#historyLocalPrice'),
   historyCnyPrice: document.querySelector('#historyCnyPrice'),
   historyEventCount: document.querySelector('#historyEventCount'),
-  chartWrap: document.querySelector('#chartWrap'),
-  emptyHistory: document.querySelector('#emptyHistory'),
-  chartCurrency: document.querySelector('#chartCurrency'),
   historyRows: document.querySelector('#historyRows'),
   publishedDateDialog: document.querySelector('#publishedDateDialog'),
   closePublishedDate: document.querySelector('#closePublishedDate'),
@@ -119,7 +109,6 @@ const collator = new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base'
 let slowLoadingTimer = null;
 let freshnessBoundaryTimer = null;
 let freshnessRefreshPromise = null;
-let chartLibraryPromise = null;
 let analyticsScheduled = false;
 let initialPriceRequest = globalThis.__icloudInitialPriceRequest ?? null;
 delete globalThis.__icloudInitialPriceRequest;
@@ -220,7 +209,6 @@ function setLoadStatus(message, { error = false, hidden = false } = {}) {
 function setFiltersDisabled(disabled) {
   elements.searchInput.disabled = disabled;
   elements.regionSelect.disabled = disabled;
-  if (elements.clearFiltersButton) elements.clearFiltersButton.disabled = disabled;
   if (elements.backToTableButton) elements.backToTableButton.disabled = disabled;
   document.querySelectorAll('button[data-sort], button[data-sort-tier], #publishedDateButton, #mobileTierControl button, .country-history-button').forEach((button) => {
     button.disabled = disabled;
@@ -383,47 +371,6 @@ function validatePriceFreshness(data) {
   if (freshness.reason === 'future-data') throw new Error('价格数据生成时间超过允许的未来偏差');
   if (freshness.reason === 'price-expired') throw new Error('价格数据已超过七天有效期');
   return freshness;
-}
-
-function removeLegacyPriceCaches() {
-  for (const key of LEGACY_PRICE_CACHE_KEYS) {
-    try { localStorage.removeItem(key); } catch {}
-  }
-}
-
-function readPriceCache() {
-  try {
-    const cached = localStorage.getItem(PRICE_CACHE_KEY);
-    if (!cached) return null;
-    if (cached.length > MAX_PRICE_CACHE_CHARACTERS) throw new Error('价格缓存超过允许大小');
-    const data = validatePayload('prices.json', JSON.parse(cached));
-    let freshness;
-    try {
-      freshness = validatePriceFreshness(data);
-    } catch (error) {
-      localStorage.removeItem(PRICE_CACHE_KEY);
-      console.warn('CACHE_EXPIRED');
-      return null;
-    }
-    return {
-      data,
-      freshness
-    };
-  } catch (error) {
-    console.warn(`已忽略无效价格缓存：${error.message}`);
-    try { localStorage.removeItem(PRICE_CACHE_KEY); } catch {}
-    return null;
-  }
-}
-
-function writePriceCache(payload) {
-  try {
-    const serialized = JSON.stringify(payload);
-    if (serialized.length > MAX_PRICE_CACHE_CHARACTERS) throw new Error('价格缓存超过允许大小');
-    localStorage.setItem(PRICE_CACHE_KEY, serialized);
-  } catch (error) {
-    console.warn(`价格缓存写入失败：${error.message}`);
-  }
 }
 
 function priceSnapshotsEqual(first, second) {
@@ -684,10 +631,9 @@ function renderTable() {
   const regionLabel = state.region === 'all' ? null : REGION_LABELS[state.region] || state.region;
   const sortLabel = state.sortKey === 'country'
     ? `按名称${state.sortDirection === 'asc' ? '排序' : '倒序'}`
-    : `${tier.label.replace(' ', '')} ${direction}`;
+    : `${tier.label} ${direction}`;
   elements.resultSummary.textContent = [regionLabel, countLabel, sortLabel].filter(Boolean).join(' · ');
   updateRankingPresentation({ filtered });
-  if (elements.clearFiltersButton) elements.clearFiltersButton.hidden = !filtered;
 
   if (!countries.length) {
     const row = document.createElement('tr');
@@ -726,7 +672,7 @@ function renderTable() {
       const affordance = document.createElement('span');
       affordance.className = 'history-affordance';
       affordance.setAttribute('aria-hidden', 'true');
-      affordance.textContent = '历史 ›';
+      affordance.textContent = '›';
       const historyAction = document.createElement('span');
       historyAction.className = 'visually-hidden';
       historyAction.textContent = '，查看 Apple 当地标价历史';
@@ -776,7 +722,14 @@ function updateRankingPresentation({ filtered = Boolean(state.query.trim() || st
   }
   if (!elements.rankHeaderLabel) return;
   if (!tierRanking) {
-    elements.rankHeaderLabel.textContent = '序号';
+    elements.rankHeaderLabel.replaceChildren();
+    const visible = document.createElement('span');
+    visible.setAttribute('aria-hidden', 'true');
+    visible.textContent = '序号';
+    const accessible = document.createElement('span');
+    accessible.className = 'visually-hidden';
+    accessible.textContent = '当前列表序号';
+    elements.rankHeaderLabel.append(visible, accessible);
     return;
   }
   if (unusable) {
@@ -786,7 +739,7 @@ function updateRankingPresentation({ filtered = Boolean(state.query.trim() || st
   elements.rankHeaderLabel.replaceChildren();
   const visible = document.createElement('span');
   visible.setAttribute('aria-hidden', 'true');
-  visible.textContent = '全球排名';
+  visible.textContent = '排名';
   const accessible = document.createElement('span');
   accessible.className = 'visually-hidden';
   accessible.textContent = '全球参考排名';
@@ -899,109 +852,6 @@ function renderLocalPriceWithTrend(plan, country, changedSeries) {
     trend.title = `与上一次当地月费相比${isIncrease ? '上涨' : '下降'} ${percentLabel}%`;
   }
   elements.historyLocalPrice.append(trend);
-}
-
-function loadChartLibrary() {
-  if (window.Chart) return Promise.resolve(window.Chart);
-  if (chartLibraryPromise) return chartLibraryPromise;
-  chartLibraryPromise = new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = CHART_SCRIPT_URL;
-    script.async = true;
-    script.addEventListener('load', () => {
-      if (window.Chart) resolve(window.Chart);
-      else reject(new Error('Chart.js loaded without exposing Chart'));
-    }, { once: true });
-    script.addEventListener('error', () => reject(new Error('Chart.js request failed')), { once: true });
-    document.head.append(script);
-  }).catch((error) => {
-    chartLibraryPromise = null;
-    throw error;
-  });
-  return chartLibraryPromise;
-}
-
-async function renderChart(record) {
-  destroyChart();
-  const requestId = ++state.chartRequestId;
-  const series = compactHistorySeries(record.events, state.historyTier);
-  const currencies = new Set(series.map(({ currency }) => currency));
-  const canChart = series.length > 1 && currencies.size === 1;
-  elements.chartWrap.hidden = !canChart;
-  elements.emptyHistory.hidden = canChart;
-
-  if (!canChart) {
-    const message = elements.emptyHistory.querySelector('p');
-    message.textContent = currencies.size > 1
-      ? '期间发生过币种变化，可在下方记录中查看各期当地价格。'
-      : 'Apple 当地标价暂时没有变化记录。';
-    refreshIcons();
-    return;
-  }
-
-  const currency = series[0].currency;
-  elements.chartCurrency.textContent = currency;
-  const context = document.querySelector('#historyChart');
-  const tier = state.data.tiers.find(({ id }) => id === state.historyTier);
-  const firstPrice = series[0].plans[state.historyTier];
-  const lastPrice = series.at(-1).plans[state.historyTier];
-  const trend = lastPrice === firstPrice ? '保持不变' : lastPrice > firstPrice ? '上涨' : '下降';
-  context.setAttribute('aria-label', `${state.activeCountry?.nameZh || state.activeCountry?.country || ''} ${tier?.label || state.historyTier} 价格变化图，币种 ${currency}，从 ${numberFormatter.format(firstPrice)} 变为 ${numberFormatter.format(lastPrice)}，${trend}，共 ${series.length} 个记录点。详细数据见下方变更记录。`);
-  try {
-    const Chart = await loadChartLibrary();
-    if (requestId !== state.chartRequestId || !elements.historyDialog.open) return;
-    state.chart = new Chart(context, {
-      type: 'line',
-      data: {
-        labels: series.map(({ observedAt }) => formatDate(observedAt)),
-        datasets: [{
-          data: series.map((event) => event.plans[state.historyTier]),
-          borderColor: '#0668d7',
-          backgroundColor: 'rgba(6, 104, 215, 0.1)',
-          pointBackgroundColor: '#ffffff',
-          pointBorderColor: '#0668d7',
-          pointBorderWidth: 2,
-          pointRadius: 4,
-          borderWidth: 2,
-          stepped: 'before',
-          fill: true
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: { duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 250 },
-        plugins: {
-          legend: { display: false },
-          tooltip: { callbacks: { label: (item) => item.raw == null ? '暂无数据' : `${numberFormatter.format(item.raw)} ${currency}` } }
-        },
-        scales: {
-          x: { grid: { display: false }, ticks: { color: '#687078' } },
-          y: { beginAtZero: false, grid: { color: '#e7e9eb' }, ticks: { color: '#687078', callback: (value) => numberFormatter.format(value) } }
-        }
-      }
-    });
-  } catch (error) {
-    if (requestId !== state.chartRequestId) return;
-    state.chart = null;
-    elements.chartWrap.hidden = true;
-    elements.emptyHistory.hidden = false;
-    elements.emptyHistory.querySelector('p').textContent = '图表暂时无法显示，下方价格记录仍可正常查看。';
-    console.warn(`价格历史图表加载失败：${error.message}`);
-    refreshIcons();
-  }
-}
-
-function destroyChart() {
-  state.chartRequestId += 1;
-  if (!state.chart) return;
-  try {
-    state.chart.destroy?.();
-  } catch (error) {
-    console.warn(`价格历史图表清理失败：${error.message}`);
-  } finally {
-    state.chart = null;
-  }
 }
 
 function renderHistoryRows(record) {
@@ -1229,15 +1079,11 @@ function renderHistoryContent() {
   const record = getHistoryRecord(country);
   const plan = country.plans[state.historyTier];
   const cny = plan.cnyPrice;
-  const tier = state.data.tiers.find(({ id }) => id === state.historyTier);
   const changedSeries = compactHistorySeries(record.events, state.historyTier);
 
   renderLocalPriceWithTrend(plan, country, changedSeries);
   elements.historyCnyPrice.textContent = formatConverted(cny, '¥');
   elements.historyEventCount.textContent = `${Math.max(changedSeries.length - 1, 0)} 次`;
-  document.querySelector('#chartTitle').textContent = `${tier.label} 价格变化`;
-  elements.chartCurrency.textContent = country.currency;
-  renderChart(record);
   renderHistoryRows(record);
 }
 
@@ -1550,15 +1396,6 @@ function bindEvents() {
     updateUrlState();
     renderTable();
   });
-  elements.clearFiltersButton?.addEventListener('click', () => {
-    state.query = '';
-    state.region = 'all';
-    elements.searchInput.value = '';
-    elements.regionSelect.value = 'all';
-    updateUrlState();
-    renderTable();
-    elements.searchInput.focus();
-  });
   document.querySelector('button[data-sort="country"]').addEventListener('click', setCountrySort);
   elements.backToTableButton?.addEventListener('click', () => {
     elements.workspaceToolbar.scrollIntoView({
@@ -1579,7 +1416,6 @@ function bindEvents() {
   });
   elements.publishedDateDialog.addEventListener('keydown', (event) => trapDialogFocus(elements.publishedDateDialog, event));
   elements.historyDialog.addEventListener('close', () => {
-    destroyChart();
     const returnFocus = state.historyReturnFocus;
     const returnCountry = state.historyReturnCountry;
     state.historyReturnFocus = null;
@@ -1664,15 +1500,7 @@ async function initialize({ forceRefresh = false } = {}) {
   if (!state.data) setFiltersDisabled(true);
   elements.dataStatus.classList.remove('is-error');
 
-  let fallbackData = state.data;
-  if (!forceRefresh) {
-    const cached = readPriceCache();
-    if (cached && (!hasStaticSnapshot || Date.parse(cached.data.generatedAt) >= Date.parse(staticSnapshotGeneratedAt))) {
-      fallbackData = cached.data;
-      applyPriceData(cached.data, { origin: 'cache' });
-      setLoadStatus('正在检查最新价格…');
-    }
-  }
+  const fallbackData = state.data;
 
   slowLoadingTimer = setTimeout(() => {
     setLoadStatus(hasStaticSnapshot || fallbackData
@@ -1683,10 +1511,10 @@ async function initialize({ forceRefresh = false } = {}) {
   try {
     const networkData = await fetchJson('prices.json', { forceRefresh });
     if (!state.data && staticDomMatchesPayload(networkData)) {
-      writePriceCache(networkData);
       hydrateStaticPriceData(networkData);
+    } else if (!state.data && hasStaticSnapshot && Date.parse(networkData.generatedAt) < Date.parse(staticSnapshotGeneratedAt)) {
+      throw new Error('网络价格数据早于当前静态页面');
     } else if (!priceSnapshotsEqual(state.data, networkData)) {
-      writePriceCache(networkData);
       applyPriceData(networkData, { origin: 'network' });
     } else {
       state.dataOrigin = 'network';
@@ -1746,6 +1574,7 @@ async function initialize({ forceRefresh = false } = {}) {
       warning.textContent = '暂时无法获取更新';
       elements.updatedAt.append(warning);
       setLoadStatus('暂时无法获取更新，当前显示最近一次可用价格', { error: true });
+      setFiltersDisabled(false);
     } else {
       showLoadError(error);
     }
@@ -1769,5 +1598,4 @@ window.addEventListener('pageshow', () => {
   void refreshPriceFreshnessLifecycle();
 });
 
-removeLegacyPriceCaches();
 initialize();
