@@ -1189,13 +1189,29 @@ test('shows an actionable error and recovers after a temporary price-data outage
     await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
     assert.equal(await page.locator('#loadStatus').isVisible(), true);
     assert.equal(await page.locator('.workspace').getAttribute('aria-busy'), 'false');
-    assert.equal(await page.locator('#searchInput').isEnabled(), true);
+    assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), expectedData.countries.length, 'static table rows must remain readable');
+    assert.equal(await page.locator('#minimumSummary .minimum-card').count(), expectedData.tiers.length, 'static minimum cards must remain readable');
+    assert.equal(await page.locator('#retryButton').isEnabled(), true);
+    assert.equal(await page.locator('#searchInput').isEnabled(), false);
+    assert.equal(await page.locator('#regionSelect').isEnabled(), false);
+    assert.equal(await page.locator('button[data-sort]').first().isEnabled(), false);
+    assert.equal(await page.locator('button[data-sort-tier]').first().isEnabled(), false);
+    assert.equal(await page.locator('#minimumSummary .minimum-card').first().isEnabled(), false);
+    assert.equal(await page.locator('#priceRows .country-history-button').first().isEnabled(), false);
+    assert.equal(await page.locator('#publishedDateButton').isEnabled(), false);
     assert.equal(await page.locator('#loadStatusText').textContent(), '暂时无法获取更新，当前显示最近一次可用价格');
     assert.equal(await page.locator('#retryButton').textContent(), '重试');
     await page.locator('#retryButton').click();
     await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
     await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, expectedData.countries.length);
     assert.equal(await page.locator('#loadStatus').isVisible(), false);
+    assert.equal(await page.locator('#searchInput').isEnabled(), true);
+    assert.equal(await page.locator('#regionSelect').isEnabled(), true);
+    assert.equal(await page.locator('button[data-sort]').first().isEnabled(), true);
+    assert.equal(await page.locator('button[data-sort-tier]').first().isEnabled(), true);
+    assert.equal(await page.locator('#minimumSummary .minimum-card').first().isEnabled(), true);
+    assert.equal(await page.locator('#priceRows .country-history-button').first().isEnabled(), true);
+    assert.equal(await page.locator('#publishedDateButton').isEnabled(), true);
     assert.equal(await page.locator('.data-status').evaluate((element) => element.classList.contains('is-error')), false);
     assert.equal(attempts, 2);
   } finally {
@@ -1313,7 +1329,7 @@ test('rejects malformed price payloads and recovers without a full-page refresh'
         await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
         await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
         assert.equal(await page.locator('#loadStatusText').textContent(), '暂时无法获取更新，当前显示最近一次可用价格', label);
-        assert.equal(await page.locator('#searchInput').isEnabled(), true, label);
+        assert.equal(await page.locator('#searchInput').isEnabled(), false, label);
         serveValidData = true;
         await page.locator('#retryButton').click();
         await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
@@ -2677,7 +2693,7 @@ test('arbitrates static and network snapshots without a third state layer', { ti
           return { status: 200, contentType: 'application/json', body: JSON.stringify(data) };
         })(),
         expectRows: fixture.countries.length,
-        expectEnabled: true,
+        expectEnabled: false,
         expectRetry: true
       },
       {
@@ -2826,7 +2842,7 @@ test('rejects redirected, oversized, and malformed UTF-8 price responses before 
       }
       await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
       await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
-      assert.equal(await page.locator('#searchInput').isEnabled(), true, `${testCase.name} data must not replace the usable static snapshot`);
+      assert.equal(await page.locator('#searchInput').isEnabled(), false, `${testCase.name} unusable static fallback must keep JS controls disabled`);
       assert.equal(redirectTargetRequested, false, 'price fetch must not follow redirects');
       await page.close();
     }

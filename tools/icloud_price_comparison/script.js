@@ -433,6 +433,7 @@ function renderMinimumSummary() {
     item.className = 'minimum-card';
     item.classList.toggle('is-active-tier', isActiveTier);
     item.dataset.tier = tier.id;
+    if (winners[0]?.marketId) item.dataset.marketId = winners[0].marketId;
     item.setAttribute('aria-pressed', String(isActiveTier));
     item.title = `查看 ${tier.label} 全球最低价地区`;
 
@@ -1559,7 +1560,6 @@ async function initialize({ forceRefresh = false } = {}) {
       warning.textContent = '暂时无法获取更新';
       elements.updatedAt.append(warning);
       setLoadStatus('暂时无法获取更新，当前显示最近一次可用价格', { error: true });
-      setFiltersDisabled(false);
     } else {
       showLoadError(error);
     }
