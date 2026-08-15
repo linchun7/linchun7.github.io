@@ -97,7 +97,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   display: flex;
   align-items: center;
   gap: 11px;
+  color: inherit;
+  text-decoration: none;
 }
+.app-brand:hover .brand-copy h1 { color: var(--accent-dark); }
+.app-brand:focus-visible { outline: 2px solid var(--accent); outline-offset: 5px; border-radius: 8px; }
 
 .brand-mark {
   width: 36px;
@@ -298,13 +302,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .search-field input:focus, .select-field select:focus { background: var(--surface); border-color: var(--accent); box-shadow: 0 0 0 3px rgba(17, 104, 212, .12); }
 .search-field input:disabled, .select-field select:disabled { color: var(--muted); background: #f0f3f6; cursor: wait; opacity: .78; }
 .workspace[aria-busy="false"] .search-field input:disabled, .workspace[aria-busy="false"] .select-field select:disabled { cursor: not-allowed; }
-.clear-filters-button { min-height: 44px; padding: 0 12px; color: var(--accent-dark); background: var(--surface); border: 1px solid var(--line-strong); border-radius: 6px; font-weight: 680; white-space: nowrap; }
-.clear-filters-button[hidden] { display: none; }
 .ranking-scope-note { color: var(--accent-dark) !important; }
 
 .table-scroll { width: 100%; overflow: visible; }
 table { width: 100%; border-collapse: collapse; }
-.price-table caption { padding: 10px 18px; color: var(--muted); background: var(--surface-soft); font-size: 12px; text-align: left; caption-side: top; }
 .price-table { min-width: 1030px; table-layout: fixed; }
 
 th, td {
@@ -326,6 +327,7 @@ th {
 }
 
 .price-table th {
+  padding: 0;
   color: #33485c;
   background: #edf2f6;
   border-bottom-color: #cbd6df;
@@ -334,12 +336,14 @@ th {
 }
 .price-table th:nth-child(2), .price-table td:nth-child(2) { width: 220px; text-align: left; }
 .price-table th:nth-child(n+3), .price-table td:nth-child(n+3) { width: 154px; }
-.price-table th:last-child, .price-table td:last-child { padding-right: 26px; }
+.price-table td:last-child { padding-right: 26px; }
+.price-table th:last-child button { padding-right: 26px; }
 .price-table .rank-column, .price-table td:first-child { width: 48px; text-align: center; color: var(--muted); }
 
 th button {
   width: 100%;
-  padding: 0;
+  min-height: 44px;
+  padding: 9px 12px;
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
@@ -350,6 +354,7 @@ th button {
   font-weight: inherit;
   transition: color 120ms ease-out, background-color 120ms ease-out;
 }
+.price-table th button:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
 
 .price-table th:nth-child(2) button { justify-content: flex-start; }
 th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
@@ -362,13 +367,13 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
 .price-table tbody tr[data-market-id]:hover td, .price-table tbody tr[data-market-id]:focus-within td { background: #f8fbfe; }
 .price-table tbody tr[data-market-id]:hover .country-name { color: var(--accent-dark); }
 
-.country-history-button { position: relative; width: 100%; min-width: 0; padding: 4px 42px 4px 0; color: inherit; background: transparent; border: 0; text-align: left; }
+.country-history-button { position: relative; width: 100%; min-width: 0; padding: 4px 28px 4px 0; color: inherit; background: transparent; border: 0; text-align: left; }
 .country-history-button:disabled { cursor: default; opacity: 1; }
 .country-history-button:disabled .history-affordance { display: none; }
 .country-history-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .country-name { display: block; overflow: hidden; color: var(--ink); font-size: 15px; font-weight: 680; line-height: 1.18; text-overflow: ellipsis; }
 .country-name-en { display: block; margin-top: 3px; overflow: hidden; color: var(--muted); font-size: 12px; line-height: 1.2; text-overflow: ellipsis; }
-.history-affordance { position: absolute; top: 50%; right: 0; color: var(--muted); font-size: 12px; opacity: .7; transform: translateY(-50%); }
+.history-affordance { position: absolute; top: 50%; right: 2px; color: var(--muted); font-size: 20px; line-height: 1; opacity: .7; transform: translateY(-50%); transition: color 120ms ease-out, opacity 120ms ease-out; }
 .rank-top { color: var(--accent) !important; font-weight: 760; }
 
 .price-cell { min-width: 0; overflow: hidden; font-variant-numeric: tabular-nums; }
@@ -398,11 +403,11 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
 }
 
 .source-links { min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px; color: var(--muted); }
-.source-heading { color: var(--ink-soft); font-size: 13px; }
+.source-heading { display: inline-flex; align-items: center; gap: 5px; color: var(--ink-soft); font-size: 13px; }
 .source-group { min-width: 0; display: inline-flex; align-items: center; flex-wrap: wrap; gap: 9px 12px; }
 .source-item, .source-meta-button, .source-status { display: inline-flex; align-items: center; gap: 5px; }
 .source-item { white-space: nowrap; }
-.source-links svg { width: 15px; height: 15px; }
+.source-links svg { width: 15px; height: 15px; flex: 0 0 auto; display: block; }
 .source-meta-button { min-width: 0; padding: 0; color: var(--muted); background: transparent; border: 0; font: inherit; text-align: left; white-space: nowrap; cursor: pointer; }
 .source-meta-button:hover { color: var(--accent-dark); }
 .source-meta-button strong { color: var(--accent-dark); font-weight: 680; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
@@ -411,10 +416,6 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
 .source-separator { width: 1px; height: 16px; background: var(--line-strong); }
 .data-disclaimer { margin: 0; padding: 12px 18px; color: var(--muted); background: var(--surface-soft); border-top: 1px solid var(--line); font-size: 12px; }
 .data-disclaimer p { margin: 0; }
-.data-disclaimer details { margin-top: 8px; }
-.data-disclaimer summary { min-height: 44px; display: inline-flex; align-items: center; color: var(--accent-dark); cursor: pointer; font-weight: 680; }
-.data-disclaimer ul { margin: 2px 0 4px; padding-left: 20px; }
-.data-disclaimer li + li { margin-top: 3px; }
 
 .control-label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 12px; font-weight: 680; }
 .segmented { display: grid; grid-template-columns: repeat(var(--tier-count), minmax(62px, 1fr)); padding: 3px; min-height: 40px; background: #e7edf2; border-radius: 7px; }
@@ -423,6 +424,7 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
 
 @media (hover: hover) and (pointer: fine) {
   th button:hover { color: var(--accent-dark); background: rgba(17, 104, 212, .08); }
+  .country-history-button:hover .history-affordance { color: var(--accent-dark); opacity: 1; }
   .segmented button:hover:not([aria-pressed="true"]) { color: var(--ink); background: rgba(255, 255, 255, .58); }
 }
 
@@ -484,25 +486,25 @@ th button:active { background: rgba(17, 104, 212, .13); }
 .history-toolbar { padding: 16px 24px 0; }
 .segmented.compact { width: min(430px, 100%); min-height: 36px; }
 .segmented.compact button { min-height: 44px; padding: 4px 8px; font-size: 12px; }
-.chart-section, .history-list { padding: 20px 24px 24px; }
+.history-list { padding: 20px 24px 24px; }
 .history-list { padding-top: 0; }
 .section-heading { margin-bottom: 12px; display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
 .section-heading h3 { margin: 0; font-size: 16px; line-height: 1.25; letter-spacing: -.005em; }
 .section-heading span { color: var(--muted); font-size: 12px; }
-.chart-wrap { position: relative; width: 100%; height: 270px; }
-.chart-wrap canvas { display: block; max-width: 100%; }
-.empty-history { min-height: 210px; display: grid; place-content: center; justify-items: center; color: var(--muted); text-align: center; background: var(--surface-soft); border: 1px dashed var(--line-strong); border-radius: 6px; }
-.empty-history[hidden] { display: none; }
-.empty-history svg { width: 26px; height: 26px; margin-bottom: 8px; }
-.empty-history p { margin: 0; }
 .history-table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; }
-.history-table-scroll table { min-width: 720px; }
+.history-dialog:not(.source-history-dialog) .history-table-scroll table { width: 100%; min-width: 0; table-layout: fixed; }
 .history-table-scroll th, .history-table-scroll td { padding: 11px 12px; font-size: 12px; text-align: right; }
 .history-table-scroll th:first-child, .history-table-scroll td:first-child,
 #historyDialog .history-table-scroll th:nth-child(2),
 #historyDialog .history-table-scroll td:nth-child(2),
 .source-history-dialog .history-table-scroll th:last-child,
 .source-history-dialog .published-change-cell { text-align: left; }
+#historyDialog .history-table-scroll th:first-child,
+#historyDialog .history-table-scroll td:first-child { width: 42%; }
+#historyDialog .history-table-scroll th:nth-child(2),
+#historyDialog .history-table-scroll td:nth-child(2) { width: 22%; }
+#historyDialog .history-table-scroll th:last-child,
+#historyDialog .history-table-scroll td:last-child { width: 36%; }
 
 .page-footer { margin-top: 20px; margin-bottom: 28px; color: var(--muted); font-size: 12px; text-align: center; }
 .page-footer p { margin: 3px 0; }
@@ -551,24 +553,13 @@ th button:active { background: rgba(17, 104, 212, .13); }
   .history-current > div:last-child { grid-column: 1 / -1; border-top: 1px solid var(--line); }
   .history-current strong { overflow: visible; white-space: normal; }
   .history-current .price-trend { display: block; margin: 2px 0 0; }
-  .history-toolbar, .chart-section, .history-list { padding-left: 16px; padding-right: 16px; }
-  .history-dialog:not(.source-history-dialog) .history-table-scroll table { width: 100%; min-width: 0; table-layout: fixed; }
-  .history-dialog:not(.source-history-dialog) .history-table-scroll th:first-child,
-  .history-dialog:not(.source-history-dialog) .history-table-scroll td:first-child { width: 42%; }
-  .history-dialog:not(.source-history-dialog) .history-table-scroll th:nth-child(2),
-  .history-dialog:not(.source-history-dialog) .history-table-scroll td:nth-child(2) { width: 22%; }
-  .history-dialog:not(.source-history-dialog) .history-table-scroll [data-history-tier-header]:not(.is-active-tier),
-  .history-dialog:not(.source-history-dialog) .history-table-scroll [data-history-tier]:not(.is-active-tier) { display: none; }
-  .history-dialog:not(.source-history-dialog) .history-table-scroll [data-history-tier-header].is-active-tier,
-  .history-dialog:not(.source-history-dialog) .history-table-scroll [data-history-tier].is-active-tier { width: 36%; }
+  .history-toolbar, .history-list { padding-left: 16px; padding-right: 16px; }
   .source-history-dialog .history-table-scroll table { width: 100%; min-width: 0; }
   .source-history-dialog .history-table-scroll th:first-child { width: 104px; }
   .source-history-dialog .history-table-scroll th:last-child,
   .source-history-dialog .published-change-cell { width: auto; }
   .segmented { grid-template-columns: repeat(var(--tier-count), minmax(0, 1fr)); }
   .segmented button { padding-inline: 3px; font-size: 12px; }
-  .chart-wrap { height: 230px; }
-
   .source-history-dialog .history-table-scroll thead {
     display: block;
     position: absolute;
@@ -712,7 +703,7 @@ th button:active { background: rgba(17, 104, 212, .13); }
 .price-table { min-width: 0; }
 .price-table thead { position: relative; z-index: 4; }
 .price-table th { top: 0; }
-.price-table th button { min-height: 44px; margin: -9px -12px; padding: 9px 12px; }
+.price-table th button { min-height: 44px; }
 .price-table tbody tr.is-highlighted td { animation: row-highlight 1.8s ease-out; }
 @keyframes row-highlight { 0%, 35% { background: #fff2c6; } 100% { background: transparent; } }
 
@@ -772,9 +763,8 @@ th button:active { background: rgba(17, 104, 212, .13); }
   .price-table td:nth-child(2) { position: static; background: inherit; box-shadow: none; }
   .price-table th[data-tier].is-active-tier,
   .price-table td[data-tier].is-active-tier { width: auto; padding-right: 18px; }
-  .price-table th,
   .price-table td { padding: 10px 12px; }
-  .price-table th button { min-height: 44px; margin: -10px -12px; padding: 10px 12px; }
+  .price-table th button { min-height: 44px; padding: 10px 12px; }
   .price-table tbody tr { height: 70px; }
   .country-history-button { min-height: 44px; padding-block: 5px; }
   .price-local { font-size: 12px; }

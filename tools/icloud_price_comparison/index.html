@@ -21,13 +21,12 @@
 <!-- ICLOUD_STATIC_META:START -->
   <meta name="icloud-price-snapshot" content="2026-08-15T04:33:18.402Z" data-fingerprint="ac2515e0415d467fcd2bff4a73777ee88ae7ffba28d91f1d4d303f24bcb4727c" data-fx-stale="false">
 <!-- ICLOUD_STATIC_META:END -->
-  <script data-cfasync="false" src="price-bootstrap.js?v=42436b3f"></script>
-  <link rel="stylesheet" href="style.css?v=b0b99115">
-  <link rel="modulepreload" href="script.js?v=9fc173a1">
+  <link rel="stylesheet" href="style.css?v=1c2111a8">
+  <link rel="modulepreload" href="script.js?v=8cfbf297">
   <link rel="modulepreload" href="data-contract.js?v=f8779a1b">
   <link rel="modulepreload" href="data-model.js?v=1df20253">
-  <link rel="modulepreload" href="vendor/lucide-subset.js?v=657f4f9d">
-  <script data-cfasync="false" type="module" src="script.js?v=9fc173a1"></script>
+  <link rel="modulepreload" href="vendor/lucide-subset.js?v=c5106146">
+  <script data-cfasync="false" type="module" src="script.js?v=8cfbf297"></script>
   <link rel="shortcut icon" href="/images/favicon.ico">
   <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
   <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
@@ -36,13 +35,13 @@
   <a class="skip-link" href="#priceWorkspace" tabindex="0">跳到价格表</a>
   <header class="app-header">
     <div class="app-header-inner">
-      <div class="app-brand">
+      <a class="app-brand" href="./" aria-label="返回 iCloud+ 全球价格对比首页">
         <span class="brand-mark" aria-hidden="true"><i data-lucide="cloud"></i></span>
         <div class="brand-copy">
           <h1>iCloud+ 全球价格对比</h1>
           <p>比较 Apple iCloud+ 在全球不同国家和地区的月费，并换算为人民币。</p>
         </div>
-      </div>
+      </a>
       <div class="data-status">
         <i data-lucide="calendar-clock" aria-hidden="true"></i>
 <!-- ICLOUD_STATIC_STATUS:START -->
@@ -111,7 +110,7 @@
         <div class="workspace-heading">
           <h2>全球 iCloud+ 月费</h2>
 <!-- ICLOUD_STATIC_WORKSPACE_META:START -->
-          <p id="resultSummary" aria-live="polite">73 个地区 · 200GB 从低到高</p>
+          <p id="resultSummary" aria-live="polite">73 个地区 · 200 GB 从低到高</p>
           <p id="rankingScopeNote" class="ranking-scope-note" hidden>排名仍为全部地区中的全球参考排名</p>
 <!-- ICLOUD_STATIC_WORKSPACE_META:END -->
         </div>
@@ -133,7 +132,6 @@
               <option value="all">所有地区</option>
             </select>
           </label>
-          <button id="clearFiltersButton" class="clear-filters-button" type="button" hidden disabled>清除筛选</button>
         </div>
         <div class="mobile-tier-picker">
           <span class="control-label">容量</span>
@@ -142,11 +140,10 @@
       </div>
 
       <div class="table-scroll">
-        <table class="price-table" aria-describedby="resultSummary">
-          <caption>人民币金额按参考汇率换算，仅用于价格比较；下方为 Apple 当地月费。</caption>
+        <table class="price-table" aria-label="全球各地区 iCloud+ 月费" aria-describedby="resultSummary">
           <thead>
             <tr>
-              <th class="rank-column" scope="col"><span id="rankHeaderLabel"><span aria-hidden="true">全球排名</span><span class="visually-hidden">全球参考排名</span></span></th>
+              <th class="rank-column" scope="col"><span id="rankHeaderLabel"><span aria-hidden="true">排名</span><span class="visually-hidden">全球参考排名</span></span></th>
               <th scope="col" aria-sort="none"><button type="button" data-sort="country" disabled>国家/地区 <i data-lucide="arrow-up-down" aria-hidden="true"></i></button></th>
 <!-- ICLOUD_STATIC_TABLE_HEAD:START -->
               <th data-tier-header="true" data-tier="50GB" class="" scope="col" aria-sort="none">
@@ -175,7 +172,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">俄罗斯</span>
               <span class="country-name-en">Russia · RUB</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -219,7 +216,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">印度</span>
               <span class="country-name-en">India · INR</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -260,7 +257,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">台湾</span>
               <span class="country-name-en">Taiwan · TWD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -302,7 +299,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">加拿大</span>
               <span class="country-name-en">Canada · CAD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -343,7 +340,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">墨西哥</span>
               <span class="country-name-en">Mexico · MXN</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -384,7 +381,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">巴基斯坦</span>
               <span class="country-name-en">Pakistan · PKR</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -425,7 +422,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">马来西亚</span>
               <span class="country-name-en">Malaysia · MYR</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -466,7 +463,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">香港</span>
               <span class="country-name-en">Hong Kong · HKD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -507,7 +504,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">泰国</span>
               <span class="country-name-en">Thailand · THB</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -548,7 +545,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">巴林</span>
               <span class="country-name-en">Bahrain · USD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -589,7 +586,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">巴哈马</span>
               <span class="country-name-en">Bahamas · USD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -630,7 +627,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">吉尔吉斯斯坦</span>
               <span class="country-name-en">Kyrgyzstan · USD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -671,7 +668,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">柬埔寨</span>
               <span class="country-name-en">Cambodia · USD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -712,7 +709,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">塔吉克斯坦</span>
               <span class="country-name-en">Tajikistan · USD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -753,7 +750,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">美国</span>
               <span class="country-name-en">United States · USD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -794,7 +791,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">乌兹别克斯坦</span>
               <span class="country-name-en">Uzbekistan · USD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -835,7 +832,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">卡塔尔</span>
               <span class="country-name-en">Qatar · QAR</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -876,7 +873,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">中国大陆</span>
               <span class="country-name-en">China mainland · CNY</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -917,7 +914,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">韩国</span>
               <span class="country-name-en">Republic of Korea · KRW</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -958,7 +955,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">新加坡</span>
               <span class="country-name-en">Singapore · SGD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -999,7 +996,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">澳大利亚</span>
               <span class="country-name-en">Australia · AUD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -1040,7 +1037,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">哈萨克斯坦</span>
               <span class="country-name-en">Kazakhstan · KZT</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -1081,7 +1078,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">菲律宾</span>
               <span class="country-name-en">Philippines · PHP</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -1122,7 +1119,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">阿拉伯联合酋长国</span>
               <span class="country-name-en">United Arab Emirates · AED</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -1163,7 +1160,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">老挝</span>
               <span class="country-name-en">Laos · USD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -1204,7 +1201,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">罗马尼亚</span>
               <span class="country-name-en">Romania · RON</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -1245,7 +1242,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">印度尼西亚</span>
               <span class="country-name-en">Indonesia · IDR</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -1286,7 +1283,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">尼日利亚</span>
               <span class="country-name-en">Nigeria · NGN</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -1328,7 +1325,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">坦桑尼亚</span>
               <span class="country-name-en">Tanzania · TZS</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -1369,7 +1366,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">日本</span>
               <span class="country-name-en">Japan · JPY</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -1410,7 +1407,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">越南</span>
               <span class="country-name-en">Vietnam · VND</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -1451,7 +1448,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">欧盟</span>
               <span class="country-name-en">Euro Zone · EUR</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -1492,7 +1489,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">克罗地亚</span>
               <span class="country-name-en">Croatia · EUR</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -1533,7 +1530,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">沙特阿拉伯</span>
               <span class="country-name-en">Saudi Arabia · SAR</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -1574,7 +1571,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">亚美尼亚</span>
               <span class="country-name-en">Armenia · USD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -1615,7 +1612,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">阿塞拜疆</span>
               <span class="country-name-en">Azerbaijan · USD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -1656,7 +1653,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">巴巴多斯</span>
               <span class="country-name-en">Barbados · USD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -1697,7 +1694,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">贝宁</span>
               <span class="country-name-en">Benin · USD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -1738,7 +1735,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">白俄罗斯</span>
               <span class="country-name-en">Belarus · USD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -1779,7 +1776,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">Republic of Congo</span>
               <span class="country-name-en">USD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -1820,7 +1817,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">科特迪瓦</span>
               <span class="country-name-en">Ivory Coast · USD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -1861,7 +1858,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">喀麦隆</span>
               <span class="country-name-en">Cameroon · USD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -1902,7 +1899,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">格鲁吉亚</span>
               <span class="country-name-en">Georgia · USD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -1943,7 +1940,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">加纳</span>
               <span class="country-name-en">Ghana · USD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -1984,7 +1981,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">肯尼亚</span>
               <span class="country-name-en">Kenya · USD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -2025,7 +2022,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">摩尔多瓦</span>
               <span class="country-name-en">Moldova · USD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -2066,7 +2063,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">Mauritius</span>
               <span class="country-name-en">USD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -2107,7 +2104,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">尼泊尔</span>
               <span class="country-name-en">Nepal · USD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -2148,7 +2145,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">塞内加尔</span>
               <span class="country-name-en">Senegal · USD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -2189,7 +2186,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">苏里南</span>
               <span class="country-name-en">Suriname · USD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -2230,7 +2227,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">乌干达</span>
               <span class="country-name-en">Uganda · USD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -2271,7 +2268,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">赞比亚</span>
               <span class="country-name-en">Zambia · USD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -2312,7 +2309,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">津巴布韦</span>
               <span class="country-name-en">Zimbabwe · USD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -2353,7 +2350,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">新西兰</span>
               <span class="country-name-en">New Zealand · NZD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -2394,7 +2391,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">保加利亚</span>
               <span class="country-name-en">Bulgaria · BGN</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -2435,7 +2432,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">土耳其</span>
               <span class="country-name-en">Türkiye · TRY</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -2476,7 +2473,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">埃及</span>
               <span class="country-name-en">Egypt · EGP</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -2517,7 +2514,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">阿尔巴尼亚</span>
               <span class="country-name-en">Albania · USD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -2558,7 +2555,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">智利</span>
               <span class="country-name-en">Chile · CLP</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -2599,7 +2596,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">冰岛</span>
               <span class="country-name-en">Iceland · USD</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -2640,7 +2637,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">瑞士</span>
               <span class="country-name-en">Switzerland · CHF</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -2681,7 +2678,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">南非</span>
               <span class="country-name-en">South Africa · ZAR</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -2722,7 +2719,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">捷克</span>
               <span class="country-name-en">Czechia · CZK</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -2763,7 +2760,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">秘鲁</span>
               <span class="country-name-en">Peru · PEN</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -2804,7 +2801,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">巴西</span>
               <span class="country-name-en">Brazil · BRL</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -2845,7 +2842,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">丹麦</span>
               <span class="country-name-en">Denmark · DKK</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -2886,7 +2883,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">以色列</span>
               <span class="country-name-en">Israel · ILS</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -2927,7 +2924,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">波兰</span>
               <span class="country-name-en">Poland · PLN</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -2968,7 +2965,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">英国</span>
               <span class="country-name-en">United Kingdom · GBP</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -3009,7 +3006,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">瑞典</span>
               <span class="country-name-en">Sweden · SEK</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -3050,7 +3047,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">匈牙利</span>
               <span class="country-name-en">Hungary · HUF</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -3091,7 +3088,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">哥伦比亚</span>
               <span class="country-name-en">Colombia · COP</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -3132,7 +3129,7 @@
               <button class="country-history-button" type="button" disabled>
               <span class="country-name">挪威</span>
               <span class="country-name-en">Norway · NOK</span>
-              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="history-affordance" aria-hidden="true">›</span>
               <span class="visually-hidden">，查看 Apple 当地标价历史</span>
               </button>
             </td>
@@ -3173,8 +3170,8 @@
       </div>
 
       <div class="workspace-footer">
-        <div class="source-links" id="sourceLinks" role="group" aria-label="数据来源与说明">
-          <strong class="source-heading"><i data-lucide="database" aria-hidden="true"></i>数据来源与说明</strong>
+        <div class="source-links" id="sourceLinks" role="group" aria-label="数据来源">
+          <strong class="source-heading"><i data-lucide="database" aria-hidden="true"></i>数据来源</strong>
           <div class="source-group">
             <a class="source-item" href="https://support.apple.com/en-us/108047" target="_blank" rel="noopener noreferrer"><i data-lucide="badge-check" aria-hidden="true"></i>价格来源：Apple</a>
 <!-- ICLOUD_STATIC_APPLE_META:START -->
@@ -3196,8 +3193,7 @@
         </div>
       </div>
       <div class="data-disclaimer">
-        <p>价格来自 Apple 官方支持页；人民币金额按参考汇率换算，仅用于比较。实际扣费可能受税费、账号地区、已有订阅方案等因素影响。</p>
-        <details><summary><i data-lucide="landmark" aria-hidden="true"></i>价格与数据说明</summary><ul><li>价格以 Apple 英文支持页最新版本为准；</li><li>中文地区名称参考 Apple 简体中文支持页；</li><li>两个语言版本的页面更新时间可能不同；</li><li>部分地区可能存在税费、历史订阅价格或其他条件；</li><li>实际账单以 Apple 账号结算结果为准。</li></ul></details>
+        <p>价格来自 Apple 官方支持页，中文地区名称参考 Apple 简体中文支持页；人民币金额按参考汇率换算，仅用于比较。实际扣费可能受税费、账号地区、已有订阅方案等因素影响，以 Apple 实际结算为准。</p>
       </div>
     </section>
   </main>
@@ -3224,17 +3220,11 @@
       <div class="segmented compact" id="historyTierControl" role="group" aria-label="历史价格容量"></div>
     </div>
 
-    <section class="chart-section" aria-labelledby="chartTitle">
-      <div class="section-heading"><h3 id="chartTitle">价格变化</h3><span id="chartCurrency"></span></div>
-      <div class="chart-wrap" id="chartWrap"><canvas id="historyChart" role="img" aria-label="价格变化图，详细数据见下方变更记录"></canvas></div>
-      <div class="empty-history" id="emptyHistory" hidden><i data-lucide="calendar-clock" aria-hidden="true"></i><p>Apple 当地标价暂时没有变化记录。</p></div>
-    </section>
-
     <section class="history-list" aria-labelledby="historyListTitle">
       <div class="section-heading"><h3 id="historyListTitle">变更记录</h3></div>
       <div class="history-table-scroll">
         <table>
-          <thead><tr><th scope="col">记录日期</th><th scope="col">币种</th><th data-history-tier-placeholder scope="col"><span class="visually-hidden">容量</span></th><th data-history-tier-placeholder scope="col"><span class="visually-hidden">容量</span></th><th data-history-tier-placeholder scope="col"><span class="visually-hidden">容量</span></th><th data-history-tier-placeholder scope="col"><span class="visually-hidden">容量</span></th><th data-history-tier-placeholder scope="col"><span class="visually-hidden">容量</span></th></tr></thead>
+          <thead><tr><th scope="col">记录日期</th><th scope="col">币种</th><th id="historyTierHeader" scope="col">容量</th></tr></thead>
           <tbody id="historyRows"></tbody>
         </table>
       </div>
