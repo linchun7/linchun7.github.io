@@ -254,6 +254,36 @@ test('retries HTTP failure, timeout, malformed prices, and stale static HTML wit
   }
 });
 
+test('aborts pending sibling requests when one resource fails fast before retry', async (t) => {
+  const server = await startSequenceServer([{ artifact: expected }]);
+  t.after(() => server.close());
+  const pendingSignals = [];
+
+  const fetchImpl = async (url, options = {}) => {
+    const parsedUrl = new URL(url, 'http://localhost');
+    const token = parsedUrl.searchParams.get('verify') ?? '';
+    const attempt = Number(token.match(/-(\d+)$/)?.[1] ?? 1);
+    if (attempt === 1 && parsedUrl.pathname === new URL(server.urls.productionPricesUrl).pathname) {
+      return new Response('{}', { status: 503, headers: { 'content-type': 'application/json' } });
+    }
+    if (attempt === 1) {
+      pendingSignals.push(options.signal);
+      return new Promise((resolve, reject) => {
+        const abort = () => reject(new DOMException('Aborted', 'AbortError'));
+        if (options.signal.aborted) abort();
+        else options.signal.addEventListener('abort', abort, { once: true });
+      });
+    }
+    return globalThis.fetch(url, options);
+  };
+
+  const result = await verifyProductionDeployment(expected, fastOptions(server, { fetchImpl }));
+  assert.equal(result.status, 'deployed');
+  assert.equal(result.attempts, 2);
+  assert.equal(pendingSignals.length, 3);
+  for (const signal of pendingSignals) assert.equal(signal.aborted, true);
+});
+
 test('rejects non-cross-checked prices and mismatched finishedAt', async () => {
   for (const mutate of [
     (prices) => { prices.source.parser = 'document-order'; },

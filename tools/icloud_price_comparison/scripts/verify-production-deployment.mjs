@@ -229,6 +229,7 @@ export async function verifyProductionDeployment(expectedArtifact, {
         ? 'request-timeout'
         : error.reason ?? `retryable-response:${String(error?.message ?? error).slice(0, 160).replace(/[\r\n]+/g, ' ')}`;
     } finally {
+      controller.abort();
       clearTimeout(timeout);
     }
     log(`Production verification attempt ${attempts}: observed=${lastObservedGeneratedAt ?? 'unavailable'} result=${lastReason}`);
