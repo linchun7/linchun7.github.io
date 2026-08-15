@@ -170,8 +170,9 @@ export function assertArchiveCountriesAreKnown(parsed, names, fileName = 'archiv
     .map(({ country }) => country)
     .filter((country) => {
       const market = resolveMarket(country);
-      const displayName = getOfficialChineseMarketName(market.id, names) ?? names[country];
-      return typeof displayName !== 'string' || !displayName.trim();
+      if (!market.unknown) return false;
+      const legacyDisplayName = names[country];
+      return typeof legacyDisplayName !== 'string' || !legacyDisplayName.trim();
     });
   if (unknownCountries.length) {
     throw new Error(`${fileName} contains countries outside the reviewed Apple country list: ${unknownCountries.join(', ')}`);

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { getOfficialChineseMarketName } from './country-names.mjs';
+import { getOfficialChineseMarketName, getOfficialChineseMarketNames } from './country-names.mjs';
 
 const DEFINITIONS = [
   ['bs', 'Bahamas'], ['bb', 'Barbados'], ['br', 'Brazil'], ['ca', 'Canada'], ['cl', 'Chile'],
@@ -49,9 +49,11 @@ function slugify(value) {
 export function createMarketResolver(registry = MARKET_REGISTRY) {
   const byName = new Map();
   const knownIds = new Set();
+  const knownById = new Map();
   for (const market of Object.values(registry)) {
     if (knownIds.has(market.id)) throw new Error(`Duplicate marketId in registry: ${market.id}`);
     knownIds.add(market.id);
+    knownById.set(market.id, market);
     for (const name of [market.canonicalName, ...(market.aliases ?? [])]) {
       const key = normalizedNameKey(name);
       if (byName.has(key)) throw new Error(`Duplicate market name or alias in registry: ${name}`);
@@ -69,7 +71,12 @@ export function createMarketResolver(registry = MARKET_REGISTRY) {
     };
     const digest = createHash('sha256').update(name).digest('hex').slice(0, 8);
     const id = `apple-${slugify(name)}-${digest}`;
-    if (knownIds.has(id)) throw new Error(`Generated marketId collides with registry: ${id}`);
+    if (knownIds.has(id)) {
+      throw reservedIdentityCollisionError(id, name, [{
+        sourceName: knownById.get(id).canonicalName,
+        location: 'market-registry.mjs'
+      }]);
+    }
     return { id, canonicalName: name, sourceName: name, nameZh: name, aliases: [], unknown: true };
   };
 }
@@ -95,6 +102,7 @@ function publishedIdentityError(message) {
 export function buildPublishedMarketIdentityIndex(previousData, previousHistory) {
   const bySourceName = new Map();
   const sourceNamesById = new Map();
+  const ownersById = new Map();
   const add = (sourceName, marketId, location) => {
     const name = normalizedName(sourceName);
     const identityKey = normalizedNameKey(name);
@@ -106,6 +114,11 @@ export function buildPublishedMarketIdentityIndex(previousData, previousHistory)
     const names = sourceNamesById.get(marketId) ?? new Set();
     names.add(normalizedNameKey(name));
     sourceNamesById.set(marketId, names);
+    const owners = ownersById.get(marketId) ?? [];
+    if (!owners.some((owner) => owner.identityKey === identityKey && owner.location === location)) {
+      owners.push({ sourceName: name, identityKey, location });
+    }
+    ownersById.set(marketId, owners);
   };
   if (previousData?.schemaVersion === 4) {
     for (const country of previousData.countries ?? []) add(country.country, country.marketId, 'prices.json');
@@ -115,7 +128,17 @@ export function buildPublishedMarketIdentityIndex(previousData, previousHistory)
       add(record.country, marketId, 'history.json');
     }
   }
-  return { bySourceName, sourceNamesById };
+  return { bySourceName, sourceNamesById, ownersById };
+}
+
+function reservedIdentityCollisionError(generatedMarketId, newSourceName, owners) {
+  const reserved = owners.map(({ sourceName, location }) => `${sourceName} (${location})`).join(', ');
+  const error = new Error(`MARKET_IDENTITY_RESERVED_ID_COLLISION: generatedMarketId=${generatedMarketId}; newSourceName=${newSourceName}; reserved=${reserved}`);
+  error.code = 'MARKET_IDENTITY_RESERVED_ID_COLLISION';
+  error.generatedMarketId = generatedMarketId;
+  error.newSourceName = newSourceName;
+  error.reservedOwners = owners.map(({ sourceName, location }) => ({ sourceName, location }));
+  return error;
 }
 
 export function createPublishedMarketResolver(previousData, previousHistory, {
@@ -128,7 +151,11 @@ export function createPublishedMarketResolver(previousData, previousHistory, {
     if (!resolved.unknown) return resolved;
     const name = normalizedName(sourceName);
     const historical = published.bySourceName.get(normalizedNameKey(name));
-    if (!historical) return resolved;
+    if (!historical) {
+      const reservedOwners = published.ownersById.get(resolved.id);
+      if (reservedOwners?.length) throw reservedIdentityCollisionError(resolved.id, name, reservedOwners);
+      return resolved;
+    }
     return {
       ...resolved,
       id: historical.marketId,
@@ -182,6 +209,7 @@ export function validateMarketIdentityContinuity(previousData, previousHistory, 
 
 export function attachMarketIdentity(countries, {
   onUnknown = () => {},
+  onChineseNamePending = () => {},
   resolve = resolveMarket,
   chineseNames = null
 } = {}) {
@@ -194,12 +222,12 @@ export function attachMarketIdentity(countries, {
     }
     ids.set(market.id, country.country);
     if (market.unknown) onUnknown(market, country);
+    const officialName = getOfficialChineseMarketName(market.id, chineseNames ?? undefined);
+    if (officialName === null) onChineseNamePending(market, country);
     return {
       ...country,
       marketId: market.id,
-      nameZh: market.unknown
-        ? country.country
-        : (getOfficialChineseMarketName(market.id, chineseNames ?? undefined) ?? country.country)
+      nameZh: officialName ?? country.country
     };
   });
 }
@@ -210,8 +238,8 @@ export function validateMarketRegistry(registry = MARKET_REGISTRY) {
   }
   createMarketResolver(registry);
   for (const market of Object.values(registry)) {
-    if (!getOfficialChineseMarketName(market.id)) {
-      throw new Error(`Market registry is missing an official Chinese name for marketId: ${market.id}`);
+    if (!Object.hasOwn(getOfficialChineseMarketNames(), market.id)) {
+      throw new Error(`Market registry is missing a Chinese-name authority record for marketId: ${market.id}`);
     }
   }
   return registry;

@@ -86,7 +86,9 @@ test('committed prices and history form a complete usable snapshot', async () =>
     seen.add(country.country);
     assert.ok(!seenMarketIds.has(country.marketId), `duplicate marketId: ${country.marketId}`);
     seenMarketIds.add(country.marketId);
-    assert.equal(country.nameZh, names[country.marketId] ?? country.country);
+    if (typeof names[country.marketId] === 'string') {
+      assert.equal(country.nameZh, names[country.marketId]);
+    }
     for (const { id } of data.tiers) {
       const plan = country.plans[id];
       assert.ok(plan && Number.isFinite(plan.price) && plan.price > 0, `invalid ${id}: ${country.country}`);

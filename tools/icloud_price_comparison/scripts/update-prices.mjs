@@ -80,6 +80,10 @@ function appleConfirmationMismatchError(message, cause = null) {
   return error;
 }
 
+function appleConfirmationUnstableError(message, cause = null) {
+  return transientHealthcheckError(message, { code: 'APPLE_CONFIRMATION_UNSTABLE', cause });
+}
+
 export function classifyHealthcheckFailure(error) {
   return error?.healthcheckSeverity === 'transient' ? 'transient' : 'severe';
 }
@@ -397,7 +401,8 @@ async function readJsonWithExistence(filePath, fallback = null) {
 export async function getExchangeRates(previousData, {
   apiKey = process.env.EXCHANGE_RATE_API_KEY,
   requiredCurrencies = [],
-  networkBudget = createNetworkBudget()
+  networkBudget = createNetworkBudget(),
+  now = new Date()
 } = {}) {
   const normalizedApiKey = typeof apiKey === 'string' ? apiKey.trim() : '';
   const sources = [];
@@ -431,7 +436,7 @@ export async function getExchangeRates(previousData, {
         networkBudget
       });
       const parsed = parseExchangeRatePayload(payload, source.ratesField);
-      validateExchangeRateFreshness(parsed.fetchedAt);
+      validateExchangeRateFreshness(parsed.fetchedAt, now);
       const missingRequiredRates = requiredCurrencies.filter(
         (currency) => !Number.isFinite(parsed.rates[currency]) || parsed.rates[currency] <= 0
       );
@@ -441,6 +446,20 @@ export async function getExchangeRates(previousData, {
           'missing-rates'
         );
       }
+      const selectedRates = selectRequiredRates(parsed.rates, requiredCurrencies);
+      const candidate = {
+        sourceUrl: source.url,
+        sourceMode: source.sourceMode,
+        base: 'USD',
+        fetchedAt: parsed.fetchedAt,
+        stale: false,
+        reusePreviousCny: false,
+        rates: selectedRates
+      };
+      const sanity = validateFxSanity(previousData, candidate, {
+        now,
+        currentCurrencies: requiredCurrencies
+      });
       const fallbackUsed = Boolean(normalizedApiKey && source.sourceMode === 'open-access');
       const fallbackReason = fallbackUsed ? failures[0]?.reason ?? 'request-failed' : null;
       const apiKeyStatus = normalizedApiKey
@@ -450,21 +469,17 @@ export async function getExchangeRates(previousData, {
         console.info('认证汇率来源不可用，已使用开放接口。');
       }
       return {
-        sourceUrl: source.url,
-        sourceMode: source.sourceMode,
+        ...candidate,
         fallbackUsed,
         fallbackReason,
         apiKeyStatus,
-        base: 'USD',
-        fetchedAt: parsed.fetchedAt,
-        stale: false,
-        reusePreviousCny: false,
-        rates: selectRequiredRates(parsed.rates, requiredCurrencies)
+        sanity
       };
     } catch (error) {
       failures.push({
         sourceMode: source.sourceMode,
-        reason: error.fxReason ?? 'request-failed',
+        reason: error.code === 'FX_SANITY_FAILURE' ? 'sanity-failed' : error.fxReason ?? 'request-failed',
+        code: error.code ?? null,
         message: error.message
       });
     }
@@ -472,7 +487,7 @@ export async function getExchangeRates(previousData, {
 
   const failureMessage = failures.map(({ sourceMode, message }) => `${sourceMode}: ${message}`).join('; ');
   try {
-    validateExchangeRateFreshness(previousData?.fx?.fetchedAt);
+    validateExchangeRateFreshness(previousData?.fx?.fetchedAt, now);
   } catch (error) {
     throw transientHealthcheckError(`${failureMessage}; previous exchange-rate-derived prices are unusable: ${error.message}`, {
       code: 'EXCHANGE_RATE_SOURCES_UNAVAILABLE',
@@ -481,6 +496,7 @@ export async function getExchangeRates(previousData, {
   }
 
   const previousRates = previousData?.fx?.rates;
+  const sanityFallbackUsed = failures.some(({ code }) => code === 'FX_SANITY_FAILURE');
   if (previousRates?.USD === 1 && Number.isFinite(previousRates.CNY) && previousRates.CNY > 0) {
     const missingPreviousRates = requiredCurrencies.filter(
       (currency) => !Number.isFinite(previousRates[currency]) || previousRates[currency] <= 0
@@ -499,7 +515,12 @@ export async function getExchangeRates(previousData, {
       fallbackReason: failures[0]?.reason ?? 'request-failed',
       apiKeyStatus: normalizedApiKey ? failures[0]?.reason ?? 'request-failed' : 'not-configured',
       reusePreviousCny: false,
-      rates: selectRequiredRates(previousRates, requiredCurrencies)
+      rates: selectRequiredRates(previousRates, requiredCurrencies),
+      sanity: {
+        status: 'fallback',
+        warnings: sanityFallbackUsed ? ['FX_SANITY_FALLBACK_TO_PREVIOUS'] : ['FX_SANITY_SKIPPED_NO_CURRENT_RATES'],
+        checks: []
+      }
     };
   }
 
@@ -512,7 +533,12 @@ export async function getExchangeRates(previousData, {
       fallbackReason: failures[0]?.reason ?? 'request-failed',
       apiKeyStatus: normalizedApiKey ? failures[0]?.reason ?? 'request-failed' : 'not-configured',
       reusePreviousCny: true,
-      rates: null
+      rates: null,
+      sanity: {
+        status: 'fallback',
+        warnings: sanityFallbackUsed ? ['FX_SANITY_FALLBACK_TO_PREVIOUS'] : ['FX_SANITY_SKIPPED_NO_CURRENT_RATES'],
+        checks: []
+      }
     };
   }
 
@@ -714,7 +740,9 @@ export function validateCountryNameMapping(mapping, registry = MARKET_REGISTRY) 
     throw new Error('Chinese country-name mapping is missing or oversized');
   }
   for (const [marketId, displayName] of entries) {
-    if (UNSAFE_OBJECT_KEYS.has(marketId) || !isSafeMappingText(marketId) || !isSafeMappingText(displayName)) {
+    if (UNSAFE_OBJECT_KEYS.has(marketId)
+      || !isSafeMappingText(marketId)
+      || (displayName !== null && !isSafeMappingText(displayName))) {
       throw new Error(`Chinese country-name mapping has an unsafe entry: ${logInline(marketId)}`);
     }
   }
@@ -740,6 +768,7 @@ export function updateHistory(previousHistory, countries, observedAt, tiers, obs
   let changed = history.schemaVersion !== targetSchemaVersion;
   history.schemaVersion = targetSchemaVersion;
   let changedCountries = 0;
+  let metadataChanged = false;
 
   for (const country of countries) {
     const recordKey = usesMarketIds ? country.marketId : country.country;
@@ -748,10 +777,14 @@ export function updateHistory(previousHistory, countries, observedAt, tiers, obs
       throw new Error(`Price history is missing marketId for ${country.country}`);
     }
     const existingRecord = Object.hasOwn(records, recordKey) ? records[recordKey] : null;
-    if (!existingRecord
+    const recordMetadataChanged = !existingRecord
       || (usesMarketIds && existingRecord.country !== country.country)
       || existingRecord?.nameZh !== country.nameZh
-      || existingRecord?.region !== country.region) changed = true;
+      || existingRecord?.region !== country.region;
+    if (recordMetadataChanged) {
+      changed = true;
+      metadataChanged = true;
+    }
     const record = existingRecord ?? {
       ...(usesMarketIds ? { country: country.country } : {}),
       nameZh: country.nameZh,
@@ -781,7 +814,7 @@ export function updateHistory(previousHistory, countries, observedAt, tiers, obs
     records[recordKey] = record;
   }
   if (changed) history.updatedAt = observedAtUtc ?? new Date().toISOString();
-  return { history, changedCountries, changed };
+  return { history, changedCountries, metadataChanged, changed };
 }
 
 export function publicationDateKey(value) {
@@ -1542,34 +1575,57 @@ function localPriceVector(country) {
     .sort(([first], [second]) => first.localeCompare(second));
 }
 
+function canonicalTierIdSet(country) {
+  return Object.keys(country?.plans ?? {}).sort().join('\u0000');
+}
+
 export function validateAppleMarketRenameReview(previousData, confirmedCountries, resolve) {
-  if (!previousData?.countries?.length) return { status: 'passed' };
+  if (!previousData?.countries?.length) return { status: 'passed', warnings: [] };
   const currentNames = new Set(confirmedCountries.map(({ country }) => country));
   const removed = previousData.countries.filter(({ country }) => !currentNames.has(country));
   const candidates = [];
   for (const added of confirmedCountries) {
     const market = resolve(added.country);
     if (!market.unknown || market.published) continue;
-    const addedVector = JSON.stringify(localPriceVector(added));
     for (const old of removed) {
       if (old.region === added.region
         && old.currency === added.currency
-        && JSON.stringify(localPriceVector(old)) === addedVector) {
-        candidates.push({ old, added });
+        && canonicalTierIdSet(old) === canonicalTierIdSet(added)) {
+        candidates.push({
+          old,
+          added,
+          pricesMatch: JSON.stringify(localPriceVector(old)) === JSON.stringify(localPriceVector(added))
+        });
       }
     }
   }
-  if (!candidates.length) return { status: 'passed' };
-  const details = candidates
-    .map(({ old, added }) => `${old.country} (${old.marketId}) -> ${added.country}`)
+  if (!candidates.length) return { status: 'passed', warnings: [] };
+  const diagnostics = candidates.map(({ old, added, pricesMatch }) => ({
+    oldSourceName: old.country,
+    newSourceName: added.country,
+    oldMarketId: old.marketId,
+    region: added.region,
+    currency: added.currency,
+    pricesMatch
+  }));
+  const exactCandidates = diagnostics.filter(({ pricesMatch }) => pricesMatch);
+  const exactCountByOld = new Map();
+  const exactCountByNew = new Map();
+  for (const candidate of exactCandidates) {
+    exactCountByOld.set(candidate.oldMarketId, (exactCountByOld.get(candidate.oldMarketId) ?? 0) + 1);
+    exactCountByNew.set(candidate.newSourceName, (exactCountByNew.get(candidate.newSourceName) ?? 0) + 1);
+  }
+  const uniqueExactCandidates = exactCandidates.filter((candidate) => (
+    exactCountByOld.get(candidate.oldMarketId) === 1
+    && exactCountByNew.get(candidate.newSourceName) === 1
+  ));
+  if (!uniqueExactCandidates.length) return { status: 'suspected', warnings: diagnostics };
+  const details = uniqueExactCandidates
+    .map(({ oldSourceName, oldMarketId, newSourceName }) => `${oldSourceName} (${oldMarketId}) -> ${newSourceName}`)
     .join('; ');
   const error = new Error(`MARKET_IDENTITY_RENAME_REVIEW_REQUIRED: ${details}. Add the new Apple source name as an alias for the published marketId, then rerun.`);
   error.code = 'MARKET_IDENTITY_RENAME_REVIEW_REQUIRED';
-  error.candidates = candidates.map(({ old, added }) => ({
-    oldSourceName: old.country,
-    newSourceName: added.country,
-    oldMarketId: old.marketId
-  }));
+  error.candidates = uniqueExactCandidates;
   throw error;
 }
 
@@ -2275,6 +2331,20 @@ export function buildActionSummaryLines(data, summary, trigger = resolveTriggerS
   for (const market of summary.unknownMarkets ?? []) {
     warnings.push(`- **UNKNOWN_APPLE_MARKET**：${markdownInline(market.sourceName)} → ${markdownInline(market.generatedMarketId ?? market.id)}；分区 ${markdownInline(market.region ?? 'unknown')}；币种 ${markdownInline(market.currency ?? 'unknown')}`);
   }
+  for (const market of summary.chineseNamePendingMarkets ?? []) {
+    warnings.push(`- **CHINESE_MARKET_NAME_PENDING**：marketId=${markdownInline(market.marketId)}；sourceName=${markdownInline(market.sourceName)}；暂用 Apple 英文名称显示`);
+  }
+  for (const suspicion of summary.marketIdentityRenameSuspicions ?? []) {
+    warnings.push(`- **MARKET_IDENTITY_RENAME_SUSPECTED**：newSourceName=${markdownInline(suspicion.newSourceName)}；candidate oldSourceName=${markdownInline(suspicion.oldSourceName)}；candidate oldMarketId=${markdownInline(suspicion.oldMarketId)}；分区 ${markdownInline(suspicion.region)}；币种 ${markdownInline(suspicion.currency)}；pricesMatch=${suspicion.pricesMatch === true ? 'true' : 'false'}；自动发布继续`);
+  }
+  for (const anomaly of summary.confirmedPriceAnomalies ?? []) {
+    const authority = anomaly.code === 'PRICE_CHANGE_ANOMALY_CONFIRMED'
+      ? 'Apple 当地价格独立确认'
+      : anomaly.code === 'FX_DERIVED_CHANGE_ANOMALY_ACCEPTED'
+        ? `FX policy accepted（${markdownInline(anomaly.fxSanityStatus ?? 'unknown')}）`
+        : `Apple 币种确认 + FX sanity（${markdownInline(anomaly.fxSanityStatus ?? 'unknown')}）`;
+    warnings.push(`- **${anomaly.code}**：marketId=${markdownInline(anomaly.marketId ?? 'unknown')}；sourceName=${markdownInline(anomaly.sourceName)}；tier=${markdownInline(anomaly.tier)}；type=${markdownInline(anomaly.type)}；previous=${markdownInline(JSON.stringify(anomaly.previous))}；current=${markdownInline(JSON.stringify(anomaly.current))}；${authority}，自动发布继续`);
+  }
 
   const lines = [
     '## iCloud+ 价格更新',
@@ -2369,9 +2439,9 @@ export async function main({
       { filePath: runLogPath, value: structuredClone(previousRunLog), text: previousRunLogState.text, existed: previousRunLogState.existed }
     ];
     validateCountryNameMapping(countryNames);
-    const html = await fetchResource(APPLE_URL, { networkBudget });
+    let html = await fetchResource(APPLE_URL, { networkBudget });
 
-  const parsed = parseApplePrices(html, { allowUnknownCountries: true });
+  let parsed = parseApplePrices(html, { allowUnknownCountries: true });
   lastAppleSnapshot = normalizeAppleSnapshot(parsed);
   if (parsed.parser !== 'cross-checked') {
     throw new Error(`Apple parser redundancy failed closed: ${logInline(parsed.parserStatus)}`);
@@ -2381,36 +2451,81 @@ export async function main({
   }
   validatePrices(parsed.countries, { tiers: parsed.tiers });
   let confirmedRemovedCountries = [];
+  let appleSemanticConfirmed = false;
   if (!previousData || appleSemanticChanged(previousData, parsed)) {
-    let confirmationHtml;
-    try {
-      confirmationHtml = await fetchResource(APPLE_URL, {
-        networkBudget,
-        cache: 'no-store',
-        headers: { 'cache-control': 'no-cache', pragma: 'no-cache' },
-        resourceName: 'Apple iCloud+ pricing semantic-change confirmation'
-      });
-    } catch (error) {
-      throw appleConfirmationUnavailableError(error);
-    }
-    let confirmationParsed;
-    try {
-      confirmationParsed = parseApplePrices(confirmationHtml, { allowUnknownCountries: true });
-    } catch (error) {
-      throw appleConfirmationMismatchError(
-        'Apple confirmation did not produce two matching parser results',
-        error
-      );
+    const fetchConfirmation = async (resourceName) => {
+      try {
+        return await fetchResource(APPLE_URL, {
+          networkBudget,
+          cache: 'no-store',
+          headers: { 'cache-control': 'no-cache', pragma: 'no-cache' },
+          resourceName
+        });
+      } catch (error) {
+        throw appleConfirmationUnavailableError(error);
+      }
+    };
+    const parseConfirmation = (sampleHtml) => {
+      try {
+        const sampleParsed = parseApplePrices(sampleHtml, { allowUnknownCountries: true });
+        if (sampleParsed.parser !== 'cross-checked') return { parsed: null, error: new Error('Apple confirmation parser redundancy degraded') };
+        validatePrices(sampleParsed.countries, { tiers: sampleParsed.tiers });
+        return { parsed: sampleParsed, error: null };
+      } catch (error) {
+        return { parsed: null, error };
+      }
+    };
+    const confirmationHtml = await fetchConfirmation('Apple iCloud+ pricing semantic-change confirmation');
+    const confirmation = parseConfirmation(confirmationHtml);
+    let matchingParsed = confirmation.parsed;
+    let authoritativeParsed = parsed;
+    let authoritativeHtml = html;
+    const initialHash = appleSemanticHash(parsed);
+    const confirmationHash = confirmation.parsed ? appleSemanticHash(confirmation.parsed) : null;
+    if (!confirmation.parsed || confirmationHash !== initialHash) {
+      const thirdHtml = await fetchConfirmation('Apple iCloud+ pricing semantic-change tie-break confirmation');
+      const third = parseConfirmation(thirdHtml);
+      if (!third.parsed) {
+        throw appleConfirmationUnstableError(
+          'Apple semantic confirmation could not form two matching cross-checked samples; stable data was preserved for an automatic retry',
+          third.error ?? confirmation.error
+        );
+      }
+      const thirdHash = appleSemanticHash(third.parsed);
+      if (!confirmation.parsed && thirdHash === initialHash) {
+        matchingParsed = third.parsed;
+      } else if (confirmation.parsed && confirmationHash === thirdHash && confirmationHash !== initialHash) {
+        authoritativeParsed = confirmation.parsed;
+        authoritativeHtml = confirmationHtml;
+        matchingParsed = third.parsed;
+      } else {
+        throw appleConfirmationUnstableError(
+          'APPLE_CONFIRMATION_UNSTABLE: three Apple samples did not establish a stable authoritative semantic snapshot'
+        );
+      }
     }
     ({ confirmedRemovedCountries } = confirmAppleSemanticChange(
-      parsed,
-      confirmationParsed,
+      authoritativeParsed,
+      matchingParsed,
       previousData
     ));
+    appleSemanticConfirmed = true;
+    parsed = authoritativeParsed;
+    html = authoritativeHtml;
+    lastAppleSnapshot = normalizeAppleSnapshot(parsed);
   }
   const unknownMarkets = [];
+  const chineseNamePendingMarkets = [];
   const marketResolver = createPublishedMarketResolver(previousData, previousHistory);
-  validateAppleMarketRenameReview(previousData, parsed.countries, marketResolver);
+  const renameReview = validateAppleMarketRenameReview(previousData, parsed.countries, marketResolver);
+  const marketIdentityRenameSuspicions = renameReview.warnings;
+  for (const warning of marketIdentityRenameSuspicions) {
+    console.warn(`MARKET_IDENTITY_RENAME_SUSPECTED:newSourceName=${logInline(warning.newSourceName)}:oldSourceName=${logInline(warning.oldSourceName)}:oldMarketId=${logInline(warning.oldMarketId)}:region=${logInline(warning.region)}:currency=${logInline(warning.currency)}:pricesMatch=${warning.pricesMatch === true ? 'true' : 'false'}`);
+    if (process.env.GITHUB_ACTIONS === 'true') {
+      const message = `newSourceName=${warning.newSourceName}; candidate oldSourceName=${warning.oldSourceName}; candidate oldMarketId=${warning.oldMarketId}; region=${warning.region}; currency=${warning.currency}; pricesMatch=${warning.pricesMatch === true ? 'true' : 'false'}; automatic publication continues`;
+      console.log(`::warning title=Apple market identity rename suspected::${escapeGitHubCommandMessage(message)}`);
+    }
+  }
   const parsedCountries = attachMarketIdentity(parsed.countries, {
     resolve: marketResolver,
     chineseNames: countryNames,
@@ -2427,6 +2542,15 @@ export async function main({
         const message = `sourceName=${warning.sourceName}; generatedMarketId=${warning.generatedMarketId}; region=${warning.region}; currency=${warning.currency}; requires registry review`;
         console.log(`::warning title=Unknown Apple market requires registry review::${escapeGitHubCommandMessage(message)}`);
       }
+    },
+    onChineseNamePending: (market, country) => {
+      const warning = { marketId: market.id, sourceName: country.country };
+      chineseNamePendingMarkets.push(warning);
+      console.warn(`CHINESE_MARKET_NAME_PENDING:marketId=${logInline(warning.marketId)}:sourceName=${logInline(warning.sourceName)}`);
+      if (process.env.GITHUB_ACTIONS === 'true') {
+        const message = `marketId=${warning.marketId}; sourceName=${warning.sourceName}; using Apple English sourceName until zh-CN wording is approved`;
+        console.log(`::warning title=Apple Chinese market name pending::${escapeGitHubCommandMessage(message)}`);
+      }
     }
   });
 
@@ -2434,16 +2558,18 @@ export async function main({
     requiredCurrencies: [...new Set(parsedCountries.map(({ currency }) => currency))],
     networkBudget
   });
-  const fxSanity = validateFxSanity(previousData, fx, {
-    currentCurrencies: parsedCountries.map(({ currency }) => currency)
-  });
+  const fxSanity = fx.sanity;
   for (const warning of fxSanity.warnings) console.warn(warning);
   const countries = attachDerivedCnyPrices(parsedCountries, { fx, previousData });
   if (process.env.GITHUB_ACTIONS === 'true' && fx.fallbackUsed && !fx.stale) {
     console.log('::notice title=汇率来源自动回退::认证汇率来源不可用，已使用开放接口。');
   }
   if (process.env.GITHUB_ACTIONS === 'true' && fx.stale) {
-    console.log('::warning title=汇率更新失败::两个在线汇率来源均不可用，已沿用上一份有效汇率。');
+    const title = fxSanity.warnings.includes('FX_SANITY_FALLBACK_TO_PREVIOUS') ? '汇率异常自动回退' : '汇率更新失败';
+    const message = fxSanity.warnings.includes('FX_SANITY_FALLBACK_TO_PREVIOUS')
+      ? '在线汇率候选未通过 sanity，已沿用上一份有效汇率；备用自动任务仍会重试。'
+      : '在线汇率来源不可用，已沿用上一份有效汇率。';
+    console.log(`::warning title=${title}::${message}`);
   }
   const missingRates = fx.rates ? getMissingExchangeRates(countries, fx.rates) : [];
   if (missingRates.length) {
@@ -2456,11 +2582,25 @@ export async function main({
     previousRates: previousData?.fx?.rates,
     currentRates: fx.rates
   });
-  validatePriceChangeAnomalies(countries, {
+  const confirmedPriceAnomalies = validatePriceChangeAnomalies(countries, {
     previousData,
     currentRates: fx.rates,
-    tiers: parsed.tiers
+    tiers: parsed.tiers,
+    appleSemanticConfirmed,
+    fxSanity
   });
+  for (const warning of confirmedPriceAnomalies) {
+    const diagnostic = `marketId=${warning.marketId ?? 'unknown'}:sourceName=${logInline(warning.sourceName)}:tier=${logInline(warning.tier)}:type=${logInline(warning.type)}:previous=${logInline(JSON.stringify(warning.previous))}:current=${logInline(JSON.stringify(warning.current))}${warning.fxSanityStatus ? `:currency=${logInline(warning.currency)}:fxSanityStatus=${logInline(warning.fxSanityStatus)}` : ''}`;
+    console.warn(`${warning.code}:${diagnostic}`);
+    if (process.env.GITHUB_ACTIONS === 'true') {
+      const title = warning.code === 'PRICE_CHANGE_ANOMALY_CONFIRMED'
+        ? 'Confirmed Apple local-price anomaly'
+        : warning.code === 'FX_DERIVED_CHANGE_ANOMALY_ACCEPTED'
+          ? 'FX-derived change anomaly accepted'
+          : 'Confirmed currency change with validated FX';
+      console.log(`::warning title=${title}::${escapeGitHubCommandMessage(diagnostic)}`);
+    }
+  }
   let finishedAt = new Date();
   if (finishedAt.getTime() < runStartedAt.getTime()) finishedAt = new Date(runStartedAt);
   const generatedAt = finishedAt.toISOString();
@@ -2503,6 +2643,9 @@ export async function main({
     missingRates,
     fxSanityWarnings: fxSanity.warnings,
     unknownMarkets,
+    chineseNamePendingMarkets,
+    marketIdentityRenameSuspicions,
+    confirmedPriceAnomalies,
     publishedDateHistory,
     publicationDateChanged: publishedDateUpdate.changed,
     publicationChanges,
