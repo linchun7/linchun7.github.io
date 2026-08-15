@@ -87,13 +87,22 @@ ExchangeRate-API ───┘        │
 | 地区新增或移除 | 2 次 | 执行独立、无缓存的完整确认抓取 |
 | 容量新增或移除 | 2 次 | 执行独立、无缓存的完整确认抓取 |
 
-第二次确认抓取同样由两个解析器共同解析，使用与主抓取相同的重试序列，并受同一个 5 分钟网络预算限制：
+Automatic-first 是本项目的总运维原则：confirmed facts 自动发布，heuristic suspicion warning 后继续，transient uncertainty 自动 retry/fallback；只有高置信 ambiguity、contract corruption 或继续发布会造成不可逆数据/identity 错误时才要求人工介入。
+
+第二次确认抓取同样由两个解析器共同解析，使用与主抓取相同的重试序列，并受同一个 5 分钟网络预算限制。正常匹配仍只请求 initial + confirmation；仅在 mismatch 或 confirmation parser degradation 时追加第三份 no-store 样本：
 
 - 确认抓取因超时、连接重置、临时 5xx/CDN 等原因始终未取得完整响应：记录 `APPLE_CONFIRMATION_UNAVAILABLE`，按 transient 处理，不写生产数据；保留上一份稳定数据，等待下一次计划任务或人工重跑。
-- 两次抓取均成功但发布日期、规范化内容 hash 或结构变化集合不一致：视为内容不稳定/完整性异常，按 severe 失败关闭。
+- A/B/B 或 A/degraded/A：自动采用有两份完整 `cross-checked` 证据的版本，保存的 parsed data 与 HTML sample 必须来自同一版本。
+- A/B/A、A/B/C 或第三样本不可用：记录 `APPLE_CONFIRMATION_UNSTABLE` / `APPLE_CONFIRMATION_UNAVAILABLE`，按 transient 保留稳定生产数据，等待备用或后续自动任务重试。
 - 不得复用第一次 HTML 冒充第二次独立确认，也不得把两个解析器误解为两次网络抓取。
 
-确认不可用与确认不一致必须分开判断。前者允许通过后续运行自动恢复，但不能用第一次结果单独发布语义变化；后者需要检查 Apple 页面和解析器。首次建立 Apple 基线也必须取得两份独立且语义一致的 `cross-checked` 结果。未知 Apple 市场在完成相同确认、生成确定性 `marketId` 且无 ID collision 后允许发布，并记录 `UNKNOWN_APPLE_MARKET` warning；它本身不是 fail-closed 条件。不得部分合并新旧结构，因为这会破坏价格、历史、容量和快照之间的一致性。
+确认不可用与确认不一致必须分开记录，但两者都不能用单份结果发布语义变化；追加第三样本仍无法形成稳定证据时保留生产数据并交给后续自动运行重试。首次建立 Apple 基线也必须取得两份独立且语义一致的 `cross-checked` 结果。未知 Apple 市场在完成相同确认、生成确定性 `marketId` 且无 ID collision 后允许发布，并记录 `UNKNOWN_APPLE_MARKET` warning；它本身不是 fail-closed 条件。不得部分合并新旧结构，因为这会破坏价格、历史、容量和快照之间的一致性。
+
+市场身份与中文命名是两条独立事实链：Apple 英文 108047 是 active market、price、currency、tier、Published Date 和语义确认 authority；Apple 简体中文 108047 只提供官方中文 wording，绝不驱动英文市场增删或价格事实。`market-registry.mjs` 只保存永久 `marketId` 和英文 aliases；唯一中文事实源 `country-names.zh.json` 以字符串表示 approved、以 `null` 表示 pending。pending（当前包括 `mu`、`cg`）使用 Apple 英文 source name 并产生非阻断 `CHINESE_MARKET_NAME_PENDING`；`la` 的“老挝”属于已审核 Apple zh-CN wording。禁止机器翻译、`Intl.DisplayNames`、第三方地名库或其他中文 locale 代替 authority。
+
+unknown market 第一次发布使用既有 deterministic ID generator；之后 prices 与完整 history ledger 是 authoritative identity，已从当前 Apple 页面移除的历史 ID 仍永久 reserved。新 unknown 撞到 registry 或任一历史 owner 时以 `MARKET_IDENTITY_RESERVED_ID_COLLISION` 失败关闭，不扩 hash、不随机换 ID。只有 removed 与 added unknown 形成双向唯一，且 region、currency、canonical tier ID set 和完整当地价格向量都完全相同时，才作为高置信度 ambiguity 以 `MARKET_IDENTITY_RENAME_REVIEW_REQUIRED` 停止；维护者只能显式增加 alias 后重跑。repricing、多个 exact candidates 或其他弱结构候选只产生非阻断 `MARKET_IDENTITY_RENAME_SUSPECTED`，FX、updater 与发布继续执行且不得自动绑定。没有 removed candidate 的真正新 unknown 继续自动发布。
+
+两份 Apple `cross-checked` 样本只确认 Apple 当地价格与币种语义：同币种且仍在 0.1x–10x 硬边界内的大幅变价以 `PRICE_CHANGE_ANOMALY_CONFIRMED` warning 自动继续。Apple 未变化而 FX 引起的显著 CNY 变化由 FX authority 单独分类为 `FX_DERIVED_CHANGE_ANOMALY_ACCEPTED`；confirmed currency change 只有在新币种为 CNY 或对应 FX check 为 `passed` 时才 warning 后继续，缺少可靠 baseline 且 converted CNY 异常时以 `CURRENCY_CHANGE_VALUE_REVIEW_REQUIRED` 停止。非法/缺失价格、parser disagreement、20x 当前 CNY 市场 outlier 等仍 fail closed。FX authenticated candidate sanity 失败后自动尝试 open endpoint；所有 fresh online candidates 都失败时，仅可沿用现有 36 小时窗口内且覆盖要求的 previous FX/CNY 数据，并记录 `FX_SANITY_FALLBACK_TO_PREVIOUS`。stale success 不满足 daily guard，备用任务仍会自动重试；没有安全 previous fallback 时按 transient 失败，绝不发布 sanity 异常的新 FX。
 ### 完整只读验证
 
 工作流：`.github/workflows/validate-icloud-price-comparison.yml`
@@ -124,6 +133,8 @@ ExchangeRate-API ───┘        │
 `GITHUB_TOKEN` 由 GitHub 每次运行临时签发，不创建长期 Secret。发布 job 只在最终 push 步骤通过环境变量使用它，checkout 不保留凭据。
 
 Cloudflare 08:05 主触发所使用的 GitHub 凭据/应用不在本仓库定义，必须在 Cloudflare 控制面单独盘点。只授予目标仓库和 workflow dispatch 所需权限，不要使用可写全部仓库的个人 Token。
+
+已知触发身份风险：2026-08 的 Actions 审计中，Cloudflare `workflow_dispatch` 与 GitHub UI 人工 dispatch 的 `actor`、`triggering_actor` 都显示为同一个仓库账号；仓库无法可靠区分两者，因此当前 `trigger_source` input 是 caller 声明，不能作为认证边界。不要增加伪造的 actor allowlist，也不要把 Secret 放进 input/URL。推荐迁移为独立、最小权限 automation identity，并让 Cloudflare 使用 `repository_dispatch`（固定 automatic semantics），把 `workflow_dispatch` 留给 UI manual；迁移必须同时修改外部 caller 并完成端到端验证，不能只改仓库而中断 08:05 主触发。在迁移前，Cloudflare credential 泄露可能通过声明 `manual` 绕过 daily guard，应以凭据轮换、最小权限和 Actions 用量告警缓解。
 
 ### 轮换
 
