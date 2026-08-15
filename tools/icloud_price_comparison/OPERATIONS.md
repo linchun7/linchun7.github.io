@@ -94,6 +94,10 @@ ExchangeRate-API ───┘        │
 - 不得复用第一次 HTML 冒充第二次独立确认，也不得把两个解析器误解为两次网络抓取。
 
 确认不可用与确认不一致必须分开判断。前者允许通过后续运行自动恢复，但不能用第一次结果单独发布语义变化；后者需要检查 Apple 页面和解析器。首次建立 Apple 基线也必须取得两份独立且语义一致的 `cross-checked` 结果。未知 Apple 市场在完成相同确认、生成确定性 `marketId` 且无 ID collision 后允许发布，并记录 `UNKNOWN_APPLE_MARKET` warning；它本身不是 fail-closed 条件。不得部分合并新旧结构，因为这会破坏价格、历史、容量和快照之间的一致性。
+
+市场身份与中文命名是两条独立事实链：Apple 英文 108047 是 active market、price、currency、tier、Published Date 和语义确认 authority；Apple 简体中文 108047 只提供官方中文 wording，绝不驱动英文市场增删或价格事实。`market-registry.mjs` 只保存永久 `marketId` 和英文 aliases；唯一中文事实源 `country-names.zh.json` 以字符串表示 approved、以 `null` 表示 pending。pending（当前包括 `mu`、`cg`）使用 Apple 英文 source name 并产生非阻断 `CHINESE_MARKET_NAME_PENDING`；`la` 的“老挝”属于已审核 Apple zh-CN wording。禁止机器翻译、`Intl.DisplayNames`、第三方地名库或其他中文 locale 代替 authority。
+
+unknown market 第一次发布使用既有 deterministic ID generator；之后 prices 与完整 history ledger 是 authoritative identity，已从当前 Apple 页面移除的历史 ID 仍永久 reserved。新 unknown 撞到 registry 或任一历史 owner 时以 `MARKET_IDENTITY_RESERVED_ID_COLLISION` 失败关闭，不扩 hash、不随机换 ID。若旧市场移除且新 unknown 具有相同 region、currency 和 canonical tier ID set，即使同时 repricing，也以 `MARKET_IDENTITY_RENAME_REVIEW_REQUIRED` 停止；维护者只能把新 Apple 英文 source name 显式加入旧 marketId aliases 后重跑，不得按字符串、中文名或价格相似度自动绑定。没有 removed candidate 的真正新 unknown 继续自动发布。
 ### 完整只读验证
 
 工作流：`.github/workflows/validate-icloud-price-comparison.yml`
@@ -124,6 +128,8 @@ ExchangeRate-API ───┘        │
 `GITHUB_TOKEN` 由 GitHub 每次运行临时签发，不创建长期 Secret。发布 job 只在最终 push 步骤通过环境变量使用它，checkout 不保留凭据。
 
 Cloudflare 08:05 主触发所使用的 GitHub 凭据/应用不在本仓库定义，必须在 Cloudflare 控制面单独盘点。只授予目标仓库和 workflow dispatch 所需权限，不要使用可写全部仓库的个人 Token。
+
+已知触发身份风险：2026-08 的 Actions 审计中，Cloudflare `workflow_dispatch` 与 GitHub UI 人工 dispatch 的 `actor`、`triggering_actor` 都显示为同一个仓库账号；仓库无法可靠区分两者，因此当前 `trigger_source` input 是 caller 声明，不能作为认证边界。不要增加伪造的 actor allowlist，也不要把 Secret 放进 input/URL。推荐迁移为独立、最小权限 automation identity，并让 Cloudflare 使用 `repository_dispatch`（固定 automatic semantics），把 `workflow_dispatch` 留给 UI manual；迁移必须同时修改外部 caller 并完成端到端验证，不能只改仓库而中断 08:05 主触发。在迁移前，Cloudflare credential 泄露可能通过声明 `manual` 绕过 daily guard，应以凭据轮换、最小权限和 Actions 用量告警缓解。
 
 ### 轮换
 
