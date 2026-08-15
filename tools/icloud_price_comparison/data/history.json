@@ -1,6 +1,6 @@
 {
   "schemaVersion": 4,
-  "updatedAt": "2026-08-14T00:06:36.290Z",
+  "updatedAt": "2026-08-15T04:33:18.402Z",
   "markets": {
     "bs": {
       "country": "Bahamas",
@@ -1396,7 +1396,7 @@
     },
     "mu": {
       "country": "Mauritius",
-      "nameZh": "毛里求斯",
+      "nameZh": "Mauritius",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -1414,7 +1414,7 @@
     },
     "cg": {
       "country": "Republic of Congo",
-      "nameZh": "刚果共和国",
+      "nameZh": "Republic of Congo",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
