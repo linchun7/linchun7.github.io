@@ -2502,13 +2502,12 @@ test('restores URL state, removes the floating search bar, and supports table re
     assert.equal(await backToTableButton.getAttribute('aria-hidden'), 'true');
     await page.evaluate(() => {
       scrollTo(0, document.scrollingElement?.scrollHeight ?? 0);
+      document.querySelector('#backToTableButton')?.focus({ preventScroll: true });
     });
     await page.waitForFunction(() => {
       const button = document.querySelector('#backToTableButton');
       return button?.classList.contains('is-visible') && button.getAttribute('aria-hidden') === 'false';
     });
-    await backToTableButton.focus();
-    await page.waitForFunction(() => document.querySelector('#backToTableButton')?.getAttribute('aria-hidden') === 'false');
     await backToTableButton.click();
     assert.equal(await page.locator('#priceWorkspace').evaluate((element) => document.activeElement === element), true, 'table return should move keyboard focus to the visible workspace');
     await page.waitForFunction(() => {
