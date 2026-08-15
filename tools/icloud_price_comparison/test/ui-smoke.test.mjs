@@ -746,13 +746,13 @@ test('renders current prices, sorting, and country history in a real browser', {
         assert.equal(await page.locator('#sourceLinks .source-group').count(), 2);
         const sourceGroups = await page.locator('#sourceLinks .source-group').allInnerTexts();
         assert.match(sourceGroups[0], /价格来源：Apple/);
-        assert.match(sourceGroups[0], /Apple 价格页更新：/);
-        assert.match(sourceGroups[0], /查看更新记录/);
-        assert.doesNotMatch(sourceGroups[1], /Apple 价格页更新：/);
+        assert.match(sourceGroups[0], /页面发布日期：/);
+        assert.match(sourceGroups[0], /查看发布日期记录/);
+        assert.doesNotMatch(sourceGroups[1], /页面发布日期：/);
         assert.match(sourceGroups[1], /汇率来源：ExchangeRate-API/);
         assert.equal(await page.locator('#sourceLinks svg').count(), 0);
         assert.match(sourceText, /价格来源：Apple/);
-        assert.match(sourceText, /Apple 价格页更新/);
+        assert.match(sourceText, /页面发布日期/);
         const fxAttribution = page.locator('a[href="https://www.exchangerate-api.com/"]');
         assert.equal((await fxAttribution.textContent()).trim(), 'ExchangeRate-API');
         assert.equal(await fxAttribution.getAttribute('aria-label'), null);
@@ -927,7 +927,7 @@ test('renders current prices, sorting, and country history in a real browser', {
         await page.locator('#publishedDateButton').focus();
         await page.locator('#publishedDateButton').click();
         await page.waitForFunction(() => document.querySelector('#publishedDateDialog')?.open === true);
-        assert.equal(await page.getByRole('dialog', { name: 'Apple 价格页更新记录' }).count(), 1, 'publication-date dialog must have an accessible name');
+        assert.equal(await page.getByRole('dialog', { name: 'Apple 页面发布日期记录' }).count(), 1, 'publication-date dialog must have an accessible name');
         assert.equal(await page.locator('#publishedDateDialog .dialog-eyebrow').count(), 0);
         assert.equal(await page.locator('#publishedDateDialog').getByText('数据来源', { exact: true }).count(), 0);
         if (viewport.width <= 1100) {
@@ -1267,7 +1267,7 @@ test('keeps current prices usable when optional history data is unavailable or m
           await page.waitForFunction(() => document.querySelector('#historySubtitle')?.textContent.includes('暂时无法读取历史记录'));
           await page.locator('#closeHistory').click();
           await page.locator('#publishedDateButton').click();
-          await page.waitForFunction(() => document.querySelector('#publishedDateRows')?.textContent.includes('暂时无法读取更新记录'));
+          await page.waitForFunction(() => document.querySelector('#publishedDateRows')?.textContent.includes('暂时无法读取发布日期记录'));
           await page.locator('#closePublishedDate').click();
         }
       } finally {
@@ -1752,7 +1752,7 @@ test('retries only valid but inconsistent history once without cache', { timeout
         await page.locator('#publishedDateButton').click();
         await page.waitForFunction((unavailable) => {
           const text = document.querySelector('#publishedDateRows')?.textContent ?? '';
-          return unavailable ? text.includes('暂时无法读取更新记录') : document.querySelectorAll('#publishedDateRows tr').length > 1;
+          return unavailable ? text.includes('暂时无法读取发布日期记录') : document.querySelectorAll('#publishedDateRows tr').length > 1;
         }, scenario.unavailable);
         assert.equal(historyCalls, scenario.expectedCalls);
       } finally {
@@ -2120,7 +2120,7 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
           position: getComputedStyle(header).position,
           containerPosition: getComputedStyle(header.closest('thead')).position
         })));
-        assert.equal(publicationHeaders[0].text, 'Apple 页面日期');
+        assert.equal(publicationHeaders[0].text, 'Apple 页面发布日期');
         assert.equal(publicationHeaders[1].text, '检测到的变化');
         assert.equal(publicationHeaders.length, 2, 'internal confirmation dates must not be shown to end users');
         assert.equal(await page.locator('#publishedDateRows tr').first().locator('td').count(), 2, 'publication rows must omit the internal confirmation date');
@@ -2868,6 +2868,115 @@ test('rejects network price data older than seven days or more than five minutes
       await page.close();
     }
   } finally {
+    await browser.close();
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+async function waitForInteractiveMinimumCards(page) {
+  await page.waitForFunction(() => {
+    const cards = [...document.querySelectorAll('#minimumSummary .minimum-card')];
+    return cards.length > 0 && cards.every((card) => !card.disabled);
+  });
+}
+
+async function assertMinimumNavigation(page, marketId, tierId, { tierInUrl }) {
+  const parsed = new URL(page.url());
+  if (tierInUrl) {
+    assert.equal(parsed.searchParams.get('tier'), tierId);
+  } else {
+    assert.equal(parsed.searchParams.has('tier'), false);
+  }
+  assert.equal(parsed.searchParams.has('q'), false);
+  assert.equal(parsed.searchParams.has('sort'), false);
+  assert.equal(parsed.searchParams.has('dir'), false);
+  assert.equal(parsed.searchParams.has('region'), false);
+  assert.equal(await page.locator('#searchInput').inputValue(), '');
+  assert.equal(await page.locator('#regionSelect').inputValue(), 'all');
+  assert.equal(await page.locator('th[data-tier="' + tierId + '"]').getAttribute('aria-sort'), 'ascending');
+  const activeCard = page.locator('#minimumSummary .minimum-card[data-tier="' + tierId + '"]');
+  assert.equal(await activeCard.getAttribute('aria-pressed'), 'true');
+  assert.equal(await activeCard.evaluate((card) => card.classList.contains('is-active-tier')), true);
+  await page.waitForFunction(({ marketId, tierId }) => {
+    const row = document.querySelector('#priceRows tr[data-market-id="' + marketId + '"]');
+    const cell = row && row.querySelector('.price-cell[data-tier="' + tierId + '"]');
+    if (!row || !cell) return false;
+    const scroller = document.querySelector('.table-scroll');
+    const rowRect = row.getBoundingClientRect();
+    const cellRect = cell.getBoundingClientRect();
+    const scrollerRect = scroller ? scroller.getBoundingClientRect() : null;
+    const rowVisible = rowRect.bottom > 0 && rowRect.top < innerHeight;
+    const cellVisible = !scrollerRect || (cellRect.right > scrollerRect.left && cellRect.left < scrollerRect.right);
+    return rowVisible && cellVisible && document.activeElement === row.querySelector('.country-history-button');
+  }, { marketId, tierId });
+  const row = page.locator('#priceRows tr[data-market-id="' + marketId + '"]');
+  assert.equal(await row.evaluate((element) => element.classList.contains('is-highlighted')), true);
+  assert.equal(await row.locator('.price-cell[data-tier="' + tierId + '"]').evaluate((cell) => cell.classList.contains('is-minimum')), true);
+}
+
+test('minimum-card click clears conflicting filters and reveals the target market on desktop', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the minimum-card desktop navigation regression');
+  if (!browserConfig) return;
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  try {
+    await page.goto('http://127.0.0.1:' + port + '/?tier=2TB&sort=country&dir=desc&region=Asia%20Pacific&q=Japan', { waitUntil: 'domcontentloaded' });
+    await waitForInteractiveMinimumCards(page);
+    const card = page.locator('#minimumSummary .minimum-card[data-tier="200GB"]');
+    const marketId = await card.getAttribute('data-market-id');
+    await card.click();
+    await assertMinimumNavigation(page, marketId, '200GB', { tierInUrl: false });
+  } finally {
+    await page.close();
+    await browser.close();
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test('minimum-card navigation works on mobile for a non-default tier', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the minimum-card mobile navigation regression');
+  if (!browserConfig) return;
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  try {
+    await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded' });
+    await waitForInteractiveMinimumCards(page);
+    const card = page.locator('#minimumSummary .minimum-card[data-tier="50GB"]');
+    const marketId = await card.getAttribute('data-market-id');
+    await card.click();
+    await assertMinimumNavigation(page, marketId, '50GB', { tierInUrl: true });
+  } finally {
+    await page.close();
+    await browser.close();
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test('minimum-card controls stay enabled after returning to default home', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the minimum-card brand-navigation regression');
+  if (!browserConfig) return;
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  const origin = 'http://127.0.0.1:' + port;
+  try {
+    await page.goto(origin + '/?tier=2TB', { waitUntil: 'domcontentloaded' });
+    await waitForInteractiveMinimumCards(page);
+    await page.locator('.app-brand').click();
+    await page.waitForURL((url) => url.origin === origin && url.pathname === '/' && url.search === '');
+    await waitForInteractiveMinimumCards(page);
+    assert.equal(await page.locator('#minimumSummary .minimum-card').evaluateAll((cards) => cards.every((card) => !card.disabled)), true);
+    const card = page.locator('#minimumSummary .minimum-card[data-tier="50GB"]');
+    const marketId = await card.getAttribute('data-market-id');
+    await card.click();
+    await assertMinimumNavigation(page, marketId, '50GB', { tierInUrl: true });
+  } finally {
+    await page.close();
     await browser.close();
     await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }
