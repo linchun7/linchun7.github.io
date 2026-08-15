@@ -140,6 +140,12 @@ jobs:
         id: data_tests
         run: pnpm test:data
 
+      - name: 生成并校验静态价格页
+        id: render_static
+        run: |
+          pnpm render:static
+          pnpm render:static:check
+
       - name: 验证更新后的页面
         id: ui_tests
         # 每日更新使用 runner 预装的 Chrome；完整 Chromium + Firefox + WebKit 验证由独立验证工作流负责。
@@ -162,8 +168,10 @@ jobs:
         run: |
           node tools/icloud_price_comparison/scripts/validate-data-artifact.mjs --data-dir tools/icloud_price_comparison/data
           tar --format=ustar -cf "$RUNNER_TEMP/icloud-price-data.tar" tools/icloud_price_comparison/data
+          cp tools/icloud_price_comparison/index.html "$RUNNER_TEMP/icloud-price-index.html"
           cd "$RUNNER_TEMP"
           sha256sum icloud-price-data.tar > icloud-price-data.tar.sha256
+          sha256sum icloud-price-index.html > icloud-price-index.html.sha256
 
       - name: 上传已测试的数据工件
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -172,6 +180,8 @@ jobs:
           path: |
             ${{ runner.temp }}/icloud-price-data.tar
             ${{ runner.temp }}/icloud-price-data.tar.sha256
+            ${{ runner.temp }}/icloud-price-index.html
+            ${{ runner.temp }}/icloud-price-index.html.sha256
           if-no-files-found: error
           retention-days: 1
 
@@ -206,6 +216,7 @@ jobs:
           severe_failure=false
           if [[ "${{ steps.core_tests.outcome }}" == "failure" ]] \
             || [[ "${{ steps.data_tests.outcome }}" == "failure" ]] \
+            || [[ "${{ steps.render_static.outcome }}" == "failure" ]] \
             || [[ "${{ steps.ui_tests.outcome }}" == "failure" ]] \
             || [[ "${{ steps.package_data.outcome }}" == "failure" ]]; then
             severe_failure=true
@@ -279,11 +290,15 @@ jobs:
           set -euo pipefail
           cd "$RUNNER_TEMP/icloud-price-data"
           sha256sum --check icloud-price-data.tar.sha256
+          sha256sum --check icloud-price-index.html.sha256
           validator="$GITHUB_WORKSPACE/tools/icloud_price_comparison/scripts/validate-data-artifact.mjs"
           node "$validator" --archive icloud-price-data.tar
           mkdir unpacked
           tar --extract --file icloud-price-data.tar --directory unpacked --no-same-owner --no-same-permissions
           node "$validator" --data-dir unpacked/tools/icloud_price_comparison/data
+          node "$GITHUB_WORKSPACE/tools/icloud_price_comparison/scripts/render-static-page.mjs" --check \
+            --index-file "$RUNNER_TEMP/icloud-price-data/icloud-price-index.html" \
+            --prices-file "$RUNNER_TEMP/icloud-price-data/unpacked/tools/icloud_price_comparison/data/prices.json"
 
       - name: 确认 main 未前进并准备提交
         id: prepare_publish
@@ -303,13 +318,20 @@ jobs:
           validated_data="$RUNNER_TEMP/icloud-price-data/unpacked/tools/icloud_price_comparison/data"
           rm -rf tools/icloud_price_comparison/data
           cp -a "$validated_data" tools/icloud_price_comparison/data
-          if git diff --quiet -- tools/icloud_price_comparison/data; then
+          cp "$RUNNER_TEMP/icloud-price-data/icloud-price-index.html" tools/icloud_price_comparison/index.html
+          base_index="$RUNNER_TEMP/generation-base-index.html"
+          git show "$GENERATION_BASE_SHA:tools/icloud_price_comparison/index.html" > "$base_index"
+          node tools/icloud_price_comparison/scripts/validate-static-page-update.mjs \
+            "$base_index" \
+            tools/icloud_price_comparison/index.html \
+            tools/icloud_price_comparison/data/prices.json
+          if git diff --quiet -- tools/icloud_price_comparison/data tools/icloud_price_comparison/index.html; then
             echo "publish_candidate=no_data_changes" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add --all tools/icloud_price_comparison/data
+          git add --all tools/icloud_price_comparison/data tools/icloud_price_comparison/index.html
           git commit -m "chore: update iCloud prices"
           echo "publish_candidate=commit_ready" >> "$GITHUB_OUTPUT"
           echo "should_push=true" >> "$GITHUB_OUTPUT"

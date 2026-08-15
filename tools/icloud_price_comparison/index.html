@@ -7,10 +7,9 @@
   <meta name="referrer" content="origin">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; media-src 'none'; manifest-src 'none'; script-src 'self' https://www.googletagmanager.com https://static.cloudflareinsights.com; style-src 'self'; connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com; img-src 'self' data: https://*.google-analytics.com https://www.googletagmanager.com; font-src 'self'">
   <meta name="theme-color" content="#eef2f6">
-  <meta name="description" content="比较全球不同国家和地区的 iCloud+ 月度价格，支持人民币换算、容量排序和历史价格查询。">
-  <meta name="keywords" content="iCloud+,Apple,云存储,全球价格,价格历史,汇率换算">
-  <meta property="og:title" content="iCloud+ 全球价格对比">
-  <meta property="og:description" content="统一比较全球 iCloud+ 月度订阅价格和历史变化。">
+  <meta name="description" content="查看 Apple iCloud+ 在全球不同国家和地区的月费，并换算为人民币，支持容量比较、地区搜索和 Apple 当地标价历史。">
+  <meta property="og:title" content="iCloud+ 全球价格对比｜各地区月费与人民币换算价">
+  <meta property="og:description" content="查看 Apple iCloud+ 全球各地区月费、人民币换算价与 Apple 当地标价历史。">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://www.linchun.com.cn/tools/icloud_price_comparison/">
   <meta property="og:image" content="https://www.linchun.com.cn/images/favicon-192x192.png">
@@ -18,14 +17,17 @@
   <meta property="og:image:height" content="192">
   <meta name="twitter:card" content="summary">
   <link rel="canonical" href="https://www.linchun.com.cn/tools/icloud_price_comparison/">
-  <title>iCloud+ 全球价格对比</title>
+  <title>iCloud+ 全球价格对比｜各地区月费与人民币换算价</title>
+<!-- ICLOUD_STATIC_META:START -->
+  <meta name="icloud-price-snapshot" content="2026-08-14T16:42:14.114Z" data-fingerprint="f1ad64e0a0aaf1d29a00090dfcabbeabc154f8ce4a2defbb03bb042a7feb95fd" data-fx-stale="false">
+<!-- ICLOUD_STATIC_META:END -->
   <script data-cfasync="false" src="price-bootstrap.js?v=42436b3f"></script>
-  <link rel="stylesheet" href="style.css?v=68f6b439">
-  <link rel="modulepreload" href="script.js?v=6e95d206">
+  <link rel="stylesheet" href="style.css?v=b0b99115">
+  <link rel="modulepreload" href="script.js?v=9fc173a1">
   <link rel="modulepreload" href="data-contract.js?v=f8779a1b">
   <link rel="modulepreload" href="data-model.js?v=1df20253">
   <link rel="modulepreload" href="vendor/lucide-subset.js?v=657f4f9d">
-  <script data-cfasync="false" type="module" src="script.js?v=6e95d206"></script>
+  <script data-cfasync="false" type="module" src="script.js?v=9fc173a1"></script>
   <link rel="shortcut icon" href="/images/favicon.ico">
   <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
   <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
@@ -38,66 +40,91 @@
         <span class="brand-mark" aria-hidden="true"><i data-lucide="cloud"></i></span>
         <div class="brand-copy">
           <h1>iCloud+ 全球价格对比</h1>
+          <p>比较 Apple iCloud+ 在全球不同国家和地区的月费，并换算为人民币。</p>
         </div>
       </div>
       <div class="data-status">
         <i data-lucide="calendar-clock" aria-hidden="true"></i>
-        <span id="updatedAt">正在读取价格数据更新时间</span>
+<!-- ICLOUD_STATIC_STATUS:START -->
+        <span id="updatedAt" title="北京时间">更新于 2026/08/15 00:42</span>
+<!-- ICLOUD_STATIC_STATUS:END -->
       </div>
     </div>
   </header>
 
   <main class="page-main">
     <noscript>
-      <p class="noscript-notice">此工具需要启用 JavaScript 才能读取、校验和比较价格数据。</p>
+      <p class="noscript-notice">当前页面已显示最近一次生成的价格。启用 JavaScript 后可使用搜索、筛选、排序和 Apple 当地标价历史等功能。</p>
     </noscript>
     <section class="overview" aria-labelledby="overviewTitle">
       <div class="overview-reference">
         <div class="overview-copy">
-          <p class="overview-kicker">人民币参考价</p>
-          <h2 id="overviewTitle">各容量参考最低价</h2>
-          <p class="overview-note">按人民币参考汇率换算，便于横向比较</p>
+          <h2 id="overviewTitle">各容量全球最低价</h2>
+          <p class="overview-note">按人民币换算，方便比较不同地区价格。</p>
         </div>
-        <div id="minimumSummary" class="minimum-stats overview-stat-list" role="group" aria-label="各容量参考最低价概览" aria-busy="true">
-          <button class="minimum-card is-loading" type="button" disabled aria-hidden="true"><span class="minimum-tier-label"></span><strong class="minimum-country"></strong><small class="minimum-price"></small></button>
-          <button class="minimum-card is-loading" type="button" disabled aria-hidden="true"><span class="minimum-tier-label"></span><strong class="minimum-country"></strong><small class="minimum-price"></small></button>
-          <button class="minimum-card is-loading" type="button" disabled aria-hidden="true"><span class="minimum-tier-label"></span><strong class="minimum-country"></strong><small class="minimum-price"></small></button>
-          <button class="minimum-card is-loading" type="button" disabled aria-hidden="true"><span class="minimum-tier-label"></span><strong class="minimum-country"></strong><small class="minimum-price"></small></button>
-          <button class="minimum-card is-loading" type="button" disabled aria-hidden="true"><span class="minimum-tier-label"></span><strong class="minimum-country"></strong><small class="minimum-price"></small></button>
+        <div id="minimumSummary" class="minimum-stats overview-stat-list" role="group" aria-label="各容量全球最低价概览" aria-busy="false">
+<!-- ICLOUD_STATIC_MINIMUMS:START -->
+          <button class="minimum-card" type="button" data-tier="50GB" data-market-id="ru" aria-pressed="false" disabled>
+            <span class="minimum-tier-label">50 GB</span>
+            <strong class="minimum-country">俄罗斯</strong>
+            <small class="minimum-price">¥4.79</small>
+            <span class="visually-hidden">，在价格表中定位</span>
+          </button>
+          <button class="minimum-card is-active-tier" type="button" data-tier="200GB" data-market-id="ru" aria-pressed="true" disabled>
+            <span class="minimum-tier-label">200 GB</span>
+            <strong class="minimum-country">俄罗斯</strong>
+            <small class="minimum-price">¥12.09</small>
+            <span class="visually-hidden">，在价格表中定位</span>
+          </button>
+          <button class="minimum-card" type="button" data-tier="2TB" data-market-id="ru" aria-pressed="false" disabled>
+            <span class="minimum-tier-label">2 TB</span>
+            <strong class="minimum-country">俄罗斯</strong>
+            <small class="minimum-price">¥48.61</small>
+            <span class="visually-hidden">，在价格表中定位</span>
+          </button>
+          <button class="minimum-card" type="button" data-tier="6TB" data-market-id="tw" aria-pressed="false" disabled>
+            <span class="minimum-tier-label">6 TB</span>
+            <strong class="minimum-country">台湾</strong>
+            <small class="minimum-price">¥189.31</small>
+            <span class="visually-hidden">，在价格表中定位</span>
+          </button>
+          <button class="minimum-card" type="button" data-tier="12TB" data-market-id="ng" aria-pressed="false" disabled>
+            <span class="minimum-tier-label">12 TB</span>
+            <strong class="minimum-country">尼日利亚</strong>
+            <small class="minimum-price">¥332.25</small>
+            <span class="visually-hidden">，在价格表中定位</span>
+          </button>
+<!-- ICLOUD_STATIC_MINIMUMS:END -->
         </div>
       </div>
-      <dl class="overview-stats overview-stat-list">
-        <div class="metric-card">
-          <dt><span class="metric-icon" aria-hidden="true"><i data-lucide="globe-2"></i></span><span>覆盖地区</span></dt>
-          <dd id="marketCount">--</dd>
-        </div>
-        <div class="metric-card">
-          <dt><span class="metric-icon" aria-hidden="true"><i data-lucide="coins"></i></span><span>当地币种</span></dt>
-          <dd id="currencyCount">--</dd>
-        </div>
-        <div class="metric-card">
-          <dt><span class="metric-icon" aria-hidden="true"><i data-lucide="database"></i></span><span>容量方案</span></dt>
-          <dd id="tierCount">--</dd>
-        </div>
+<!-- ICLOUD_STATIC_OVERVIEW:START -->
+      <dl class="overview-stats overview-stat-list" aria-label="价格覆盖概览">
+        <div><dt>覆盖</dt><dd id="marketCount">73 个地区</dd></div>
+        <div><dt>币种</dt><dd id="currencyCount">44 种</dd></div>
+        <div><dt>容量</dt><dd id="tierCount">5 档</dd></div>
       </dl>
+<!-- ICLOUD_STATIC_OVERVIEW:END -->
     </section>
 
-    <section id="priceWorkspace" class="workspace" aria-label="全球各地区 iCloud+ 价格" aria-busy="true" tabindex="-1">
+    <section id="priceWorkspace" class="workspace" aria-label="全球各地区 iCloud+ 价格" aria-busy="false" tabindex="-1">
       <div class="workspace-toolbar">
         <div class="workspace-heading">
-          <h2>各地区 iCloud+ 价格</h2>
-          <p id="resultSummary" aria-live="polite">等待价格数据</p>
+          <h2>全球 iCloud+ 月费</h2>
+<!-- ICLOUD_STATIC_WORKSPACE_META:START -->
+          <p id="resultSummary" aria-live="polite">73 个地区 · 200GB 从低到高</p>
+          <p id="rankingScopeNote" class="ranking-scope-note" hidden>排名仍为全部地区中的全球参考排名</p>
+<!-- ICLOUD_STATIC_WORKSPACE_META:END -->
         </div>
-        <div id="loadStatus" class="load-status" role="status" aria-live="polite">
+        <div id="loadStatus" class="load-status" role="status" aria-live="polite" hidden>
           <span class="spinner" aria-hidden="true"></span>
-          <span id="loadStatusText">正在加载价格数据，请稍候…</span>
-          <button id="retryButton" type="button" hidden>重新加载</button>
+          <span id="loadStatusText">正在检查最新价格…</span>
+          <button id="retryButton" type="button" hidden>重试</button>
         </div>
         <div class="filters">
           <label class="search-field">
             <i data-lucide="search" aria-hidden="true"></i>
-            <span class="visually-hidden">搜索国家、地区或币种</span>
-            <input id="searchInput" name="price-search" type="search" placeholder="搜索国家、地区或币种…" autocomplete="off" maxlength="160" disabled>
+            <span class="visually-hidden">搜索国家/地区、英文名或币种</span>
+            <input id="searchInput" name="price-search" type="search" placeholder="搜索国家/地区、英文名或币种" autocomplete="off" maxlength="160" disabled>
           </label>
           <label class="select-field">
             <i data-lucide="globe-2" aria-hidden="true"></i>
@@ -106,6 +133,7 @@
               <option value="all">所有地区</option>
             </select>
           </label>
+          <button id="clearFiltersButton" class="clear-filters-button" type="button" hidden disabled>清除筛选</button>
         </div>
         <div class="mobile-tier-picker">
           <span class="control-label">容量</span>
@@ -115,59 +143,3080 @@
 
       <div class="table-scroll">
         <table class="price-table" aria-describedby="resultSummary">
-          <caption class="visually-hidden">全球各地区 iCloud+ 月度价格与人民币参考价</caption>
+          <caption>人民币金额按参考汇率换算，仅用于价格比较；下方为 Apple 当地月费。</caption>
           <thead>
             <tr>
-              <th class="rank-column" scope="col">#</th>
+              <th class="rank-column" scope="col"><span id="rankHeaderLabel"><span aria-hidden="true">全球排名</span><span class="visually-hidden">全球参考排名</span></span></th>
               <th scope="col" aria-sort="none"><button type="button" data-sort="country" disabled>国家/地区 <i data-lucide="arrow-up-down" aria-hidden="true"></i></button></th>
-              <th data-tier-placeholder scope="col"><span class="visually-hidden">容量方案（加载中）</span></th>
-              <th data-tier-placeholder scope="col"><span class="visually-hidden">容量方案（加载中）</span></th>
-              <th data-tier-placeholder scope="col"><span class="visually-hidden">容量方案（加载中）</span></th>
-              <th data-tier-placeholder scope="col"><span class="visually-hidden">容量方案（加载中）</span></th>
-              <th data-tier-placeholder scope="col"><span class="visually-hidden">容量方案（加载中）</span></th>
+<!-- ICLOUD_STATIC_TABLE_HEAD:START -->
+              <th data-tier-header="true" data-tier="50GB" class="" scope="col" aria-sort="none">
+                <button type="button" data-sort-tier="50GB" disabled>50 GB / 月 <i data-lucide="arrow-up-down" aria-hidden="true"></i></button>
+              </th>
+              <th data-tier-header="true" data-tier="200GB" class="is-active-tier" scope="col" aria-sort="ascending">
+                <button type="button" data-sort-tier="200GB" disabled>200 GB / 月 <i data-lucide="arrow-up" aria-hidden="true"></i></button>
+              </th>
+              <th data-tier-header="true" data-tier="2TB" class="" scope="col" aria-sort="none">
+                <button type="button" data-sort-tier="2TB" disabled>2 TB / 月 <i data-lucide="arrow-up-down" aria-hidden="true"></i></button>
+              </th>
+              <th data-tier-header="true" data-tier="6TB" class="" scope="col" aria-sort="none">
+                <button type="button" data-sort-tier="6TB" disabled>6 TB / 月 <i data-lucide="arrow-up-down" aria-hidden="true"></i></button>
+              </th>
+              <th data-tier-header="true" data-tier="12TB" class="" scope="col" aria-sort="none">
+                <button type="button" data-sort-tier="12TB" disabled>12 TB / 月 <i data-lucide="arrow-up-down" aria-hidden="true"></i></button>
+              </th>
+<!-- ICLOUD_STATIC_TABLE_HEAD:END -->
             </tr>
           </thead>
           <tbody id="priceRows">
-            <tr><td class="loading-cell" colspan="7"><span class="spinner"></span>正在加载…</td></tr>
+<!-- ICLOUD_STATIC_TABLE_BODY:START -->
+          <tr data-market-id="ru">
+            <td class="rank-top">1</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">俄罗斯</span>
+              <span class="country-name-en">Russia · RUB</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell is-minimum" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="minimum-badge">最低</span>
+                <span class="price-symbol">¥</span><span class="price-amount">4.79</span>
+              </strong>
+              <span class="price-local">59 p.</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted is-minimum" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="minimum-badge">最低</span>
+                <span class="price-symbol">¥</span><span class="price-amount">12.09</span>
+              </strong>
+              <span class="price-local">149 p.</span>
+            </td>
+            <td class="price-cell is-minimum" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="minimum-badge">最低</span>
+                <span class="price-symbol">¥</span><span class="price-amount">48.61</span>
+              </strong>
+              <span class="price-local">599 p.</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">283.20</span>
+              </strong>
+              <span class="price-local">3490 p.</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">567.22</span>
+              </strong>
+              <span class="price-local">6990 p.</span>
+            </td>
+          </tr>
+          <tr data-market-id="in">
+            <td class="rank-top">2</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">印度</span>
+              <span class="country-name-en">India · INR</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">5.31</span>
+              </strong>
+              <span class="price-local">Rs 75</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">15.50</span>
+              </strong>
+              <span class="price-local">Rs 219</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">53.01</span>
+              </strong>
+              <span class="price-local">Rs 749</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">212.25</span>
+              </strong>
+              <span class="price-local">Rs 2999</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">417.56</span>
+              </strong>
+              <span class="price-local">Rs 5900</span>
+            </td>
+          </tr>
+          <tr data-market-id="tw">
+            <td class="rank-top">3</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">台湾</span>
+              <span class="country-name-en">Taiwan · TWD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.31</span>
+              </strong>
+              <span class="price-local">NT$ 30</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">18.93</span>
+              </strong>
+              <span class="price-local">NT$ 90</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">63.10</span>
+              </strong>
+              <span class="price-local">NT$ 300</span>
+            </td>
+            <td class="price-cell is-minimum" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="minimum-badge">最低</span>
+                <span class="price-symbol">¥</span><span class="price-amount">189.31</span>
+              </strong>
+              <span class="price-local">NT$ 900</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">376.52</span>
+              </strong>
+              <span class="price-local">NT$ 1790</span>
+            </td>
+          </tr>
+          <tr data-market-id="ca">
+            <td>4</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">加拿大</span>
+              <span class="country-name-en">Canada · CAD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.26</span>
+              </strong>
+              <span class="price-local">$1.29</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">19.35</span>
+              </strong>
+              <span class="price-local">$3.99</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">62.99</span>
+              </strong>
+              <span class="price-local">$12.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">193.92</span>
+              </strong>
+              <span class="price-local">$39.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">387.89</span>
+              </strong>
+              <span class="price-local">$79.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="mx">
+            <td>5</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">墨西哥</span>
+              <span class="country-name-en">Mexico · MXN</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.74</span>
+              </strong>
+              <span class="price-local">$17</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">19.43</span>
+              </strong>
+              <span class="price-local">$49</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">70.97</span>
+              </strong>
+              <span class="price-local">$179</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">197.86</span>
+              </strong>
+              <span class="price-local">$499</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">396.11</span>
+              </strong>
+              <span class="price-local">$999</span>
+            </td>
+          </tr>
+          <tr data-market-id="pk">
+            <td>6</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">巴基斯坦</span>
+              <span class="country-name-en">Pakistan · PKR</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">4.86</span>
+              </strong>
+              <span class="price-local">Rs200</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">19.45</span>
+              </strong>
+              <span class="price-local">Rs800</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">60.79</span>
+              </strong>
+              <span class="price-local">Rs2500</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">216.40</span>
+              </strong>
+              <span class="price-local">Rs8900</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">435.24</span>
+              </strong>
+              <span class="price-local">Rs17900</span>
+            </td>
+          </tr>
+          <tr data-market-id="my">
+            <td>7</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">马来西亚</span>
+              <span class="country-name-en">Malaysia · MYR</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.45</span>
+              </strong>
+              <span class="price-local">RM3.90</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">19.67</span>
+              </strong>
+              <span class="price-local">RM11.90</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">74.23</span>
+              </strong>
+              <span class="price-local">RM44.90</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">214.76</span>
+              </strong>
+              <span class="price-local">RM129.90</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">446.21</span>
+              </strong>
+              <span class="price-local">RM269.90</span>
+            </td>
+          </tr>
+          <tr data-market-id="hk">
+            <td>8</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">香港</span>
+              <span class="country-name-en">Hong Kong · HKD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.89</span>
+              </strong>
+              <span class="price-local">HK$ 8</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">19.80</span>
+              </strong>
+              <span class="price-local">HK$ 23</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">67.16</span>
+              </strong>
+              <span class="price-local">HK$ 78</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">204.93</span>
+              </strong>
+              <span class="price-local">HK$ 238</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">402.97</span>
+              </strong>
+              <span class="price-local">HK$ 468</span>
+            </td>
+          </tr>
+          <tr data-market-id="th">
+            <td>9</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">泰国</span>
+              <span class="country-name-en">Thailand · THB</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">7.13</span>
+              </strong>
+              <span class="price-local">฿35</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">20.18</span>
+              </strong>
+              <span class="price-local">฿99</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">81.31</span>
+              </strong>
+              <span class="price-local">฿399</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">242.51</span>
+              </strong>
+              <span class="price-local">฿1190</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">487.07</span>
+              </strong>
+              <span class="price-local">฿2390</span>
+            </td>
+          </tr>
+          <tr data-market-id="bh">
+            <td>10</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">巴林</span>
+              <span class="country-name-en">Bahrain · USD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.69</span>
+              </strong>
+              <span class="price-local">$0.99</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">20.20</span>
+              </strong>
+              <span class="price-local">$2.99</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">74.26</span>
+              </strong>
+              <span class="price-local">$10.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">222.91</span>
+              </strong>
+              <span class="price-local">$32.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">439.14</span>
+              </strong>
+              <span class="price-local">$64.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="bs">
+            <td>10</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">巴哈马</span>
+              <span class="country-name-en">Bahamas · USD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.69</span>
+              </strong>
+              <span class="price-local">$0.99</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">20.20</span>
+              </strong>
+              <span class="price-local">$2.99</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">74.26</span>
+              </strong>
+              <span class="price-local">$10.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">222.91</span>
+              </strong>
+              <span class="price-local">$32.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">439.14</span>
+              </strong>
+              <span class="price-local">$64.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="kg">
+            <td>10</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">吉尔吉斯斯坦</span>
+              <span class="country-name-en">Kyrgyzstan · USD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.69</span>
+              </strong>
+              <span class="price-local">$0.99</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">20.20</span>
+              </strong>
+              <span class="price-local">$2.99</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">74.26</span>
+              </strong>
+              <span class="price-local">$10.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">222.91</span>
+              </strong>
+              <span class="price-local">$32.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">439.14</span>
+              </strong>
+              <span class="price-local">$64.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="kh">
+            <td>10</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">柬埔寨</span>
+              <span class="country-name-en">Cambodia · USD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.69</span>
+              </strong>
+              <span class="price-local">$0.99</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">20.20</span>
+              </strong>
+              <span class="price-local">$2.99</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">74.26</span>
+              </strong>
+              <span class="price-local">$10.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">222.91</span>
+              </strong>
+              <span class="price-local">$32.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">439.14</span>
+              </strong>
+              <span class="price-local">$64.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="tj">
+            <td>10</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">塔吉克斯坦</span>
+              <span class="country-name-en">Tajikistan · USD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.69</span>
+              </strong>
+              <span class="price-local">$0.99</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">20.20</span>
+              </strong>
+              <span class="price-local">$2.99</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">74.26</span>
+              </strong>
+              <span class="price-local">$10.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">222.91</span>
+              </strong>
+              <span class="price-local">$32.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">439.14</span>
+              </strong>
+              <span class="price-local">$64.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="us">
+            <td>10</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">美国</span>
+              <span class="country-name-en">United States · USD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.69</span>
+              </strong>
+              <span class="price-local">$0.99</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">20.20</span>
+              </strong>
+              <span class="price-local">$2.99</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">67.50</span>
+              </strong>
+              <span class="price-local">$9.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">202.64</span>
+              </strong>
+              <span class="price-local">$29.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">405.35</span>
+              </strong>
+              <span class="price-local">$59.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="uz">
+            <td>10</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">乌兹别克斯坦</span>
+              <span class="country-name-en">Uzbekistan · USD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.69</span>
+              </strong>
+              <span class="price-local">$0.99</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">20.20</span>
+              </strong>
+              <span class="price-local">$2.99</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">74.26</span>
+              </strong>
+              <span class="price-local">$10.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">222.91</span>
+              </strong>
+              <span class="price-local">$32.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">439.14</span>
+              </strong>
+              <span class="price-local">$64.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="qa">
+            <td>11</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">卡塔尔</span>
+              <span class="country-name-en">Qatar · QAR</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.85</span>
+              </strong>
+              <span class="price-local">3.69﷼</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">20.40</span>
+              </strong>
+              <span class="price-local">10.99﷼</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">68.67</span>
+              </strong>
+              <span class="price-local">36.99﷼</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">204.18</span>
+              </strong>
+              <span class="price-local">109.99﷼</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">408.37</span>
+              </strong>
+              <span class="price-local">219.99﷼</span>
+            </td>
+          </tr>
+          <tr data-market-id="kr">
+            <td>12</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">韩国</span>
+              <span class="country-name-en">Republic of Korea · KRW</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">5.24</span>
+              </strong>
+              <span class="price-local">₩1100</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">20.96</span>
+              </strong>
+              <span class="price-local">₩4400</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">66.69</span>
+              </strong>
+              <span class="price-local">₩14000</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">209.59</span>
+              </strong>
+              <span class="price-local">₩44000</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">419.18</span>
+              </strong>
+              <span class="price-local">₩88000</span>
+            </td>
+          </tr>
+          <tr data-market-id="cn">
+            <td>13</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">中国大陆</span>
+              <span class="country-name-en">China mainland · CNY</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.00</span>
+              </strong>
+              <span class="price-local">¥6</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">21.00</span>
+              </strong>
+              <span class="price-local">¥21</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">68.00</span>
+              </strong>
+              <span class="price-local">¥68</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">198.00</span>
+              </strong>
+              <span class="price-local">¥198</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">398.00</span>
+              </strong>
+              <span class="price-local">¥398</span>
+            </td>
+          </tr>
+          <tr data-market-id="sg">
+            <td>14</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">新加坡</span>
+              <span class="country-name-en">Singapore · SGD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">7.81</span>
+              </strong>
+              <span class="price-local">S$ 1.48</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">21.01</span>
+              </strong>
+              <span class="price-local">S$ 3.98</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">73.78</span>
+              </strong>
+              <span class="price-local">S$ 13.98</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">226.83</span>
+              </strong>
+              <span class="price-local">S$ 42.98</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">448.50</span>
+              </strong>
+              <span class="price-local">S$ 84.98</span>
+            </td>
+          </tr>
+          <tr data-market-id="au">
+            <td>15</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">澳大利亚</span>
+              <span class="country-name-en">Australia · AUD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">7.11</span>
+              </strong>
+              <span class="price-local">$1.49</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">21.41</span>
+              </strong>
+              <span class="price-local">$4.49</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">71.49</span>
+              </strong>
+              <span class="price-local">$14.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">214.57</span>
+              </strong>
+              <span class="price-local">$44.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">429.18</span>
+              </strong>
+              <span class="price-local">$89.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="kz">
+            <td>16</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">哈萨克斯坦</span>
+              <span class="country-name-en">Kazakhstan · KZT</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">7.25</span>
+              </strong>
+              <span class="price-local">₸499</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">21.65</span>
+              </strong>
+              <span class="price-local">₸1490</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">72.50</span>
+              </strong>
+              <span class="price-local">₸4990</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">217.79</span>
+              </strong>
+              <span class="price-local">₸14990</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">435.72</span>
+              </strong>
+              <span class="price-local">₸29990</span>
+            </td>
+          </tr>
+          <tr data-market-id="ph">
+            <td>17</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">菲律宾</span>
+              <span class="country-name-en">Philippines · PHP</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.50</span>
+              </strong>
+              <span class="price-local">₱59</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">21.91</span>
+              </strong>
+              <span class="price-local">₱199</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">76.97</span>
+              </strong>
+              <span class="price-local">₱699</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">219.14</span>
+              </strong>
+              <span class="price-local">₱1990</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">439.37</span>
+              </strong>
+              <span class="price-local">₱3990</span>
+            </td>
+          </tr>
+          <tr data-market-id="ae">
+            <td>18</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">阿拉伯联合酋长国</span>
+              <span class="country-name-en">United Arab Emirates · AED</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">7.34</span>
+              </strong>
+              <span class="price-local">AED 3.99</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">22.06</span>
+              </strong>
+              <span class="price-local">AED 11.99</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">73.58</span>
+              </strong>
+              <span class="price-local">AED 39.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">220.77</span>
+              </strong>
+              <span class="price-local">AED 119.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">441.56</span>
+              </strong>
+              <span class="price-local">AED 239.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="la">
+            <td>19</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">老挝</span>
+              <span class="country-name-en">Laos · USD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.69</span>
+              </strong>
+              <span class="price-local">$0.99</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">22.23</span>
+              </strong>
+              <span class="price-local">$3.29</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">74.26</span>
+              </strong>
+              <span class="price-local">$10.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">222.91</span>
+              </strong>
+              <span class="price-local">$32.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">439.14</span>
+              </strong>
+              <span class="price-local">$64.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="ro">
+            <td>20</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">罗马尼亚</span>
+              <span class="country-name-en">Romania · RON</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">7.42</span>
+              </strong>
+              <span class="price-local">4.99 lei</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">22.28</span>
+              </strong>
+              <span class="price-local">14.99 lei</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">74.29</span>
+              </strong>
+              <span class="price-local">49.99 lei</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">222.89</span>
+              </strong>
+              <span class="price-local">149.99 lei</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">445.79</span>
+              </strong>
+              <span class="price-local">299.99 lei</span>
+            </td>
+          </tr>
+          <tr data-market-id="id">
+            <td>21</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">印度尼西亚</span>
+              <span class="country-name-en">Indonesia · IDR</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">5.67</span>
+              </strong>
+              <span class="price-local">Rp 15000</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">22.30</span>
+              </strong>
+              <span class="price-local">Rp 59000</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">75.21</span>
+              </strong>
+              <span class="price-local">Rp 199000</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">226.39</span>
+              </strong>
+              <span class="price-local">Rp 599000</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">453.16</span>
+              </strong>
+              <span class="price-local">Rp 1199000</span>
+            </td>
+          </tr>
+          <tr data-market-id="ng">
+            <td>22</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">尼日利亚</span>
+              <span class="country-name-en">Nigeria · NGN</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.46</span>
+              </strong>
+              <span class="price-local">₦1300</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">22.35</span>
+              </strong>
+              <span class="price-local">₦4500</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">74.00</span>
+              </strong>
+              <span class="price-local">₦14900</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">198.16</span>
+              </strong>
+              <span class="price-local">₦39900</span>
+            </td>
+            <td class="price-cell is-minimum" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="minimum-badge">最低</span>
+                <span class="price-symbol">¥</span><span class="price-amount">332.25</span>
+              </strong>
+              <span class="price-local">₦66900</span>
+            </td>
+          </tr>
+          <tr data-market-id="tz">
+            <td>23</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">坦桑尼亚</span>
+              <span class="country-name-en">Tanzania · TZS</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.38</span>
+              </strong>
+              <span class="price-local">2500 TSh</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">22.72</span>
+              </strong>
+              <span class="price-local">8900 TSh</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">76.34</span>
+              </strong>
+              <span class="price-local">29900 TSh</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">229.54</span>
+              </strong>
+              <span class="price-local">89900 TSh</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">459.34</span>
+              </strong>
+              <span class="price-local">179900 TSh</span>
+            </td>
+          </tr>
+          <tr data-market-id="jp">
+            <td>24</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">日本</span>
+              <span class="country-name-en">Japan · JPY</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">7.63</span>
+              </strong>
+              <span class="price-local">¥180</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">22.89</span>
+              </strong>
+              <span class="price-local">¥540</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">76.30</span>
+              </strong>
+              <span class="price-local">¥1800</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">233.15</span>
+              </strong>
+              <span class="price-local">¥5500</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">466.31</span>
+              </strong>
+              <span class="price-local">¥11000</span>
+            </td>
+          </tr>
+          <tr data-market-id="vn">
+            <td>25</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">越南</span>
+              <span class="country-name-en">Vietnam · VND</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.49</span>
+              </strong>
+              <span class="price-local">₫25000</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">23.12</span>
+              </strong>
+              <span class="price-local">₫89000</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">77.67</span>
+              </strong>
+              <span class="price-local">₫299000</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">233.52</span>
+              </strong>
+              <span class="price-local">₫899000</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">467.30</span>
+              </strong>
+              <span class="price-local">₫1799000</span>
+            </td>
+          </tr>
+          <tr data-market-id="euro-zone">
+            <td>26</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">欧盟</span>
+              <span class="country-name-en">Euro Zone · EUR</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">7.71</span>
+              </strong>
+              <span class="price-local">0.99 €</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">23.30</span>
+              </strong>
+              <span class="price-local">2.99 €</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">77.84</span>
+              </strong>
+              <span class="price-local">9.99 €</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">233.67</span>
+              </strong>
+              <span class="price-local">29.99 €</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">467.43</span>
+              </strong>
+              <span class="price-local">59.99 €</span>
+            </td>
+          </tr>
+          <tr data-market-id="hr">
+            <td>26</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">克罗地亚</span>
+              <span class="country-name-en">Croatia · EUR</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">7.71</span>
+              </strong>
+              <span class="price-local">0.99 €</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">23.30</span>
+              </strong>
+              <span class="price-local">2.99 €</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">77.84</span>
+              </strong>
+              <span class="price-local">9.99 €</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">233.67</span>
+              </strong>
+              <span class="price-local">29.99 €</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">467.43</span>
+              </strong>
+              <span class="price-local">59.99 €</span>
+            </td>
+          </tr>
+          <tr data-market-id="sa">
+            <td>27</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">沙特阿拉伯</span>
+              <span class="country-name-en">Saudi Arabia · SAR</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">7.19</span>
+              </strong>
+              <span class="price-local">3.99﷼</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">23.41</span>
+              </strong>
+              <span class="price-local">12.99﷼</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">81.07</span>
+              </strong>
+              <span class="price-local">44.99﷼</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">234.22</span>
+              </strong>
+              <span class="price-local">129.99﷼</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">486.49</span>
+              </strong>
+              <span class="price-local">269.99﷼</span>
+            </td>
+          </tr>
+          <tr data-market-id="am">
+            <td>28</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">亚美尼亚</span>
+              <span class="country-name-en">Armenia · USD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">8.04</span>
+              </strong>
+              <span class="price-local">$1.19</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">23.58</span>
+              </strong>
+              <span class="price-local">$3.49</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">81.02</span>
+              </strong>
+              <span class="price-local">$11.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">236.43</span>
+              </strong>
+              <span class="price-local">$34.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">472.92</span>
+              </strong>
+              <span class="price-local">$69.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="az">
+            <td>28</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">阿塞拜疆</span>
+              <span class="country-name-en">Azerbaijan · USD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.69</span>
+              </strong>
+              <span class="price-local">$0.99</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">23.58</span>
+              </strong>
+              <span class="price-local">$3.49</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">81.02</span>
+              </strong>
+              <span class="price-local">$11.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">236.43</span>
+              </strong>
+              <span class="price-local">$34.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">472.92</span>
+              </strong>
+              <span class="price-local">$69.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="bb">
+            <td>28</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">巴巴多斯</span>
+              <span class="country-name-en">Barbados · USD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.69</span>
+              </strong>
+              <span class="price-local">$0.99</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">23.58</span>
+              </strong>
+              <span class="price-local">$3.49</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">81.02</span>
+              </strong>
+              <span class="price-local">$11.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">236.43</span>
+              </strong>
+              <span class="price-local">$34.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">472.92</span>
+              </strong>
+              <span class="price-local">$69.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="bj">
+            <td>28</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">贝宁</span>
+              <span class="country-name-en">Benin · USD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.69</span>
+              </strong>
+              <span class="price-local">$0.99</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">23.58</span>
+              </strong>
+              <span class="price-local">$3.49</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">81.02</span>
+              </strong>
+              <span class="price-local">$11.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">236.43</span>
+              </strong>
+              <span class="price-local">$34.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">472.92</span>
+              </strong>
+              <span class="price-local">$69.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="by">
+            <td>28</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">白俄罗斯</span>
+              <span class="country-name-en">Belarus · USD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">8.04</span>
+              </strong>
+              <span class="price-local">$1.19</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">23.58</span>
+              </strong>
+              <span class="price-local">$3.49</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">81.02</span>
+              </strong>
+              <span class="price-local">$11.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">236.43</span>
+              </strong>
+              <span class="price-local">$34.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">472.92</span>
+              </strong>
+              <span class="price-local">$69.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="cg">
+            <td>28</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">刚果共和国</span>
+              <span class="country-name-en">Republic of Congo · USD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">8.04</span>
+              </strong>
+              <span class="price-local">$1.19</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">23.58</span>
+              </strong>
+              <span class="price-local">$3.49</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">81.02</span>
+              </strong>
+              <span class="price-local">$11.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">236.43</span>
+              </strong>
+              <span class="price-local">$34.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">472.92</span>
+              </strong>
+              <span class="price-local">$69.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="ci">
+            <td>28</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">科特迪瓦</span>
+              <span class="country-name-en">Ivory Coast · USD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.69</span>
+              </strong>
+              <span class="price-local">$0.99</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">23.58</span>
+              </strong>
+              <span class="price-local">$3.49</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">81.02</span>
+              </strong>
+              <span class="price-local">$11.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">236.43</span>
+              </strong>
+              <span class="price-local">$34.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">472.92</span>
+              </strong>
+              <span class="price-local">$69.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="cm">
+            <td>28</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">喀麦隆</span>
+              <span class="country-name-en">Cameroon · USD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.69</span>
+              </strong>
+              <span class="price-local">$0.99</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">23.58</span>
+              </strong>
+              <span class="price-local">$3.49</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">81.02</span>
+              </strong>
+              <span class="price-local">$11.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">236.43</span>
+              </strong>
+              <span class="price-local">$34.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">472.92</span>
+              </strong>
+              <span class="price-local">$69.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="ge">
+            <td>28</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">格鲁吉亚</span>
+              <span class="country-name-en">Georgia · USD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.69</span>
+              </strong>
+              <span class="price-local">$0.99</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">23.58</span>
+              </strong>
+              <span class="price-local">$3.49</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">81.02</span>
+              </strong>
+              <span class="price-local">$11.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">236.43</span>
+              </strong>
+              <span class="price-local">$34.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">472.92</span>
+              </strong>
+              <span class="price-local">$69.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="gh">
+            <td>28</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">加纳</span>
+              <span class="country-name-en">Ghana · USD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.69</span>
+              </strong>
+              <span class="price-local">$0.99</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">23.58</span>
+              </strong>
+              <span class="price-local">$3.49</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">81.02</span>
+              </strong>
+              <span class="price-local">$11.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">236.43</span>
+              </strong>
+              <span class="price-local">$34.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">472.92</span>
+              </strong>
+              <span class="price-local">$69.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="ke">
+            <td>28</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">肯尼亚</span>
+              <span class="country-name-en">Kenya · USD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.69</span>
+              </strong>
+              <span class="price-local">$0.99</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">23.58</span>
+              </strong>
+              <span class="price-local">$3.49</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">81.02</span>
+              </strong>
+              <span class="price-local">$11.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">236.43</span>
+              </strong>
+              <span class="price-local">$34.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">472.92</span>
+              </strong>
+              <span class="price-local">$69.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="md">
+            <td>28</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">摩尔多瓦</span>
+              <span class="country-name-en">Moldova · USD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.69</span>
+              </strong>
+              <span class="price-local">$0.99</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">23.58</span>
+              </strong>
+              <span class="price-local">$3.49</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">81.02</span>
+              </strong>
+              <span class="price-local">$11.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">236.43</span>
+              </strong>
+              <span class="price-local">$34.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">472.92</span>
+              </strong>
+              <span class="price-local">$69.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="mu">
+            <td>28</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">毛里求斯</span>
+              <span class="country-name-en">Mauritius · USD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">8.04</span>
+              </strong>
+              <span class="price-local">$1.19</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">23.58</span>
+              </strong>
+              <span class="price-local">$3.49</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">81.02</span>
+              </strong>
+              <span class="price-local">$11.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">236.43</span>
+              </strong>
+              <span class="price-local">$34.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">472.92</span>
+              </strong>
+              <span class="price-local">$69.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="np">
+            <td>28</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">尼泊尔</span>
+              <span class="country-name-en">Nepal · USD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.69</span>
+              </strong>
+              <span class="price-local">$0.99</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">23.58</span>
+              </strong>
+              <span class="price-local">$3.49</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">81.02</span>
+              </strong>
+              <span class="price-local">$11.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">236.43</span>
+              </strong>
+              <span class="price-local">$34.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">472.92</span>
+              </strong>
+              <span class="price-local">$69.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="sn">
+            <td>28</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">塞内加尔</span>
+              <span class="country-name-en">Senegal · USD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.69</span>
+              </strong>
+              <span class="price-local">$0.99</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">23.58</span>
+              </strong>
+              <span class="price-local">$3.49</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">81.02</span>
+              </strong>
+              <span class="price-local">$11.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">236.43</span>
+              </strong>
+              <span class="price-local">$34.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">472.92</span>
+              </strong>
+              <span class="price-local">$69.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="sr">
+            <td>28</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">苏里南</span>
+              <span class="country-name-en">Suriname · USD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.69</span>
+              </strong>
+              <span class="price-local">$0.99</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">23.58</span>
+              </strong>
+              <span class="price-local">$3.49</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">81.02</span>
+              </strong>
+              <span class="price-local">$11.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">236.43</span>
+              </strong>
+              <span class="price-local">$34.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">472.92</span>
+              </strong>
+              <span class="price-local">$69.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="ug">
+            <td>28</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">乌干达</span>
+              <span class="country-name-en">Uganda · USD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.69</span>
+              </strong>
+              <span class="price-local">$0.99</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">23.58</span>
+              </strong>
+              <span class="price-local">$3.49</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">81.02</span>
+              </strong>
+              <span class="price-local">$11.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">236.43</span>
+              </strong>
+              <span class="price-local">$34.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">472.92</span>
+              </strong>
+              <span class="price-local">$69.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="zm">
+            <td>28</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">赞比亚</span>
+              <span class="country-name-en">Zambia · USD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.69</span>
+              </strong>
+              <span class="price-local">$0.99</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">23.58</span>
+              </strong>
+              <span class="price-local">$3.49</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">81.02</span>
+              </strong>
+              <span class="price-local">$11.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">236.43</span>
+              </strong>
+              <span class="price-local">$34.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">472.92</span>
+              </strong>
+              <span class="price-local">$69.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="zw">
+            <td>28</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">津巴布韦</span>
+              <span class="country-name-en">Zimbabwe · USD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.69</span>
+              </strong>
+              <span class="price-local">$0.99</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">23.58</span>
+              </strong>
+              <span class="price-local">$3.49</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">81.02</span>
+              </strong>
+              <span class="price-local">$11.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">236.43</span>
+              </strong>
+              <span class="price-local">$34.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">472.92</span>
+              </strong>
+              <span class="price-local">$69.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="nz">
+            <td>29</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">新西兰</span>
+              <span class="country-name-en">New Zealand · NZD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">7.87</span>
+              </strong>
+              <span class="price-local">$1.99</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">23.68</span>
+              </strong>
+              <span class="price-local">$5.99</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">79.02</span>
+              </strong>
+              <span class="price-local">$19.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">237.13</span>
+              </strong>
+              <span class="price-local">$59.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">474.30</span>
+              </strong>
+              <span class="price-local">$119.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="bg">
+            <td>30</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">保加利亚</span>
+              <span class="country-name-en">Bulgaria · BGN</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">7.93</span>
+              </strong>
+              <span class="price-local">1.99 лв</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">23.86</span>
+              </strong>
+              <span class="price-local">5.99 лв</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">83.63</span>
+              </strong>
+              <span class="price-local">20.99 лв</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">258.93</span>
+              </strong>
+              <span class="price-local">64.99 лв</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">517.89</span>
+              </strong>
+              <span class="price-local">129.99 лв</span>
+            </td>
+          </tr>
+          <tr data-market-id="tr">
+            <td>31</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">土耳其</span>
+              <span class="country-name-en">Türkiye · TRY</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">7.06</span>
+              </strong>
+              <span class="price-local">49.99 TL</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">24.02</span>
+              </strong>
+              <span class="price-local">169.99 TL</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">77.73</span>
+              </strong>
+              <span class="price-local">549.99 TL</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">240.25</span>
+              </strong>
+              <span class="price-local">1699.99 TL</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">480.50</span>
+              </strong>
+              <span class="price-local">3399.99 TL</span>
+            </td>
+          </tr>
+          <tr data-market-id="eg">
+            <td>32</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">埃及</span>
+              <span class="country-name-en">Egypt · EGP</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.72</span>
+              </strong>
+              <span class="price-local">£49.99</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">24.19</span>
+              </strong>
+              <span class="price-local">£179.99</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">80.65</span>
+              </strong>
+              <span class="price-local">£599.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">241.94</span>
+              </strong>
+              <span class="price-local">£1799.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">483.89</span>
+              </strong>
+              <span class="price-local">£3599.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="al">
+            <td>33</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">阿尔巴尼亚</span>
+              <span class="country-name-en">Albania · USD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">8.04</span>
+              </strong>
+              <span class="price-local">$1.19</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">24.26</span>
+              </strong>
+              <span class="price-local">$3.59</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">81.02</span>
+              </strong>
+              <span class="price-local">$11.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">236.43</span>
+              </strong>
+              <span class="price-local">$34.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">472.92</span>
+              </strong>
+              <span class="price-local">$69.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="cl">
+            <td>34</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">智利</span>
+              <span class="country-name-en">Chile · CLP</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">7.32</span>
+              </strong>
+              <span class="price-local">$990</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">24.31</span>
+              </strong>
+              <span class="price-local">$3290</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">81.21</span>
+              </strong>
+              <span class="price-local">$10990</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">243.78</span>
+              </strong>
+              <span class="price-local">$32990</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">480.24</span>
+              </strong>
+              <span class="price-local">$64990</span>
+            </td>
+          </tr>
+          <tr data-market-id="ch">
+            <td>35</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">瑞士</span>
+              <span class="country-name-en">Switzerland · CHF</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">8.31</span>
+              </strong>
+              <span class="price-local">CHF 1</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">24.92</span>
+              </strong>
+              <span class="price-local">CHF 3</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">83.06</span>
+              </strong>
+              <span class="price-local">CHF 10</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">249.18</span>
+              </strong>
+              <span class="price-local">CHF 30</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">498.37</span>
+              </strong>
+              <span class="price-local">CHF 60</span>
+            </td>
+          </tr>
+          <tr data-market-id="is">
+            <td>36</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">冰岛</span>
+              <span class="country-name-en">Iceland · USD</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">8.04</span>
+              </strong>
+              <span class="price-local">$1.19</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">24.93</span>
+              </strong>
+              <span class="price-local">$3.69</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">81.02</span>
+              </strong>
+              <span class="price-local">$11.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">236.43</span>
+              </strong>
+              <span class="price-local">$34.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">472.92</span>
+              </strong>
+              <span class="price-local">$69.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="za">
+            <td>37</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">南非</span>
+              <span class="country-name-en">South Africa · ZAR</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">6.26</span>
+              </strong>
+              <span class="price-local">R14.99</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">25.05</span>
+              </strong>
+              <span class="price-local">R59.99</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">83.52</span>
+              </strong>
+              <span class="price-local">R199.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">250.55</span>
+              </strong>
+              <span class="price-local">R599.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">501.11</span>
+              </strong>
+              <span class="price-local">R1199.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="cz">
+            <td>38</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">捷克</span>
+              <span class="country-name-en">Czechia · CZK</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">8.04</span>
+              </strong>
+              <span class="price-local">25 Kč</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">25.41</span>
+              </strong>
+              <span class="price-local">79 Kč</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">80.09</span>
+              </strong>
+              <span class="price-local">249 Kč</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">240.92</span>
+              </strong>
+              <span class="price-local">749 Kč</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">479.26</span>
+              </strong>
+              <span class="price-local">1490 Kč</span>
+            </td>
+          </tr>
+          <tr data-market-id="pe">
+            <td>39</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">秘鲁</span>
+              <span class="country-name-en">Peru · PEN</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">7.81</span>
+              </strong>
+              <span class="price-local">S/.3.90</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">25.84</span>
+              </strong>
+              <span class="price-local">S/.12.90</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">85.94</span>
+              </strong>
+              <span class="price-local">S/.42.90</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">260.23</span>
+              </strong>
+              <span class="price-local">S/.129.90</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">520.66</span>
+              </strong>
+              <span class="price-local">S/.259.90</span>
+            </td>
+          </tr>
+          <tr data-market-id="br">
+            <td>40</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">巴西</span>
+              <span class="country-name-en">Brazil · BRL</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">7.69</span>
+              </strong>
+              <span class="price-local">R$ 5.90</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">25.94</span>
+              </strong>
+              <span class="price-local">R$ 19.90</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">87.21</span>
+              </strong>
+              <span class="price-local">R$ 66.90</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">260.60</span>
+              </strong>
+              <span class="price-local">R$ 199.90</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">521.32</span>
+              </strong>
+              <span class="price-local">R$ 399.90</span>
+            </td>
+          </tr>
+          <tr data-market-id="dk">
+            <td>41</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">丹麦</span>
+              <span class="country-name-en">Denmark · DKK</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">9.38</span>
+              </strong>
+              <span class="price-local">9 kr</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">26.06</span>
+              </strong>
+              <span class="price-local">25 kr</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">92.77</span>
+              </strong>
+              <span class="price-local">89 kr</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">280.40</span>
+              </strong>
+              <span class="price-local">269 kr</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">572.27</span>
+              </strong>
+              <span class="price-local">549 kr</span>
+            </td>
+          </tr>
+          <tr data-market-id="il">
+            <td>42</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">以色列</span>
+              <span class="country-name-en">Israel · ILS</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">8.87</span>
+              </strong>
+              <span class="price-local">₪3.90</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">27.05</span>
+              </strong>
+              <span class="price-local">₪11.90</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">90.70</span>
+              </strong>
+              <span class="price-local">₪39.90</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">272.54</span>
+              </strong>
+              <span class="price-local">₪119.90</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">545.32</span>
+              </strong>
+              <span class="price-local">₪239.90</span>
+            </td>
+          </tr>
+          <tr data-market-id="pl">
+            <td>43</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">波兰</span>
+              <span class="country-name-en">Poland · PLN</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">9.03</span>
+              </strong>
+              <span class="price-local">4.99 zł</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">27.11</span>
+              </strong>
+              <span class="price-local">14.99 zł</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">90.42</span>
+              </strong>
+              <span class="price-local">49.99 zł</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">271.30</span>
+              </strong>
+              <span class="price-local">149.99 zł</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">542.63</span>
+              </strong>
+              <span class="price-local">299.99 zł</span>
+            </td>
+          </tr>
+          <tr data-market-id="gb">
+            <td>44</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">英国</span>
+              <span class="country-name-en">United Kingdom · GBP</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">9.02</span>
+              </strong>
+              <span class="price-local">£0.99</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">27.25</span>
+              </strong>
+              <span class="price-local">£2.99</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">81.94</span>
+              </strong>
+              <span class="price-local">£8.99</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">246.02</span>
+              </strong>
+              <span class="price-local">£26.99</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">501.24</span>
+              </strong>
+              <span class="price-local">£54.99</span>
+            </td>
+          </tr>
+          <tr data-market-id="se">
+            <td>45</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">瑞典</span>
+              <span class="country-name-en">Sweden · SEK</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">8.48</span>
+              </strong>
+              <span class="price-local">12 kr</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">27.56</span>
+              </strong>
+              <span class="price-local">39 kr</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">91.16</span>
+              </strong>
+              <span class="price-local">129 kr</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">281.95</span>
+              </strong>
+              <span class="price-local">399 kr</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">564.61</span>
+              </strong>
+              <span class="price-local">799 kr</span>
+            </td>
+          </tr>
+          <tr data-market-id="hu">
+            <td>46</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">匈牙利</span>
+              <span class="country-name-en">Hungary · HUF</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">8.56</span>
+              </strong>
+              <span class="price-local">399 Ft</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">27.68</span>
+              </strong>
+              <span class="price-local">1290 Ft</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">96.33</span>
+              </strong>
+              <span class="price-local">4490 Ft</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">278.70</span>
+              </strong>
+              <span class="price-local">12990 Ft</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">579.07</span>
+              </strong>
+              <span class="price-local">26990 Ft</span>
+            </td>
+          </tr>
+          <tr data-market-id="no">
+            <td>47</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">挪威</span>
+              <span class="country-name-en">Norway · NOK</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">8.53</span>
+              </strong>
+              <span class="price-local">12 kr</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">27.71</span>
+              </strong>
+              <span class="price-local">39 kr</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">91.67</span>
+              </strong>
+              <span class="price-local">129 kr</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">283.53</span>
+              </strong>
+              <span class="price-local">399 kr</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">567.77</span>
+              </strong>
+              <span class="price-local">799 kr</span>
+            </td>
+          </tr>
+          <tr data-market-id="co">
+            <td>48</td>
+            <td>
+              <button class="country-history-button" type="button" disabled>
+              <span class="country-name">哥伦比亚</span>
+              <span class="country-name-en">Colombia · COP</span>
+              <span class="history-affordance" aria-hidden="true">历史 ›</span>
+              <span class="visually-hidden">，查看 Apple 当地标价历史</span>
+              </button>
+            </td>
+            <td class="price-cell" data-tier="50GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">8.39</span>
+              </strong>
+              <span class="price-local">$3900</span>
+            </td>
+            <td class="price-cell is-active-tier is-sorted" data-tier="200GB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">27.76</span>
+              </strong>
+              <span class="price-local">$12900</span>
+            </td>
+            <td class="price-cell" data-tier="2TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">96.61</span>
+              </strong>
+              <span class="price-local">$44900</span>
+            </td>
+            <td class="price-cell" data-tier="6TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">279.51</span>
+              </strong>
+              <span class="price-local">$129900</span>
+            </td>
+            <td class="price-cell" data-tier="12TB">
+              <strong class="price-cny">
+                <span class="price-symbol">¥</span><span class="price-amount">580.76</span>
+              </strong>
+              <span class="price-local">$269900</span>
+            </td>
+          </tr>
+<!-- ICLOUD_STATIC_TABLE_BODY:END -->
           </tbody>
         </table>
       </div>
 
       <div class="workspace-footer">
-        <div class="source-links" id="sourceLinks" role="group" aria-label="数据来源与更新时间">
+        <div class="source-links" id="sourceLinks" role="group" aria-label="数据来源与说明">
+          <strong class="source-heading"><i data-lucide="database" aria-hidden="true"></i>数据来源与说明</strong>
           <div class="source-group">
-            <a class="source-item" href="https://support.apple.com/en-us/108047" target="_blank" rel="noopener noreferrer"><i data-lucide="badge-check" aria-hidden="true"></i>Apple iCloud+ 价格</a>
-            <button class="source-meta-button" id="publishedDateButton" type="button" disabled title="查看 Apple 官网发布日期变更记录" aria-describedby="publishedDateHint">
+            <a class="source-item" href="https://support.apple.com/en-us/108047" target="_blank" rel="noopener noreferrer"><i data-lucide="badge-check" aria-hidden="true"></i>价格来源：Apple</a>
+<!-- ICLOUD_STATIC_APPLE_META:START -->
+            <span>Apple 价格页更新：<strong id="applePublishedDate">2026/07/17</strong></span>
+<!-- ICLOUD_STATIC_APPLE_META:END -->
+            <button class="source-meta-button" id="publishedDateButton" type="button" disabled title="查看 Apple 价格页更新记录" aria-describedby="publishedDateHint">
               <i data-lucide="calendar-days" aria-hidden="true"></i>
-              <span>页面发布日期：<strong id="applePublishedDate">--</strong></span>
+              <span>查看更新记录</span>
             </button>
-            <span id="publishedDateHint" class="visually-hidden">打开 Apple 官网发布日期变更记录</span>
+            <span id="publishedDateHint" class="visually-hidden">打开 Apple 价格页更新记录</span>
           </div>
           <span class="source-separator" aria-hidden="true"></span>
           <div class="source-group">
-            <a class="source-item" href="https://www.exchangerate-api.com" target="_blank" rel="noopener noreferrer"><i data-lucide="landmark" aria-hidden="true"></i><span class="visually-hidden">人民币参考汇率：</span>Rates By Exchange Rate API</a>
-            <span class="source-status"><i data-lucide="clock-3" aria-hidden="true"></i><span id="fxStatus">更新时间：--</span></span>
+            <a class="source-item" href="https://www.exchangerate-api.com" target="_blank" rel="noopener noreferrer"><i data-lucide="coins" aria-hidden="true"></i>参考汇率：ExchangeRate-API</a>
+<!-- ICLOUD_STATIC_FX_META:START -->
+            <span id="fxStatus"><i data-lucide="clock-3" aria-hidden="true"></i>汇率更新：2026/08/14 08:00</span>
+<!-- ICLOUD_STATIC_FX_META:END -->
           </div>
         </div>
       </div>
-      <p class="data-disclaimer">人民币金额按参考汇率换算，仅供横向比较；实际结算、税费和方案可用性以 Apple 对应地区页面及结算结果为准。</p>
+      <div class="data-disclaimer">
+        <p>价格来自 Apple 官方支持页；人民币金额按参考汇率换算，仅用于比较。实际扣费可能受税费、账号地区、已有订阅方案等因素影响。</p>
+        <details><summary><i data-lucide="landmark" aria-hidden="true"></i>价格与数据说明</summary><ul><li>价格以 Apple 英文支持页最新版本为准；</li><li>中文地区名称参考 Apple 简体中文支持页；</li><li>两个语言版本的页面更新时间可能不同；</li><li>部分地区可能存在税费、历史订阅价格或其他条件；</li><li>实际账单以 Apple 账号结算结果为准。</li></ul></details>
+      </div>
     </section>
   </main>
 
   <dialog id="historyDialog" class="history-dialog" aria-labelledby="historyTitle">
     <div class="dialog-header">
       <div>
-        <p class="dialog-eyebrow">价格历史</p>
-        <h2 id="historyTitle">地区价格历史</h2>
+        <p class="dialog-eyebrow">Apple 当地标价</p>
+        <h2 id="historyTitle">Apple 当地标价历史</h2>
         <p id="historySubtitle"></p>
+        <p class="history-explanation">这里记录 Apple 当地月费变化，不记录日常汇率波动。</p>
       </div>
       <button class="icon-button" id="closeHistory" type="button" aria-label="关闭价格历史" title="关闭"><i data-lucide="x" aria-hidden="true"></i></button>
     </div>
 
     <div class="history-current">
-      <div><span>当前当地月费</span><strong id="historyLocalPrice">--</strong></div>
-      <div><span>折合人民币</span><strong id="historyCnyPrice">--</strong></div>
-      <div><span>累计价格变更</span><strong id="historyEventCount">--</strong></div>
+      <div><span>当地月费</span><strong id="historyLocalPrice">--</strong></div>
+      <div><span>约合人民币</span><strong id="historyCnyPrice">--</strong></div>
+      <div><span>价格变动次数</span><strong id="historyEventCount">--</strong></div>
     </div>
 
     <div class="history-toolbar">
@@ -178,14 +3227,14 @@
     <section class="chart-section" aria-labelledby="chartTitle">
       <div class="section-heading"><h3 id="chartTitle">价格变化</h3><span id="chartCurrency"></span></div>
       <div class="chart-wrap" id="chartWrap"><canvas id="historyChart" role="img" aria-label="价格变化图，详细数据见下方变更记录"></canvas></div>
-      <div class="empty-history" id="emptyHistory" hidden><i data-lucide="calendar-clock" aria-hidden="true"></i><p>当前只有初始记录，尚未检测到价格变化。</p></div>
+      <div class="empty-history" id="emptyHistory" hidden><i data-lucide="calendar-clock" aria-hidden="true"></i><p>Apple 当地标价暂时没有变化记录。</p></div>
     </section>
 
     <section class="history-list" aria-labelledby="historyListTitle">
       <div class="section-heading"><h3 id="historyListTitle">变更记录</h3></div>
       <div class="history-table-scroll">
         <table>
-          <thead><tr><th scope="col">记录日期</th><th scope="col">币种</th><th data-history-tier-placeholder scope="col"><span class="visually-hidden">容量方案（加载中）</span></th><th data-history-tier-placeholder scope="col"><span class="visually-hidden">容量方案（加载中）</span></th><th data-history-tier-placeholder scope="col"><span class="visually-hidden">容量方案（加载中）</span></th><th data-history-tier-placeholder scope="col"><span class="visually-hidden">容量方案（加载中）</span></th><th data-history-tier-placeholder scope="col"><span class="visually-hidden">容量方案（加载中）</span></th></tr></thead>
+          <thead><tr><th scope="col">记录日期</th><th scope="col">币种</th><th data-history-tier-placeholder scope="col"><span class="visually-hidden">容量</span></th><th data-history-tier-placeholder scope="col"><span class="visually-hidden">容量</span></th><th data-history-tier-placeholder scope="col"><span class="visually-hidden">容量</span></th><th data-history-tier-placeholder scope="col"><span class="visually-hidden">容量</span></th><th data-history-tier-placeholder scope="col"><span class="visually-hidden">容量</span></th></tr></thead>
           <tbody id="historyRows"></tbody>
         </table>
       </div>
@@ -195,23 +3244,23 @@
   <dialog id="publishedDateDialog" class="history-dialog source-history-dialog" aria-labelledby="publishedDateDialogTitle">
     <div class="dialog-header">
       <div>
-        <p class="dialog-eyebrow">Apple 页面记录</p>
-        <h2 id="publishedDateDialogTitle">发布日期变更</h2>
-        <p>仅在 Apple Support 页面发布日期发生变化时记录。</p>
+        <p class="dialog-eyebrow">数据来源</p>
+        <h2 id="publishedDateDialogTitle">Apple 价格页更新记录</h2>
+        <p>当 Apple 支持页更新日期发生变化时，这里会记录我们检测到的价格、地区或容量变化。</p>
       </div>
       <button class="icon-button" id="closePublishedDate" type="button" aria-label="关闭发布日期记录" title="关闭"><i data-lucide="x" aria-hidden="true"></i></button>
     </div>
 
     <div class="published-date-current">
-      <span>最近发布日期</span>
+      <span>Apple 页面最近更新</span>
       <strong id="publishedDateDialogCurrent">--</strong>
     </div>
 
     <section class="history-list published-date-list" aria-labelledby="publishedDateListTitle">
-      <div class="section-heading"><h3 id="publishedDateListTitle">发布日期变更记录</h3></div>
+      <div class="section-heading"><h3 id="publishedDateListTitle">更新记录</h3></div>
       <div class="history-table-scroll">
         <table>
-          <thead><tr><th scope="col">Apple 页面发布日期</th><th scope="col">本次内容变化</th></tr></thead>
+          <thead><tr><th scope="col">Apple 页面日期</th><th scope="col">检测到的变化</th></tr></thead>
           <tbody id="publishedDateRows"></tbody>
         </table>
       </div>

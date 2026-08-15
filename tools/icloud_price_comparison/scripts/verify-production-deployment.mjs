@@ -1,25 +1,16 @@
-import { createHash } from 'node:crypto';
 import { appendFile, readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { validatePricePayload } from '../data-contract.js';
+import { assertStaticPageMatches, publicPayloadFingerprint } from './static-page.mjs';
 
 export const PRODUCTION_PRICES_URL = 'https://www.linchun.com.cn/tools/icloud_price_comparison/data/prices.json';
+export const PRODUCTION_INDEX_URL = 'https://www.linchun.com.cn/tools/icloud_price_comparison/';
 export const DEFAULT_MAX_WAIT_MS = 5 * 60 * 1_000;
 export const DEFAULT_INTERVAL_MS = 15 * 1_000;
 export const DEFAULT_REQUEST_TIMEOUT_MS = 10 * 1_000;
-const MAX_RESPONSE_BYTES = 1024 * 1024;
-
-function canonicalize(value) {
-  if (Array.isArray(value)) return value.map(canonicalize);
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalize(value[key])]));
-  }
-  return value;
-}
-
-export function publicPayloadFingerprint(payload) {
-  return createHash('sha256').update(JSON.stringify(canonicalize(payload))).digest('hex');
-}
+const MAX_JSON_RESPONSE_BYTES = 1024 * 1024;
+const MAX_HTML_RESPONSE_BYTES = 512 * 1024;
+export { publicPayloadFingerprint };
 
 function validateDeployablePayload(payload, label) {
   validatePricePayload(payload);
@@ -35,12 +26,22 @@ async function readBoundedJson(response) {
     throw new Error(`unexpected content type: ${contentType || 'missing'}`);
   }
   const declaredLength = response.headers.get('content-length');
-  if (/^\d+$/.test(declaredLength ?? '') && Number(declaredLength) > MAX_RESPONSE_BYTES) {
+  if (/^\d+$/.test(declaredLength ?? '') && Number(declaredLength) > MAX_JSON_RESPONSE_BYTES) {
     throw new Error('production response exceeds the size limit');
   }
   const bytes = new Uint8Array(await response.arrayBuffer());
-  if (bytes.byteLength > MAX_RESPONSE_BYTES) throw new Error('production response exceeds the size limit');
+  if (bytes.byteLength > MAX_JSON_RESPONSE_BYTES) throw new Error('production response exceeds the size limit');
   return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+}
+
+async function readBoundedHtml(response) {
+  const contentType = response.headers.get('content-type') ?? '';
+  if (!/text\/html\b/i.test(contentType)) throw new Error(`unexpected HTML content type: ${contentType || 'missing'}`);
+  const declaredLength = response.headers.get('content-length');
+  if (/^\d+$/.test(declaredLength ?? '') && Number(declaredLength) > MAX_HTML_RESPONSE_BYTES) throw new Error('production HTML exceeds the size limit');
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes.byteLength > MAX_HTML_RESPONSE_BYTES) throw new Error('production HTML exceeds the size limit');
+  return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
 }
 
 function safeObservedTimestamp(value) {
@@ -49,6 +50,7 @@ function safeObservedTimestamp(value) {
 
 export async function verifyProductionDeployment(expectedPayload, {
   productionUrl = PRODUCTION_PRICES_URL,
+  productionIndexUrl = PRODUCTION_INDEX_URL,
   runId = 'local',
   maxWaitMs = DEFAULT_MAX_WAIT_MS,
   intervalMs = DEFAULT_INTERVAL_MS,
@@ -87,7 +89,18 @@ export async function verifyProductionDeployment(expectedPayload, {
       } else {
         const observed = validateDeployablePayload(await readBoundedJson(response), 'production payload');
         lastObservedGeneratedAt = safeObservedTimestamp(observed.generatedAt);
-        const observedFingerprint = publicPayloadFingerprint(observed);
+      const observedFingerprint = publicPayloadFingerprint(observed);
+        const indexUrl = new URL(productionIndexUrl);
+        indexUrl.searchParams.set('verify', `${runId}-${attempts}`);
+        const htmlResponse = await fetchImpl(indexUrl, {
+          cache: 'no-store',
+          headers: { 'cache-control': 'no-cache', pragma: 'no-cache' },
+          redirect: 'error',
+          signal: controller.signal
+        });
+        if (!htmlResponse.ok) throw new Error(`production HTML HTTP_${htmlResponse.status}`);
+        const productionHtml = await readBoundedHtml(htmlResponse);
+        assertStaticPageMatches(productionHtml, observed);
         if (observedFingerprint === expectedFingerprint
           && observed.generatedAt === expected.generatedAt
           && observed.run.finishedAtUtc === expected.run.finishedAtUtc) {

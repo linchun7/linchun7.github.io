@@ -71,8 +71,8 @@ ExchangeRate-API ───┘        │
 4. Apple 页面在共享 5 分钟网络预算内抓取并通过双路径解析/结构校验。
 5. 汇率在线获取成功，或严格满足 36 小时回退条件。
 6. `test:data` 和 runner Chrome UI 测试通过。
-7. 完整 `data/` 通过语义验证后打包；发布 job 在展开前后再次验证。
-8. 发布前确认远端 `main` 未前进，只在最后一步提交并推送完整 `data/`。
+7. 完整 `data/` 通过语义验证后，自动从 `prices.json` 生成并复核 `index.html` 的静态价格区域；数据和首页作为同一受控发布工件上传。
+8. 发布 job 在展开前后再次验证数据与静态投影，并确认首页 markers 外的手写 shell 未改变；远端 `main` 未前进时才在最后一步提交并推送。
 
 注意：由工作流内置 `GITHUB_TOKEN` 推送的数据提交不会再触发普通 `push` 验证工作流；因此每日工作流自身的 core/data/Chrome/工件验证是发布门禁。完整三浏览器验证由下述独立工作流覆盖。
 
@@ -232,6 +232,8 @@ Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
 ### 缓存
 
 当前运维目标：HTML/JSON 最长约 10 分钟，带内容哈希版本的静态资源约 30 分钟。修改浏览器 JS/CSS/数据契约后运行 `pnpm assets:update`，提交前用 `pnpm assets:check` 验证引用与内容一致；不要手工填写 query version。部署后可按工具路径定向 purge；不要全站清缓存，除非事故范围确实是全站。
+
+production verification 同时请求真实 `prices.json` 与首页 HTML：前者必须通过 schema 4、parser、时间和完整 fingerprint 校验，后者的所有生成区域必须与同一次 JSON 精确一致。duplicate automatic 与 superseded newer-main 路径复用同一 verifier；JSON/HTML 任一代际不一致都不能发送成功心跳。
 
 Cloudflare 可能自动修改 HTML 注入 Beacon，因此 HTML 响应字节 hash 不一定与仓库文件相同。JS、CSS、vendor 和 JSON 不应被改写，可直接比较 SHA-256；HTML 应同时检查候选资源版本、CSP、页脚和脚本列表。
 

@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium, firefox, webkit } from 'playwright';
 
 import { validatePriceHistoryConsistency } from '../data-contract.js';
+import { renderStaticFragments, replaceStaticFragments } from '../scripts/static-page.mjs';
 
 const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REPOSITORY_DIR = path.resolve(PROJECT_DIR, '../..');
@@ -233,7 +234,7 @@ test('starts price data early and deprioritizes optional third-party work', asyn
   assert.match(html, /img-src[^;]+google-analytics\.com[^;]+www\.googletagmanager\.com/, 'GA4 image endpoints must be explicitly allowed by CSP');
   assert.doesNotMatch(html, /访问统计使用 Google Analytics 和 Cloudflare Web Analytics；站内搜索词不会发送给统计服务。/);
   assert.doesNotMatch(html, /raw\.githubusercontent\.com/, 'frontend data must not fall back to a mutable branch URL');
-  assert.match(html, /Rates By Exchange Rate API/);
+  assert.match(html, /参考汇率：ExchangeRate-API/);
   assert.match(html, /data-cfasync="false" type="module"/, 'Rocket Loader must not rewrite the module entry point');
   assert.match(bootstrapSource, /redirect:\s*'error'/, 'the eager price request must reject redirects');
   assert.match(bootstrapSource, /String\(amount\) === match\[1\]/, 'bootstrap URL tiers must use the same canonical numeric spelling as the module');
@@ -487,7 +488,46 @@ test('shows a usable explanation when JavaScript is disabled', { timeout: 30_000
     await notice.waitFor({ state: 'visible' });
     assert.equal(await notice.isVisible(), true);
     assert.match(await notice.innerText(), /JavaScript/);
-    assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), 0);
+    assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), 73);
+    assert.equal(await page.locator('#minimumSummary .minimum-card').count(), 5);
+    assert.equal(await page.locator('#loadStatus').isHidden(), true);
+    assert.equal(await page.locator('#priceWorkspace').getAttribute('aria-busy'), 'false');
+    assert.equal(await page.locator('#minimumSummary').getAttribute('aria-busy'), 'false');
+    assert.equal(await page.locator('.spinner:visible').count(), 0);
+    assert.equal(await page.getByText('中国大陆', { exact: true }).count(), 1);
+    assert.equal(await page.getByText('日本', { exact: true }).count(), 1);
+    assert.equal(await page.getByText('美国', { exact: true }).count(), 1);
+  } finally {
+    await browser.close();
+  }
+});
+
+test('keeps stale-FX static safety cues when the network refresh fails', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the stale-FX static fallback test');
+  if (!browserConfig) return;
+  const [shell, current] = await Promise.all([
+    readFile(path.join(PROJECT_DIR, 'index.html'), 'utf8'),
+    readFixture('prices.json')
+  ]);
+  const payload = structuredClone(current);
+  payload.fx.stale = true;
+  payload.fx.fallbackReason = 'request-failed';
+  const html = replaceStaticFragments(shell, renderStaticFragments(payload));
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await page.route(`http://127.0.0.1:${port}/`, (route) => route.fulfill({ status: 200, contentType: 'text/html', body: html }));
+  await page.route('**/data/prices.json*', (route) => route.fulfill({ status: 503, body: '{}' }));
+  await page.route('https://**/*', (route) => route.abort());
+  try {
+    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
+    assert.equal(await page.locator('.minimum-card, .minimum-badge, .is-minimum, .rank-top').count(), 0);
+    assert.match(await page.locator('#minimumSummary').innerText(), /参考汇率暂未更新/);
+    assert.match(await page.locator('#rankingScopeNote').innerText(), /最近一次可用汇率/);
+    assert.ok(await page.locator('.price-local').count() > 0);
+    assert.ok(await page.locator('.price-cny').count() > 0);
   } finally {
     await browser.close();
   }
@@ -547,22 +587,24 @@ test('renders current prices, sorting, and country history in a real browser', {
       try {
         await page.goto(`${baseUrl}/`, { waitUntil: 'domcontentloaded' });
         assert.equal(await page.locator('#loadStatus').isVisible(), true, `${viewport.name} should show loading status before price data arrives`);
-        assert.match(await page.locator('#loadStatusText').textContent(), /正在加载价格数据/);
+        assert.match(await page.locator('#loadStatusText').textContent(), /正在检查最新价格/);
         assert.equal(await page.locator('.workspace').getAttribute('aria-busy'), 'true');
         assert.equal(await page.locator('#searchInput').isDisabled(), true);
         assert.equal(await page.locator('#regionSelect').isDisabled(), true);
+        assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), expectedData.countries.length, `${viewport.name} must show static prices before network hydration`);
         if (viewport.name === 'narrow-mobile') {
           assert.equal(await page.locator('.spinner').first().evaluate((element) => getComputedStyle(element).animationName), 'none');
         }
         if (viewport.name === 'desktop') {
           await page.waitForTimeout(1_600);
-          assert.match(await page.locator('#loadStatusText').textContent(), /网络较慢，仍在加载/);
+          assert.match(await page.locator('#loadStatusText').textContent(), /正在检查更新，当前价格仍可查看/);
         }
         releasePriceRequest();
         await page.waitForFunction(
           (count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count,
           expectedData.countries.length
         );
+        await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
         assert.equal(await page.locator('th[data-tier-placeholder]').count(), 0, `${viewport.name} price header placeholders must be replaced after data validation`);
         const initialResources = await page.evaluate(() => performance.getEntriesByType('resource').map(({ name }) => name));
         assert.equal(initialResources.some((url) => url.includes('/data/history.json')), false, `${viewport.name} must defer history data`);
@@ -570,15 +612,18 @@ test('renders current prices, sorting, and country history in a real browser', {
         assert.equal(initialResources.some((url) => url.includes('/vendor/lucide.min.js')), false, `${viewport.name} must not load the full Lucide bundle`);
         assert.equal(initialResources.some((url) => url.includes('/vendor/lucide-subset.js')), true, `${viewport.name} must load the Lucide subset`);
 
-        assert.equal(await page.locator('#marketCount').textContent(), String(expectedData.countries.length));
-        assert.equal(await page.locator('#tierCount').textContent(), String(expectedData.tiers.length));
+        assert.equal(await page.locator('#marketCount').textContent(), `${expectedData.countries.length} 个地区`);
+        assert.equal(await page.locator('#tierCount').textContent(), `${expectedData.tiers.length} 档`);
         assert.equal(await page.locator('#loadStatus').isVisible(), false, `${viewport.name} should hide loading status after price data arrives`);
         assert.equal(await page.locator('.workspace').getAttribute('aria-busy'), 'false');
         assert.equal(await page.locator('#searchInput').isEnabled(), true);
         assert.equal(await page.locator('#regionSelect').isEnabled(), true);
+        assert.equal(await page.locator('#priceRows .history-affordance').count(), expectedData.countries.length);
+        const hydratedAccessibleCopy = await page.locator('#minimumSummary, #priceRows').allInnerTexts();
+        assert.equal(hydratedAccessibleCopy.join(' ').includes('启用 JavaScript 后'), false);
         assert.equal(await page.locator('.app-brand h1').textContent(), 'iCloud+ 全球价格对比');
-        assert.equal(await page.locator('#overviewTitle').textContent(), '各容量参考最低价');
-        assert.equal(await page.locator('.workspace-heading h2').textContent(), '各地区 iCloud+ 价格');
+        assert.equal(await page.locator('#overviewTitle').textContent(), '各容量全球最低价');
+        assert.equal(await page.locator('.workspace-heading h2').textContent(), '全球 iCloud+ 月费');
         assert.equal(await page.locator('button[data-sort-tier]').count(), expectedData.tiers.length);
         if (viewport.width > 900) {
           const referenceBox = await page.locator('.overview-reference').boundingBox();
@@ -603,10 +648,10 @@ test('renders current prices, sorting, and country history in a real browser', {
             fontSize: Number.parseFloat(style.fontSize)
           };
         }));
-        assert.deepEqual(statValues.map(({ text }) => text), [String(expectedData.countries.length), String(new Set(expectedData.countries.map(({ currency }) => currency)).size), String(expectedData.tiers.length)]);
+        assert.deepEqual(statValues.map(({ text }) => text), [`${expectedData.countries.length} 个地区`, `${new Set(expectedData.countries.map(({ currency }) => currency)).size} 种`, `${expectedData.tiers.length} 档`]);
         assert.equal(new Set(statValues.map(({ color }) => color)).size, 1, `${viewport.name} stat colors should have equal emphasis`);
         assert.equal(new Set(statValues.map(({ fontSize }) => fontSize)).size, 1, `${viewport.name} stat sizes should have equal emphasis`);
-        assert.ok(statValues.every(({ fontSize }) => fontSize >= (viewport.width > 900 ? 28 : 24)), `${viewport.name} stats should remain readable`);
+        assert.ok(statValues.every(({ fontSize }) => fontSize >= 13), `${viewport.name} compact stats should remain readable`);
         const statCards = await page.locator('.overview-stats > div').evaluateAll((elements) => elements.map((element) => {
           const style = getComputedStyle(element);
           return { backgroundColor: style.backgroundColor, borderColor: style.borderColor };
@@ -649,6 +694,25 @@ test('renders current prices, sorting, and country history in a real browser', {
         if (viewport.width <= 640) {
           const sourceTargetHeights = await page.locator('.source-item, .source-meta-button').evaluateAll((targets) => targets.map((target) => target.getBoundingClientRect().height));
           assert.ok(sourceTargetHeights.every((height) => height >= 44), `${viewport.name} source actions must retain comfortable touch targets`);
+          const mobileTypography = await page.evaluate(() => ({
+            status: Number.parseFloat(getComputedStyle(document.querySelector('.data-status')).fontSize),
+            local: Number.parseFloat(getComputedStyle(document.querySelector('.price-local')).fontSize),
+            tier: Number.parseFloat(getComputedStyle(document.querySelector('.minimum-tier-label')).fontSize)
+          }));
+          assert.ok(Object.values(mobileTypography).every((size) => size >= 12), `${viewport.name} core mobile text must be at least 12px`);
+          const touchTargets = await page.evaluate(() => {
+            const retry = document.querySelector('#retryButton');
+            const clear = document.querySelector('#clearFiltersButton');
+            document.querySelector('#loadStatus').hidden = false;
+            retry.hidden = false;
+            clear.hidden = false;
+            const heights = [retry, clear].map((button) => button.getBoundingClientRect().height);
+            document.querySelector('#loadStatus').hidden = true;
+            retry.hidden = true;
+            clear.hidden = true;
+            return heights;
+          });
+          assert.ok(touchTargets.every((height) => height >= 44), `${viewport.name} retry and clear-filter targets must be at least 44px`);
         }
         if (viewport.name === 'narrow-mobile') {
           const metricLabels = await page.locator('.overview-stats dt > span:last-child').evaluateAll((labels) => labels.map((label) => ({
@@ -659,7 +723,7 @@ test('renders current prices, sorting, and country history in a real browser', {
         }
         const semanticAlignments = await page.evaluate(() => ({
           minimumCard: getComputedStyle(document.querySelector('#minimumSummary .minimum-card')).textAlign,
-          metricCard: getComputedStyle(document.querySelector('.overview-stats .metric-card')).textAlign,
+          metricCard: getComputedStyle(document.querySelector('.overview-stats > div')).textAlign,
           rankHeader: getComputedStyle(document.querySelector('.price-table .rank-column')).textAlign,
           countryHeader: getComputedStyle(document.querySelector('.price-table th:nth-child(2)')).textAlign,
           priceHeader: getComputedStyle(document.querySelector('.price-table th[data-tier-header]')).textAlign,
@@ -668,7 +732,7 @@ test('renders current prices, sorting, and country history in a real browser', {
         }));
         assert.deepEqual(semanticAlignments, {
           minimumCard: 'left',
-          metricCard: 'left',
+          metricCard: 'start',
           rankHeader: 'center',
           countryHeader: 'left',
           priceHeader: 'right',
@@ -683,22 +747,27 @@ test('renders current prices, sorting, and country history in a real browser', {
           text: badge.textContent
         }));
         assert.equal(minimumBadgePosition.badgeIndex, 0, 'minimum badge should sit directly before the price');
-        assert.equal(minimumBadgePosition.text, '参考最低');
+        assert.equal(minimumBadgePosition.text, '最低');
         assert.ok(minimumBadgePosition.gapToPrice >= 0 && minimumBadgePosition.gapToPrice <= 6, `${viewport.name} minimum badge should stay close to the price`);
         const minimumCellBackground = await page.locator('.price-cell.is-minimum').first().evaluate((cell) => getComputedStyle(cell).backgroundColor);
         const standardCellBackground = await page.locator('.price-cell:not(.is-minimum):not(.is-sorted)').first().evaluate((cell) => getComputedStyle(cell).backgroundColor);
         assert.notEqual(minimumCellBackground, standardCellBackground, 'minimum cell should use a restrained green tint');
         const sourceText = await page.locator('#sourceLinks').innerText();
         assert.equal(await page.locator('#sourceLinks .source-group').count(), 2);
-        assert.equal(await page.locator('#sourceLinks .source-status svg').count(), 1);
-        assert.match(sourceText, /Apple iCloud\+ 价格/);
-        assert.ok(sourceText.indexOf('Apple iCloud+ 价格') < sourceText.indexOf('页面发布日期'));
-        assert.ok(sourceText.indexOf('页面发布日期') < sourceText.indexOf('Rates By Exchange Rate API'));
+        const sourceGroups = await page.locator('#sourceLinks .source-group').allInnerTexts();
+        assert.match(sourceGroups[0], /价格来源：Apple/);
+        assert.match(sourceGroups[0], /Apple 价格页更新：/);
+        assert.match(sourceGroups[0], /查看更新记录/);
+        assert.doesNotMatch(sourceGroups[1], /Apple 价格页更新：/);
+        assert.match(sourceGroups[1], /参考汇率：ExchangeRate-API/);
+        assert.ok(await page.locator('#sourceLinks svg').count() >= 4);
+        assert.match(sourceText, /价格来源：Apple/);
+        assert.match(sourceText, /Apple 价格页更新/);
         const fxAttribution = page.locator('a[href="https://www.exchangerate-api.com"]');
-        assert.match((await fxAttribution.textContent()).trim(), /Rates By Exchange Rate API$/);
+        assert.match((await fxAttribution.textContent()).trim(), /参考汇率：ExchangeRate-API$/);
         assert.equal(await fxAttribution.getAttribute('aria-label'), null);
-        assert.equal(await page.getByRole('link', { name: /Rates By Exchange Rate API/ }).count(), 1);
-        assert.match(sourceText, /更新时间：.+北京时间/);
+        assert.equal(await page.getByRole('link', { name: /参考汇率：ExchangeRate-API/ }).count(), 1);
+        assert.match(sourceText, /汇率更新：/);
         const labelInNameFailures = await page.locator('#minimumSummary .minimum-card, .country-history-button, #publishedDateButton').evaluateAll((controls) => controls.flatMap((control) => {
           const normalize = (value) => value.replace(/\s+/g, ' ').trim();
           const visibleText = normalize(control.innerText);
@@ -920,17 +989,15 @@ test('renders current prices, sorting, and country history in a real browser', {
 
         const publishedDateAffordance = await page.locator('#publishedDateButton').evaluate((button) => ({
           cursor: getComputedStyle(button).cursor,
-          dateDecoration: getComputedStyle(button.querySelector('strong')).textDecorationLine,
           iconCount: button.querySelectorAll('svg').length
         }));
         assert.equal(publishedDateAffordance.cursor, 'pointer');
-        assert.match(publishedDateAffordance.dateDecoration, /underline/);
         assert.equal(publishedDateAffordance.iconCount, 1, 'publication-date control should only keep the leading calendar icon');
 
         await page.locator('#publishedDateButton').focus();
         await page.locator('#publishedDateButton').click();
         await page.waitForFunction(() => document.querySelector('#publishedDateDialog')?.open === true);
-        assert.equal(await page.getByRole('dialog', { name: '发布日期变更' }).count(), 1, 'publication-date dialog must have an accessible name');
+        assert.equal(await page.getByRole('dialog', { name: 'Apple 价格页更新记录' }).count(), 1, 'publication-date dialog must have an accessible name');
         if (viewport.width <= 1100) {
           const closePublishedDateBox = await page.locator('#closePublishedDate').boundingBox();
           assert.ok(closePublishedDateBox && closePublishedDateBox.width >= 44 && closePublishedDateBox.height >= 44, `${viewport.name} publication dialog close control must retain a comfortable touch target`);
@@ -1142,9 +1209,10 @@ test('shows an actionable error and recovers after a temporary price-data outage
     assert.equal(await page.locator('#loadStatus').isVisible(), true);
     assert.equal(await page.locator('.workspace').getAttribute('aria-busy'), 'false');
     assert.equal(await page.locator('#searchInput').isDisabled(), true);
-    assert.equal(await page.locator('#loadStatusText').textContent(), '价格数据无法加载，请检查网络后重试。');
-    assert.equal(await page.locator('#retryButton').textContent(), '重新加载');
+    assert.equal(await page.locator('#loadStatusText').textContent(), '暂时无法获取更新，当前显示最近一次可用价格');
+    assert.equal(await page.locator('#retryButton').textContent(), '重试');
     await page.locator('#retryButton').click();
+    await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
     await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, expectedData.countries.length);
     assert.equal(await page.locator('#loadStatus').isVisible(), false);
     assert.equal(await page.locator('.data-status').evaluate((element) => element.classList.contains('is-error')), false);
@@ -1208,17 +1276,17 @@ test('keeps current prices usable when optional history data is unavailable or m
         await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
         await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, expectedData.countries.length);
         assert.equal(await page.locator('#loadStatus').isVisible(), false);
-        assert.equal(await page.locator('#marketCount').textContent(), String(expectedData.countries.length));
+        assert.equal(await page.locator('#marketCount').textContent(), `${expectedData.countries.length} 个地区`);
         assert.equal(await page.locator('#publishedDateButton').isVisible(), true);
         if (scenario.expectedPublishedDate) {
           assert.equal(await page.locator('#applePublishedDate').textContent(), scenario.expectedPublishedDate);
         }
         if (scenario.unavailable) {
           await page.locator('#priceRows tr[data-market-id]').first().click();
-          await page.waitForFunction(() => document.querySelector('#historySubtitle')?.textContent.includes('历史数据暂不可用'));
+          await page.waitForFunction(() => document.querySelector('#historySubtitle')?.textContent.includes('暂时无法读取历史记录'));
           await page.locator('#closeHistory').click();
           await page.locator('#publishedDateButton').click();
-          await page.waitForFunction(() => document.querySelector('#publishedDateRows')?.textContent.includes('历史数据暂不可用'));
+          await page.waitForFunction(() => document.querySelector('#publishedDateRows')?.textContent.includes('暂时无法读取更新记录'));
           await page.locator('#closePublishedDate').click();
         }
       } finally {
@@ -1263,10 +1331,11 @@ test('rejects malformed price payloads and recovers without a full-page refresh'
       try {
         await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
         await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
-        assert.equal(await page.locator('#loadStatusText').textContent(), '价格数据无法加载，请检查网络后重试。', label);
+        assert.equal(await page.locator('#loadStatusText').textContent(), '暂时无法获取更新，当前显示最近一次可用价格', label);
         assert.equal(await page.locator('#searchInput').isDisabled(), true, label);
         serveValidData = true;
         await page.locator('#retryButton').click();
+        await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
         await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, validData.countries.length);
         assert.equal(await page.locator('#loadStatus').isVisible(), false, `${label} should recover after retry`);
       } finally {
@@ -1301,9 +1370,9 @@ test('rebuilds tier headers and filters after a successful retry with changed ti
     });
     try {
       await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-      await page.waitForFunction((count) => document.querySelector('#tierCount')?.textContent === String(count), fullData.tiers.length);
+      await page.waitForFunction((count) => document.querySelector('#tierCount')?.textContent === `${count} 档`, fullData.tiers.length);
       await page.locator('#retryButton').dispatchEvent('click');
-      await page.waitForFunction((count) => document.querySelector('#tierCount')?.textContent === String(count), reducedData.tiers.length);
+      await page.waitForFunction((count) => document.querySelector('#tierCount')?.textContent === `${count} 档`, reducedData.tiers.length);
       assert.equal(await page.locator('.price-table thead th').count(), reducedData.tiers.length + 2);
       assert.equal(await page.locator('#priceRows tr[data-market-id]').first().locator('td').count(), reducedData.tiers.length + 2);
       assert.deepEqual(
@@ -1333,7 +1402,7 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
         data.fx.fetchedAt = data.generatedAt;
         data.fx.stale = false;
       },
-      expected: /超过 36 小时/,
+      expected: /价格暂未更新/,
       minimumDegraded: true
     },
     {
@@ -1343,7 +1412,7 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
         data.fx.fetchedAt = data.generatedAt;
         data.fx.stale = false;
       },
-      expected: /数据更新时间/,
+      expected: /更新于/,
       expectedStale: false
     },
     {
@@ -1353,7 +1422,7 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
         data.fx.fetchedAt = data.generatedAt;
         data.fx.stale = false;
       },
-      expected: /数据更新时间/,
+      expected: /更新于/,
       expectedStale: false
     },
     {
@@ -1363,7 +1432,7 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
         data.fx.fetchedAt = data.generatedAt;
         data.fx.stale = false;
       },
-      expected: /超过 36 小时/,
+      expected: /价格暂未更新/,
       minimumDegraded: true
     },
     {
@@ -1374,7 +1443,7 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
         data.fx.stale = true;
         data.fx.fallbackReason = 'request-failed';
       },
-      expected: /汇率沿用上次成功结果/,
+      expected: /参考汇率暂未更新/,
       minimumDegraded: true
     },
     {
@@ -1385,7 +1454,7 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
         data.fx.stale = true;
         data.fx.fallbackReason = 'request-failed';
       },
-      expected: /超过 36 小时/,
+      expected: /价格暂未更新/,
       minimumDegraded: true
     }
   ];
@@ -1418,8 +1487,8 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
           assert.match(
             await page.locator('#minimumSummary').textContent(),
             label.includes('snapshot') || label.includes('historical')
-              ? /价格数据已超过 36 小时/
-              : /人民币换算沿用上次成功汇率.*最低价排名暂不展示/,
+              ? /价格暂未更新/
+              : /参考汇率暂未更新.*最近一次可用汇率/,
             label
           );
         }
@@ -1434,7 +1503,7 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
         assert.ok(statusLayout.right <= statusLayout.viewportWidth + 1, `${label} status text must stay inside the viewport`);
         assert.ok(statusLayout.documentWidth <= statusLayout.viewportWidth + 1, `${label} must not create page-level horizontal overflow`);
         assert.equal(await page.locator('button[data-sort-tier="200GB"]').locator('xpath=ancestor::th').getAttribute('aria-sort'), 'ascending');
-        assert.match(await page.locator('#resultSummary').textContent(), /200 GB/);
+        assert.match(await page.locator('#resultSummary').textContent(), /200GB/);
         if (process.env.SCREENSHOT_DIR && label === 'old snapshot with fallback rates') {
           await page.screenshot({ path: path.join(process.env.SCREENSHOT_DIR, 'stale-combined.png') });
         }
@@ -1486,7 +1555,7 @@ test('reclassifies long-lived pages across lifecycle boundaries without replacin
   try {
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction((count) => document.querySelectorAll('.minimum-badge').length === count, fixture.tiers.length);
-    assert.equal(await page.locator('#overviewTitle').textContent(), '各容量参考最低价');
+    assert.equal(await page.locator('#overviewTitle').textContent(), '各容量全球最低价');
 
     await page.locator('#priceRows tr[data-market-id]').first().click();
     await page.waitForFunction(() => document.querySelector('#historySubtitle')?.textContent.includes('历史数据暂不可用') === false);
@@ -1499,7 +1568,7 @@ test('reclassifies long-lived pages across lifecycle boundaries without replacin
       Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
       document.dispatchEvent(new Event('visibilitychange'));
     }, Date.parse(original.generatedAt) + (36 * 60 * 60 * 1_000) + 1);
-    await page.waitForFunction(() => document.querySelector('#overviewTitle')?.textContent === '历史参考价格');
+    await page.waitForFunction(() => document.querySelector('#updatedAt')?.textContent.includes('价格暂未更新'));
     assert.equal(await page.locator('.minimum-card').count(), 0);
     assert.equal(await page.locator('.minimum-badge').count(), 0);
     assert.equal(await page.locator('.price-cell.is-minimum').count(), 0);
@@ -1507,7 +1576,7 @@ test('reclassifies long-lived pages across lifecycle boundaries without replacin
     assert.equal(await page.locator('#searchInput').isEnabled(), true);
     await page.locator('#retryButton').dispatchEvent('click');
     await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
-    assert.equal(await page.locator('#overviewTitle').textContent(), '历史参考价格', 'an equal network snapshot must still use current time');
+    assert.equal(await page.locator('#overviewTitle').textContent(), '各容量全球最低价', 'an equal network snapshot must still use current time');
     assert.equal(await page.locator('#searchInput').isEnabled(), true);
     assert.equal(historyCalls, historyCallsAfterLoad, 'an equal snapshot freshness change must retain loaded history');
 
@@ -1516,7 +1585,7 @@ test('reclassifies long-lived pages across lifecycle boundaries without replacin
       Date.now = () => nowMs;
       window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
     }, Date.parse(original.generatedAt) + (7 * 24 * 60 * 60 * 1_000) + 1);
-    await page.waitForFunction(() => document.querySelector('#overviewTitle')?.textContent === '各容量参考最低价');
+    await page.waitForFunction(() => document.querySelector('#overviewTitle')?.textContent === '各容量全球最低价');
     assert.ok(priceCalls >= 3, 'crossing seven days must force a network refresh');
     assert.equal(await page.locator('#retryButton').isHidden(), true);
   } finally {
@@ -1544,7 +1613,7 @@ test('normalizes transient network warnings after an equal-snapshot retry', { ti
       {
         label: 'price-stale',
         nowMs: Date.parse(fixture.generatedAt) + (48 * 60 * 60 * 1_000),
-        expectedWarning: /超过 36 小时/
+        expectedWarning: /价格暂未更新/
       }
     ];
     for (const scenario of scenarios) {
@@ -1628,7 +1697,7 @@ test('shows an explicit expired state when lifecycle refresh fails', { timeout: 
   try {
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, payload.countries.length);
-    assert.equal(await page.locator('#overviewTitle').textContent(), '历史参考价格', 'exactly seven days remains degraded');
+    assert.equal(await page.locator('#overviewTitle').textContent(), '各容量全球最低价', 'exactly seven days remains degraded');
     await page.locator('#priceRows tr[data-market-id]').first().click();
     await page.waitForFunction(() => document.querySelector('#historyDialog')?.open === true);
     failRefresh = true;
@@ -1643,10 +1712,10 @@ test('shows an explicit expired state when lifecycle refresh fails', { timeout: 
     assert.equal(await expiredHistoryButton.isDisabled(), true);
     await expiredHistoryButton.evaluate((button) => button.click());
     assert.equal(await page.locator('#historyDialog').evaluate((dialog) => dialog.open), false);
-    assert.match(await page.locator('#loadStatusText').textContent(), /超过 7 天有效期.*请重新加载/);
+    assert.match(await page.locator('#loadStatusText').textContent(), /价格已经较久没有更新.*请稍后重试/);
     assert.equal(await page.locator('#searchInput').isDisabled(), true);
     assert.equal(await page.locator('.minimum-badge').count(), 0);
-    assert.match(await page.locator('#minimumSummary').textContent(), /当前参考最低价不可用/);
+    assert.match(await page.locator('#minimumSummary').textContent(), /价格已经较久没有更新/);
   } finally {
     await page.close();
     await browser.close();
@@ -1693,7 +1762,7 @@ test('retries only valid but inconsistent history once without cache', { timeout
         await page.locator('#publishedDateButton').click();
         await page.waitForFunction((unavailable) => {
           const text = document.querySelector('#publishedDateRows')?.textContent ?? '';
-          return unavailable ? text.includes('历史数据暂不可用') : document.querySelectorAll('#publishedDateRows tr').length > 1;
+          return unavailable ? text.includes('暂时无法读取更新记录') : document.querySelectorAll('#publishedDateRows tr').length > 1;
         }, scenario.unavailable);
         assert.equal(historyCalls, scenario.expectedCalls);
       } finally {
@@ -1862,7 +1931,7 @@ test('keeps the page and publication history bounded with a single-tier table on
         cellRight: cellBox.right
       };
     });
-    assert.equal(minimumBadgeLayout.text, '参考最低');
+    assert.equal(minimumBadgeLayout.text, '最低');
     assert.ok(minimumBadgeLayout.badgeLeft >= minimumBadgeLayout.cellLeft - 1, 'minimum badge must stay inside the active price cell on narrow screens');
     assert.ok(minimumBadgeLayout.badgeRight <= minimumBadgeLayout.cellRight + 1, 'minimum badge must not overflow the table on narrow screens');
 
@@ -2112,8 +2181,8 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
           position: getComputedStyle(header).position,
           containerPosition: getComputedStyle(header.closest('thead')).position
         })));
-        assert.equal(publicationHeaders[0].text, 'Apple 页面发布日期');
-        assert.equal(publicationHeaders[1].text, '本次内容变化');
+        assert.equal(publicationHeaders[0].text, 'Apple 页面日期');
+        assert.equal(publicationHeaders[1].text, '检测到的变化');
         assert.equal(publicationHeaders.length, 2, 'internal confirmation dates must not be shown to end users');
         assert.equal(await page.locator('#publishedDateRows tr').first().locator('td').count(), 2, 'publication rows must omit the internal confirmation date');
         assert.equal(publicationHeaders[0].whiteSpace, 'normal', 'Apple publication-date header must be allowed to wrap');
@@ -2220,7 +2289,7 @@ test('resets a removed region filter after a successful price retry', { timeout:
       await page.locator('#regionSelect').selectOption(removedRegion);
       assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), fullData.countries.filter(({ region }) => region === removedRegion).length);
       await page.locator('#retryButton').dispatchEvent('click');
-      await page.waitForFunction((count) => document.querySelector('#marketCount')?.textContent === String(count), replacement.countries.length);
+      await page.waitForFunction((count) => document.querySelector('#marketCount')?.textContent === `${count} 个地区`, replacement.countries.length);
       await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, replacement.countries.length);
       assert.equal(await page.locator('#regionSelect').inputValue(), 'all');
       assert.equal(priceCalls, 2);
@@ -2292,7 +2361,7 @@ test('rebinds or closes an open history dialog after country replacement', { tim
         await page.locator(`#priceRows tr[data-market-id="${activeCountry.marketId}"]`).click();
         await page.waitForFunction(() => document.querySelector('#historyDialog')?.open === true);
         await page.locator('#retryButton').dispatchEvent('click');
-        await page.waitForFunction((count) => document.querySelector('#marketCount')?.textContent === String(count), scenario.replacement.countries.length);
+        await page.waitForFunction((count) => document.querySelector('#marketCount')?.textContent === `${count} 个地区`, scenario.replacement.countries.length);
         if (scenario.expectedOpen) {
           await page.waitForFunction((title) => document.querySelector('#historyTitle')?.textContent === title, scenario.expectedTitle);
           await page.locator('#closeHistory').click();
@@ -2336,7 +2405,7 @@ test('keeps the minimum-price overview stable and the desktop table header stick
   });
   try {
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-    assert.equal(await page.locator('#minimumSummary .minimum-card.is-loading').count(), 5);
+    assert.equal(await page.locator('#minimumSummary .minimum-card').count(), 5);
     assert.equal(await page.locator('h1').count(), 1);
     assert.equal(await page.locator('h1').textContent(), 'iCloud+ \u5168\u7403\u4ef7\u683c\u5bf9\u6bd4');
     assert.equal(await page.locator('#overviewTitle').evaluate((element) => element.tagName), 'H2');
@@ -2496,10 +2565,14 @@ test('restores URL state, removes the floating search bar, and supports table re
     const backToTableButton = page.locator('#backToTableButton');
     assert.equal(await backToTableButton.count(), 1);
     assert.equal(await backToTableButton.getAttribute('aria-hidden'), 'true');
-    await page.evaluate(() => document.querySelectorAll('#priceRows tr[data-market-id]')[35]?.scrollIntoView());
-    await page.evaluate(() => scrollBy(0, 180));
-    await page.waitForFunction(() => document.querySelector('#backToTableButton')?.classList.contains('is-visible'));
-    assert.equal(await backToTableButton.getAttribute('aria-hidden'), 'false');
+    await page.evaluate(() => {
+      scrollTo(0, document.scrollingElement?.scrollHeight ?? 0);
+      document.querySelector('#backToTableButton')?.focus({ preventScroll: true });
+    });
+    await page.waitForFunction(() => {
+      const button = document.querySelector('#backToTableButton');
+      return button?.classList.contains('is-visible') && button.getAttribute('aria-hidden') === 'false';
+    });
     await backToTableButton.click();
     assert.equal(await page.locator('#priceWorkspace').evaluate((element) => document.activeElement === element), true, 'table return should move keyboard focus to the visible workspace');
     await page.waitForFunction(() => {
@@ -2663,8 +2736,9 @@ test('rejects network price data older than seven days or more than five minutes
       }));
       await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
       await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
-      assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), 0, label);
-      assert.match(await page.locator('#updatedAt').textContent(), /价格数据无法加载/, label);
+      assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), validData.countries.length, label);
+      assert.match(await page.locator('#updatedAt').textContent(), /更新于/ , label);
+      assert.match(await page.locator('#loadStatusText').textContent(), /当前显示最近一次可用价格/, label);
       await page.close();
     }
   } finally {
@@ -2692,8 +2766,8 @@ test('enforces fresh, stale, and expired local price cache behavior', { timeout:
     await cachedPage.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, validData.countries.length);
     await cachedPage.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
     assert.equal(await cachedPage.locator('#searchInput').isEnabled(), true);
-    assert.match(await cachedPage.locator('#loadStatusText').textContent(), /本地缓存/);
-    assert.match(await cachedPage.locator('#updatedAt').textContent(), /\u7f51\u7edc\u5237\u65b0\u5931\u8d25/);
+    assert.match(await cachedPage.locator('#loadStatusText').textContent(), /当前显示最近一次可用价格/);
+    assert.match(await cachedPage.locator('#updatedAt').textContent(), /暂时无法获取更新/);
     assert.ok(await cachedPage.locator('.minimum-badge').count() > 0, 'a cache exactly 36 hours old keeps minimum cues');
     await cachedPage.close();
 
@@ -2716,10 +2790,10 @@ test('enforces fresh, stale, and expired local price cache behavior', { timeout:
     assert.equal(await stalePage.locator('.minimum-badge').count(), 0);
     assert.equal(await stalePage.locator('.price-cell.is-minimum').count(), 0);
     assert.equal(await stalePage.locator('.rank-top').count(), 0);
-    assert.equal(await stalePage.locator('#overviewTitle').textContent(), '历史参考价格');
+    assert.equal(await stalePage.locator('#overviewTitle').textContent(), '各容量全球最低价');
     assert.equal(
       await stalePage.locator('#minimumSummary').textContent(),
-      '当前价格数据已超过 36 小时，以下价格仅供历史参考。获取新数据后恢复参考最低价排名。'
+      '价格暂未更新，当前显示最近一次获取的 Apple 标价。'
     );
     await stalePage.locator('button[data-sort-tier]:visible').first().click();
     assert.ok(await stalePage.locator('#priceRows tr[data-market-id]').count() > 0, 'stale-cache sorting remains usable');
@@ -2734,8 +2808,8 @@ test('enforces fresh, stale, and expired local price cache behavior', { timeout:
     await expiredPage.route('**/data/prices.json*', (route) => route.fulfill({ status: 503, body: '{}' }));
     await expiredPage.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
     await expiredPage.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
-    assert.equal(await expiredPage.locator('#priceRows tr[data-market-id]').count(), 0);
-    assert.equal(await expiredPage.locator('#loadStatusText').textContent(), '价格数据无法加载，请检查网络后重试。');
+    assert.equal(await expiredPage.locator('#priceRows tr[data-market-id]').count(), validData.countries.length);
+    assert.match(await expiredPage.locator('#loadStatusText').textContent(), /价格已经较久没有更新/);
     assert.equal(await expiredPage.evaluate(() => localStorage.getItem('icloud-price-comparison:validated-prices:v2')), null);
     await expiredPage.close();
 
