@@ -72,8 +72,10 @@ export async function updateAssetVersions({ projectDir = PROJECT_DIR, check = fa
     .filter(([name, contents]) => result.originals[name] !== contents)
     .map(([name]) => name);
   if (check) {
-    console.log(`Computed static asset versions: ${Object.entries(result.versions).map(([name, version]) => `${name}=${version}`).join(', ')}`);
-    if (mismatches.length) throw new Error(`Static asset versions are stale in: ${mismatches.join(', ')}. Run pnpm assets:update.`);
+    if (mismatches.length) {
+      console.log(`::error file=tools/icloud_price_comparison/index.html,title=Computed asset hash::script.js=${result.versions['script.js']}`);
+      throw new Error(`Static asset versions are stale in: ${mismatches.join(', ')}. Run pnpm assets:update.`);
+    }
     return result;
   }
   await Promise.all([...result.updates].map(([name, contents]) => (
