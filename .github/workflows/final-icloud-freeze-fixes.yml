@@ -15,13 +15,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: agent/final-og-doc-correction
           fetch-depth: 0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '22'
 
@@ -48,6 +48,12 @@ jobs:
           if old_media not in style and new_media not in style:
               raise SystemExit('desktop media rule not found')
           style = style.replace(old_media, new_media, 1)
+
+          old_mobile = '  .data-status { width: 100%; font-size: 12px; line-height: 1.3; overflow-wrap: anywhere; white-space: normal; }'
+          new_mobile = '  .data-status { width: 100%; justify-content: flex-end; font-size: 12px; line-height: 1.3; overflow-wrap: anywhere; text-align: right; white-space: normal; }'
+          if old_mobile not in style and new_mobile not in style:
+              raise SystemExit('mobile data-status rule not found')
+          style = style.replace(old_mobile, new_mobile, 1)
           style_path.write_text(style)
 
           operations_path = project / 'OPERATIONS.md'
@@ -104,6 +110,30 @@ test('keeps desktop search filtering free of vertical and scrollbar-gutter layou
     assert.equal(empty.clientWidth, baseline.clientWidth, 'removing the vertical scrollbar must keep a stable viewport gutter');
     assert.equal(empty.mainLeft, baseline.mainLeft, 'empty search results must not shift the centered page shell horizontally');
     assert.equal(empty.toolbarHeight, baseline.toolbarHeight, 'empty search results must keep the toolbar height stable');
+  } finally {
+    await browser.close();
+  }
+});
+
+test('keeps the mobile updated timestamp on the trailing edge', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the mobile header alignment regression test');
+  if (!browserConfig) return;
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await page.route('https://**/*', (route) => route.abort());
+  try {
+    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+    const alignment = await page.locator('.data-status').evaluate((element) => ({
+      justifyContent: getComputedStyle(element).justifyContent,
+      textAlign: getComputedStyle(element).textAlign,
+      right: element.getBoundingClientRect().right,
+      parentRight: element.parentElement.getBoundingClientRect().right
+    }));
+    assert.equal(alignment.justifyContent, 'flex-end');
+    assert.equal(alignment.textAlign, 'right');
+    assert.ok(Math.abs(alignment.right - alignment.parentRight) < 1, 'mobile timestamp row should retain the full header width');
   } finally {
     await browser.close();
   }
