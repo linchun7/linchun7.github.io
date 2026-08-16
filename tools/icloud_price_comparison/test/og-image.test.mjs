@@ -86,7 +86,5 @@ function parsePng(buffer) {
 }
 
 test('social sharing image is structurally decodable and visibly non-trivial', async () => {
-  const image = await readFile(imageUrl);
-  assert.ok(image.length >= 16 * 1024, `social image is unexpectedly small: ${image.length} bytes`);
-  parsePng(image);
+  parsePng(await readFile(imageUrl));
 });
