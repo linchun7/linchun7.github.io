@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { load } from 'cheerio';
+import { assertSeoProjectionMatches, renderSeoProjection } from '../scripts/render-static-page.mjs';
 import {
   assertStaticPageMatches,
   extractStaticFragments,
@@ -13,6 +14,7 @@ import {
 
 const indexUrl = new URL('../index.html', import.meta.url);
 const pricesUrl = new URL('../data/prices.json', import.meta.url);
+const ogImageUrl = new URL('../og-image.png', import.meta.url);
 
 test('committed raw HTML is the deterministic projection of validated prices', async () => {
   const [html, payload] = await Promise.all([
@@ -20,7 +22,9 @@ test('committed raw HTML is the deterministic projection of validated prices', a
     readFile(pricesUrl, 'utf8').then(JSON.parse)
   ]);
   assert.equal(assertStaticPageMatches(html, payload), true);
+  assert.equal(assertSeoProjectionMatches(html, payload), true);
   assert.equal(replaceStaticFragments(html, renderStaticFragments(payload)), html);
+  assert.equal(renderSeoProjection(html, payload), html);
   const $ = load(html);
   assert.equal($('#priceRows > tr[data-market-id]').length, payload.countries.length);
   assert.equal($('.price-table thead th[data-tier-header]').length, payload.tiers.length);
@@ -50,6 +54,25 @@ test('committed raw HTML is the deterministic projection of validated prices', a
   }
 });
 
+test('social metadata points to one valid 1200x630 PNG contract', async () => {
+  const [html, image] = await Promise.all([readFile(indexUrl, 'utf8'), readFile(ogImageUrl)]);
+  const $ = load(html);
+  const canonical = $('link[rel="canonical"]');
+  const ogImage = $('meta[property="og:image"]').attr('content');
+  assert.equal(canonical.length, 1);
+  assert.equal($('meta[property="og:url"]').attr('content'), canonical.attr('href'));
+  assert.equal(ogImage, $('meta[name="twitter:image"]').attr('content'));
+  assert.equal(ogImage, 'https://www.linchun.com.cn/tools/icloud_price_comparison/og-image.png');
+  assert.equal($('meta[property="og:image:type"]').attr('content'), 'image/png');
+  assert.equal($('meta[property="og:image:width"]').attr('content'), '1200');
+  assert.equal($('meta[property="og:image:height"]').attr('content'), '630');
+  assert.equal($('meta[name="twitter:card"]').attr('content'), 'summary_large_image');
+  assert.deepEqual([...image.subarray(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  assert.equal(image.toString('ascii', 12, 16), 'IHDR');
+  assert.equal(image.readUInt32BE(16), 1200);
+  assert.equal(image.readUInt32BE(20), 630);
+});
+
 test('static rendering removes minimum cues and explains rankings when FX is stale', async () => {
   const [html, current] = await Promise.all([
     readFile(indexUrl, 'utf8'),
@@ -58,9 +81,10 @@ test('static rendering removes minimum cues and explains rankings when FX is sta
   const payload = structuredClone(current);
   payload.fx.stale = true;
   payload.fx.fallbackReason = 'request-failed';
-  const rendered = replaceStaticFragments(html, renderStaticFragments(payload));
+  const rendered = renderSeoProjection(replaceStaticFragments(html, renderStaticFragments(payload)), payload);
   const $ = load(rendered);
   assert.equal(assertStaticPageMatches(rendered, payload), true);
+  assert.equal(assertSeoProjectionMatches(rendered, payload), true);
   assert.equal($('.minimum-card, .minimum-badge, .is-minimum, .rank-top').length, 0);
   assert.match($('#minimumSummary').text(), /参考汇率暂未更新/);
   assert.match($('#rankingScopeNote').text(), /最近一次可用汇率/);
@@ -70,7 +94,7 @@ test('static rendering removes minimum cues and explains rankings when FX is sta
   assert.equal($('meta[name="icloud-price-snapshot"]').attr('data-fx-stale'), 'true');
 });
 
-test('static rendering uses the first tier consistently when 200GB is absent', async () => {
+test('static and SEO rendering use the first tier consistently when 200GB is absent', async () => {
   const [html, current] = await Promise.all([
     readFile(indexUrl, 'utf8'),
     readFile(pricesUrl, 'utf8').then(JSON.parse)
@@ -80,9 +104,10 @@ test('static rendering uses the first tier consistently when 200GB is absent', a
   for (const country of payload.countries) delete country.plans['200GB'];
   payload.run.pricePoints = payload.countries.length * payload.tiers.length;
   const defaultTier = preferredDefaultTier(payload);
-  const rendered = replaceStaticFragments(html, renderStaticFragments(payload));
+  const rendered = renderSeoProjection(replaceStaticFragments(html, renderStaticFragments(payload)), payload);
   const $ = load(rendered);
   assert.equal(assertStaticPageMatches(rendered, payload), true);
+  assert.equal(assertSeoProjectionMatches(rendered, payload), true);
   assert.equal(defaultTier.id, payload.tiers[0].id);
   assert.equal($('.minimum-card.is-active-tier').length, 0);
   assert.equal($('.minimum-card[aria-pressed]').length, 0);
@@ -91,6 +116,20 @@ test('static rendering uses the first tier consistently when 200GB is absent', a
   assert.equal($('#priceRows > tr > td:first-child').filter((_, cell) => load(cell).text() === '--').length, 0);
   assert.equal($('#resultSummary').text(), `${payload.countries.length} 个地区 · ${defaultTier.label} 从低到高`);
   assert.equal(rendered.includes('200GB 从低到高'), false);
+
+  const tierIds = payload.tiers.map(({ id }) => id);
+  for (const selector of [
+    'meta[name="description"]',
+    'meta[property="og:description"]',
+    'meta[property="og:image:alt"]',
+    'meta[name="twitter:description"]',
+    'meta[name="twitter:image:alt"]',
+    '#brandDescription'
+  ]) {
+    const text = $(selector).attr('content') ?? $(selector).text();
+    for (const tierId of tierIds) assert.ok(text.includes(tierId), `${selector} must include ${tierId}`);
+    assert.equal(text.includes('200GB'), false, `${selector} must not retain removed 200GB`);
+  }
 });
 
 test('static renderer rejects missing, duplicate, and hand-edited generated regions', async () => {
@@ -101,6 +140,7 @@ test('static renderer rejects missing, duplicate, and hand-edited generated regi
   assert.throws(() => extractStaticFragments(html.replace('<!-- ICLOUD_STATIC_STATUS:END -->', '')), /STATIC_RENDER_MARKER_INVALID:STATUS/);
   assert.throws(() => extractStaticFragments(html.replace('<!-- ICLOUD_STATIC_STATUS:START -->', '<!-- ICLOUD_STATIC_STATUS:START --><!-- ICLOUD_STATIC_STATUS:START -->')), /STATIC_RENDER_MARKER_INVALID:STATUS/);
   assert.throws(() => assertStaticPageMatches(html.replace('United States · USD', 'United States · EUR'), payload), /STATIC_RENDER_MISMATCH:TABLE_BODY/);
+  assert.throws(() => assertSeoProjectionMatches(html.replace('<meta name="description"', '<meta name="description-copy"'), payload), /SEO_PROJECTION_TARGET_INVALID:description/);
 });
 
 test('raw product copy avoids engineering-only loading and cache language', async () => {
