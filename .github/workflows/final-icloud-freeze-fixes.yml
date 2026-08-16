@@ -1,6 +1,6 @@
 name: Final iCloud freeze fixes
 
-# Temporary branch-only patch runner; it deletes itself after a successful commit. Re-run after replacing the social image blob.
+# Temporary branch-only patch runner; it deletes itself after a successful commit. Validate the compact social image and final polish.
 on:
   push:
     branches:
