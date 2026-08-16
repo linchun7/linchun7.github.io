@@ -1,11 +1,11 @@
 # Apple 页面快照
 
-本目录只保存从 Apple iCloud+ 价格页面解析出的规范化 JSON。前端不直接读取这些文件；价格页、价格历史和发布日期记录使用经过校验的 `prices.json` 与 `history.json`。所有价格仍以 Apple Support 为唯一官方来源，仓库和运行附件均不保存 Apple 原始 HTML。
+本目录只保存从 Apple iCloud+ 价格页面解析出的规范化 JSON。前端不直接读取这些文件；价格页、价格历史和发布日期记录使用经过校验的 `prices.json` 与 `history.json`。所有价格仍以 Apple Support 为官方价格来源，仓库和运行附件均不保存 Apple 原始 HTML。
 
 ## 文件结构
 
 - `YYYY-MM-DD.json`：规范化快照，包含 `schemaVersion`、发布日期、容量、地区、分区、币种和数值价格，不包含 Apple 页面结构或格式化价格文本。
-- `YYYY-MM-DD-<hash>.json`：同一 Apple `Published Date` 的不同规范化内容修订；`hash` 是 64 位内容指纹的前缀。
+- `YYYY-MM-DD-<hash>.json`：同一 Apple `Published Date` 的不同规范化内容修订；`hash` 使用规范化内容 SHA-256 十六进制值的前 12 位。
 - `index.json`：`schemaVersion: 2` JSON-only 索引。每个发布日期只有一个记录，可包含多个修订，并指向按 `firstConfirmedDate` 排序的活动修订。
 
 索引修订中的关键字段：
@@ -27,19 +27,19 @@ JSON 通过同目录临时文件和硬链接排他落盘，`index.json` 使用�
 
 ## 历史导入
 
-当前仓库保留的 2024–2026 历史页面可离线导入（命令从 `tools/icloud_price_comparison/` 执行）：
+当前索引覆盖的历史页面可以离线导入（命令从 `tools/icloud_price_comparison/` 执行）：
 
 ```bash
 node scripts/import-apple-archives.mjs --input <目录>
 ```
 
-导入目录必须包含索引中除当前 live 日期以外的所有既有发布日期；空目录或不完整目录会在写入前拒绝，避免误删历史。导入器先尝试生产解析器，失败后才使用 `parse-legacy-archive.mjs`；通过解析、至少 60 个地区、价格完整性和快照去重校验后才会提交。
+导入目录必须包含索引中除当前 live 日期以外的所有既有发布日期；空目录或不完整目录会在写入前拒绝，避免误删历史。导入器先尝试生产解析器，失败后才使用 `parse-legacy-archive.mjs`；通过解析、完整性和快照去重校验后才会提交。
 
 这里的“当前 live 日期”是 `data/prices.json.source.publishedDate` 规范化后的日期。
 
 导入器只读取输入目录中的 HTML 用于离线解析，不把 HTML 复制到仓库。规范化 JSON、重建后的 `history.json` 和 `index.json` 任一环节失败，都会通过持久化事务日志删除计划创建的文件、恢复原历史和索引，并保留上一份有效数据；进程被强制终止后，下次运行会先恢复未完成事务。
 
-Wayback 抓取时间只用于历史 Apple 页面排序、来源追溯和最早确认日期；导入时先换算为北京时间后写入 `firstConfirmedDate`。项目自动监测后的生产版本使用首次成功抓取的北京时间日期。Wayback 不是独立的价格来源。
+Wayback 抓取时间只用于历史 Apple 页面排序、来源追溯和最早确认日期；导入时先换算为北京时间后写入 `firstConfirmedDate`。项目自动监测后的生产版本使用首次成功抓取的北京时间日期。Wayback 不是独立价格源。
 
 ## 维护规则
 
