@@ -395,9 +395,8 @@ function staticDomMatchesPayload(data) {
 
 function reconcileStaticTierState() {
   if (!hasStaticSnapshot
-    || state.sortTier === DEFAULT_SORT_TIER
+    || (state.sortTier === DEFAULT_SORT_TIER && state.sortDirection === 'asc')
     || state.sortKey !== 'tier'
-    || state.sortDirection !== 'asc'
     || state.query
     || state.region !== 'all') return false;
 
@@ -410,17 +409,19 @@ function reconcileStaticTierState() {
   });
   if (!tier || tierIndex < 0 || !rankedRows.length || rankedRows.some((entry) => entry === null)) return false;
 
-  rankedRows.sort((first, second) => (
-    first.rank - second.rank
-    || first.row.dataset.marketId.localeCompare(second.row.dataset.marketId, 'en')
-  ));
+  rankedRows.sort((first, second) => {
+    const comparison = first.rank - second.rank;
+    if (comparison !== 0) return state.sortDirection === 'asc' ? comparison : -comparison;
+    return first.row.dataset.marketId.localeCompare(second.row.dataset.marketId, 'en');
+  });
   elements.priceRows.append(...rankedRows.map(({ row }) => row));
   for (const { rank, row } of rankedRows) {
     const rankCell = row.cells[0];
     rankCell.textContent = String(rank);
-    rankCell.classList.toggle('rank-top', !staticSnapshotFxStale && rank <= 3);
+    rankCell.classList.toggle('rank-top', !staticSnapshotFxStale && state.sortDirection === 'asc' && rank <= 3);
   }
-  elements.resultSummary.textContent = `${rankedRows.length} 个地区 · ${tier.label} 从低到高`;
+  const direction = state.sortDirection === 'asc' ? '从低到高' : '从高到低';
+  elements.resultSummary.textContent = `${rankedRows.length} 个地区 · ${tier.label} ${direction}`;
   renderSortHeaders({ refresh: false });
   updateTierPresentation();
   for (const cell of elements.priceRows.querySelectorAll('.price-cell[data-tier]')) {
