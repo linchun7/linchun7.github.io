@@ -1,0 +1,41 @@
+name: Temporary branch cleanup
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  delete-non-main-branches:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete every remote branch except main
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
+          mapfile -t branches < <(
+            git ls-remote --heads "$remote" \
+              | awk '{sub("refs/heads/", "", $2); print $2}' \
+              | grep -vx 'main' || true
+          )
+
+          if ((${#branches[@]} == 0)); then
+            echo "No non-main branches found."
+          else
+            printf 'Deleting %d branches:\n' "${#branches[@]}"
+            printf ' - %s\n' "${branches[@]}"
+            for branch in "${branches[@]}"; do
+              git push "$remote" --delete "$branch"
+            done
+          fi
+
+          remaining="$(git ls-remote --heads "$remote" | awk '{sub("refs/heads/", "", $2); print $2}')"
+          printf 'Remaining branches:\n%s\n' "$remaining"
+          test "$remaining" = "main"
