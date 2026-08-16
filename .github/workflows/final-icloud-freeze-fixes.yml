@@ -1,5 +1,6 @@
 name: Final iCloud freeze fixes
 
+# Temporary branch-only patch runner; it deletes itself after a successful commit.
 on:
   push:
     branches:
