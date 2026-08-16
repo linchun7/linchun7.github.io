@@ -20,8 +20,11 @@ jobs:
         run: |
           set -euo pipefail
           remote="https://x-access-token:${GH_TOKEN}@github.com/${REPOSITORY}.git"
+          git init -q
+          git remote add origin "$remote"
+
           mapfile -t branches < <(
-            git ls-remote --heads "$remote" \
+            git ls-remote --heads origin \
               | awk '{sub("refs/heads/", "", $2); print $2}' \
               | grep -vx 'main' || true
           )
@@ -32,10 +35,10 @@ jobs:
             printf 'Deleting %d branches:\n' "${#branches[@]}"
             printf ' - %s\n' "${branches[@]}"
             for branch in "${branches[@]}"; do
-              git push "$remote" --delete "$branch"
+              git push origin --delete "$branch"
             done
           fi
 
-          remaining="$(git ls-remote --heads "$remote" | awk '{sub("refs/heads/", "", $2); print $2}')"
+          remaining="$(git ls-remote --heads origin | awk '{sub("refs/heads/", "", $2); print $2}')"
           printf 'Remaining branches:\n%s\n' "$remaining"
           test "$remaining" = "main"
