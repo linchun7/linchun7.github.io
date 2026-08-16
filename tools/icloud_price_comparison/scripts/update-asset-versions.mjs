@@ -72,6 +72,7 @@ export async function updateAssetVersions({ projectDir = PROJECT_DIR, check = fa
     .filter(([name, contents]) => result.originals[name] !== contents)
     .map(([name]) => name);
   if (check) {
+    console.log(`Computed static asset versions: ${Object.entries(result.versions).map(([name, version]) => `${name}=${version}`).join(', ')}`);
     if (mismatches.length) throw new Error(`Static asset versions are stale in: ${mismatches.join(', ')}. Run pnpm assets:update.`);
     return result;
   }
