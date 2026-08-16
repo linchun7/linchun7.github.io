@@ -341,9 +341,8 @@ Cloudflare/DNS 回滚使用发布前保存的配置记录；TLS 最低版本不�
 - 临时浏览器、截图、日志、下载包、本地审计工具和一次性清单放入 ignored `artifacts/`。
 - 公开仓库不保留面向特定 AI/代理的 `AGENTS.md`；长期规则写入 README/OPERATIONS。
 - 项目长期 Markdown 仅为 `README.md`、`OPERATIONS.md`、`THIRD_PARTY_NOTICES.md` 和 `data/apple-snapshots/README.md`，由 core 测试保护允许列表。
-- 页面底部应与实际隐私行为一致，当前包含两类信息：
-  - “本工具与 Apple Inc. 无关联，数据仅供参考。”
-  - “访问统计使用 Google Analytics 和 Cloudflare Web Analytics；站内搜索词不会发送给统计服务。”
+- 页面底部当前只展示“本工具与 Apple Inc. 无关联，数据仅供参考。”及版权信息；不要把 GA4 / Cloudflare Web Analytics 运维说明误写成当前可见 footer 文案。
+- GA4 与 Cloudflare Web Analytics 的实际启用状态、隐私边界和检查方法记录在 README/本手册中；若未来要新增用户可见统计披露，应作为明确的产品文案变更，并同步修改页面与 UI 测试。
 - 不要在文档中重新引入已经关闭、已经决策或已经由代码契约解决的历史待办；若事实发生变化，按新的具体事件记录和处理。
 - 修改文档时同步清理代码、workflow、测试和页面文案中的失效引用。
 - Git 历史和 `history.json` 的增长继续由每周维护 workflow 监控；不要由自动任务重写 Git 历史。
