@@ -22,10 +22,8 @@ function runBrowserSuite(browser) {
   });
 }
 
-const requestedBrowser = process.env.PLAYWRIGHT_BROWSER;
-const browsers = requestedBrowser ? [requestedBrowser] : ['chromium', 'firefox', 'webkit'];
 const results = [];
-for (const browser of browsers) {
+for (const browser of ['chromium', 'firefox', 'webkit']) {
   results.push(await runBrowserSuite(browser));
 }
 if (results.some((code) => code !== 0)) process.exitCode = 1;
