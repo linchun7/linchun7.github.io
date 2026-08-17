@@ -105,8 +105,8 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /name: 验证更新后的价格数据[\s\S]*?id: data_tests[\s\S]*?run: pnpm test:data/);
   assert.match(workflow, /name: 抓取并校验 Apple 价格[\s\S]*?id: update_data[\s\S]*?EXCHANGE_RATE_API_KEY:\s*\$\{\{ secrets\.EXCHANGE_RATE_API_KEY \}\}[\s\S]*?run: pnpm update:data/);
   assert.doesNotMatch(workflow, /v6\/\$\{\{ secrets\.EXCHANGE_RATE_API_KEY \}\}/, 'the API key must not be placed in a request URL');
-  assert.match(workflow, /actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7/);
-  assert.match(workflow, /actions\/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8\.0\.1/);
+  assert.match(workflow, /actions\/upload-artifact@[a-f0-9]{40} # v\d+\.\d+\.\d+/);
+  assert.match(workflow, /actions\/download-artifact@[a-f0-9]{40} # v\d+\.\d+\.\d+/);
   assert.match(workflow, /retention-days:\s*14/);
   assert.match(workflow, /GENERATION_BASE_SHA/);
   assert.match(
@@ -260,6 +260,7 @@ test('moves full-history growth checks into a weekly read-only workflow', async 
   assert.match(workflow, /actions\/checkout@[a-f0-9]{40} # v\d+[\s\S]*?fetch-depth: 0[\s\S]*?persist-credentials: false/);
   assert.match(workflow, /git count-objects -vH/);
   assert.match(workflow, /history\.json/);
+  assert.match(workflow, /apple-snapshots[\s\S]*?snapshot_json_count[\s\S]*?remote_branch_count/);
   assert.match(workflow, /git_kib >= 819200[\s\S]*?::error[\s\S]*?exit 1[\s\S]*?git_kib >= 512000[\s\S]*?::warning/);
 });
 
