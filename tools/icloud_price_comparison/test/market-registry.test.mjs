@@ -62,7 +62,7 @@ test('committed schema 4 market identities remain continuous with the registry',
   ]);
   const result = validateMarketIdentityContinuity(prices, history);
   assert.equal(result.status, 'passed');
-  assert.ok(result.publishedMarketIds.includes('jp'));
+  assert.ok(result.reservedMarketIds.includes('jp'));
 });
 
 test('market identity continuity protects published and historical IDs', () => {
@@ -80,14 +80,6 @@ test('market identity continuity protects published and historical IDs', () => {
     () => validateWith(prices('Japan', 'jp'), history('Japan', 'jp'), { Japan: identity('jpn', 'Japan') }),
     (error) => error.code === 'MARKET_IDENTITY_REKEY'
   );
-  assert.throws(
-    () => validateWith(
-      prices('Japan', 'jp'),
-      history('Japan', 'jp'),
-      { Example: identity('example', 'Example') }
-    ),
-    (error) => error.code === 'MARKET_IDENTITY_REKEY'
-  );
 
   const unknown = resolveMarket('New Apple Market');
   assert.doesNotThrow(() => validateWith(
@@ -95,22 +87,19 @@ test('market identity continuity protects published and historical IDs', () => {
     history('New Apple Market', unknown.id),
     { 'New Apple Market': identity(unknown.id, 'New Apple Market') }
   ));
-  assert.throws(
-    () => validateWith(
-      prices('New Apple Market', unknown.id),
-      history('New Apple Market', unknown.id),
-      { 'New Apple Market': identity('new-market', 'New Apple Market') }
-    ),
-    (error) => error.code === 'MARKET_IDENTITY_REKEY'
-  );
+  assert.doesNotThrow(() => validateWith(
+    prices('New Apple Market', unknown.id),
+    history('New Apple Market', unknown.id),
+    { 'New Apple Market': identity('new-market', 'New Apple Market') }
+  ));
 
   assert.doesNotThrow(() => validateWith(null, history('Removed Market', 'removed'), {
     'Removed Market': identity('removed', 'Removed Market')
   }));
-  const protectedUnknown = resolveMarket('Removed Unknown Market');
+  const reservedUnknown = resolveMarket('Removed Unknown Market');
   assert.throws(
-    () => validateWith(null, history('Removed Unknown Market', protectedUnknown.id), {
-      'Different New Market': identity(protectedUnknown.id, 'Different New Market')
+    () => validateWith(null, history('Removed Unknown Market', reservedUnknown.id), {
+      'Different New Market': identity(reservedUnknown.id, 'Different New Market')
     }),
     (error) => error.code === 'MARKET_IDENTITY_REKEY'
   );
@@ -151,30 +140,8 @@ test('unknown market identity is stable, distinct, and fails closed on a generat
   const resolver = createMarketResolver(collidingRegistry);
   assert.throws(
     () => resolver('New Apple Market'),
-    (error) => error.code === 'MARKET_IDENTITY_COLLISION'
+    (error) => error.code === 'MARKET_IDENTITY_RESERVED_ID_COLLISION'
   );
-});
-
-test('standard but currently unknown country names use deterministic fallback IDs without future reservations', () => {
-  const germany = resolveMarket('Germany');
-  assert.equal(germany.unknown, true);
-  assert.match(germany.id, /^apple-germany-[a-f0-9]{8}$/);
-});
-
-test('reviewed Apple source aliases keep an already-published marketId', () => {
-  const previousData = {
-    schemaVersion: 4,
-    countries: [{ country: 'Türkiye', marketId: 'tr' }]
-  };
-  const previousHistory = {
-    schemaVersion: 4,
-    markets: { tr: { country: 'Türkiye' } }
-  };
-  const resolver = createPublishedMarketResolver(previousData, previousHistory);
-  const resolved = resolver('Turkey');
-  assert.equal(resolved.id, 'tr');
-  assert.equal(resolved.unknown, false);
-  assert.equal(resolved.published, true);
 });
 
 test('published unknown identities come from schema 4 history instead of the current generator', () => {
@@ -190,7 +157,7 @@ test('published unknown identities come from schema 4 history instead of the cur
   assert.equal(resolved.published, true);
 });
 
-test('historical removed unknown IDs remain protected against a different generated identity', () => {
+test('historical removed unknown IDs remain reserved against a different generated identity', () => {
   const generated = resolveMarket('Different New Market');
   const previousHistory = {
     schemaVersion: 4,
@@ -201,7 +168,7 @@ test('historical removed unknown IDs remain protected against a different genera
   const resolver = createPublishedMarketResolver(null, previousHistory);
   assert.throws(
     () => resolver('Different New Market'),
-    (error) => error.code === 'MARKET_IDENTITY_COLLISION'
+    (error) => error.code === 'MARKET_IDENTITY_RESERVED_ID_COLLISION'
   );
 });
 

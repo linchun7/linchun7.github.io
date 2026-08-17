@@ -1586,7 +1586,7 @@ export function validateAppleMarketRenameReview(previousData, confirmedCountries
   const candidates = [];
   for (const added of confirmedCountries) {
     const market = resolve(added.country);
-    if (!market.unknown || market.published) continue;
+    if (market.published || (!market.unknown && !market.reserved)) continue;
     for (const old of removed) {
       if (old.region === added.region
         && old.currency === added.currency
@@ -2539,8 +2539,8 @@ export async function main({
       unknownMarkets.push(warning);
       console.warn(`UNKNOWN_APPLE_MARKET:${logInline(warning.sourceName)}:${warning.generatedMarketId}:${logInline(warning.region)}:${logInline(warning.currency)}`);
       if (process.env.GITHUB_ACTIONS === 'true') {
-        const message = `sourceName=${warning.sourceName}; generatedMarketId=${warning.generatedMarketId}; region=${warning.region}; currency=${warning.currency}; candidate uses permanent fallback identity; normal publication validation still applies; review Apple source naming if an alias is needed`;
-        console.log(`::warning title=Unknown Apple market uses fallback identity::${escapeGitHubCommandMessage(message)}`);
+        const message = `sourceName=${warning.sourceName}; generatedMarketId=${warning.generatedMarketId}; region=${warning.region}; currency=${warning.currency}; requires registry review`;
+        console.log(`::warning title=Unknown Apple market requires registry review::${escapeGitHubCommandMessage(message)}`);
       }
     },
     onChineseNamePending: (market, country) => {
