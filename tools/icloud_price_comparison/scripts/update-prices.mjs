@@ -2539,8 +2539,8 @@ export async function main({
       unknownMarkets.push(warning);
       console.warn(`UNKNOWN_APPLE_MARKET:${logInline(warning.sourceName)}:${warning.generatedMarketId}:${logInline(warning.region)}:${logInline(warning.currency)}`);
       if (process.env.GITHUB_ACTIONS === 'true') {
-        const message = `sourceName=${warning.sourceName}; generatedMarketId=${warning.generatedMarketId}; region=${warning.region}; currency=${warning.currency}; requires registry review`;
-        console.log(`::warning title=Unknown Apple market requires registry review::${escapeGitHubCommandMessage(message)}`);
+        const message = `sourceName=${warning.sourceName}; generatedMarketId=${warning.generatedMarketId}; region=${warning.region}; currency=${warning.currency}; published with permanent fallback identity; review Apple source naming if an alias is needed`;
+        console.log(`::warning title=Unknown Apple market published with fallback identity::${escapeGitHubCommandMessage(message)}`);
       }
     },
     onChineseNamePending: (market, country) => {

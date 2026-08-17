@@ -4721,4 +4721,3 @@ test('records pure tier removal and same-price restoration as availability chang
   assert.equal(restored.history.countries.Alpha.events.length, 3);
   assert.deepEqual(restored.history.countries.Alpha.events.at(-1).plans, { '50GB': 1, '200GB': 3 });
 });
-
