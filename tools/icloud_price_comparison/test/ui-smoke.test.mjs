@@ -3280,3 +3280,25 @@ test('prioritizes exact market IDs without hiding partial matches and distinguis
     await server.close(() => {});
   }
 });
+
+
+test('supports friendly market search aliases and prioritizes exact alias hits', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the market search alias regression test');
+  if (!browserConfig) return;
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await page.route('https://**/*', (route) => route.abort());
+  try {
+    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length > 0);
+    for (const [query, expectedMarketId] of [['uk', 'gb'], ['usa', 'us'], ['turkey', 'tr']]) {
+      await page.locator('#searchInput').fill(query);
+      await page.waitForFunction((marketId) => document.querySelector('#priceRows tr[data-market-id]')?.dataset.marketId === marketId, expectedMarketId);
+      assert.equal(await page.locator('#priceRows tr[data-market-id]').first().getAttribute('data-market-id'), expectedMarketId);
+    }
+  } finally {
+    await browser.close();
+  }
+});
