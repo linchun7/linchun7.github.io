@@ -39,10 +39,11 @@ test('retired reservation and browser identity-search layers cannot return in ru
   }
 });
 
-test('unknown Apple markets are described as published fallback identities rather than publication-blocking registry work', () => {
-  assert.match(updater, /Unknown Apple market published with fallback identity/);
-  assert.match(updater, /published with permanent fallback identity/);
-  assert.doesNotMatch(updater, /requires registry review/);
+test('unknown Apple market warning reflects pre-publication fallback semantics without creating a manual gate', () => {
+  assert.match(updater, /Unknown Apple market uses fallback identity/);
+  assert.match(updater, /candidate uses permanent fallback identity/);
+  assert.match(updater, /normal publication validation still applies/);
+  assert.doesNotMatch(updater, /requires registry review|published with permanent fallback identity/);
 });
 
 test('documents user-facing search without exposing marketId or search aliases as product features', () => {
