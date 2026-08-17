@@ -2,6 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { renderStaticPage } from './render-static-page.mjs';
 import { updateAssetVersions } from './update-asset-versions.mjs';
 
 const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -59,28 +60,54 @@ await rewrite('script.js', (source) => {
         ? \`${'${country.country} · ${country.currency}'}\`
         : country.currency;`,
     'fallback currency subtitle');
+
+  result = replaceExactlyOnce(result,
+`  for (const { rank, row } of rankedRows) {
+    const rankCell = row.cells[0];
+    rankCell.textContent = String(rank);
+    rankCell.classList.toggle('rank-top', !staticSnapshotFxStale && state.sortDirection === 'asc' && rank <= 3);
+  }`,
+`  for (const { rank, row } of rankedRows) {
+    const rankCell = row.cells[0];
+    rankCell.textContent = String(rank);
+    rankCell.classList.toggle('rank-top', !staticSnapshotFxStale && state.sortDirection === 'asc' && rank <= 3);
+    const historyButton = row.querySelector('.country-history-button');
+    if (historyButton) historyButton.dataset.mobileRank = String(rank);
+  }`,
+    'static mobile rank reconciliation');
+
+  result = replaceExactlyOnce(result,
+`      historyButton.type = 'button';
+      historyButton.className = 'country-history-button';
+      historyButton.disabled = state.dataFreshness?.status === 'unusable';`,
+`      historyButton.type = 'button';
+      historyButton.className = 'country-history-button';
+      historyButton.dataset.mobileRank = String(displayedRank);
+      historyButton.disabled = state.dataFreshness?.status === 'unusable';`,
+    'dynamic mobile rank cue');
   return result;
 });
 
+await rewrite('scripts/static-page.mjs', (source) => replaceExactlyOnce(source,
+`    '              <button class="country-history-button" type="button" disabled>',`,
+`    \`              <button class="country-history-button" type="button" data-mobile-rank="\${escapeHtml(rank)}" disabled>\`,`,
+  'static mobile rank cue'));
+
 await rewrite('style.css', (source) => {
   let result = replaceExactlyOnce(source,
-`  .price-table th:first-child,
-  .price-table td:first-child { display: none; }
-  .price-table td.loading-cell:first-child,
-  .price-table td.empty-cell:first-child { display: table-cell; }`,
-`  .price-table th:first-child { display: none; }
-  .price-table tbody tr[data-market-id] { position: relative; }
-  .price-table tbody tr[data-market-id] > td:first-child {
+`  .country-history-button { min-height: 44px; padding-block: 5px; }`,
+`  .country-history-button { min-height: 44px; padding-right: 64px; padding-block: 5px; }
+  .country-history-button[data-mobile-rank]::after {
     position: absolute;
     top: 50%;
-    left: 12px;
-    z-index: 1;
-    width: 30px;
+    right: 28px;
+    min-width: 28px;
     height: 22px;
-    padding: 0;
-    display: flex;
+    padding: 0 5px;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
+    content: attr(data-mobile-rank);
     transform: translateY(-50%);
     color: var(--accent-dark);
     background: var(--accent-soft);
@@ -89,39 +116,23 @@ await rewrite('style.css', (source) => {
     font-size: 11px;
     font-weight: 760;
     line-height: 1;
-  }
-  .price-table td.loading-cell:first-child,
-  .price-table td.empty-cell:first-child { display: table-cell; }`,
+    font-variant-numeric: tabular-nums;
+  }`,
     'mobile rank badge');
-
-  result = replaceExactlyOnce(result,
-`  .price-table td:nth-child(2) { position: static; background: inherit; box-shadow: none; }`,
-`  .price-table td:nth-child(2) { position: static; padding-left: 54px; background: inherit; box-shadow: none; }`,
-    'mobile country rank spacing');
 
   result = replaceExactlyOnce(result,
 `  .minimum-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }`,
 `  .minimum-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }`,
     'three-column mobile minimum cards');
 
-  result = replaceExactlyOnce(result,
-`  .price-table th:nth-child(2),
-  .price-table td:nth-child(2) { width: 43%; padding-left: 18px; }`,
-`  .price-table th:nth-child(2),
-  .price-table td:nth-child(2) { width: 43%; padding-left: 52px; }`,
-    'small mobile country rank spacing');
-
   return replaceExactlyOnce(result,
 `@media (prefers-reduced-motion: reduce) {`,
 `@media (max-width: 359px) {
   .minimum-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .price-table tbody tr[data-market-id] > td:first-child { left: 8px; }
-  .price-table th:nth-child(2),
-  .price-table td:nth-child(2) { width: 46%; padding-left: 46px; }
 }
 
 @media (prefers-reduced-motion: reduce) {`,
-    'narrow-mobile fallback');
+    'narrow-mobile minimum-card fallback');
 });
 
 await rewrite('test/ui-smoke.test.mjs', (source) => {
@@ -153,10 +164,14 @@ await rewrite('test/ui-smoke.test.mjs', (source) => {
         await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, data.countries.length);
         await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
 
-        const firstRank = page.locator('#priceRows tr[data-market-id] > td:first-child').first();
-        assert.equal(await firstRank.isVisible(), true, String(viewport.width) + 'px must expose the current rank or sequence');
-        const rankBox = await firstRank.boundingBox();
-        assert.ok(rankBox && rankBox.width >= 22 && rankBox.height >= 20, String(viewport.width) + 'px rank badge must remain legible');
+        const firstHistoryButton = page.locator('#priceRows tr[data-market-id] .country-history-button').first();
+        const rankCue = await firstHistoryButton.evaluate((button) => ({
+          rank: button.dataset.mobileRank,
+          content: getComputedStyle(button, '::after').content,
+          paddingRight: Number.parseFloat(getComputedStyle(button).paddingRight)
+        }));
+        assert.ok(rankCue.rank && rankCue.content.includes(rankCue.rank), String(viewport.width) + 'px must expose the current rank or sequence');
+        assert.ok(rankCue.paddingRight >= 60, String(viewport.width) + 'px rank badge must reserve non-overlapping space');
 
         const minimumColumns = await page.locator('#minimumSummary').evaluate((element) => (
           getComputedStyle(element).gridTemplateColumns.trim().split(/\\s+/).filter(Boolean).length
@@ -164,15 +179,15 @@ await rewrite('test/ui-smoke.test.mjs', (source) => {
         assert.equal(minimumColumns, viewport.minimumColumns, String(viewport.width) + 'px minimum-price cards should use the intended compact grid');
 
         await page.locator('#searchInput').fill('us');
-        await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length === 1);
+        await page.waitForFunction((id) => document.querySelector('#priceRows tr[data-market-id]')?.dataset.marketId === id, 'us');
         assert.equal(await page.locator('#priceRows tr[data-market-id]').first().getAttribute('data-market-id'), 'us', 'exact marketId search must outrank substring matches such as Russia');
 
         await page.locator('#searchInput').fill('jp');
-        await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length === 1);
+        await page.waitForFunction((id) => document.querySelector('#priceRows tr[data-market-id]')?.dataset.marketId === id, 'jp');
         assert.equal(await page.locator('#priceRows tr[data-market-id]').first().getAttribute('data-market-id'), 'jp');
 
         await page.locator('#searchInput').fill(fallbackCountry.country);
-        await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length === 1);
+        await page.waitForFunction((id) => document.querySelector('#priceRows tr[data-market-id]')?.dataset.marketId === id, fallbackCountry.marketId);
         assert.equal((await page.locator('#priceRows .country-name-en').first().textContent()).trim(), fallbackCountry.currency, 'pending Chinese names must keep the currency subtitle after dynamic rendering');
 
         const layout = await page.evaluate(() => ({
@@ -191,5 +206,6 @@ await rewrite('test/ui-smoke.test.mjs', (source) => {
   return `${source.trimEnd()}\n\n${testSource}\n`;
 });
 
+await renderStaticPage({ write: true });
 const { versions } = await updateAssetVersions({ projectDir: PROJECT_DIR });
 console.log(`Applied iCloud UX polish; asset versions: ${JSON.stringify(versions)}`);
