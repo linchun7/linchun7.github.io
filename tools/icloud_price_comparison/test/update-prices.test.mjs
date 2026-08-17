@@ -4722,26 +4722,3 @@ test('records pure tier removal and same-price restoration as availability chang
   assert.deepEqual(restored.history.countries.Alpha.events.at(-1).plans, { '50GB': 1, '200GB': 3 });
 });
 
-
-test('future-reserved markets still participate in rename ambiguity review', () => {
-  const old = {
-    country: 'Old Germany Placeholder', marketId: 'legacy-de-owner', region: 'Europe, Middle East & Africa', currency: 'EUR',
-    plans: { '50GB': { price: 0.99 }, '200GB': { price: 2.99 } }
-  };
-  const added = {
-    country: 'Germany', region: old.region, currency: old.currency,
-    plans: structuredClone(old.plans)
-  };
-  assert.equal(resolveMarket('Germany').reserved, true);
-  assert.throws(
-    () => validateAppleMarketRenameReview({ countries: [old] }, [added], resolveMarket),
-    (error) => error.code === 'MARKET_IDENTITY_RENAME_REVIEW_REQUIRED'
-  );
-
-  const repriced = structuredClone(added);
-  repriced.plans['50GB'].price = 1.09;
-  const review = validateAppleMarketRenameReview({ countries: [old] }, [repriced], resolveMarket);
-  assert.equal(review.status, 'suspected');
-  assert.equal(review.warnings.length, 1);
-  assert.equal(review.warnings[0].pricesMatch, false);
-});

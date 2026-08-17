@@ -3,9 +3,9 @@ import {
   publicationDateKey,
   validatePayload,
   validatePriceHistoryConsistency
-} from './data-contract.js?v=5ad385ff';
+} from './data-contract.js?v=f8779a1b';
 import { createIcons } from './vendor/lucide-subset.js?v=1afb95ee';
-import { marketSearchAliases, VALID_REGIONS } from './data-model.js?v=d365ae66';
+import { VALID_REGIONS } from './data-model.js?v=1df20253';
 
 const REQUEST_TIMEOUT_MS = 8_000;
 const ANALYTICS_ID = 'G-K2S9L4CHNP';
@@ -565,27 +565,11 @@ function normalizedSearchQuery() {
   return state.query.trim().toLocaleLowerCase('zh-CN');
 }
 
-function normalizedMarketSearchAliases(country) {
-  return marketSearchAliases(country.marketId)
-    .map((alias) => alias.toLocaleLowerCase('en-US'));
-}
-
 function matchesCountrySearch(country, query) {
   if (!query) return true;
-  const marketId = country.marketId.toLocaleLowerCase('en-US');
   const namesAndRegion = `${country.country} ${country.nameZh ?? ''} ${REGION_LABELS[country.region] || country.region}`.toLocaleLowerCase('zh-CN');
   const currency = country.currency.toLocaleLowerCase('en-US');
-  const aliases = normalizedMarketSearchAliases(country);
-  return marketId.includes(query)
-    || namesAndRegion.includes(query)
-    || aliases.some((alias) => alias.includes(query))
-    || currency === query;
-}
-
-function exactSearchIdentityPriority(country, query) {
-  if (!query) return 0;
-  if (country.marketId.toLocaleLowerCase('en-US') === query) return 2;
-  return normalizedMarketSearchAliases(country).some((alias) => alias === query) ? 1 : 0;
+  return namesAndRegion.includes(query) || currency === query;
 }
 
 function filteredCountries() {
@@ -602,11 +586,7 @@ function sortValue(country) {
 }
 
 function sortedCountries() {
-  const query = normalizedSearchQuery();
   return filteredCountries().sort((a, b) => {
-    const aIdentityPriority = exactSearchIdentityPriority(a, query);
-    const bIdentityPriority = exactSearchIdentityPriority(b, query);
-    if (aIdentityPriority !== bIdentityPriority) return bIdentityPriority - aIdentityPriority;
 
     const first = sortValue(a);
     const second = sortValue(b);

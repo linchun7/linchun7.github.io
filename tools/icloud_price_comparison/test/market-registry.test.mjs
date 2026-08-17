@@ -62,7 +62,7 @@ test('committed schema 4 market identities remain continuous with the registry',
   ]);
   const result = validateMarketIdentityContinuity(prices, history);
   assert.equal(result.status, 'passed');
-  assert.ok(result.reservedMarketIds.includes('jp'));
+  assert.ok(result.publishedMarketIds.includes('jp'));
 });
 
 test('market identity continuity protects published and historical IDs', () => {
@@ -87,11 +87,14 @@ test('market identity continuity protects published and historical IDs', () => {
     history('New Apple Market', unknown.id),
     { 'New Apple Market': identity(unknown.id, 'New Apple Market') }
   ));
-  assert.doesNotThrow(() => validateWith(
-    prices('New Apple Market', unknown.id),
-    history('New Apple Market', unknown.id),
-    { 'New Apple Market': identity('new-market', 'New Apple Market') }
-  ));
+  assert.throws(
+    () => validateWith(
+      prices('New Apple Market', unknown.id),
+      history('New Apple Market', unknown.id),
+      { 'New Apple Market': identity('new-market', 'New Apple Market') }
+    ),
+    (error) => error.code === 'MARKET_IDENTITY_REKEY'
+  );
 
   assert.doesNotThrow(() => validateWith(null, history('Removed Market', 'removed'), {
     'Removed Market': identity('removed', 'Removed Market')
@@ -142,6 +145,28 @@ test('unknown market identity is stable, distinct, and fails closed on a generat
     () => resolver('New Apple Market'),
     (error) => error.code === 'MARKET_IDENTITY_RESERVED_ID_COLLISION'
   );
+});
+
+test('standard but currently unknown country names use deterministic fallback IDs without future reservations', () => {
+  const germany = resolveMarket('Germany');
+  assert.equal(germany.unknown, true);
+  assert.match(germany.id, /^apple-germany-[a-f0-9]{8}$/);
+});
+
+test('reviewed Apple source aliases keep an already-published marketId', () => {
+  const previousData = {
+    schemaVersion: 4,
+    countries: [{ country: 'Türkiye', marketId: 'tr' }]
+  };
+  const previousHistory = {
+    schemaVersion: 4,
+    markets: { tr: { country: 'Türkiye' } }
+  };
+  const resolver = createPublishedMarketResolver(previousData, previousHistory);
+  const resolved = resolver('Turkey');
+  assert.equal(resolved.id, 'tr');
+  assert.equal(resolved.unknown, false);
+  assert.equal(resolved.published, true);
 });
 
 test('published unknown identities come from schema 4 history instead of the current generator', () => {
