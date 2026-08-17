@@ -21,6 +21,18 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
+      - name: Harden temporary patch helper
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('tools/icloud_price_comparison/scripts/agent-identity-simplify.py')
+          text = path.read_text(encoding='utf-8')
+          old = "updated, count = re.subn(pattern, replacement, text, count=1, flags=re.S)"
+          new = "updated, count = re.subn(pattern, lambda _match: replacement, text, count=1, flags=re.S)"
+          if text.count(old) != 1:
+              raise SystemExit('temporary regex helper shape changed')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
       - name: Apply reviewed simplification
         run: python tools/icloud_price_comparison/scripts/agent-identity-simplify.py
       - name: Install dependencies
