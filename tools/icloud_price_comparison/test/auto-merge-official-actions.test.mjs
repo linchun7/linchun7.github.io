@@ -7,7 +7,7 @@ import {
   validateChangedFiles,
   validatePullRequest,
   verifyActionReferences,
-} from '../scripts/auto-merge-official-actions.mjs';
+} from '../scripts/auto-merge-dependabot.mjs';
 
 const BASE_SHA = 'a'.repeat(40);
 const HEAD_SHA = 'b'.repeat(40);
