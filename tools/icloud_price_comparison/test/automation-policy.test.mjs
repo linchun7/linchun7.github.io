@@ -8,7 +8,7 @@ const updateWorkflowUrl = new URL('../../../.github/workflows/update-icloud-pric
 const manifestUrl = new URL('../vendor/manifest.json', import.meta.url);
 const noticesUrl = new URL('../THIRD_PARTY_NOTICES.md', import.meta.url);
 
-test('stages automated maintenance after the daily production update window', async () => {
+test('stages automated maintenance after production and isolates npm dependency PRs', async () => {
   const [dependabot, updateWorkflow] = await Promise.all([
     readFile(dependabotUrl, 'utf8'),
     readFile(updateWorkflowUrl, 'utf8'),
@@ -17,7 +17,12 @@ test('stages automated maintenance after the daily production update window', as
   assert.match(updateWorkflow, /cron:\s*['"]10 0 \* \* \*['"]/, 'daily GitHub fallback stays at 08:10 Beijing');
   assert.match(dependabot, /package-ecosystem: npm[\s\S]*?day: monday[\s\S]*?time: ["']10:20["'][\s\S]*?timezone: Asia\/Shanghai/);
   assert.match(dependabot, /package-ecosystem: github-actions[\s\S]*?day: monday[\s\S]*?time: ["']12:20["'][\s\S]*?timezone: Asia\/Shanghai/);
-  assert.match(dependabot, /icloud-price-dependencies:[\s\S]*?update-types:[\s\S]*?- ["']minor["'][\s\S]*?- ["']patch["']/);
+
+  const npmStart = dependabot.indexOf('package-ecosystem: npm');
+  const actionsStart = dependabot.indexOf('package-ecosystem: github-actions');
+  assert.ok(npmStart >= 0 && actionsStart > npmStart);
+  const npmBlock = dependabot.slice(npmStart, actionsStart);
+  assert.doesNotMatch(npmBlock, /\n\s+groups:/, 'npm updates should remain independent so one incompatible package cannot block unrelated upgrades');
 });
 
 test('auto-merge is limited to trusted Dependabot scopes after successful full validation', async () => {
