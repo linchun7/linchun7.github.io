@@ -102,6 +102,12 @@ jobs:
         run: pnpm validate:snapshots
       - name: 检查依赖漏洞
         run: pnpm audit --audit-level low
+      - name: 检查 PR 已提交差异格式
+        if: github.event_name == 'pull_request'
+        working-directory: .
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: git diff --check "$BASE_SHA" HEAD
       - name: 检查工作区差异格式
         working-directory: .
         run: git diff --check
