@@ -2,7 +2,6 @@ import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { renderStaticPage } from './render-static-page.mjs';
 import { updateAssetVersions } from './update-asset-versions.mjs';
 
 const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -206,6 +205,7 @@ await rewrite('test/ui-smoke.test.mjs', (source) => {
   return `${source.trimEnd()}\n\n${testSource}\n`;
 });
 
+const { renderStaticPage } = await import('./render-static-page.mjs?ux-polish=1');
 await renderStaticPage({ write: true });
 const { versions } = await updateAssetVersions({ projectDir: PROJECT_DIR });
 console.log(`Applied iCloud UX polish; asset versions: ${JSON.stringify(versions)}`);
