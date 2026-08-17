@@ -1,255 +1,290 @@
-document.addEventListener('DOMContentLoaded', function() {
-    const tabs = document.querySelectorAll('.nav-link');
-    const contents = document.querySelectorAll('.tab-pane');
+(() => {
+    'use strict';
 
-    function showContent(targetId) {
-        contents.forEach(content => {
-            content.classList.remove('show', 'active');
-        });
-        document.getElementById(targetId).classList.add('show', 'active');
-    }
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const MAX_DETAIL_PERIODS = 2000;
 
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            const targetId = tab.getAttribute('data-bs-target').replace('#', '');
+    const $ = (id) => document.getElementById(id);
 
-            tabs.forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-
-            showContent(targetId);
-        });
+    const numberFormatter = new Intl.NumberFormat('zh-CN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
     });
 
-    tabs[0].classList.add('active');
-    showContent(tabs[0].getAttribute('data-bs-target').replace('#', ''));
-});
-
-
-
-// 获取第一个功能的计算按钮和结果显示区域的元素
-const calculateButton1 = document.getElementById('calculate1');
-const resultDiv1 = document.getElementById('result1');
-
-// 添加点击事件监听器，当点击计算按钮时执行计算
-calculateButton1.addEventListener('click', () => {
-    // 获取用户输入的值
-    const principal1 = parseFloat(document.getElementById('principal1').value);
-    const days1 = parseInt(document.getElementById('days1').value);
-    const interest1 = parseFloat(document.getElementById('interest1').value);
-    const rateType1 = parseInt(document.getElementById('rateType1').value);
-
-    // 检查输入值是否为空
-    if (isNaN(principal1) || isNaN(days1) || isNaN(interest1)) {
-        resultDiv1.innerHTML = '请输入有效的值';
-    } else {
-        // 计算年化收益率，收益/本金/投资天数*365(360)*100%
-        const annualizedReturn = (interest1 / principal1 / days1) * rateType1 * 100;
-
-        // 在页面上显示计算结果
-        resultDiv1.innerHTML = `年化收益率：<span style='color: red'>${annualizedReturn.toFixed(2)}%</span>`;
+    function formatNumber(value) {
+        return Number.isFinite(value) ? numberFormatter.format(value) : '—';
     }
-});
 
-
-
-
-// 获取第二个功能的计算按钮和结果显示区域的元素
-const calculateButton2 = document.getElementById('calculate2');
-const resultDiv2 = document.getElementById('result2');
-
-// 添加点击事件监听器，当点击计算按钮时执行计算
-calculateButton2.addEventListener('click', () => {
-    // 获取用户输入的值
-    const principal2 = parseFloat(document.getElementById('principal2').value);
-    const days2 = parseInt(document.getElementById('days2').value);
-    const annualRate2 = parseFloat(document.getElementById('annualRate2').value);
-    const rateType2 = parseInt(document.getElementById('rateType2').value);
-
-    // 检查输入值是否为空
-    if (isNaN(principal2) || isNaN(days2) || isNaN(annualRate2)) {
-        resultDiv2.innerHTML = '请输入有效的值';
-    } else {
-        // 计算利息收益，收益 = （本金 × 年化收益率） × （天数 / 365（360））
-        const interestEarnings = (principal2 * annualRate2 / 100) * (days2 / rateType2);
-
-        // 在页面上显示计算结果
-        resultDiv2.innerHTML = `利息收益：<span style='color: red'>${interestEarnings.toFixed(2)}</span>`;
+    function formatPercent(value) {
+        return Number.isFinite(value) ? `${value.toFixed(2)}%` : '—';
     }
-});
 
-// 获取第三个功能的计算按钮和结果显示区域的元素
-const calculateButton3 = document.getElementById('calculate3');
-const resultDiv3 = document.getElementById('result3');
+    function setResult(id, text, type = 'success') {
+        const element = $(id);
+        if (!element) return;
+        element.textContent = text;
+        element.classList.toggle('result-error', type === 'error');
+        element.classList.toggle('result-success', type !== 'error');
+    }
 
-// 添加点击事件监听器，当点击计算按钮时执行计算
-calculateButton3.addEventListener('click', () => {
-    // 获取用户输入的值
-    const startDate = new Date(document.getElementById('startDate').value);
-    const startNetValue = parseFloat(document.getElementById('startNetValue').value);
-    const endDate = new Date(document.getElementById('endDate').value);
-    const endNetValue = parseFloat(document.getElementById('endNetValue').value);
-    const rateType3 = parseInt(document.getElementById('rateType3').value);
+    function clearResult(id) {
+        const element = $(id);
+        if (!element) return;
+        element.textContent = '';
+        element.classList.remove('result-error', 'result-success');
+    }
 
-    // 检查输入值是否为空
-    if (isNaN(startNetValue) || isNaN(endNetValue) || isNaN(rateType3) || isNaN(startDate) || isNaN(endDate)) {
-        resultDiv3.innerHTML = '请输入有效的值';
-    } else {
-        // 计算天数和净值变化
-        const days = (endDate - startDate) / (1000 * 60 * 60 * 24);
-        const netValueChange = endNetValue - startNetValue;
+    function readFiniteNumber(id, label) {
+        const element = $(id);
+        const raw = element ? element.value.trim() : '';
+        if (raw === '') throw new Error(`请输入${label}`);
+        const value = Number(raw);
+        if (!Number.isFinite(value)) throw new Error(`${label}必须是有效数字`);
+        return value;
+    }
 
-        if (days === 0) {
-            resultDiv3.innerHTML = '终止日期应大于起始日期';
-        } else {
+    function readPositiveNumber(id, label) {
+        const value = readFiniteNumber(id, label);
+        if (value <= 0) throw new Error(`${label}必须大于 0`);
+        return value;
+    }
 
-            // 计算净值收益率，年化收益率 =（结束净值 - 初始净值）/ 初始净值 / 已成立天数 ×365(360)
-            const netValueReturn = (netValueChange / startNetValue) / days * rateType3 * 100;
+    function readPositiveInteger(id, label) {
+        const value = readFiniteNumber(id, label);
+        if (!Number.isInteger(value) || value <= 0) throw new Error(`${label}必须是大于 0 的整数`);
+        return value;
+    }
 
-            // 在页面上显示计算结果
-            resultDiv3.innerHTML = `年化收益率：<span style='color: red'>${netValueReturn.toFixed(2)}%</span>`;
+    function readAnnualDays(id) {
+        const value = Number($(id).value);
+        if (value !== 360 && value !== 365) throw new Error('年投资天数必须为 360 或 365');
+        return value;
+    }
+
+    function parseDateUtc(id, label) {
+        const raw = $(id).value;
+        if (!raw) throw new Error(`请选择${label}`);
+
+        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+        if (!match) throw new Error(`${label}格式无效`);
+
+        const timestamp = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+        if (!Number.isFinite(timestamp)) throw new Error(`${label}格式无效`);
+        return timestamp;
+    }
+
+    function runCalculation(resultId, calculator) {
+        try {
+            const message = calculator();
+            setResult(resultId, message, 'success');
+        } catch (error) {
+            setResult(resultId, error instanceof Error ? error.message : '计算失败，请检查输入', 'error');
         }
     }
-});
 
+    function calculateAnnualizedReturn() {
+        const principal = readPositiveNumber('principal1', '本金');
+        const days = readPositiveInteger('days1', '天数');
+        const earnings = readFiniteNumber('interest1', '收益');
+        const annualDays = readAnnualDays('rateType1');
 
+        const annualizedReturn = (earnings / principal / days) * annualDays * 100;
+        if (!Number.isFinite(annualizedReturn)) throw new Error('计算结果异常，请检查输入');
 
-// 获取第四个功能的计算按钮和结果显示区域的元素
-document.getElementById("calculate4").addEventListener("click", function() {
-    // 获取用户输入的值
-    const principal = parseFloat(document.getElementById("principal3").value); // 获取本金
-    const compoundingFrequency = document.getElementById("compoundingFrequency").value; // 获取复利方式
-    const depositPeriod = parseFloat(document.getElementById("depositPeriod").value); // 获取存期
-    const annualRate = parseFloat(document.getElementById("annualRate3").value); // 获取年化收益率
-    const rateType = parseInt(document.getElementById("rateType4").value); // 获取年化收益率类型
+        return `年化收益率：${formatPercent(annualizedReturn)}`;
+    }
 
-    // 检测输入值是否为空
-    if (isNaN(principal) || isNaN(depositPeriod) || isNaN(annualRate) || isNaN(rateType)) {
-        const resultDiv4 = document.getElementById("result4");
-        resultDiv4.innerHTML = '请输入有效的值';
-    } else {
-        // 将年化收益率转换为对应复利方式的利率
-        let rate;
-        if (compoundingFrequency === "daily") {
-            rate = annualRate / rateType; // 日利率
-        } else if (compoundingFrequency === "weekly") {
-            rate = annualRate / rateType * 7; //日利率*7=周利率
-        } else if (compoundingFrequency === "monthly") {
-            rate = annualRate / 12; // 月
-        } else if (compoundingFrequency === "quarterly") {
-            rate = annualRate / 4; // 季
-        } else if (compoundingFrequency === "semi-annually") {
-            rate = annualRate / 2; // 半年
-        } else if (compoundingFrequency === "annually") {
-            rate = annualRate; // 年
+    function calculateInterest() {
+        const principal = readPositiveNumber('principal2', '本金');
+        const days = readPositiveInteger('days2', '天数');
+        const annualRate = readFiniteNumber('annualRate2', '年化收益率');
+        const annualDays = readAnnualDays('rateType2');
+
+        const earnings = principal * (annualRate / 100) * (days / annualDays);
+        if (!Number.isFinite(earnings)) throw new Error('计算结果异常，请检查输入');
+
+        return `利息收益：${formatNumber(earnings)} 元`;
+    }
+
+    function calculateNetValueReturn() {
+        const startDate = parseDateUtc('startDate', '起始日期');
+        const endDate = parseDateUtc('endDate', '终止日期');
+        const startValue = readPositiveNumber('startNetValue', '起始净值');
+        const endValue = readPositiveNumber('endNetValue', '终止净值');
+        const annualDays = readAnnualDays('rateType3');
+
+        if (endDate <= startDate) throw new Error('终止日期必须晚于起始日期');
+
+        const days = (endDate - startDate) / DAY_MS;
+        const annualizedReturn = ((endValue - startValue) / startValue) / days * annualDays * 100;
+
+        if (!Number.isFinite(annualizedReturn)) throw new Error('计算结果异常，请检查输入');
+        return `净值年化收益率：${formatPercent(annualizedReturn)}（持有 ${days} 天）`;
+    }
+
+    const frequencyConfig = {
+        annually: { label: '年', divisor: 1 },
+        'semi-annually': { label: '半年', divisor: 2 },
+        quarterly: { label: '季', divisor: 4 },
+        monthly: { label: '月', divisor: 12 },
+        weekly: { label: '周', dayBased: 7 },
+        daily: { label: '日', dayBased: 1 }
+    };
+
+    function getPeriodicRate(annualRatePercent, frequency, annualDays) {
+        const config = frequencyConfig[frequency];
+        if (!config) throw new Error('复利方式无效');
+
+        const periodicPercent = config.dayBased
+            ? annualRatePercent * config.dayBased / annualDays
+            : annualRatePercent / config.divisor;
+
+        const rate = periodicPercent / 100;
+        if (!Number.isFinite(rate) || rate <= -1) {
+            throw new Error('该年化收益率在当前复利方式下会使单期本金小于等于 0，请调整参数');
+        }
+        return rate;
+    }
+
+    function clearElement(element) {
+        while (element && element.firstChild) {
+            element.removeChild(element.firstChild);
+        }
+    }
+
+    function appendCell(row, text, tag = 'td') {
+        const cell = document.createElement(tag);
+        cell.textContent = text;
+        row.appendChild(cell);
+    }
+
+    function renderCompoundDetails(principal, periods, periodicRate) {
+        const container = $('result4-table');
+        clearElement(container);
+
+        if (periods > MAX_DETAIL_PERIODS) {
+            const note = document.createElement('p');
+            note.className = 'detail-limit-note';
+            note.textContent = `存期共 ${periods} 期，为避免浏览器卡顿，仅显示汇总结果；明细最多展示 ${MAX_DETAIL_PERIODS} 期。`;
+            container.appendChild(note);
+            return;
         }
 
-        // 计算复利收益和明细
-        const n = depositPeriod; // 计息期数
-        const i = rate / 100; // 将利率转为小数
-        let totalPrincipal = principal;
+        const wrapper = document.createElement('div');
+        wrapper.className = 'compound-table-wrap';
+
+        const table = document.createElement('table');
+        table.className = 'table table-sm compound-table';
+
+        const thead = document.createElement('thead');
+        const headRow = document.createElement('tr');
+        ['期数', '期初本金', '本期收益', '累计收益', '本息合计'].forEach((text) => appendCell(headRow, text, 'th'));
+        thead.appendChild(headRow);
+
+        const tbody = document.createElement('tbody');
+        let balance = principal;
         let totalInterest = 0;
 
-        // 构建明细表格的表头
-        // 构建明细表格
-        let detailsTable = `<div style="overflow-x: auto;">
-                                <table style="width: auto; border-collapse: collapse; margin-top: 10px;">
-                                    <thead>
-                                        <tr>
-                                            <th style="min-width: 100px;">期  数</th>
-                                            <th style="min-width: 100px;">本  金</th>
-                                            <th style="min-width: 100px;">利  息</th>
-                                            <th style="min-width: 100px;">利息总计</th>
-                                            <th style="min-width: 150px;">本息总计</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>`;
-
-        // 计算并构建每期的明细
-        // 计算并构建每期的明细
-        for (let period = 1; period <= depositPeriod; period++) {
-            const interest = totalPrincipal * i;
+        for (let period = 1; period <= periods; period += 1) {
+            const opening = balance;
+            const interest = opening * periodicRate;
             totalInterest += interest;
+            balance += interest;
 
-            // 本期本金总计为初始本金 + 累计的总利息
-            const totalAmount = principal + totalInterest;
-
-            detailsTable += `<tr>
-                        <td>${period}</td>
-                        <td>${totalPrincipal.toFixed(2)}</td>
-                        <td>${interest.toFixed(2)}</td>
-                        <td>${totalInterest.toFixed(2)}</td>
-                        <td>${totalAmount.toFixed(2)}</td>
-                    </tr>`;
-
-            // 更新总本金为本金总计，以便下一期使用
-            totalPrincipal = totalAmount;
+            const row = document.createElement('tr');
+            appendCell(row, String(period));
+            appendCell(row, formatNumber(opening));
+            appendCell(row, formatNumber(interest));
+            appendCell(row, formatNumber(totalInterest));
+            appendCell(row, formatNumber(balance));
+            tbody.appendChild(row);
         }
 
-        // 关闭明细表格
-        detailsTable += `</tbody></table></div>`;
-
-        // 计算本息总额和利息
-        const futureValue = totalPrincipal;
-        const totalInterestAmount = totalInterest;
-
-        // 显示结果和明细
-        const result4 = document.getElementById("result4");
-        const resultElement = document.getElementById("result4-table");
-        result4.innerHTML = `<div>本息总计：<span style='color: red'>${futureValue.toFixed(2)}</span></div>
-                                    <div>利息总计：<span style='color: red'>${totalInterest.toFixed(2)}</span></div>`;
-        resultElement.innerHTML = `${detailsTable}`;
-
+        table.append(thead, tbody);
+        wrapper.appendChild(table);
+        container.appendChild(wrapper);
     }
-});
 
+    function calculateCompound() {
+        const principal = readPositiveNumber('principal3', '本金');
+        const periods = readPositiveInteger('depositPeriod', '存期');
+        const annualRate = readFiniteNumber('annualRate3', '年化收益率');
+        const annualDays = readAnnualDays('rateType4');
+        const frequency = $('compoundingFrequency').value;
 
+        const periodicRate = getPeriodicRate(annualRate, frequency, annualDays);
+        const growthFactor = Math.pow(1 + periodicRate, periods);
+        const futureValue = principal * growthFactor;
+        const totalInterest = futureValue - principal;
 
+        if (!Number.isFinite(futureValue) || !Number.isFinite(totalInterest)) {
+            throw new Error('计算结果过大或无效，请缩短存期或调整收益率');
+        }
 
-// 清空1的点击事件监听器
-document.getElementById('empty1').addEventListener('click', () => {
-    // 清空输入字段的值
-    document.getElementById('principal1').value = '';
-    document.getElementById('days1').value = '';
-    document.getElementById('interest1').value = '';
+        renderCompoundDetails(principal, periods, periodicRate);
+        return `本息总计：${formatNumber(futureValue)} 元；利息总计：${formatNumber(totalInterest)} 元`;
+    }
 
-    // 清空结果显示区域
-    resultDiv1.innerHTML = '';
-});
+    function clearFields(ids, resultId, extraClear) {
+        ids.forEach((id) => {
+            const element = $(id);
+            if (element) element.value = '';
+        });
+        clearResult(resultId);
+        if (typeof extraClear === 'function') extraClear();
+        const first = $(ids[0]);
+        if (first) first.focus();
+    }
 
-// 清空2的点击事件监听器
-document.getElementById('empty2').addEventListener('click', () => {
-    // 清空输入字段的值
-    document.getElementById('principal2').value = '';
-    document.getElementById('days2').value = '';
-    document.getElementById('annualRate2').value = '';
+    function activateTab(tab) {
+        document.querySelectorAll('#myTabs .nav-link').forEach((button) => {
+            const active = button === tab;
+            button.classList.toggle('active', active);
+            button.setAttribute('aria-selected', String(active));
+        });
 
-    // 清空结果显示区域
-    resultDiv2.innerHTML = '';
-});
+        document.querySelectorAll('#contents .tab-pane').forEach((panel) => {
+            const active = panel.id === tab.dataset.target;
+            panel.hidden = !active;
+            panel.classList.toggle('show', active);
+            panel.classList.toggle('active', active);
+        });
+    }
 
-// 清空3的点击事件监听器
-document.getElementById('empty3').addEventListener('click', () => {
-    // 清空输入字段的值
-    document.getElementById('startDate').value = '';
-    document.getElementById('startNetValue').value = '';
-    document.getElementById('endDate').value = '';
-    document.getElementById('endNetValue').value = '';
+    function updateFrequencyLabel() {
+        const config = frequencyConfig[$('compoundingFrequency').value] || frequencyConfig.annually;
+        $('frequency').textContent = config.label;
+    }
 
+    function init() {
+        document.querySelectorAll('#myTabs .nav-link').forEach((tab) => {
+            tab.addEventListener('click', () => activateTab(tab));
+        });
 
-    // 清空结果显示区域
-    resultDiv3.innerHTML = '';
-});
+        $('calculate1').addEventListener('click', () => runCalculation('result1', calculateAnnualizedReturn));
+        $('calculate2').addEventListener('click', () => runCalculation('result2', calculateInterest));
+        $('calculate3').addEventListener('click', () => runCalculation('result3', calculateNetValueReturn));
+        $('calculate4').addEventListener('click', () => {
+            clearElement($('result4-table'));
+            runCalculation('result4', calculateCompound);
+        });
 
-// 清空4的点击事件监听器
-document.getElementById('empty4').addEventListener('click', () => {
-    // 清空输入字段的值
-    document.getElementById('principal3').value = '';
-    document.getElementById('depositPeriod').value = '';
-    document.getElementById('annualRate3').value = '';
+        $('empty1').addEventListener('click', () => clearFields(['principal1', 'days1', 'interest1'], 'result1'));
+        $('empty2').addEventListener('click', () => clearFields(['principal2', 'days2', 'annualRate2'], 'result2'));
+        $('empty3').addEventListener('click', () => clearFields(['startDate', 'startNetValue', 'endDate', 'endNetValue'], 'result3'));
+        $('empty4').addEventListener('click', () => clearFields(
+            ['principal3', 'depositPeriod', 'annualRate3'],
+            'result4',
+            () => clearElement($('result4-table'))
+        ));
 
-    // 清空结果显示区域
-    const result4 = document.getElementById("result4");
-    const resultElement = document.getElementById("result4-table");
-    result4.innerHTML = '';
-    resultElement.innerHTML = '';
-});
+        $('compoundingFrequency').addEventListener('change', updateFrequencyLabel);
+        updateFrequencyLabel();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init, { once: true });
+    } else {
+        init();
+    }
+})();

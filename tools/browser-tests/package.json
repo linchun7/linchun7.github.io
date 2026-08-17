@@ -1,0 +1,11 @@
+{
+  "name": "linchun-static-tools-browser-tests",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}
