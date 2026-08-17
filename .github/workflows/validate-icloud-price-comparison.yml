@@ -25,66 +25,6 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  rank-span-apply:
-    if: github.event_name == 'pull_request' && github.head_ref == 'agent/icloud-ux-polish'
-    name: 应用跨浏览器移动排名修复
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: 检出 UX 分支
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.head_ref }}
-          fetch-depth: 0
-          persist-credentials: true
-      - name: 配置 Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 22
-      - name: 启用并校验 pnpm
-        working-directory: tools/icloud_price_comparison
-        run: |
-          corepack enable
-          pnpm --version
-      - name: 安装项目依赖
-        working-directory: tools/icloud_price_comparison
-        run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: 应用跨浏览器移动排名修复
-        working-directory: tools/icloud_price_comparison
-        run: node scripts/fix-mobile-rank-span.mjs
-      - name: 移除临时执行机制
-        run: |
-          git fetch origin main --depth=1
-          git checkout FETCH_HEAD -- .github/workflows/validate-icloud-price-comparison.yml
-          git rm tools/icloud_price_comparison/scripts/fix-mobile-rank-span.mjs
-      - name: 运行核心与数据测试
-        working-directory: tools/icloud_price_comparison
-        run: pnpm test:core
-      - name: 安装 Chromium 与 Firefox
-        working-directory: tools/icloud_price_comparison
-        run: pnpm exec playwright install --with-deps chromium firefox
-      - name: 运行 Chromium UX 验收
-        working-directory: tools/icloud_price_comparison
-        env:
-          PLAYWRIGHT_BROWSER: chromium
-        run: node --test test/ui-smoke.test.mjs test/static-descending-url-state.test.mjs
-      - name: 运行 Firefox UX 验收
-        working-directory: tools/icloud_price_comparison
-        env:
-          PLAYWRIGHT_BROWSER: firefox
-        run: node --test test/ui-smoke.test.mjs test/static-descending-url-state.test.mjs
-      - name: 检查最终差异
-        run: git diff --check
-      - name: 提交最终跨浏览器修复
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "Fix iCloud mobile rank across browsers"
-          git push origin HEAD:${{ github.head_ref }}
-
   core:
     name: 核心、数据与依赖安全测试
     runs-on: ubuntu-latest

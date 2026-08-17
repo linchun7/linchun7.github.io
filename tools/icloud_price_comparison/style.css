@@ -373,6 +373,7 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
 .country-history-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .country-name { display: block; overflow: hidden; color: var(--ink); font-size: 15px; font-weight: 680; line-height: 1.18; text-overflow: ellipsis; }
 .country-name-en { display: block; margin-top: 3px; overflow: hidden; color: var(--muted); font-size: 12px; line-height: 1.2; text-overflow: ellipsis; }
+.mobile-rank { display: none; }
 .history-affordance { position: absolute; top: 50%; right: 2px; color: var(--muted); font-size: 20px; line-height: 1; opacity: .7; transform: translateY(-50%); transition: color 120ms ease-out, opacity 120ms ease-out; }
 .rank-top { color: var(--accent) !important; font-weight: 760; }
 
@@ -752,7 +753,7 @@ th button:active { background: rgba(17, 104, 212, .13); }
   .price-table th button { min-height: 44px; padding: 10px 12px; }
   .price-table tbody tr { height: 70px; }
   .country-history-button { min-height: 44px; padding-right: 64px; padding-block: 5px; }
-  .country-history-button[data-mobile-rank]::after {
+  .mobile-rank {
     position: absolute;
     top: 50%;
     right: 28px;
@@ -762,7 +763,6 @@ th button:active { background: rgba(17, 104, 212, .13); }
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    content: attr(data-mobile-rank);
     transform: translateY(-50%);
     color: var(--accent-dark);
     background: var(--accent-soft);

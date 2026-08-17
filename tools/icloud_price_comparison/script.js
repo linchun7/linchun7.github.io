@@ -419,8 +419,8 @@ function reconcileStaticTierState() {
     const rankCell = row.cells[0];
     rankCell.textContent = String(rank);
     rankCell.classList.toggle('rank-top', !staticSnapshotFxStale && state.sortDirection === 'asc' && rank <= 3);
-    const historyButton = row.querySelector('.country-history-button');
-    if (historyButton) historyButton.dataset.mobileRank = String(rank);
+    const mobileRank = row.querySelector('.mobile-rank');
+    if (mobileRank) mobileRank.textContent = String(rank);
   }
   const direction = state.sortDirection === 'asc' ? '从低到高' : '从高到低';
   elements.resultSummary.textContent = `${rankedRows.length} 个地区 · ${tier.label} ${direction}`;
@@ -679,7 +679,6 @@ function renderTable({ alignTierColumn = true } = {}) {
       const historyButton = document.createElement('button');
       historyButton.type = 'button';
       historyButton.className = 'country-history-button';
-      historyButton.dataset.mobileRank = String(displayedRank);
       historyButton.disabled = state.dataFreshness?.status === 'unusable';
       const displayName = country.nameZh || country.country;
       const secondaryName = country.nameZh && country.nameZh !== country.country
@@ -689,6 +688,11 @@ function renderTable({ alignTierColumn = true } = {}) {
       name.className = 'country-name';
       name.textContent = displayName;
       historyButton.append(name);
+      const mobileRank = document.createElement('span');
+      mobileRank.className = 'mobile-rank';
+      mobileRank.setAttribute('aria-hidden', 'true');
+      mobileRank.textContent = String(displayedRank);
+      historyButton.append(mobileRank);
       if (secondaryName) {
         const nameEn = document.createElement('span');
         nameEn.className = 'country-name-en';

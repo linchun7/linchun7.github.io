@@ -3191,12 +3191,12 @@ test('keeps mobile ranking visible and UX fallbacks stable', { timeout: 60_000 }
         await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
 
         const firstHistoryButton = page.locator('#priceRows tr[data-market-id] .country-history-button').first();
+        const rankBadge = firstHistoryButton.locator('.mobile-rank');
         const rankCue = await firstHistoryButton.evaluate((button) => ({
-          rank: button.dataset.mobileRank,
-          content: getComputedStyle(button, '::after').content,
           paddingRight: Number.parseFloat(getComputedStyle(button).paddingRight)
         }));
-        assert.ok(rankCue.rank && rankCue.content.includes(rankCue.rank), String(viewport.width) + 'px must expose the current rank or sequence');
+        assert.equal(await rankBadge.isVisible(), true, String(viewport.width) + 'px must expose the current rank or sequence');
+        assert.match((await rankBadge.textContent()).trim(), /^\d+|—$/, String(viewport.width) + 'px rank badge must contain the current rank or sequence');
         assert.ok(rankCue.paddingRight >= 60, String(viewport.width) + 'px rank badge must reserve non-overlapping space');
 
         const minimumColumns = await page.locator('#minimumSummary').evaluate((element) => (
