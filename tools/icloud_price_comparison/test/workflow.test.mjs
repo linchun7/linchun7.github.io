@@ -289,7 +289,7 @@ test('keeps pull-request validation read-only, complete, and SHA-pinned', async 
   assert.match(ciWorkflow, /run: pnpm validate:artifact/);
   assert.match(ciWorkflow, /schedule:[\s\S]*?cron:\s*['"]5 22 \* \* 0['"]/);
   assert.match(ciWorkflow, /run: pnpm validate:snapshots/);
-  assert.doesNotMatch(ciWorkflow, /if: github.event_name == 'schedule' \\|\\| github.event_name == 'workflow_dispatch'/);
+  assert.equal(ciWorkflow.includes("if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'"), false);
   assert.match(ciWorkflow, /group: validate-icloud-price-comparison-\$\{\{ github\.ref \}\}/);
   assert.match(ciWorkflow, /cancel-in-progress: \$\{\{ github\.event_name == 'pull_request' \}\}/);
   assert.doesNotMatch(ciWorkflow, /run: pnpm test:browsers/);
@@ -298,6 +298,8 @@ test('keeps pull-request validation read-only, complete, and SHA-pinned', async 
   assert.doesNotMatch(coreJob, /playwright install|test:browsers|ui-smoke/);
   assert.match(ciWorkflow, /run: pnpm audit --audit-level low/);
   assert.match(coreJob, /run: git diff --check/);
+  assert.match(coreJob, /name: 强制关键架构更新同步文档[\s\S]*?if: github\.event_name == 'pull_request'/);
+  assert.match(coreJob, /fetch-depth: 0/);
 });
 
 test('runs the same UI acceptance suite in Chromium, Firefox, and WebKit', async () => {

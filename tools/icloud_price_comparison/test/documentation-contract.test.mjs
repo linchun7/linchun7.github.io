@@ -4,9 +4,10 @@ import test from 'node:test';
 
 const readProjectFile = (name) => readFile(new URL(`../${name}`, import.meta.url), 'utf8');
 
-const [readme, operations] = await Promise.all([
+const [readme, operations, validationWorkflow] = await Promise.all([
   readProjectFile('README.md'),
-  readProjectFile('OPERATIONS.md')
+  readProjectFile('OPERATIONS.md'),
+  readFile(new URL('../../../.github/workflows/validate-icloud-price-comparison.yml', import.meta.url), 'utf8')
 ]);
 
 test('documents the generated SEO source rather than treating index.html as the source of truth', () => {
@@ -33,11 +34,10 @@ test('documents friendly search aliases separately from permanent market identit
   }
 });
 
-test('documents the explicit fallback market ID migration path', () => {
+test('documents published market IDs as permanent and removes the routine rekey path', () => {
   for (const document of [readme, operations]) {
-    assert.match(document, /migrate-market-id\.mjs/);
-    assert.match(document, /--from <apple-/);
-    assert.match(document, /--to <reviewed-id>/);
+    assert.match(document, /marketId[\s\S]*(?:永久冻结|永久不可变)/);
+    assert.doesNotMatch(document, /migrate-market-id\.mjs/);
   }
 });
 
@@ -46,4 +46,13 @@ test('documents current search and mobile sequence semantics', () => {
   assert.match(readme, /币种[\s\S]*完整/);
   assert.match(readme, /`序N`|`序1`/);
   assert.match(operations, /`序N`/);
+});
+
+
+test('PR validation forces critical architecture changes to update both long-lived documents', () => {
+  assert.match(validationWorkflow, /强制关键架构更新同步文档/);
+  assert.match(validationWorkflow, /tools\/icloud_price_comparison\/README\.md/);
+  assert.match(validationWorkflow, /tools\/icloud_price_comparison\/OPERATIONS\.md/);
+  assert.match(validationWorkflow, /market-registry/);
+  assert.match(validationWorkflow, /data-model/);
 });

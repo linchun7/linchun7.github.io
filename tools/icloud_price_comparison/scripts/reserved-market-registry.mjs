@@ -1,5 +1,5 @@
-// Stable reservations for plausible future Apple market identities.
-// This catalog is not a claim that Apple currently offers iCloud+ in every listed country/region.
+// Stable identity candidates for Apple market names that are not currently active.
+// This is a naming/ID dictionary, not a prediction or claim that Apple offers iCloud+ in these places.
 // IDs use ISO 3166-1 alpha-2 where available; Kosovo uses the widely used xk reservation.
 
 const RESERVED_DEFINITIONS = [

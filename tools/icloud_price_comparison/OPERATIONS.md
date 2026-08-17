@@ -33,7 +33,7 @@ Apple Support HTML ─┐
 
 维护和事故处理不得绕过以下长期约束：
 
-- schema 4 与稳定 `marketId`。
+- schema 4；一个市场只要正式发布过一次，其 `marketId` 永久冻结。普通更新、registry 调整、future candidate 或搜索优化都不得 rekey。
 - 欧元区中文名称保持“欧盟”。中文名称尚未确认时使用 Apple 英文 source name，不机器翻译。
 - 新 Apple 市场先匹配 active registry，再匹配 `reserved-market-registry.mjs` 的高置信 future reservation；二者都未命中时才生成确定性 `apple-*` ID。future reservation 不是 Apple 可用性声明，真正 unknown 完成正常语义确认且无冲突后仍允许自动发布。
 - 已发布或历史出现过的市场 ID 永久 reserved，不因市场移除而重新分配。
@@ -94,6 +94,7 @@ Apple Support HTML ─┐
 - Chromium / Firefox / WebKit UI 验收
 - `pnpm audit --audit-level low`
 - `git diff --check`
+- 对关键架构 PR 执行文档同步门禁：命中 identity、数据契约、核心搜索/生成器或关键 update/validate workflow 时，`README.md` 与 `OPERATIONS.md` 必须同时进入 diff。
 
 每日更新由内置 `GITHUB_TOKEN` 推送的数据提交不会再触发普通 push 验证，因此每日 workflow 自身的 core/data/runner Chrome/工件验证就是自动数据发布门禁。
 
@@ -131,29 +132,15 @@ Apple Support HTML ─┐
 - `scripts/reserved-market-registry.mjs` 保存高置信 future reservations，主要预留未被 active registry 使用的 ISO 3166-1 alpha-2 ID，并额外预留 `xk`。这里的条目不表示 Apple 已经支持对应市场；只有 Apple 英文页实际出现并精确命中已审核 canonical name/alias 时才采用该 ID。
 - `scripts/country-names.zh.json` 仍是 Apple 简体中文名称唯一事实源：字符串表示 approved，`null` 表示 pending。future reservation 不预造中文名；pending 继续显示 Apple 英文 `sourceName` 并记录 `CHINESE_MARKET_NAME_PENDING`。
 - active/reserved 均未命中的新市场才使用 deterministic `apple-*` fallback，并记录 `UNKNOWN_APPLE_MARKET`。完成正常 Apple 语义确认且 ID 不冲突后可以自动发布。
-- 已发布 `apple-*` fallback 默认保持 sticky。后来确认了更友好的代码时，优先在 `data-model.js` 的 `MARKET_SEARCH_ALIASES` 添加用户搜索 alias，不改变价格/历史 identity。
+- 已发布 `apple-*` fallback 永久保持原 ID。后来确认了更友好的代码时，只在 `data-model.js` 的 `MARKET_SEARCH_ALIASES` 添加用户搜索 alias，不改变价格/历史 identity。
 - 新 identity 若撞到 active registry、future reservation 或任一历史 reserved ID，以 `MARKET_IDENTITY_RESERVED_ID_COLLISION` 失败关闭，不随机换 ID。
 - 只有 removed 与 added unknown 双向唯一，并且 region、currency、canonical tier set 和完整当地价格向量完全相同，才作为高置信 rename ambiguity 停止并要求显式 alias；repricing、多候选或其他弱信号只记录 `MARKET_IDENTITY_RENAME_SUSPECTED`，不得自动绑定旧 ID。
 
-### 显式 rekey 的极少数处理流程
+### marketId 永久不可变
 
-只有业务上确实需要把一个已发布 `apple-*` fallback 改为已人工复核的 active/reserved ID，才允许运行 `scripts/migrate-market-id.mjs`。这不是普通更新步骤。
+已经发布的 `marketId` 不再提供常规迁移路径。active registry、future identity candidate 和搜索 alias 都只能影响**尚未首次发布**的身份选择或用户检索，不能覆盖 `prices.json` / `history.json` 的已发布 ledger。不得为了缩短 ID、改用 ISO 两位码或改善搜索而手工重写历史 key。
 
-1. 先把目标 source name / alias 与目标 ID 加入 active 或 future reservation 并单独审核，确认目标 ID 从未被其他 active/history identity 占用。
-2. 先 dry-run：
-
-```bash
-node scripts/migrate-market-id.mjs --from <apple-...> --to <reviewed-id>
-```
-
-3. 确认 dry-run 和身份审查无误后才写入：
-
-```bash
-node scripts/migrate-market-id.mjs --from <apple-...> --to <reviewed-id> --write
-```
-
-4. 工具会同步迁移 `prices.json` 与 `history.json`、重新生成 `index.html`；发生写入/渲染失败时恢复原文件。随后必须运行 `pnpm test:core`、`pnpm validate:artifact`、`pnpm validate:snapshots`、`pnpm test:browsers`，完整审核数据与静态页 diff 后再通过普通 PR 发布。
-5. 不允许为了“代码更好看”而迁移，也不要手工改单个 `history.json` key。普通已发布 ID 的 rekey 仍由 identity continuity 检查失败关闭。
+如果未来确认某个已发布 identity 本身就是错误绑定，应按数据事故单独设计一次性修复方案，明确影响面、回滚和全历史验证；这不属于日常运维能力，也不在仓库保留通用 rekey 工具。
 
 长期边界由 `test/market-registry.test.mjs`、`test/market-identity-reservations.test.mjs` 和 `test/documentation-contract.test.mjs` 保护。
 

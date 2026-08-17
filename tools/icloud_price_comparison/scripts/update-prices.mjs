@@ -1586,7 +1586,7 @@ export function validateAppleMarketRenameReview(previousData, confirmedCountries
   const candidates = [];
   for (const added of confirmedCountries) {
     const market = resolve(added.country);
-    if (!market.unknown || market.published) continue;
+    if (market.published || (!market.unknown && !market.reserved)) continue;
     for (const old of removed) {
       if (old.region === added.region
         && old.currency === added.currency

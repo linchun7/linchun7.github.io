@@ -37,6 +37,30 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
+      - name: 强制关键架构更新同步文档
+        if: github.event_name == 'pull_request'
+        working-directory: .
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          changed="$(git diff --name-only "$BASE_SHA" HEAD)"
+          needs_docs=false
+          while IFS= read -r file; do
+            case "$file" in
+              .github/workflows/update-icloud-prices.yml|.github/workflows/validate-icloud-price-comparison.yml|tools/icloud_price_comparison/data-contract.js|tools/icloud_price_comparison/data-model.js|tools/icloud_price_comparison/script.js|tools/icloud_price_comparison/scripts/market-registry.mjs|tools/icloud_price_comparison/scripts/reserved-market-registry.mjs|tools/icloud_price_comparison/scripts/update-prices.mjs|tools/icloud_price_comparison/scripts/parse-prices.mjs|tools/icloud_price_comparison/scripts/render-static-page.mjs|tools/icloud_price_comparison/scripts/static-page.mjs|tools/icloud_price_comparison/scripts/validate-data-artifact.mjs)
+                needs_docs=true
+                ;;
+            esac
+          done <<< "$changed"
+          if [ "$needs_docs" = true ]; then
+            for doc in tools/icloud_price_comparison/README.md tools/icloud_price_comparison/OPERATIONS.md; do
+              if ! printf '%s\n' "$changed" | grep -Fxq "$doc"; then
+                echo "Critical iCloud architecture changed without required documentation update: $doc" >&2
+                exit 1
+              fi
+            done
+          fi
       - name: 配置 Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
