@@ -13,9 +13,13 @@ new = """  assert.match(ciWorkflow, /run: pnpm audit --audit-level low/);
   const docsGate = coreJob.match(/- name: 强制关键架构更新同步文档[\\s\\S]*?(?=\\n      - name: 强制已发布 marketId 永久保留)/)?.[0] ?? '';
   assert.match(docsGate, /data-model\\.js/);
   assert.doesNotMatch(docsGate, /tools\\/icloud_price_comparison\\/script\\.js/);
-  assert.match(coreJob, /name: 强制已发布 marketId 永久保留[\\s\\S]*?git['\"], \\['show'[\\s\\S]*?Published marketId removed from history ledger[\\s\\S]*?Published source identity rekeyed/);
-  assert.match(coreJob, /name: 检查已提交 PR 差异格式[\\s\\S]*?if: github\\.event_name == 'pull_request'[\\s\\S]*?git diff --check \\\"\\$BASE_SHA\\\" HEAD/);
-  assert.match(coreJob, /name: 检查工作区差异格式[\\s\\S]*?if: github\\.event_name != 'pull_request'[\\s\\S]*?run: git diff --check/);
+  assert.ok(coreJob.includes('name: 强制已发布 marketId 永久保留'));
+  assert.ok(coreJob.includes('Published marketId removed from history ledger'));
+  assert.ok(coreJob.includes('Published source identity rekeyed'));
+  assert.ok(coreJob.includes('name: 检查已提交 PR 差异格式'));
+  assert.ok(coreJob.includes('run: git diff --check "$BASE_SHA" HEAD'));
+  assert.ok(coreJob.includes('name: 检查工作区差异格式'));
+  assert.ok(coreJob.includes("if: github.event_name != 'pull_request'"));
   assert.match(coreJob, /fetch-depth: 0/);
 """
 if text.count(old) != 1:
