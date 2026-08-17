@@ -97,10 +97,10 @@ ExchangeRate-API ───┘        │
 ### Dependabot 与依赖自动合并
 
 - npm：每周一北京时间 10:20 检查；GitHub Actions：每周一 12:20 检查。两个窗口都放在每日价格更新之后，并彼此错开，尽量避免多个自动任务同时推进 `main`。
-- npm 的 patch/minor 更新按 `icloud-price-dependencies` 分组。PR 必须先完整通过 core、artifact、全部 snapshots、`pnpm audit` 和 Chromium / Firefox / WebKit 验收。
+- npm 依赖保持独立 PR，避免一个包的兼容性问题阻塞其他无关升级。每个 patch/minor PR 都必须先完整通过 core、artifact、全部 snapshots、`pnpm audit` 和 Chromium / Firefox / WebKit 验收。
 - 完整验证成功后，可信默认分支上的自动合并器再次确认：作者必须是 `dependabot[bot]`、分支属于本仓库、base/head SHA 与刚通过测试的精确提交一致、改动只包含项目 `package.json` 与 `pnpm-lock.yaml`、依赖名称没有新增或删除、除现有依赖精确版本 pin 外 `package.json` 其他字段完全不变，并且所有版本只做向前的 patch/minor 更新。全部满足才 squash merge 精确 head SHA。
 - npm major 更新、依赖新增/删除、版本范围、`packageManager` / scripts / 业务文件变化，或任意额外文件改动都不会自动合并，必须人工审核。
-- Lucide 的实际版本只在 `package.json` / `pnpm-lock.yaml` 固定，不再在 vendor manifest 和 notice 重复维护版本字符串。vendor manifest 仍固定本地 subset 的文件名、包名、许可证和 SHA-256；CI 会把页面实际使用的每个 Lucide icon node 与当前 package pin 逐个深度比较。若上游修改了任一已使用图标，自动升级会自然失败关闭，直到人工更新并复核 subset/hash。
+- Lucide 的实际版本只在 `package.json` / `pnpm-lock.yaml` 固定，不再在 vendor manifest 和 notice 重复维护版本字符串。vendor manifest 仍固定本地 subset 的文件名、包名、许可证和 SHA-256；CI 会验证实际安装包的 version/license，并把页面实际使用的每个 Lucide icon node 与当前 package pin 逐个深度比较。若上游修改许可证元数据或任一已使用图标，自动升级会自然失败关闭，直到人工复核并在需要时更新 subset/hash/notice。
 - 官方 `actions/*` 仍走更严格的供应链路径：只允许 workflow 中完整 SHA 一对一替换，自动合并器还会解析对应 release tag 并确认 tag 最终指向被 pin 的精确 commit。第三方 Action、可变 tag 或附带业务改动不会自动合并。
 - 自动合并 workflow 使用 `workflow_run`，有写权限的 job 只执行默认分支中的可信校验器，不执行 Dependabot PR 自带脚本，也不使用 `pull_request_target`。
 
