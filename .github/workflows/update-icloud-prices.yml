@@ -148,7 +148,7 @@ jobs:
 
       - name: 验证更新后的页面
         id: ui_tests
-        # 每日更新使用 runner 预装的 Chrome；完整 Chromium + Firefox + WebKit 验证由独立验证工作流负责。
+        # GITHUB_TOKEN 发布提交不会再次触发 push workflow；每日门禁在本 workflow 内完成 core/data + runner Chrome，Chromium + Firefox + WebKit 由代码变更/每周独立验证补充。
         run: pnpm test:ui
 
       - name: 上传诊断信息和 Apple 规范化快照

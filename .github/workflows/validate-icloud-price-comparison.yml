@@ -48,7 +48,7 @@ jobs:
           needs_docs=false
           while IFS= read -r file; do
             case "$file" in
-              .github/workflows/update-icloud-prices.yml|.github/workflows/validate-icloud-price-comparison.yml|tools/icloud_price_comparison/data-contract.js|tools/icloud_price_comparison/data-model.js|tools/icloud_price_comparison/scripts/market-registry.mjs|tools/icloud_price_comparison/scripts/reserved-market-registry.mjs|tools/icloud_price_comparison/scripts/update-prices.mjs|tools/icloud_price_comparison/scripts/parse-prices.mjs|tools/icloud_price_comparison/scripts/render-static-page.mjs|tools/icloud_price_comparison/scripts/static-page.mjs|tools/icloud_price_comparison/scripts/validate-data-artifact.mjs)
+              .github/workflows/update-icloud-prices.yml|.github/workflows/validate-icloud-price-comparison.yml|tools/icloud_price_comparison/data-contract.js|tools/icloud_price_comparison/data-model.js|tools/icloud_price_comparison/scripts/market-registry.mjs|tools/icloud_price_comparison/scripts/update-prices.mjs|tools/icloud_price_comparison/scripts/parse-prices.mjs|tools/icloud_price_comparison/scripts/render-static-page.mjs|tools/icloud_price_comparison/scripts/static-page.mjs|tools/icloud_price_comparison/scripts/validate-data-artifact.mjs)
                 needs_docs=true
                 ;;
             esac
@@ -62,10 +62,10 @@ jobs:
             done
           fi
       - name: 强制已发布 marketId 永久保留
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
         working-directory: .
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
         run: |
           node --input-type=module <<'NODE'
           import { execFileSync } from 'node:child_process';

@@ -33,14 +33,14 @@ Apple Support HTML ─┐
 
 维护和事故处理不得绕过以下长期约束：
 
-- schema 4；一个市场只要正式发布过一次，其 `marketId` 永久冻结。普通更新、registry 调整、future candidate 或搜索优化都不得 rekey。
+- schema 4；一个市场只要正式发布过一次，其 `marketId` 永久冻结。普通更新、registry 调整或搜索优化都不得 rekey。
 - 欧元区中文名称保持“欧盟”。中文名称尚未确认时使用 Apple 英文 source name，不机器翻译。
-- 新 Apple 市场先匹配 active registry，再匹配 `reserved-market-registry.mjs` 的高置信 future reservation；二者都未命中时才生成确定性 `apple-*` ID。future reservation 不是 Apple 可用性声明，真正 unknown 完成正常语义确认且无冲突后仍允许自动发布。
+- 新 Apple 市场先匹配 active registry；未命中时直接生成确定性 `apple-*` ID。真正 unknown 完成正常语义确认且无冲突后允许自动发布，一旦发布该 ID 永久不 rekey。
 - 已发布或历史出现过的市场 ID 永久 reserved，不因市场移除而重新分配。
 - 不做模糊 market rename 自动绑定；只有严格高置信 identity ambiguity 才要求维护者显式增加 alias。
 - 默认 200GB 人民币参考价升序；200GB 不存在时使用当前 tier 列表首项作为默认容量。
 - 容量价格排序显示生成器提供的全球 `cnyRank`；搜索和地区筛选不重算局部排名。国家/地区排序改用当前列表序号，移动端显示为 `序N`，并提供独立读屏文本“全球价格排名第 N / 当前列表序号第 N”；视觉徽标本身不重复进入无障碍名称。
-- 搜索输入先做 Unicode NFKC 规范化；`marketId`、`MARKET_SEARCH_ALIASES`、中英文国家/地区名做部分匹配。地区搜索同时覆盖 Apple 原始英文 region 与中文显示标签，但仅在查询至少 2 个 Unicode 字符时参与；完整 `marketId` 优先级最高，完整 search alias 次之，币种只按完整代码匹配。
+- 搜索输入先做 Unicode NFKC 规范化；`marketId`、中英文国家/地区名做部分匹配。地区搜索同时覆盖 Apple 原始英文 region 与中文显示标签，但仅在查询至少 2 个 Unicode 字符时参与；完整 `marketId` 优先级最高，币种只按完整代码匹配。
 - 最低价提示由生成器 `cnyRank === 1` 决定，不以显示后的两位小数重新排名。
 - 当前价格不写入浏览器持久存储；静态 HTML 是无 JavaScript/网络失败时的正式 fallback。
 - URL query 只保留规范的 `tier`、`sort`、`dir`、`region`；搜索词与未知状态不持久化。唯一允许保留的页面内 fragment 是 `#priceWorkspace`，其他未知 fragment 会被清理。
@@ -125,24 +125,19 @@ Apple Support HTML ─┐
 
 远端基线变化时必须重新生成，不 rebase 已生成工件，不 force push。
 
-## 6. Market identity、预留 ID 与中文名称
+## 6. Market identity 与中文名称
 
-- `marketId` 是永久数据身份。已经写入 `prices.json` / `history.json` 的 source-name identity ledger 优先于后来新增的漂亮代码；普通更新不得静默 rekey。
-- `scripts/market-registry.mjs` 保存当前已知 Apple 市场的稳定 ID、Apple 英文 canonical name 和 aliases。
-- `scripts/reserved-market-registry.mjs` 保存高置信 future reservations，主要预留未被 active registry 使用的 ISO 3166-1 alpha-2 ID，并额外预留 `xk`。这里的条目不表示 Apple 已经支持对应市场；只有 Apple 英文页实际出现并精确命中已审核 canonical name/alias 时才采用该 ID。
-- `scripts/country-names.zh.json` 仍是 Apple 简体中文名称唯一事实源：字符串表示 approved，`null` 表示 pending。future reservation 不预造中文名；pending 继续显示 Apple 英文 `sourceName` 并记录 `CHINESE_MARKET_NAME_PENDING`。
-- active/reserved 均未命中的新市场才使用 deterministic `apple-*` fallback，并记录 `UNKNOWN_APPLE_MARKET`。完成正常 Apple 语义确认且 ID 不冲突后可以自动发布。
-- 已发布 `apple-*` fallback 永久保持原 ID。正式收编时 active registry 继续使用该 `apple-*`，source aliases 同时覆盖历史/当前 Apple 英文名称；移除与其名称或友好代码冲突的 future reservation，并给该永久 ID 增加中文名称 authority。只有冲突 reservation 已移除后才可按需增加浏览器 search alias；任何步骤都不得改变 prices/history identity。
-- 新 identity 若撞到 active registry、future reservation 或任一历史 reserved ID，以 `MARKET_IDENTITY_RESERVED_ID_COLLISION` 失败关闭，不随机换 ID。
-- removed/added 在 region、currency、canonical tier set 上形成一对一唯一结构候选时，即使 Apple 同批 repricing 也以 `MARKET_IDENTITY_RENAME_REVIEW_REQUIRED` 停止并要求显式 source alias；完整当地价格向量相同仍用于多候选 disambiguation。只有结构上仍多义的候选才记录 `MARKET_IDENTITY_RENAME_SUSPECTED`，不得自动绑定旧 ID。
+- 已发布 `prices.json` / `history.json` source-name identity ledger 永远优先，普通更新不得 rekey。
+- `scripts/market-registry.mjs` 只保存 active Apple 市场的稳定 ID、canonical name 和 reviewed source aliases；source alias 必须保持同一永久 ID。
+- active registry 未命中的新市场直接使用 deterministic `apple-*` fallback，记录 `UNKNOWN_APPLE_MARKET`，经正常语义确认且无冲突后可自动发布。
+- 已发布 `apple-*` 永久保持原 ID。后续正式识别或 Apple 英文 wording 改变时，只能在 active registry 中沿用该 ID并补 source alias；不得改成友好两位码。
+- `scripts/country-names.zh.json` 仍是 Apple 简体中文名称唯一事实源；pending 继续显示 Apple 英文 `sourceName`。
+- 新 identity 撞到 active registry 或任一历史 ID 时，以 `MARKET_IDENTITY_RESERVED_ID_COLLISION` 失败关闭；该错误码是兼容名称，不表示存在单独的预留表。
+- removed/added 若形成一对一结构改名候选，以 `MARKET_IDENTITY_RENAME_REVIEW_REQUIRED` 停止并要求显式 source alias，不做模糊自动绑定。
 
 ### marketId 永久不可变
 
-已经发布的 `marketId` 不再提供常规迁移路径。active registry、future identity candidate 和搜索 alias 都只能影响**尚未首次发布**的身份选择或用户检索，不能覆盖 `prices.json` / `history.json` 的已发布 ledger。不得为了缩短 ID、改用 ISO 两位码或改善搜索而手工重写历史 key。
-
-如果未来确认某个已发布 identity 本身就是错误绑定，应按数据事故单独设计一次性修复方案，明确影响面、回滚和全历史验证；这不属于日常运维能力，也不在仓库保留通用 rekey 工具。
-
-长期边界由 `test/market-registry.test.mjs`、`test/market-identity-reservations.test.mjs` 和 `test/documentation-contract.test.mjs` 保护。
+已发布 `marketId` 不提供常规迁移路径。active registry 只能识别尚未首次发布的身份，或用同一 ID 维护既有 source alias；不能覆盖已发布 ledger。真正的历史身份错误按数据事故单独设计一次性修复。长期边界由 `test/market-registry.test.mjs`、`test/market-identity-stability.test.mjs` 和 `test/documentation-contract.test.mjs` 保护。
 
 ## 7. Freshness、异常和 fallback
 
@@ -272,7 +267,7 @@ curl -fsSIL https://www.linchun.com.cn/tools/icloud_price_comparison/not-a-real-
 - GA4 / Cloudflare Analytics 域名和次数符合预期。
 - 应用自身不写 Cookie、localStorage、sessionStorage、IndexedDB 或 Service Worker。
 - 控制台无应用 error/CSP violation。
-- schema 4 数据、静态 fallback、历史、排序、筛选、`marketId`/search alias 搜索、`序N` 移动端语义、键盘和窄屏正常。
+- schema 4 数据、静态 fallback、历史、排序、筛选、`marketId`/中英文名称/地区/完整币种搜索、`序N` 移动端语义、键盘和窄屏正常。
 - `meta description`、OG/Twitter description 与当前 `seoProjection()` 一致，且容量列表与 `prices.json.tiers` 一致；不要只肉眼看 `index.html` 后认定 SEO 已修改成功。
 
 最初 document URL 在脚本执行前仍可能进入浏览器历史、代理、Cloudflare/GitHub Pages 和访问日志，因此任何 Secret、Token 或个人信息都不得放入 URL。
