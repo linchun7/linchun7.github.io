@@ -9,6 +9,7 @@ updates:
       timezone: Asia/Shanghai
     open-pull-requests-limit: 5
     groups:
+      # Batch low-risk version maintenance; major updates remain separate for manual review.
       routine-icloud-dependencies:
         applies-to: version-updates
         patterns:
