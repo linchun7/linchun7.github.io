@@ -27,11 +27,13 @@ jobs:
         run: |
           python tools/icloud_price_comparison/scripts/.temporary-followup-patch.py
           python tools/icloud_price_comparison/scripts/.temporary-followup-test-repair.py
+          python tools/icloud_price_comparison/scripts/.temporary-followup-a11y-repair.py
       - name: Hide temporary workflow and patchers from final-tree tests
         run: |
           rm .github/workflows/temporary-icloud-followup-hardening.yml
           rm tools/icloud_price_comparison/scripts/.temporary-followup-patch.py
           rm tools/icloud_price_comparison/scripts/.temporary-followup-test-repair.py
+          rm tools/icloud_price_comparison/scripts/.temporary-followup-a11y-repair.py
       - name: Install dependencies
         working-directory: tools/icloud_price_comparison
         run: |
