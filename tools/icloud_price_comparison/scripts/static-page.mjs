@@ -113,6 +113,7 @@ function renderCountryRow(country, tiers, options) {
     '              <button class="country-history-button" type="button" disabled>',
     `              <span class="country-name">${escapeHtml(displayName(country))}</span>`,
     `              <span class="mobile-rank" aria-hidden="true">${escapeHtml(rank)}</span>`,
+    `              <span class="mobile-rank-sr visually-hidden">全球价格排名第 ${escapeHtml(rank)}</span>`,
     secondary.trimEnd(),
     '              <span class="history-affordance" aria-hidden="true">›</span>',
     '              <span class="visually-hidden">，查看价格历史</span>',

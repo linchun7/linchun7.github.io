@@ -3,9 +3,9 @@ import {
   publicationDateKey,
   validatePayload,
   validatePriceHistoryConsistency
-} from './data-contract.js?v=5ad385ff';
+} from './data-contract.js?v=ad96cb53';
 import { createIcons } from './vendor/lucide-subset.js?v=1afb95ee';
-import { marketSearchAliases, VALID_REGIONS } from './data-model.js?v=d365ae66';
+import { marketSearchPriority, matchesMarketSearch, normalizeMarketSearchText, REGION_LABELS, VALID_REGIONS } from './data-model.js?v=2287dd22';
 
 const REQUEST_TIMEOUT_MS = 8_000;
 const ANALYTICS_ID = 'G-K2S9L4CHNP';
@@ -21,11 +21,6 @@ const MAX_RESPONSE_BYTES = Object.freeze({
   'history.json': 8 * 1024 * 1024
 });
 const MAX_SEARCH_QUERY_CODE_POINTS = 160;
-const REGION_LABELS = {
-  Americas: '美洲',
-  'Europe, Middle East & Africa': '欧洲、中东和非洲',
-  'Asia Pacific': '亚太'
-};
 const URL_STATE_REGIONS = new Set(VALID_REGIONS);
 const initialUrlState = new URLSearchParams(location.search);
 const initialQuery = boundedSearchQuery(initialUrlState.get('q') ?? '');
@@ -421,6 +416,8 @@ function reconcileStaticTierState() {
     rankCell.classList.toggle('rank-top', !staticSnapshotFxStale && state.sortDirection === 'asc' && rank <= 3);
     const mobileRank = row.querySelector('.mobile-rank');
     if (mobileRank) mobileRank.textContent = String(rank);
+    const mobileRankSr = row.querySelector('.mobile-rank-sr');
+    if (mobileRankSr) mobileRankSr.textContent = `全球价格排名第 ${rank}`;
   }
   const direction = state.sortDirection === 'asc' ? '从低到高' : '从高到低';
   elements.resultSummary.textContent = `${rankedRows.length} 个地区 · ${tier.label} ${direction}`;
@@ -562,38 +559,13 @@ function renderHistoryHeaders() {
 }
 
 function normalizedSearchQuery() {
-  return state.query.trim().toLocaleLowerCase('zh-CN');
-}
-
-function normalizedMarketSearchAliases(country) {
-  return marketSearchAliases(country.marketId)
-    .map((alias) => alias.toLocaleLowerCase('en-US'));
-}
-
-function matchesCountrySearch(country, query) {
-  if (!query) return true;
-  const marketId = country.marketId.toLocaleLowerCase('en-US');
-  const names = `${country.country} ${country.nameZh ?? ''}`.toLocaleLowerCase('zh-CN');
-  const region = (REGION_LABELS[country.region] || country.region).toLocaleLowerCase('zh-CN');
-  const currency = country.currency.toLocaleLowerCase('en-US');
-  const aliases = normalizedMarketSearchAliases(country);
-  return marketId.includes(query)
-    || names.includes(query)
-    || (query.length >= 2 && region.includes(query))
-    || aliases.some((alias) => alias.includes(query))
-    || currency === query;
-}
-
-function exactSearchIdentityPriority(country, query) {
-  if (!query) return 0;
-  if (country.marketId.toLocaleLowerCase('en-US') === query) return 2;
-  return normalizedMarketSearchAliases(country).some((alias) => alias === query) ? 1 : 0;
+  return normalizeMarketSearchText(state.query);
 }
 
 function filteredCountries() {
   const query = normalizedSearchQuery();
   return state.data.countries.filter((country) => (
-    matchesCountrySearch(country, query)
+    matchesMarketSearch(country, query)
     && (state.region === 'all' || country.region === state.region)
   ));
 }
@@ -606,8 +578,8 @@ function sortValue(country) {
 function sortedCountries() {
   const query = normalizedSearchQuery();
   return filteredCountries().sort((a, b) => {
-    const aIdentityPriority = exactSearchIdentityPriority(a, query);
-    const bIdentityPriority = exactSearchIdentityPriority(b, query);
+    const aIdentityPriority = marketSearchPriority(a, query);
+    const bIdentityPriority = marketSearchPriority(b, query);
     if (aIdentityPriority !== bIdentityPriority) return bIdentityPriority - aIdentityPriority;
 
     const first = sortValue(a);
@@ -623,6 +595,13 @@ function createCell(text, className) {
   cell.textContent = text;
   if (className) cell.className = className;
   return cell;
+}
+
+function mobileRankAccessibilityText(displayedRank) {
+  if (displayedRank === '—') return '排名暂不可用';
+  return state.sortKey === 'country'
+    ? `当前列表序号第 ${displayedRank}`
+    : `全球价格排名第 ${displayedRank}`;
 }
 
 function createPriceCell(country, tierId) {
@@ -723,6 +702,10 @@ function renderTable({ alignTierColumn = true } = {}) {
         ? `序${displayedRank}`
         : String(displayedRank);
       historyButton.append(mobileRank);
+      const mobileRankSr = document.createElement('span');
+      mobileRankSr.className = 'mobile-rank-sr visually-hidden';
+      mobileRankSr.textContent = mobileRankAccessibilityText(displayedRank);
+      historyButton.append(mobileRankSr);
       if (secondaryName) {
         const nameEn = document.createElement('span');
         nameEn.className = 'country-name-en';

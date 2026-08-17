@@ -18,7 +18,7 @@
 - 市场身份按“已发布 identity ledger → active registry → future reservation → deterministic `apple-*` fallback”的安全顺序处理。`scripts/reserved-market-registry.mjs` 只提前预留高置信国家/地区 ID，不代表 Apple 当前提供这些市场；真正未识别的 Apple 市场才生成可复现的 `apple-*` ID，确认无冲突后可自动发布。
 - 页面默认按 200GB 人民币参考价从低到高排序；若未来 Apple 不再提供 200GB，则使用当前 `tiers` 中的首个容量作为默认容量。
 - 容量排序时显示生成器提供的全球 `cnyRank`，搜索或地区筛选不会把排名重算成局部排名；切换为国家/地区排序时数字改为当前列表序号，移动端明确显示为 `序1`、`序2`、`序3`……，不引入第二套价格排名。
-- 搜索对 `marketId`、人工维护的 search alias、中英文国家/地区名称使用部分字符串匹配；地区名称仅在搜索词至少 2 个字符时参与部分匹配，避免单字（例如“中”）误命中“欧洲、中东和非洲”等地区标签；完整 `marketId` 命中优先级最高，完整 search alias 次之，但都不排除其他合法部分匹配；币种仅按完整代码匹配，避免短字母把同币种市场全部带出。
+- 搜索输入先做 Unicode NFKC 规范化，再对 `marketId`、人工维护的 search alias、中英文国家/地区名称做部分字符串匹配；地区搜索同时覆盖 Apple 原始英文 region 与中文显示标签，但只有搜索词至少 2 个 Unicode 字符时才参与，避免单字（例如“中”）误命中“欧洲、中东和非洲”；完整 `marketId` 命中优先级最高，完整 search alias 次之；币种仅按完整代码匹配。
 - 容量、排序方向、地区筛选等可分享状态写入规范 URL；站内搜索词不保留在 URL。允许的页面内跳转 fragment 仅有 `#priceWorkspace`，其他未知 fragment 会被清理。
 - 最低价卡片是导航操作：切换对应容量、从低到高排序并定位目标地区。
 - 当前价格不写入 `localStorage`、`sessionStorage`、IndexedDB 或 Service Worker；没有浏览器持久价格缓存。
@@ -29,7 +29,7 @@
 - 展示 Apple 页面解析出的地区、分区、币种、容量和当地月费，以及人民币参考价。
 - 按容量汇总参考最低价和所有并列地区。
 - 支持中英文国家/地区、`marketId`、友好 search alias、地区名称和完整币种代码搜索，以及分区筛选、容量排序、地区排序和 URL 状态恢复；精确 `marketId` 命中优先级最高，精确 alias 次之，但部分匹配仍保留。
-- 容量价格排序使用全球参考排名；国家/地区排序使用列表序号，移动端用 `序N` 区分序号与排名。
+- 容量价格排序使用全球参考排名；国家/地区排序使用列表序号，移动端用 `序N` 区分序号与排名，并提供独立的读屏文本“全球价格排名第 N / 当前列表序号第 N”，视觉徽标本身不重复进入无障碍名称。
 - 点击地区可查看当地月费、人民币换算价、价格变更次数和完整的 Apple 当地标价历史。
 - 展示 Apple `Published Date`，并记录发布日期变化时对应的容量、地区、分区、币种和价格差异。
 - 记录地区、容量的新增和移除；已存在的市场身份和历史不会因为暂时下线而重新分配。
@@ -102,11 +102,11 @@ Apple Support HTML ─┐
 
 浏览器端友好搜索别名维护在 `data-model.js` 的 `MARKET_SEARCH_ALIASES`。例如 `uk → gb`、`usa → us`、`turkey → tr`。search alias 只改善用户搜索，不改变永久 `marketId`，也不写入公共价格 schema。
 
-如果一个真正未知市场已经以 `apple-*` fallback 发布，后来才确认它对应某个友好代码，**仍然不 rekey**：这个 `apple-*` 就是该市场的永久 identity。只给原 `marketId` 增加合适的 `MARKET_SEARCH_ALIASES`，让用户用友好代码找到它而不破坏历史。
+如果一个真正未知市场已经以 `apple-*` fallback 发布，后来才完成正式识别，**仍然不 rekey**：这个 `apple-*` 就是该市场的永久 identity。收编时把同一个 `apple-*` 加入 active registry，canonical name / source aliases 必须同时覆盖历史 Apple 名称与当前 Apple 名称；删除与该身份名称或友好代码冲突的 future reservation，并为这个永久 ID 增加 Apple 中文名称 authority（可先为 `null`）。只有冲突的 future reservation 已移除后，才可按需给这个永久 ID 增加 `MARKET_SEARCH_ALIASES`（例如友好两位码）；search alias 仍不参与 identity 决策。
 
 - 已从 Apple 页面移除的历史市场 ID 仍永久 reserved，不得分配给其他市场。
 - 新生成或预留的 ID 如果与 active registry 或历史 ledger 冲突，以 `MARKET_IDENTITY_RESERVED_ID_COLLISION` 失败关闭，不随机换 ID。
-- 不做模糊名称匹配，不自动把“疑似改名”绑定到旧市场。只有满足严格双向唯一和完整结构一致的高置信 ambiguity 才停止并要求显式 alias；弱信号只记录 review warning。
+- 不做模糊名称匹配，不自动把“疑似改名”绑定到旧市场。removed/added 若在 region、currency、canonical tier set 上形成一对一唯一结构候选，即使同一批次同时 repricing 也停止并要求显式 source alias；价格向量完全相同仍可作为多候选中的强 disambiguation。只有结构上仍存在多义性的弱信号才记录 review warning。
 
 ### marketId 永久不可变
 
@@ -165,7 +165,7 @@ pnpm audit --audit-level low
 
 完整 `pnpm test` 等价于 core 后执行三浏览器验收。
 
-关键架构文件发生变化时，PR CI 会强制要求 `README.md` 与 `OPERATIONS.md` 同步修改；只改代码不更新这两份长期文档会直接失败。文档契约测试随后继续校验关键规则内容，避免只做空白式文档改动。
+关键架构事实源发生变化时，PR CI 会强制要求 `README.md` 与 `OPERATIONS.md` 同步修改；identity/data contract、`data-model.js` 中的搜索契约、生成器和关键 update/validate workflow 属于强制范围。`script.js` 作为宽泛 UI/render glue 不再因任意小改动触发两份长文档，但搜索核心语义已集中到受门禁保护的 `data-model.js`。文档契约测试继续校验关键规则内容。PR 还会直接检查 base→head 已发布 marketId 不被删除或原名 rekey，并对已提交差异执行 `git diff --check`。
 
 本地预览从仓库根目录启动：
 

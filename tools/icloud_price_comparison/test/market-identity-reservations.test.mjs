@@ -54,8 +54,10 @@ test('future reservations fail in CI when a friendly ID is already owned by diff
   };
   assert.throws(
     () => validateMarketIdentityContinuity(null, previousHistory),
-    (error) => error.code === 'MARKET_IDENTITY_REKEY'
-      && /future market Germany cannot reserve historical marketId de/.test(error.message)
+    (error) => error.code === 'MARKET_IDENTITY_RESERVED_ID_COLLISION'
+      && error.generatedMarketId === 'de'
+      && error.newSourceName === 'Germany'
+      && error.reservedOwners.some(({ sourceName }) => sourceName === 'Legacy German Code Owner')
   );
 });
 

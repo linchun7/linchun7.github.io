@@ -721,6 +721,7 @@ th button:active { background: rgba(17, 104, 212, .13); }
 .back-to-table-button svg { width: 19px; height: 19px; }
 
 @media (min-width: 1101px) {
+  .mobile-rank-sr { display: none; }
   .workspace-toolbar { min-height: 101px; }
   .loading-cell { height: max(400px, calc(100dvh - 500px)); }
 }

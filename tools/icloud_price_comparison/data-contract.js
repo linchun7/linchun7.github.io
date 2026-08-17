@@ -1,4 +1,4 @@
-import { isValidRegion } from './data-model.js?v=d365ae66';
+import { isValidRegion } from './data-model.js?v=2287dd22';
 
 export const APPLE_SUPPORT_URL = 'https://support.apple.com/en-us/108047';
 

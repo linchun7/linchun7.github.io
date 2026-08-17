@@ -1608,24 +1608,33 @@ export function validateAppleMarketRenameReview(previousData, confirmedCountries
     currency: added.currency,
     pricesMatch
   }));
-  const exactCandidates = diagnostics.filter(({ pricesMatch }) => pricesMatch);
-  const exactCountByOld = new Map();
-  const exactCountByNew = new Map();
-  for (const candidate of exactCandidates) {
-    exactCountByOld.set(candidate.oldMarketId, (exactCountByOld.get(candidate.oldMarketId) ?? 0) + 1);
-    exactCountByNew.set(candidate.newSourceName, (exactCountByNew.get(candidate.newSourceName) ?? 0) + 1);
+  const uniqueOneToOneCandidates = (items) => {
+    const countByOld = new Map();
+    const countByNew = new Map();
+    for (const candidate of items) {
+      countByOld.set(candidate.oldMarketId, (countByOld.get(candidate.oldMarketId) ?? 0) + 1);
+      countByNew.set(candidate.newSourceName, (countByNew.get(candidate.newSourceName) ?? 0) + 1);
+    }
+    return items.filter((candidate) => (
+      countByOld.get(candidate.oldMarketId) === 1
+      && countByNew.get(candidate.newSourceName) === 1
+    ));
+  };
+  const reviewCandidates = new Map();
+  for (const candidate of [
+    ...uniqueOneToOneCandidates(diagnostics.filter(({ pricesMatch }) => pricesMatch)),
+    ...uniqueOneToOneCandidates(diagnostics)
+  ]) {
+    reviewCandidates.set(`${candidate.oldMarketId}\u0000${candidate.newSourceName}`, candidate);
   }
-  const uniqueExactCandidates = exactCandidates.filter((candidate) => (
-    exactCountByOld.get(candidate.oldMarketId) === 1
-    && exactCountByNew.get(candidate.newSourceName) === 1
-  ));
-  if (!uniqueExactCandidates.length) return { status: 'suspected', warnings: diagnostics };
-  const details = uniqueExactCandidates
-    .map(({ oldSourceName, oldMarketId, newSourceName }) => `${oldSourceName} (${oldMarketId}) -> ${newSourceName}`)
+  const requiredReview = [...reviewCandidates.values()];
+  if (!requiredReview.length) return { status: 'suspected', warnings: diagnostics };
+  const details = requiredReview
+    .map(({ oldSourceName, oldMarketId, newSourceName, pricesMatch }) => `${oldSourceName} (${oldMarketId}) -> ${newSourceName}${pricesMatch ? '' : ' [repriced]'}`)
     .join('; ');
-  const error = new Error(`MARKET_IDENTITY_RENAME_REVIEW_REQUIRED: ${details}. Add the new Apple source name as an alias for the published marketId, then rerun.`);
+  const error = new Error(`MARKET_IDENTITY_RENAME_REVIEW_REQUIRED: ${details}. Add the new Apple source name as a reviewed source alias for the published marketId, then rerun.`);
   error.code = 'MARKET_IDENTITY_RENAME_REVIEW_REQUIRED';
-  error.candidates = uniqueExactCandidates;
+  error.candidates = requiredReview;
   throw error;
 }
 

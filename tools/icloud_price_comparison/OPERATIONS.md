@@ -40,7 +40,7 @@ Apple Support HTML ─┐
 - 不做模糊 market rename 自动绑定；只有严格高置信 identity ambiguity 才要求维护者显式增加 alias。
 - 默认 200GB 人民币参考价升序；200GB 不存在时使用当前 tier 列表首项作为默认容量。
 - 容量价格排序显示生成器提供的全球 `cnyRank`；搜索和地区筛选不重算局部排名。国家/地区排序改用当前列表序号，移动端显示为 `序N`，与价格排名语义明确分离但共用同一列表顺序数据。
-- 搜索对 `marketId`、`MARKET_SEARCH_ALIASES`、中英文国家/地区名做部分匹配；地区名仅在搜索词至少 2 个字符时参与部分匹配，防止单字误命中整片分区；完整 `marketId` 优先级最高，完整 search alias 次之，均不排除其他部分匹配；币种只按完整代码匹配。
+- 搜索输入先做 Unicode NFKC 规范化；`marketId`、`MARKET_SEARCH_ALIASES`、中英文国家/地区名做部分匹配。地区搜索同时覆盖 Apple 原始英文 region 与中文显示标签，但仅在查询至少 2 个 Unicode 字符时参与；完整 `marketId` 优先级最高，完整 search alias 次之，币种只按完整代码匹配。
 - 最低价提示由生成器 `cnyRank === 1` 决定，不以显示后的两位小数重新排名。
 - 当前价格不写入浏览器持久存储；静态 HTML 是无 JavaScript/网络失败时的正式 fallback。
 - URL query 只保留规范的 `tier`、`sort`、`dir`、`region`；搜索词与未知状态不持久化。唯一允许保留的页面内 fragment 是 `#priceWorkspace`，其他未知 fragment 会被清理。
@@ -94,7 +94,7 @@ Apple Support HTML ─┐
 - Chromium / Firefox / WebKit UI 验收
 - `pnpm audit --audit-level low`
 - `git diff --check`
-- 对关键架构 PR 执行文档同步门禁：命中 identity、数据契约、核心搜索/生成器或关键 update/validate workflow 时，`README.md` 与 `OPERATIONS.md` 必须同时进入 diff。
+- 对关键架构 PR 执行文档同步门禁：identity、数据契约、`data-model.js` 搜索事实源、生成器或关键 update/validate workflow 变化时，`README.md` 与 `OPERATIONS.md` 必须同时进入 diff；宽泛 `script.js` 的普通 UI/render 小改动不再单独触发该门禁。PR 同时比较 base→head 的已发布 marketId ledger，并检查已提交 diff 格式。
 
 每日更新由内置 `GITHUB_TOKEN` 推送的数据提交不会再触发普通 push 验证，因此每日 workflow 自身的 core/data/runner Chrome/工件验证就是自动数据发布门禁。
 
@@ -132,9 +132,9 @@ Apple Support HTML ─┐
 - `scripts/reserved-market-registry.mjs` 保存高置信 future reservations，主要预留未被 active registry 使用的 ISO 3166-1 alpha-2 ID，并额外预留 `xk`。这里的条目不表示 Apple 已经支持对应市场；只有 Apple 英文页实际出现并精确命中已审核 canonical name/alias 时才采用该 ID。
 - `scripts/country-names.zh.json` 仍是 Apple 简体中文名称唯一事实源：字符串表示 approved，`null` 表示 pending。future reservation 不预造中文名；pending 继续显示 Apple 英文 `sourceName` 并记录 `CHINESE_MARKET_NAME_PENDING`。
 - active/reserved 均未命中的新市场才使用 deterministic `apple-*` fallback，并记录 `UNKNOWN_APPLE_MARKET`。完成正常 Apple 语义确认且 ID 不冲突后可以自动发布。
-- 已发布 `apple-*` fallback 永久保持原 ID。后来确认了更友好的代码时，只在 `data-model.js` 的 `MARKET_SEARCH_ALIASES` 添加用户搜索 alias，不改变价格/历史 identity。
+- 已发布 `apple-*` fallback 永久保持原 ID。正式收编时 active registry 继续使用该 `apple-*`，source aliases 同时覆盖历史/当前 Apple 英文名称；移除与其名称或友好代码冲突的 future reservation，并给该永久 ID 增加中文名称 authority。只有冲突 reservation 已移除后才可按需增加浏览器 search alias；任何步骤都不得改变 prices/history identity。
 - 新 identity 若撞到 active registry、future reservation 或任一历史 reserved ID，以 `MARKET_IDENTITY_RESERVED_ID_COLLISION` 失败关闭，不随机换 ID。
-- 只有 removed 与 added unknown 双向唯一，并且 region、currency、canonical tier set 和完整当地价格向量完全相同，才作为高置信 rename ambiguity 停止并要求显式 alias；repricing、多候选或其他弱信号只记录 `MARKET_IDENTITY_RENAME_SUSPECTED`，不得自动绑定旧 ID。
+- removed/added 在 region、currency、canonical tier set 上形成一对一唯一结构候选时，即使 Apple 同批 repricing 也以 `MARKET_IDENTITY_RENAME_REVIEW_REQUIRED` 停止并要求显式 source alias；完整当地价格向量相同仍用于多候选 disambiguation。只有结构上仍多义的候选才记录 `MARKET_IDENTITY_RENAME_SUSPECTED`，不得自动绑定旧 ID。
 
 ### marketId 永久不可变
 
