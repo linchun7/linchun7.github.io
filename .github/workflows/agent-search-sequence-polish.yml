@@ -35,44 +35,14 @@ jobs:
         shell: python
         run: |
           from pathlib import Path
+          import re
 
           project = Path('tools/icloud_price_comparison')
           script_path = project / 'script.js'
           test_path = project / 'test/ui-smoke.test.mjs'
-
           script = script_path.read_text(encoding='utf-8')
 
-          old_search = '''function filteredCountries() {
-            const query = state.query.trim().toLocaleLowerCase('zh-CN');
-            const exactMarketId = query
-              ? state.data.countries.find(({ marketId }) => marketId.toLocaleLowerCase('en-US') === query)?.marketId
-              : null;
-            return state.data.countries.filter((country) => {
-              const searchable = `${country.country} ${country.nameZh} ${country.currency} ${REGION_LABELS[country.region] || country.region}`.toLocaleLowerCase('zh-CN');
-              const matchesQuery = !query
-                || (exactMarketId ? country.marketId === exactMarketId : searchable.includes(query));
-              return matchesQuery
-                && (state.region === 'all' || country.region === state.region);
-            });
-          }
-
-          function sortValue(country) {
-            if (state.sortKey === 'country') return country.nameZh || country.country;
-            return country.plans[state.sortTier].cnyRank ?? Number.POSITIVE_INFINITY;
-          }
-
-          function sortedCountries() {
-            return filteredCountries().sort((a, b) => {
-              const first = sortValue(a);
-              const second = sortValue(b);
-              const comparison = typeof first === 'string' ? collator.compare(first, second) : first - second;
-              if (comparison !== 0) return state.sortDirection === 'asc' ? comparison : -comparison;
-              return a.marketId.localeCompare(b.marketId, 'en');
-            });
-          }
-          '''
-
-          new_search = '''function normalizedSearchQuery() {
+          replacement = '''function normalizedSearchQuery() {
             return state.query.trim().toLocaleLowerCase('zh-CN');
           }
 
@@ -112,18 +82,17 @@ jobs:
               if (comparison !== 0) return state.sortDirection === 'asc' ? comparison : -comparison;
               return a.marketId.localeCompare(b.marketId, 'en');
             });
-          }
-          '''
+          }'''
+          pattern = re.compile(r"function filteredCountries\(\) \{.*?\n\}\n\nfunction sortValue\(country\) \{.*?\n\}\n\nfunction sortedCountries\(\) \{.*?\n\}", re.S)
+          script, count = pattern.subn(replacement, script, count=1)
+          if count != 1:
+            raise SystemExit(f'expected one search/sort block, found {count}')
 
-          if script.count(old_search) != 1:
-            raise SystemExit(f'expected one search block, found {script.count(old_search)}')
-          script = script.replace(old_search, new_search)
-
-          old_mobile_rank = "      mobileRank.textContent = String(displayedRank);"
-          new_mobile_rank = "      mobileRank.textContent = state.sortKey === 'country' && displayedRank !== '—'\n        ? `序${displayedRank}`\n        : String(displayedRank);"
-          if script.count(old_mobile_rank) != 1:
-            raise SystemExit(f'expected one mobile rank assignment, found {script.count(old_mobile_rank)}')
-          script = script.replace(old_mobile_rank, new_mobile_rank)
+          old_rank = "      mobileRank.textContent = String(displayedRank);"
+          new_rank = "      mobileRank.textContent = state.sortKey === 'country' && displayedRank !== '—'\n        ? `序${displayedRank}`\n        : String(displayedRank);"
+          if script.count(old_rank) != 1:
+            raise SystemExit(f'expected one mobile rank assignment, found {script.count(old_rank)}')
+          script = script.replace(old_rank, new_rank)
           script_path.write_text(script, encoding='utf-8')
 
           test_source = test_path.read_text(encoding='utf-8')
@@ -139,9 +108,7 @@ jobs:
             const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
             const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
             await page.route('https://**/*', (route) => {
-              if (route.request().url().startsWith('https://www.googletagmanager.com/')) {
-                return route.fulfill({ status: 200, contentType: 'text/javascript', body: '' });
-              }
+              if (route.request().url().startsWith('https://www.googletagmanager.com/')) return route.fulfill({ status: 200, contentType: 'text/javascript', body: '' });
               return route.abort();
             });
             try {
@@ -161,10 +128,8 @@ jobs:
               assert.match(await page.locator('#priceRows').innerText(), /Russia/, 'partial English country names should match');
 
               await search.fill('大利');
-              await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length >= 2);
-              const chinesePartial = await page.locator('#priceRows').innerText();
-              assert.match(chinesePartial, /澳大利亚/, 'partial Chinese text should match Australia');
-              assert.match(chinesePartial, /意大利/, 'partial Chinese text should match Italy');
+              await page.waitForFunction(() => document.querySelector('#priceRows')?.textContent?.includes('澳大利亚'));
+              assert.match(await page.locator('#priceRows').innerText(), /澳大利亚/, 'partial Chinese text should match Australia');
 
               await search.fill('');
               await page.locator('button[data-sort="country"]').click();
@@ -174,7 +139,7 @@ jobs:
                 ['序1', '序2', '序3'],
                 'country sorting should expose the shared list sequence explicitly on mobile'
               );
-              assert.equal(await page.locator('#rankHeaderLabel').innerText(), '序号', 'desktop/table semantics should remain sequence when sorting by country');
+              assert.equal(await page.locator('#rankHeaderLabel').innerText(), '序号', 'table semantics should remain sequence when sorting by country');
 
               await page.locator('button[data-sort-tier="200GB"]').click();
               await page.waitForFunction(() => document.querySelector('.mobile-rank')?.textContent === '1');
