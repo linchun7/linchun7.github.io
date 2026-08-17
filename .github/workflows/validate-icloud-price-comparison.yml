@@ -48,7 +48,7 @@ jobs:
           needs_docs=false
           while IFS= read -r file; do
             case "$file" in
-              .github/workflows/update-icloud-prices.yml|.github/workflows/validate-icloud-price-comparison.yml|tools/icloud_price_comparison/data-contract.js|tools/icloud_price_comparison/data-model.js|tools/icloud_price_comparison/script.js|tools/icloud_price_comparison/scripts/market-registry.mjs|tools/icloud_price_comparison/scripts/reserved-market-registry.mjs|tools/icloud_price_comparison/scripts/update-prices.mjs|tools/icloud_price_comparison/scripts/parse-prices.mjs|tools/icloud_price_comparison/scripts/render-static-page.mjs|tools/icloud_price_comparison/scripts/static-page.mjs|tools/icloud_price_comparison/scripts/validate-data-artifact.mjs)
+              .github/workflows/update-icloud-prices.yml|.github/workflows/validate-icloud-price-comparison.yml|tools/icloud_price_comparison/data-contract.js|tools/icloud_price_comparison/data-model.js|tools/icloud_price_comparison/script.js|tools/icloud_price_comparison/scripts/market-registry.mjs|tools/icloud_price_comparison/scripts/update-prices.mjs|tools/icloud_price_comparison/scripts/parse-prices.mjs|tools/icloud_price_comparison/scripts/render-static-page.mjs|tools/icloud_price_comparison/scripts/static-page.mjs|tools/icloud_price_comparison/scripts/validate-data-artifact.mjs)
                 needs_docs=true
                 ;;
             esac
@@ -65,6 +65,29 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
+      - name: 强制已发布 marketId 永久保留
+        if: github.event_name == 'pull_request'
+        working-directory: .
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          base_history="$RUNNER_TEMP/base-history.json"
+          git show "$BASE_SHA:tools/icloud_price_comparison/data/history.json" > "$base_history"
+          node --input-type=module - "$base_history" tools/icloud_price_comparison/data/history.json <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          const [basePath, headPath] = process.argv.slice(2);
+          const [base, head] = await Promise.all([
+            readFile(basePath, 'utf8').then(JSON.parse),
+            readFile(headPath, 'utf8').then(JSON.parse)
+          ]);
+          if (base?.schemaVersion !== 4 || head?.schemaVersion !== 4 || !base.markets || !head.markets) {
+            throw new Error('marketId immutability check requires schema 4 history');
+          }
+          const removed = Object.keys(base.markets).filter((marketId) => !Object.hasOwn(head.markets, marketId));
+          if (removed.length) {
+            throw new Error(`Published history removed marketId(s): ${removed.join(', ')}`);
+          }
+          NODE
       - name: 启用并校验 pnpm
         run: |
           corepack enable
