@@ -25,20 +25,31 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: 检查仓库与价格历史体积
+      - name: 检查仓库、数据与证据增长
         shell: bash
         run: |
           set -euo pipefail
+          project_data=tools/icloud_price_comparison/data
+          snapshots_dir="$project_data/apple-snapshots"
+
           git_kib=$(du -sk .git | cut -f1)
           git_mib=$(( (git_kib + 1023) / 1024 ))
-          history_bytes=$(wc -c < tools/icloud_price_comparison/data/history.json)
+          data_kib=$(du -sk "$project_data" | cut -f1)
+          snapshots_kib=$(du -sk "$snapshots_dir" | cut -f1)
+          snapshot_json_count=$(find "$snapshots_dir" -maxdepth 1 -type f -name '*.json' ! -name 'index.json' | wc -l)
+          history_bytes=$(wc -c < "$project_data/history.json")
           history_kib=$(( (history_bytes + 1023) / 1024 ))
+          remote_branch_count=$(git for-each-ref --format='%(refname:short)' refs/remotes/origin | wc -l)
           object_report=$(git count-objects -vH)
+
           {
             echo "## iCloud 仓库每周容量审计"
             echo ""
             echo "- 完整 Git 历史：${git_mib} MiB"
+            echo "- 当前 data/：${data_kib} KiB"
             echo "- 价格历史：${history_kib} KiB"
+            echo "- Apple 规范化快照：${snapshot_json_count} 个 JSON / ${snapshots_kib} KiB"
+            echo "- 远端分支引用：${remote_branch_count}"
             echo ""
             echo '```text'
             echo "$object_report"
@@ -47,6 +58,9 @@ jobs:
 
           if (( history_bytes >= 2097152 )); then
             echo "::warning title=价格历史体积::history.json 已达 ${history_kib} KiB，请考虑按年份或地区拆分。"
+          fi
+          if (( remote_branch_count > 20 )); then
+            echo "::warning title=远端分支数量::当前有 ${remote_branch_count} 个远端分支引用，请确认是否存在长期遗留分支。"
           fi
           if (( git_kib >= 819200 )); then
             echo "::error title=Git 历史体积超过硬阈值::完整 Git 历史已达 ${git_mib} MiB，超过 800 MiB，必须人工维护。"
