@@ -1,0 +1,67 @@
+name: One-shot iCloud automation test patch
+
+on:
+  push:
+    branches:
+      - agent/icloud-automation-unification
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: agent/icloud-automation-unification
+          persist-credentials: true
+          fetch-depth: 1
+
+      - name: Patch only stale workflow assertions
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('tools/icloud_price_comparison/test/workflow.test.mjs')
+          text = path.read_text()
+
+          old_cancel = "  assert.match(ciWorkflow, /cancel-in-progress: false/);"
+          new_cancel = """  assert.match(ciWorkflow, /group: validate-icloud-price-comparison-\\$\\{\\{ github\\.ref \\}\\}/);
+            assert.match(ciWorkflow, /cancel-in-progress: \\$\\{\\{ github\\.event_name == 'pull_request' \\}\\}/);"""
+          if text.count(old_cancel) != 1:
+              raise SystemExit('expected exactly one stale cancellation assertion')
+          text = text.replace(old_cancel, new_cancel)
+
+          old_title = "test('automates only official GitHub Actions updates after exact-SHA validation', async () => {"
+          new_title = "test('auto-merges only verified Dependabot dependency scopes after exact validation', async () => {"
+          if text.count(old_title) != 1:
+              raise SystemExit('expected exactly one stale auto-merge test title')
+          text = text.replace(old_title, new_title)
+
+          old_scope = "  assert.match(autoMergeWorkflow, /workflow_run\\.conclusion == 'success'[\\s\\S]*?workflow_run\\.event == 'pull_request'[\\s\\S]*?workflow_run\\.actor\\.login == 'dependabot\\[bot\\]'[\\s\\S]*?startsWith\\(github\\.event\\.workflow_run\\.head_branch, 'dependabot\\/github_actions\\/'\\)[\\s\\S]*?pull_requests\\[0\\]\\.number > 0/);"
+          new_scope = """  assert.match(autoMergeWorkflow, /workflow_run\\.conclusion == 'success'/);
+            assert.match(autoMergeWorkflow, /workflow_run\\.event == 'pull_request'/);
+            assert.match(autoMergeWorkflow, /workflow_run\\.actor\\.login == 'dependabot\\[bot\\]'/);
+            assert.match(autoMergeWorkflow, /startsWith\\(github\\.event\\.workflow_run\\.head_branch, 'dependabot\\/github_actions\\/'\\)/);
+            assert.match(autoMergeWorkflow, /startsWith\\(github\\.event\\.workflow_run\\.head_branch, 'dependabot\\/npm_and_yarn\\/tools\\/icloud_price_comparison\\/'\\)/);
+            assert.match(autoMergeWorkflow, /pull_requests\\[0\\]\\.number > 0/);"""
+          if text.count(old_scope) != 1:
+              raise SystemExit('expected exactly one stale auto-merge scope assertion')
+          text = text.replace(old_scope, new_scope)
+
+          path.write_text(text)
+
+      - name: Self-delete helper and commit exact patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/tmp-fix-icloud-automation-tests.yml
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add tools/icloud_price_comparison/test/workflow.test.mjs
+          git commit -m 'test: align workflow contracts with dependency automation'
+          git push origin HEAD:agent/icloud-automation-unification
