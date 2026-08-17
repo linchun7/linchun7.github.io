@@ -59,16 +59,18 @@ jobs:
         run: rm .github/workflows/agent-icloud-seo-country-terms.yml
 
       - name: Check final diff
+        shell: python
         run: |
-          set -euo pipefail
-          git diff --check
-          changed=$(git status --short | awk '{print $2}')
-          expected='tools/icloud_price_comparison/index.html'
-          if [ "$changed" != "$expected" ]; then
-            echo "Unexpected final diff:"
-            git status --short
-            exit 1
-          fi
+          import subprocess
+
+          subprocess.run(['git', 'diff', '--check'], check=True)
+          lines = subprocess.check_output(['git', 'status', '--short'], text=True).splitlines()
+          expected = {
+            ' M tools/icloud_price_comparison/index.html',
+            ' D .github/workflows/agent-icloud-seo-country-terms.yml',
+          }
+          if set(lines) != expected:
+            raise SystemExit('Unexpected final diff:\n' + '\n'.join(lines))
 
       - name: Commit clean SEO change
         run: |
