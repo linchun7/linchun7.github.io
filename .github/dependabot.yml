@@ -8,6 +8,7 @@ updates:
       time: "10:20"
       timezone: Asia/Shanghai
     open-pull-requests-limit: 5
+    # Keep npm updates independent so one incompatible package cannot block unrelated upgrades.
 
   - package-ecosystem: github-actions
     directory: /
