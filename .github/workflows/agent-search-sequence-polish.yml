@@ -196,6 +196,9 @@ jobs:
         working-directory: tools/icloud_price_comparison
         run: pnpm assets:update
 
+      - name: Remove temporary workflow before repository checks
+        run: rm .github/workflows/agent-search-sequence-polish.yml
+
       - name: Run core checks
         working-directory: tools/icloud_price_comparison
         run: pnpm test:core
@@ -206,11 +209,10 @@ jobs:
           PLAYWRIGHT_BROWSER: chromium
         run: node --test test/ui-smoke.test.mjs
 
-      - name: Remove temporary workflow and commit final patch
+      - name: Commit final patch
         shell: bash
         run: |
           set -euo pipefail
-          rm .github/workflows/agent-search-sequence-polish.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add tools/icloud_price_comparison/script.js \
