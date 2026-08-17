@@ -1,0 +1,66 @@
+name: Temporary iCloud follow-up hardening
+
+on:
+  push:
+    branches:
+      - agent/icloud-followup-hardening
+
+permissions:
+  contents: write
+
+jobs:
+  patch-test-commit:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: agent/icloud-followup-hardening
+          fetch-depth: 0
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: Apply reviewed patch
+        run: python tools/icloud_price_comparison/scripts/.temporary-followup-patch.py
+      - name: Hide temporary workflow and patcher from final-tree tests
+        run: |
+          rm .github/workflows/temporary-icloud-followup-hardening.yml
+          rm tools/icloud_price_comparison/scripts/.temporary-followup-patch.py
+      - name: Install dependencies
+        working-directory: tools/icloud_price_comparison
+        run: |
+          corepack enable
+          pnpm --version
+          pnpm install --frozen-lockfile --ignore-scripts
+      - name: Regenerate controlled artifacts
+        working-directory: tools/icloud_price_comparison
+        run: |
+          pnpm assets:update
+          pnpm render:static
+      - name: Run core and data validation
+        working-directory: tools/icloud_price_comparison
+        run: |
+          pnpm test:core
+          pnpm validate:artifact
+          pnpm validate:snapshots
+          pnpm audit --audit-level low
+      - name: Run Chromium acceptance
+        working-directory: tools/icloud_price_comparison
+        env:
+          PLAYWRIGHT_BROWSER: chromium
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          node --test test/ui-smoke.test.mjs test/static-descending-url-state.test.mjs
+      - name: Check diff and commit product changes
+        run: |
+          git diff --check
+          git status --short
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add tools/icloud_price_comparison
+          git diff --cached --check
+          git commit -m "Harden iCloud identity and search follow-ups"
+          git push origin HEAD:agent/icloud-followup-hardening
