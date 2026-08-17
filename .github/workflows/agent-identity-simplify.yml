@@ -119,12 +119,15 @@ jobs:
       - name: Validate all snapshots
         working-directory: tools/icloud_price_comparison
         run: pnpm validate:snapshots
-      - name: Check diff and commit
+      - name: Commit non-workflow project changes
         run: |
           git diff --check
-          test ! -e .github/workflows/agent-identity-simplify.yml
           test ! -e tools/icloud_price_comparison/scripts/agent-identity-simplify.py
           test ! -e tools/icloud_price_comparison/scripts/migrate-market-id.mjs
+          # GITHUB_TOKEN is intentionally not allowed to mutate workflow files.
+          # Restore those two paths here; they are finalized through the GitHub connector.
+          git restore --source=HEAD -- .github/workflows/agent-identity-simplify.yml .github/workflows/validate-icloud-price-comparison.yml
+          git diff --check
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
