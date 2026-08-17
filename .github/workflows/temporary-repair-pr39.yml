@@ -63,14 +63,14 @@ jobs:
 
           test_path = Path('tools/icloud_price_comparison/test/ui-smoke.test.mjs')
           test_source = test_path.read_text(encoding='utf-8')
-          anchor = """    for (const [query, expectedMarketId] of [['uk', 'gb'], ['usa', 'us'], ['turkey', 'tr']]) {
-              await page.locator('#searchInput').fill(query);
-              await page.waitForFunction((marketId) => document.querySelector('#priceRows tr[data-market-id]')?.dataset.marketId === marketId, expectedMarketId);
-              assert.equal(await page.locator('#priceRows tr[data-market-id]').first().getAttribute('data-market-id'), expectedMarketId);
-            }
-          """
-          replacement = anchor + """
-            const search = page.locator('#searchInput');
+          test_marker = "test('supports friendly market search aliases and prioritizes exact alias hits'"
+          start = test_source.find(test_marker)
+          if start < 0:
+              raise SystemExit('ui-smoke alias regression test not found')
+          insert_at = test_source.find('  } finally {', start)
+          if insert_at < 0:
+              raise SystemExit('ui-smoke alias regression insertion point not found')
+          block = """    const search = page.locator('#searchInput');
             await search.fill('中');
             await page.waitForFunction(() => {
               const rows = [...document.querySelectorAll('#priceRows tr[data-market-id]')];
@@ -84,10 +84,9 @@ jobs:
             await page.waitForFunction(() => [...document.querySelectorAll('#priceRows tr[data-market-id]')]
               .some((row) => row.dataset.marketId === 'ng'));
             assert.equal(await page.locator('#priceRows tr[data-market-id=\"ng\"]').count(), 1, 'multi-character region search must still match 欧洲、中东和非洲');
+
           """
-          if anchor not in test_source:
-              raise SystemExit('ui-smoke alias regression anchor not found')
-          test_path.write_text(test_source.replace(anchor, replacement, 1), encoding='utf-8')
+          test_path.write_text(test_source[:insert_at] + block + test_source[insert_at:], encoding='utf-8')
           PY
 
       - name: Regenerate derived files and validate core
