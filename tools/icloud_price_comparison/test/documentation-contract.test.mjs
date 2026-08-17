@@ -4,10 +4,14 @@ import test from 'node:test';
 
 const readProjectFile = (name) => readFile(new URL(`../${name}`, import.meta.url), 'utf8');
 
-const [readme, operations, validationWorkflow] = await Promise.all([
+const [readme, operations, validationWorkflow, marketRegistry, dataModel, browserScript, updater] = await Promise.all([
   readProjectFile('README.md'),
   readProjectFile('OPERATIONS.md'),
-  readFile(new URL('../../../.github/workflows/validate-icloud-price-comparison.yml', import.meta.url), 'utf8')
+  readFile(new URL('../../../.github/workflows/validate-icloud-price-comparison.yml', import.meta.url), 'utf8'),
+  readProjectFile('scripts/market-registry.mjs'),
+  readProjectFile('data-model.js'),
+  readProjectFile('script.js'),
+  readProjectFile('scripts/update-prices.mjs')
 ]);
 
 test('documents the generated SEO source rather than treating index.html as the source of truth', () => {
@@ -25,6 +29,13 @@ test('documents the simple immutable market identity model', () => {
     assert.match(document, /market-registry\.mjs/);
     assert.doesNotMatch(document, /reserved-market-registry\.mjs|MARKET_SEARCH_ALIASES/);
     assert.doesNotMatch(document, /migrate-market-id\.mjs/);
+  }
+});
+
+test('retired reservation and browser identity-search layers cannot return in runtime sources by accident', () => {
+  const retiredIdentityLayer = /RESERVED_MARKET_REGISTRY|reserved-market-registry\.mjs|validateReservedMarketRegistry|MARKET_SEARCH_ALIASES|marketSearchAliases|MARKET_IDENTITY_RESERVED_ID_COLLISION|reservedIdentityCollisionError/;
+  for (const source of [marketRegistry, dataModel, browserScript, updater]) {
+    assert.doesNotMatch(source, retiredIdentityLayer);
   }
 });
 
@@ -49,4 +60,9 @@ test('PR validation protects published market IDs across the base and head histo
   assert.match(validationWorkflow, /强制已发布 marketId 永久保留/);
   assert.match(validationWorkflow, /base-history\.json/);
   assert.match(validationWorkflow, /removed marketId/i);
+});
+
+test('PR validation checks whitespace in the committed base-to-head diff', () => {
+  assert.match(validationWorkflow, /检查 PR 已提交差异格式/);
+  assert.match(validationWorkflow, /git diff --check "\$BASE_SHA" HEAD/);
 });
