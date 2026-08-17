@@ -72,8 +72,6 @@ jobs:
       - name: Validate all snapshots
         working-directory: tools/icloud_price_comparison
         run: pnpm validate:snapshots
-      - name: Check project diff
-        run: git diff --check -- tools/icloud_price_comparison
       - name: Commit project changes and remove temporary tooling
         run: |
           git config user.name github-actions[bot]
