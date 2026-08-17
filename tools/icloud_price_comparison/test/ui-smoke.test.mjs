@@ -3282,43 +3282,6 @@ test('prioritizes exact market IDs without hiding partial matches and distinguis
 });
 
 
-test('supports friendly market search aliases and prioritizes exact alias hits', { timeout: 30_000 }, async (context) => {
-  const browserConfig = await resolveBrowser(context, 'the market search alias regression test');
-  if (!browserConfig) return;
-  const server = await startServer();
-  const { port } = server.address();
-  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
-  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-  await page.route('https://**/*', (route) => route.abort());
-  try {
-    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length > 0);
-    for (const [query, expectedMarketId] of [['uk', 'gb'], ['usa', 'us'], ['turkey', 'tr']]) {
-      await page.locator('#searchInput').fill(query);
-      await page.waitForFunction((marketId) => document.querySelector('#priceRows tr[data-market-id]')?.dataset.marketId === marketId, expectedMarketId);
-      assert.equal(await page.locator('#priceRows tr[data-market-id]').first().getAttribute('data-market-id'), expectedMarketId);
-    }
-    const search = page.locator('#searchInput');
-    await search.fill('中');
-    await page.waitForFunction(() => {
-      const rows = [...document.querySelectorAll('#priceRows tr[data-market-id]')];
-      return rows.some((row) => row.dataset.marketId === 'cn')
-        && !rows.some((row) => row.dataset.marketId === 'ng');
-    });
-    assert.equal(await page.locator('#priceRows tr[data-market-id="cn"]').count(), 1, 'single-character country search must still match 中国大陆');
-    assert.equal(await page.locator('#priceRows tr[data-market-id="ng"]').count(), 0, 'single-character 中 must not match Nigeria through the EMEA region label');
-
-    await search.fill('中东');
-    await page.waitForFunction(() => [...document.querySelectorAll('#priceRows tr[data-market-id]')]
-      .some((row) => row.dataset.marketId === 'ng'));
-    assert.equal(await page.locator('#priceRows tr[data-market-id="ng"]').count(), 1, 'multi-character region search must still match 欧洲、中东和非洲');
-
-  } finally {
-    await browser.close();
-  }
-});
-
-
 test('normalizes compatibility search and exposes mobile rank semantics', { timeout: 30_000 }, async (context) => {
   const browserConfig = await resolveBrowser(context, 'the search normalization and mobile accessibility regression test');
   if (!browserConfig) return;

@@ -3,11 +3,9 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import {
-  MARKET_SEARCH_ALIASES,
   marketSearchPriority,
   matchesMarketSearch,
   normalizeMarketSearchText,
-  validateMarketSearchAliases
 } from '../data-model.js';
 import {
   createMarketResolver,
@@ -31,24 +29,12 @@ test('search normalization covers compatibility forms and both raw/localized reg
   assert.equal(matchesMarketSearch(cn, 'Asia Pacific'), true);
 });
 
-test('published fallback IDs can receive friendly search aliases only after conflicting candidate IDs are removed', () => {
-  const fallbackId = 'apple-reviewed-market-12345678';
-  assert.equal(validateMarketSearchAliases({ [fallbackId]: ['de'] }, [fallbackId])[fallbackId][0], 'de');
-  assert.throws(
-    () => validateMarketSearchAliases({ [fallbackId]: ['de'] }, [fallbackId, 'de']),
-    /shadows marketId de/
-  );
-  assert.equal(validateMarketSearchAliases(MARKET_SEARCH_ALIASES, [
-    'euro-zone', 'ci', 'cg', 'cn', 'gb', 'kr', 'md', 'tr', 'tz', 'us', 'vn'
-  ]), MARKET_SEARCH_ALIASES);
-});
-
 test('reviewed Apple source aliases preserve an already-published fallback identity', () => {
   const fallbackId = 'apple-legacy-raw-name-12345678';
   const registry = {
     'Reviewed Name': { id: fallbackId, canonicalName: 'Reviewed Name', aliases: ['Legacy Raw Name'], reserved: false }
   };
-  const resolve = createMarketResolver(registry, { reservedRegistry: {} });
+  const resolve = createMarketResolver(registry);
   const previousHistory = {
     schemaVersion: 4,
     markets: { [fallbackId]: { country: 'Legacy Raw Name' } }
@@ -65,7 +51,7 @@ test('different identities claiming the same historical ID use the collision err
   const registry = {
     'New Owner': { id: 'stable-id', canonicalName: 'New Owner', aliases: [], reserved: false }
   };
-  const resolve = createMarketResolver(registry, { reservedRegistry: {} });
+  const resolve = createMarketResolver(registry);
   const previousHistory = {
     schemaVersion: 4,
     markets: { 'stable-id': { country: 'Old Owner' } }

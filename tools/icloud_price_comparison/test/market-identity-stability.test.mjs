@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import { readdir, readFile } from 'node:fs/promises';
+import path from 'node:path';
+import test from 'node:test';
+import { fileURLToPath } from 'node:url';
+import { createMarketResolver, createPublishedMarketResolver, resolveMarket, validateMarketIdentityContinuity } from '../scripts/market-registry.mjs';
+const DIR=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const ident=(id,canonicalName,aliases=[])=>({id,canonicalName,aliases,reserved:false});
+const hist=(name,id)=>({schemaVersion:4,markets:{[id]:{country:name,nameZh:name,region:'Europe, Middle East & Africa',events:[]}}});
+test('unknown market gets deterministic apple-* identity',()=>{const a=resolveMarket('Example New Apple Market'),b=resolveMarket('Example New Apple Market');assert.equal(a.unknown,true);assert.match(a.id,/^apple-example-new-apple-market-[0-9a-f]{8}$/);assert.equal(a.id,b.id);});
+test('published fallback stays fixed and later friendly rekey fails continuity',()=>{const a=resolveMarket('Example Published Unknown'),h=hist('Example Published Unknown',a.id),registry={'Example Published Unknown':ident('ex','Example Published Unknown')},r=createPublishedMarketResolver(null,h,{registry});assert.equal(r('Example Published Unknown').id,a.id);assert.throws(()=>validateMarketIdentityContinuity(null,h,{registry}),(e)=>e.code==='MARKET_IDENTITY_REKEY');});
+test('reviewed source alias can follow Apple wording without rekey',()=>{const h=hist('Turkey','tr'),registry={'Türkiye':ident('tr','Türkiye',['Turkey'])},r=createPublishedMarketResolver(null,h,{registry});assert.equal(r('Türkiye').id,'tr');assert.doesNotThrow(()=>validateMarketIdentityContinuity(null,h,{registry}));});
+test('active ID cannot overwrite unrelated published identity',()=>{assert.throws(()=>validateMarketIdentityContinuity(null,hist('Legacy Germany Identity','de'),{registry:{Germany:ident('de','Germany')}}),(e)=>e.code==='MARKET_IDENTITY_RESERVED_ID_COLLISION');});
+test('no routine market migration tool is exposed',async()=>{const scripts=await readdir(path.join(DIR,'scripts')),pkg=JSON.parse(await readFile(path.join(DIR,'package.json'),'utf8'));assert.equal(scripts.some(n=>/migrate.*market|market.*migrate/i.test(n)),false);assert.equal(Object.keys(pkg.scripts??{}).some(n=>/migrate.*market|market.*migrate/i.test(n)),false);});
+test('committed production ledger validates under simplified model',async()=>{const [p,h]=await Promise.all([readFile(path.join(DIR,'data/prices.json'),'utf8').then(JSON.parse),readFile(path.join(DIR,'data/history.json'),'utf8').then(JSON.parse)]);assert.doesNotThrow(()=>validateMarketIdentityContinuity(p,h));const r=createMarketResolver();for(const c of p.countries){const x=r(c.country);if(!x.unknown)assert.equal(x.id,c.marketId);}});
