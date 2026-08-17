@@ -74,7 +74,7 @@ export function createMarketResolver(registry = MARKET_REGISTRY) {
     const digest = createHash('sha256').update(name).digest('hex').slice(0, 8);
     const id = `apple-${slugify(name)}-${digest}`;
     if (knownIds.has(id)) {
-      throw reservedIdentityCollisionError(id, name, [{
+      throw marketIdentityCollisionError(id, name, [{
         sourceName: knownById.get(id).canonicalName,
         location: 'market-registry.mjs'
       }]);
@@ -133,13 +133,13 @@ export function buildPublishedMarketIdentityIndex(previousData, previousHistory)
   return { bySourceName, sourceNamesById, ownersById };
 }
 
-function reservedIdentityCollisionError(generatedMarketId, newSourceName, owners) {
-  const reserved = owners.map(({ sourceName, location }) => `${sourceName} (${location})`).join(', ');
-  const error = new Error(`MARKET_IDENTITY_RESERVED_ID_COLLISION: generatedMarketId=${generatedMarketId}; newSourceName=${newSourceName}; reserved=${reserved}`);
-  error.code = 'MARKET_IDENTITY_RESERVED_ID_COLLISION';
-  error.generatedMarketId = generatedMarketId;
+function marketIdentityCollisionError(marketId, newSourceName, owners) {
+  const occupiedBy = owners.map(({ sourceName, location }) => `${sourceName} (${location})`).join(', ');
+  const error = new Error(`MARKET_IDENTITY_COLLISION: marketId=${marketId}; newSourceName=${newSourceName}; occupiedBy=${occupiedBy}`);
+  error.code = 'MARKET_IDENTITY_COLLISION';
+  error.marketId = marketId;
   error.newSourceName = newSourceName;
-  error.reservedOwners = owners.map(({ sourceName, location }) => ({ sourceName, location }));
+  error.existingOwners = owners.map(({ sourceName, location }) => ({ sourceName, location }));
   return error;
 }
 
@@ -183,7 +183,7 @@ export function createPublishedMarketResolver(previousData, previousHistory, {
           };
         }
       }
-      throw reservedIdentityCollisionError(resolved.id, name, existingOwners);
+      throw marketIdentityCollisionError(resolved.id, name, existingOwners);
     }
     return resolved;
   };
@@ -203,7 +203,13 @@ export function validateMarketIdentityContinuity(previousData, previousHistory, 
     } catch (error) {
       throw marketIdentityError(`${location} cannot resolve ${sourceName}: ${error.message}`);
     }
-    if (!resolved.unknown && resolved.id !== expectedId) {
+    if (resolved.unknown) {
+      if (!String(expectedId).startsWith('apple-')) {
+        throw marketIdentityError(`${location} no longer recognizes published market ${sourceName} with marketId ${expectedId}`);
+      }
+      return;
+    }
+    if (resolved.id !== expectedId) {
       throw marketIdentityError(`${location} maps ${sourceName} from ${expectedId} to ${resolved.id}`);
     }
   };
