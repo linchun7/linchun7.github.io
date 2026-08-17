@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 const SHA_PATTERN = /^[a-f0-9]{40}$/;
 const WORKFLOW_PATH_PATTERN = /^\.github\/workflows\/[^/]+\.ya?ml$/;
 const ACTION_LINE_PATTERN = /^([+-])\s*uses:\s*(actions\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*)@([a-f0-9]{40})\s+#\s+(v\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?)\s*$/;
+const ACTION_STABLE_SEMVER_PATTERN = /^v(\d+)\.(\d+)\.(\d+)$/;
 const NPM_BRANCH_PREFIX = 'dependabot/npm_and_yarn/tools/icloud_price_comparison/';
 const NPM_PACKAGE_PATH = 'tools/icloud_price_comparison/package.json';
 const NPM_LOCK_PATH = 'tools/icloud_price_comparison/pnpm-lock.yaml';
@@ -44,6 +45,32 @@ function classifyDependabotPullRequest(pr, expected) {
   throw new Error('Dependabot branch is outside the approved automation scopes');
 }
 
+function parseStableActionVersion(version, label) {
+  invariant(typeof version === 'string', `${label} must use an exact stable vX.Y.Z release tag`);
+  const match = version.match(ACTION_STABLE_SEMVER_PATTERN);
+  invariant(match, `${label} must use an exact stable vX.Y.Z release tag`);
+  return match.slice(1).map(Number);
+}
+
+function compareVersions(left, right) {
+  for (let index = 0; index < 3; index += 1) {
+    if (left[index] !== right[index]) return left[index] - right[index];
+  }
+  return 0;
+}
+
+function validateRoutineActionVersions(oldReferences, newReferences, filename) {
+  for (const action of new Set(oldReferences.map(({ action: name }) => name))) {
+    const oldVersions = [...new Set(oldReferences.filter(({ action: name }) => name === action).map(({ version }) => version))];
+    const newVersions = [...new Set(newReferences.filter(({ action: name }) => name === action).map(({ version }) => version))];
+    invariant(oldVersions.length === 1 && newVersions.length === 1, `Action ${action} must use one reviewed version per changed workflow: ${filename}`);
+    const oldVersion = parseStableActionVersion(oldVersions[0], `${action} old version`);
+    const newVersion = parseStableActionVersion(newVersions[0], `${action} new version`);
+    invariant(newVersion[0] === oldVersion[0], `${action} major update requires manual review`);
+    invariant(compareVersions(newVersion, oldVersion) > 0, `${action} update must move forward`);
+  }
+}
+
 export function validateChangedFiles(files) {
   invariant(files.length > 0 && files.length <= MAX_CHANGED_FILES, 'Changed-file count is invalid');
 
@@ -63,7 +90,7 @@ export function validateChangedFiles(files) {
     for (const line of changedLines) {
       const match = line.match(ACTION_LINE_PATTERN);
       invariant(match, 'Only full-SHA actions/* references may change in ' + file.filename);
-      const reference = { action: match[2], sha: match[3] };
+      const reference = { action: match[2], sha: match[3], version: match[4] };
       (match[1] === '-' ? oldReferences : newReferences).push(reference);
     }
 
@@ -72,6 +99,7 @@ export function validateChangedFiles(files) {
     const oldActions = oldReferences.map(({ action }) => action).sort();
     const newActions = newReferences.map(({ action }) => action).sort();
     invariant(JSON.stringify(oldActions) === JSON.stringify(newActions), 'Action names must not change');
+    validateRoutineActionVersions(oldReferences, newReferences, file.filename);
 
     const oldDigests = oldReferences.map(({ action, sha }) => action + '@' + sha).sort();
     const newDigests = newReferences.map(({ action, sha }) => action + '@' + sha).sort();
@@ -103,13 +131,6 @@ function parseStableVersion(version, label) {
   const match = version.match(STABLE_SEMVER_PATTERN);
   invariant(match, `${label} must use an exact stable semver pin`);
   return match.slice(1).map(Number);
-}
-
-function compareVersions(left, right) {
-  for (let index = 0; index < 3; index += 1) {
-    if (left[index] !== right[index]) return left[index] - right[index];
-  }
-  return 0;
 }
 
 export function validateRoutineNpmPackageUpdate(basePackage, headPackage) {
