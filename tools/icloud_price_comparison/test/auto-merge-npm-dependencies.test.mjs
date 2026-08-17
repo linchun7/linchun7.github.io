@@ -20,7 +20,7 @@ function validPullRequest() {
     user: { login: 'dependabot[bot]' },
     base: { ref: 'main', sha: BASE_SHA },
     head: {
-      ref: 'dependabot/npm_and_yarn/tools/icloud_price_comparison/icloud-price-dependencies-123456',
+      ref: 'dependabot/npm_and_yarn/tools/icloud_price_comparison/dependency-123456',
       sha: HEAD_SHA,
       repo: { full_name: 'owner/repository' },
     },
@@ -48,11 +48,15 @@ function routinePackage() {
   return value;
 }
 
-function changedFiles() {
+function directChangedFiles() {
   return [
     { filename: PACKAGE_PATH, status: 'modified' },
     { filename: LOCK_PATH, status: 'modified' },
   ];
+}
+
+function lockOnlyChangedFiles() {
+  return [{ filename: LOCK_PATH, status: 'modified' }];
 }
 
 function asContent(value) {
@@ -86,14 +90,15 @@ test('accepts only the tested iCloud Dependabot npm pull request', () => {
   }
 });
 
-test('allows only package.json plus pnpm-lock.yaml for routine npm auto-merge', () => {
-  assert.doesNotThrow(() => validateNpmChangedFiles(changedFiles()));
+test('allows only lockfile-only or package.json plus lockfile npm changes', () => {
+  assert.equal(validateNpmChangedFiles(directChangedFiles()), true);
+  assert.equal(validateNpmChangedFiles(lockOnlyChangedFiles()), false);
 
-  const extra = [...changedFiles(), { filename: 'tools/icloud_price_comparison/script.js', status: 'modified' }];
+  const extra = [...directChangedFiles(), { filename: 'tools/icloud_price_comparison/script.js', status: 'modified' }];
   assert.throws(() => validateNpmChangedFiles(extra));
-  assert.throws(() => validateNpmChangedFiles([changedFiles()[0]]));
+  assert.throws(() => validateNpmChangedFiles([{ filename: PACKAGE_PATH, status: 'modified' }]));
 
-  const renamed = changedFiles();
+  const renamed = directChangedFiles();
   renamed[0] = { ...renamed[0], previous_filename: 'old-package.json' };
   assert.throws(() => validateNpmChangedFiles(renamed));
 });
@@ -104,6 +109,7 @@ test('auto-merges only forward minor or patch changes to existing exact dependen
     { packageName: 'cheerio', before: '1.2.0', after: '1.3.0' },
     { packageName: 'lucide', before: '1.31.0', after: '1.31.1' },
   ]);
+  assert.deepEqual(validateRoutineNpmPackageUpdate(basePackage(), basePackage()), []);
 
   const invalidPackages = [
     (value) => { value.dependencies.cheerio = '2.0.0'; },
@@ -122,13 +128,13 @@ test('auto-merges only forward minor or patch changes to existing exact dependen
   }
 });
 
-test('merges a fully validated routine npm PR only at the exact tested head SHA', async () => {
+test('merges a fully validated direct npm PR only at the exact tested head SHA', async () => {
   const pullRequest = { ...validPullRequest(), changed_files: 2 };
   const requests = [];
   const fetchImpl = async (url, options) => {
     requests.push({ url, options });
     if (url.endsWith('/pulls/42')) return Response.json(pullRequest);
-    if (url.includes('/pulls/42/files?')) return Response.json(changedFiles());
+    if (url.includes('/pulls/42/files?')) return Response.json(directChangedFiles());
     if (url.includes('/contents/' + PACKAGE_PATH + '?ref=' + BASE_SHA)) return Response.json(asContent(basePackage()));
     if (url.includes('/contents/' + PACKAGE_PATH + '?ref=' + HEAD_SHA)) return Response.json(asContent(routinePackage()));
     if (url.endsWith('/pulls/42/merge')) {
@@ -156,6 +162,36 @@ test('merges a fully validated routine npm PR only at the exact tested head SHA'
   assert.ok(requests.every(({ options }) => options.redirect === 'error'));
 });
 
+test('merges a fully validated lockfile-only transitive update without changing package semantics', async () => {
+  const pullRequest = { ...validPullRequest(), changed_files: 1 };
+  const requests = [];
+  const fetchImpl = async (url, options) => {
+    requests.push({ url, options });
+    if (url.endsWith('/pulls/42')) return Response.json(pullRequest);
+    if (url.includes('/pulls/42/files?')) return Response.json(lockOnlyChangedFiles());
+    if (url.includes('/contents/' + PACKAGE_PATH + '?ref=' + BASE_SHA)) return Response.json(asContent(basePackage()));
+    if (url.includes('/contents/' + PACKAGE_PATH + '?ref=' + HEAD_SHA)) return Response.json(asContent(basePackage()));
+    if (url.endsWith('/pulls/42/merge')) {
+      const body = JSON.parse(options.body);
+      assert.equal(body.sha, HEAD_SHA);
+      assert.equal(body.merge_method, 'squash');
+      return Response.json({ merged: true });
+    }
+    return Response.json({ message: 'unexpected request' }, { status: 404 });
+  };
+
+  await main({
+    DEFAULT_BRANCH: 'main',
+    GITHUB_TOKEN: 'test-token',
+    PR_NUMBER: '42',
+    REPOSITORY: 'owner/repository',
+    RUN_BASE_SHA: BASE_SHA,
+    RUN_HEAD_SHA: HEAD_SHA,
+  }, fetchImpl, () => {});
+
+  assert.equal(requests.length, 5);
+});
+
 test('refuses to merge a major npm update even after a successful CI trigger', async () => {
   const pullRequest = { ...validPullRequest(), changed_files: 2 };
   const major = basePackage();
@@ -163,7 +199,7 @@ test('refuses to merge a major npm update even after a successful CI trigger', a
   let mergeRequested = false;
   const fetchImpl = async (url) => {
     if (url.endsWith('/pulls/42')) return Response.json(pullRequest);
-    if (url.includes('/pulls/42/files?')) return Response.json(changedFiles());
+    if (url.includes('/pulls/42/files?')) return Response.json(directChangedFiles());
     if (url.includes('/contents/' + PACKAGE_PATH + '?ref=' + BASE_SHA)) return Response.json(asContent(basePackage()));
     if (url.includes('/contents/' + PACKAGE_PATH + '?ref=' + HEAD_SHA)) return Response.json(asContent(major));
     if (url.endsWith('/pulls/42/merge')) {
