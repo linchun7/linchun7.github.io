@@ -3317,3 +3317,45 @@ test('supports friendly market search aliases and prioritizes exact alias hits',
     await browser.close();
   }
 });
+
+
+test('normalizes compatibility search and exposes mobile rank semantics', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the search normalization and mobile accessibility regression test');
+  if (!browserConfig) return;
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await page.route('https://**/*', (route) => route.abort());
+  try {
+    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length > 0);
+    const search = page.locator('#searchInput');
+
+    await search.fill('ＵＳ');
+    await page.waitForFunction(() => document.querySelector('#priceRows tr[data-market-id]')?.dataset.marketId === 'us');
+    assert.equal(await page.locator('#priceRows tr[data-market-id]').first().getAttribute('data-market-id'), 'us');
+
+    await search.fill('Americas');
+    await page.waitForFunction(() => document.querySelector('#priceRows tr[data-market-id="us"]'));
+    assert.equal(await page.locator('#priceRows tr[data-market-id="us"]').count(), 1);
+    assert.equal(await page.locator('#priceRows tr[data-market-id="ng"]').count(), 0);
+
+    await search.fill('Asia Pacific');
+    await page.waitForFunction(() => document.querySelector('#priceRows tr[data-market-id="jp"]'));
+    assert.equal(await page.locator('#priceRows tr[data-market-id="jp"]').count(), 1);
+    assert.equal(await page.locator('#priceRows tr[data-market-id="ng"]').count(), 0);
+
+    await search.fill('');
+    const rankText = page.locator('#priceRows .mobile-rank-sr').first();
+    assert.match((await rankText.textContent()).trim(), /^全球价格排名第 \d+$/);
+    assert.notEqual(await rankText.evaluate((element) => getComputedStyle(element).display), 'none');
+
+    await page.locator('button[data-sort="country"]').click();
+    await page.waitForFunction(() => document.querySelector('#priceRows .mobile-rank-sr')?.textContent === '当前列表序号第 1');
+    assert.equal((await page.locator('#priceRows .mobile-rank-sr').first().textContent()).trim(), '当前列表序号第 1');
+  } finally {
+    await browser.close();
+    await server.close(() => {});
+  }
+});

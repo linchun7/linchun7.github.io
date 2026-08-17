@@ -163,9 +163,9 @@ export function createPublishedMarketResolver(previousData, previousHistory, {
     const historical = published.bySourceName.get(identityKey);
     const resolved = resolveUnknown(name);
 
-    // Once a source name has been published, its identity ledger wins even if a later
-    // registry/reservation review discovers a nicer human-facing code. A deliberate
-    // migration must update prices/history together instead of silently re-keying here.
+    // Once a source name has been published, its identity ledger wins. Reviewed
+    // source aliases may teach the resolver a new Apple spelling, but they must keep
+    // the already-published marketId rather than creating a rekey path.
     if (historical) {
       return {
         ...resolved,
@@ -179,7 +179,24 @@ export function createPublishedMarketResolver(previousData, previousHistory, {
     }
 
     const existingOwners = published.ownersById.get(resolved.id);
-    if (existingOwners?.length) throw reservedIdentityCollisionError(resolved.id, name, existingOwners);
+    if (existingOwners?.length) {
+      if (!resolved.unknown) {
+        const acceptedNames = new Set([resolved.canonicalName, ...(resolved.aliases ?? [])].map(normalizedNameKey));
+        const conflicts = existingOwners.filter(({ identityKey: ownerKey }) => !acceptedNames.has(ownerKey));
+        if (!conflicts.length) {
+          return {
+            ...resolved,
+            sourceName: name,
+            nameZh: getOfficialChineseMarketName(resolved.id) ?? name,
+            reserved: false,
+            published: true,
+            preservedPublishedIdentity: false
+          };
+        }
+        throw reservedIdentityCollisionError(resolved.id, name, conflicts);
+      }
+      throw reservedIdentityCollisionError(resolved.id, name, existingOwners);
+    }
     return resolved;
   };
 }
@@ -218,11 +235,12 @@ export function validateMarketIdentityContinuity(previousData, previousHistory, 
   }
 
   for (const market of Object.values(registry)) {
-    const publishedNames = publishedNamesById.get(market.id);
-    if (!publishedNames) continue;
-    const registryNames = [market.canonicalName, ...(market.aliases ?? [])].map(normalizedNameKey);
-    if (!registryNames.some((name) => publishedNames.has(name))) {
-      throw marketIdentityError(`registry market ${market.canonicalName} occupies reserved marketId ${market.id}`);
+    const owners = published.ownersById.get(market.id);
+    if (!owners?.length) continue;
+    const acceptedNames = new Set([market.canonicalName, ...(market.aliases ?? [])].map(normalizedNameKey));
+    const conflicts = owners.filter(({ identityKey }) => !acceptedNames.has(identityKey));
+    if (conflicts.length) {
+      throw reservedIdentityCollisionError(market.id, market.canonicalName, conflicts);
     }
   }
 
@@ -235,8 +253,7 @@ export function validateMarketIdentityContinuity(previousData, previousHistory, 
     const acceptedNames = new Set([market.canonicalName, ...(market.aliases ?? [])].map(normalizedNameKey));
     const conflicts = owners.filter(({ identityKey }) => !acceptedNames.has(identityKey));
     if (conflicts.length) {
-      const occupiedBy = conflicts.map(({ sourceName, location }) => `${sourceName} (${location})`).join(', ');
-      throw marketIdentityError(`future market ${market.canonicalName} cannot reserve historical marketId ${market.id}; occupied by ${occupiedBy}`);
+      throw reservedIdentityCollisionError(market.id, market.canonicalName, conflicts);
     }
   }
   return { status: 'passed', reservedMarketIds: [...publishedNamesById.keys()].sort() };
