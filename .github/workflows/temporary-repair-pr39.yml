@@ -1,0 +1,113 @@
+name: Temporary repair PR 39
+
+on:
+  push:
+    branches:
+      - agent/icloud-simplify-market-identity
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.event.head_commit.message == 'Run PR 39 repair'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Restore main and apply reviewed fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git rm -r --quiet .
+          git checkout origin/main -- .
+          python3 - <<'PY'
+          from pathlib import Path
+
+          script_path = Path('tools/icloud_price_comparison/script.js')
+          script = script_path.read_text(encoding='utf-8')
+          old = """function matchesCountrySearch(country, query) {
+            if (!query) return true;
+            const marketId = country.marketId.toLocaleLowerCase('en-US');
+            const namesAndRegion = `${country.country} ${country.nameZh ?? ''} ${REGION_LABELS[country.region] || country.region}`.toLocaleLowerCase('zh-CN');
+            const currency = country.currency.toLocaleLowerCase('en-US');
+            const aliases = normalizedMarketSearchAliases(country);
+            return marketId.includes(query)
+              || namesAndRegion.includes(query)
+              || aliases.some((alias) => alias.includes(query))
+              || currency === query;
+          }
+          """
+          new = """function matchesCountrySearch(country, query) {
+            if (!query) return true;
+            const marketId = country.marketId.toLocaleLowerCase('en-US');
+            const names = `${country.country} ${country.nameZh ?? ''}`.toLocaleLowerCase('zh-CN');
+            const region = (REGION_LABELS[country.region] || country.region).toLocaleLowerCase('zh-CN');
+            const currency = country.currency.toLocaleLowerCase('en-US');
+            const aliases = normalizedMarketSearchAliases(country);
+            return marketId.includes(query)
+              || names.includes(query)
+              || (query.length >= 2 && region.includes(query))
+              || aliases.some((alias) => alias.includes(query))
+              || currency === query;
+          }
+          """
+          if old not in script:
+              raise SystemExit('script.js search matcher anchor not found')
+          script_path.write_text(script.replace(old, new, 1), encoding='utf-8')
+
+          test_path = Path('tools/icloud_price_comparison/test/ui-smoke.test.mjs')
+          test_source = test_path.read_text(encoding='utf-8')
+          anchor = """    for (const [query, expectedMarketId] of [['uk', 'gb'], ['usa', 'us'], ['turkey', 'tr']]) {
+              await page.locator('#searchInput').fill(query);
+              await page.waitForFunction((marketId) => document.querySelector('#priceRows tr[data-market-id]')?.dataset.marketId === marketId, expectedMarketId);
+              assert.equal(await page.locator('#priceRows tr[data-market-id]').first().getAttribute('data-market-id'), expectedMarketId);
+            }
+          """
+          replacement = anchor + """
+            const search = page.locator('#searchInput');
+            await search.fill('中');
+            await page.waitForFunction(() => {
+              const rows = [...document.querySelectorAll('#priceRows tr[data-market-id]')];
+              return rows.some((row) => row.dataset.marketId === 'cn')
+                && !rows.some((row) => row.dataset.marketId === 'ng');
+            });
+            assert.equal(await page.locator('#priceRows tr[data-market-id=\"cn\"]').count(), 1, 'single-character country search must still match 中国大陆');
+            assert.equal(await page.locator('#priceRows tr[data-market-id=\"ng\"]').count(), 0, 'single-character 中 must not match Nigeria through the EMEA region label');
+
+            await search.fill('中东');
+            await page.waitForFunction(() => [...document.querySelectorAll('#priceRows tr[data-market-id]')]
+              .some((row) => row.dataset.marketId === 'ng'));
+            assert.equal(await page.locator('#priceRows tr[data-market-id=\"ng\"]').count(), 1, 'multi-character region search must still match 欧洲、中东和非洲');
+          """
+          if anchor not in test_source:
+              raise SystemExit('ui-smoke alias regression anchor not found')
+          test_path.write_text(test_source.replace(anchor, replacement, 1), encoding='utf-8')
+          PY
+
+      - name: Regenerate derived files and validate core
+        working-directory: tools/icloud_price_comparison
+        shell: bash
+        run: |
+          set -euo pipefail
+          corepack enable
+          pnpm install --frozen-lockfile
+          pnpm assets:update
+          pnpm render:static
+          pnpm test:core
+
+      - name: Commit repaired branch and remove temporary workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git diff --cached --check
+          git commit -m 'Repair iCloud identity and search regression'
+          git push origin HEAD:${{ github.ref_name }}
