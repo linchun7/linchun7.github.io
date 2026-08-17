@@ -289,7 +289,8 @@ test('keeps pull-request validation read-only, complete, and SHA-pinned', async 
   assert.match(ciWorkflow, /schedule:[\s\S]*?cron:\s*['"]5 22 \* \* 0['"]/);
   assert.match(ciWorkflow, /run: pnpm validate:snapshots/);
   assert.doesNotMatch(ciWorkflow, /if: github.event_name == 'schedule' \\|\\| github.event_name == 'workflow_dispatch'/);
-  assert.match(ciWorkflow, /cancel-in-progress: false/);
+  assert.match(ciWorkflow, /group: validate-icloud-price-comparison-\$\{\{ github\.ref \}\}/);
+  assert.match(ciWorkflow, /cancel-in-progress: \$\{\{ github\.event_name == 'pull_request' \}\}/);
   assert.doesNotMatch(ciWorkflow, /run: pnpm test:browsers/);
   assert.match(ciWorkflow, /PLAYWRIGHT_BROWSER: \$\{\{ matrix\.browser \}\}[\s\S]*?node --test test\/ui-smoke\.test\.mjs/);
   const coreJob = ciWorkflow.match(/\n  core:[\s\S]*?(?=\n  browser:)/)?.[0] ?? '';
@@ -319,7 +320,7 @@ test('runs the same UI acceptance suite in Chromium, Firefox, and WebKit', async
   assert.match(webkitRunner, /PLAYWRIGHT_BROWSER = 'webkit'[\s\S]*?import\('\.\.\/test\/ui-smoke\.test\.mjs'\)/);
 });
 
-test('automates only official GitHub Actions updates after exact-SHA validation', async () => {
+test('auto-merges only verified Dependabot dependency scopes after exact validation', async () => {
   const [autoMergeWorkflow, dependabot] = await Promise.all([
     readFile(autoMergeWorkflowUrl, 'utf8'),
     readFile(dependabotUrl, 'utf8'),
@@ -333,7 +334,12 @@ test('automates only official GitHub Actions updates after exact-SHA validation'
   assert.doesNotMatch(dependabot, /pip|docker/);
 
   assert.match(autoMergeWorkflow, /workflow_run:[\s\S]*?Validate iCloud price comparison[\s\S]*?completed/);
-  assert.match(autoMergeWorkflow, /workflow_run\.conclusion == 'success'[\s\S]*?workflow_run\.event == 'pull_request'[\s\S]*?workflow_run\.actor\.login == 'dependabot\[bot\]'[\s\S]*?startsWith\(github\.event\.workflow_run\.head_branch, 'dependabot\/github_actions\/'\)[\s\S]*?pull_requests\[0\]\.number > 0/);
+  assert.match(autoMergeWorkflow, /workflow_run\.conclusion == 'success'/);
+  assert.match(autoMergeWorkflow, /workflow_run\.event == 'pull_request'/);
+  assert.match(autoMergeWorkflow, /workflow_run\.actor\.login == 'dependabot\[bot\]'/);
+  assert.match(autoMergeWorkflow, /startsWith\(github\.event\.workflow_run\.head_branch, 'dependabot\/github_actions\/'\)/);
+  assert.match(autoMergeWorkflow, /startsWith\(github\.event\.workflow_run\.head_branch, 'dependabot\/npm_and_yarn\/tools\/icloud_price_comparison\/'\)/);
+  assert.match(autoMergeWorkflow, /pull_requests\[0\]\.number > 0/);
   assert.match(autoMergeWorkflow, /permissions:\s+contents: write\s+pull-requests: write/);
   assert.doesNotMatch(autoMergeWorkflow, /pull_request_target|secrets\.(?!GITHUB_TOKEN)/);
   assert.match(autoMergeWorkflow, /ref: \$\{\{ github\.event\.repository\.default_branch \}\}[\s\S]*?persist-credentials: false/);

@@ -94,12 +94,15 @@ ExchangeRate-API ───┘        │
 
 每日更新由内置 `GITHUB_TOKEN` 推送的数据提交不会再触发普通 push 验证，因此每日 workflow 自身的 core/data/runner Chrome/工件验证就是自动数据发布门禁。
 
-### Dependabot
+### Dependabot 与依赖自动合并
 
-- npm：每周检查。
-- GitHub Actions：每周检查。
-- 只有满足仓库自动合并 workflow 精确约束的官方 `actions/*` 完整 SHA 一对一更新可自动合并。
-- npm 依赖、第三方 Action、可变 tag、业务文件或额外 workflow 改动必须人工审核。
+- npm：每周一北京时间 10:20 检查；GitHub Actions：每周一 12:20 检查。两个窗口都放在每日价格更新之后，并彼此错开，尽量避免多个自动任务同时推进 `main`。
+- npm 的常规 version update 将全部 patch/minor 更新合并为一个 routine PR，major 保持单独 PR；安全更新不受该 version group 限制。routine PR、直接依赖的向前 patch/minor 更新，以及不改变 `package.json` 语义的 lockfile-only 传递依赖更新，都必须先完整通过 core、artifact、全部 snapshots、`pnpm audit` 和 Chromium / Firefox / WebKit 验收。
+- 完整验证成功后，可信默认分支上的自动合并器再次确认：作者必须是 `dependabot[bot]`、分支属于本仓库、base/head SHA 与刚通过测试的精确提交一致；文件范围只能是单独 `pnpm-lock.yaml`，或 `package.json` + `pnpm-lock.yaml`。若 `package.json` 发生变化，依赖名称不得新增/删除，除现有依赖精确版本 pin 外其他字段必须完全不变，所有版本只能向前做 patch/minor 更新；若仅 lockfile 变化，则 base/head 的 `package.json` 必须完全一致。全部满足才 squash merge 精确 head SHA。
+- npm major 更新、依赖新增/删除、版本范围、`packageManager` / scripts / 业务文件变化，或任意额外文件改动都不会自动合并，必须人工审核。
+- Lucide 的实际版本只在 `package.json` / `pnpm-lock.yaml` 固定，不再在 vendor manifest 和 notice 重复维护版本字符串。vendor manifest 仍固定本地 subset 的文件名、包名、许可证和 SHA-256；CI 会验证实际安装包的 version/license，并把页面实际使用的每个 Lucide icon node 与当前 package pin 逐个深度比较。若上游修改许可证元数据或任一已使用图标，自动升级会自然失败关闭，直到人工复核并在需要时更新 subset/hash/notice。
+- 官方 `actions/*` 仍走更严格的供应链路径：只允许 workflow 中完整 SHA 一对一替换，自动合并器还会解析对应 release tag 并确认 tag 最终指向被 pin 的精确 commit。第三方 Action、可变 tag 或附带业务改动不会自动合并。
+- 自动合并 workflow 使用 `workflow_run`，有写权限的 job 只执行默认分支中的可信校验器，不执行 Dependabot PR 自带脚本，也不使用 `pull_request_target`。
 
 ## 5. 生产更新顺序
 
