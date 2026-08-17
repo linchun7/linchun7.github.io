@@ -573,11 +573,13 @@ function normalizedMarketSearchAliases(country) {
 function matchesCountrySearch(country, query) {
   if (!query) return true;
   const marketId = country.marketId.toLocaleLowerCase('en-US');
-  const namesAndRegion = `${country.country} ${country.nameZh ?? ''} ${REGION_LABELS[country.region] || country.region}`.toLocaleLowerCase('zh-CN');
+  const names = `${country.country} ${country.nameZh ?? ''}`.toLocaleLowerCase('zh-CN');
+  const region = (REGION_LABELS[country.region] || country.region).toLocaleLowerCase('zh-CN');
   const currency = country.currency.toLocaleLowerCase('en-US');
   const aliases = normalizedMarketSearchAliases(country);
   return marketId.includes(query)
-    || namesAndRegion.includes(query)
+    || names.includes(query)
+    || (query.length >= 2 && region.includes(query))
     || aliases.some((alias) => alias.includes(query))
     || currency === query;
 }

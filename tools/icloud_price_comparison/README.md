@@ -18,7 +18,7 @@
 - 市场身份按“已发布 identity ledger → active registry → future reservation → deterministic `apple-*` fallback”的安全顺序处理。`scripts/reserved-market-registry.mjs` 只提前预留高置信国家/地区 ID，不代表 Apple 当前提供这些市场；真正未识别的 Apple 市场才生成可复现的 `apple-*` ID，确认无冲突后可自动发布。
 - 页面默认按 200GB 人民币参考价从低到高排序；若未来 Apple 不再提供 200GB，则使用当前 `tiers` 中的首个容量作为默认容量。
 - 容量排序时显示生成器提供的全球 `cnyRank`，搜索或地区筛选不会把排名重算成局部排名；切换为国家/地区排序时数字改为当前列表序号，移动端明确显示为 `序1`、`序2`、`序3`……，不引入第二套价格排名。
-- 搜索对 `marketId`、人工维护的 search alias、中英文国家/地区名称和地区名称使用部分字符串匹配；完整 `marketId` 命中优先级最高，完整 search alias 次之，但都不排除其他合法部分匹配；币种仅按完整代码匹配，避免短字母把同币种市场全部带出。
+- 搜索对 `marketId`、人工维护的 search alias、中英文国家/地区名称使用部分字符串匹配；地区名称仅在搜索词至少 2 个字符时参与部分匹配，避免单字（例如“中”）误命中“欧洲、中东和非洲”等地区标签；完整 `marketId` 命中优先级最高，完整 search alias 次之，但都不排除其他合法部分匹配；币种仅按完整代码匹配，避免短字母把同币种市场全部带出。
 - 容量、排序方向、地区筛选等可分享状态写入规范 URL；站内搜索词不保留在 URL。允许的页面内跳转 fragment 仅有 `#priceWorkspace`，其他未知 fragment 会被清理。
 - 最低价卡片是导航操作：切换对应容量、从低到高排序并定位目标地区。
 - 当前价格不写入 `localStorage`、`sessionStorage`、IndexedDB 或 Service Worker；没有浏览器持久价格缓存。

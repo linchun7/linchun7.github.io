@@ -3298,6 +3298,21 @@ test('supports friendly market search aliases and prioritizes exact alias hits',
       await page.waitForFunction((marketId) => document.querySelector('#priceRows tr[data-market-id]')?.dataset.marketId === marketId, expectedMarketId);
       assert.equal(await page.locator('#priceRows tr[data-market-id]').first().getAttribute('data-market-id'), expectedMarketId);
     }
+    const search = page.locator('#searchInput');
+    await search.fill('中');
+    await page.waitForFunction(() => {
+      const rows = [...document.querySelectorAll('#priceRows tr[data-market-id]')];
+      return rows.some((row) => row.dataset.marketId === 'cn')
+        && !rows.some((row) => row.dataset.marketId === 'ng');
+    });
+    assert.equal(await page.locator('#priceRows tr[data-market-id="cn"]').count(), 1, 'single-character country search must still match 中国大陆');
+    assert.equal(await page.locator('#priceRows tr[data-market-id="ng"]').count(), 0, 'single-character 中 must not match Nigeria through the EMEA region label');
+
+    await search.fill('中东');
+    await page.waitForFunction(() => [...document.querySelectorAll('#priceRows tr[data-market-id]')]
+      .some((row) => row.dataset.marketId === 'ng'));
+    assert.equal(await page.locator('#priceRows tr[data-market-id="ng"]').count(), 1, 'multi-character region search must still match 欧洲、中东和非洲');
+
   } finally {
     await browser.close();
   }

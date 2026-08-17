@@ -40,7 +40,7 @@ Apple Support HTML ─┐
 - 不做模糊 market rename 自动绑定；只有严格高置信 identity ambiguity 才要求维护者显式增加 alias。
 - 默认 200GB 人民币参考价升序；200GB 不存在时使用当前 tier 列表首项作为默认容量。
 - 容量价格排序显示生成器提供的全球 `cnyRank`；搜索和地区筛选不重算局部排名。国家/地区排序改用当前列表序号，移动端显示为 `序N`，与价格排名语义明确分离但共用同一列表顺序数据。
-- 搜索对 `marketId`、`MARKET_SEARCH_ALIASES`、中英文国家/地区名和地区名做部分匹配；完整 `marketId` 优先级最高，完整 search alias 次之，均不排除其他部分匹配；币种只按完整代码匹配。
+- 搜索对 `marketId`、`MARKET_SEARCH_ALIASES`、中英文国家/地区名做部分匹配；地区名仅在搜索词至少 2 个字符时参与部分匹配，防止单字误命中整片分区；完整 `marketId` 优先级最高，完整 search alias 次之，均不排除其他部分匹配；币种只按完整代码匹配。
 - 最低价提示由生成器 `cnyRank === 1` 决定，不以显示后的两位小数重新排名。
 - 当前价格不写入浏览器持久存储；静态 HTML 是无 JavaScript/网络失败时的正式 fallback。
 - URL query 只保留规范的 `tier`、`sort`、`dir`、`region`；搜索词与未知状态不持久化。唯一允许保留的页面内 fragment 是 `#priceWorkspace`，其他未知 fragment 会被清理。
