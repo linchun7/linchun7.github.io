@@ -1,18 +1,15 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import {
+  MARKET_REGISTRY,
   createPublishedMarketResolver,
   resolveMarket,
   validateMarketIdentityContinuity,
   validateReservedMarketRegistry
 } from '../scripts/market-registry.mjs';
 import { RESERVED_MARKET_REGISTRY } from '../scripts/reserved-market-registry.mjs';
-import { migrateMarketIdentityPayloads } from '../scripts/migrate-market-id.mjs';
-
-const pricesUrl = new URL('../data/prices.json', import.meta.url);
-const historyUrl = new URL('../data/history.json', import.meta.url);
+import { MARKET_SEARCH_ALIASES, validateMarketSearchAliases } from '../data-model.js';
 
 test('pre-reserves friendly IDs for plausible future markets without claiming they are active', () => {
   const reservations = validateReservedMarketRegistry();
@@ -50,35 +47,37 @@ test('published fallback identity wins over a reservation added later', () => {
   assert.doesNotThrow(() => validateMarketIdentityContinuity(previousData, previousHistory));
 });
 
-test('explicit migration can move a reviewed apple-* fallback to a friendly ID atomically at payload level', async () => {
-  const [prices, history] = await Promise.all([
-    readFile(pricesUrl, 'utf8').then(JSON.parse),
-    readFile(historyUrl, 'utf8').then(JSON.parse)
-  ]);
-  const sourceId = 'apple-united-states-review-test-12345678';
-  const testPrices = structuredClone(prices);
-  const testHistory = structuredClone(history);
-  const country = testPrices.countries.find(({ marketId }) => marketId === 'us');
-  assert.ok(country, 'fixture must contain the United States market');
-  country.marketId = sourceId;
-  testHistory.markets[sourceId] = testHistory.markets.us;
-  delete testHistory.markets.us;
-
-  const migrated = migrateMarketIdentityPayloads(testPrices, testHistory, { from: sourceId, to: 'us' });
-  assert.equal(migrated.sourceName, 'United States');
-  assert.equal(migrated.prices.countries.find(({ country: name }) => name === 'United States').marketId, 'us');
-  assert.ok(migrated.history.markets.us);
-  assert.equal(Object.hasOwn(migrated.history.markets, sourceId), false);
-  assert.equal(country.marketId, sourceId, 'the pure migration helper must not mutate its inputs');
+test('future reservations fail in CI when a friendly ID is already owned by different history', () => {
+  const previousHistory = {
+    schemaVersion: 4,
+    markets: { de: { country: 'Legacy German Code Owner' } }
+  };
+  assert.throws(
+    () => validateMarketIdentityContinuity(null, previousHistory),
+    (error) => error.code === 'MARKET_IDENTITY_REKEY'
+      && /future market Germany cannot reserve historical marketId de/.test(error.message)
+  );
 });
 
-test('explicit migration rejects an unreviewed target or non-fallback source', async () => {
-  const [prices, history] = await Promise.all([
-    readFile(pricesUrl, 'utf8').then(JSON.parse),
-    readFile(historyUrl, 'utf8').then(JSON.parse)
-  ]);
+test('search aliases are unique, safe, and cannot shadow active or future identity codes', () => {
+  const marketIds = [
+    ...Object.values(MARKET_REGISTRY).map(({ id }) => id),
+    ...Object.values(RESERVED_MARKET_REGISTRY).map(({ id }) => id)
+  ];
+  assert.equal(validateMarketSearchAliases(MARKET_SEARCH_ALIASES, marketIds), MARKET_SEARCH_ALIASES);
   assert.throws(
-    () => migrateMarketIdentityPayloads(prices, history, { from: 'us', to: 'de' }),
-    /Only deterministic apple-\* fallback identities/
+    () => validateMarketSearchAliases({ us: ['friendly'], gb: ['friendly'] }, marketIds),
+    /belongs to both/
+  );
+  assert.throws(
+    () => validateMarketSearchAliases({ us: ['de'] }, marketIds),
+    /shadows marketId de/
+  );
+});
+
+test('does not ship a routine marketId rekey tool after an identity has been published', async () => {
+  await assert.rejects(
+    import('../scripts/migrate-market-id.mjs'),
+    (error) => error?.code === 'ERR_MODULE_NOT_FOUND'
   );
 });

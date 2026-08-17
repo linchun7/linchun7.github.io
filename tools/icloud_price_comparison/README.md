@@ -12,7 +12,7 @@
 
 当前长期约束如下，修改这些行为应视为产品契约变化，而不是普通 UI 调整：
 
-- 公共数据使用 schema 4，市场使用稳定 `marketId`。
+- 公共数据使用 schema 4；一个市场只要正式发布过一次，其 `marketId` 就永久冻结，不做常规 rekey。
 - Apple 英文支持页决定 active market、价格、币种、容量和发布日期；Apple 简体中文支持页只用于已经复核的官方中文市场名称。
 - 欧元区中文名称保持“欧盟”。中文名称尚未确认时保留 Apple 英文名称，不阻断价格更新。
 - 市场身份按“已发布 identity ledger → active registry → future reservation → deterministic `apple-*` fallback”的安全顺序处理。`scripts/reserved-market-registry.mjs` 只提前预留高置信国家/地区 ID，不代表 Apple 当前提供这些市场；真正未识别的 Apple 市场才生成可复现的 `apple-*` ID，确认无冲突后可自动发布。
@@ -74,7 +74,7 @@ Apple Support HTML ─┐
 | 文件 | 用途 | 关键约束 |
 | --- | --- | --- |
 | `data/prices.json` | schema 4 当前价格与公共运行元数据 | 当前价格唯一事实源；含稳定 `marketId`、`cnyPrice`、`cnyRank`；不公开 raw FX rates、内部全精度值或 API Key 状态 |
-| `data/history.json` | 以 `marketId` 为键的价格/币种事件和 Apple 发布日期事件 | 只有实际事件、迁移或结构变化时才改写；历史市场 ID 永久保留 |
+| `data/history.json` | 以 `marketId` 为键的价格/币种事件和 Apple 发布日期事件 | 只有实际事件或结构变化时才改写；已经发布的市场 ID 永久保留且不 rekey |
 | `data/run-log.json` | 最近成功运行的来源、数量、耗时和变化 | 保留最近 90 条成功运行，不公开凭据配置/状态 |
 | `data/apple-snapshots/` | Apple 价格页面的规范化 JSON 证据与索引 | 不保存原始 HTML；同一发布日期的不同修订不会互相覆盖 |
 
@@ -102,31 +102,17 @@ Apple Support HTML ─┐
 
 浏览器端友好搜索别名维护在 `data-model.js` 的 `MARKET_SEARCH_ALIASES`。例如 `uk → gb`、`usa → us`、`turkey → tr`。search alias 只改善用户搜索，不改变永久 `marketId`，也不写入公共价格 schema。
 
-如果一个真正未知市场已经以 `apple-*` fallback 发布，后来才确认它对应某个友好代码，**默认不 rekey**：已发布 identity 继续保持 sticky，可以给原 `marketId` 增加合适的 `MARKET_SEARCH_ALIASES`，让用户用友好代码找到它而不破坏历史。
+如果一个真正未知市场已经以 `apple-*` fallback 发布，后来才确认它对应某个友好代码，**仍然不 rekey**：这个 `apple-*` 就是该市场的永久 identity。只给原 `marketId` 增加合适的 `MARKET_SEARCH_ALIASES`，让用户用友好代码找到它而不破坏历史。
 
 - 已从 Apple 页面移除的历史市场 ID 仍永久 reserved，不得分配给其他市场。
 - 新生成或预留的 ID 如果与 active registry 或历史 ledger 冲突，以 `MARKET_IDENTITY_RESERVED_ID_COLLISION` 失败关闭，不随机换 ID。
 - 不做模糊名称匹配，不自动把“疑似改名”绑定到旧市场。只有满足严格双向唯一和完整结构一致的高置信 ambiguity 才停止并要求显式 alias；弱信号只记录 review warning。
 
-### 极少数显式 marketId migration
+### marketId 永久不可变
 
-只有确实需要把一个**已经发布的 `apple-*` fallback**迁移到经过人工复核的 active/reserved ID 时，才使用显式迁移工具。普通 registry 编辑不能静默改历史 ID。
+`marketId` 一旦进入已发布的 `prices.json` / `history.json` identity ledger 就不再修改。仓库不提供日常 rekey/migration 工具，也不允许为了代码更短、ISO 代码更漂亮或搜索更方便而迁移历史身份。友好搜索需求只通过 `MARKET_SEARCH_ALIASES` 解决；如果未来发现真正的历史身份错误，应针对该事故单独设计、审核和验证一次性修复，而不是建立常规改 ID 通道。
 
-先 dry-run：
-
-```bash
-node scripts/migrate-market-id.mjs --from <apple-...> --to <reviewed-id>
-```
-
-确认目标 ID 已先进入 active/reserved registry、没有任何 active/history 冲突并审核完整 diff 后，才允许写入：
-
-```bash
-node scripts/migrate-market-id.mjs --from <apple-...> --to <reviewed-id> --write
-```
-
-工具只接受 `apple-*` 作为源 ID，会同步迁移 `prices.json` 与 `history.json` 的 identity、重新生成 `index.html`，并在失败时恢复原文件。迁移后必须运行 core、artifact、snapshots 和三浏览器验收，再通过普通 PR 发布；不要手工改单个 JSON key。
-
-相关长期边界由 `test/market-registry.test.mjs`、`test/market-identity-reservations.test.mjs` 和 `test/documentation-contract.test.mjs` 共同保护。
+长期边界由 `test/market-registry.test.mjs`、`test/market-identity-reservations.test.mjs` 和 `test/documentation-contract.test.mjs` 共同保护。
 
 ## 页面生成与 SEO
 
@@ -178,6 +164,8 @@ pnpm audit --audit-level low
 - `pnpm update:data`：写生产数据，只用于明确的手动更新或隔离环境。
 
 完整 `pnpm test` 等价于 core 后执行三浏览器验收。
+
+关键架构文件发生变化时，PR CI 会强制要求 `README.md` 与 `OPERATIONS.md` 同步修改；只改代码不更新这两份长期文档会直接失败。文档契约测试随后继续校验关键规则内容，避免只做空白式文档改动。
 
 本地预览从仓库根目录启动：
 

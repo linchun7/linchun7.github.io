@@ -172,6 +172,7 @@ export function createPublishedMarketResolver(previousData, previousHistory, {
         id: historical.marketId,
         sourceName: name,
         nameZh: getOfficialChineseMarketName(historical.marketId) ?? name,
+        reserved: false,
         published: true,
         preservedPublishedIdentity: resolved.id !== historical.marketId
       };
@@ -222,6 +223,20 @@ export function validateMarketIdentityContinuity(previousData, previousHistory, 
     const registryNames = [market.canonicalName, ...(market.aliases ?? [])].map(normalizedNameKey);
     if (!registryNames.some((name) => publishedNames.has(name))) {
       throw marketIdentityError(`registry market ${market.canonicalName} occupies reserved marketId ${market.id}`);
+    }
+  }
+
+  // Future ID candidates are allowed to name an already-published identity only when
+  // every historical owner is the same reviewed source identity. This makes a bad
+  // reservation fail in CI, before Apple ever activates that market name.
+  for (const market of Object.values(reservedRegistryFor(registry))) {
+    const owners = published.ownersById.get(market.id);
+    if (!owners?.length) continue;
+    const acceptedNames = new Set([market.canonicalName, ...(market.aliases ?? [])].map(normalizedNameKey));
+    const conflicts = owners.filter(({ identityKey }) => !acceptedNames.has(identityKey));
+    if (conflicts.length) {
+      const occupiedBy = conflicts.map(({ sourceName, location }) => `${sourceName} (${location})`).join(', ');
+      throw marketIdentityError(`future market ${market.canonicalName} cannot reserve historical marketId ${market.id}; occupied by ${occupiedBy}`);
     }
   }
   return { status: 'passed', reservedMarketIds: [...publishedNamesById.keys()].sort() };
