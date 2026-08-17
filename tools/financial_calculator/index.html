@@ -1,68 +1,56 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-
 <head>
-
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, maximum-scale=1, user-scalable=no">
-    <link rel="stylesheet" href="../css/bootstrap.min.css">
-    <link rel="stylesheet" href="styles.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="format-detection" content="telephone=no">
+    <meta name="description" content="金融计算器：计算年化收益率、利息收益、净值年化收益率和复利收益。">
+    <link rel="stylesheet" href="../css/bootstrap.min.css">
+    <link rel="stylesheet" href="styles.css?v=20260817-1">
     <link rel="shortcut icon" href="/images/favicon.ico">
     <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
     <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
-    <title>金融计算器 - 算年化收益率、算利息收益、算净值收益率、算复利收益</title>
+    <script src="script.js?v=20260817-1" defer></script>
+    <title>金融计算器 - 年化收益率、利息收益、净值收益率、复利收益</title>
 
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-K2S9L4CHNP"></script>
     <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-
-      gtag('config', 'G-K2S9L4CHNP');
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-K2S9L4CHNP');
     </script>
-
 </head>
-
 <body>
-    <div class="container my-4">
-        <ul class="nav nav-tabs justify-content-center" id="myTabs">
-            <li class="nav-item" role="presentation">
-                <a class="nav-link active" id="tab1" data-bs-toggle="tab" data-bs-target="#content1" role="tab" aria-controls="content1" aria-selected="true">年化收益率</a>
-            </li>
-            <li class="nav-item" role="presentation">
-                <a class="nav-link" id="tab2" data-bs-toggle="tab" data-bs-target="#content2" role="tab" aria-controls="content2" aria-selected="false">利息收益</a>
-            </li>
-            <li class="nav-item" role="presentation">
-                <a class="nav-link" id="tab3" data-bs-toggle="tab" data-bs-target="#content3" role="tab" aria-controls="content3" aria-selected="false">净值收益率</a>
-            </li>
-            <li class="nav-item" role="presentation">
-                <a class="nav-link" id="tab4" data-bs-toggle="tab" data-bs-target="#content4" role="tab" aria-controls="content4" aria-selected="false">复利收益</a>
-            </li>
-        </ul>
+    <main class="container my-4">
+        <header class="calculator-header">
+            <h1>金融计算器</h1>
+            <p>计算年化收益率、利息收益、净值年化收益率和复利收益。</p>
+        </header>
+
+        <div class="nav nav-tabs justify-content-center" id="myTabs" role="tablist" aria-label="金融计算类型">
+            <button class="nav-link active" id="tab1" type="button" data-target="content1" role="tab" aria-controls="content1" aria-selected="true">年化收益率</button>
+            <button class="nav-link" id="tab2" type="button" data-target="content2" role="tab" aria-controls="content2" aria-selected="false">利息收益</button>
+            <button class="nav-link" id="tab3" type="button" data-target="content3" role="tab" aria-controls="content3" aria-selected="false">净值收益率</button>
+            <button class="nav-link" id="tab4" type="button" data-target="content4" role="tab" aria-controls="content4" aria-selected="false">复利收益</button>
+        </div>
+
         <div class="tab-content" id="contents">
-            <!-- 算年化收益率内容 -->
-            <div id="content1" class="function-content tab-pane fade show active">
+            <section id="content1" class="function-content tab-pane show active" role="tabpanel" aria-labelledby="tab1">
                 <div class="mb-3 row align-items-center">
                     <label for="principal1" class="form-label col-auto mb-0">本金：</label>
-                    <div class="col">
-                        <input type="number" class="form-control" id="principal1">
-                    </div>
+                    <div class="col"><input type="number" class="form-control" id="principal1" min="0" step="0.01" inputmode="decimal"></div>
                     <span class="col-auto">元</span>
                 </div>
                 <div class="mb-3 row align-items-center">
                     <label for="days1" class="form-label col-auto mb-0">天数：</label>
-                    <div class="col">
-                        <input type="number" class="form-control" id="days1">
-                    </div>
+                    <div class="col"><input type="number" class="form-control" id="days1" min="1" step="1" inputmode="numeric"></div>
                     <span class="col-auto">天</span>
                 </div>
                 <div class="mb-3 row align-items-center">
                     <label for="interest1" class="form-label col-auto mb-0">收益：</label>
-                    <div class="col">
-                        <input type="number" class="form-control" id="interest1">
-                    </div>
+                    <div class="col"><input type="number" class="form-control" id="interest1" step="0.01" inputmode="decimal"></div>
                     <span class="col-auto">元</span>
                 </div>
                 <div class="mb-3 row align-items-center">
@@ -77,35 +65,27 @@
                 </div>
                 <div class="mb-3 row justify-content-center">
                     <div class="col-auto">
-                        <button id="empty1" class="btn btn-primary">清空</button>
-                        <button id="calculate1" class="btn btn-primary">计算</button>
+                        <button id="empty1" type="button" class="btn btn-outline-secondary">清空</button>
+                        <button id="calculate1" type="button" class="btn btn-primary">计算</button>
                     </div>
                 </div>
+                <div class="mt-3 result-info" id="result1" role="status" aria-live="polite"></div>
+            </section>
 
-                <div class="mt-3 result-info" id="result1"></div>
-            </div>
-
-            <!-- 算利息收益内容 -->
-            <div id="content2" class="function-content tab-pane fade">
+            <section id="content2" class="function-content tab-pane" role="tabpanel" aria-labelledby="tab2" hidden>
                 <div class="mb-3 row align-items-center">
                     <label for="principal2" class="form-label col-auto mb-0">本金：</label>
-                    <div class="col">
-                        <input type="number" class="form-control" id="principal2">
-                    </div>
+                    <div class="col"><input type="number" class="form-control" id="principal2" min="0" step="0.01" inputmode="decimal"></div>
                     <span class="col-auto">元</span>
                 </div>
                 <div class="mb-3 row align-items-center">
                     <label for="days2" class="form-label col-auto mb-0">天数：</label>
-                    <div class="col">
-                        <input type="number" class="form-control" id="days2">
-                    </div>
+                    <div class="col"><input type="number" class="form-control" id="days2" min="1" step="1" inputmode="numeric"></div>
                     <span class="col-auto">天</span>
                 </div>
                 <div class="mb-3 row align-items-center">
                     <label for="annualRate2" class="form-label col-auto mb-0">年化收益率：</label>
-                    <div class="col">
-                        <input type="number" class="form-control" id="annualRate2">
-                    </div>
+                    <div class="col"><input type="number" class="form-control" id="annualRate2" step="0.01" inputmode="decimal"></div>
                     <span class="col-auto">%</span>
                 </div>
                 <div class="mb-3 row align-items-center">
@@ -120,43 +100,33 @@
                 </div>
                 <div class="mb-3 row justify-content-center">
                     <div class="col-auto">
-                        <button id="empty2" class="btn btn-primary">清空</button>
-                        <button id="calculate2" class="btn btn-primary">计算</button>
+                        <button id="empty2" type="button" class="btn btn-outline-secondary">清空</button>
+                        <button id="calculate2" type="button" class="btn btn-primary">计算</button>
                     </div>
                 </div>
-                <div class="mt-3 result-info" id="result2"></div>
-            </div>
+                <div class="mt-3 result-info" id="result2" role="status" aria-live="polite"></div>
+            </section>
 
-
-            <!-- 净值收益率内容 -->
-            <div id="content3" class="function-content tab-pane fade">
+            <section id="content3" class="function-content tab-pane" role="tabpanel" aria-labelledby="tab3" hidden>
                 <div class="mb-3 row align-items-center">
                     <label for="startDate" class="form-label col-auto mb-0">起始日期：</label>
-                    <div class="col">
-                        <input type="date" class="form-control" id="startDate">
-                    </div>
-                    <span class="col-auto"></span>
+                    <div class="col"><input type="date" class="form-control" id="startDate"></div>
+                    <span class="col-auto placeholder">&#12288;</span>
                 </div>
                 <div class="mb-3 row align-items-center">
                     <label for="startNetValue" class="form-label col-auto mb-0">起始净值：</label>
-                    <div class="col">
-                        <input type="number" class="form-control" id="startNetValue" step="0.01">
-                    </div>
-                    <span class="col-auto"></span>
+                    <div class="col"><input type="number" class="form-control" id="startNetValue" min="0" step="0.0001" inputmode="decimal"></div>
+                    <span class="col-auto placeholder">&#12288;</span>
                 </div>
                 <div class="mb-3 row align-items-center">
                     <label for="endDate" class="form-label col-auto mb-0">终止日期：</label>
-                    <div class="col">
-                        <input type="date" class="form-control" id="endDate">
-                    </div>
-                    <span class="col-auto"></span>
+                    <div class="col"><input type="date" class="form-control" id="endDate"></div>
+                    <span class="col-auto placeholder">&#12288;</span>
                 </div>
                 <div class="mb-3 row align-items-center">
                     <label for="endNetValue" class="form-label col-auto mb-0">终止净值：</label>
-                    <div class="col">
-                        <input type="number" class="form-control" id="endNetValue" step="0.01">
-                    </div>
-                    <span class="col-auto"></span>
+                    <div class="col"><input type="number" class="form-control" id="endNetValue" min="0" step="0.0001" inputmode="decimal"></div>
+                    <span class="col-auto placeholder">&#12288;</span>
                 </div>
                 <div class="mb-3 row align-items-center">
                     <label for="rateType3" class="form-label col-auto mb-0">年投资天数：</label>
@@ -166,24 +136,21 @@
                             <option value="365">按 365 天</option>
                         </select>
                     </div>
-                    <span class="col-auto placeholder"></span>
+                    <span class="col-auto placeholder">&#12288;</span>
                 </div>
                 <div class="mb-3 row justify-content-center">
                     <div class="col-auto">
-                        <button id="empty3" class="btn btn-primary">清空</button>
-                        <button id="calculate3" class="btn btn-primary">计算</button>
+                        <button id="empty3" type="button" class="btn btn-outline-secondary">清空</button>
+                        <button id="calculate3" type="button" class="btn btn-primary">计算</button>
                     </div>
                 </div>
-                <div class="mt-3 result-info" id="result3"></div>
-            </div>
+                <div class="mt-3 result-info" id="result3" role="status" aria-live="polite"></div>
+            </section>
 
-            <!-- 算复利收益内容 -->
-            <div id="content4" class="function-content tab-pane fade">
+            <section id="content4" class="function-content tab-pane" role="tabpanel" aria-labelledby="tab4" hidden>
                 <div class="mb-3 row align-items-center">
                     <label for="principal3" class="form-label col-auto mb-0">本金：</label>
-                    <div class="col">
-                        <input type="number" class="form-control" id="principal3">
-                    </div>
+                    <div class="col"><input type="number" class="form-control" id="principal3" min="0" step="0.01" inputmode="decimal"></div>
                     <span class="col-auto">元</span>
                 </div>
                 <div class="mb-3 row align-items-center">
@@ -202,16 +169,12 @@
                 </div>
                 <div class="mb-3 row align-items-center">
                     <label for="depositPeriod" class="form-label col-auto mb-0">存期：</label>
-                    <div class="col">
-                        <input type="number" class="form-control" id="depositPeriod">
-                    </div>
+                    <div class="col"><input type="number" class="form-control" id="depositPeriod" min="1" step="1" inputmode="numeric"></div>
                     <span class="col-auto" id="frequency">年</span>
                 </div>
                 <div class="mb-3 row align-items-center">
                     <label for="annualRate3" class="form-label col-auto mb-0">年化收益率：</label>
-                    <div class="col">
-                        <input type="number" class="form-control" id="annualRate3">
-                    </div>
+                    <div class="col"><input type="number" class="form-control" id="annualRate3" step="0.01" inputmode="decimal"></div>
                     <span class="col-auto">%</span>
                 </div>
                 <div class="mb-3 row align-items-center">
@@ -226,71 +189,20 @@
                 </div>
                 <div class="mb-3 row justify-content-center">
                     <div class="col-auto">
-                        <button id="empty4" class="btn btn-primary">清空</button>
-                        <button id="calculate4" class="btn btn-primary">计算</button>
+                        <button id="empty4" type="button" class="btn btn-outline-secondary">清空</button>
+                        <button id="calculate4" type="button" class="btn btn-primary">计算</button>
                     </div>
                 </div>
-                <div class="mt-3 result-info" id="result4"></div>
+                <div class="mt-3 result-info" id="result4" role="status" aria-live="polite"></div>
                 <div class="mt-3" id="result4-table"></div>
-            </div>
-
-
+            </section>
         </div>
-    </div>
 
-
-
-
+        <p class="calculator-note">计算结果仅基于输入参数和所选计息口径，不构成投资、贷款或税务建议。</p>
+    </main>
 
     <footer>
-        <p>&copy; 2023 <a href="https://www.linchun.com.cn">林春写字的地方</a></p>
+        <p>&copy; 2026 <a href="https://www.linchun.com.cn">林春写字的地方</a></p>
     </footer>
-
-    <script>
-        window.onload = function() {
-            const compoundingFrequencyElement = document.getElementById("compoundingFrequency");
-            const depositPeriodElement = document.getElementById("depositPeriod");
-            const frequencyElement = document.getElementById("frequency");
-
-            function updateControls() {
-                const newCompoundingFrequency = compoundingFrequencyElement.value;
-
-                // 更新存期单位
-                switch (newCompoundingFrequency) {
-                    case "annually":
-                        frequencyElement.textContent = "年";
-                        break;
-                    case "semi-annually":
-                        frequencyElement.textContent = "半年";
-                        break;
-                    case "quarterly":
-                        frequencyElement.textContent = "季";
-                        break;
-                    case "monthly":
-                        frequencyElement.textContent = "月";
-                        break;
-                    case "weekly":
-                        frequencyElement.textContent = "周";
-                        break;
-                    case "daily":
-                        frequencyElement.textContent = "日";
-                        break;
-                    default:
-                        frequencyElement.textContent = "年";
-                        break;
-                }
-            }
-
-            // 设置默认值和监听事件
-            updateControls();
-
-            // 当"复利方式"选择变更时
-            compoundingFrequencyElement.addEventListener("change", updateControls);
-        };
-    </script>
-
-
-    <script src="script.js"></script>
 </body>
-
 </html>

@@ -1,0 +1,71 @@
+name: Validate static tools
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/validate-static-tools.yml'
+      - 'tools/myip/**'
+      - 'tools/financial_calculator/**'
+      - 'tools/browser-tests/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/validate-static-tools.yml'
+      - 'tools/myip/**'
+      - 'tools/financial_calculator/**'
+      - 'tools/browser-tests/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-static-tools-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  browser:
+    name: 静态工具浏览器测试 (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: 配置 Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: 安装浏览器测试依赖
+        working-directory: tools/browser-tests
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: 安装 ${{ matrix.browser }}
+        working-directory: tools/browser-tests
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+
+      - name: 运行 ${{ matrix.browser }} 兼容性测试
+        env:
+          PLAYWRIGHT_BROWSER: ${{ matrix.browser }}
+          BASE_URL: http://127.0.0.1:4173
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/static-tools-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          sleep 1
+          node tools/browser-tests/static-tools-smoke.mjs
+
+      - name: 检查差异格式
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: git diff --check "$BASE_SHA" HEAD

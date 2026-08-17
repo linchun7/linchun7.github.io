@@ -15,9 +15,10 @@ const LONG_LIVED_WORKFLOWS = [
   'icloud-repository-maintenance.yml',
   'update-icloud-prices.yml',
   'validate-icloud-price-comparison.yml',
+  'validate-static-tools.yml',
 ];
 
-test('keeps the automation surface limited to four long-lived workflows', async () => {
+test('keeps the automation surface limited to five reviewed long-lived workflows', async () => {
   const workflows = (await readdir(workflowsDirUrl))
     .filter((name) => /\.ya?ml$/i.test(name))
     .sort();

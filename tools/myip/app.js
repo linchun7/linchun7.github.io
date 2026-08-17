@@ -1,217 +1,417 @@
-const $$ = document;
-let random = parseInt(Math.random() * 100000000);
+(() => {
+    'use strict';
 
-let IP = {
-    get: (url, type) => fetch(url, { method: 'GET' })
-        .then((resp) => {
-            if (type === 'text')
-                return Promise.all([resp.ok, resp.status, resp.text(), resp.headers]);
-            else {
-                return Promise.all([resp.ok, resp.status, resp.json(), resp.headers]);
+    const REQUEST_TIMEOUT_MS = 7000;
+    const WEBRTC_TIMEOUT_MS = 5000;
+    const REACHABILITY_TIMEOUT_MS = 6000;
+
+    const providerResults = new Map();
+
+    const $ = (id) => document.getElementById(id);
+
+    function normalizeText(value) {
+        if (value === null || value === undefined) return '';
+        return String(value).trim();
+    }
+
+    function joinText(values) {
+        return values.map(normalizeText).filter(Boolean).join(' ');
+    }
+
+    function isIpAddress(value) {
+        const text = normalizeText(value);
+        if (!text) return false;
+
+        const ipv4 = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/;
+        if (ipv4.test(text)) return true;
+
+        // Browsers may expose compressed IPv6 forms (for example 2001:db8::1).
+        // A lightweight shape check is sufficient here because the value is display-only
+        // and still comes from a trusted JSON field/candidate parser before textContent rendering.
+        const ipv6 = text.split('%')[0];
+        return ipv6.includes(':') && ipv6.length <= 45 && /^[0-9a-f:.]+$/i.test(ipv6);
+    }
+
+    function createTimeoutError(label) {
+        const error = new Error(`${label || '请求'}超时`);
+        error.name = 'TimeoutError';
+        return error;
+    }
+
+    async function fetchWithTimeout(url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
+        const controller = typeof AbortController === 'function' ? new AbortController() : null;
+        let timeoutId;
+
+        const timeoutPromise = new Promise((_, reject) => {
+            timeoutId = window.setTimeout(() => {
+                if (controller) controller.abort();
+                reject(createTimeoutError());
+            }, timeoutMs);
+        });
+
+        try {
+            const response = await Promise.race([
+                fetch(url, {
+                    cache: 'no-store',
+                    credentials: 'omit',
+                    ...options,
+                    ...(controller ? { signal: controller.signal } : {})
+                }),
+                timeoutPromise
+            ]);
+
+            if (response.type !== 'opaque' && !response.ok) {
+                throw new Error(`HTTP ${response.status}`);
             }
-        })
-        .then(([ok, status, data, headers]) => {
-            if (ok) {
-                let json = { ok, status, data, headers }
-                return json;
-            } else {
-                throw new Error(JSON.stringify(json.error));
+
+            return response;
+        } catch (error) {
+            if (error && error.name === 'AbortError') {
+                throw createTimeoutError();
             }
-        }).catch(error => {
             throw error;
-        }),
+        } finally {
+            window.clearTimeout(timeoutId);
+        }
+    }
 
-    getJsonp: (url) => {
-        var script = document.createElement('script');
-        script.src = url
-        document.head.appendChild(script);
-    },
+    async function fetchJson(url) {
+        const response = await fetchWithTimeout(url, {
+            method: 'GET',
+            mode: 'cors',
+            headers: { Accept: 'application/json' }
+        });
+        return response.json();
+    }
 
-    parseIPMoeip: (ip, elID) => {
-        IP.get(`https://ip.mcr.moe/?ip=${ip}&unicode&z=${random}`, 'json')
-            .then(resp => {
-                $$.getElementById(elID).innerHTML = `${resp.data.country} ${resp.data.area} ${resp.data.provider}`;
-            })
-    },
+    function setText(id, value) {
+        const element = $(id);
+        if (!element) return;
+        element.textContent = normalizeText(value);
+    }
 
-    parseIPIpapi: (ip, elID) => {
-        IP.get(`https://ipapi.co/${ip}/json?z=${random}`, 'json')
-            .then(resp => {
-                $$.getElementById(elID).innerHTML = `${resp.data.country_name} ${resp.data.city} ${resp.data.org}`;
-            })
-    },
+    function setStatus(id, state, text) {
+        const element = $(id);
+        if (!element) return;
+        element.className = `status-pill status-${state}`;
+        element.textContent = text;
+    }
 
-    getWebrtcIP: function() {
-        window.RTCPeerConnection = window.RTCPeerConnection || window.mozRTCPeerConnection  || window.webkitRTCPeerConnection;
-        var webrtc = new RTCPeerConnection({ iceServers: []}), i = function() {};
-        webrtc.createDataChannel("");
-        webrtc.createOffer(webrtc.setLocalDescription.bind(webrtc), i);
+    function setProviderLoading(id) {
+        providerResults.delete(id);
+        setText(`${id}-ip`, '查询中…');
+        setText(`${id}-detail`, '正在连接数据源');
+        setStatus(`${id}-status`, 'loading', '查询中');
+    }
 
-        webrtc.onicecandidate = function(con) {
-            try {
-                if (con && con.candidate && con.candidate.candidate) {
-                    var webctrip = /([0-9]{1,3}(\.[0-9]{1,3}){3}|[a-f0-9]{1,4}(:[a-f0-9]{1,4}){7})/
-                        .exec(con.candidate.candidate)[1];
-                    $$.getElementById("ip-webrtc").innerHTML = webctrip;
-                    webrtc.onicecandidate = i;
-                    $$.getElementById("ip-webrtc-geo").innerHTML = "WebRTC Leaked IP"
-                } else {
-                    // WebRTC IPs
-                    const iceServers = [
-                        { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:stun1.l.google.com:19302' },
-                        { urls: 'stun:stun2.l.google.com:19302' },
-                        { urls: 'stun:stun3.l.google.com:19302' },
-                        { urls: 'stun:stun4.l.google.com:19302' },
-                    ];
+    function setProviderSuccess(id, result) {
+        const ip = normalizeText(result.ip);
+        const detail = normalizeText(result.detail) || '已获取公网地址';
+        providerResults.set(id, { ip, detail });
+        setText(`${id}-ip`, ip || '未返回 IP');
+        setText(`${id}-detail`, detail);
+        setStatus(`${id}-status`, 'success', '正常');
+        updateSummary();
+    }
 
-                    // getUserIPs function
-                    async function getUserIPs(callback) {
-                        try {
-                            const myPeerConnection = new RTCPeerConnection({ iceServers });
-                            myPeerConnection.createDataChannel("");
-                            const offer = await myPeerConnection.createOffer();
-                            await myPeerConnection.setLocalDescription(offer);
-                            myPeerConnection.onicecandidate = function(event) {
-                                if (event.candidate) {
-                                    const parts = event.candidate.candidate.split(' ');
-                                    const ip = parts[4];
-                                    callback(ip);
-                                }
-                            };
-                        } catch (error) {
-                            console.error("Error retrieving IP addresses:", error);
-                            callback(null);
-                        }
+    function setProviderError(id, error) {
+        providerResults.delete(id);
+        setText(`${id}-ip`, '暂不可用');
+        setText(`${id}-detail`, error instanceof Error ? error.message : '请求失败');
+        setStatus(`${id}-status`, 'error', '失败');
+        updateSummary();
+    }
+
+    function uniqueIps() {
+        return [...new Set(
+            [...providerResults.values()]
+                .map((item) => normalizeText(item.ip))
+                .filter(isIpAddress)
+        )];
+    }
+
+    function updateSummary() {
+        const ips = uniqueIps();
+        const summaryIp = $('summary-ip');
+        const summaryDetail = $('summary-detail');
+        const summaryStatus = $('summary-status');
+
+        if (!summaryIp || !summaryDetail || !summaryStatus) return;
+
+        if (ips.length === 0) {
+            summaryIp.textContent = '正在获取公网 IP…';
+            summaryDetail.textContent = '各数据源会独立重试，单个服务失败不会影响其他结果。';
+            summaryStatus.className = 'status-pill status-loading';
+            summaryStatus.textContent = '查询中';
+            return;
+        }
+
+        if (ips.length === 1) {
+            summaryIp.textContent = ips[0];
+            summaryDetail.textContent = providerResults.size >= 2
+                ? `已有 ${providerResults.size} 个数据源返回结果。`
+                : '已获取公网出口地址，其他数据源仍在查询。';
+            summaryStatus.className = 'status-pill status-success';
+            summaryStatus.textContent = '已获取';
+            return;
+        }
+
+        summaryIp.textContent = ips.join(' / ');
+        summaryDetail.textContent = '不同服务返回了不同出口 IP，常见于 IPv4/IPv6 双栈、代理、VPN 或 iCloud Private Relay。';
+        summaryStatus.className = 'status-pill status-warning';
+        summaryStatus.textContent = '多出口';
+    }
+
+    const providers = [
+        {
+            id: 'provider-baidu',
+            async load() {
+                const data = await fetchJson('https://qifu-api.baidubce.com/ip/local/geo/v1/district');
+                if (!data || !isIpAddress(data.ip)) throw new Error('百度接口未返回有效 IP');
+                return {
+                    ip: data.ip,
+                    detail: joinText([
+                        data.data && data.data.country,
+                        data.data && data.data.prov,
+                        data.data && data.data.city,
+                        data.data && data.data.district,
+                        data.data && data.data.isp
+                    ])
+                };
+            }
+        },
+        {
+            id: 'provider-ipsb',
+            async load() {
+                const data = await fetchJson('https://api.ip.sb/geoip');
+                if (!data || !isIpAddress(data.ip)) throw new Error('IP.SB 未返回有效 IP');
+                return {
+                    ip: data.ip,
+                    detail: joinText([data.country, data.city, data.organization])
+                };
+            }
+        },
+        {
+            id: 'provider-ipify',
+            async load() {
+                const data = await fetchJson('https://api64.ipify.org?format=json');
+                if (!data || !isIpAddress(data.ip)) throw new Error('IPify 未返回有效 IP');
+
+                let detail = 'IPify 公网地址';
+                try {
+                    const geo = await fetchJson(`https://ipapi.co/${encodeURIComponent(data.ip)}/json/`);
+                    detail = joinText([geo.country_name, geo.region, geo.city, geo.org]) || detail;
+                } catch (error) {
+                    console.warn('IPify 地理信息查询失败：', error);
+                }
+
+                return { ip: data.ip, detail };
+            }
+        }
+    ];
+
+    async function loadProvider(provider) {
+        setProviderLoading(provider.id);
+        try {
+            const result = await provider.load();
+            setProviderSuccess(provider.id, result);
+        } catch (error) {
+            console.warn(`${provider.id} 查询失败：`, error);
+            setProviderError(provider.id, error);
+        }
+    }
+
+    function getCandidateAddress(candidate) {
+        if (!candidate) return '';
+
+        if (candidate.address) {
+            return normalizeText(candidate.address);
+        }
+
+        const raw = normalizeText(candidate.candidate);
+        const parts = raw.split(/\s+/);
+        return parts.length >= 6 ? normalizeText(parts[4]) : '';
+    }
+
+    async function collectWebRtcCandidates() {
+        const PeerConnection = window.RTCPeerConnection || window.webkitRTCPeerConnection;
+        if (typeof PeerConnection !== 'function') {
+            return {
+                state: 'unsupported',
+                title: '浏览器未提供 WebRTC',
+                detail: '公网 IP 查询不受影响。'
+            };
+        }
+
+        let pc;
+        const found = new Map();
+        let sawMdns = false;
+
+        try {
+            pc = new PeerConnection({
+                iceServers: [
+                    { urls: 'stun:stun.cloudflare.com:3478' },
+                    { urls: 'stun:stun.l.google.com:19302' }
+                ]
+            });
+
+            pc.createDataChannel('network-probe');
+
+            await new Promise(async (resolve, reject) => {
+                let settled = false;
+                const finish = () => {
+                    if (settled) return;
+                    settled = true;
+                    window.clearTimeout(timer);
+                    resolve();
+                };
+
+                const timer = window.setTimeout(finish, WEBRTC_TIMEOUT_MS);
+
+                pc.onicecandidate = (event) => {
+                    if (!event.candidate) {
+                        finish();
+                        return;
                     }
 
-                    getUserIPs((ip) => {
-                        if (ip) {
-                            const ipv4Regex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-                            const ipv6Regex = /^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}(([0-9a-fA-F]{1,4}:){1,4}|((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))$/;
-                            if (ipv4Regex.test(ip)) {
-                                $$.getElementById("ip-webrtc").innerHTML = ip;
-                                $$.getElementById("ip-webrtc-geo").innerHTML = "WebRTC Leaked IP"
-                            } else if (ipv6Regex.test(ip)) {
-                                $$.getElementById("ip-webrtc-geo").innerHTML = "WebRTC IPv6: "+ip;
-                            }
-                        } else {
-                            $$.getElementById("ip-webrtc").innerHTML = "N/A";
-                        }
-                    });
+                    const address = getCandidateAddress(event.candidate);
+                    const type = normalizeText(event.candidate.type) || 'candidate';
+
+                    if (/\.local$/i.test(address)) {
+                        sawMdns = true;
+                        return;
+                    }
+
+                    if (isIpAddress(address)) {
+                        found.set(`${type}:${address}`, { type, address });
+                    }
+                };
+
+                pc.onicecandidateerror = (event) => {
+                    console.warn('WebRTC ICE candidate error:', event && event.errorText ? event.errorText : event);
+                };
+
+                try {
+                    const offer = await pc.createOffer();
+                    await pc.setLocalDescription(offer);
+                } catch (error) {
+                    reject(error);
                 }
-            } catch {
-                $$.getElementById("ip-webrtc").innerHTML = "N/A";
+            });
+        } finally {
+            if (pc) {
+                pc.onicecandidate = null;
+                pc.onicecandidateerror = null;
+                pc.close();
             }
         }
-    },
 
-    getIpipnetIP: () => {
-        IP.get(`https://myip.ipip.net/?z=${random}`, 'text')
-            .then((resp) => {
-                let data = resp.data.replace('当前 IP：', '').split(' 来自于：');
-                $$.getElementById('ip-ipipnet').innerHTML = `<p id="ip-ipipnet">${data[0]}</p><p class="sk-text-small" id="ip-ipipnet-geo">${data[1]}</p>`;
-            });
-    },
+        const candidates = [...found.values()];
+        if (candidates.length > 0) {
+            const summary = candidates
+                .slice(0, 4)
+                .map((item) => `${item.type}: ${item.address}`)
+                .join(' · ');
+            return {
+                state: 'success',
+                title: summary,
+                detail: sawMdns
+                    ? '同时检测到 mDNS 隐私候选；浏览器可能隐藏真实局域网地址。'
+                    : 'WebRTC 候选仅用于网络诊断，不作为公网 IP 的唯一判断依据。'
+            };
+        }
 
-    getbaidubceIP: () => {
-        IP.get(`https://qifu-api.baidubce.com/ip/local/geo/v1/district?r=${random}`, 'json')
-            .then(resp => {
-                $$.getElementById('ip-baidubce').innerHTML = resp.data.ip;
-                $$.getElementById('ip-baidubce-geo').innerHTML = `${resp.data.data.country} ${resp.data.data.prov} ${resp.data.data.city} ${resp.data.data.district} ${resp.data.data.isp}`;
-            })    
-    },
+        if (sawMdns) {
+            return {
+                state: 'privacy',
+                title: '本地地址已被浏览器隐藏',
+                detail: '检测到 mDNS 候选。这是 Safari/WebKit 等现代浏览器的正常隐私保护。'
+            };
+        }
 
-    getQQIP: () => {
-        window.qq = (data) => {
-            displayQQData(data);
+        return {
+            state: 'privacy',
+            title: '浏览器未暴露网络候选',
+            detail: '可能由浏览器隐私策略、Private Relay、VPN 或 STUN 网络限制导致；公网 IP 查询仍可正常使用。'
         };
-        IP.getJsonp("https://r.inews.qq.com/api/ip2city?otype=jsonp&callback=qq");
-    },
+    }
 
-    getIpsbIP: () => {
-        IP.get(`https://api.ip.sb/geoip?z=${random}`, 'json')
-            .then(resp => {
-                $$.getElementById('ip-ipsb').innerHTML = resp.data.ip;
-                $$.getElementById('ip-ipsb-geo').innerHTML = `${resp.data.country} ${resp.data.city} ${resp.data.organization}`;
-            })
-    },
+    async function loadWebRtc() {
+        setText('webrtc-ip', '检测中…');
+        setText('webrtc-detail', 'WebRTC 仅作为辅助诊断，不影响公网 IP 查询。');
+        setStatus('webrtc-status', 'loading', '检测中');
 
-    getIpifyIP: () => {
-        IP.get(`https://api.ipify.org/?format=json&z=${random}`, 'json')
-            .then(resp => {
-                $$.getElementById('ip-ipify').innerHTML = resp.data.ip;
-                return resp.data.ip;
-            })
-            .then(ip => {
-                IP.parseIPIpapi(ip, 'ip-ipify-geo');
-            })
-            .catch(e => {
-                console.log('Failed to load resource: api.ipify.org')
-            })
-    },
+        try {
+            const result = await collectWebRtcCandidates();
+            setText('webrtc-ip', result.title);
+            setText('webrtc-detail', result.detail);
 
-    getIpapiIP: () => {
-        IP.get(`https://ipapi.co/json?z=${random}`, 'json')
-            .then(resp => {
-                $$.getElementById('ip-ipapi').innerHTML = resp.data.ip;
-                IP.parseIPIpapi(resp.data.ip, 'ip-ipapi-geo');
-            })
-            .catch(e => {
-                console.log('Failed to load resource: ipapi.co')
-            })
-    },
-	getipinfoIP: () => {
-        IP.get(`https://ipinfo.io/json?${random}`, 'json')
-            .then(resp => {
-                $$.getElementById('ip-ipinfo').innerHTML = resp.data.ip;
-                $$.getElementById('ip-ipinfo-geo').innerHTML = `${resp.data.country} ${resp.data.city} ${resp.data.org}`;
-            })
-            .catch(e => {
-                console.log('Failed to load resource: ipinfo.co')
-            })
-    },
-	
-};
+            if (result.state === 'success') {
+                setStatus('webrtc-status', 'success', '已检测');
+            } else if (result.state === 'unsupported') {
+                setStatus('webrtc-status', 'warning', '不支持');
+            } else {
+                setStatus('webrtc-status', 'warning', '隐私保护');
+            }
+        } catch (error) {
+            console.warn('WebRTC 检测失败：', error);
+            setText('webrtc-ip', 'WebRTC 检测不可用');
+            setText('webrtc-detail', error instanceof Error ? error.message : '检测失败');
+            setStatus('webrtc-status', 'error', '失败');
+        }
+    }
 
-// 定义回调函数，处理 QQ IP 数据
-function displayQQData(data) {
-    if (data && typeof data === 'object' && data.ip) {
-        $$.getElementById('ip-QQ').innerHTML = data.ip;
-        $$.getElementById('ip-QQ-geo').innerHTML = `${data.country} ${data.province} ${data.city} ${data.district}`;
+    const reachabilityTargets = [
+        { id: 'reach-baidu', url: 'https://www.baidu.com/favicon.ico' },
+        { id: 'reach-netease', url: 'https://music.163.com/favicon.ico' },
+        { id: 'reach-github', url: 'https://github.com/favicon.ico' },
+        { id: 'reach-youtube', url: 'https://www.youtube.com/favicon.ico' }
+    ];
+
+    async function checkReachability(target) {
+        setStatus(`${target.id}-status`, 'loading', '检测中');
+        setText(`${target.id}-detail`, '正在建立连接');
+
+        try {
+            await fetchWithTimeout(target.url, { method: 'GET', mode: 'no-cors' }, REACHABILITY_TIMEOUT_MS);
+            setStatus(`${target.id}-status`, 'success', '可连接');
+            setText(`${target.id}-detail`, '浏览器能够发起网络请求');
+        } catch (error) {
+            setStatus(`${target.id}-status`, 'error', '不可达');
+            setText(
+                `${target.id}-detail`,
+                error && error.name === 'TimeoutError' ? '连接超时' : '请求被阻断或网络不可达'
+            );
+        }
+    }
+
+    function runAll() {
+        providerResults.clear();
+        updateSummary();
+
+        providers.forEach((provider) => {
+            loadProvider(provider);
+        });
+
+        loadWebRtc();
+
+        reachabilityTargets.forEach((target) => {
+            checkReachability(target);
+        });
+    }
+
+    function init() {
+        const retryButton = $('retry-all');
+        if (retryButton) {
+            retryButton.addEventListener('click', runAll);
+        }
+
+        runAll();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init, { once: true });
     } else {
-        console.error('Failed to load QQ IP data');
-        $$.getElementById('ip-QQ').innerHTML = '无法加载 QQ IP 数据';
-        $$.getElementById('ip-QQ-geo').innerHTML = '';
+        init();
     }
-}
-
-let HTTP = {
-    checker: (domain, cbElID) => {
-        let img = new Image;
-        let timeout = setTimeout(() => {
-            img.onerror = img.onload = null;
-            img.src = '';
-            $$.getElementById(cbElID).innerHTML = '<span class="sk-text-error">连接超时</span>'
-        }, 6000);
-
-        img.onerror = () => {
-            clearTimeout(timeout);
-            $$.getElementById(cbElID).innerHTML = '<span class="sk-text-error">无法访问</span>'
-        }
-
-        img.onload = () => {
-            clearTimeout(timeout);
-            $$.getElementById(cbElID).innerHTML = '<span class="sk-text-success">连接正常</span>'
-        }
-
-        img.src = `https://${domain}/favicon.ico?${+(new Date)}`
-    },
-
-    runcheck: () => {
-        HTTP.checker('www.baidu.com', 'http-baidu');
-        HTTP.checker('s1.music.126.net/style', 'http-163');
-        HTTP.checker('github.com', 'http-github');
-        HTTP.checker('www.youtube.com', 'http-youtube');
-    }
-};
+})();

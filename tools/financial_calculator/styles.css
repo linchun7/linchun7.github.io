@@ -1,3 +1,166 @@
-/* build time:Mon Dec 23 2024 19:00:59 GMT+0800 (中国标准时间)*/
-body{font-family:"Helvetica Neue",Helvetica,Arial,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;margin:0;padding:0;display:flex;flex-direction:column;min-height:100vh;margin-right:calc(100% - 100vw);overflow-x:hidden}h2{margin:20px;font-size:24px;text-align:center}.container{flex-grow:1;padding:20px;max-width:600px}.col{padding-right:0}.placeholder{visibility:hidden}.select-style{text-align:center}.nav-tabs .nav-link.active{font-size:1.25em;font-weight:700}.tab-content{margin-top:30px}table tbody td,table thead th{font-family:Menlo,Consolas,monospace;padding-left:10px;padding-right:10px}footer{text-align:center;margin:0 auto;text-overflow:ellipsis;overflow:hidden;white-space:nowrap;max-width:600px}footer p{margin:5px 0}footer a{color:inherit;text-decoration:none}footer a:visited{color:inherit;text-decoration:none}footer a:hover{color:#0842a0;text-decoration:underline}footer a:active{position:relative;top:1px}.inline-elements{display:inline}.inline-block-elements{display:inline-block;width:auto}.result-info{font-weight:700;font-size:1.1em}
-/* rebuild by neat */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    overflow-x: hidden;
+    color: #111827;
+    background: #f8fafc;
+}
+
+.container {
+    flex-grow: 1;
+    padding: 20px;
+    max-width: 720px;
+}
+
+.calculator-header {
+    margin: 8px auto 24px;
+    text-align: center;
+}
+
+.calculator-header h1 {
+    margin: 0 0 6px;
+    font-size: 30px;
+}
+
+.calculator-header p,
+.calculator-note {
+    color: #667085;
+}
+
+.col {
+    padding-right: 0;
+}
+
+.placeholder {
+    visibility: hidden;
+}
+
+.select-style {
+    text-align: center;
+}
+
+.nav-tabs {
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.nav-tabs .nav-link {
+    border: 0;
+    border-bottom: 2px solid transparent;
+    color: #475467;
+    background: transparent;
+    cursor: pointer;
+}
+
+.nav-tabs .nav-link.active {
+    border-bottom-color: #0d6efd;
+    color: #0d6efd;
+    font-size: 1.05em;
+    font-weight: 700;
+}
+
+.tab-content {
+    margin-top: 28px;
+    padding: 22px;
+    border: 1px solid #e4e7ec;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 8px 24px rgba(16, 24, 40, 0.05);
+}
+
+.result-info {
+    min-height: 1.8em;
+    font-weight: 700;
+    font-size: 1.08em;
+}
+
+.result-success {
+    color: #067647;
+}
+
+.result-error {
+    color: #b42318;
+}
+
+.calculator-note {
+    margin: 18px 4px 0;
+    font-size: 12px;
+    text-align: center;
+}
+
+.compound-table-wrap {
+    max-height: 460px;
+    overflow: auto;
+    border: 1px solid #e4e7ec;
+    border-radius: 10px;
+}
+
+.compound-table {
+    margin-bottom: 0;
+    min-width: 620px;
+}
+
+.compound-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #f9fafb;
+}
+
+.compound-table td,
+.compound-table th {
+    padding-left: 10px;
+    padding-right: 10px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    white-space: nowrap;
+}
+
+.detail-limit-note {
+    margin: 0;
+    padding: 12px 14px;
+    border-radius: 10px;
+    color: #b54708;
+    background: #fffaeb;
+    font-size: 13px;
+}
+
+footer {
+    margin: 0 auto;
+    padding: 8px 16px 18px;
+    max-width: 720px;
+    color: #667085;
+    text-align: center;
+    font-size: 13px;
+}
+
+footer p {
+    margin: 5px 0;
+}
+
+footer a {
+    color: inherit;
+    text-decoration: none;
+}
+
+footer a:hover {
+    color: #0842a0;
+    text-decoration: underline;
+}
+
+@media (max-width: 576px) {
+    .container {
+        padding: 14px;
+    }
+
+    .tab-content {
+        padding: 16px 13px;
+    }
+
+    .calculator-header h1 {
+        font-size: 26px;
+    }
+}
