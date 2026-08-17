@@ -48,7 +48,7 @@ jobs:
           needs_docs=false
           while IFS= read -r file; do
             case "$file" in
-              .github/workflows/update-icloud-prices.yml|.github/workflows/validate-icloud-price-comparison.yml|tools/icloud_price_comparison/data-contract.js|tools/icloud_price_comparison/data-model.js|tools/icloud_price_comparison/script.js|tools/icloud_price_comparison/scripts/market-registry.mjs|tools/icloud_price_comparison/scripts/reserved-market-registry.mjs|tools/icloud_price_comparison/scripts/update-prices.mjs|tools/icloud_price_comparison/scripts/parse-prices.mjs|tools/icloud_price_comparison/scripts/render-static-page.mjs|tools/icloud_price_comparison/scripts/static-page.mjs|tools/icloud_price_comparison/scripts/validate-data-artifact.mjs)
+              .github/workflows/update-icloud-prices.yml|.github/workflows/validate-icloud-price-comparison.yml|tools/icloud_price_comparison/data-contract.js|tools/icloud_price_comparison/data-model.js|tools/icloud_price_comparison/scripts/market-registry.mjs|tools/icloud_price_comparison/scripts/reserved-market-registry.mjs|tools/icloud_price_comparison/scripts/update-prices.mjs|tools/icloud_price_comparison/scripts/parse-prices.mjs|tools/icloud_price_comparison/scripts/render-static-page.mjs|tools/icloud_price_comparison/scripts/static-page.mjs|tools/icloud_price_comparison/scripts/validate-data-artifact.mjs)
                 needs_docs=true
                 ;;
             esac
@@ -61,6 +61,39 @@ jobs:
               fi
             done
           fi
+      - name: 强制已发布 marketId 永久保留
+        if: github.event_name == 'pull_request'
+        working-directory: .
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          import { readFileSync } from 'node:fs';
+
+          const historyPath = 'tools/icloud_price_comparison/data/history.json';
+          const base = JSON.parse(execFileSync('git', ['show', `${process.env.BASE_SHA}:${historyPath}`], { encoding: 'utf8' }));
+          const head = JSON.parse(readFileSync(historyPath, 'utf8'));
+          const baseMarkets = base.markets ?? {};
+          const headMarkets = head.markets ?? {};
+
+          const missing = Object.keys(baseMarkets).filter((marketId) => !Object.hasOwn(headMarkets, marketId));
+          if (missing.length) {
+            console.error(`Published marketId removed from history ledger: ${missing.join(', ')}`);
+            process.exit(1);
+          }
+
+          const key = (value) => String(value ?? '').normalize('NFKC').trim().toLocaleLowerCase('en-US');
+          const baseBySourceName = new Map(Object.entries(baseMarkets).map(([marketId, record]) => [key(record.country), marketId]));
+          const rekeyed = Object.entries(headMarkets).filter(([marketId, record]) => {
+            const baseId = baseBySourceName.get(key(record.country));
+            return baseId && baseId !== marketId;
+          });
+          if (rekeyed.length) {
+            console.error(`Published source identity rekeyed: ${rekeyed.map(([marketId, record]) => `${record.country} -> ${marketId} (was ${baseBySourceName.get(key(record.country))})`).join('; ')}`);
+            process.exit(1);
+          }
+          NODE
       - name: 配置 Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -79,7 +112,14 @@ jobs:
         run: pnpm validate:snapshots
       - name: 检查依赖漏洞
         run: pnpm audit --audit-level low
+      - name: 检查已提交 PR 差异格式
+        if: github.event_name == 'pull_request'
+        working-directory: .
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: git diff --check "$BASE_SHA" HEAD
       - name: 检查工作区差异格式
+        if: github.event_name != 'pull_request'
         working-directory: .
         run: git diff --check
 
