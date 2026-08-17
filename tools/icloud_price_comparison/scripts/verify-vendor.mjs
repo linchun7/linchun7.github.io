@@ -46,6 +46,17 @@ for (const asset of manifest.assets) {
     throw new Error(`${asset.package} vendor asset is not pinned in package.json`);
   }
 
+  const installedPackage = JSON.parse(await readFile(
+    path.join(projectDir, 'node_modules', ...asset.package.split('/'), 'package.json'),
+    'utf8'
+  ));
+  if (installedPackage.version !== pinnedVersion) {
+    throw new Error(`${asset.package} installed version ${installedPackage.version ?? 'missing'} does not match package.json ${pinnedVersion}`);
+  }
+  if (installedPackage.license !== asset.license) {
+    throw new Error(`${asset.package} installed license ${installedPackage.license ?? 'missing'} does not match reviewed license ${asset.license}`);
+  }
+
   const bytes = await readFile(path.join(projectDir, 'vendor', asset.file));
   const sha256 = createHash('sha256').update(bytes).digest('hex');
   if (sha256 !== asset.sha256) throw new Error(`${asset.file} does not match its reviewed SHA-256`);
@@ -86,4 +97,4 @@ for (const [iconName, iconNode] of Object.entries(lucideSubset)) {
   }
 }
 
-console.log(`Verified ${manifest.assets.length} vendored assets, package pins, upstream icon nodes, hashes, usage, and notices (Lucide ${lucideVersion}).`);
+console.log(`Verified ${manifest.assets.length} vendored assets, installed package metadata, package pins, upstream icon nodes, hashes, usage, and notices (Lucide ${lucideVersion}).`);
