@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const dependabotUrl = new URL('../../../.github/dependabot.yml', import.meta.url);
 const autoMergeWorkflowUrl = new URL('../../../.github/workflows/auto-merge-official-actions.yml', import.meta.url);
+const validationWorkflowUrl = new URL('../../../.github/workflows/validate-icloud-price-comparison.yml', import.meta.url);
 const updateWorkflowUrl = new URL('../../../.github/workflows/update-icloud-prices.yml', import.meta.url);
 const manifestUrl = new URL('../vendor/manifest.json', import.meta.url);
 const noticesUrl = new URL('../THIRD_PARTY_NOTICES.md', import.meta.url);
@@ -23,6 +24,13 @@ test('stages automated maintenance after production and isolates npm dependency 
   assert.ok(npmStart >= 0 && actionsStart > npmStart);
   const npmBlock = dependabot.slice(npmStart, actionsStart);
   assert.doesNotMatch(npmBlock, /\n\s+groups:/, 'npm updates should remain independent so one incompatible package cannot block unrelated upgrades');
+});
+
+test('superseded PR validations cancel while main, manual, and scheduled validation remain complete', async () => {
+  const workflow = await readFile(validationWorkflowUrl, 'utf8');
+  assert.match(workflow, /group: validate-icloud-price-comparison-\$\{\{ github\.ref \}\}/);
+  assert.match(workflow, /cancel-in-progress: \$\{\{ github\.event_name == 'pull_request' \}\}/);
+  assert.doesNotMatch(workflow, /cancel-in-progress:\s*true/);
 });
 
 test('auto-merge is limited to trusted Dependabot scopes after successful full validation', async () => {
