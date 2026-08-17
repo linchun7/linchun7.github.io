@@ -1,4 +1,5 @@
 name: Temporary iCloud search alias integration
+# Retry after aligning the legacy continuity test with sticky apple-* identities.
 
 on:
   push:
