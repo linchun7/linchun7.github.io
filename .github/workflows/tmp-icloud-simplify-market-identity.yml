@@ -45,12 +45,33 @@ jobs:
         run: |
           pnpm assets:update
           pnpm render:static
-      - name: Validate core and artifacts
+      - name: Check generated assets
         working-directory: tools/icloud_price_comparison
         run: |
-          pnpm test:core
-          pnpm validate:artifact
-          pnpm validate:snapshots
+          pnpm assets:check
+          pnpm render:static:check
+          pnpm test:vendor
+      - name: Test documentation contract
+        working-directory: tools/icloud_price_comparison
+        run: node --test --test-concurrency=1 test/documentation-contract.test.mjs
+      - name: Test market identity
+        working-directory: tools/icloud_price_comparison
+        run: node --test --test-concurrency=1 test/market-registry.test.mjs
+      - name: Test workflow contracts
+        working-directory: tools/icloud_price_comparison
+        run: node --test --test-concurrency=1 test/automation-policy.test.mjs test/workflow.test.mjs
+      - name: Test updater
+        working-directory: tools/icloud_price_comparison
+        run: node --test --test-concurrency=1 test/update-prices.test.mjs
+      - name: Run full core suite
+        working-directory: tools/icloud_price_comparison
+        run: pnpm test:core
+      - name: Validate current artifact
+        working-directory: tools/icloud_price_comparison
+        run: pnpm validate:artifact
+      - name: Validate all snapshots
+        working-directory: tools/icloud_price_comparison
+        run: pnpm validate:snapshots
       - name: Check diff
         run: git diff --check
       - name: Commit project changes
