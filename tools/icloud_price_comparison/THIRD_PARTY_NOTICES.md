@@ -2,9 +2,11 @@
 
 This project includes the following locally served third-party software. These notices apply only to the named third-party components; they do not grant a license to the rest of this repository.
 
-## Lucide 1.31.0
+## Lucide
 
-Source: <https://github.com/lucide-icons/lucide/tree/1.31.0>
+Source: <https://github.com/lucide-icons/lucide>
+
+The exact reviewed version used by this project is pinned in `package.json` and `pnpm-lock.yaml`.
 
 ISC License
 

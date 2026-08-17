@@ -5,20 +5,25 @@ updates:
     schedule:
       interval: weekly
       day: monday
-      time: "08:20"
+      time: "10:20"
       timezone: Asia/Shanghai
     open-pull-requests-limit: 5
     groups:
-      icloud-price-dependencies:
+      # Batch low-risk version maintenance; major updates remain separate for manual review.
+      routine-icloud-dependencies:
+        applies-to: version-updates
         patterns:
           - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
       day: monday
-      time: "08:30"
+      time: "12:20"
       timezone: Asia/Shanghai
     open-pull-requests-limit: 1
     allow:

@@ -15,15 +15,22 @@ const [manifest, packageJson, notices, indexHtml, scriptSource, vendorEntries, l
   import('lucide')
 ]);
 
-if (manifest.schemaVersion !== 1 || !Array.isArray(manifest.assets) || !manifest.assets.length) {
+if (manifest.schemaVersion !== 2 || !Array.isArray(manifest.assets) || !manifest.assets.length) {
   throw new Error('Vendor manifest has an unsupported structure');
 }
 
 const manifestFiles = new Set();
 const manifestPackages = new Set();
+const pinnedVersions = new Map();
+for (const [packageName, version] of Object.entries({
+  ...(packageJson.dependencies ?? {}),
+  ...(packageJson.devDependencies ?? {}),
+})) {
+  pinnedVersions.set(packageName, version);
+}
 
 for (const asset of manifest.assets) {
-  if (Object.keys(asset).sort().join(',') !== 'file,license,package,sha256,version'
+  if (Object.keys(asset).sort().join(',') !== 'file,license,package,sha256'
     || !/^[a-z0-9][a-z0-9.-]*$/i.test(asset.file)
     || path.basename(asset.file) !== asset.file
     || !/^[a-f0-9]{64}$/.test(asset.sha256)
@@ -33,16 +40,30 @@ for (const asset of manifest.assets) {
   }
   manifestFiles.add(asset.file);
   manifestPackages.add(asset.package);
-  const pinnedVersion = packageJson.devDependencies?.[asset.package];
-  if (pinnedVersion !== asset.version) {
-    throw new Error(`${asset.package} vendor version ${asset.version} does not match package.json ${pinnedVersion ?? 'missing'}`);
+
+  const pinnedVersion = pinnedVersions.get(asset.package);
+  if (!pinnedVersion) {
+    throw new Error(`${asset.package} vendor asset is not pinned in package.json`);
   }
+
+  const installedPackage = JSON.parse(await readFile(
+    path.join(projectDir, 'node_modules', ...asset.package.split('/'), 'package.json'),
+    'utf8'
+  ));
+  if (installedPackage.version !== pinnedVersion) {
+    throw new Error(`${asset.package} installed version ${installedPackage.version ?? 'missing'} does not match package.json ${pinnedVersion}`);
+  }
+  if (installedPackage.license !== asset.license) {
+    throw new Error(`${asset.package} installed license ${installedPackage.license ?? 'missing'} does not match reviewed license ${asset.license}`);
+  }
+
   const bytes = await readFile(path.join(projectDir, 'vendor', asset.file));
   const sha256 = createHash('sha256').update(bytes).digest('hex');
   if (sha256 !== asset.sha256) throw new Error(`${asset.file} does not match its reviewed SHA-256`);
-  if (!notices.includes(`Lucide ${asset.version}`)) {
-    throw new Error(`${asset.package} ${asset.version} is missing from THIRD_PARTY_NOTICES.md`);
-  }
+}
+
+if (!notices.includes('## Lucide\n') && !notices.includes('## Lucide\r\n')) {
+  throw new Error('Lucide notice is missing from THIRD_PARTY_NOTICES.md');
 }
 
 const vendoredScripts = vendorEntries
@@ -54,6 +75,8 @@ if (JSON.stringify(vendoredScripts) !== JSON.stringify([...manifestFiles].sort()
 }
 
 const lucideAsset = manifest.assets.find(({ package: packageName }) => packageName === 'lucide');
+if (!lucideAsset) throw new Error('Lucide vendor asset is missing');
+const lucideVersion = pinnedVersions.get('lucide');
 const lucideSource = await readFile(path.join(projectDir, 'vendor', lucideAsset.file), 'utf8');
 const lucideObjectMatch = lucideSource.match(/const ICONS = (\{[\s\S]*?\n\});\n\nfunction setAttributes/);
 if (!lucideObjectMatch) throw new Error('Unable to parse the reviewed Lucide subset');
@@ -70,8 +93,8 @@ if (JSON.stringify(Object.keys(lucideSubset).sort()) !== JSON.stringify([...used
 for (const [iconName, iconNode] of Object.entries(lucideSubset)) {
   const exportName = iconName.split('-').map((part) => part[0].toUpperCase() + part.slice(1)).join('');
   if (!isDeepStrictEqual(iconNode, lucide[exportName])) {
-    throw new Error(`Lucide icon ${iconName} does not match pinned lucide ${lucideAsset.version}`);
+    throw new Error(`Lucide icon ${iconName} does not match package.json-pinned lucide ${lucideVersion}`);
   }
 }
 
-console.log(`Verified ${manifest.assets.length} vendored assets, pinned versions, upstream bytes/icon nodes, hashes, usage, and notices.`);
+console.log(`Verified ${manifest.assets.length} vendored assets, installed package metadata, package pins, upstream icon nodes, hashes, usage, and notices (Lucide ${lucideVersion}).`);

@@ -1,11 +1,15 @@
 import { execFile } from 'node:child_process';
 import { resolve } from 'node:path';
-import { promisify } from 'node:util';
+import { isDeepStrictEqual, promisify } from 'node:util';
 import { pathToFileURL } from 'node:url';
 
 const SHA_PATTERN = /^[a-f0-9]{40}$/;
 const WORKFLOW_PATH_PATTERN = /^\.github\/workflows\/[^/]+\.ya?ml$/;
 const ACTION_LINE_PATTERN = /^([+-])\s*uses:\s*(actions\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*)@([a-f0-9]{40})\s+#\s+(v\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?)\s*$/;
+const NPM_BRANCH_PREFIX = 'dependabot/npm_and_yarn/tools/icloud_price_comparison/';
+const NPM_PACKAGE_PATH = 'tools/icloud_price_comparison/package.json';
+const NPM_LOCK_PATH = 'tools/icloud_price_comparison/pnpm-lock.yaml';
+const STABLE_SEMVER_PATTERN = /^(\d+)\.(\d+)\.(\d+)$/;
 const MAX_CHANGED_FILES = 20;
 const MAX_ACTION_REFERENCES = 100;
 const execFileAsync = promisify(execFile);
@@ -14,14 +18,30 @@ function invariant(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-export function validatePullRequest(pr, expected) {
+function validateCommonPullRequest(pr, expected) {
   invariant(pr.state === 'open' && !pr.draft, 'Pull request must be open and ready');
   invariant(pr.user?.login === 'dependabot[bot]', 'Pull request author must be dependabot[bot]');
   invariant(pr.base?.ref === expected.defaultBranch, 'Pull request must target the default branch');
   invariant(pr.base?.sha === expected.baseSha, 'Base SHA changed after validation');
   invariant(pr.head?.sha === expected.headSha, 'Head SHA changed after validation');
   invariant(pr.head?.repo?.full_name === expected.repository, 'Dependabot branch must belong to this repository');
+}
+
+export function validatePullRequest(pr, expected) {
+  validateCommonPullRequest(pr, expected);
   invariant(pr.head?.ref?.startsWith('dependabot/github_actions/'), 'Pull request must be a GitHub Actions update');
+}
+
+export function validateNpmPullRequest(pr, expected) {
+  validateCommonPullRequest(pr, expected);
+  invariant(pr.head?.ref?.startsWith(NPM_BRANCH_PREFIX), 'Pull request must be an iCloud npm update');
+}
+
+function classifyDependabotPullRequest(pr, expected) {
+  validateCommonPullRequest(pr, expected);
+  if (pr.head?.ref?.startsWith('dependabot/github_actions/')) return 'github-actions';
+  if (pr.head?.ref?.startsWith(NPM_BRANCH_PREFIX)) return 'npm';
+  throw new Error('Dependabot branch is outside the approved automation scopes');
 }
 
 export function validateChangedFiles(files) {
@@ -61,6 +81,74 @@ export function validateChangedFiles(files) {
   }
 
   return changedReferenceCount;
+}
+
+export function validateNpmChangedFiles(files) {
+  invariant(files.length === 1 || files.length === 2, 'Routine npm update must change pnpm-lock.yaml, optionally with package.json');
+  const actualFiles = files.map(({ filename }) => filename).sort();
+  const lockOnly = [NPM_LOCK_PATH];
+  const directUpdate = [NPM_LOCK_PATH, NPM_PACKAGE_PATH].sort();
+  invariant(
+    isDeepStrictEqual(actualFiles, lockOnly) || isDeepStrictEqual(actualFiles, directUpdate),
+    'Routine npm update changed files outside the approved dependency pair'
+  );
+  for (const file of files) {
+    invariant(file.status === 'modified' && !file.previous_filename, 'Routine npm dependency files may only be modified');
+  }
+  return actualFiles.includes(NPM_PACKAGE_PATH);
+}
+
+function parseStableVersion(version, label) {
+  invariant(typeof version === 'string', `${label} must use an exact stable semver pin`);
+  const match = version.match(STABLE_SEMVER_PATTERN);
+  invariant(match, `${label} must use an exact stable semver pin`);
+  return match.slice(1).map(Number);
+}
+
+function compareVersions(left, right) {
+  for (let index = 0; index < 3; index += 1) {
+    if (left[index] !== right[index]) return left[index] - right[index];
+  }
+  return 0;
+}
+
+export function validateRoutineNpmPackageUpdate(basePackage, headPackage) {
+  invariant(basePackage && headPackage && typeof basePackage === 'object' && typeof headPackage === 'object', 'package.json payload is invalid');
+  const {
+    dependencies: baseDependencies = {},
+    devDependencies: baseDevDependencies = {},
+    ...baseRest
+  } = basePackage;
+  const {
+    dependencies: headDependencies = {},
+    devDependencies: headDevDependencies = {},
+    ...headRest
+  } = headPackage;
+
+  invariant(isDeepStrictEqual(baseRest, headRest), 'Routine npm update may only change dependency version pins');
+
+  const changes = [];
+  for (const [sectionName, baseSection, headSection] of [
+    ['dependencies', baseDependencies, headDependencies],
+    ['devDependencies', baseDevDependencies, headDevDependencies],
+  ]) {
+    const baseNames = Object.keys(baseSection).sort();
+    const headNames = Object.keys(headSection).sort();
+    invariant(isDeepStrictEqual(baseNames, headNames), `Routine npm update may not add or remove ${sectionName}`);
+
+    for (const packageName of baseNames) {
+      const before = baseSection[packageName];
+      const after = headSection[packageName];
+      if (before === after) continue;
+      const oldVersion = parseStableVersion(before, `${packageName} old version`);
+      const newVersion = parseStableVersion(after, `${packageName} new version`);
+      invariant(newVersion[0] === oldVersion[0], `${packageName} major update requires manual review`);
+      invariant(compareVersions(newVersion, oldVersion) > 0, `${packageName} update must move forward`);
+      changes.push({ packageName, before, after });
+    }
+  }
+
+  return changes;
 }
 
 async function githubRequest(repository, token, path, options = {}, fetchImpl = fetch) {
@@ -146,6 +234,23 @@ async function readPullRequestFiles(repository, token, pullNumber, fetchImpl) {
   return files;
 }
 
+async function readJsonAtRef(repository, token, path, ref, fetchImpl) {
+  const payload = await githubRequest(
+    repository,
+    token,
+    '/contents/' + path + '?ref=' + encodeURIComponent(ref),
+    {},
+    fetchImpl
+  );
+  invariant(payload?.encoding === 'base64' && typeof payload.content === 'string', `Unable to read ${path} at ${ref}`);
+  const text = Buffer.from(payload.content.replace(/\s+/g, ''), 'base64').toString('utf8');
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`${path} at ${ref} is not valid JSON`);
+  }
+}
+
 export async function main(env = process.env, fetchImpl = fetch, log = console.log, runGit = execFileAsync) {
   const {
     DEFAULT_BRANCH: defaultBranch,
@@ -165,7 +270,7 @@ export async function main(env = process.env, fetchImpl = fetch, log = console.l
   invariant(SHA_PATTERN.test(headSha || ''), 'RUN_HEAD_SHA must be a full SHA');
 
   const pullRequest = await githubRequest(repository, token, '/pulls/' + pullNumber, {}, fetchImpl);
-  validatePullRequest(pullRequest, { repository, defaultBranch, baseSha, headSha });
+  const kind = classifyDependabotPullRequest(pullRequest, { repository, defaultBranch, baseSha, headSha });
   invariant(
     Number.isSafeInteger(pullRequest.changed_files)
       && pullRequest.changed_files > 0
@@ -175,20 +280,42 @@ export async function main(env = process.env, fetchImpl = fetch, log = console.l
 
   const files = await readPullRequestFiles(repository, token, pullNumber, fetchImpl);
   invariant(files.length === pullRequest.changed_files, 'Changed-file list is incomplete');
-  const referenceCount = validateChangedFiles(files);
-  const actionReferences = collectNewActionReferences(files);
-  await verifyActionReferences(actionReferences, runGit);
+
+  let summary;
+  let commitTitle;
+  if (kind === 'github-actions') {
+    const referenceCount = validateChangedFiles(files);
+    const actionReferences = collectNewActionReferences(files);
+    await verifyActionReferences(actionReferences, runGit);
+    summary = `${referenceCount} official Action reference(s) and exact release tag(s)`;
+    commitTitle = 'chore: update official GitHub Actions (#' + pullNumber + ')';
+  } else {
+    const packageFileChanged = validateNpmChangedFiles(files);
+    const [basePackage, headPackage] = await Promise.all([
+      readJsonAtRef(repository, token, NPM_PACKAGE_PATH, baseSha, fetchImpl),
+      readJsonAtRef(repository, token, NPM_PACKAGE_PATH, headSha, fetchImpl),
+    ]);
+    const changes = validateRoutineNpmPackageUpdate(basePackage, headPackage);
+    if (packageFileChanged) {
+      invariant(changes.length > 0, 'package.json changed without an approved dependency version update');
+      summary = `${changes.length} routine npm dependency update(s)`;
+    } else {
+      invariant(changes.length === 0, 'Lockfile-only update unexpectedly changed package.json semantics');
+      summary = 'one lockfile-only transitive npm dependency update';
+    }
+    commitTitle = 'chore: update iCloud dependencies (#' + pullNumber + ')';
+  }
 
   const result = await githubRequest(repository, token, '/pulls/' + pullNumber + '/merge', {
     method: 'PUT',
     body: JSON.stringify({
-      commit_title: 'chore: update official GitHub Actions (#' + pullNumber + ')',
+      commit_title: commitTitle,
       merge_method: 'squash',
       sha: headSha,
     }),
   }, fetchImpl);
   invariant(result.merged === true, result.message || 'GitHub did not merge the pull request');
-  log('Merged Dependabot PR #' + pullNumber + ' after validating ' + referenceCount + ' official Action reference(s) and exact release tag(s).');
+  log(`Merged Dependabot PR #${pullNumber} after validating ${summary}.`);
 }
 
 function logInline(value, maximumCodePoints = 1000) {
@@ -203,7 +330,7 @@ function logInline(value, maximumCodePoints = 1000) {
 const isDirectRun = process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url;
 if (isDirectRun) {
   main().catch((error) => {
-    console.error(`Official Action auto-merge failed: ${logInline(error?.message ?? error)}`);
+    console.error(`Dependabot auto-merge failed: ${logInline(error?.message ?? error)}`);
     process.exitCode = 1;
   });
 }
