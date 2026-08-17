@@ -9,7 +9,7 @@ const updateWorkflowUrl = new URL('../../../.github/workflows/update-icloud-pric
 const manifestUrl = new URL('../vendor/manifest.json', import.meta.url);
 const noticesUrl = new URL('../THIRD_PARTY_NOTICES.md', import.meta.url);
 
-test('stages automated maintenance after production and isolates npm dependency PRs', async () => {
+test('stages maintenance after production and groups only routine npm version updates', async () => {
   const [dependabot, updateWorkflow] = await Promise.all([
     readFile(dependabotUrl, 'utf8'),
     readFile(updateWorkflowUrl, 'utf8'),
@@ -23,7 +23,8 @@ test('stages automated maintenance after production and isolates npm dependency 
   const actionsStart = dependabot.indexOf('package-ecosystem: github-actions');
   assert.ok(npmStart >= 0 && actionsStart > npmStart);
   const npmBlock = dependabot.slice(npmStart, actionsStart);
-  assert.doesNotMatch(npmBlock, /\n\s+groups:/, 'npm updates should remain independent so one incompatible package cannot block unrelated upgrades');
+  assert.match(npmBlock, /routine-icloud-dependencies:[\s\S]*?applies-to: version-updates[\s\S]*?patterns:[\s\S]*?- ["']\*["'][\s\S]*?update-types:[\s\S]*?- ["']minor["'][\s\S]*?- ["']patch["']/);
+  assert.doesNotMatch(npmBlock, /update-types:[\s\S]*?- ["']major["']/);
 });
 
 test('superseded PR validations cancel while main, manual, and scheduled validation remain complete', async () => {
