@@ -1,0 +1,169 @@
+name: Temporary iCloud search alias integration
+
+on:
+  push:
+    branches:
+      - agent/icloud-docs-sync
+    paths:
+      - '.github/workflows/temp-icloud-search-alias.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temp-icloud-search-alias
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: agent/icloud-docs-sync
+          fetch-depth: 1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: Patch search integration and browser regression
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              if text.count(old) != 1:
+                  raise SystemExit(f'{path}: expected exactly one replacement target, found {text.count(old)}')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          script = 'tools/icloud_price_comparison/script.js'
+          replace_once(
+              script,
+              "import { VALID_REGIONS } from './data-model.js?v=1df20253';",
+              "import { marketSearchAliases, VALID_REGIONS } from './data-model.js?v=1df20253';"
+          )
+          replace_once(
+              script,
+              '''function matchesCountrySearch(country, query) {
+            if (!query) return true;
+            const marketId = country.marketId.toLocaleLowerCase('en-US');
+            const namesAndRegion = `${country.country} ${country.nameZh ?? ''} ${REGION_LABELS[country.region] || country.region}`.toLocaleLowerCase('zh-CN');
+            const currency = country.currency.toLocaleLowerCase('en-US');
+            return marketId.includes(query)
+              || namesAndRegion.includes(query)
+              || currency === query;
+          }
+          ''',
+              '''function normalizedMarketSearchAliases(country) {
+            return marketSearchAliases(country.marketId)
+              .map((alias) => alias.toLocaleLowerCase('en-US'));
+          }
+
+          function matchesCountrySearch(country, query) {
+            if (!query) return true;
+            const marketId = country.marketId.toLocaleLowerCase('en-US');
+            const namesAndRegion = `${country.country} ${country.nameZh ?? ''} ${REGION_LABELS[country.region] || country.region}`.toLocaleLowerCase('zh-CN');
+            const currency = country.currency.toLocaleLowerCase('en-US');
+            const aliases = normalizedMarketSearchAliases(country);
+            return marketId.includes(query)
+              || namesAndRegion.includes(query)
+              || aliases.some((alias) => alias.includes(query))
+              || currency === query;
+          }
+
+          function exactSearchIdentityPriority(country, query) {
+            if (!query) return 0;
+            if (country.marketId.toLocaleLowerCase('en-US') === query) return 2;
+            return normalizedMarketSearchAliases(country).some((alias) => alias === query) ? 1 : 0;
+          }
+          '''
+          )
+          replace_once(
+              script,
+              '''  return filteredCountries().sort((a, b) => {
+            const aExactMarketId = query && a.marketId.toLocaleLowerCase('en-US') === query;
+            const bExactMarketId = query && b.marketId.toLocaleLowerCase('en-US') === query;
+            if (aExactMarketId !== bExactMarketId) return aExactMarketId ? -1 : 1;
+
+            const first = sortValue(a);
+          ''',
+              '''  return filteredCountries().sort((a, b) => {
+            const aIdentityPriority = exactSearchIdentityPriority(a, query);
+            const bIdentityPriority = exactSearchIdentityPriority(b, query);
+            if (aIdentityPriority !== bIdentityPriority) return bIdentityPriority - aIdentityPriority;
+
+            const first = sortValue(a);
+          '''
+          )
+
+          ui = Path('tools/icloud_price_comparison/test/ui-smoke.test.mjs')
+          ui_text = ui.read_text(encoding='utf-8')
+          marker = "test('supports friendly market search aliases and prioritizes exact alias hits'"
+          if marker not in ui_text:
+              ui_text += r'''
+
+          test('supports friendly market search aliases and prioritizes exact alias hits', { timeout: 30_000 }, async (context) => {
+            const browserConfig = await resolveBrowser(context, 'the market search alias regression test');
+            if (!browserConfig) return;
+            const server = await startServer();
+            const { port } = server.address();
+            const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+            const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+            await page.route('https://**/*', (route) => route.abort());
+            try {
+              await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+              await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length > 0);
+              for (const [query, expectedMarketId] of [['uk', 'gb'], ['usa', 'us'], ['turkey', 'tr']]) {
+                await page.locator('#searchInput').fill(query);
+                await page.waitForFunction((marketId) => document.querySelector('#priceRows tr[data-market-id]')?.dataset.marketId === marketId, expectedMarketId);
+                assert.equal(await page.locator('#priceRows tr[data-market-id]').first().getAttribute('data-market-id'), expectedMarketId);
+              }
+            } finally {
+              await browser.close();
+            }
+          });
+          '''
+              ui.write_text(ui_text, encoding='utf-8')
+          PY
+
+          rm .github/workflows/temp-icloud-search-alias.yml
+
+      - name: Install dependencies
+        working-directory: tools/icloud_price_comparison
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Regenerate asset versions and static page
+        working-directory: tools/icloud_price_comparison
+        run: |
+          pnpm assets:update
+          pnpm render:static
+          pnpm assets:check
+          pnpm render:static:check
+
+      - name: Run core validation
+        working-directory: tools/icloud_price_comparison
+        run: |
+          pnpm test:core
+          pnpm validate:artifact
+          pnpm validate:snapshots
+
+      - name: Check diff formatting
+        run: git diff --check
+
+      - name: Commit integrated changes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Integrate market identity aliases and SEO projection"
+          git push origin HEAD:agent/icloud-docs-sync
