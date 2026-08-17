@@ -16,7 +16,7 @@ function escapeHtmlAttribute(value) {
 function seoProjection(payload) {
   const tiers = payload.tiers.map(({ id }) => id).join('、');
   return {
-    description: `比较 Apple iCloud+ 全球各国家和地区价格，涵盖日本、美国、俄罗斯、土耳其、尼日利亚等热门市场，覆盖 ${tiers} 月费，并提供当地币价、人民币参考价、最低价排名和价格历史。`,
+    description: `比较 Apple iCloud+ 全球各国家和地区价格，涵盖美国、日本、中国大陆、俄罗斯、土耳其、尼日利亚、台湾等常见及低价市场，覆盖 ${tiers} 月费，并提供当地币价、人民币参考价、最低价排名和价格历史。`,
     imageAlt: `iCloud+ 全球价格对比：${tiers}`,
     brandDescription: `覆盖 Apple iCloud+ ${tiers} 套餐，比较全球各地区当地月费与人民币参考价。`
   };
