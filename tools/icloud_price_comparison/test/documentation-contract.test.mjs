@@ -41,18 +41,46 @@ test('documents published market IDs as permanent and removes the routine rekey 
   }
 });
 
-test('documents current search and mobile sequence semantics', () => {
-  assert.match(readme, /精确 `marketId`[\s\S]*优先/);
+test('documents the reviewed same-ID fallback promotion lifecycle', () => {
+  for (const document of [readme, operations]) {
+    assert.match(document, /apple-\*[\s\S]*(?:active registry|active registry[\s\S]*apple-\*)/i);
+    assert.match(document, /future reservation[\s\S]*(?:移除|冲突)|(?:移除|冲突)[\s\S]*future reservation/i);
+    assert.match(document, /source alias/i);
+    assert.match(document, /中文名称 authority|中文名称.*authority/i);
+  }
+});
+
+test('documents repriced rename review and normalized bilingual region search', () => {
+  for (const document of [readme, operations]) {
+    assert.match(document, /NFKC/);
+    assert.match(document, /英文 region|Apple 原始英文 region/);
+    assert.match(document, /中文.*标签|中文显示标签/);
+    assert.match(document, /repricing|repriced/i);
+    assert.match(document, /MARKET_IDENTITY_RENAME_REVIEW_REQUIRED|停止并要求/);
+  }
+});
+
+test('documents current search, mobile sequence, and assistive rank semantics', () => {
+  assert.match(readme, /完整 `marketId`[\s\S]*优先|完整 `marketId` 命中优先级最高/);
   assert.match(readme, /币种[\s\S]*完整/);
   assert.match(readme, /`序N`|`序1`/);
   assert.match(operations, /`序N`/);
+  for (const document of [readme, operations]) {
+    assert.match(document, /全球价格排名第 N|当前列表序号第 N/);
+  }
 });
 
-
-test('PR validation forces critical architecture changes to update both long-lived documents', () => {
+test('PR validation keeps the docs gate focused and enforces immutable published IDs', () => {
   assert.match(validationWorkflow, /强制关键架构更新同步文档/);
   assert.match(validationWorkflow, /tools\/icloud_price_comparison\/README\.md/);
   assert.match(validationWorkflow, /tools\/icloud_price_comparison\/OPERATIONS\.md/);
   assert.match(validationWorkflow, /market-registry/);
-  assert.match(validationWorkflow, /data-model/);
+  assert.match(validationWorkflow, /data-model\.js/);
+  const docsGate = validationWorkflow.match(/- name: 强制关键架构更新同步文档[\s\S]*?(?=\n      - name: 强制已发布 marketId 永久保留)/)?.[0] ?? '';
+  assert.ok(docsGate, 'documentation gate block must remain detectable');
+  assert.doesNotMatch(docsGate, /tools\/icloud_price_comparison\/script\.js/);
+  assert.match(validationWorkflow, /强制已发布 marketId 永久保留/);
+  assert.match(validationWorkflow, /Published marketId removed from history ledger/);
+  assert.match(validationWorkflow, /Published source identity rekeyed/);
+  assert.match(validationWorkflow, /git diff --check \"\$BASE_SHA\" HEAD/);
 });
