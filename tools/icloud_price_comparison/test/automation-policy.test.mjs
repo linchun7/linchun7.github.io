@@ -42,7 +42,7 @@ test('vendored Lucide metadata does not duplicate the package version pin', asyn
   for (const asset of manifest.assets) {
     assert.equal(Object.hasOwn(asset, 'version'), false);
   }
-  assert.match(notices, /^## Lucide$/m);
+  assert.match(notices, /^## Lucide\r?$/m);
   assert.match(notices, /exact reviewed version[\s\S]*?package\.json[\s\S]*?pnpm-lock\.yaml/i);
-  assert.doesNotMatch(notices, /^## Lucide \d+\.\d+\.\d+$/m);
+  assert.doesNotMatch(notices, /^## Lucide \d+\.\d+\.\d+\r?$/m);
 });
