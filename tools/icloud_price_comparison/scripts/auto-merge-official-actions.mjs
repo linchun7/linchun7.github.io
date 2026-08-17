@@ -84,13 +84,18 @@ export function validateChangedFiles(files) {
 }
 
 export function validateNpmChangedFiles(files) {
-  invariant(files.length === 2, 'Routine npm update must change exactly package.json and pnpm-lock.yaml');
-  const expectedFiles = [NPM_LOCK_PATH, NPM_PACKAGE_PATH].sort();
+  invariant(files.length === 1 || files.length === 2, 'Routine npm update must change pnpm-lock.yaml, optionally with package.json');
   const actualFiles = files.map(({ filename }) => filename).sort();
-  invariant(isDeepStrictEqual(actualFiles, expectedFiles), 'Routine npm update changed files outside the approved dependency pair');
+  const lockOnly = [NPM_LOCK_PATH];
+  const directUpdate = [NPM_LOCK_PATH, NPM_PACKAGE_PATH].sort();
+  invariant(
+    isDeepStrictEqual(actualFiles, lockOnly) || isDeepStrictEqual(actualFiles, directUpdate),
+    'Routine npm update changed files outside the approved dependency pair'
+  );
   for (const file of files) {
     invariant(file.status === 'modified' && !file.previous_filename, 'Routine npm dependency files may only be modified');
   }
+  return actualFiles.includes(NPM_PACKAGE_PATH);
 }
 
 function parseStableVersion(version, label) {
@@ -143,7 +148,6 @@ export function validateRoutineNpmPackageUpdate(basePackage, headPackage) {
     }
   }
 
-  invariant(changes.length > 0, 'Routine npm update did not change any dependency pins');
   return changes;
 }
 
@@ -286,13 +290,19 @@ export async function main(env = process.env, fetchImpl = fetch, log = console.l
     summary = `${referenceCount} official Action reference(s) and exact release tag(s)`;
     commitTitle = 'chore: update official GitHub Actions (#' + pullNumber + ')';
   } else {
-    validateNpmChangedFiles(files);
+    const packageFileChanged = validateNpmChangedFiles(files);
     const [basePackage, headPackage] = await Promise.all([
       readJsonAtRef(repository, token, NPM_PACKAGE_PATH, baseSha, fetchImpl),
       readJsonAtRef(repository, token, NPM_PACKAGE_PATH, headSha, fetchImpl),
     ]);
     const changes = validateRoutineNpmPackageUpdate(basePackage, headPackage);
-    summary = `${changes.length} routine npm dependency update(s)`;
+    if (packageFileChanged) {
+      invariant(changes.length > 0, 'package.json changed without an approved dependency version update');
+      summary = `${changes.length} routine npm dependency update(s)`;
+    } else {
+      invariant(changes.length === 0, 'Lockfile-only update unexpectedly changed package.json semantics');
+      summary = 'one lockfile-only transitive npm dependency update';
+    }
     commitTitle = 'chore: update iCloud dependencies (#' + pullNumber + ')';
   }
 
