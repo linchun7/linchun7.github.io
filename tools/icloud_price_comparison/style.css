@@ -373,6 +373,7 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
 .country-history-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .country-name { display: block; overflow: hidden; color: var(--ink); font-size: 15px; font-weight: 680; line-height: 1.18; text-overflow: ellipsis; }
 .country-name-en { display: block; margin-top: 3px; overflow: hidden; color: var(--muted); font-size: 12px; line-height: 1.2; text-overflow: ellipsis; }
+.mobile-rank { display: none; }
 .history-affordance { position: absolute; top: 50%; right: 2px; color: var(--muted); font-size: 20px; line-height: 1; opacity: .7; transform: translateY(-50%); transition: color 120ms ease-out, opacity 120ms ease-out; }
 .rank-top { color: var(--accent) !important; font-weight: 760; }
 
@@ -521,7 +522,7 @@ th button:active { background: rgba(17, 104, 212, .13); }
   .overview { padding: 12px 0 0; gap: 12px; }
   .overview-reference { min-height: 0; padding: 17px 15px 15px; }
   .overview-note { font-size: 12px; }
-  .minimum-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
+  .minimum-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
   .minimum-tier-label { top: 6px; left: 8px; font-size: 12px; }
   .minimum-country { font-size: 16px; }
   .overview-stats { min-height: 0; gap: 6px; }
@@ -751,7 +752,27 @@ th button:active { background: rgba(17, 104, 212, .13); }
   .price-table td { padding: 10px 12px; }
   .price-table th button { min-height: 44px; padding: 10px 12px; }
   .price-table tbody tr { height: 70px; }
-  .country-history-button { min-height: 44px; padding-block: 5px; }
+  .country-history-button { min-height: 44px; padding-right: 64px; padding-block: 5px; }
+  .mobile-rank {
+    position: absolute;
+    top: 50%;
+    right: 28px;
+    min-width: 28px;
+    height: 22px;
+    padding: 0 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transform: translateY(-50%);
+    color: var(--accent-dark);
+    background: var(--accent-soft);
+    border: 1px solid #cfe2fa;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 760;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
   .price-local { font-size: 12px; }
   .minimum-badge { max-width: 32px; padding-inline: 5px; overflow: hidden; font-size: 10px; text-overflow: clip; }
 }
@@ -769,6 +790,10 @@ th button:active { background: rgba(17, 104, 212, .13); }
   .country-name { font-size: 14px; }
   .price-cny { font-size: 14px; }
 
+}
+
+@media (max-width: 359px) {
+  .minimum-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (prefers-reduced-motion: reduce) {

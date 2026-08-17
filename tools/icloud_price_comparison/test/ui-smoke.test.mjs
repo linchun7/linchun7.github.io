@@ -3163,3 +3163,69 @@ test('minimum-card controls stay enabled after returning to default home', { tim
     await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }
 });
+
+test('keeps mobile ranking visible and UX fallbacks stable', { timeout: 60_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the mobile ranking and UX regression test');
+  if (!browserConfig) return;
+  const data = await readFixture('prices.json');
+  const fallbackCountry = data.countries.find(({ country, nameZh }) => nameZh === country);
+  assert.ok(fallbackCountry, 'the fixture needs at least one market pending an official Chinese name');
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  try {
+    for (const viewport of [
+      { width: 390, height: 844, minimumColumns: 3 },
+      { width: 320, height: 720, minimumColumns: 2 }
+    ]) {
+      const page = await browser.newPage({ viewport: { width: viewport.width, height: viewport.height } });
+      await page.route('https://**/*', (route) => {
+        if (route.request().url().startsWith('https://www.googletagmanager.com/')) {
+          return route.fulfill({ status: 200, contentType: 'text/javascript', body: '' });
+        }
+        return route.abort();
+      });
+      try {
+        await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded' });
+        await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, data.countries.length);
+        await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
+
+        const firstHistoryButton = page.locator('#priceRows tr[data-market-id] .country-history-button').first();
+        const rankBadge = firstHistoryButton.locator('.mobile-rank');
+        const rankCue = await firstHistoryButton.evaluate((button) => ({
+          paddingRight: Number.parseFloat(getComputedStyle(button).paddingRight)
+        }));
+        assert.equal(await rankBadge.isVisible(), true, String(viewport.width) + 'px must expose the current rank or sequence');
+        assert.match((await rankBadge.textContent()).trim(), /^\d+|—$/, String(viewport.width) + 'px rank badge must contain the current rank or sequence');
+        assert.ok(rankCue.paddingRight >= 60, String(viewport.width) + 'px rank badge must reserve non-overlapping space');
+
+        const minimumColumns = await page.locator('#minimumSummary').evaluate((element) => (
+          getComputedStyle(element).gridTemplateColumns.trim().split(/\s+/).filter(Boolean).length
+        ));
+        assert.equal(minimumColumns, viewport.minimumColumns, String(viewport.width) + 'px minimum-price cards should use the intended compact grid');
+
+        await page.locator('#searchInput').fill('us');
+        await page.waitForFunction((id) => document.querySelector('#priceRows tr[data-market-id]')?.dataset.marketId === id, 'us');
+        assert.equal(await page.locator('#priceRows tr[data-market-id]').first().getAttribute('data-market-id'), 'us', 'exact marketId search must outrank substring matches such as Russia');
+
+        await page.locator('#searchInput').fill('jp');
+        await page.waitForFunction((id) => document.querySelector('#priceRows tr[data-market-id]')?.dataset.marketId === id, 'jp');
+        assert.equal(await page.locator('#priceRows tr[data-market-id]').first().getAttribute('data-market-id'), 'jp');
+
+        await page.locator('#searchInput').fill(fallbackCountry.country);
+        await page.waitForFunction((id) => document.querySelector('#priceRows tr[data-market-id]')?.dataset.marketId === id, fallbackCountry.marketId);
+        assert.equal((await page.locator('#priceRows .country-name-en').first().textContent()).trim(), fallbackCountry.currency, 'pending Chinese names must keep the currency subtitle after dynamic rendering');
+
+        const layout = await page.evaluate(() => ({
+          documentWidth: document.documentElement.scrollWidth,
+          viewportWidth: document.documentElement.clientWidth
+        }));
+        assert.ok(layout.documentWidth <= layout.viewportWidth + 1, String(viewport.width) + 'px page must not gain horizontal overflow');
+      } finally {
+        await page.close();
+      }
+    }
+  } finally {
+    await browser.close();
+  }
+});
