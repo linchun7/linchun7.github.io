@@ -55,12 +55,13 @@ jobs:
           workflow = workflow_path.read_text(encoding='utf-8')
           start = workflow.index('      - name: 强制关键架构更新同步文档\n')
           end = workflow.index('      - name: 配置 Node.js\n', start)
+          pr_base_expression = '$' + '{{ github.event.pull_request.base.sha }}'
           clean_gate = '\n'.join([
             '      - name: 强制关键架构更新同步文档',
             "        if: github.event_name == 'pull_request'",
             '        working-directory: .',
             '        env:',
-            '          BASE_SHA: ${{ github.event.pull_request.base.sha }}',
+            f'          BASE_SHA: {pr_base_expression}',
             '        run: |',
             '          changed="$(git diff --name-only "$BASE_SHA" HEAD)"',
             '          needs_docs=false',
