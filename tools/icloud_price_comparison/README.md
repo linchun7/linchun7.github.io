@@ -4,7 +4,7 @@
 
 原 GitHub Pages 地址仅作为旧入口：<https://linchun7.github.io/tools/icloud_price_comparison/>
 
-本工具比较 Apple iCloud+ 在不同国家和地区的月费。Apple Support 英文价格页提供当地价格、币种、容量、市场结构和 `Published Date`；ExchangeRate-API 用于生成两位小数的人民币参考价。人民币金额只用于横向比较，不是 Apple 结算价。
+本工具比较 Apple iCloud+ 在不同国家和地区的月费。Apple Support 英文价格页提供当地价格、币种、容量、市场结构和 `Published Date`；人民币参考价优先使用 ExchangeRate-API 认证源生成，认证源不可用或未通过校验时可尝试开放汇率源，并只在受控 freshness 条件内沿用上一份已验证的安全派生结果。人民币金额只用于横向比较，不是 Apple 结算价。
 
 日常值守、自动更新、监控、Secret、Cloudflare、部署、回滚和事故处理见 [OPERATIONS.md](OPERATIONS.md)。Apple 规范化历史证据见 [data/apple-snapshots/README.md](data/apple-snapshots/README.md)。
 
@@ -17,7 +17,9 @@
 - 欧元区中文名称保持“欧盟”。中文名称尚未确认时保留 Apple 英文名称，不阻断价格更新。
 - Apple 首次出现 registry 中不存在的市场时，生成可复现的 `apple-*` 市场 ID；确认无 ID 冲突后可自动发布。
 - 页面默认按 200GB 人民币参考价从低到高排序；若未来 Apple 不再提供 200GB，则使用当前 `tiers` 中的首个容量作为默认容量。
-- 容量、排序方向、地区筛选等可分享状态写入规范 URL；站内搜索词不保留在 URL。
+- 容量排序时显示生成器提供的全球 `cnyRank`，搜索或地区筛选不会把排名重算成局部排名；切换为国家/地区排序时数字改为当前列表序号，移动端明确显示为 `序1`、`序2`、`序3`……，不引入第二套价格排名。
+- 搜索对 `marketId`、中英文国家/地区名称和地区名称使用部分字符串匹配；当查询完整等于某个 `marketId` 时，该市场只提升到搜索结果第一位，不排除其他合法部分匹配；币种仅按完整代码匹配，避免短字母把同币种市场全部带出。
+- 容量、排序方向、地区筛选等可分享状态写入规范 URL；站内搜索词不保留在 URL。允许的页面内跳转 fragment 仅有 `#priceWorkspace`，其他未知 fragment 会被清理。
 - 最低价卡片是导航操作：切换对应容量、从低到高排序并定位目标地区。
 - 当前价格不写入 `localStorage`、`sessionStorage`、IndexedDB 或 Service Worker；没有浏览器持久价格缓存。
 - JavaScript 关闭、网络较慢或网络价格读取失败时，最近一次已发布的静态价格仍可直接使用。
@@ -26,7 +28,8 @@
 
 - 展示 Apple 页面解析出的地区、分区、币种、容量和当地月费，以及人民币参考价。
 - 按容量汇总参考最低价和所有并列地区。
-- 支持地区搜索、分区筛选、容量排序、地区排序和 URL 状态恢复。
+- 支持中英文国家/地区、`marketId`、地区名称和完整币种代码搜索，以及分区筛选、容量排序、地区排序和 URL 状态恢复；精确 `marketId` 命中优先，但部分匹配仍保留。
+- 容量价格排序使用全球参考排名；国家/地区排序使用列表序号，移动端用 `序N` 区分序号与排名。
 - 点击地区可查看当地月费、人民币换算价、价格变更次数和完整的 Apple 当地标价历史。
 - 展示 Apple `Published Date`，并记录发布日期变化时对应的容量、地区、分区、币种和价格差异。
 - 记录地区、容量的新增和移除；已存在的市场身份和历史不会因为暂时下线而重新分配。
@@ -61,7 +64,7 @@ ExchangeRate-API ───┘        │
 3. Apple 业务语义发生变化时，执行独立 no-store 确认抓取；只有稳定、完整、交叉核对一致的结果才能继续。暂时网络不确定性保留上一份生产数据并等待后续自动重试。
 4. 获取并校验汇率；认证来源不可用时自动尝试开放来源。所有 fresh 在线候选均不可用时，只允许在既定 freshness 窗口内沿用上一份安全派生人民币结果。
 5. 事务式生成 `prices.json`、`history.json`、`run-log.json` 和规范化 Apple 快照。
-6. 从已验证的 `prices.json` 确定性生成 `index.html` 的静态价格区域、状态文案和与容量列表相关的 SEO 文案。
+6. 从已验证的 `prices.json` 确定性生成 `index.html` 的静态价格区域、状态文案和 SEO Projection。容量列表仍由当前 payload 动态驱动；description 同时保留经人工选择的稳定热门国家意图，当前最低价国家则继续由动态正文表达。
 7. 深验完整 `data/` 与静态投影，上传只读发布工件；独立发布 job 再次验证远端基线后才提交到 `main`。
 
 生成 job 只有 `contents: read`；只有不安装项目依赖的发布 job 使用 `contents: write`。生成后如果远端 `main` 已前进，本次发布失败关闭，不 rebase 旧工件，也不 force push。
@@ -99,14 +102,24 @@ ExchangeRate-API ───┘        │
 
 ## 页面生成与 SEO
 
-`data/prices.json` 是价格事实源，`index.html` 是它的确定性静态投影。不要手工修改 `ICLOUD_STATIC_*` markers 内的生成内容。
+`data/prices.json` 是价格事实源，`index.html` 是它的确定性静态投影。当前生成边界有两层，维护时必须区分“生成源”和“生成后的 HTML 产物”：
+
+1. `scripts/static-page.mjs` 生成 `ICLOUD_STATIC_*` markers 内的价格表、最低价、更新时间、覆盖统计等区域；不要手工修改这些 marker 内的内容。
+2. `scripts/render-static-page.mjs` 的 `seoProjection()` 生成一组位于 markers 外部的 SEO/首屏目标，包括 `meta description`、Open Graph/Twitter description、OG/Twitter 图片 alt 和 `#brandDescription`。这些位置虽然不在 `ICLOUD_STATIC_*` 内，也同样不能把 `index.html` 当作事实源手工修改；需要改 SEO 时应先改 `seoProjection()`，再重新生成 `index.html`。
 
 ```bash
 pnpm render:static
 pnpm render:static:check
 ```
 
-容量相关的 description、Open Graph/Twitter description、图片 alt 和首屏产品说明都由当前 `payload.tiers` 生成。未来 Apple 合法新增或移除容量时，静态生成会同步更新这些文案，避免页面数据与 SEO 文本漂移。
+`render:static:check` 会同时验证静态 fragments 与 SEO Projection；直接手改生成产物但未同步生成源会以 `STATIC_RENDER_MISMATCH` 或 `SEO_PROJECTION_MISMATCH` 失败关闭。
+
+SEO 当前采用“稳定意图 + 动态数据”的组合：
+
+- description、Open Graph/Twitter description 自然包含日本、美国、俄罗斯、土耳其、尼日利亚等长期热门市场词；这组词不是“当前最低价榜单”，不会因日常汇率波动自动替换。
+- description 中的容量列表、OG/Twitter 图片 alt 和首屏产品说明仍由当前 `payload.tiers` 动态生成；未来 Apple 合法新增或移除容量时会同步更新。
+- 当前各容量最低价市场、价格、排名、覆盖数量和更新时间继续由静态正文随 `prices.json` 动态生成，搜索引擎可以直接抓取这些真实页面内容。
+- 页面 `<title>`、canonical URL 等未列入 `seoProjection()` 的 shell metadata 不是价格更新的动态目标；如需修改应作为明确 SEO 变更并保留相应测试。
 
 ### 社交分享图
 
@@ -129,7 +142,7 @@ pnpm check:live
 pnpm audit --audit-level low
 ```
 
-- `pnpm test:core`：静态资源版本、静态投影、vendor、解析、数据契约、市场 identity、事务、artifact 安全、幂等和 workflow 契约。
+- `pnpm test:core`：静态资源版本、静态 fragments/SEO Projection、vendor、解析、数据契约、市场 identity、事务、artifact 安全、幂等和 workflow 契约。
 - `pnpm validate:artifact`：验证当前完整 `data/` 及跨文件语义。
 - `pnpm validate:snapshots`：深度解析所有规范化 Apple 快照修订。
 - `pnpm test:browsers`：本地依次运行 Chromium、Firefox、WebKit 的同一套 UI 验收；GitHub Actions 使用三组 matrix runners。
@@ -160,14 +173,15 @@ node scripts/import-apple-archives.mjs --input <包含完整历史快照的目�
 
 - Apple 价格、币种、市场结构、容量和发布日期：<https://support.apple.com/en-us/108047>
 - Apple 简体中文市场名称：<https://support.apple.com/zh-cn/108047>
-- 汇率：<https://www.exchangerate-api.com/docs/overview>
+- 汇率认证源：`https://v6.exchangerate-api.com/v6/latest/USD`（API Key 通过 `Authorization: Bearer` 传递，不放在 URL 中）
+- 汇率开放回退源：<https://open.er-api.com/v6/latest/USD>
 
 人民币结果仅供信息与横向比较；税费、可用性、付款方式、购买区域限制和最终结算以 Apple 对应地区页面与实际结算结果为准。本工具与 Apple Inc. 无关联，数据仅供参考。
 
 ## 隐私与 Web 安全
 
 - 页面启用 Google Analytics 4（`G-K2S9L4CHNP`）和 Cloudflare Web Analytics；站内搜索词不会发送给统计服务。
-- 初始脚本在价格网络请求和分析脚本执行前清理 `q`、未知/重复/非法查询参数和未知 fragment；URL 最终只保留规范的 `tier`、`sort`、`dir`、`region`。
+- 初始脚本在价格网络请求和分析脚本执行前清理 `q`、未知/重复/非法查询参数和未知 fragment；URL 最终只保留规范的 `tier`、`sort`、`dir`、`region`，并可保留唯一允许的页面内 fragment `#priceWorkspace`。
 - 应用自身不写 Cookie、`localStorage`、`sessionStorage` 或 IndexedDB。GA4 可能按 Google 实现写入 `_ga` 系列 Cookie。
 - 动态数据使用 DOM API 和 `textContent` 渲染，不使用 `innerHTML`、`eval`、`document.write` 或字符串事件处理器。
 - Cloudflare HTTP CSP 与 HTML meta CSP 应保持同一最小权限边界；完整响应头、TLS、DNS、缓存和发布验收要求见 [OPERATIONS.md](OPERATIONS.md)。
