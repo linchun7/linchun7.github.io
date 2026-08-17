@@ -1,0 +1,68 @@
+name: Temporary format PR 39
+
+on:
+  push:
+    branches:
+      - agent/icloud-simplify-market-identity
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.event.head_commit.message == 'Run PR 39 format repair'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Normalize regression test formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('tools/icloud_price_comparison/test/ui-smoke.test.mjs')
+          source = path.read_text(encoding='utf-8')
+          test_marker = "test('supports friendly market search aliases and prioritizes exact alias hits'"
+          test_start = source.find(test_marker)
+          start = source.find("    const search = page.locator('#searchInput');", test_start)
+          end = source.find('  } finally {', start)
+          if min(test_start, start, end) < 0:
+              raise SystemExit('search regression formatting anchors not found')
+          block = """    const search = page.locator('#searchInput');
+              await search.fill('中');
+              await page.waitForFunction(() => {
+                const rows = [...document.querySelectorAll('#priceRows tr[data-market-id]')];
+                return rows.some((row) => row.dataset.marketId === 'cn')
+                  && !rows.some((row) => row.dataset.marketId === 'ng');
+              });
+              assert.equal(await page.locator('#priceRows tr[data-market-id=\"cn\"]').count(), 1, 'single-character country search must still match 中国大陆');
+              assert.equal(await page.locator('#priceRows tr[data-market-id=\"ng\"]').count(), 0, 'single-character 中 must not match Nigeria through the EMEA region label');
+
+              await search.fill('中东');
+              await page.waitForFunction(() => [...document.querySelectorAll('#priceRows tr[data-market-id]')]
+                .some((row) => row.dataset.marketId === 'ng'));
+              assert.equal(await page.locator('#priceRows tr[data-market-id=\"ng\"]').count(), 1, 'multi-character region search must still match 欧洲、中东和非洲');
+
+          """
+          path.write_text(source[:start] + block + source[end:], encoding='utf-8')
+          PY
+          node --check tools/icloud_price_comparison/test/ui-smoke.test.mjs
+          rm .github/workflows/temporary-format-pr39.yml
+          git diff --check
+
+      - name: Commit formatting repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git diff --cached --check
+          git commit -m 'Polish iCloud search regression coverage'
+          git push origin HEAD:${{ github.ref_name }}
