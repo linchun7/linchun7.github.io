@@ -1,0 +1,85 @@
+name: Apply corrected iCloud SEO country terms
+
+on:
+  push:
+    branches:
+      - agent/icloud-seo-country-terms
+    paths:
+      - .github/workflows/agent-icloud-seo-country-terms-v2.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: agent/icloud-seo-country-terms
+          fetch-depth: 1
+
+      - name: Update SEO descriptions
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('tools/icloud_price_comparison/index.html')
+          text = path.read_text(encoding='utf-8')
+          old = '比较 Apple iCloud+ 全球各国家和地区价格，覆盖 50GB、200GB、2TB、6TB、12TB 月费，提供当地币价、人民币参考价、最低价排名和价格历史。'
+          new = '比较 Apple iCloud+ 全球各国家和地区价格，涵盖日本、美国、俄罗斯、土耳其、尼日利亚等热门市场，覆盖 50GB、200GB、2TB、6TB、12TB 月费，并提供当地币价、人民币参考价、最低价排名和价格历史。'
+          count = text.count(old)
+          if count != 3:
+            raise SystemExit(f'expected exactly 3 SEO descriptions, found {count}')
+          path.write_text(text.replace(old, new), encoding='utf-8')
+
+      - name: Verify synchronized SEO metadata
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          text = Path('tools/icloud_price_comparison/index.html').read_text(encoding='utf-8')
+          expected = '比较 Apple iCloud+ 全球各国家和地区价格，涵盖日本、美国、俄罗斯、土耳其、尼日利亚等热门市场，覆盖 50GB、200GB、2TB、6TB、12TB 月费，并提供当地币价、人民币参考价、最低价排名和价格历史。'
+          patterns = [
+            r'<meta name="description" content="([^"]+)">',
+            r'<meta property="og:description" content="([^"]+)">',
+            r'<meta name="twitter:description" content="([^"]+)">',
+          ]
+          for pattern in patterns:
+            match = re.search(pattern, text)
+            if not match or match.group(1) != expected:
+              raise SystemExit('SEO descriptions are not synchronized')
+
+      - name: Remove temporary workflows
+        run: |
+          rm .github/workflows/agent-icloud-seo-country-terms.yml
+          rm .github/workflows/agent-icloud-seo-country-terms-v2.yml
+
+      - name: Check final diff
+        shell: python
+        run: |
+          import subprocess
+
+          subprocess.run(['git', 'diff', '--check'], check=True)
+          lines = set(subprocess.check_output(['git', 'status', '--short'], text=True).splitlines())
+          expected = {
+            ' M tools/icloud_price_comparison/index.html',
+            ' D .github/workflows/agent-icloud-seo-country-terms.yml',
+            ' D .github/workflows/agent-icloud-seo-country-terms-v2.yml',
+          }
+          if lines != expected:
+            raise SystemExit('Unexpected final diff:\n' + '\n'.join(sorted(lines)))
+
+      - name: Commit clean SEO change
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tools/icloud_price_comparison/index.html \
+                  .github/workflows/agent-icloud-seo-country-terms.yml \
+                  .github/workflows/agent-icloud-seo-country-terms-v2.yml
+          git commit -m "Improve iCloud country SEO descriptions"
+          git push origin HEAD:agent/icloud-seo-country-terms
