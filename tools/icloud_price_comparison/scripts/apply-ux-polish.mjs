@@ -127,7 +127,7 @@ await rewrite('style.css', (source) => {
 await rewrite('test/ui-smoke.test.mjs', (source) => {
   const marker = `test('keeps mobile ranking visible and UX fallbacks stable'`;
   if (source.includes(marker)) throw new Error('UX regression test already exists');
-  return `${source.trimEnd()}\n\n${String.raw`test('keeps mobile ranking visible and UX fallbacks stable', { timeout: 60_000 }, async (context) => {
+  const testSource = `test('keeps mobile ranking visible and UX fallbacks stable', { timeout: 60_000 }, async (context) => {
   const browserConfig = await resolveBrowser(context, 'the mobile ranking and UX regression test');
   if (!browserConfig) return;
   const data = await readFixture('prices.json');
@@ -149,19 +149,19 @@ await rewrite('test/ui-smoke.test.mjs', (source) => {
         return route.abort();
       });
       try {
-        await page.goto(\`http://127.0.0.1:\${port}/\`, { waitUntil: 'domcontentloaded' });
+        await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded' });
         await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, data.countries.length);
         await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
 
         const firstRank = page.locator('#priceRows tr[data-market-id] > td:first-child').first();
-        assert.equal(await firstRank.isVisible(), true, \`\${viewport.width}px must expose the current rank or sequence\`);
+        assert.equal(await firstRank.isVisible(), true, String(viewport.width) + 'px must expose the current rank or sequence');
         const rankBox = await firstRank.boundingBox();
-        assert.ok(rankBox && rankBox.width >= 22 && rankBox.height >= 20, \`\${viewport.width}px rank badge must remain legible\`);
+        assert.ok(rankBox && rankBox.width >= 22 && rankBox.height >= 20, String(viewport.width) + 'px rank badge must remain legible');
 
         const minimumColumns = await page.locator('#minimumSummary').evaluate((element) => (
-          getComputedStyle(element).gridTemplateColumns.trim().split(/\s+/).filter(Boolean).length
+          getComputedStyle(element).gridTemplateColumns.trim().split(/\\s+/).filter(Boolean).length
         ));
-        assert.equal(minimumColumns, viewport.minimumColumns, \`\${viewport.width}px minimum-price cards should use the intended compact grid\`);
+        assert.equal(minimumColumns, viewport.minimumColumns, String(viewport.width) + 'px minimum-price cards should use the intended compact grid');
 
         await page.locator('#searchInput').fill('us');
         await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length === 1);
@@ -179,7 +179,7 @@ await rewrite('test/ui-smoke.test.mjs', (source) => {
           documentWidth: document.documentElement.scrollWidth,
           viewportWidth: document.documentElement.clientWidth
         }));
-        assert.ok(layout.documentWidth <= layout.viewportWidth + 1, \`\${viewport.width}px page must not gain horizontal overflow\`);
+        assert.ok(layout.documentWidth <= layout.viewportWidth + 1, String(viewport.width) + 'px page must not gain horizontal overflow');
       } finally {
         await page.close();
       }
@@ -187,7 +187,8 @@ await rewrite('test/ui-smoke.test.mjs', (source) => {
   } finally {
     await browser.close();
   }
-});`}\n`;
+});`;
+  return `${source.trimEnd()}\n\n${testSource}\n`;
 });
 
 const { versions } = await updateAssetVersions({ projectDir: PROJECT_DIR });
