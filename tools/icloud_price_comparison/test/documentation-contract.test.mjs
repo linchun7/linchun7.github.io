@@ -39,6 +39,12 @@ test('retired reservation and browser identity-search layers cannot return in ru
   }
 });
 
+test('unknown Apple markets are described as published fallback identities rather than publication-blocking registry work', () => {
+  assert.match(updater, /Unknown Apple market published with fallback identity/);
+  assert.match(updater, /published with permanent fallback identity/);
+  assert.doesNotMatch(updater, /requires registry review/);
+});
+
 test('documents user-facing search without exposing marketId or search aliases as product features', () => {
   assert.match(readme, /中英文国家\/地区[\s\S]*地区名称[\s\S]*币种/);
   assert.match(readme, /`序N`|`序1`/);
