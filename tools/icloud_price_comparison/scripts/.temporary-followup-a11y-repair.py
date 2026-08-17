@@ -1,7 +1,8 @@
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
-STYLE = ROOT / 'tools' / 'icloud_price_comparison' / 'style.css'
+PROJECT = ROOT / 'tools' / 'icloud_price_comparison'
+STYLE = PROJECT / 'style.css'
 text = STYLE.read_text(encoding='utf-8')
 
 old = ".mobile-rank { display: none; }\n.mobile-rank-sr { display: none; }\n"
@@ -22,6 +23,14 @@ text = text.replace(
     "@media (min-width: 1101px) {\n  .mobile-rank-sr { display: none; }\n  .workspace-toolbar { min-height: 101px; }",
     1
 )
-
 STYLE.write_text(text, encoding='utf-8')
-print('mobile rank accessibility visibility repaired')
+
+ui_test = PROJECT / 'test' / 'ui-smoke.test.mjs'
+ui = ui_test.read_text(encoding='utf-8')
+old_assertion = "assert.match((await rankText.textContent()).trim(), /^全球价格排名第 \\\\d+$/);"
+new_assertion = "assert.match((await rankText.textContent()).trim(), /^全球价格排名第 \\d+$/);"
+if ui.count(old_assertion) != 1:
+    raise SystemExit('expected one over-escaped mobile rank assertion')
+ui_test.write_text(ui.replace(old_assertion, new_assertion, 1), encoding='utf-8')
+
+print('mobile rank accessibility visibility and browser assertion repaired')
