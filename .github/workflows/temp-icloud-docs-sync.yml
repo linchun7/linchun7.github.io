@@ -1,0 +1,224 @@
+name: Temporary iCloud documentation sync
+
+on:
+  push:
+    branches:
+      - agent/icloud-docs-sync
+    paths:
+      - '.github/workflows/temp-icloud-docs-sync.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temp-icloud-docs-sync
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: agent/icloud-docs-sync
+          fetch-depth: 1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: Synchronize README and operations documentation
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected 1 exact match, found {count}')
+              return text.replace(old, new, 1)
+
+          readme_path = Path('tools/icloud_price_comparison/README.md')
+          readme = readme_path.read_text(encoding='utf-8')
+          readme = replace_once(
+              readme,
+              'ExchangeRate-API ───┘        │',
+              '汇率认证/开放源 ────┘        │',
+              'README data-flow source'
+          )
+          readme = replace_once(
+              readme,
+              '- Apple 首次出现 registry 中不存在的市场时，生成可复现的 `apple-*` 市场 ID；确认无 ID 冲突后可自动发布。',
+              '- 市场身份按“已发布 identity ledger → active registry → future reservation → deterministic `apple-*` fallback”的安全顺序处理。`scripts/reserved-market-registry.mjs` 只提前预留高置信国家/地区 ID，不代表 Apple 当前提供这些市场；真正未识别的 Apple 市场才生成可复现的 `apple-*` ID，确认无冲突后可自动发布。',
+              'README market identity product rule'
+          )
+          readme = replace_once(
+              readme,
+              '- 搜索对 `marketId`、中英文国家/地区名称和地区名称使用部分字符串匹配；当查询完整等于某个 `marketId` 时，该市场只提升到搜索结果第一位，不排除其他合法部分匹配；币种仅按完整代码匹配，避免短字母把同币种市场全部带出。',
+              '- 搜索对 `marketId`、人工维护的 search alias、中英文国家/地区名称和地区名称使用部分字符串匹配；完整 `marketId` 命中优先级最高，完整 search alias 次之，但都不排除其他合法部分匹配；币种仅按完整代码匹配，避免短字母把同币种市场全部带出。',
+              'README search product rule'
+          )
+          readme = replace_once(
+              readme,
+              '- 支持中英文国家/地区、`marketId`、地区名称和完整币种代码搜索，以及分区筛选、容量排序、地区排序和 URL 状态恢复；精确 `marketId` 命中优先，但部分匹配仍保留。',
+              '- 支持中英文国家/地区、`marketId`、友好 search alias、地区名称和完整币种代码搜索，以及分区筛选、容量排序、地区排序和 URL 状态恢复；精确 `marketId` 命中优先级最高，精确 alias 次之，但部分匹配仍保留。',
+              'README page search capability'
+          )
+
+          market_section = '''## 市场身份、预留 ID 与中文名称
+
+`marketId` 的首要职责是**永久数据身份**，不是为了让代码看起来漂亮而随意更换。当前身份体系分为四层：
+
+1. `prices.json` / `history.json` 已经发布过的 identity ledger 优先。某个 Apple source name 一旦以一个 `marketId` 发布，后续普通自动更新继续沿用该 ID。
+2. `scripts/market-registry.mjs` 保存当前已知 Apple 市场的稳定 `marketId`、Apple 英文 canonical name 和 aliases。
+3. `scripts/reserved-market-registry.mjs` 预留未来可能出现的高置信国家/地区 ID，主要使用未被 active registry 占用的 ISO 3166-1 alpha-2 代码，并额外预留 `xk`。预留项**不是 Apple 可用性清单**，不会因为存在于该文件就进入 `prices.json` 或页面；只有 Apple 英文页真的出现并与明确 canonical name/alias 匹配时才启用该 ID。
+4. 如果 Apple 首次出现的名称既不在 active registry，也不在 future reservations，才生成确定性的 `apple-<slug>-<hash>` ID，并记录 `UNKNOWN_APPLE_MARKET`。完成正常 Apple 语义确认且无 ID 冲突后允许自动发布。
+
+中文名称继续独立遵守 Apple 来源规则：`scripts/country-names.zh.json` 是 Apple 简体中文市场名称唯一事实源。已审核 wording 保存字符串；尚待 Apple zh-CN wording 确认则保存 `null` 或视为 pending，前端继续显示 Apple 英文 `sourceName` 并记录 `CHINESE_MARKET_NAME_PENDING`。提前预留一个 market ID 不等于提前创造中文名称。
+
+### 搜索 alias 与已发布 fallback
+
+浏览器端友好搜索别名维护在 `data-model.js` 的 `MARKET_SEARCH_ALIASES`。例如 `uk → gb`、`usa → us`、`turkey → tr`。search alias 只改善用户搜索，不改变永久 `marketId`，也不写入公共价格 schema。
+
+如果一个真正未知市场已经以 `apple-*` fallback 发布，后来才确认它对应某个友好代码，**默认不 rekey**：已发布 identity 继续保持 sticky，可以给原 `marketId` 增加合适的 `MARKET_SEARCH_ALIASES`，让用户用友好代码找到它而不破坏历史。
+
+- 已从 Apple 页面移除的历史市场 ID 仍永久 reserved，不得分配给其他市场。
+- 新生成或预留的 ID 如果与 active registry 或历史 ledger 冲突，以 `MARKET_IDENTITY_RESERVED_ID_COLLISION` 失败关闭，不随机换 ID。
+- 不做模糊名称匹配，不自动把“疑似改名”绑定到旧市场。只有满足严格双向唯一和完整结构一致的高置信 ambiguity 才停止并要求显式 alias；弱信号只记录 review warning。
+
+### 极少数显式 marketId migration
+
+只有确实需要把一个**已经发布的 `apple-*` fallback**迁移到经过人工复核的 active/reserved ID 时，才使用显式迁移工具。普通 registry 编辑不能静默改历史 ID。
+
+先 dry-run：
+
+```bash
+node scripts/migrate-market-id.mjs --from <apple-...> --to <reviewed-id>
+```
+
+确认目标 ID 已先进入 active/reserved registry、没有任何 active/history 冲突并审核完整 diff 后，才允许写入：
+
+```bash
+node scripts/migrate-market-id.mjs --from <apple-...> --to <reviewed-id> --write
+```
+
+工具只接受 `apple-*` 作为源 ID，会同步迁移 `prices.json` 与 `history.json` 的 identity、重新生成 `index.html`，并在失败时恢复原文件。迁移后必须运行 core、artifact、snapshots 和三浏览器验收，再通过普通 PR 发布；不要手工改单个 JSON key。
+
+相关长期边界由 `test/market-registry.test.mjs`、`test/market-identity-reservations.test.mjs` 和 `test/documentation-contract.test.mjs` 共同保护。
+
+'''
+          readme, count = re.subn(
+              r'## 市场身份与中文名称\n.*?(?=## 页面生成与 SEO\n)',
+              market_section,
+              readme,
+              count=1,
+              flags=re.S
+          )
+          if count != 1:
+              raise SystemExit(f'README market section replacement count={count}')
+          readme = readme.replace(
+              'description、Open Graph/Twitter description 自然包含日本、美国、俄罗斯、土耳其、尼日利亚等长期热门市场词；这组词不是“当前最低价榜单”，不会因日常汇率波动自动替换。',
+              'description、Open Graph/Twitter description 自然包含美国、日本、中国大陆、俄罗斯、土耳其、尼日利亚、台湾等常见及低价市场词；这组词是稳定搜索意图，不是“当前最低价榜单”，不会因日常汇率波动自动替换。'
+          )
+          readme_path.write_text(readme, encoding='utf-8')
+
+          operations_path = Path('tools/icloud_price_comparison/OPERATIONS.md')
+          operations = operations_path.read_text(encoding='utf-8')
+          operations = replace_once(
+              operations,
+              '- 未登记 Apple 市场生成确定性 `apple-*` ID；完成正常 Apple 语义确认且无 ID 冲突后允许发布。',
+              '- 新 Apple 市场先匹配 active registry，再匹配 `reserved-market-registry.mjs` 的高置信 future reservation；二者都未命中时才生成确定性 `apple-*` ID。future reservation 不是 Apple 可用性声明，真正 unknown 完成正常语义确认且无冲突后仍允许自动发布。',
+              'OPERATIONS market product rule'
+          )
+          operations = replace_once(
+              operations,
+              '- 搜索对 `marketId`、中英文国家/地区名和地区名做部分匹配；完整 `marketId` 命中只提升优先级，不排除其他部分匹配；币种只按完整代码匹配。',
+              '- 搜索对 `marketId`、`MARKET_SEARCH_ALIASES`、中英文国家/地区名和地区名做部分匹配；完整 `marketId` 优先级最高，完整 search alias 次之，均不排除其他部分匹配；币种只按完整代码匹配。',
+              'OPERATIONS search rule'
+          )
+          operations = operations.replace(
+              'description 中的日本、美国、俄罗斯、土耳其、尼日利亚等国家词是稳定的长期搜索意图，不按每日最低价自动替换。',
+              'description 中的美国、日本、中国大陆、俄罗斯、土耳其、尼日利亚、台湾等常见及低价市场词是稳定搜索意图，不按每日最低价自动替换。'
+          )
+
+          ops_market_section = '''## 6. Market identity、预留 ID 与中文名称
+
+- `marketId` 是永久数据身份。已经写入 `prices.json` / `history.json` 的 source-name identity ledger 优先于后来新增的漂亮代码；普通更新不得静默 rekey。
+- `scripts/market-registry.mjs` 保存当前已知 Apple 市场的稳定 ID、Apple 英文 canonical name 和 aliases。
+- `scripts/reserved-market-registry.mjs` 保存高置信 future reservations，主要预留未被 active registry 使用的 ISO 3166-1 alpha-2 ID，并额外预留 `xk`。这里的条目不表示 Apple 已经支持对应市场；只有 Apple 英文页实际出现并精确命中已审核 canonical name/alias 时才采用该 ID。
+- `scripts/country-names.zh.json` 仍是 Apple 简体中文名称唯一事实源：字符串表示 approved，`null` 表示 pending。future reservation 不预造中文名；pending 继续显示 Apple 英文 `sourceName` 并记录 `CHINESE_MARKET_NAME_PENDING`。
+- active/reserved 均未命中的新市场才使用 deterministic `apple-*` fallback，并记录 `UNKNOWN_APPLE_MARKET`。完成正常 Apple 语义确认且 ID 不冲突后可以自动发布。
+- 已发布 `apple-*` fallback 默认保持 sticky。后来确认了更友好的代码时，优先在 `data-model.js` 的 `MARKET_SEARCH_ALIASES` 添加用户搜索 alias，不改变价格/历史 identity。
+- 新 identity 若撞到 active registry、future reservation 或任一历史 reserved ID，以 `MARKET_IDENTITY_RESERVED_ID_COLLISION` 失败关闭，不随机换 ID。
+- 只有 removed 与 added unknown 双向唯一，并且 region、currency、canonical tier set 和完整当地价格向量完全相同，才作为高置信 rename ambiguity 停止并要求显式 alias；repricing、多候选或其他弱信号只记录 `MARKET_IDENTITY_RENAME_SUSPECTED`，不得自动绑定旧 ID。
+
+### 显式 rekey 的极少数处理流程
+
+只有业务上确实需要把一个已发布 `apple-*` fallback 改为已人工复核的 active/reserved ID，才允许运行 `scripts/migrate-market-id.mjs`。这不是普通更新步骤。
+
+1. 先把目标 source name / alias 与目标 ID 加入 active 或 future reservation 并单独审核，确认目标 ID 从未被其他 active/history identity 占用。
+2. 先 dry-run：
+
+```bash
+node scripts/migrate-market-id.mjs --from <apple-...> --to <reviewed-id>
+```
+
+3. 确认 dry-run 和身份审查无误后才写入：
+
+```bash
+node scripts/migrate-market-id.mjs --from <apple-...> --to <reviewed-id> --write
+```
+
+4. 工具会同步迁移 `prices.json` 与 `history.json`、重新生成 `index.html`；发生写入/渲染失败时恢复原文件。随后必须运行 `pnpm test:core`、`pnpm validate:artifact`、`pnpm validate:snapshots`、`pnpm test:browsers`，完整审核数据与静态页 diff 后再通过普通 PR 发布。
+5. 不允许为了“代码更好看”而迁移，也不要手工改单个 `history.json` key。普通已发布 ID 的 rekey 仍由 identity continuity 检查失败关闭。
+
+长期边界由 `test/market-registry.test.mjs`、`test/market-identity-reservations.test.mjs` 和 `test/documentation-contract.test.mjs` 保护。
+
+'''
+          operations, count = re.subn(
+              r'## 6\. Market identity 与中文名称\n.*?(?=## 7\. Freshness、异常和 fallback\n)',
+              ops_market_section,
+              operations,
+              count=1,
+              flags=re.S
+          )
+          if count != 1:
+              raise SystemExit(f'OPERATIONS market section replacement count={count}')
+
+          deploy_old = '- schema 4 数据、静态 fallback、历史、排序、筛选、键盘和窄屏正常。'
+          deploy_new = '- schema 4 数据、静态 fallback、历史、排序、筛选、`marketId`/search alias 搜索、`序N` 移动端语义、键盘和窄屏正常。'
+          operations = replace_once(operations, deploy_old, deploy_new, 'OPERATIONS post-deploy browser check')
+          operations_path.write_text(operations, encoding='utf-8')
+          PY
+
+          rm .github/workflows/temp-icloud-docs-sync.yml
+
+      - name: Install dependencies
+        working-directory: tools/icloud_price_comparison
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Run documentation and project contracts
+        working-directory: tools/icloud_price_comparison
+        run: |
+          pnpm test:core
+          pnpm validate:artifact
+          pnpm validate:snapshots
+
+      - name: Check diff formatting
+        run: git diff --check
+
+      - name: Commit final documentation sync
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Synchronize iCloud identity and SEO documentation"
+          git push origin HEAD:agent/icloud-docs-sync
