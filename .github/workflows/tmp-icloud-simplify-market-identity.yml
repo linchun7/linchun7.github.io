@@ -39,6 +39,7 @@ jobs:
           python tools/icloud_price_comparison/scripts/_tmp_simplify_market_identity.py
           rm tools/icloud_price_comparison/scripts/_tmp_simplify_market_identity.py
           rm tools/icloud_price_comparison/scripts/_tmp_fix_simplify_patch.py
+          rm .github/workflows/tmp-icloud-simplify-market-identity.yml
       - name: Refresh generated assets
         working-directory: tools/icloud_price_comparison
         run: |
