@@ -15,10 +15,10 @@
 - 公共数据使用 schema 4，市场使用稳定 `marketId`。
 - Apple 英文支持页决定 active market、价格、币种、容量和发布日期；Apple 简体中文支持页只用于已经复核的官方中文市场名称。
 - 欧元区中文名称保持“欧盟”。中文名称尚未确认时保留 Apple 英文名称，不阻断价格更新。
-- Apple 首次出现 registry 中不存在的市场时，生成可复现的 `apple-*` 市场 ID；确认无 ID 冲突后可自动发布。
+- 市场身份按“已发布 identity ledger → active registry → future reservation → deterministic `apple-*` fallback”的安全顺序处理。`scripts/reserved-market-registry.mjs` 只提前预留高置信国家/地区 ID，不代表 Apple 当前提供这些市场；真正未识别的 Apple 市场才生成可复现的 `apple-*` ID，确认无冲突后可自动发布。
 - 页面默认按 200GB 人民币参考价从低到高排序；若未来 Apple 不再提供 200GB，则使用当前 `tiers` 中的首个容量作为默认容量。
 - 容量排序时显示生成器提供的全球 `cnyRank`，搜索或地区筛选不会把排名重算成局部排名；切换为国家/地区排序时数字改为当前列表序号，移动端明确显示为 `序1`、`序2`、`序3`……，不引入第二套价格排名。
-- 搜索对 `marketId`、中英文国家/地区名称和地区名称使用部分字符串匹配；当查询完整等于某个 `marketId` 时，该市场只提升到搜索结果第一位，不排除其他合法部分匹配；币种仅按完整代码匹配，避免短字母把同币种市场全部带出。
+- 搜索对 `marketId`、人工维护的 search alias、中英文国家/地区名称和地区名称使用部分字符串匹配；完整 `marketId` 命中优先级最高，完整 search alias 次之，但都不排除其他合法部分匹配；币种仅按完整代码匹配，避免短字母把同币种市场全部带出。
 - 容量、排序方向、地区筛选等可分享状态写入规范 URL；站内搜索词不保留在 URL。允许的页面内跳转 fragment 仅有 `#priceWorkspace`，其他未知 fragment 会被清理。
 - 最低价卡片是导航操作：切换对应容量、从低到高排序并定位目标地区。
 - 当前价格不写入 `localStorage`、`sessionStorage`、IndexedDB 或 Service Worker；没有浏览器持久价格缓存。
@@ -28,7 +28,7 @@
 
 - 展示 Apple 页面解析出的地区、分区、币种、容量和当地月费，以及人民币参考价。
 - 按容量汇总参考最低价和所有并列地区。
-- 支持中英文国家/地区、`marketId`、地区名称和完整币种代码搜索，以及分区筛选、容量排序、地区排序和 URL 状态恢复；精确 `marketId` 命中优先，但部分匹配仍保留。
+- 支持中英文国家/地区、`marketId`、友好 search alias、地区名称和完整币种代码搜索，以及分区筛选、容量排序、地区排序和 URL 状态恢复；精确 `marketId` 命中优先级最高，精确 alias 次之，但部分匹配仍保留。
 - 容量价格排序使用全球参考排名；国家/地区排序使用列表序号，移动端用 `序N` 区分序号与排名。
 - 点击地区可查看当地月费、人民币换算价、价格变更次数和完整的 Apple 当地标价历史。
 - 展示 Apple `Published Date`，并记录发布日期变化时对应的容量、地区、分区、币种和价格差异。
@@ -42,7 +42,7 @@
 ```text
 Apple Support HTML ─┐
                     ├─ 只读生成/测试 job
-ExchangeRate-API ───┘        │
+汇率认证/开放源 ────┘        │
                              ├─ schema / history / snapshot / static HTML 验证
                              └─ 依赖隔离的 contents:write 发布 job
                                           │
@@ -87,18 +87,46 @@ ExchangeRate-API ───┘        │
 
 网络数据超过 7 天或相对当前时间超前超过 5 分钟时不会覆盖已显示的静态价格。36 小时以内为正常可用窗口；36 小时至 7 天只作为旧数据参考。最低价提示只由 `cnyRank === 1` 决定，价格过期或 `fx.stale` 时隐藏最低价排名提示。
 
-## 市场身份与中文名称
+## 市场身份、预留 ID 与中文名称
 
-`scripts/market-registry.mjs` 是长期市场身份目录，保存稳定 `marketId`、Apple 英文 canonical name 和历史 aliases。`scripts/country-names.zh.json` 是 Apple 简体中文市场名称的唯一事实源。
+`marketId` 的首要职责是**永久数据身份**，不是为了让代码看起来漂亮而随意更换。当前身份体系分为四层：
 
-- 已审核中文 wording：保存字符串。
-- 尚待 Apple zh-CN wording 确认：保存 `null`，前端继续显示 Apple 英文 `sourceName`，并记录 `CHINESE_MARKET_NAME_PENDING`。
-- 未登记 Apple 市场：生成确定性 `apple-*` ID，并记录 `UNKNOWN_APPLE_MARKET`；只要结构已完成正常 Apple 确认且 ID 不冲突，就允许继续发布。
-- 一旦某个未知市场已经发布，其 schema 4 prices/history identity ledger 优先于当前 ID 生成器。
-- 已从 Apple 页面移除的历史市场 ID 仍永久 reserved。
-- 不做模糊名称匹配，不自动把“疑似改名”绑定到旧市场。只有满足严格双向唯一和完整结构一致的高置信 ambiguity 才停止并要求显式 alias。
+1. `prices.json` / `history.json` 已经发布过的 identity ledger 优先。某个 Apple source name 一旦以一个 `marketId` 发布，后续普通自动更新继续沿用该 ID。
+2. `scripts/market-registry.mjs` 保存当前已知 Apple 市场的稳定 `marketId`、Apple 英文 canonical name 和 aliases。
+3. `scripts/reserved-market-registry.mjs` 预留未来可能出现的高置信国家/地区 ID，主要使用未被 active registry 占用的 ISO 3166-1 alpha-2 代码，并额外预留 `xk`。预留项**不是 Apple 可用性清单**，不会因为存在于该文件就进入 `prices.json` 或页面；只有 Apple 英文页真的出现并与明确 canonical name/alias 匹配时才启用该 ID。
+4. 如果 Apple 首次出现的名称既不在 active registry，也不在 future reservations，才生成确定性的 `apple-<slug>-<hash>` ID，并记录 `UNKNOWN_APPLE_MARKET`。完成正常 Apple 语义确认且无 ID 冲突后允许自动发布。
 
-相关长期边界由 `test/market-registry.test.mjs` 独立保护，不依赖已经退出生产路径的历史 schema 迁移器。
+中文名称继续独立遵守 Apple 来源规则：`scripts/country-names.zh.json` 是 Apple 简体中文市场名称唯一事实源。已审核 wording 保存字符串；尚待 Apple zh-CN wording 确认则保存 `null` 或视为 pending，前端继续显示 Apple 英文 `sourceName` 并记录 `CHINESE_MARKET_NAME_PENDING`。提前预留一个 market ID 不等于提前创造中文名称。
+
+### 搜索 alias 与已发布 fallback
+
+浏览器端友好搜索别名维护在 `data-model.js` 的 `MARKET_SEARCH_ALIASES`。例如 `uk → gb`、`usa → us`、`turkey → tr`。search alias 只改善用户搜索，不改变永久 `marketId`，也不写入公共价格 schema。
+
+如果一个真正未知市场已经以 `apple-*` fallback 发布，后来才确认它对应某个友好代码，**默认不 rekey**：已发布 identity 继续保持 sticky，可以给原 `marketId` 增加合适的 `MARKET_SEARCH_ALIASES`，让用户用友好代码找到它而不破坏历史。
+
+- 已从 Apple 页面移除的历史市场 ID 仍永久 reserved，不得分配给其他市场。
+- 新生成或预留的 ID 如果与 active registry 或历史 ledger 冲突，以 `MARKET_IDENTITY_RESERVED_ID_COLLISION` 失败关闭，不随机换 ID。
+- 不做模糊名称匹配，不自动把“疑似改名”绑定到旧市场。只有满足严格双向唯一和完整结构一致的高置信 ambiguity 才停止并要求显式 alias；弱信号只记录 review warning。
+
+### 极少数显式 marketId migration
+
+只有确实需要把一个**已经发布的 `apple-*` fallback**迁移到经过人工复核的 active/reserved ID 时，才使用显式迁移工具。普通 registry 编辑不能静默改历史 ID。
+
+先 dry-run：
+
+```bash
+node scripts/migrate-market-id.mjs --from <apple-...> --to <reviewed-id>
+```
+
+确认目标 ID 已先进入 active/reserved registry、没有任何 active/history 冲突并审核完整 diff 后，才允许写入：
+
+```bash
+node scripts/migrate-market-id.mjs --from <apple-...> --to <reviewed-id> --write
+```
+
+工具只接受 `apple-*` 作为源 ID，会同步迁移 `prices.json` 与 `history.json` 的 identity、重新生成 `index.html`，并在失败时恢复原文件。迁移后必须运行 core、artifact、snapshots 和三浏览器验收，再通过普通 PR 发布；不要手工改单个 JSON key。
+
+相关长期边界由 `test/market-registry.test.mjs`、`test/market-identity-reservations.test.mjs` 和 `test/documentation-contract.test.mjs` 共同保护。
 
 ## 页面生成与 SEO
 
@@ -116,7 +144,7 @@ pnpm render:static:check
 
 SEO 当前采用“稳定意图 + 动态数据”的组合：
 
-- description、Open Graph/Twitter description 自然包含日本、美国、俄罗斯、土耳其、尼日利亚等长期热门市场词；这组词不是“当前最低价榜单”，不会因日常汇率波动自动替换。
+- description、Open Graph/Twitter description 自然包含美国、日本、中国大陆、俄罗斯、土耳其、尼日利亚、台湾等常见及低价市场词；这组词是稳定搜索意图，不是“当前最低价榜单”，不会因日常汇率波动自动替换。
 - description 中的容量列表、OG/Twitter 图片 alt 和首屏产品说明仍由当前 `payload.tiers` 动态生成；未来 Apple 合法新增或移除容量时会同步更新。
 - 当前各容量最低价市场、价格、排名、覆盖数量和更新时间继续由静态正文随 `prices.json` 动态生成，搜索引擎可以直接抓取这些真实页面内容。
 - 页面 `<title>`、canonical URL 等未列入 `seoProjection()` 的 shell metadata 不是价格更新的动态目标；如需修改应作为明确 SEO 变更并保留相应测试。
