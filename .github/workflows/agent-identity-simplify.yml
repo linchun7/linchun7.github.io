@@ -27,11 +27,21 @@ jobs:
           from pathlib import Path
           path = Path('tools/icloud_price_comparison/scripts/agent-identity-simplify.py')
           text = path.read_text(encoding='utf-8')
-          old = "updated, count = re.subn(pattern, replacement, text, count=1, flags=re.S)"
-          new = "updated, count = re.subn(pattern, lambda _match: replacement, text, count=1, flags=re.S)"
-          if text.count(old) != 1:
-              raise SystemExit('temporary regex helper shape changed')
-          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          replacements = [
+            (
+              "updated, count = re.subn(pattern, replacement, text, count=1, flags=re.S)",
+              "updated, count = re.subn(pattern, lambda _match: replacement, text, count=1, flags=re.S)"
+            ),
+            (
+              "text = replace_once(text, old_checkout, new_checkout, 'validation documentation gate')",
+              "if text.count(old_checkout) != 2:\n    raise SystemExit(f'validation documentation gate: expected 2 checkout matches, found {text.count(old_checkout)}')\ntext = text.replace(old_checkout, new_checkout, 1)"
+            )
+          ]
+          for old, new in replacements:
+              if text.count(old) != 1:
+                  raise SystemExit(f'temporary helper shape changed: {old[:40]}')
+              text = text.replace(old, new, 1)
+          path.write_text(text, encoding='utf-8')
           PY
       - name: Apply reviewed simplification
         run: python tools/icloud_price_comparison/scripts/agent-identity-simplify.py
