@@ -110,7 +110,7 @@ function renderCountryRow(country, tiers, options) {
     `          <tr data-market-id="${escapeHtml(country.marketId)}" data-cny-ranks="${tierRanks}">`,
     `            <td${options.minimumCuesEnabled && rank <= 3 ? ' class="rank-top"' : ''}>${rank}</td>`,
     '            <td>',
-    '              <button class="country-history-button" type="button" disabled>',
+    `              <button class="country-history-button" type="button" data-mobile-rank="${escapeHtml(rank)}" disabled>`,
     `              <span class="country-name">${escapeHtml(displayName(country))}</span>`,
     secondary.trimEnd(),
     '              <span class="history-affordance" aria-hidden="true">›</span>',

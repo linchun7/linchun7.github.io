@@ -419,6 +419,8 @@ function reconcileStaticTierState() {
     const rankCell = row.cells[0];
     rankCell.textContent = String(rank);
     rankCell.classList.toggle('rank-top', !staticSnapshotFxStale && state.sortDirection === 'asc' && rank <= 3);
+    const historyButton = row.querySelector('.country-history-button');
+    if (historyButton) historyButton.dataset.mobileRank = String(rank);
   }
   const direction = state.sortDirection === 'asc' ? '从低到高' : '从高到低';
   elements.resultSummary.textContent = `${rankedRows.length} 个地区 · ${tier.label} ${direction}`;
@@ -561,9 +563,14 @@ function renderHistoryHeaders() {
 
 function filteredCountries() {
   const query = state.query.trim().toLocaleLowerCase('zh-CN');
+  const exactMarketId = query
+    ? state.data.countries.find(({ marketId }) => marketId.toLocaleLowerCase('en-US') === query)?.marketId
+    : null;
   return state.data.countries.filter((country) => {
     const searchable = `${country.country} ${country.nameZh} ${country.currency} ${REGION_LABELS[country.region] || country.region}`.toLocaleLowerCase('zh-CN');
-    return (!query || searchable.includes(query))
+    const matchesQuery = !query
+      || (exactMarketId ? country.marketId === exactMarketId : searchable.includes(query));
+    return matchesQuery
       && (state.region === 'all' || country.region === state.region);
   });
 }
@@ -672,11 +679,12 @@ function renderTable({ alignTierColumn = true } = {}) {
       const historyButton = document.createElement('button');
       historyButton.type = 'button';
       historyButton.className = 'country-history-button';
+      historyButton.dataset.mobileRank = String(displayedRank);
       historyButton.disabled = state.dataFreshness?.status === 'unusable';
       const displayName = country.nameZh || country.country;
       const secondaryName = country.nameZh && country.nameZh !== country.country
         ? `${country.country} · ${country.currency}`
-        : '';
+        : country.currency;
       const name = document.createElement('span');
       name.className = 'country-name';
       name.textContent = displayName;
