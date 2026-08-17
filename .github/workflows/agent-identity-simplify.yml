@@ -45,6 +45,62 @@ jobs:
           PY
       - name: Apply reviewed simplification
         run: python tools/icloud_price_comparison/scripts/agent-identity-simplify.py
+      - name: Simplify documentation gate and repair workflow assertion
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          workflow_path = Path('.github/workflows/validate-icloud-price-comparison.yml')
+          workflow = workflow_path.read_text(encoding='utf-8')
+          start = workflow.index('      - name: 强制关键架构更新同步文档\n')
+          end = workflow.index('      - name: 配置 Node.js\n', start)
+          clean_gate = '\n'.join([
+            '      - name: 强制关键架构更新同步文档',
+            "        if: github.event_name == 'pull_request'",
+            '        working-directory: .',
+            '        env:',
+            '          BASE_SHA: ${{ github.event.pull_request.base.sha }}',
+            '        run: |',
+            '          changed="$(git diff --name-only "$BASE_SHA" HEAD)"',
+            '          needs_docs=false',
+            '          while IFS= read -r file; do',
+            '            case "$file" in',
+            '              .github/workflows/update-icloud-prices.yml|.github/workflows/validate-icloud-price-comparison.yml|tools/icloud_price_comparison/data-contract.js|tools/icloud_price_comparison/data-model.js|tools/icloud_price_comparison/script.js|tools/icloud_price_comparison/scripts/market-registry.mjs|tools/icloud_price_comparison/scripts/reserved-market-registry.mjs|tools/icloud_price_comparison/scripts/update-prices.mjs|tools/icloud_price_comparison/scripts/parse-prices.mjs|tools/icloud_price_comparison/scripts/render-static-page.mjs|tools/icloud_price_comparison/scripts/static-page.mjs|tools/icloud_price_comparison/scripts/validate-data-artifact.mjs)',
+            '                needs_docs=true',
+            '                ;;',
+            '            esac',
+            '          done <<< "$changed"',
+            '          if [ "$needs_docs" = true ]; then',
+            '            for doc in tools/icloud_price_comparison/README.md tools/icloud_price_comparison/OPERATIONS.md; do',
+            '              if ! printf \'%s\\n\' "$changed" | grep -Fxq "$doc"; then',
+            '                echo "Critical iCloud architecture changed without required documentation update: $doc" >&2',
+            '                exit 1',
+            '              fi',
+            '            done',
+            '          fi',
+            ''
+          ])
+          workflow = workflow[:start] + clean_gate + workflow[end:]
+          workflow_path.write_text(workflow, encoding='utf-8')
+
+          test_path = Path('tools/icloud_price_comparison/test/workflow.test.mjs')
+          test = test_path.read_text(encoding='utf-8')
+          test, count = re.subn(
+            r"  assert\.doesNotMatch\(ciWorkflow, /if: github\.event_name == 'schedule'.*?workflow_dispatch'/\);",
+            "  assert.equal(ciWorkflow.includes(\"if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'\"), false);",
+            test,
+            count=1
+          )
+          if count != 1:
+            raise SystemExit(f'workflow assertion replacement count={count}')
+          needle = "  assert.match(coreJob, /run: git diff --check/);\n"
+          addition = "  assert.match(coreJob, /name: 强制关键架构更新同步文档[\\s\\S]*?if: github\\.event_name == 'pull_request'/);\n  assert.match(coreJob, /fetch-depth: 0/);\n"
+          if test.count(needle) != 1:
+            raise SystemExit('workflow core assertion anchor changed')
+          test = test.replace(needle, needle + addition, 1)
+          test_path.write_text(test, encoding='utf-8')
+          PY
       - name: Install dependencies
         working-directory: tools/icloud_price_comparison
         run: |
