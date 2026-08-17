@@ -35,8 +35,8 @@ function validWorkflowChange() {
     changes: 2,
     patch: [
       '@@ -1 +1 @@',
-      '-        uses: actions/checkout@' + OLD_ACTION_SHA + ' # v5.0.0',
-      '+        uses: actions/checkout@' + NEW_ACTION_SHA + ' # v6.0.0',
+      '-        uses: actions/checkout@' + OLD_ACTION_SHA + ' # v6.0.0',
+      '+        uses: actions/checkout@' + NEW_ACTION_SHA + ' # v6.1.0',
     ].join('\n'),
   };
 }
@@ -64,7 +64,7 @@ test('accepts only the tested Dependabot GitHub Actions pull request', () => {
   }
 });
 
-test('accepts one-for-one full-SHA actions/* replacements and rejects every broader diff', () => {
+test('accepts one-for-one full-SHA routine actions/* replacements and rejects every broader diff', () => {
   assert.equal(validateChangedFiles([validWorkflowChange()]), 1);
   assert.throws(
     () => validateChangedFiles(Array.from({ length: 21 }, validWorkflowChange)),
@@ -73,8 +73,8 @@ test('accepts one-for-one full-SHA actions/* replacements and rejects every broa
   const excessiveReferences = validWorkflowChange();
   excessiveReferences.patch = [
     '@@ -1,101 +1,101 @@',
-    ...Array.from({ length: 101 }, () => '-        uses: actions/checkout@' + OLD_ACTION_SHA + ' # v5.0.0'),
-    ...Array.from({ length: 101 }, () => '+        uses: actions/checkout@' + NEW_ACTION_SHA + ' # v6.0.0')
+    ...Array.from({ length: 101 }, () => '-        uses: actions/checkout@' + OLD_ACTION_SHA + ' # v6.0.0'),
+    ...Array.from({ length: 101 }, () => '+        uses: actions/checkout@' + NEW_ACTION_SHA + ' # v6.1.0')
   ].join('\n');
   excessiveReferences.changes = 202;
   assert.throws(() => validateChangedFiles([excessiveReferences]), /Action reference count is invalid/);
@@ -85,7 +85,7 @@ test('accepts one-for-one full-SHA actions/* replacements and rejects every broa
     (file) => { delete file.patch; },
     (file) => { file.patch = file.patch.replace('actions/checkout', 'third-party/action'); },
     (file) => { file.patch = file.patch.replace(NEW_ACTION_SHA, 'v6'.padEnd(40, 'x')); },
-    (file) => { file.patch = file.patch.replace('v6.0.0', 'v6'); },
+    (file) => { file.patch = file.patch.replace('v6.1.0', 'v6'); },
     (file) => { file.patch += '\n+      timeout-minutes: 30'; file.changes += 1; },
     (file) => { file.patch = file.patch.replace(NEW_ACTION_SHA, OLD_ACTION_SHA); },
   ];
@@ -95,6 +95,20 @@ test('accepts one-for-one full-SHA actions/* replacements and rejects every broa
     mutate(file);
     assert.throws(() => validateChangedFiles([file]));
   }
+});
+
+test('requires stable forward patch/minor Action releases and rejects majors', () => {
+  const major = validWorkflowChange();
+  major.patch = major.patch.replace('# v6.1.0', '# v7.0.0');
+  assert.throws(() => validateChangedFiles([major]), /major update requires manual review/);
+
+  const rollback = validWorkflowChange();
+  rollback.patch = rollback.patch.replace('# v6.0.0', '# v6.2.0').replace('# v6.1.0', '# v6.1.0');
+  assert.throws(() => validateChangedFiles([rollback]), /update must move forward/);
+
+  const prerelease = validWorkflowChange();
+  prerelease.patch = prerelease.patch.replace('# v6.1.0', '# v6.1.0-beta.1');
+  assert.throws(() => validateChangedFiles([prerelease]), /exact stable vX\.Y\.Z release tag/);
 });
 
 test('rejects an oversized pull request before requesting its changed-file pages', async () => {
@@ -146,7 +160,7 @@ test('merges through the GitHub API only with the exact tested head SHA', async 
     RUN_BASE_SHA: BASE_SHA,
     RUN_HEAD_SHA: HEAD_SHA,
   }, fetchImpl, () => {}, async () => ({
-    stdout: `${NEW_ACTION_SHA}\trefs/tags/v6.0.0\n`,
+    stdout: `${NEW_ACTION_SHA}\trefs/tags/v6.1.0\n`,
     stderr: ''
   }));
 
@@ -160,13 +174,13 @@ test('rejects a pinned Action SHA that does not match its exact release tag', as
   const requests = [];
   const runGit = async (command, arguments_, options) => {
     requests.push({ command, arguments_, options });
-    return { stdout: `${OLD_ACTION_SHA}\trefs/tags/v6.0.0\n`, stderr: '' };
+    return { stdout: `${OLD_ACTION_SHA}\trefs/tags/v6.1.0\n`, stderr: '' };
   };
   await assert.rejects(
     verifyActionReferences([
-      { action: 'actions/checkout', sha: NEW_ACTION_SHA, version: 'v6.0.0' },
+      { action: 'actions/checkout', sha: NEW_ACTION_SHA, version: 'v6.1.0' },
     ], runGit),
-    /Pinned SHA does not match actions\/checkout@v6\.0\.0/
+    /Pinned SHA does not match actions\/checkout@v6\.1\.0/
   );
   assert.equal(requests.length, 1);
   assert.equal(requests[0].command, 'git');
@@ -178,17 +192,17 @@ test('peels annotated official Action tags before comparing the pinned commit', 
   const tagObjectSha = 'e'.repeat(40);
   const runGit = async () => ({
     stdout: [
-      `${tagObjectSha}\trefs/tags/v6.0.0`,
-      `${NEW_ACTION_SHA}\trefs/tags/v6.0.0^{}`,
+      `${tagObjectSha}\trefs/tags/v6.1.0`,
+      `${NEW_ACTION_SHA}\trefs/tags/v6.1.0^{}`,
       ''
     ].join('\n'),
     stderr: ''
   });
   await assert.doesNotReject(verifyActionReferences([
-    { action: 'actions/checkout', sha: NEW_ACTION_SHA, version: 'v6.0.0' },
+    { action: 'actions/checkout', sha: NEW_ACTION_SHA, version: 'v6.1.0' },
   ], runGit));
   assert.equal(
-    await resolveActionTagCommit({ action: 'actions/checkout', version: 'v6.0.0' }, runGit),
+    await resolveActionTagCommit({ action: 'actions/checkout', version: 'v6.1.0' }, runGit),
     NEW_ACTION_SHA
   );
 });
