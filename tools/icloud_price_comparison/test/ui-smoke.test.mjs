@@ -3229,3 +3229,54 @@ test('keeps mobile ranking visible and UX fallbacks stable', { timeout: 60_000 }
     await browser.close();
   }
 });
+
+
+test('prioritizes exact market IDs without hiding partial matches and distinguishes mobile sequence numbers', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'search priority and mobile sequence regression coverage');
+  if (!browserConfig) return;
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await page.route('https://**/*', (route) => {
+    if (route.request().url().startsWith('https://www.googletagmanager.com/')) return route.fulfill({ status: 200, contentType: 'text/javascript', body: '' });
+    return route.abort();
+  });
+  try {
+    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length > 0);
+    const search = page.locator('#searchInput');
+
+    await search.fill('us');
+    await page.waitForFunction(() => document.querySelector('#priceRows tr[data-market-id]')?.dataset.marketId === 'us');
+    const usResults = page.locator('#priceRows tr[data-market-id]');
+    assert.equal(await usResults.first().getAttribute('data-market-id'), 'us');
+    assert.ok(await usResults.count() > 1);
+    assert.match(await page.locator('#priceRows').innerText(), /Russia/);
+
+    await search.fill('rus');
+    await page.waitForFunction(() => document.querySelector('#priceRows')?.textContent?.includes('Russia'));
+    assert.match(await page.locator('#priceRows').innerText(), /Russia/);
+
+    await search.fill('大利');
+    await page.waitForFunction(() => document.querySelector('#priceRows')?.textContent?.includes('澳大利亚'));
+    assert.match(await page.locator('#priceRows').innerText(), /澳大利亚/);
+
+    await search.fill('');
+    await page.locator('button[data-sort="country"]').click();
+    await page.waitForFunction(() => document.querySelector('.mobile-rank')?.textContent === '序1');
+    assert.deepEqual(
+      await page.locator('#priceRows .mobile-rank').evaluateAll((nodes) => nodes.slice(0, 3).map((node) => node.textContent)),
+      ['序1', '序2', '序3']
+    );
+    assert.equal(await page.locator('#rankHeaderLabel > span[aria-hidden="true"]').innerText(), '序号');
+
+    await page.locator('button[data-sort-tier="200GB"]').click();
+    await page.waitForFunction(() => document.querySelector('.mobile-rank')?.textContent === '1');
+    assert.equal((await page.locator('#priceRows .mobile-rank').first().innerText()).startsWith('序'), false);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1), true);
+  } finally {
+    await browser.close();
+    await server.close(() => {});
+  }
+});

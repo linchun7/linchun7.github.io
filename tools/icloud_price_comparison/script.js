@@ -561,18 +561,26 @@ function renderHistoryHeaders() {
   header.textContent = state.data.tiers.find(({ id }) => id === state.historyTier)?.label ?? state.historyTier;
 }
 
+function normalizedSearchQuery() {
+  return state.query.trim().toLocaleLowerCase('zh-CN');
+}
+
+function matchesCountrySearch(country, query) {
+  if (!query) return true;
+  const marketId = country.marketId.toLocaleLowerCase('en-US');
+  const namesAndRegion = `${country.country} ${country.nameZh ?? ''} ${REGION_LABELS[country.region] || country.region}`.toLocaleLowerCase('zh-CN');
+  const currency = country.currency.toLocaleLowerCase('en-US');
+  return marketId.includes(query)
+    || namesAndRegion.includes(query)
+    || currency === query;
+}
+
 function filteredCountries() {
-  const query = state.query.trim().toLocaleLowerCase('zh-CN');
-  const exactMarketId = query
-    ? state.data.countries.find(({ marketId }) => marketId.toLocaleLowerCase('en-US') === query)?.marketId
-    : null;
-  return state.data.countries.filter((country) => {
-    const searchable = `${country.country} ${country.nameZh} ${country.currency} ${REGION_LABELS[country.region] || country.region}`.toLocaleLowerCase('zh-CN');
-    const matchesQuery = !query
-      || (exactMarketId ? country.marketId === exactMarketId : searchable.includes(query));
-    return matchesQuery
-      && (state.region === 'all' || country.region === state.region);
-  });
+  const query = normalizedSearchQuery();
+  return state.data.countries.filter((country) => (
+    matchesCountrySearch(country, query)
+    && (state.region === 'all' || country.region === state.region)
+  ));
 }
 
 function sortValue(country) {
@@ -581,7 +589,12 @@ function sortValue(country) {
 }
 
 function sortedCountries() {
+  const query = normalizedSearchQuery();
   return filteredCountries().sort((a, b) => {
+    const aExactMarketId = query && a.marketId.toLocaleLowerCase('en-US') === query;
+    const bExactMarketId = query && b.marketId.toLocaleLowerCase('en-US') === query;
+    if (aExactMarketId !== bExactMarketId) return aExactMarketId ? -1 : 1;
+
     const first = sortValue(a);
     const second = sortValue(b);
     const comparison = typeof first === 'string' ? collator.compare(first, second) : first - second;
@@ -691,7 +704,9 @@ function renderTable({ alignTierColumn = true } = {}) {
       const mobileRank = document.createElement('span');
       mobileRank.className = 'mobile-rank';
       mobileRank.setAttribute('aria-hidden', 'true');
-      mobileRank.textContent = String(displayedRank);
+      mobileRank.textContent = state.sortKey === 'country' && displayedRank !== '—'
+        ? `序${displayedRank}`
+        : String(displayedRank);
       historyButton.append(mobileRank);
       if (secondaryName) {
         const nameEn = document.createElement('span');
