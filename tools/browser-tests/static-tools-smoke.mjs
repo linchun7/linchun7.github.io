@@ -30,6 +30,16 @@ async function routePconline(page, payload) {
     });
 }
 
+async function routeSohu(page, payload) {
+    await page.route('**/pv.sohu.com/cityjson**', async (route) => {
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/javascript; charset=utf-8',
+            body: `var returnCitySN = ${JSON.stringify(payload)};`
+        });
+    });
+}
+
 async function createMyIpContext() {
     const context = await browser.newContext();
     await context.addInitScript(() => {
@@ -85,9 +95,9 @@ async function testMyIpSplitRouting() {
         region: '',
         addr: '四川省成都市 示例运营商'
     });
-    await page.route('**/api.bilibili.com/**', async (route) => {
+    await page.route('**/pv.sohu.com/cityjson**', async (route) => {
         domesticFallbackCalls += 1;
-        await route.fulfill({ status: 500, contentType: 'application/json', body: '{}' });
+        await route.abort();
     });
     await routeJson(page, '**/api.ip.sb/**', {
         ip: '198.51.100.20',
@@ -104,7 +114,7 @@ async function testMyIpSplitRouting() {
     await page.goto(`${baseUrl}/tools/myip/`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => document.querySelector('#summary-status')?.textContent === '已分流');
 
-    assert.equal(domesticFallbackCalls, 0, 'domestic HTTPS fallback should not run when PConline succeeds');
+    assert.equal(domesticFallbackCalls, 0, 'Sohu fallback should not run when PConline succeeds');
     assert.equal(await page.locator('#domestic-ipv4').textContent(), '203.0.113.10');
     assert.equal(await page.locator('#international-ipv4').textContent(), '198.51.100.20');
     assert.equal(await page.locator('#international-ipv6').textContent(), '2001:db8::20');
@@ -127,16 +137,10 @@ async function testMyIpDomesticFallbackAndOptionalIpv6() {
         domesticPrimaryAttempts += 1;
         await route.abort();
     });
-    await routeJson(page, '**/api.bilibili.com/**', {
-        code: 0,
-        message: '0',
-        data: {
-            addr: '203.0.113.30',
-            country: '中国',
-            province: '四川',
-            city: '成都',
-            isp: '示例运营商'
-        }
+    await routeSohu(page, {
+        cip: '203.0.113.30',
+        cid: '510100',
+        cname: '四川省成都市'
     });
     await routeJson(page, '**/api.ip.sb/**', { error: 'temporary' }, 503);
     await routeJson(page, '**/api.ipify.org/**', { ip: '198.51.100.77' });
@@ -147,7 +151,7 @@ async function testMyIpDomesticFallbackAndOptionalIpv6() {
     await page.goto(`${baseUrl}/tools/myip/`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => document.querySelector('#summary-status')?.textContent === '已分流');
 
-    assert.equal(domesticPrimaryAttempts, 2, 'domestic primary should retry once before fallback');
+    assert.equal(domesticPrimaryAttempts, 2, 'PConline should retry once before Sohu fallback');
     assert.equal(await page.locator('#source-domestic-status').textContent(), '备用成功');
     assert.equal(await page.locator('#domestic-ipv4').textContent(), '203.0.113.30');
     assert.equal(await page.locator('#international-ipv4').textContent(), '198.51.100.77');
@@ -171,7 +175,7 @@ async function testMyIpDifferentFamiliesAreNotSplit() {
         region: '',
         addr: '广东省深圳市 示例运营商'
     });
-    await page.route('**/api.bilibili.com/**', (route) => route.abort());
+    await page.route('**/pv.sohu.com/cityjson**', (route) => route.abort());
     await routeJson(page, '**/api.ip.sb/**', {
         ip: '2001:db8::80',
         country: 'Singapore',
@@ -203,8 +207,8 @@ async function testMyIpAllFailuresReachFinalState() {
     page.on('pageerror', (error) => pageErrors.push(error));
 
     await page.route('**/whois.pconline.com.cn/**', (route) => route.abort());
+    await page.route('**/pv.sohu.com/cityjson**', (route) => route.abort());
     for (const pattern of [
-        '**/api.bilibili.com/**',
         '**/api.ip.sb/**',
         '**/api.ipify.org/**',
         '**/ipwho.is/**'
