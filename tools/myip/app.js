@@ -347,7 +347,7 @@
                 handler(value);
             };
 
-            try { delete window.returnCitySN; } catch (_) { window.returnCitySN = undefined; }
+            window.returnCitySN = null;
             const timer = window.setTimeout(() => finish(reject, createTimeoutError('国内备用接口')), timeoutMs);
             script.async = true;
             script.referrerPolicy = 'no-referrer';
