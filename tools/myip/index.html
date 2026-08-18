@@ -5,11 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="format-detection" content="telephone=no">
     <meta name="description" content="识别当前国内与国际网络出口 IP、IPv4/IPv6 状态及代理分流情况，并提供 WebRTC/STUN 辅助诊断。">
+    <meta name="myip-first-party-probe" content="">
     <link rel="shortcut icon" href="/images/favicon.ico">
     <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
     <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
-    <link rel="stylesheet" href="style.css?v=20260818-1">
-    <script src="app.js?v=20260818-1" defer></script>
+    <link rel="stylesheet" href="style.css?v=20260818-2">
+    <script src="app.js?v=20260818-2" defer></script>
     <title>网络出口 IP 与分流检测</title>
 </head>
 <body>
@@ -91,7 +92,7 @@
                             <strong id="domestic-ipv6" aria-live="polite">检测中…</strong>
                         </div>
                     </div>
-                    <p id="domestic-detail" class="detail-text">请求国内站点，用于观察 DIRECT / 直连规则实际使用的出口。</p>
+                    <p id="domestic-detail" class="detail-text">请求真实国内服务域名，用于观察 DIRECT / 直连规则实际使用的出口。</p>
                 </article>
 
                 <article class="egress-card" aria-labelledby="international-title">
@@ -112,7 +113,7 @@
                             <strong id="international-ipv6" aria-live="polite">检测中…</strong>
                         </div>
                     </div>
-                    <p id="international-detail" class="detail-text">请求国际 IP 服务，用于观察代理、VPN 或国际策略路由实际使用的出口。</p>
+                    <p id="international-detail" class="detail-text">优先使用本站第一方 Cloudflare Worker 探针，并由独立国际服务复核。</p>
                 </article>
             </div>
         </section>
@@ -123,21 +124,28 @@
                     <p class="eyebrow">PROBE EVIDENCE</p>
                     <h2 id="sources-title">探测证据</h2>
                 </div>
-                <p>单个服务失败不会覆盖已成功结果；国际 IPv6 不存在时会显示“未检测到”，不会当作故障。</p>
+                <p>第一方探针负责国际主结果；第三方只用于交叉验证和故障降级，单个服务失败不会覆盖已成功结果。</p>
             </div>
 
             <div class="source-list">
                 <article class="source-row">
                     <div>
                         <h3>国内线路</h3>
-                        <p id="source-domestic-detail" class="detail-text">优先国内 HTTPS API，必要时切换国内备用接口。</p>
+                        <p id="source-domestic-detail" class="detail-text">优先太平洋网络，必要时切换搜狐国内备用。</p>
                     </div>
                     <span id="source-domestic-status" class="status-pill status-loading">检测中</span>
                 </article>
                 <article class="source-row">
                     <div>
+                        <h3>第一方国际探针</h3>
+                        <p id="source-firstparty-detail" class="detail-text">等待 Cloudflare Worker 首次部署后绑定 workers.dev 地址。</p>
+                    </div>
+                    <span id="source-firstparty-status" class="status-pill status-idle">待配置</span>
+                </article>
+                <article class="source-row">
+                    <div>
                         <h3>IP.SB</h3>
-                        <p id="source-ipsb-detail" class="detail-text">国际公网地址与归属信息。</p>
+                        <p id="source-ipsb-detail" class="detail-text">国际公网地址与归属信息，用于独立复核。</p>
                     </div>
                     <span id="source-ipsb-status" class="status-pill status-loading">检测中</span>
                 </article>
@@ -157,8 +165,8 @@
                 </article>
                 <article class="source-row">
                     <div>
-                        <h3>国际备用</h3>
-                        <p id="source-fallback-detail" class="detail-text">仅在主要国际数据源全部失败时按需启用。</p>
+                        <h3>国际最后备用</h3>
+                        <p id="source-fallback-detail" class="detail-text">仅在第一方与主要国际数据源均失败时按需启用。</p>
                     </div>
                     <span id="source-fallback-status" class="status-pill status-idle">待命</span>
                 </article>
@@ -188,8 +196,8 @@
         </section>
 
         <aside class="privacy-note">
-            <strong>说明：</strong>
-            本页直接从你的浏览器向不同域名发起探测，因此结果会真实受到代理软件的域名规则、IPv4/IPv6 策略、VPN、iCloud Private Relay 和浏览器隐私策略影响。查询结果不会上传到本站服务器；第三方探测服务会按其自身策略看到对应请求和出口 IP。
+            <strong>隐私说明：</strong>
+            国内探测会直接访问所列国内第三方服务；国际主探针由本站自有 Cloudflare Worker 接收请求并返回该连接看到的出口 IP 与粗粒度网络信息，应用代码不持久化查询结果。IP.SB、IPify、IPWho.is 仅作为独立复核或备用，并受各自服务策略约束。
         </aside>
 
         <noscript>
