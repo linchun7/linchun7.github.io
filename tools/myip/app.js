@@ -193,23 +193,25 @@
         };
     }
 
-    function uniqueIps(route, family) {
-        const observations = routeResults[route].observations || [];
-        return [...new Set(observations.filter((item) => item.family === family).map((item) => item.ip))];
+    function preferredObservation(route, family) {
+        return (routeResults[route].observations || []).find((item) => item.family === family) || null;
     }
 
     function routeIsFinal(route) {
         return routeResults[route].status === 'success' || routeResults[route].status === 'error';
     }
 
-    function routeHasMultipleSameFamily(route) {
-        return uniqueIps(route, 4).length > 1 || uniqueIps(route, 6).length > 1;
+    function displayIp(route, family) {
+        const observation = preferredObservation(route, family);
+        if (observation) return observation.ip;
+        return routeIsFinal(route) ? '未检测到' : '检测中…';
     }
 
-    function displayIp(route, family) {
-        const ips = uniqueIps(route, family);
-        if (ips.length) return ips.join(' / ');
-        return routeIsFinal(route) ? '未检测到' : '检测中…';
+    function routeHasDisagreement(route, family) {
+        const ips = (routeResults[route].observations || [])
+            .filter((item) => item.family === family)
+            .map((item) => item.ip);
+        return new Set(ips).size > 1;
     }
 
     function renderRoute(route) {
@@ -224,8 +226,6 @@
             setStatus(`${route}-status`, 'loading', '检测中');
         } else if (current.status === 'error') {
             setStatus(`${route}-status`, 'warning', '未获取');
-        } else if (routeHasMultipleSameFamily(route)) {
-            setStatus(`${route}-status`, 'warning', '多个出口');
         } else {
             setStatus(`${route}-status`, 'success', '已获取');
         }
@@ -233,19 +233,19 @@
     }
 
     function compareFamily(family) {
-        const domestic = uniqueIps('domestic', family);
-        const international = uniqueIps('international', family);
-        if (!domestic.length || !international.length) return null;
+        const domestic = preferredObservation('domestic', family);
+        const international = preferredObservation('international', family);
+        if (!domestic || !international) return null;
         return {
             family,
-            same: domestic.some((ip) => international.includes(ip)),
+            same: domestic.ip === international.ip,
             domestic,
             international
         };
     }
 
     function firstRouteIp(route) {
-        return uniqueIps(route, 4)[0] || uniqueIps(route, 6)[0] || '';
+        return preferredObservation(route, 4)?.ip || preferredObservation(route, 6)?.ip || '';
     }
 
     function renderSummary() {
@@ -277,13 +277,6 @@
             return;
         }
 
-        if (routeHasMultipleSameFamily('domestic') || routeHasMultipleSameFamily('international')) {
-            setStatus('summary-status', 'warning', '多个出口');
-            setText('summary-main', '检测到多个公网出口');
-            setText('summary-detail', '不同检测网站返回了不同 IP，说明当前规则可能还会按具体域名或代理组继续分流。');
-            return;
-        }
-
         const comparisons = [compareFamily(4), compareFamily(6)].filter(Boolean);
         const split = comparisons.find((item) => !item.same);
         const same = comparisons.find((item) => item.same);
@@ -300,7 +293,7 @@
         if (same) {
             setStatus('summary-status', 'success', '同一出口');
             setText('summary-main', '国内和国际网站使用同一个 IP');
-            setText('summary-detail', `当前共同出口：${same.domestic[0]}。如果你开启了代理，可能是全局代理或这些检测域名被分到了同一路径。`);
+            setText('summary-detail', `当前共同出口：${same.domestic.ip}。如果你开启了代理，可能是全局代理或这些检测域名被分到了同一路径。`);
             return;
         }
 
@@ -397,7 +390,7 @@
     }
 
     async function loadIpw() {
-        const text = normalizeText(await fetchText(`https://4.ipw.cn/?_=${Date.now()}`));
+        const text = normalizeText(await fetchText('https://4.ipw.cn/'));
         const ip = text.split(/\s+/)[0];
         return makeObservation(ip, 'IPW', '', 'domestic-backup');
     }
@@ -411,7 +404,8 @@
                 return observation;
             } catch (error) {
                 if (runId !== activeRunId) return null;
-                setSource('pconline', 'warning', '未响应', formatError(error));
+                const invalid = /非公网 IP/.test(formatError(error));
+                setSource('pconline', 'warning', invalid ? '已忽略' : '未响应', formatError(error));
                 return null;
             }
         })();
@@ -424,22 +418,23 @@
                 return observation;
             } catch (error) {
                 if (runId !== activeRunId) return null;
-                setSource('ipw', 'warning', '备用未响应', formatError(error));
+                const invalid = /非公网 IP/.test(formatError(error));
+                setSource('ipw', 'warning', invalid ? '备用已忽略' : '备用未响应', formatError(error));
                 return null;
             }
         })();
 
-        const observations = (await Promise.all([pconlineTask, ipwTask])).filter(Boolean);
+        const [pconline, ipw] = await Promise.all([pconlineTask, ipwTask]);
         if (runId !== activeRunId) return;
+        const observations = [pconline, ipw].filter(Boolean);
 
         if (observations.length) {
-            const unique = [...new Set(observations.map((item) => item.ip))];
+            const preferred = observations[0];
+            const disagreement = observations.length > 1 && observations[0].ip !== observations[1].ip;
             routeResults.domestic = {
                 status: 'success',
                 observations,
-                detail: unique.length > 1
-                    ? '两个国内检测网站返回了不同 IP。'
-                    : `访问国内检测网站时使用 ${unique[0]}。`
+                detail: `访问国内检测网站时使用 ${preferred.ip}。${disagreement ? '备用检测返回了另一个 IP，可在检测详情中查看。' : ''}`
             };
         } else {
             routeResults.domestic = {
@@ -462,9 +457,10 @@
         ]);
     }
 
-    async function internationalTask(id, successLabel, loader) {
+    async function internationalTask(runId, id, successLabel, loader) {
         try {
             const result = await loader();
+            if (runId !== activeRunId) return [];
             const observations = Array.isArray(result) ? result : [result];
             const valid = observations.filter(Boolean);
             if (!valid.length) throw new Error('未返回公网 IP');
@@ -472,70 +468,74 @@
             setSource(id, 'success', successLabel, detail);
             return valid;
         } catch (error) {
-            setSource(id, id === 'ipify6' ? 'idle' : 'warning', id === 'ipify6' ? '未检测到' : (id === 'backup' ? '备用未响应' : '未响应'), formatError(error));
+            if (runId !== activeRunId) return [];
+            const isIpv6 = id === 'ipify6';
+            const isBackup = id === 'backup';
+            setSource(
+                id,
+                isIpv6 ? 'idle' : 'warning',
+                isIpv6 ? '未检测到' : (isBackup ? '备用未响应' : '未响应'),
+                formatError(error)
+            );
             return [];
         }
     }
 
     async function loadInternational(runId) {
         const firstPartyUrl = getFirstPartyProbeUrl();
-        const tasks = [];
-
-        tasks.push(internationalTask('firstparty', '正常', async () => {
-            if (!firstPartyUrl) throw new Error('本站检测地址未配置');
-            const data = await fetchJson(firstPartyUrl);
-            if (!data || data.schemaVersion !== 1 || data.role !== 'international-first-party') throw new Error('返回格式不正确');
-            const detail = firstPartyDetail(data);
-            const observations = [makeObservation(data.ip, '本站国际检测', detail, 'international-primary')];
-            if (data.originalIpv6 && normalizeText(data.originalIpv6) !== normalizeText(data.ip)) {
-                observations.push(makeObservation(data.originalIpv6, '本站国际检测 IPv6', detail, 'international-primary'));
-            }
-            return observations;
-        }));
-
-        tasks.push(internationalTask('ipsb', '正常', async () => {
-            const data = await fetchJson('https://api.ip.sb/geoip');
-            const detail = joinText([data && data.country, data && data.region, data && data.city, data && (data.isp || data.organization || data.asn_organization)]);
-            return makeObservation(data && data.ip, 'IP.SB', detail);
-        }));
-
-        tasks.push(internationalTask('ipify4', '正常', async () => {
-            const data = await fetchJson('https://api.ipify.org?format=json');
-            if (!data || ipFamily(data.ip) !== 4) throw new Error('未返回 IPv4');
-            return makeObservation(data.ip, 'IPify IPv4');
-        }));
-
-        tasks.push(internationalTask('ipify6', '正常', async () => {
-            const data = await fetchJson('https://api6.ipify.org?format=json', IPV6_TIMEOUT_MS);
-            if (!data || ipFamily(data.ip) !== 6) throw new Error('未返回 IPv6');
-            return makeObservation(data.ip, 'IPify IPv6');
-        }));
-
-        tasks.push(internationalTask('backup', '备用正常', async () => {
-            const data = await fetchJson('https://ipwho.is/');
-            if (!data || data.success === false) throw new Error('备用服务未返回结果');
-            const detail = joinText([
-                data.country,
-                data.region,
-                data.city,
-                data.connection && (data.connection.isp || data.connection.org)
-            ]);
-            return makeObservation(data.ip, 'IPWho.is', detail, 'international-backup');
-        }));
+        const tasks = [
+            internationalTask(runId, 'firstparty', '正常', async () => {
+                if (!firstPartyUrl) throw new Error('本站检测地址未配置');
+                const data = await fetchJson(firstPartyUrl);
+                if (!data || data.schemaVersion !== 1 || data.role !== 'international-first-party') throw new Error('返回格式不正确');
+                const detail = firstPartyDetail(data);
+                const observations = [makeObservation(data.ip, '本站国际检测', detail, 'international-primary')];
+                if (data.originalIpv6 && normalizeText(data.originalIpv6) !== normalizeText(data.ip)) {
+                    observations.push(makeObservation(data.originalIpv6, '本站国际检测 IPv6', detail, 'international-primary'));
+                }
+                return observations;
+            }),
+            internationalTask(runId, 'ipsb', '正常', async () => {
+                const data = await fetchJson('https://api.ip.sb/geoip');
+                const detail = joinText([data && data.country, data && data.region, data && data.city, data && (data.isp || data.organization || data.asn_organization)]);
+                return makeObservation(data && data.ip, 'IP.SB', detail);
+            }),
+            internationalTask(runId, 'ipify4', '正常', async () => {
+                const data = await fetchJson('https://api.ipify.org?format=json');
+                if (!data || ipFamily(data.ip) !== 4) throw new Error('未返回 IPv4');
+                return makeObservation(data.ip, 'IPify IPv4');
+            }),
+            internationalTask(runId, 'ipify6', '正常', async () => {
+                const data = await fetchJson('https://api6.ipify.org?format=json', IPV6_TIMEOUT_MS);
+                if (!data || ipFamily(data.ip) !== 6) throw new Error('未返回 IPv6');
+                return makeObservation(data.ip, 'IPify IPv6');
+            }),
+            internationalTask(runId, 'backup', '备用正常', async () => {
+                const data = await fetchJson('https://ipwho.is/');
+                if (!data || data.success === false) throw new Error('备用服务未返回结果');
+                const detail = joinText([
+                    data.country,
+                    data.region,
+                    data.city,
+                    data.connection && (data.connection.isp || data.connection.org)
+                ]);
+                return makeObservation(data.ip, 'IPWho.is', detail, 'international-backup');
+            })
+        ];
 
         const groups = await Promise.all(tasks);
         if (runId !== activeRunId) return;
         const observations = groups.flat();
 
         if (observations.length) {
-            const primary = observations.find((item) => item.role === 'international-primary');
-            const detail = primary && primary.detail
-                ? `${primary.detail}。访问国际检测网站时使用 ${primary.ip}。`
-                : `访问国际检测网站时已获取公网 IP。`;
+            const preferredV4 = observations.find((item) => item.family === 4);
+            const preferredV6 = observations.find((item) => item.family === 6);
+            const preferred = preferredV4 || preferredV6;
+            const disagreement = routeHasDisagreementFrom(observations, 4) || routeHasDisagreementFrom(observations, 6);
             routeResults.international = {
                 status: 'success',
                 observations,
-                detail
+                detail: `${preferred?.detail ? `${preferred.detail}。` : ''}访问国际检测网站时使用 ${preferred?.ip || '已获取的公网 IP'}。${disagreement ? '部分备用检测返回了不同 IP，可在检测详情中查看。' : ''}`
             };
         } else {
             routeResults.international = {
@@ -545,6 +545,11 @@
             };
         }
         renderRoute('international');
+    }
+
+    function routeHasDisagreementFrom(observations, family) {
+        const ips = observations.filter((item) => item.family === family).map((item) => item.ip);
+        return new Set(ips).size > 1;
     }
 
     function runAll() {
