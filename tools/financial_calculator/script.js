@@ -57,7 +57,7 @@
 
     function readAnnualDays(id) {
         const value = Number($(id).value);
-        if (value !== 360 && value !== 365) throw new Error('年投资天数必须为 360 或 365');
+        if (value !== 360 && value !== 365) throw new Error('年化天数必须为 360 或 365');
         return value;
     }
 
@@ -136,7 +136,6 @@
         const config = frequencyConfig[frequency];
         if (!config) throw new Error('复利方式无效');
 
-        // 本工具的复利输入采用名义年利率（APR）：按复利频率折算单期利率后逐期复利。
         const periodicPercent = config.dayBased
             ? annualRatePercent * config.dayBased / annualDays
             : annualRatePercent / config.divisor;
@@ -211,9 +210,12 @@
         const principal = readPositiveNumber('principal3', '本金');
         const periods = readPositiveInteger('depositPeriod', '存期');
         const annualRate = readFiniteNumber('annualRate3', '名义年利率');
-        const annualDays = readAnnualDays('rateType4');
         const frequency = $('compoundingFrequency').value;
+        const config = frequencyConfig[frequency];
+        if (!config) throw new Error('复利方式无效');
 
+        // 360 / 365 天只参与按周、按日复利；其他频率完全忽略该选择。
+        const annualDays = config.dayBased ? readAnnualDays('rateType4') : 365;
         const periodicRate = getPeriodicRate(annualRate, frequency, annualDays);
         const growthFactor = Math.pow(1 + periodicRate, periods);
         const futureValue = principal * growthFactor;

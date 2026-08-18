@@ -16,7 +16,6 @@ const warningMessages = {
 
 const numberUtils = {
     toFixed2: (num) => Math.round((num + Number.EPSILON) * 100) / 100,
-    parseAmount: (str) => Number(String(str).replace(/,/g, '')),
     formatMoney: (amount) => new Intl.NumberFormat('zh-CN', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
@@ -95,10 +94,12 @@ const validationUtils = {
     }
 };
 
+// Horner 形式与逐项折现数学等价，但避免在每个现金流上重复调用 Math.pow。
 function npv(cashFlows, rate) {
-    let total = 0;
-    for (let i = 0; i < cashFlows.length; i++) {
-        total += cashFlows[i] / Math.pow(1 + rate, i);
+    const divisor = 1 + rate;
+    let total = cashFlows[cashFlows.length - 1];
+    for (let i = cashFlows.length - 2; i >= 0; i--) {
+        total = cashFlows[i] + total / divisor;
     }
     return total;
 }
@@ -146,7 +147,7 @@ function annualizeMonthlyIRR(monthlyRate) {
     return (Math.pow(1 + monthlyRate, 12) - 1) * 100;
 }
 
-function exportToCSV(schedule, totals, apr) {
+function exportToCSV(schedule, totals) {
     const BOM = '\uFEFF';
     const headers = ['期数', '月还款总额', '应还本金', '手续费', '剩余本金', '累计已还本金', '当期手续费折年（单利）', '提前还款年化利率（复利IRR）'];
     let csvContent = BOM + headers.join(',') + '\n';
@@ -205,7 +206,7 @@ function renderTable(schedule, totals, apr) {
             </div>
         </div>
         <div class="table-container">
-            <h3 class="table-title">装修贷款还款明细表 - <a href="#" onclick="window.lastExportData && exportToCSV(window.lastExportData.schedule, window.lastExportData.totals, window.lastExportData.apr); return false;" class="export-link">导出</a></h3>
+            <h3 class="table-title">装修贷款还款明细表 - <a href="#" onclick="window.lastExportData && exportToCSV(window.lastExportData.schedule, window.lastExportData.totals); return false;" class="export-link">导出</a></h3>
             <table>
                 <thead>
                     <tr>
@@ -245,7 +246,7 @@ function renderTable(schedule, totals, apr) {
                 </tbody>
             </table>
             <div class="export-btn-container">
-                <button class="export-btn" onclick="window.lastExportData && exportToCSV(window.lastExportData.schedule, window.lastExportData.totals, window.lastExportData.apr)">导出还款明细表</button>
+                <button class="export-btn" onclick="window.lastExportData && exportToCSV(window.lastExportData.schedule, window.lastExportData.totals)">导出还款明细表</button>
             </div>
         </div>
     `;

@@ -10,7 +10,7 @@
     <link rel="shortcut icon" href="/images/favicon.ico">
     <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
     <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
-    <script src="script.js?v=20260818-2" defer></script>
+    <script src="script.js?v=20260819-1" defer></script>
     <title>金融计算器 - 单利年化、利息收益、净值 CAGR、复利收益</title>
 
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-K2S9L4CHNP"></script>
@@ -75,7 +75,7 @@
                         <span class="col-auto unit">元</span>
                     </div>
                     <div class="mb-3 row align-items-center">
-                        <label for="rateType1" class="form-label col-auto mb-0">年投资天数：</label>
+                        <label for="rateType1" class="form-label col-auto mb-0">年化天数：</label>
                         <div class="col">
                             <select class="form-control select-style" id="rateType1">
                                 <option value="360">按 360 天</option>
@@ -108,7 +108,7 @@
                         <span class="col-auto unit">%</span>
                     </div>
                     <div class="mb-3 row align-items-center">
-                        <label for="rateType2" class="form-label col-auto mb-0">年投资天数：</label>
+                        <label for="rateType2" class="form-label col-auto mb-0">年化天数：</label>
                         <div class="col">
                             <select class="form-control select-style" id="rateType2">
                                 <option value="360">按 360 天</option>
@@ -146,7 +146,7 @@
                         <span class="col-auto placeholder" aria-hidden="true">&#12288;</span>
                     </div>
                     <div class="mb-3 row align-items-center">
-                        <label for="rateType3" class="form-label col-auto mb-0">年投资天数：</label>
+                        <label for="rateType3" class="form-label col-auto mb-0">年化天数：</label>
                         <div class="col">
                             <select class="form-control select-style" id="rateType3">
                                 <option value="360">按 360 天</option>
@@ -193,9 +193,9 @@
                         <span class="col-auto unit">%</span>
                     </div>
                     <div class="mb-3 row align-items-center">
-                        <label for="rateType4" class="form-label col-auto mb-0">年投资天数：</label>
+                        <label for="rateType4" class="form-label col-auto mb-0">周/日年计息天数：</label>
                         <div class="col">
-                            <select class="form-control select-style" id="rateType4">
+                            <select class="form-control select-style" id="rateType4" aria-label="按周或按日复利使用的年计息天数">
                                 <option value="360">按 360 天</option>
                                 <option value="365">按 365 天</option>
                             </select>
@@ -212,7 +212,7 @@
             </div>
         </section>
 
-        <p class="calculator-note">单利年化/利息工具按线性单利口径；净值年化使用 CAGR；复利收益中的输入为名义年利率（APR），再按所选频率折算单期利率复利。</p>
+        <p class="calculator-note">单利年化/利息工具按线性单利口径；净值年化使用 CAGR；复利收益输入为名义年利率（APR）。360 / 365 天只参与按周、按日复利的单期利率折算。</p>
     </main>
 
     <footer class="page-footer">
