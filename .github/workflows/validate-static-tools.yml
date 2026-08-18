@@ -6,6 +6,7 @@ on:
       - '.github/workflows/validate-static-tools.yml'
       - 'tools/myip/**'
       - 'tools/financial_calculator/**'
+      - 'tools/card_number_new/**'
       - 'tools/browser-tests/**'
   push:
     branches: [main]
@@ -13,6 +14,7 @@ on:
       - '.github/workflows/validate-static-tools.yml'
       - 'tools/myip/**'
       - 'tools/financial_calculator/**'
+      - 'tools/card_number_new/**'
       - 'tools/browser-tests/**'
   workflow_dispatch:
 
@@ -63,6 +65,7 @@ jobs:
           trap 'kill "$server_pid" 2>/dev/null || true' EXIT
           sleep 1
           node tools/browser-tests/static-tools-smoke.mjs
+          node tools/browser-tests/card-number-new-smoke.mjs
 
       - name: 检查差异格式
         if: github.event_name == 'pull_request'

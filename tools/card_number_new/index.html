@@ -3,83 +3,117 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="format-detection" content="telephone=no">
     <meta name="description" content="专业银行卡号生成与靓号计算，支持规则定制、特定数字排除及靓号特征自动打标。">
     <meta property="og:title" content="银行卡号规则计算器（新版）">
     <meta property="og:description" content="精准计算银行卡号靓号号段，一键生成组合，支持多维过滤与卡号导出。">
-    
     <title>银行卡号规则计算器（新版）</title>
-    <link rel="stylesheet" href="style.css?v=20260730-1">
+    <link rel="stylesheet" href="style.css?v=20260818-1">
     <link rel="shortcut icon" href="/images/favicon.ico">
     <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
     <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+    <script src="core.js?v=20260818-1" defer></script>
+    <script src="app.js?v=20260818-1" defer></script>
 </head>
 <body>
-
+    <a class="skip-link" href="#main">跳到主要内容</a>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-    <main>
-        <h1><span aria-hidden="true">💳</span><span>银行卡号规则计算器</span><span class="version-label">新版</span></h1>
-        <p class="subtitle">输入卡号规则极速生成组合，支持 Luhn 算法校验、特定数字排除与特征打标</p>
-        
-        <div class="input-group">
-            <label class="sr-only" for="inputField">卡号生成规则</label>
-            <input type="text" id="inputField" placeholder="例如输入：6214 8800 **aa bbbb" autofocus autocomplete="off" spellcheck="false" aria-describedby="lenWarning">
-            <button type="button" id="calcBtn" class="btn btn-primary">生成卡号</button>
-            <button type="button" id="stopBtn" class="btn btn-danger" style="display: none;">停止</button>
-            <button type="button" id="clearBtn" class="btn btn-outline">清空</button>
+    <header class="app-header">
+        <div class="app-header-inner">
+            <a class="app-brand" href="./" aria-label="银行卡号规则计算器首页">
+                <span class="brand-mark" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="5" width="18" height="14" rx="2"></rect>
+                        <path d="M3 9h18M7 15h4"></path>
+                    </svg>
+                </span>
+                <span class="brand-copy">
+                    <strong>银行卡号规则计算器 <span class="version-label">新版</span></strong>
+                    <p>按规则生成通过 Luhn 校验的号码组合</p>
+                </span>
+            </a>
         </div>
+    </header>
 
-        <button type="button" id="toggleAdvBtn" class="btn btn-text" aria-expanded="false" aria-controls="advPanel">⚙️ <span id="toggleAdvLabel">展开高级筛选选项</span> <span class="toggle-icon" aria-hidden="true">▼</span></button>
-
-        <div class="advanced-panel" id="advPanel">
-            <div class="adv-desc" style="color: var(--primary); font-weight: 600; font-size: 13px;">以下排除规则仅对 * 和字母可变位生效。</div>
-            
-            <div>
-                <div class="adv-title">排除指定数字</div>
-                <div class="checkbox-grid" id="numberCheckboxes">
-                    <label><input type="checkbox" value="0"> 0</label>
-                    <label><input type="checkbox" value="1"> 1</label>
-                    <label><input type="checkbox" value="2"> 2</label>
-                    <label><input type="checkbox" value="3"> 3</label>
-                    <label><input type="checkbox" value="4"> 4</label>
-                    <label><input type="checkbox" value="5"> 5</label>
-                    <label><input type="checkbox" value="6"> 6</label>
-                    <label><input type="checkbox" value="7"> 7</label>
-                    <label><input type="checkbox" value="8"> 8</label>
-                    <label><input type="checkbox" value="9"> 9</label>
+    <main id="main" class="page-main">
+        <section class="tool-card control-card" aria-labelledby="rule-title">
+            <div class="section-heading">
+                <div>
+                    <h1 id="rule-title">卡号规则</h1>
+                    <p>支持数字、英文字母和 *。同一字母代表同一数字，每个 * 独立取值，空格不计入位数。</p>
                 </div>
             </div>
-            <div>
-                <div class="adv-title">按奇偶排除</div>
-                <div class="checkbox-grid">
-                    <label><input type="checkbox" id="excludeOdd"> 排除奇数（1、3、5、7、9）</label>
-                    <label><input type="checkbox" id="excludeEven"> 排除偶数（0、2、4、6、8）</label>
+
+            <div class="input-group">
+                <label class="sr-only" for="inputField">卡号生成规则</label>
+                <input type="text" id="inputField" placeholder="例如：6214 8800 **aa bbbb" autofocus autocomplete="off" spellcheck="false" aria-describedby="lenWarning">
+                <button type="button" id="calcBtn" class="primary-button">生成卡号</button>
+                <button type="button" id="stopBtn" class="danger-button" hidden>停止</button>
+                <button type="button" id="clearBtn" class="secondary-button">清空</button>
+            </div>
+
+            <div class="input-meta">
+                <span>有效位数：<strong id="validCount">0</strong> 位</span>
+                <span id="lenWarning" class="length-warning" hidden></span>
+            </div>
+
+            <button type="button" id="toggleAdvBtn" class="text-button" aria-expanded="false" aria-controls="advPanel">
+                <span aria-hidden="true">⚙</span> <span id="toggleAdvLabel">展开高级筛选</span>
+            </button>
+
+            <div class="advanced-panel" id="advPanel">
+                <p class="adv-desc">以下排除规则仅对 * 和字母可变位生效。</p>
+                <div>
+                    <div class="adv-title">排除指定数字</div>
+                    <div class="checkbox-grid" id="numberCheckboxes">
+                        <label><input type="checkbox" value="0"> 0</label>
+                        <label><input type="checkbox" value="1"> 1</label>
+                        <label><input type="checkbox" value="2"> 2</label>
+                        <label><input type="checkbox" value="3"> 3</label>
+                        <label><input type="checkbox" value="4"> 4</label>
+                        <label><input type="checkbox" value="5"> 5</label>
+                        <label><input type="checkbox" value="6"> 6</label>
+                        <label><input type="checkbox" value="7"> 7</label>
+                        <label><input type="checkbox" value="8"> 8</label>
+                        <label><input type="checkbox" value="9"> 9</label>
+                    </div>
+                </div>
+                <div>
+                    <div class="adv-title">按奇偶排除</div>
+                    <div class="checkbox-grid checkbox-wide">
+                        <label><input type="checkbox" id="excludeOdd"> 排除奇数（1、3、5、7、9）</label>
+                        <label><input type="checkbox" id="excludeEven"> 排除偶数（0、2、4、6、8）</label>
+                    </div>
                 </div>
             </div>
-        </div>
+        </section>
 
-        <div class="dashboard">
-            <div>有效位数：<span id="validCount" class="stat-num">0</span> 位 
-                <span id="lenWarning" class="length-warning" style="display: none;"></span>
+        <section class="stats-card" aria-label="计算统计">
+            <div class="stat-item"><span>符合规则</span><strong id="expectedCount">—</strong><small>条</small></div>
+            <div class="stat-item"><span>当前显示</span><strong id="resultCount">0</strong><small>条</small></div>
+            <div class="stats-actions">
+                <button type="button" id="copyPageBtn" class="secondary-button compact-button" hidden>复制本页</button>
+                <button type="button" id="downloadBtn" class="primary-button compact-button" hidden>下载结果(.csv)</button>
             </div>
-            <div>符合规则：<span id="expectedCount" class="stat-num">—</span> 条</div>
-            <div>当前显示：<span id="resultCount" class="stat-num">0</span> 条</div>
-            <div class="dashboard-actions">
-                <button type="button" id="copyPageBtn" class="btn btn-outline btn-compact" style="display: none;">复制本页</button>
-                <button type="button" id="downloadBtn" class="btn btn-primary btn-compact" style="display: none;">下载结果(.csv)</button>
+        </section>
+
+        <div id="dynamic-legend" class="legend-card" hidden></div>
+
+        <section class="result-card" aria-labelledby="result-title">
+            <div class="result-heading">
+                <div>
+                    <h2 id="result-title">生成结果</h2>
+                    <p>点击单条结果可复制纯数字卡号。</p>
+                </div>
+                <span id="status-bar" class="status-pill status-success" role="status" aria-live="polite" hidden>计算完成</span>
             </div>
-        </div>
-
-        <div id="dynamic-legend" style="display: none;"></div>
-
-        <div class="terminal-wrap">
-            <span id="status-bar" role="status" aria-live="polite">✓ 计算完成</span>
             <div id="result-container" role="region" aria-label="生成结果">
-                <div class="empty-placeholder">等待输入卡号规则：支持数字、英文字母和 *。相同字母代表相同数字，每个 * 独立代表任意数字。空格不计入位数。</div>
+                <div class="empty-placeholder">等待输入规则。支持数字、英文字母和 *；空格不计入位数。</div>
             </div>
-        </div>
+        </section>
 
-        <div class="pagination" id="pagination" style="display: none;">
+        <nav class="pagination" id="pagination" aria-label="结果分页" hidden>
             <button type="button" id="firstPageBtn" title="跳转至第一页">第一页</button>
             <div class="pagination-center">
                 <button type="button" id="prevBtn">上一页</button>
@@ -91,14 +125,12 @@
                 <button type="button" id="nextBtn">下一页</button>
             </div>
             <button type="button" id="lastPageBtn" title="跳转至最后一页">最后一页</button>
-        </div>
+        </nav>
     </main>
 
-    <footer>
-        <p>&copy; 2023 <a href="https://www.linchun.com.cn" target="_blank" rel="noopener noreferrer">林春写字的地方</a></p>
+    <footer class="page-footer">
+        <p>&copy; 2026 <a href="https://www.linchun.com.cn" target="_blank" rel="noopener noreferrer">林春写字的地方</a></p>
     </footer>
-
-    <script src="app.js?v=20260730-1"></script>
 
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-K2S9L4CHNP"></script>
     <script>
