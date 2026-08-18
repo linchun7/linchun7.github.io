@@ -19,10 +19,34 @@ async function routeJson(page, pattern, payload, status = 200) {
     });
 }
 
+function firstPartyPayload(ip, network = {}) {
+    return {
+        schemaVersion: 1,
+        role: 'international-first-party',
+        ip,
+        family: ip.includes(':') ? 6 : 4,
+        originalIpv6: null,
+        network: {
+            country: 'JP',
+            region: 'Tokyo',
+            city: 'Tokyo',
+            asn: 64500,
+            organization: 'Example Proxy',
+            colo: 'NRT',
+            ...network
+        },
+        observedAt: '2026-08-18T06:00:00.000Z'
+    };
+}
+
+async function routeFirstParty(page, payload, status = 200) {
+    await routeJson(page, '**/myip.cfw3.workers.dev/v1/ip', payload, status);
+}
+
 async function testMyIpWorkerProbe() {
     const request = {
         method: 'GET',
-        url: 'https://linchun-myip-probe.example.workers.dev/v1/ip',
+        url: 'https://myip.example.workers.dev/v1/ip',
         headers: new Headers({
             Origin: 'https://www.linchun.com.cn',
             'CF-Connecting-IP': '198.51.100.42'
@@ -64,7 +88,7 @@ async function testMyIpWorkerProbe() {
 
     const healthResponse = await myIpProbeWorker.fetch({
         ...request,
-        url: 'https://linchun-myip-probe.example.workers.dev/healthz'
+        url: 'https://myip.example.workers.dev/healthz'
     });
     assert.equal(healthResponse.status, 200);
     assert.deepEqual(await healthResponse.json(), { ok: true, service: 'linchun-myip-probe' });
@@ -141,6 +165,7 @@ async function testMyIpSplitRouting() {
         domesticFallbackCalls += 1;
         await route.abort();
     });
+    await routeFirstParty(page, firstPartyPayload('198.51.100.20'));
     await routeJson(page, '**/api.ip.sb/**', {
         ip: '198.51.100.20',
         country: 'Japan',
@@ -157,6 +182,7 @@ async function testMyIpSplitRouting() {
     await page.waitForFunction(() => document.querySelector('#summary-status')?.textContent === '已分流');
 
     assert.equal(domesticFallbackCalls, 0, 'Sohu fallback should not run when PConline succeeds');
+    assert.equal(await page.locator('#source-firstparty-status').textContent(), '主探针正常');
     assert.equal(await page.locator('#domestic-ipv4').textContent(), '203.0.113.10');
     assert.equal(await page.locator('#international-ipv4').textContent(), '198.51.100.20');
     assert.equal(await page.locator('#international-ipv6').textContent(), '2001:db8::20');
@@ -165,6 +191,41 @@ async function testMyIpSplitRouting() {
     assert.equal(await page.locator('#webrtc-status').textContent(), '隐私保护');
     assert.equal(await page.locator('iframe[sandbox]').count(), 0, 'completed sandbox probes should be removed');
     assert.equal(pageErrors.length, 0, `myip split page errors: ${pageErrors.map(String).join('; ')}`);
+
+    await context.close();
+}
+
+async function testMyIpFirstPartySurvivesExternalFailure() {
+    const context = await createMyIpContext();
+    const page = await context.newPage();
+    const pageErrors = [];
+    page.on('pageerror', (error) => pageErrors.push(error));
+
+    await routePconline(page, {
+        ip: '203.0.113.90',
+        pro: '四川省',
+        city: '成都市',
+        region: '',
+        addr: '四川省成都市 示例运营商'
+    });
+    await page.route('**/pv.sohu.com/cityjson**', (route) => route.abort());
+    await routeFirstParty(page, firstPartyPayload('198.51.100.90'));
+    await routeJson(page, '**/api.ip.sb/**', { error: 'unavailable' }, 503);
+    await routeJson(page, '**/api.ipify.org/**', { error: 'unavailable' }, 503);
+    await page.route('**/api6.ipify.org/**', (route) => route.abort());
+    await page.route('**/ipwho.is/**', (route) => route.abort());
+    await page.route('**/googletagmanager.com/**', (route) => route.abort());
+
+    await page.goto(`${baseUrl}/tools/myip/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#summary-status')?.textContent === '已分流');
+
+    assert.equal(await page.locator('#source-firstparty-status').textContent(), '主探针正常');
+    assert.equal(await page.locator('#international-ipv4').textContent(), '198.51.100.90');
+    assert.equal(await page.locator('#source-ipsb-status').textContent(), '未确认');
+    assert.equal(await page.locator('#source-ipify4-status').textContent(), '未确认');
+    assert.equal(await page.locator('#source-fallback-status').textContent(), '待命');
+    assert.match(await page.locator('#international-detail').textContent(), /第一方 Worker 作为国际主探针/);
+    assert.equal(pageErrors.length, 0, `myip first-party page errors: ${pageErrors.map(String).join('; ')}`);
 
     await context.close();
 }
@@ -196,6 +257,7 @@ async function testMyIpDomesticFallbackAndRetryReset() {
             })};`
         });
     });
+    await routeFirstParty(page, firstPartyPayload('198.51.100.77'));
     await routeJson(page, '**/api.ip.sb/**', { error: 'temporary' }, 503);
     await routeJson(page, '**/api.ipify.org/**', { ip: '198.51.100.77' });
     await page.route('**/api6.ipify.org/**', (route) => route.abort());
@@ -207,6 +269,7 @@ async function testMyIpDomesticFallbackAndRetryReset() {
 
     assert.equal(domesticPrimaryAttempts, 2, 'PConline should retry once before Sohu fallback');
     assert.equal(await page.locator('#source-domestic-status').textContent(), '备用成功');
+    assert.equal(await page.locator('#source-firstparty-status').textContent(), '主探针正常');
     assert.equal(await page.locator('#domestic-ipv4').textContent(), '203.0.113.30');
     assert.equal(await page.locator('#international-ipv4').textContent(), '198.51.100.77');
     assert.equal(await page.locator('#source-ipify6-status').textContent(), '未检测到');
@@ -241,6 +304,7 @@ async function testMyIpDifferentFamiliesAreNotSplit() {
         addr: '广东省深圳市 示例运营商'
     });
     await page.route('**/pv.sohu.com/cityjson**', (route) => route.abort());
+    await routeFirstParty(page, firstPartyPayload('2001:db8::80', { country: 'SG', city: 'Singapore', region: 'Singapore' }));
     await routeJson(page, '**/api.ip.sb/**', {
         ip: '2001:db8::80',
         country: 'Singapore',
@@ -273,6 +337,7 @@ async function testMyIpAllFailuresReachFinalState() {
 
     await page.route('**/whois.pconline.com.cn/**', (route) => route.abort());
     await page.route('**/pv.sohu.com/cityjson**', (route) => route.abort());
+    await routeFirstParty(page, { error: 'unavailable' }, 503);
     for (const pattern of [
         '**/api.ip.sb/**',
         '**/api.ipify.org/**',
@@ -290,6 +355,7 @@ async function testMyIpAllFailuresReachFinalState() {
     assert.match(await page.locator('#summary-main').textContent(), /未能确认当前公网出口/);
     assert.equal(await page.locator('#domestic-status').textContent(), '未确认');
     assert.equal(await page.locator('#international-status').textContent(), '未确认');
+    assert.equal(await page.locator('#source-firstparty-status').textContent(), '主探针未确认');
     assert.equal(await page.locator('#source-ipify6-status').textContent(), '未检测到');
     assert.equal(await page.locator('iframe[sandbox]').count(), 0, 'failed sandbox probes should be removed');
     assert.equal(pageErrors.length, 0, `myip failure page errors: ${pageErrors.map(String).join('; ')}`);
@@ -299,6 +365,7 @@ async function testMyIpAllFailuresReachFinalState() {
 
 async function testMyIp() {
     await testMyIpSplitRouting();
+    await testMyIpFirstPartySurvivesExternalFailure();
     await testMyIpDomesticFallbackAndRetryReset();
     await testMyIpDifferentFamiliesAreNotSplit();
     await testMyIpAllFailuresReachFinalState();
