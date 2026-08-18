@@ -103,6 +103,15 @@ async function testRenovationCalculator() {
     assert.equal(principalCells.some(text => text.includes('-')), false, 'principal instalments must never become negative after cent rounding');
     assert.match(await page.locator('tbody tr').last().textContent(), /￥1\.00/, 'rounded principal instalments must sum back to the original loan amount');
 
+    // 贷款现金流按人民币“分”计算，超过两位小数的输入先规范到分，避免零手续费现金流出现亚分差额。
+    await page.fill('#loanAmount', '100000.001');
+    await page.fill('#loanTerm', '12');
+    await page.fill('#serviceFee', '0');
+    await page.click('#calculateBtn');
+    await page.waitForFunction(() => document.querySelector('.summary-card')?.textContent?.includes('0.00%'));
+    assert.match(await page.locator('.summary-card').first().textContent(), /0\.00%/);
+    assert.match(await page.locator('tbody tr').last().textContent(), /100,000\.00/);
+
     assert.equal(pageErrors.length, 0, `renovation calculator page errors: ${pageErrors.map(String).join('; ')}`);
     await context.close();
 }
