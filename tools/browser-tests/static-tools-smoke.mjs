@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { chromium, firefox, webkit } from 'playwright';
+import myIpProbeWorker from '../myip/worker/src/index.js';
 
 const browserName = process.env.PLAYWRIGHT_BROWSER || 'chromium';
 const browserType = { chromium, firefox, webkit }[browserName];
@@ -16,6 +17,57 @@ async function routeJson(page, pattern, payload, status = 200) {
             body: JSON.stringify(payload)
         });
     });
+}
+
+async function testMyIpWorkerProbe() {
+    const request = {
+        method: 'GET',
+        url: 'https://linchun-myip-probe.example.workers.dev/v1/ip',
+        headers: new Headers({
+            Origin: 'https://www.linchun.com.cn',
+            'CF-Connecting-IP': '198.51.100.42'
+        }),
+        cf: {
+            country: 'JP',
+            region: 'Tokyo',
+            regionCode: '13',
+            city: 'Tokyo',
+            timezone: 'Asia/Tokyo',
+            asn: 64500,
+            asOrganization: 'Example Network',
+            colo: 'NRT',
+            clientTcpRtt: 18
+        }
+    };
+
+    const response = await myIpProbeWorker.fetch(request);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('Access-Control-Allow-Origin'), 'https://www.linchun.com.cn');
+    assert.match(response.headers.get('Cache-Control') || '', /no-store/);
+    const payload = await response.json();
+    assert.equal(payload.schemaVersion, 1);
+    assert.equal(payload.role, 'international-first-party');
+    assert.equal(payload.ip, '198.51.100.42');
+    assert.equal(payload.family, 4);
+    assert.equal(payload.network.country, 'JP');
+    assert.equal(payload.network.organization, 'Example Network');
+    assert.equal(payload.network.colo, 'NRT');
+
+    const forbiddenResponse = await myIpProbeWorker.fetch({
+        ...request,
+        headers: new Headers({
+            Origin: 'https://untrusted.example',
+            'CF-Connecting-IP': '198.51.100.42'
+        })
+    });
+    assert.equal(forbiddenResponse.status, 403);
+
+    const healthResponse = await myIpProbeWorker.fetch({
+        ...request,
+        url: 'https://linchun-myip-probe.example.workers.dev/healthz'
+    });
+    assert.equal(healthResponse.status, 200);
+    assert.deepEqual(await healthResponse.json(), { ok: true, service: 'linchun-myip-probe' });
 }
 
 async function routePconline(page, payload) {
@@ -299,6 +351,7 @@ async function testFinance() {
 }
 
 try {
+    await testMyIpWorkerProbe();
     await testMyIp();
     await testFinance();
     console.log(`Static tools smoke tests passed in ${browserName}.`);
