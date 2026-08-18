@@ -4,17 +4,27 @@ on:
   pull_request:
     paths:
       - '.github/workflows/validate-static-tools.yml'
+      - '.github/workflows/update-static-tool-vendors.yml'
       - 'tools/myip/**'
       - 'tools/financial_calculator/**'
+      - 'tools/renovation_calculator/**'
+      - 'tools/rmb_converter/**'
+      - 'tools/space/**'
       - 'tools/card_number_new/**'
+      - 'tools/vendor/**'
       - 'tools/browser-tests/**'
   push:
     branches: [main]
     paths:
       - '.github/workflows/validate-static-tools.yml'
+      - '.github/workflows/update-static-tool-vendors.yml'
       - 'tools/myip/**'
       - 'tools/financial_calculator/**'
+      - 'tools/renovation_calculator/**'
+      - 'tools/rmb_converter/**'
+      - 'tools/space/**'
       - 'tools/card_number_new/**'
+      - 'tools/vendor/**'
       - 'tools/browser-tests/**'
   workflow_dispatch:
 
@@ -66,6 +76,7 @@ jobs:
           sleep 1
           node tools/browser-tests/static-tools-smoke.mjs
           node tools/browser-tests/card-number-new-smoke.mjs
+          node tools/browser-tests/utility-tools-smoke.mjs
 
       - name: 检查差异格式
         if: github.event_name == 'pull_request'
