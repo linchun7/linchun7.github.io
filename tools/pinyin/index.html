@@ -2,272 +2,135 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>汉字转拼音工具</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, maximum-scale=1, user-scalable=no">
-    <link rel="stylesheet" href="../css/bootstrap.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/pinyin-pro"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="format-detection" content="telephone=no">
+    <meta name="description" content="在线汉字转拼音工具，支持无声调、带声调、数字声调、首字母和单字多音字读音，一键复制结果。">
+    <meta property="og:title" content="汉字转拼音工具">
+    <meta property="og:description" content="将汉字快速转换为多种拼音格式，支持单字多音字读音与一键复制。">
+    <link rel="canonical" href="https://www.linchun.com.cn/tools/pinyin/">
+    <title>汉字转拼音工具</title>
+    <link rel="stylesheet" href="style.css?v=20260818-1">
     <link rel="shortcut icon" href="/images/favicon.ico">
     <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
     <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
-    
-    <style>
-        body {
-            font-family: "Helvetica Neue", Helvetica, Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-            margin-right: calc(100% - 100vw);/* 部分浏览器滚动条问题 */
-            overflow-x: hidden;/* 横向滚动条问题 */
-        }
-
-        .container {
-            margin-top: 20px;
-            flex-grow: 1;
-            padding: 15px;
-        }
-        h1 {
-            text-align: center;
-            font-size: 24px;
-            margin-bottom: 15px;
-        }
-		
-		#prompt-a {
-			color: rgba(8, 66, 160, 1);
-		}
-
-		#prompt-a:visited {
-			color: rgba(8, 66, 160, 1);
-		}
-
-		#prompt-a:hover {
-			color: blue;
-			text-decoration: underline;	
-		}
-
-		#prompt-a:active {
-			position: relative;
-			top: 1px;
-		}
-
-
-        .result-container {
-            margin-top: 20px;
-        }
-
-        .form-label {
-            margin: 0px;
-        }
-        .container .form-label {
-            font-size: 16px; /* 按需调整字体大小 */
-        }
-		
-		.result-text {
-			font-size: 16px;
-			min-height: 2em;
-			max-height: 200px; /* 设置最大高度，超过此高度将出现滚动条 */
-			display: flex;
-			align-items: center;
-			height: auto;
-			overflow-wrap: anywhere;
-			overflow-y: auto; /* 添加垂直滚动条 */
-		}
-
-		
-         #inputInfo {
-			 resize: none; 
-			 height: 8em;
-			 margin: 0;
-			 padding: 5px;
-
-	 	}
-        .copy-button {
-        }
-        
-        footer {
-            text-align: center;
-            margin: 0px auto;
-            text-overflow: ellipsis;
-            overflow: hidden;
-            white-space: nowrap;
-            max-width: 600px;
-        }
-
-        footer p {
-            margin: 6px 0;
-        }
-
-        footer a {
-            color: inherit;
-            text-decoration: none; 
-        }
-
-        footer a:visited {
-            color: inherit;
-            text-decoration: none; 
-        }
-
-        footer a:hover {
-            color: rgba(8, 66, 160, 1);
-            text-decoration: underline;
-        }
-
-        footer a:active {
-            position: relative;
-            top: 1px;
-        }
-
-    </style>
+    <script src="https://cdn.jsdelivr.net/npm/pinyin-pro@3.28.2/dist/index.js" defer></script>
+    <script src="app.js?v=20260818-1" defer></script>
 </head>
-
 <body>
-    <div class="container">
-        <h1>汉字转拼音工具</h1>
+    <a class="skip-link" href="#main">跳到主要内容</a>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-        <div class="row justify-content-center">
-            <div class="col-md-8">
-                <div class="mb-3">
-                    <label class="form-label fs-4">输入汉字：</label>
-					<a id="prompt-a" href="https://www.linchun.com.cn/posts/db7def30.html">查看说明</a>
-                    <div class="input-group">
-						<textarea id="inputInfo" type="text" class="form-control" oninput="show()"></textarea>
-                        <button class="btn btn-danger" type="button" onclick="clearAndFocus()">清空</button>
-                    </div>
-                </div>
+    <header class="app-header">
+        <div class="app-header-inner">
+            <a class="app-brand" href="./" aria-label="汉字转拼音工具首页">
+                <span class="brand-mark" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 5h14M8 9h8M6 13h12M9 17h6"></path>
+                    </svg>
+                </span>
+                <span class="brand-copy">
+                    <strong>汉字转拼音工具</strong>
+                    <p>输入汉字，即时生成常用拼音格式</p>
+                </span>
+            </a>
+        </div>
+    </header>
 
-                <div class="result-container">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <label class="form-label fs-4">拼音 不带声调：</label>
-                        <label id="alertText1" class="form-label fs-4" style="background:#F0F0F0"></label>
-                        <button class="btn btn-success copy-button" onclick="copyResult(1)">复制</button>
-                    </div>
-                    <div id="result1" class="form-control result-text" readonly></div>
+    <main id="main" class="page-main">
+        <section class="tool-card input-card" aria-labelledby="input-title">
+            <div class="section-heading">
+                <div>
+                    <h1 id="input-title">输入汉字</h1>
+                    <p>非中文字符会从拼音结果中移除；多音字结果仅在输入单个汉字时显示。</p>
                 </div>
-				
-				 <div class="result-container">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <label class="form-label fs-4">拼音 带声调：</label>
-                        <label id="alertText2" class="form-label fs-4" style="background:#F0F0F0"></label>
-                        <button class="btn btn-success copy-button" onclick="copyResult(2)">复制</button>
-                    </div>
-                    <div id="result2" class="form-control result-text" readonly></div>
-                </div>
-				
-					 <div class="result-container">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <label class="form-label fs-4">拼音 带数字声调：</label>
-                        <label id="alertText3" class="form-label fs-4" style="background:#F0F0F0"></label>
-                        <button class="btn btn-success copy-button" onclick="copyResult(3)">复制</button>
-                    </div>
-                    <div id="result3" class="form-control result-text" readonly></div>
-                </div>
-				
-						 <div class="result-container">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <label class="form-label fs-4">拼音 首字母：</label>
-                        <label id="alertText4" class="form-label fs-4" style="background:#F0F0F0"></label>
-                        <button class="btn btn-success copy-button" onclick="copyResult(4)">复制</button>
-                    </div>
-                    <div id="result4" class="form-control result-text" readonly></div>
-                </div>
-				
-					 <div class="result-container">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <label class="form-label fs-4">多音字 (单字时有效)：</label>
-                        <label id="alertText5" class="form-label fs-4" style="background:#F0F0F0"></label>
-                        <button class="btn btn-success copy-button" onclick="copyResult(5)">复制</button>
-                    </div>
-                    <div id="result5" class="form-control result-text" readonly></div>
-                </div>
-				
-				
+                <a class="help-link" href="https://www.linchun.com.cn/posts/db7def30.html">使用说明</a>
             </div>
-        </div>		
-    </div>
-	
-	<footer>
-        <p>&copy; 2023 <a href="https://www.linchun.com.cn">林春写字的地方</a></p>
+
+            <label class="sr-only" for="inputInfo">需要转换为拼音的汉字</label>
+            <textarea id="inputInfo" placeholder="例如：汉语拼音、吕布、行长" autofocus autocomplete="off" spellcheck="false"></textarea>
+            <div class="input-actions">
+                <span class="input-hint">标准拼音使用 ü；数字声调示例：lü3。</span>
+                <button type="button" id="clearBtn" class="secondary-button">清空</button>
+            </div>
+        </section>
+
+        <section class="result-card" aria-labelledby="result-title">
+            <div class="result-heading">
+                <div>
+                    <h2 id="result-title">转换结果</h2>
+                    <p>每项结果可单独复制。</p>
+                </div>
+            </div>
+
+            <div class="result-list">
+                <article class="result-item">
+                    <div class="result-item-heading">
+                        <div>
+                            <h3>拼音 · 不带声调</h3>
+                            <p>例如：han yu pin yin</p>
+                        </div>
+                        <button type="button" class="secondary-button compact-button copy-button" data-result="result1" aria-label="复制不带声调的拼音结果" disabled>复制</button>
+                    </div>
+                    <div id="result1" class="result-text" role="region" aria-label="不带声调的拼音结果"><span class="empty-text">等待输入</span></div>
+                </article>
+
+                <article class="result-item">
+                    <div class="result-item-heading">
+                        <div>
+                            <h3>拼音 · 带声调</h3>
+                            <p>例如：hàn yǔ pīn yīn</p>
+                        </div>
+                        <button type="button" class="secondary-button compact-button copy-button" data-result="result2" aria-label="复制带声调的拼音结果" disabled>复制</button>
+                    </div>
+                    <div id="result2" class="result-text" role="region" aria-label="带声调的拼音结果"><span class="empty-text">等待输入</span></div>
+                </article>
+
+                <article class="result-item">
+                    <div class="result-item-heading">
+                        <div>
+                            <h3>拼音 · 数字声调</h3>
+                            <p>例如：han4 yu3 pin1 yin1</p>
+                        </div>
+                        <button type="button" class="secondary-button compact-button copy-button" data-result="result3" aria-label="复制数字声调的拼音结果" disabled>复制</button>
+                    </div>
+                    <div id="result3" class="result-text" role="region" aria-label="数字声调的拼音结果"><span class="empty-text">等待输入</span></div>
+                </article>
+
+                <article class="result-item">
+                    <div class="result-item-heading">
+                        <div>
+                            <h3>拼音 · 首字母</h3>
+                            <p>连续输出，不添加分隔符。</p>
+                        </div>
+                        <button type="button" class="secondary-button compact-button copy-button" data-result="result4" aria-label="复制拼音首字母结果" disabled>复制</button>
+                    </div>
+                    <div id="result4" class="result-text" role="region" aria-label="拼音首字母结果"><span class="empty-text">等待输入</span></div>
+                </article>
+
+                <article class="result-item">
+                    <div class="result-item-heading">
+                        <div>
+                            <h3>单字多音</h3>
+                            <p>仅输入一个汉字时列出该字的多个读音。</p>
+                        </div>
+                        <button type="button" class="secondary-button compact-button copy-button" data-result="result5" aria-label="复制单字多音结果" disabled>复制</button>
+                    </div>
+                    <div id="result5" class="result-text" role="region" aria-label="单字多音结果"><span class="empty-text">仅单个汉字时显示</span></div>
+                </article>
+            </div>
+        </section>
+    </main>
+
+    <footer class="page-footer">
+        <p>&copy; 2026 <a href="https://www.linchun.com.cn" target="_blank" rel="noopener noreferrer">林春写字的地方</a></p>
     </footer>
 
-    <script>
-        // 使用现代的语法定义 window.onload 事件
-        window.addEventListener('load', () => {
-            const inputElement = document.getElementById("inputInfo");
-            inputElement.focus();
-        });
-
-        function clearAndFocus() {
-            const inputElement = document.getElementById("inputInfo");
-            inputElement.value = "";
-            inputElement.focus();
-            show();
-        }
-
-        $ = function() {
-            return document.getElementById.apply(document, arguments);
-        }
-
-        function show() {
-            var { pinyin } = pinyinPro;
-            var inputElement = document.getElementById('inputInfo');
-            var outputElement1 = document.getElementById('result1');
-            var outputElement2 = document.getElementById('result2');
-            var outputElement3 = document.getElementById('result3');
-            var outputElement4 = document.getElementById('result4');
-            var outputElement5 = document.getElementById('result5');
-
-            
-            var inputText = inputElement.value;
-
-            // 使用 pinyinPro 进行汉字转拼音
-            var pinyinResult1 = pinyin(inputText,{pattern: 'pinyin', v: true, toneType: 'none', nonZh: 'removed'}); // 不带声调，
-            var pinyinResult2 = pinyin(inputText,{pattern: 'pinyin', v: true, toneType: 'symbol', nonZh: 'removed'}); // 带声调
-            var pinyinResult3 = pinyin(inputText,{pattern: 'pinyin', v: true, toneType: 'num', nonZh: 'removed' }); // 带数字声调
-            var pinyinResult4 = pinyin(inputText, { pattern: 'first', toneType: 'none', nonZh: 'removed', separator: '' }); // 首字母，无声调，移除非汉字，无连接
-            var pinyinResult5 = pinyin(inputText, { multiple: true }); // 多音字
-
-            // 显示拼音结果
-            outputElement1.textContent = pinyinResult1;
-            outputElement2.textContent = pinyinResult2;
-            outputElement3.textContent = pinyinResult3;
-            outputElement4.textContent = pinyinResult4;
-            outputElement5.textContent = pinyinResult5;
-        }
-        
-        function copyResult(resultNumber) {
-            const resultElement = document.getElementById(`result${resultNumber}`);
-            const resultValue = resultElement.textContent.trim();
-
-            const alertTextElement = document.getElementById(`alertText${resultNumber}`);
-
-            if (resultValue === "") {
-                alertTextElement.textContent = "无内容";
-            } else {
-                const textArea = document.createElement("textarea");
-                textArea.value = resultValue;
-                document.body.appendChild(textArea);
-                textArea.select();
-                document.execCommand("copy");
-                document.body.removeChild(textArea);
-
-                alertTextElement.textContent = "已复制";
-            }
-
-            setTimeout(function() {
-                alertTextElement.textContent = "";
-            }, 3000);
-        }
-    </script>
-
-    <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-K2S9L4CHNP"></script>
     <script>
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-        gtag('config', 'G-K2S9L4CHNP');
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-K2S9L4CHNP');
     </script>
 </body>
 </html>
