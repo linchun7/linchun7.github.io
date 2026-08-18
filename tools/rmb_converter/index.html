@@ -156,7 +156,7 @@
             const input = document.getElementById('inputmoney');
             const result = document.getElementById('result1');
             const alertText = document.getElementById('alertText');
-            const validNumber = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
+            const validNumber = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?$/;
             let statusTimer;
 
             function setStatus(message) {
@@ -185,8 +185,10 @@
                     return;
                 }
 
+                const normalized = value.replace(/^([+-]?)\./, '$10.');
+
                 try {
-                    result.textContent = Nzh.cn.toMoney(value);
+                    result.textContent = Nzh.cn.toMoney(normalized);
                 } catch (error) {
                     result.textContent = '金额格式暂无法转换，请检查输入。';
                     result.classList.add('error');
