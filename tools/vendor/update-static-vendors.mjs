@@ -17,6 +17,7 @@ const vendors = [
         packageName: 'nzh',
         packagePath: 'package/dist/nzh.min.js',
         targetPath: 'tools/rmb_converter/dist/nzh.min.js',
+        versionPattern: /\bnzh v([^\s*]+)/i,
         test: testNzh
     },
     {
@@ -24,6 +25,7 @@ const vendors = [
         packageName: 'pangu',
         packagePath: 'package/dist/browser/pangu.min.js',
         targetPath: 'tools/space/dist/browser/pangu.min.js',
+        versionPattern: /@version:\s*([^\s*]+)/i,
         test: testPangu
     }
 ];
@@ -86,7 +88,15 @@ async function download(url, destination) {
 }
 
 async function loadCandidate(vendor, tempRoot) {
+    const target = path.join(repoRoot, vendor.targetPath);
+    const currentCode = await readFile(target, 'utf8');
+    const currentVersion = vendor.versionPattern.exec(currentCode)?.[1];
+    assert.equal(typeof currentVersion, 'string', `${vendor.name}: current version cannot be parsed`);
+
     const metadata = await readPackageMetadata(vendor.packageName);
+    console.log(`${vendor.name}: current=${currentVersion}, latest=${metadata.version}`);
+    if (currentVersion === metadata.version) return null;
+
     const vendorDir = path.join(tempRoot, vendor.packageName);
     const archive = path.join(vendorDir, `${vendor.packageName}.tgz`);
     const extracted = path.join(vendorDir, 'extracted');
@@ -99,7 +109,11 @@ async function loadCandidate(vendor, tempRoot) {
     if (code.length < 1000 || /<html[\s>]/i.test(code)) {
         throw new Error(`${vendor.name}: candidate bundle looks invalid`);
     }
+
+    const candidateVersion = vendor.versionPattern.exec(code)?.[1];
+    assert.equal(candidateVersion, metadata.version, `${vendor.name}: bundle version does not match npm metadata`);
     vendor.test(code);
+    console.log(`validated ${vendor.name}@${metadata.version}`);
     return { vendor, version: metadata.version, code };
 }
 
@@ -109,25 +123,20 @@ async function main() {
         const candidates = [];
         for (const vendor of vendors) {
             const candidate = await loadCandidate(vendor, tempRoot);
-            candidates.push(candidate);
-            console.log(`validated ${vendor.name}@${candidate.version}`);
+            if (candidate) candidates.push(candidate);
         }
 
-        let changed = 0;
+        if (candidates.length === 0) {
+            console.log('all vendor bundles are already current');
+            return;
+        }
+
         for (const candidate of candidates) {
             const target = path.join(repoRoot, candidate.vendor.targetPath);
-            const current = await readFile(target, 'utf8').catch(() => '');
-            if (current === candidate.code) {
-                console.log(`current ${candidate.vendor.name} bundle already matches latest`);
-                continue;
-            }
-            await mkdir(path.dirname(target), { recursive: true });
             await writeFile(target, candidate.code, 'utf8');
-            changed += 1;
             console.log(`updated ${candidate.vendor.targetPath} -> ${candidate.version}`);
         }
-
-        console.log(changed ? `updated ${changed} vendor bundle(s)` : 'all vendor bundles are already current');
+        console.log(`updated ${candidates.length} vendor bundle(s)`);
     } finally {
         await rm(tempRoot, { recursive: true, force: true });
     }
