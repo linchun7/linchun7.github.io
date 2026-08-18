@@ -83,6 +83,7 @@ jobs:
           node tools/browser-tests/card-number-new-smoke.mjs
           node tools/browser-tests/pinyin-smoke.mjs
           node tools/browser-tests/utility-tools-smoke.mjs
+          python3 tools/hospital_rank/scripts/validate_data.py
           node tools/browser-tests/hospital-rank-smoke.mjs
 
       - name: 检查差异格式
@@ -175,7 +176,7 @@ jobs:
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git config user.email '41898282+linchun7@users.noreply.github.com'
           git add tools/pinyin/index.html
           git commit -m "chore(pinyin): update pinyin-pro to ${LATEST}"
           git push origin HEAD:main
@@ -276,7 +277,7 @@ jobs:
           fi
 
           git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git config user.email '41898282+linchun7@users.noreply.github.com'
           git add tools/rmb_converter/dist/nzh.min.js tools/space/dist/browser/pangu.min.js
           git commit -m 'chore: update static tool vendor scripts'
 
