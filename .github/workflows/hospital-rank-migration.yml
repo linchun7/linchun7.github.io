@@ -7,36 +7,94 @@ on:
       - '.github/workflows/hospital-rank-migration.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  migrate:
+  migrate-and-publish:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: 检出仓库
+      - name: 检出当前 PR 分支
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 1
+          persist-credentials: false
 
       - name: 配置 Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: 抓取并核验 2009–2023 源站数据
+      - name: 抓取、核验并补齐 2009–2023 数据
         run: |
-          python tools/hospital_rank/scripts/build_data.py \
-            --output-dir /tmp/hospital-rank-migration
+          set -euo pipefail
+          out="$RUNNER_TEMP/hospital-rank-migration"
+          python tools/hospital_rank/scripts/build_data.py --output-dir "$out"
+          python tools/hospital_rank/scripts/complete_migration.py --output-dir "$out"
+          python - "$out/audit.json" <<'PY'
+          import json, sys
+          audit = json.load(open(sys.argv[1], encoding='utf-8'))
+          assert audit['status'] == 'ok', audit['status']
+          assert audit['summary']['unmatchedSource'] == 0
+          assert audit['summary']['unmatchedLegacy'] == 0
+          assert audit['summary']['valueDifferences'] == 0
+          assert audit['summary']['entityRecoveryFuzzy'] == 0
+          assert audit['summary']['sourceRecords'] == 1430
+          PY
 
-      - name: 用跨年份医院实体补齐旧数据缺失年份
+      - name: 写入规范 JSON 并删除旧数据载体
         run: |
-          python tools/hospital_rank/scripts/complete_migration.py \
-            --output-dir /tmp/hospital-rank-migration
+          set -euo pipefail
+          out="$RUNNER_TEMP/hospital-rank-migration"
+          mkdir -p tools/hospital_rank/data
+          cp "$out/candidate-rankings.json" tools/hospital_rank/data/rankings.json
+          cp "$out/source-snapshot.json" tools/hospital_rank/data/source-snapshot.json
+          cp "$out/audit.json" tools/hospital_rank/data/audit.json
+          rm -f tools/hospital_rank/data.js
+          sed -i '/<script src="data.js"><\/script>/d' tools/hospital_rank/index.html
+          if ! grep -q '^\.history-source-name' tools/hospital_rank/style.css; then
+            cat >> tools/hospital_rank/style.css <<'CSS'
 
-      - name: 上传迁移候选与审计报告
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: hospital-rank-migration
-          path: /tmp/hospital-rank-migration
-          if-no-files-found: error
-          retention-days: 3
+          .history-source-name {
+            grid-column: 1 / -1;
+            overflow: hidden;
+            color: var(--muted);
+            font-size: 11px;
+            line-height: 1.35;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+          CSS
+          fi
+
+      - name: 离线深验正式数据
+        run: |
+          set -euo pipefail
+          python tools/hospital_rank/scripts/validate_data.py
+          python -m py_compile tools/hospital_rank/scripts/validate_data.py
+          node --check tools/hospital_rank/script.js
+
+      - name: 清理一次性迁移设施
+        run: |
+          rm -f tools/hospital_rank/scripts/migrate_data.py
+          rm -f tools/hospital_rank/scripts/build_data.py
+          rm -f tools/hospital_rank/scripts/complete_migration.py
+          rm -f .github/workflows/hospital-rank-migration.yml
+
+      - name: 提交到当前 PR 分支
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TARGET_BRANCH: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all \
+            tools/hospital_rank \
+            .github/workflows/hospital-rank-migration.yml
+          git diff --cached --check
+          git commit -m "refactor hospital ranking data to normalized json"
+          auth_header=$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" push origin "HEAD:$TARGET_BRANCH"
