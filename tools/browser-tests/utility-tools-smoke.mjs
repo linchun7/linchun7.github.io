@@ -42,6 +42,15 @@ async function testRmbConverter() {
     const focusedToolBox = await page.locator('.tool-card').boundingBox();
     assert.ok(focusedResultBox && focusedToolBox && focusedResultBox.y < focusedToolBox.y, 'focused input must not reorder the stable result/input layout');
 
+    // 用缩短后的可视区近似模拟手机软键盘弹出，滚到输入框后结果卡仍应完整留在视口内。
+    await page.setViewportSize({ width: 390, height: 480 });
+    await page.locator('#inputmoney').scrollIntoViewIfNeeded();
+    const keyboardResultBox = await page.locator('.result-card').boundingBox();
+    assert.ok(
+        keyboardResultBox && keyboardResultBox.y >= 0 && keyboardResultBox.y + keyboardResultBox.height <= 480,
+        'result card should remain fully visible in a keyboard-reduced viewport'
+    );
+
     await page.fill('#inputmoney', '.5');
     await page.waitForFunction(() => document.querySelector('#result1')?.textContent === '人民币伍角');
     assert.equal(await page.locator('#result1').textContent(), '人民币伍角');
