@@ -1,0 +1,100 @@
+name: Update pinyin-pro
+
+on:
+  schedule:
+    - cron: '23 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-pinyin-pro
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: 检查并验证 pinyin-pro 更新
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: 检出 main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: 配置 Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: 检查最新版本
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          current="$(sed -n 's#.*pinyin-pro@\([^/"[:space:]]*\)/dist/index\.js.*#\1#p' tools/pinyin/index.html | head -n 1)"
+          latest="$(npm view pinyin-pro version)"
+
+          if [[ -z "$current" || -z "$latest" ]]; then
+            echo '无法解析当前或最新 pinyin-pro 版本' >&2
+            exit 1
+          fi
+
+          echo "当前版本: $current"
+          echo "最新版本: $latest"
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+
+          if [[ "$current" == "$latest" ]]; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          sed -i "s#pinyin-pro@${current}/dist/index.js#pinyin-pro@${latest}/dist/index.js#" tools/pinyin/index.html
+          grep -F "pinyin-pro@${latest}/dist/index.js" tools/pinyin/index.html >/dev/null
+          echo 'changed=true' >> "$GITHUB_OUTPUT"
+
+      - name: 安装浏览器测试依赖
+        if: steps.version.outputs.changed == 'true'
+        working-directory: tools/browser-tests
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: 安装三浏览器
+        if: steps.version.outputs.changed == 'true'
+        working-directory: tools/browser-tests
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: 验证候选版本
+        if: steps.version.outputs.changed == 'true'
+        env:
+          BASE_URL: http://127.0.0.1:4173
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/pinyin-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          sleep 1
+
+          for browser in chromium firefox webkit; do
+            echo "验证 $browser"
+            PLAYWRIGHT_BROWSER="$browser" node tools/browser-tests/pinyin-smoke.mjs
+          done
+
+          git diff --check
+
+      - name: 提交通过验证的版本
+        if: steps.version.outputs.changed == 'true'
+        env:
+          LATEST: ${{ steps.version.outputs.latest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add tools/pinyin/index.html
+          git commit -m "chore(pinyin): update pinyin-pro to ${LATEST}"
+          git push origin HEAD:main
