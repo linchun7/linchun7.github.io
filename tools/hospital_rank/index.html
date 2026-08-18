@@ -2,66 +2,135 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="format-detection" content="telephone=no">
-    <meta name="description" content="复旦版医院排名查询">
-    
+    <meta name="description" content="复旦版中国医院综合排行榜查询，支持年份、省份、城市筛选与医院历年排名变化查看。">
+
     <link rel="shortcut icon" href="/images/favicon.ico">
     <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
     <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
     <title>复旦版医院排名查询</title>
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
 </head>
 <body>
-    <div class="container">
-        <h1>复旦版医院排名查询</h1>
-        
-        <div class="search-box">
-            <input type="text" id="hospitalSearch" placeholder="搜索医院名称">
-            <select id="yearSelect">
-                <option value="">请选择年份</option>
-            </select>
-            <select id="provinceSelect">
-                <option value="">全部省份</option>
-            </select>
-            <select id="citySelect">
-                <option value="">全部城市</option>
-            </select>
-        </div>
+    <a class="skip-link" href="#hospitalTable">跳到医院榜单</a>
 
-        <div class="charts-container" style="display: none;">
-            <div class="chart-box">
-                <div id="rankingTrend" class="chart"></div>
+    <header class="app-header">
+        <div class="app-header-inner">
+            <a class="app-brand" href="./" aria-label="复旦版医院排名查询首页">
+                <span class="brand-mark" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 21V8.5a1.5 1.5 0 0 1 1.5-1.5H9V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7h3.5A1.5 1.5 0 0 1 20 8.5V21"/>
+                        <path d="M9 21v-4h6v4M8 11h2m4 0h2m-8 3h2m4 0h2M12 5v4M10 7h4"/>
+                    </svg>
+                </span>
+                <span class="brand-copy">
+                    <strong>复旦版医院排名查询</strong>
+                    <p>中国医院综合排行榜 · 历年查询</p>
+                </span>
+            </a>
+            <div class="data-status" id="dataStatus" aria-live="polite">正在读取榜单数据…</div>
+        </div>
+    </header>
+
+    <main class="page-main" id="mainContent">
+        <section class="overview" aria-labelledby="rankingNoteTitle">
+            <div class="overview-reference">
+                <div class="overview-copy">
+                    <p class="eyebrow">排名说明</p>
+                    <h1 id="rankingNoteTitle">数字排名与等级制统一查询</h1>
+                    <p class="overview-note">2009–2022 年为数字排名；2023 年榜单采用等级制。同等级官方不分先后，本站仅为便于浏览，按该医院最近一次数字排名辅助排序，不代表官方档内名次。</p>
+                </div>
+                <dl class="overview-stats" aria-label="榜单概览">
+                    <div><dt>数据范围</dt><dd id="yearRange">—</dd></div>
+                    <div><dt>最新榜单</dt><dd id="latestYear">—</dd></div>
+                    <div><dt>最新上榜</dt><dd id="latestCount">—</dd></div>
+                </dl>
             </div>
-        </div>
+        </section>
 
-        <div class="result-container">
-            <table id="hospitalTable">
-                <thead>
-                    <tr>
-                        <th data-sort="年份">年份 <span class="sort-icon">↕</span></th>
-                        <th data-sort="排名">排名 <span class="sort-icon">↕</span></th>
-                        <th data-sort="医院名称">医院名称 <span class="sort-icon">↕</span></th>
-                        <th data-sort="专科声誉">专科声誉 <span class="sort-icon">↕</span></th>
-                        <th data-sort="科研学术">科研学术 <span class="sort-icon">↕</span></th>
-                        <th data-sort="综合得分">综合得分 <span class="sort-icon">↕</span></th>
-                        <th data-sort="省份">省份 <span class="sort-icon">↕</span> <span class="count-badge"></span></th>
-                        <th data-sort="城市">城市 <span class="sort-icon">↕</span> <span class="count-badge"></span></th>
-                    </tr>
-                </thead>
-                <tbody id="hospitalList">
-                </tbody>
-            </table>
-        </div>
-        <div class="data-source">
-            数据来源：<a href="https://rank.cn-healthcare.com/fudan/national-general" target="_blank">中国医院及专科声誉排行榜 复旦大学医院管理研究所</a>
-        </div>
-        <footer>
-            <p>&copy; 2023 <a href="https://www.linchun.com.cn">林春写字的地方</a></p>
-        </footer>
-    </div>
-    <script src="data.js"></script>
+        <section class="workspace" aria-labelledby="workspaceTitle">
+            <div class="workspace-toolbar">
+                <div class="workspace-heading">
+                    <h2 id="workspaceTitle">医院榜单</h2>
+                    <p id="resultSummary" aria-live="polite">正在加载…</p>
+                </div>
+                <div class="filters" aria-label="榜单筛选">
+                    <label class="filter-field search-field" for="hospitalSearch">
+                        <span class="filter-label">医院</span>
+                        <span class="field-control">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                            <input type="search" id="hospitalSearch" placeholder="搜索医院或曾用名" autocomplete="off">
+                        </span>
+                    </label>
+                    <label class="filter-field select-field" for="yearSelect">
+                        <span class="filter-label">年份</span>
+                        <span class="field-control">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+                            <select id="yearSelect">
+                                <option value="">全部年份</option>
+                            </select>
+                        </span>
+                    </label>
+                    <label class="filter-field select-field" for="provinceSelect">
+                        <span class="filter-label">省份</span>
+                        <span class="field-control">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s7-5.2 7-12a7 7 0 1 0-14 0c0 6.8 7 12 7 12Z"/><circle cx="12" cy="9" r="2.3"/></svg>
+                            <select id="provinceSelect">
+                                <option value="">全部省份</option>
+                            </select>
+                        </span>
+                    </label>
+                    <label class="filter-field select-field" for="citySelect">
+                        <span class="filter-label">城市</span>
+                        <span class="field-control">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 21V9l8-4 8 4v12M8 21v-5h8v5M8 11h2m4 0h2"/></svg>
+                            <select id="citySelect">
+                                <option value="">全部城市</option>
+                            </select>
+                        </span>
+                    </label>
+                </div>
+            </div>
+
+            <noscript><p class="noscript-notice">需要启用 JavaScript 才能筛选、排序和查看医院历年排名。</p></noscript>
+
+            <div class="table-scroll">
+                <table id="hospitalTable" class="hospital-table">
+                    <thead>
+                        <tr>
+                            <th aria-sort="none"><button type="button" data-sort="年份">年份 <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+                            <th aria-sort="none"><button type="button" data-sort="排名">排名/等级 <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+                            <th aria-sort="none"><button type="button" data-sort="医院名称">医院名称 <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+                            <th aria-sort="none"><button type="button" data-sort="专科声誉">专科声誉 <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+                            <th aria-sort="none"><button type="button" data-sort="科研学术">科研学术 <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+                            <th aria-sort="none"><button type="button" data-sort="综合得分">综合得分 <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+                            <th aria-sort="none"><button type="button" data-sort="省份">省份 <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+                            <th aria-sort="none"><button type="button" data-sort="城市">城市 <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+                        </tr>
+                    </thead>
+                    <tbody id="hospitalList"></tbody>
+                </table>
+            </div>
+
+            <div class="workspace-footer">
+                <div class="source-links">
+                    <span>数据来源</span>
+                    <a href="https://rank.cn-healthcare.com/fudan/national-general" target="_blank" rel="noopener noreferrer">中国医院及专科声誉排行榜 · 复旦大学医院管理研究所</a>
+                </div>
+            </div>
+            <div class="data-disclaimer">
+                <p>说明：等级制年份只展示官方等级，不换算为具体名次；同等级内的历史排名辅助排序仅用于本站浏览。点击医院名称可展开历年排名变化。</p>
+            </div>
+        </section>
+    </main>
+
+    <footer class="page-footer">
+        <p>&copy; <span id="copyrightYear"></span> <a href="https://www.linchun.com.cn">林春写字的地方</a></p>
+    </footer>
+
+    <div class="stats-tooltip" id="statsTooltip" role="status" hidden></div>
+
     <script src="script.js"></script>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-K2S9L4CHNP"></script>
@@ -69,8 +138,7 @@
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
-
       gtag('config', 'G-K2S9L4CHNP');
     </script>
 </body>
-</html> 
+</html>

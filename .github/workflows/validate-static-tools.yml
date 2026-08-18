@@ -11,6 +11,7 @@ on:
       - 'tools/space/**'
       - 'tools/card_number_new/**'
       - 'tools/pinyin/**'
+      - 'tools/hospital_rank/**'
       - 'tools/vendor/**'
       - 'tools/browser-tests/**'
   push:
@@ -24,6 +25,7 @@ on:
       - 'tools/space/**'
       - 'tools/card_number_new/**'
       - 'tools/pinyin/**'
+      - 'tools/hospital_rank/**'
       - 'tools/vendor/**'
       - 'tools/browser-tests/**'
   schedule:
@@ -81,6 +83,8 @@ jobs:
           node tools/browser-tests/card-number-new-smoke.mjs
           node tools/browser-tests/pinyin-smoke.mjs
           node tools/browser-tests/utility-tools-smoke.mjs
+          python3 tools/hospital_rank/scripts/validate_data.py
+          node tools/browser-tests/hospital-rank-smoke.mjs
 
       - name: 检查差异格式
         if: github.event_name == 'pull_request'

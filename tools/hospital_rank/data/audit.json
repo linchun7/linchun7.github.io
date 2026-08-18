@@ -1,0 +1,1720 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-18T16:18:45Z",
+  "status": "ok",
+  "summary": {
+    "years": 15,
+    "sourceRecords": 1430,
+    "legacyRecords": 1330,
+    "hospitalEntities": 128,
+    "canonicalizedSourceNames": 98,
+    "fuzzyMatches": 0,
+    "valueDifferences": 0,
+    "unmatchedSource": 0,
+    "unmatchedLegacy": 0,
+    "sourceValidationWarnings": 1,
+    "locationConflicts": 0,
+    "entityRecovered": 100,
+    "entityRecoveryFuzzy": 0,
+    "newEntities": 1,
+    "historicalAliasCandidates2011": 22,
+    "historicalAliasesAdded2011": 22
+  },
+  "years": [
+    {
+      "year": 2009,
+      "rankingMode": "numeric",
+      "sourceCount": 50,
+      "legacyCount": 50,
+      "matchedCount": 50,
+      "unmatchedSourceCount": 0,
+      "sourceWarningCount": 0,
+      "normalizedCount": 50
+    },
+    {
+      "year": 2010,
+      "rankingMode": "numeric",
+      "sourceCount": 80,
+      "legacyCount": 80,
+      "matchedCount": 80,
+      "unmatchedSourceCount": 0,
+      "sourceWarningCount": 0,
+      "normalizedCount": 80
+    },
+    {
+      "year": 2011,
+      "rankingMode": "numeric",
+      "sourceCount": 100,
+      "legacyCount": 0,
+      "matchedCount": 0,
+      "unmatchedSourceCount": 0,
+      "sourceWarningCount": 0,
+      "normalizedCount": 100
+    },
+    {
+      "year": 2012,
+      "rankingMode": "numeric",
+      "sourceCount": 100,
+      "legacyCount": 100,
+      "matchedCount": 100,
+      "unmatchedSourceCount": 0,
+      "sourceWarningCount": 0,
+      "normalizedCount": 100
+    },
+    {
+      "year": 2013,
+      "rankingMode": "numeric",
+      "sourceCount": 100,
+      "legacyCount": 100,
+      "matchedCount": 100,
+      "unmatchedSourceCount": 0,
+      "sourceWarningCount": 0,
+      "normalizedCount": 100
+    },
+    {
+      "year": 2014,
+      "rankingMode": "numeric",
+      "sourceCount": 100,
+      "legacyCount": 100,
+      "matchedCount": 100,
+      "unmatchedSourceCount": 0,
+      "sourceWarningCount": 1,
+      "normalizedCount": 100
+    },
+    {
+      "year": 2015,
+      "rankingMode": "numeric",
+      "sourceCount": 100,
+      "legacyCount": 100,
+      "matchedCount": 100,
+      "unmatchedSourceCount": 0,
+      "sourceWarningCount": 0,
+      "normalizedCount": 100
+    },
+    {
+      "year": 2016,
+      "rankingMode": "numeric",
+      "sourceCount": 100,
+      "legacyCount": 100,
+      "matchedCount": 100,
+      "unmatchedSourceCount": 0,
+      "sourceWarningCount": 0,
+      "normalizedCount": 100
+    },
+    {
+      "year": 2017,
+      "rankingMode": "numeric",
+      "sourceCount": 100,
+      "legacyCount": 100,
+      "matchedCount": 100,
+      "unmatchedSourceCount": 0,
+      "sourceWarningCount": 0,
+      "normalizedCount": 100
+    },
+    {
+      "year": 2018,
+      "rankingMode": "numeric",
+      "sourceCount": 100,
+      "legacyCount": 100,
+      "matchedCount": 100,
+      "unmatchedSourceCount": 0,
+      "sourceWarningCount": 0,
+      "normalizedCount": 100
+    },
+    {
+      "year": 2019,
+      "rankingMode": "numeric",
+      "sourceCount": 100,
+      "legacyCount": 100,
+      "matchedCount": 100,
+      "unmatchedSourceCount": 0,
+      "sourceWarningCount": 0,
+      "normalizedCount": 100
+    },
+    {
+      "year": 2020,
+      "rankingMode": "numeric",
+      "sourceCount": 100,
+      "legacyCount": 100,
+      "matchedCount": 100,
+      "unmatchedSourceCount": 0,
+      "sourceWarningCount": 0,
+      "normalizedCount": 100
+    },
+    {
+      "year": 2021,
+      "rankingMode": "numeric",
+      "sourceCount": 100,
+      "legacyCount": 100,
+      "matchedCount": 100,
+      "unmatchedSourceCount": 0,
+      "sourceWarningCount": 0,
+      "normalizedCount": 100
+    },
+    {
+      "year": 2022,
+      "rankingMode": "numeric",
+      "sourceCount": 100,
+      "legacyCount": 100,
+      "matchedCount": 100,
+      "unmatchedSourceCount": 0,
+      "sourceWarningCount": 0,
+      "normalizedCount": 100
+    },
+    {
+      "year": 2023,
+      "rankingMode": "grade",
+      "sourceCount": 100,
+      "legacyCount": 100,
+      "matchedCount": 100,
+      "unmatchedSourceCount": 0,
+      "sourceWarningCount": 0,
+      "normalizedCount": 100
+    }
+  ],
+  "sourceValidationWarnings": [
+    {
+      "year": 2014,
+      "type": "score-sum",
+      "sourceName": "复旦大学附属儿科医院",
+      "rank": 40,
+      "specialtyReputation": 8.984,
+      "researchAcademic": 5.795,
+      "overallScore": 14.799,
+      "delta": 0.02
+    }
+  ],
+  "canonicalizations": [
+    {
+      "year": 2009,
+      "sourceName": "空军军医大学西京医院",
+      "canonicalName": "空军军医大学第一附属医院（西京医院）"
+    },
+    {
+      "year": 2009,
+      "sourceName": "东部战区总医院",
+      "canonicalName": "中国人民解放军东部战区总医院"
+    },
+    {
+      "year": 2009,
+      "sourceName": "中国医学科学院血液病医院（血液学研究所）",
+      "canonicalName": "中国医学科学院血液病医院（研究所）"
+    },
+    {
+      "year": 2009,
+      "sourceName": "广州医学院第一附属医院",
+      "canonicalName": "广州医科大学附属第一医院"
+    },
+    {
+      "year": 2010,
+      "sourceName": "空军军医大学西京医院",
+      "canonicalName": "空军军医大学第一附属医院（西京医院）"
+    },
+    {
+      "year": 2010,
+      "sourceName": "东部战区总医院",
+      "canonicalName": "中国人民解放军东部战区总医院"
+    },
+    {
+      "year": 2010,
+      "sourceName": "南京鼓楼医院",
+      "canonicalName": "南京大学医学院附属鼓楼医院"
+    },
+    {
+      "year": 2010,
+      "sourceName": "中国医学科学院血液病医院（血液学研究所）",
+      "canonicalName": "中国医学科学院血液病医院（研究所）"
+    },
+    {
+      "year": 2010,
+      "sourceName": "广州医学院第一附属医院",
+      "canonicalName": "广州医科大学附属第一医院"
+    },
+    {
+      "year": 2010,
+      "sourceName": "空军军医大学唐都医院",
+      "canonicalName": "空军军医大学第二附属医院(唐都医院)"
+    },
+    {
+      "year": 2010,
+      "sourceName": "山东省立医院",
+      "canonicalName": "山东第一医科大学附属省立医院（山东省立医院）"
+    },
+    {
+      "year": 2012,
+      "sourceName": "空军军医大学西京医院",
+      "canonicalName": "空军军医大学第一附属医院（西京医院）"
+    },
+    {
+      "year": 2012,
+      "sourceName": "首都医科大学北京宣武医院",
+      "canonicalName": "首都医科大学宣武医院"
+    },
+    {
+      "year": 2012,
+      "sourceName": "南京鼓楼医院",
+      "canonicalName": "南京大学医学院附属鼓楼医院"
+    },
+    {
+      "year": 2012,
+      "sourceName": "上海市胸科医院",
+      "canonicalName": "上海市胸科医院（暨上海交通大学医学院附属胸科医院）"
+    },
+    {
+      "year": 2012,
+      "sourceName": "中国医学科学院血液病医院（血液学研究所）",
+      "canonicalName": "中国医学科学院血液病医院（研究所）"
+    },
+    {
+      "year": 2012,
+      "sourceName": "东部战区总医院",
+      "canonicalName": "中国人民解放军东部战区总医院"
+    },
+    {
+      "year": 2012,
+      "sourceName": "空军军医大学唐都医院",
+      "canonicalName": "空军军医大学第二附属医院(唐都医院)"
+    },
+    {
+      "year": 2012,
+      "sourceName": "温州医学院附属眼视光医院",
+      "canonicalName": "温州医科大学附属眼视光医院"
+    },
+    {
+      "year": 2012,
+      "sourceName": "中国医学科学院皮肤病研究所",
+      "canonicalName": "中国医学科学院皮肤病医院（研究所）"
+    },
+    {
+      "year": 2013,
+      "sourceName": "空军军医大学西京医院",
+      "canonicalName": "空军军医大学第一附属医院（西京医院）"
+    },
+    {
+      "year": 2013,
+      "sourceName": "东部战区总医院",
+      "canonicalName": "中国人民解放军东部战区总医院"
+    },
+    {
+      "year": 2013,
+      "sourceName": "南京鼓楼医院",
+      "canonicalName": "南京大学医学院附属鼓楼医院"
+    },
+    {
+      "year": 2013,
+      "sourceName": "山东省立医院",
+      "canonicalName": "山东第一医科大学附属省立医院（山东省立医院）"
+    },
+    {
+      "year": 2013,
+      "sourceName": "空军军医大学唐都医院",
+      "canonicalName": "空军军医大学第二附属医院(唐都医院)"
+    },
+    {
+      "year": 2013,
+      "sourceName": "上海市胸科医院",
+      "canonicalName": "上海市胸科医院（暨上海交通大学医学院附属胸科医院）"
+    },
+    {
+      "year": 2013,
+      "sourceName": "中国医学科学院血液病医院（血液学研究所）",
+      "canonicalName": "中国医学科学院血液病医院（研究所）"
+    },
+    {
+      "year": 2013,
+      "sourceName": "北部战区总医院",
+      "canonicalName": "中国人民解放军北部战区总医院"
+    },
+    {
+      "year": 2013,
+      "sourceName": "中国医学科学院皮肤病研究所",
+      "canonicalName": "中国医学科学院皮肤病医院（研究所）"
+    },
+    {
+      "year": 2014,
+      "sourceName": "空军军医大学西京医院",
+      "canonicalName": "空军军医大学第一附属医院（西京医院）"
+    },
+    {
+      "year": 2014,
+      "sourceName": "东部战区总医院",
+      "canonicalName": "中国人民解放军东部战区总医院"
+    },
+    {
+      "year": 2014,
+      "sourceName": "山东省立医院",
+      "canonicalName": "山东第一医科大学附属省立医院（山东省立医院）"
+    },
+    {
+      "year": 2014,
+      "sourceName": "南京鼓楼医院",
+      "canonicalName": "南京大学医学院附属鼓楼医院"
+    },
+    {
+      "year": 2014,
+      "sourceName": "空军军医大学唐都医院",
+      "canonicalName": "空军军医大学第二附属医院(唐都医院)"
+    },
+    {
+      "year": 2014,
+      "sourceName": "中国医学科学院血液病医院（血液学研究所）",
+      "canonicalName": "中国医学科学院血液病医院（研究所）"
+    },
+    {
+      "year": 2014,
+      "sourceName": "上海市胸科医院",
+      "canonicalName": "上海市胸科医院（暨上海交通大学医学院附属胸科医院）"
+    },
+    {
+      "year": 2014,
+      "sourceName": "北部战区总医院",
+      "canonicalName": "中国人民解放军北部战区总医院"
+    },
+    {
+      "year": 2014,
+      "sourceName": "中国医学科学院皮肤病研究所",
+      "canonicalName": "中国医学科学院皮肤病医院（研究所）"
+    },
+    {
+      "year": 2015,
+      "sourceName": "空军军医大学西京医院",
+      "canonicalName": "空军军医大学第一附属医院（西京医院）"
+    },
+    {
+      "year": 2015,
+      "sourceName": "东部战区总医院",
+      "canonicalName": "中国人民解放军东部战区总医院"
+    },
+    {
+      "year": 2015,
+      "sourceName": "山东省立医院",
+      "canonicalName": "山东第一医科大学附属省立医院（山东省立医院）"
+    },
+    {
+      "year": 2015,
+      "sourceName": "南京鼓楼医院",
+      "canonicalName": "南京大学医学院附属鼓楼医院"
+    },
+    {
+      "year": 2015,
+      "sourceName": "中国医学科学院血液病医院（血液学研究所）",
+      "canonicalName": "中国医学科学院血液病医院（研究所）"
+    },
+    {
+      "year": 2015,
+      "sourceName": "空军军医大学唐都医院",
+      "canonicalName": "空军军医大学第二附属医院(唐都医院)"
+    },
+    {
+      "year": 2015,
+      "sourceName": "北部战区总医院",
+      "canonicalName": "中国人民解放军北部战区总医院"
+    },
+    {
+      "year": 2015,
+      "sourceName": "上海市胸科医院",
+      "canonicalName": "上海市胸科医院（暨上海交通大学医学院附属胸科医院）"
+    },
+    {
+      "year": 2015,
+      "sourceName": "温州医科大学附属眼视光医院（浙江省眼科医院）",
+      "canonicalName": "温州医科大学附属眼视光医院"
+    },
+    {
+      "year": 2015,
+      "sourceName": "中国医学科学院皮肤病研究所",
+      "canonicalName": "中国医学科学院皮肤病医院（研究所）"
+    },
+    {
+      "year": 2016,
+      "sourceName": "空军军医大学西京医院",
+      "canonicalName": "空军军医大学第一附属医院（西京医院）"
+    },
+    {
+      "year": 2016,
+      "sourceName": "东部战区总医院",
+      "canonicalName": "中国人民解放军东部战区总医院"
+    },
+    {
+      "year": 2016,
+      "sourceName": "山东省立医院",
+      "canonicalName": "山东第一医科大学附属省立医院（山东省立医院）"
+    },
+    {
+      "year": 2016,
+      "sourceName": "南京鼓楼医院",
+      "canonicalName": "南京大学医学院附属鼓楼医院"
+    },
+    {
+      "year": 2016,
+      "sourceName": "中国医学科学院血液病医院（血液学研究所）",
+      "canonicalName": "中国医学科学院血液病医院（研究所）"
+    },
+    {
+      "year": 2016,
+      "sourceName": "北部战区总医院",
+      "canonicalName": "中国人民解放军北部战区总医院"
+    },
+    {
+      "year": 2016,
+      "sourceName": "空军军医大学唐都医院",
+      "canonicalName": "空军军医大学第二附属医院(唐都医院)"
+    },
+    {
+      "year": 2016,
+      "sourceName": "上海市胸科医院",
+      "canonicalName": "上海市胸科医院（暨上海交通大学医学院附属胸科医院）"
+    },
+    {
+      "year": 2016,
+      "sourceName": "温州医科大学附属眼视光医院（浙江省眼科医院）",
+      "canonicalName": "温州医科大学附属眼视光医院"
+    },
+    {
+      "year": 2017,
+      "sourceName": "空军军医大学西京医院",
+      "canonicalName": "空军军医大学第一附属医院（西京医院）"
+    },
+    {
+      "year": 2017,
+      "sourceName": "东部战区总医院",
+      "canonicalName": "中国人民解放军东部战区总医院"
+    },
+    {
+      "year": 2017,
+      "sourceName": "南京鼓楼医院",
+      "canonicalName": "南京大学医学院附属鼓楼医院"
+    },
+    {
+      "year": 2017,
+      "sourceName": "山东省立医院",
+      "canonicalName": "山东第一医科大学附属省立医院（山东省立医院）"
+    },
+    {
+      "year": 2017,
+      "sourceName": "空军军医大学唐都医院",
+      "canonicalName": "空军军医大学第二附属医院(唐都医院)"
+    },
+    {
+      "year": 2017,
+      "sourceName": "中国医学科学院血液病医院（血液学研究所）",
+      "canonicalName": "中国医学科学院血液病医院（研究所）"
+    },
+    {
+      "year": 2017,
+      "sourceName": "上海市胸科医院",
+      "canonicalName": "上海市胸科医院（暨上海交通大学医学院附属胸科医院）"
+    },
+    {
+      "year": 2017,
+      "sourceName": "北部战区总医院",
+      "canonicalName": "中国人民解放军北部战区总医院"
+    },
+    {
+      "year": 2018,
+      "sourceName": "空军军医大学西京医院",
+      "canonicalName": "空军军医大学第一附属医院（西京医院）"
+    },
+    {
+      "year": 2018,
+      "sourceName": "南京鼓楼医院",
+      "canonicalName": "南京大学医学院附属鼓楼医院"
+    },
+    {
+      "year": 2018,
+      "sourceName": "东部战区总医院",
+      "canonicalName": "中国人民解放军东部战区总医院"
+    },
+    {
+      "year": 2018,
+      "sourceName": "山东省立医院",
+      "canonicalName": "山东第一医科大学附属省立医院（山东省立医院）"
+    },
+    {
+      "year": 2018,
+      "sourceName": "上海市胸科医院",
+      "canonicalName": "上海市胸科医院（暨上海交通大学医学院附属胸科医院）"
+    },
+    {
+      "year": 2018,
+      "sourceName": "中国医学科学院血液病医院（血液学研究所）",
+      "canonicalName": "中国医学科学院血液病医院（研究所）"
+    },
+    {
+      "year": 2018,
+      "sourceName": "北部战区总医院",
+      "canonicalName": "中国人民解放军北部战区总医院"
+    },
+    {
+      "year": 2018,
+      "sourceName": "空军军医大学唐都医院",
+      "canonicalName": "空军军医大学第二附属医院(唐都医院)"
+    },
+    {
+      "year": 2019,
+      "sourceName": "空军军医大学西京医院",
+      "canonicalName": "空军军医大学第一附属医院（西京医院）"
+    },
+    {
+      "year": 2019,
+      "sourceName": "南京鼓楼医院",
+      "canonicalName": "南京大学医学院附属鼓楼医院"
+    },
+    {
+      "year": 2019,
+      "sourceName": "东部战区总医院",
+      "canonicalName": "中国人民解放军东部战区总医院"
+    },
+    {
+      "year": 2019,
+      "sourceName": "山东省立医院",
+      "canonicalName": "山东第一医科大学附属省立医院（山东省立医院）"
+    },
+    {
+      "year": 2019,
+      "sourceName": "上海市胸科医院",
+      "canonicalName": "上海市胸科医院（暨上海交通大学医学院附属胸科医院）"
+    },
+    {
+      "year": 2019,
+      "sourceName": "北部战区总医院",
+      "canonicalName": "中国人民解放军北部战区总医院"
+    },
+    {
+      "year": 2019,
+      "sourceName": "空军军医大学唐都医院",
+      "canonicalName": "空军军医大学第二附属医院(唐都医院)"
+    },
+    {
+      "year": 2019,
+      "sourceName": "中国医学科学院血液病医院（血液学研究所）",
+      "canonicalName": "中国医学科学院血液病医院（研究所）"
+    },
+    {
+      "year": 2020,
+      "sourceName": "空军军医大学西京医院",
+      "canonicalName": "空军军医大学第一附属医院（西京医院）"
+    },
+    {
+      "year": 2020,
+      "sourceName": "东部战区总医院",
+      "canonicalName": "中国人民解放军东部战区总医院"
+    },
+    {
+      "year": 2020,
+      "sourceName": "山东省立医院",
+      "canonicalName": "山东第一医科大学附属省立医院（山东省立医院）"
+    },
+    {
+      "year": 2020,
+      "sourceName": "上海市胸科医院",
+      "canonicalName": "上海市胸科医院（暨上海交通大学医学院附属胸科医院）"
+    },
+    {
+      "year": 2020,
+      "sourceName": "中国医学科学院血液病医院（血液学研究所）",
+      "canonicalName": "中国医学科学院血液病医院（研究所）"
+    },
+    {
+      "year": 2020,
+      "sourceName": "空军军医大学唐都医院",
+      "canonicalName": "空军军医大学第二附属医院(唐都医院)"
+    },
+    {
+      "year": 2020,
+      "sourceName": "北部战区总医院",
+      "canonicalName": "中国人民解放军北部战区总医院"
+    },
+    {
+      "year": 2021,
+      "sourceName": "空军军医大学西京医院",
+      "canonicalName": "空军军医大学第一附属医院（西京医院）"
+    },
+    {
+      "year": 2021,
+      "sourceName": "四川省医学科学院•四川省人民医院",
+      "canonicalName": "四川省人民医院"
+    },
+    {
+      "year": 2021,
+      "sourceName": "上海市胸科医院（暨上海交通大学附属胸科医院）",
+      "canonicalName": "上海市胸科医院（暨上海交通大学医学院附属胸科医院）"
+    },
+    {
+      "year": 2021,
+      "sourceName": "中国医学科学院血液病医院（血液学研究所）",
+      "canonicalName": "中国医学科学院血液病医院（研究所）"
+    },
+    {
+      "year": 2021,
+      "sourceName": "空军军医大学唐都医院",
+      "canonicalName": "空军军医大学第二附属医院(唐都医院)"
+    },
+    {
+      "year": 2022,
+      "sourceName": "东部战区总医院",
+      "canonicalName": "中国人民解放军东部战区总医院"
+    },
+    {
+      "year": 2022,
+      "sourceName": "中国医学科学院血液病医院（血液学研究所）",
+      "canonicalName": "中国医学科学院血液病医院（研究所）"
+    },
+    {
+      "year": 2022,
+      "sourceName": "上海交通大学医学院附属胸科医院",
+      "canonicalName": "上海市胸科医院（暨上海交通大学医学院附属胸科医院）"
+    },
+    {
+      "year": 2022,
+      "sourceName": "北部战区总医院",
+      "canonicalName": "中国人民解放军北部战区总医院"
+    },
+    {
+      "year": 2022,
+      "sourceName": "空军军医大学唐都医院",
+      "canonicalName": "空军军医大学第二附属医院(唐都医院)"
+    }
+  ],
+  "fuzzyMatches": [],
+  "valueDifferences": [],
+  "unmatchedSource": [],
+  "unmatchedLegacy": [],
+  "locationConflicts": [],
+  "entityRecovery": [
+    {
+      "year": 2011,
+      "sourceName": "中国医学科学院北京协和医院",
+      "hospitalId": "h_933e572411",
+      "canonicalName": "中国医学科学院北京协和医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "四川大学华西医院",
+      "hospitalId": "h_b81d6bf8bf",
+      "canonicalName": "四川大学华西医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "中国人民解放军总医院",
+      "hospitalId": "h_3cfd7279c0",
+      "canonicalName": "中国人民解放军总医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "上海交通大学医学院附属瑞金医院",
+      "hospitalId": "h_853281ebe3",
+      "canonicalName": "上海交通大学医学院附属瑞金医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "空军军医大学西京医院",
+      "hospitalId": "h_9013bee792",
+      "canonicalName": "空军军医大学第一附属医院（西京医院）",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "复旦大学附属中山医院",
+      "hospitalId": "h_777034def1",
+      "canonicalName": "复旦大学附属中山医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "复旦大学附属华山医院",
+      "hospitalId": "h_f73b651f8e",
+      "canonicalName": "复旦大学附属华山医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "北京大学第一医院",
+      "hospitalId": "h_b38599d45e",
+      "canonicalName": "北京大学第一医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "北京大学人民医院",
+      "hospitalId": "h_4f051936eb",
+      "canonicalName": "北京大学人民医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "华中科技大学同济医学院附属同济医院",
+      "hospitalId": "h_5e41fa3513",
+      "canonicalName": "华中科技大学同济医学院附属同济医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "中山大学附属第一医院",
+      "hospitalId": "h_3784e1c17a",
+      "canonicalName": "中山大学附属第一医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "北京大学第三医院",
+      "hospitalId": "h_fe1dddbf21",
+      "canonicalName": "北京大学第三医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "华中科技大学同济医学院附属协和医院",
+      "hospitalId": "h_4e519aadaa",
+      "canonicalName": "华中科技大学同济医学院附属协和医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "浙江大学医学院附属第一医院",
+      "hospitalId": "h_6013828594",
+      "canonicalName": "浙江大学医学院附属第一医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "海军军医大学第一附属医院",
+      "hospitalId": "h_5324359dc1",
+      "canonicalName": "海军军医大学第一附属医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "中国医科大学附属第一医院",
+      "hospitalId": "h_ba8befe6a9",
+      "canonicalName": "中国医科大学附属第一医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "中国医学科学院阜外医院",
+      "hospitalId": "h_18ffe4dd12",
+      "canonicalName": "中国医学科学院阜外医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "中南大学湘雅二医院",
+      "hospitalId": "h_fd268f9309",
+      "canonicalName": "中南大学湘雅二医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "上海交通大学医学院附属仁济医院",
+      "hospitalId": "h_6469b003e2",
+      "canonicalName": "上海交通大学医学院附属仁济医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "南方医科大学南方医院",
+      "hospitalId": "h_7ab1de17cb",
+      "canonicalName": "南方医科大学南方医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "上海交通大学医学院附属第九人民医院",
+      "hospitalId": "h_a7ea69b366",
+      "canonicalName": "上海交通大学医学院附属第九人民医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "中南大学湘雅医院",
+      "hospitalId": "h_fcf153bdc6",
+      "canonicalName": "中南大学湘雅医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "首都医科大学附属北京安贞医院",
+      "hospitalId": "h_787937bed8",
+      "canonicalName": "首都医科大学附属北京安贞医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "中国医学科学院肿瘤医院",
+      "hospitalId": "h_7c9f2e7e2f",
+      "canonicalName": "中国医学科学院肿瘤医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "中山大学肿瘤防治中心",
+      "hospitalId": "h_ae33a0484f",
+      "canonicalName": "中山大学肿瘤防治中心",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "海军军医大学第二附属医院",
+      "hospitalId": "h_92d059fa6a",
+      "canonicalName": "海军军医大学第二附属医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "上海市第六人民医院",
+      "hospitalId": "h_c3711ecdc4",
+      "canonicalName": "上海市第六人民医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "上海交通大学医学院附属新华医院",
+      "hospitalId": "h_788fa3c30f",
+      "canonicalName": "上海交通大学医学院附属新华医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "山东大学齐鲁医院",
+      "hospitalId": "h_aed493d15f",
+      "canonicalName": "山东大学齐鲁医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "首都医科大学附属北京同仁医院",
+      "hospitalId": "h_f05dcff5f9",
+      "canonicalName": "首都医科大学附属北京同仁医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "陆军军医大学第一附属医院",
+      "hospitalId": "h_a8c9643720",
+      "canonicalName": "陆军军医大学第一附属医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "中国医科大学附属盛京医院",
+      "hospitalId": "h_3d74b591d5",
+      "canonicalName": "中国医科大学附属盛京医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "复旦大学附属肿瘤医院",
+      "hospitalId": "h_c174aa6ac5",
+      "canonicalName": "复旦大学附属肿瘤医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "广东省人民医院",
+      "hospitalId": "h_73093111b2",
+      "canonicalName": "广东省人民医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "中山大学附属第三医院",
+      "hospitalId": "h_3bfcadea47",
+      "canonicalName": "中山大学附属第三医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "首都医科大学北京宣武医院",
+      "hospitalId": "h_823bdee70d",
+      "canonicalName": "首都医科大学宣武医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "首都医科大学附属北京儿童医院",
+      "hospitalId": "h_c1b98c0a94",
+      "canonicalName": "首都医科大学附属北京儿童医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "复旦大学附属儿科医院",
+      "hospitalId": "h_6c46fbceeb",
+      "canonicalName": "复旦大学附属儿科医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "首都医科大学附属北京天坛医院",
+      "hospitalId": "h_500faa0c94",
+      "canonicalName": "首都医科大学附属北京天坛医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "复旦大学附属眼耳鼻喉科医院",
+      "hospitalId": "h_860207926d",
+      "canonicalName": "复旦大学附属眼耳鼻喉科医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "江苏省人民医院（南京医科大学第一附属医院）",
+      "hospitalId": "h_b54d59ad90",
+      "canonicalName": "江苏省人民医院（南京医科大学第一附属医院）",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "浙江大学医学院附属第二医院",
+      "hospitalId": "h_110675a0fb",
+      "canonicalName": "浙江大学医学院附属第二医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "中山大学中山眼科中心",
+      "hospitalId": "h_de611fd8c5",
+      "canonicalName": "中山大学中山眼科中心",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "吉林大学第一医院",
+      "hospitalId": "h_fa81b0fbe6",
+      "canonicalName": "吉林大学第一医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "广州医学院第一附属医院",
+      "hospitalId": "h_8def121e57",
+      "canonicalName": "广州医科大学附属第一医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "苏州大学附属第一医院",
+      "hospitalId": "h_969ecba906",
+      "canonicalName": "苏州大学附属第一医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "南京鼓楼医院",
+      "hospitalId": "h_ed57c24c72",
+      "canonicalName": "南京大学医学院附属鼓楼医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "天津医科大学总医院",
+      "hospitalId": "h_3ef487dfc5",
+      "canonicalName": "天津医科大学总医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "重庆医科大学附属儿童医院",
+      "hospitalId": "h_b5430e604d",
+      "canonicalName": "重庆医科大学附属儿童医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "中国人民解放军第三〇二医院",
+      "hospitalId": "h_54b321e8b0",
+      "canonicalName": "中国人民解放军第三〇二医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "上海交通大学医学院附属上海儿童医学中心",
+      "hospitalId": "h_4e5af6bec6",
+      "canonicalName": "上海交通大学医学院附属上海儿童医学中心",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "哈尔滨医科大学附属第一医院",
+      "hospitalId": "h_978fc1ff79",
+      "canonicalName": "哈尔滨医科大学附属第一医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "四川大学华西第二医院",
+      "hospitalId": "h_4d07015a0e",
+      "canonicalName": "四川大学华西第二医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "东部战区总医院",
+      "hospitalId": "h_3d6078f899",
+      "canonicalName": "中国人民解放军东部战区总医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "中国医学科学院整形外科医院",
+      "hospitalId": "h_6731306e1a",
+      "canonicalName": "中国医学科学院整形外科医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "武汉大学人民医院",
+      "hospitalId": "h_b07990f85b",
+      "canonicalName": "武汉大学人民医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "空军军医大学第三附属医院（口腔医院）",
+      "hospitalId": "h_9f65d8be8d",
+      "canonicalName": "空军军医大学第三附属医院（口腔医院）",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "中国医学科学院血液病医院（血液学研究所）",
+      "hospitalId": "h_340c14831e",
+      "canonicalName": "中国医学科学院血液病医院（研究所）",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "北京大学口腔医院",
+      "hospitalId": "h_58404ab76e",
+      "canonicalName": "北京大学口腔医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "首都医科大学附属北京朝阳医院",
+      "hospitalId": "h_e10718a4b4",
+      "canonicalName": "首都医科大学附属北京朝阳医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "浙江大学医学院附属妇产科医院",
+      "hospitalId": "h_d3bf33adbe",
+      "canonicalName": "浙江大学医学院附属妇产科医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "浙江大学医学院附属儿童医院",
+      "hospitalId": "h_18c794ebf2",
+      "canonicalName": "浙江大学医学院附属儿童医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "天津医科大学肿瘤医院",
+      "hospitalId": "h_aaa6ef055b",
+      "canonicalName": "天津医科大学肿瘤医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "安徽医科大学第一附属医院",
+      "hospitalId": "h_d8873335ed",
+      "canonicalName": "安徽医科大学第一附属医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "西安交通大学第一附属医院",
+      "hospitalId": "h_9d0d64e5e3",
+      "canonicalName": "西安交通大学第一附属医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "山东省肿瘤医院暨山东省肿瘤防治研究院",
+      "hospitalId": "h_8405b53dbb",
+      "canonicalName": "山东省肿瘤医院暨山东省肿瘤防治研究院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "北京大学肿瘤医院",
+      "hospitalId": "h_53053b4def",
+      "canonicalName": "北京大学肿瘤医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "重庆医科大学附属第一医院",
+      "hospitalId": "h_637cd5ec91",
+      "canonicalName": "重庆医科大学附属第一医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "北京积水潭医院",
+      "hospitalId": "h_4939c66ed2",
+      "canonicalName": "北京积水潭医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "陆军军医大学第二附属医院",
+      "hospitalId": "h_3368537b49",
+      "canonicalName": "陆军军医大学第二附属医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "空军军医大学唐都医院",
+      "hospitalId": "h_79997b8bd1",
+      "canonicalName": "空军军医大学第二附属医院(唐都医院)",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "上海市胸科医院",
+      "hospitalId": "h_09cda620b5",
+      "canonicalName": "上海市胸科医院（暨上海交通大学医学院附属胸科医院）",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "复旦大学附属妇产科医院",
+      "hospitalId": "h_75ccb7f105",
+      "canonicalName": "复旦大学附属妇产科医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "上海市第一人民医院",
+      "hospitalId": "h_1a7b8941a8",
+      "canonicalName": "上海市第一人民医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "四川大学华西口腔医院",
+      "hospitalId": "h_73ed80dba7",
+      "canonicalName": "四川大学华西口腔医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "中山大学孙逸仙纪念医院",
+      "hospitalId": "h_9da51a15c9",
+      "canonicalName": "中山大学孙逸仙纪念医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "首都医科大学附属北京地坛医院",
+      "hospitalId": "h_ba83ba13ec",
+      "canonicalName": "首都医科大学附属北京地坛医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "陆军军医大学第三附属医院",
+      "hospitalId": "h_a00ae031dc",
+      "canonicalName": "陆军军医大学第三附属医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "东方肝胆外科医院",
+      "hospitalId": "h_6b02887d6d",
+      "canonicalName": "东方肝胆外科医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "中国医学科学院皮肤病研究所",
+      "hospitalId": "h_ee3264aa1a",
+      "canonicalName": "中国医学科学院皮肤病医院（研究所）",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "上海市精神卫生中心",
+      "hospitalId": "h_bc13969c86",
+      "canonicalName": "上海市精神卫生中心",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "中日友好医院",
+      "hospitalId": "h_1601595daa",
+      "canonicalName": "中日友好医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "西安交通大学第二附属医院",
+      "hospitalId": "h_1bdedddaab",
+      "canonicalName": "西安交通大学第二附属医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "哈尔滨医科大学附属第二医院",
+      "hospitalId": "h_0b662881f2",
+      "canonicalName": "哈尔滨医科大学附属第二医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "上海市肺科医院",
+      "hospitalId": "h_2dca56453f",
+      "canonicalName": "上海市肺科医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "中山大学光华口腔医学院附属口腔医院",
+      "hospitalId": "h_52d187e31a",
+      "canonicalName": "中山大学光华口腔医学院附属口腔医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "首都医科大学附属北京友谊医院",
+      "hospitalId": "h_26d5159167",
+      "canonicalName": "首都医科大学附属北京友谊医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "北京大学第六医院",
+      "hospitalId": "h_e7b8b5d012",
+      "canonicalName": "北京大学第六医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "首都儿科研究所",
+      "hospitalId": "h_8a3da598ab",
+      "canonicalName": "首都儿科研究所",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "武汉大学口腔医院",
+      "hospitalId": "h_47850f4873",
+      "canonicalName": "武汉大学口腔医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "广州市妇女儿童医疗中心",
+      "hospitalId": "h_329371dbfd",
+      "canonicalName": "广州市妇女儿童医疗中心",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "首都医科大学附属北京佑安医院",
+      "hospitalId": "h_0cc4a81c5d",
+      "canonicalName": "首都医科大学附属北京佑安医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "哈尔滨医科大学附属肿瘤医院",
+      "hospitalId": "h_d9553494d8",
+      "canonicalName": "哈尔滨医科大学附属肿瘤医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "重庆医科大学附属第二医院",
+      "hospitalId": "h_d1d32e96a5",
+      "canonicalName": "重庆医科大学附属第二医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "天津医科大学第二医院",
+      "hospitalId": "h_1e988953db",
+      "canonicalName": "天津医科大学第二医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "北京医院",
+      "hospitalId": "h_5505d532be",
+      "canonicalName": "北京医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "温州医学院附属眼视光医院",
+      "hospitalId": "h_b972f4e487",
+      "canonicalName": "温州医科大学附属眼视光医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "天津市眼科医院",
+      "hospitalId": "h_7e55f65dc1",
+      "canonicalName": "天津市眼科医院",
+      "method": "explicit-new-entity",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "浙江省肿瘤医院",
+      "hospitalId": "h_bd20c96c87",
+      "canonicalName": "浙江省肿瘤医院",
+      "method": "entity-exact",
+      "score": 1.0
+    },
+    {
+      "year": 2011,
+      "sourceName": "郑州大学第一附属医院",
+      "hospitalId": "h_d36be87688",
+      "canonicalName": "郑州大学第一附属医院",
+      "method": "entity-exact",
+      "score": 1.0
+    }
+  ],
+  "entityRecoveryFuzzy": [],
+  "newEntities": [
+    {
+      "year": 2011,
+      "sourceName": "天津市眼科医院",
+      "hospitalId": "h_7e55f65dc1",
+      "province": "天津市",
+      "city": "天津市",
+      "reason": "仅出现在旧库缺失的2011年度；复旦2011综合榜第98名",
+      "metadataEvidence": "https://www.oio.cn/"
+    }
+  ],
+  "historicalAliasEnrichment": [
+    {
+      "year": 2011,
+      "rank": 1,
+      "originalPublishedName": "北京协和医院",
+      "currentHistoricalPageName": "中国医学科学院北京协和医院",
+      "canonicalName": "中国医学科学院北京协和医院",
+      "hospitalId": "h_933e572411",
+      "addedToAliases": true,
+      "sourceUrl": "https://www.fdygs.com/news2011-2.aspx"
+    },
+    {
+      "year": 2011,
+      "rank": 5,
+      "originalPublishedName": "第四军医大学西京医院",
+      "currentHistoricalPageName": "空军军医大学西京医院",
+      "canonicalName": "空军军医大学第一附属医院（西京医院）",
+      "hospitalId": "h_9013bee792",
+      "addedToAliases": true,
+      "sourceUrl": "https://www.fdygs.com/news2011-2.aspx"
+    },
+    {
+      "year": 2011,
+      "rank": 15,
+      "originalPublishedName": "第二军医大学长海医院",
+      "currentHistoricalPageName": "海军军医大学第一附属医院",
+      "canonicalName": "海军军医大学第一附属医院",
+      "hospitalId": "h_5324359dc1",
+      "addedToAliases": true,
+      "sourceUrl": "https://www.fdygs.com/news2011-2.aspx"
+    },
+    {
+      "year": 2011,
+      "rank": 17,
+      "originalPublishedName": "中国医学科学院阜外心血管病医院",
+      "currentHistoricalPageName": "中国医学科学院阜外医院",
+      "canonicalName": "中国医学科学院阜外医院",
+      "hospitalId": "h_18ffe4dd12",
+      "addedToAliases": true,
+      "sourceUrl": "https://www.fdygs.com/news2011-2.aspx"
+    },
+    {
+      "year": 2011,
+      "rank": 26,
+      "originalPublishedName": "第二军医大学长征医院",
+      "currentHistoricalPageName": "海军军医大学第二附属医院",
+      "canonicalName": "海军军医大学第二附属医院",
+      "hospitalId": "h_92d059fa6a",
+      "addedToAliases": true,
+      "sourceUrl": "https://www.fdygs.com/news2011-2.aspx"
+    },
+    {
+      "year": 2011,
+      "rank": 27,
+      "originalPublishedName": "上海交通大学医学院附属第六人民医院",
+      "currentHistoricalPageName": "上海市第六人民医院",
+      "canonicalName": "上海市第六人民医院",
+      "hospitalId": "h_c3711ecdc4",
+      "addedToAliases": true,
+      "sourceUrl": "https://www.fdygs.com/news2011-2.aspx"
+    },
+    {
+      "year": 2011,
+      "rank": 31,
+      "originalPublishedName": "第三军医大学西南医院",
+      "currentHistoricalPageName": "陆军军医大学第一附属医院",
+      "canonicalName": "陆军军医大学第一附属医院",
+      "hospitalId": "h_a8c9643720",
+      "addedToAliases": true,
+      "sourceUrl": "https://www.fdygs.com/news2011-2.aspx"
+    },
+    {
+      "year": 2011,
+      "rank": 41,
+      "originalPublishedName": "江苏省人民医院",
+      "currentHistoricalPageName": "江苏省人民医院（南京医科大学第一附属医院）",
+      "canonicalName": "江苏省人民医院（南京医科大学第一附属医院）",
+      "hospitalId": "h_b54d59ad90",
+      "addedToAliases": true,
+      "sourceUrl": "https://www.fdygs.com/news2011-2.aspx"
+    },
+    {
+      "year": 2011,
+      "rank": 42,
+      "originalPublishedName": "浙江医科大学附属第二医院",
+      "currentHistoricalPageName": "浙江大学医学院附属第二医院",
+      "canonicalName": "浙江大学医学院附属第二医院",
+      "hospitalId": "h_110675a0fb",
+      "addedToAliases": true,
+      "sourceUrl": "https://www.fdygs.com/news2011-2.aspx"
+    },
+    {
+      "year": 2011,
+      "rank": 50,
+      "originalPublishedName": "中国人民解放军第三零二医院",
+      "currentHistoricalPageName": "中国人民解放军第三〇二医院",
+      "canonicalName": "中国人民解放军第三〇二医院",
+      "hospitalId": "h_54b321e8b0",
+      "addedToAliases": true,
+      "sourceUrl": "https://www.fdygs.com/news2011-2.aspx"
+    },
+    {
+      "year": 2011,
+      "rank": 54,
+      "originalPublishedName": "南京军区南京总医院",
+      "currentHistoricalPageName": "东部战区总医院",
+      "canonicalName": "中国人民解放军东部战区总医院",
+      "hospitalId": "h_3d6078f899",
+      "addedToAliases": true,
+      "sourceUrl": "https://www.fdygs.com/news2011-2.aspx"
+    },
+    {
+      "year": 2011,
+      "rank": 57,
+      "originalPublishedName": "第四军医大学口腔医院",
+      "currentHistoricalPageName": "空军军医大学第三附属医院（口腔医院）",
+      "canonicalName": "空军军医大学第三附属医院（口腔医院）",
+      "hospitalId": "h_9f65d8be8d",
+      "addedToAliases": true,
+      "sourceUrl": "https://www.fdygs.com/news2011-2.aspx"
+    },
+    {
+      "year": 2011,
+      "rank": 58,
+      "originalPublishedName": "中国医学科学院血液学研究所",
+      "currentHistoricalPageName": "中国医学科学院血液病医院（血液学研究所）",
+      "canonicalName": "中国医学科学院血液病医院（研究所）",
+      "hospitalId": "h_340c14831e",
+      "addedToAliases": true,
+      "sourceUrl": "https://www.fdygs.com/news2011-2.aspx"
+    },
+    {
+      "year": 2011,
+      "rank": 63,
+      "originalPublishedName": "天津医科大学附属肿瘤医院",
+      "currentHistoricalPageName": "天津医科大学肿瘤医院",
+      "canonicalName": "天津医科大学肿瘤医院",
+      "hospitalId": "h_aaa6ef055b",
+      "addedToAliases": true,
+      "sourceUrl": "https://www.fdygs.com/news2011-2.aspx"
+    },
+    {
+      "year": 2011,
+      "rank": 65,
+      "originalPublishedName": "西安交通大学医学院第一附属医院",
+      "currentHistoricalPageName": "西安交通大学第一附属医院",
+      "canonicalName": "西安交通大学第一附属医院",
+      "hospitalId": "h_9d0d64e5e3",
+      "addedToAliases": true,
+      "sourceUrl": "https://www.fdygs.com/news2011-2.aspx"
+    },
+    {
+      "year": 2011,
+      "rank": 66,
+      "originalPublishedName": "山东省肿瘤医院",
+      "currentHistoricalPageName": "山东省肿瘤医院暨山东省肿瘤防治研究院",
+      "canonicalName": "山东省肿瘤医院暨山东省肿瘤防治研究院",
+      "hospitalId": "h_8405b53dbb",
+      "addedToAliases": true,
+      "sourceUrl": "https://www.fdygs.com/news2011-2.aspx"
+    },
+    {
+      "year": 2011,
+      "rank": 70,
+      "originalPublishedName": "第三军医大学新桥医院",
+      "currentHistoricalPageName": "陆军军医大学第二附属医院",
+      "canonicalName": "陆军军医大学第二附属医院",
+      "hospitalId": "h_3368537b49",
+      "addedToAliases": true,
+      "sourceUrl": "https://www.fdygs.com/news2011-2.aspx"
+    },
+    {
+      "year": 2011,
+      "rank": 71,
+      "originalPublishedName": "第四军医大学唐都医院",
+      "currentHistoricalPageName": "空军军医大学唐都医院",
+      "canonicalName": "空军军医大学第二附属医院(唐都医院)",
+      "hospitalId": "h_79997b8bd1",
+      "addedToAliases": true,
+      "sourceUrl": "https://www.fdygs.com/news2011-2.aspx"
+    },
+    {
+      "year": 2011,
+      "rank": 74,
+      "originalPublishedName": "上海交通大学医学院附属第一人民医院",
+      "currentHistoricalPageName": "上海市第一人民医院",
+      "canonicalName": "上海市第一人民医院",
+      "hospitalId": "h_1a7b8941a8",
+      "addedToAliases": true,
+      "sourceUrl": "https://www.fdygs.com/news2011-2.aspx"
+    },
+    {
+      "year": 2011,
+      "rank": 78,
+      "originalPublishedName": "第三军医大学大坪医院",
+      "currentHistoricalPageName": "陆军军医大学第三附属医院",
+      "canonicalName": "陆军军医大学第三附属医院",
+      "hospitalId": "h_a00ae031dc",
+      "addedToAliases": true,
+      "sourceUrl": "https://www.fdygs.com/news2011-2.aspx"
+    },
+    {
+      "year": 2011,
+      "rank": 83,
+      "originalPublishedName": "西安交通大学医学院第二附属医院",
+      "currentHistoricalPageName": "西安交通大学第二附属医院",
+      "canonicalName": "西安交通大学第二附属医院",
+      "hospitalId": "h_1bdedddaab",
+      "addedToAliases": true,
+      "sourceUrl": "https://www.fdygs.com/news2011-2.aspx"
+    },
+    {
+      "year": 2011,
+      "rank": 85,
+      "originalPublishedName": "同济大学附属上海市肺科医院",
+      "currentHistoricalPageName": "上海市肺科医院",
+      "canonicalName": "上海市肺科医院",
+      "hospitalId": "h_2dca56453f",
+      "addedToAliases": true,
+      "sourceUrl": "https://www.fdygs.com/news2011-2.aspx"
+    }
+  ]
+}
