@@ -10,11 +10,22 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import hashlib
 import json
 import re
 import unicodedata
 from pathlib import Path
 from typing import Any
+
+NEW_ENTITY_OVERRIDES = {
+    "天津市眼科医院": {
+        "aliases": ["天津市立眼科医院", "南开大学附属眼科医院"],
+        "province": "天津市",
+        "city": "天津市",
+        "reason": "仅出现在旧库缺失的2011年度；复旦2011综合榜第98名",
+        "metadataEvidence": "https://www.oio.cn/",
+    }
+}
 
 
 def norm(value: str) -> str:
@@ -59,6 +70,20 @@ def match_entity(source_name: str, hospitals: list[dict[str, Any]]) -> tuple[dic
     return None, "entity-unmatched", 0.0
 
 
+def create_explicit_entity(source_name: str) -> dict[str, Any] | None:
+    override = NEW_ENTITY_OVERRIDES.get(source_name)
+    if not override:
+        return None
+    hospital_id = "h_" + hashlib.sha1(norm(source_name).encode("utf-8")).hexdigest()[:10]
+    return {
+        "id": hospital_id,
+        "name": source_name,
+        "aliases": sorted(set(override["aliases"])),
+        "province": override["province"],
+        "city": override["city"],
+    }
+
+
 def normalized_record(source: dict[str, Any], hospital_id: str, mode: str) -> dict[str, Any]:
     row: dict[str, Any] = {
         "hospitalId": hospital_id,
@@ -96,18 +121,40 @@ def main() -> int:
     audit = load(audit_path)
 
     hospitals = candidate["hospitals"]
+    existing_ids = {hospital["id"] for hospital in hospitals}
     source_by_year = {int(block["year"]): block for block in snapshot["years"]}
     candidate_by_year = {int(block["year"]): block for block in candidate["years"]}
 
     recovered: list[dict[str, Any]] = []
     remaining: list[dict[str, Any]] = []
     fuzzy: list[dict[str, Any]] = []
+    created: list[dict[str, Any]] = []
 
     for missing in audit.get("unmatchedSource", []):
         year = int(missing["year"])
         source_block = source_by_year[year]
         source = next(record for record in source_block["records"] if record["sourceName"] == missing["sourceName"])
         entity, method, score = match_entity(source["sourceName"], hospitals)
+
+        if entity is None:
+            entity = create_explicit_entity(source["sourceName"])
+            if entity:
+                if entity["id"] in existing_ids:
+                    raise RuntimeError(f"explicit hospital id collision: {entity['id']}")
+                hospitals.append(entity)
+                existing_ids.add(entity["id"])
+                override = NEW_ENTITY_OVERRIDES[source["sourceName"]]
+                created.append({
+                    "year": year,
+                    "sourceName": source["sourceName"],
+                    "hospitalId": entity["id"],
+                    "province": entity["province"],
+                    "city": entity["city"],
+                    "reason": override["reason"],
+                    "metadataEvidence": override["metadataEvidence"],
+                })
+                method, score = "explicit-new-entity", 1.0
+
         if entity is None:
             remaining.append({**missing, "entityBestScore": round(score, 4), "entityMethod": method})
             continue
@@ -132,16 +179,21 @@ def main() -> int:
         if method == "entity-fuzzy":
             fuzzy.append(recovered[-1])
 
-    # Preserve source table order for every year.
+    # Preserve official source-table order for every year; grade years may later use a
+    # separate auxiliary display sort in the frontend, but source order remains intact here.
     for year, block in candidate_by_year.items():
         source_order = {record["sourceName"]: index for index, record in enumerate(source_by_year[year]["records"])}
         block["records"].sort(key=lambda record: source_order.get(record["sourceName"], 10**9))
+    hospitals.sort(key=lambda hospital: hospital["name"])
 
     audit["entityRecovery"] = recovered
     audit["entityRecoveryFuzzy"] = fuzzy
+    audit["newEntities"] = created
     audit["unmatchedSource"] = remaining
     audit["summary"]["entityRecovered"] = len(recovered)
     audit["summary"]["entityRecoveryFuzzy"] = len(fuzzy)
+    audit["summary"]["newEntities"] = len(created)
+    audit["summary"]["hospitalEntities"] = len(hospitals)
     audit["summary"]["unmatchedSource"] = len(remaining)
     audit["status"] = "ok" if not remaining and not audit.get("unmatchedLegacy") else "needs-review"
 
@@ -156,7 +208,9 @@ def main() -> int:
     print(json.dumps({
         "recovered": len(recovered),
         "fuzzy": len(fuzzy),
+        "newEntities": len(created),
         "remaining": len(remaining),
+        "hospitalEntities": len(hospitals),
         "status": audit["status"],
     }, ensure_ascii=False, indent=2))
     if remaining:
