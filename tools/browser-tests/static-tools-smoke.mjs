@@ -18,6 +18,18 @@ async function routeJson(page, pattern, payload, status = 200) {
     });
 }
 
+async function routePconline(page, payload) {
+    await page.route('**/whois.pconline.com.cn/**', async (route) => {
+        const callback = new URL(route.request().url()).searchParams.get('callback');
+        assert.ok(callback, 'PConline JSONP callback should be present');
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/javascript; charset=utf-8',
+            body: `${callback}(${JSON.stringify(payload)});`
+        });
+    });
+}
+
 async function createMyIpContext() {
     const context = await browser.newContext();
     await context.addInitScript(() => {
@@ -63,18 +75,20 @@ async function testMyIpSplitRouting() {
     const context = await createMyIpContext();
     const page = await context.newPage();
     const pageErrors = [];
+    let domesticFallbackCalls = 0;
     page.on('pageerror', (error) => pageErrors.push(error));
 
-    await routeJson(page, '**/api.bilibili.com/**', {
-        code: 0,
-        message: '0',
-        data: {
-            addr: '203.0.113.10',
-            country: '中国',
-            province: '四川',
-            city: '成都',
-            isp: '示例运营商'
-        }
+    await routePconline(page, {
+        ip: '203.0.113.10',
+        pro: '四川省',
+        city: '成都市',
+        region: '',
+        addr: '四川省成都市 示例运营商'
+    });
+    await page.route('**/api.bilibili.com/**', async (route) => {
+        domesticFallbackCalls += 1;
+        await routeJson(page, '**/never-used/**', {});
+        await route.fulfill({ status: 500, contentType: 'application/json', body: '{}' });
     });
     await routeJson(page, '**/api.ip.sb/**', {
         ip: '198.51.100.20',
@@ -91,6 +105,7 @@ async function testMyIpSplitRouting() {
     await page.goto(`${baseUrl}/tools/myip/`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => document.querySelector('#summary-status')?.textContent === '已分流');
 
+    assert.equal(domesticFallbackCalls, 0, 'domestic HTTPS fallback should not run when PConline succeeds');
     assert.equal(await page.locator('#domestic-ipv4').textContent(), '203.0.113.10');
     assert.equal(await page.locator('#international-ipv4').textContent(), '198.51.100.20');
     assert.equal(await page.locator('#international-ipv6').textContent(), '2001:db8::20');
@@ -109,24 +124,20 @@ async function testMyIpDomesticFallbackAndOptionalIpv6() {
     let domesticPrimaryAttempts = 0;
     page.on('pageerror', (error) => pageErrors.push(error));
 
-    await page.route('**/api.bilibili.com/**', async (route) => {
-        domesticPrimaryAttempts += 1;
-        await route.fulfill({ status: 503, contentType: 'application/json', body: '{}' });
-    });
     await page.route('**/whois.pconline.com.cn/**', async (route) => {
-        const callback = new URL(route.request().url()).searchParams.get('callback');
-        assert.ok(callback, 'PConline JSONP callback should be present');
-        await route.fulfill({
-            status: 200,
-            contentType: 'application/javascript; charset=utf-8',
-            body: `${callback}(${JSON.stringify({
-                ip: '203.0.113.30',
-                pro: '四川省',
-                city: '成都市',
-                region: '',
-                addr: '四川省成都市 示例运营商'
-            })});`
-        });
+        domesticPrimaryAttempts += 1;
+        await route.abort();
+    });
+    await routeJson(page, '**/api.bilibili.com/**', {
+        code: 0,
+        message: '0',
+        data: {
+            addr: '203.0.113.30',
+            country: '中国',
+            province: '四川',
+            city: '成都',
+            isp: '示例运营商'
+        }
     });
     await routeJson(page, '**/api.ip.sb/**', { error: 'temporary' }, 503);
     await routeJson(page, '**/api.ipify.org/**', { ip: '198.51.100.77' });
@@ -154,6 +165,7 @@ async function testMyIpAllFailuresReachFinalState() {
     const pageErrors = [];
     page.on('pageerror', (error) => pageErrors.push(error));
 
+    await page.route('**/whois.pconline.com.cn/**', (route) => route.abort());
     for (const pattern of [
         '**/api.bilibili.com/**',
         '**/api.ip.sb/**',
@@ -163,7 +175,6 @@ async function testMyIpAllFailuresReachFinalState() {
         await routeJson(page, pattern, { error: 'unavailable' }, 503);
     }
     await page.route('**/api6.ipify.org/**', (route) => route.abort());
-    await page.route('**/whois.pconline.com.cn/**', (route) => route.abort());
     await page.route('**/googletagmanager.com/**', (route) => route.abort());
 
     await page.goto(`${baseUrl}/tools/myip/`, { waitUntil: 'domcontentloaded' });
