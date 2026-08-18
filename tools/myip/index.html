@@ -9,8 +9,8 @@
     <link rel="shortcut icon" href="/images/favicon.ico">
     <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
     <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
-    <link rel="stylesheet" href="style.css?v=20260818-5">
-    <script src="app.js?v=20260818-5" defer></script>
+    <link rel="stylesheet" href="style.css?v=20260818-6">
+    <script src="app.js?v=20260818-6" defer></script>
     <title>IP 地址与分流检测</title>
 </head>
 <body>
@@ -54,7 +54,7 @@
                     <span id="domestic-ip-label">IPv4</span>
                     <strong id="domestic-ipv4" aria-live="polite">检测中…</strong>
                 </div>
-                <p id="domestic-detail" class="detail-text">正在获取地区和运营商信息…</p>
+                <p id="domestic-detail" class="detail-text">正在获取地区、运营商和多来源一致性…</p>
             </article>
 
             <article class="ip-card" aria-labelledby="international-title">
@@ -70,28 +70,42 @@
                     <span>IPv6</span>
                     <strong id="international-ipv6" aria-live="polite">检测中…</strong>
                 </div>
-                <p id="international-detail" class="detail-text">正在获取地区和运营商信息…</p>
+                <p id="international-detail" class="detail-text">正在获取地区、运营商和多来源一致性…</p>
             </article>
         </section>
 
-        <p class="plain-note">国内、国际地址不同通常表示规则分流正在使用不同出口；地址相同则可能是直连、全局代理或命中了同一路径。</p>
+        <p class="plain-note">主卡按固定优先级采用一个结果；其他来源若返回不同 IP，会保留在检测详情中。</p>
 
         <details class="details-card" open>
             <summary>检测详情</summary>
             <div class="source-list">
                 <article class="source-row">
                     <div>
-                        <h3>国内主检测 · 太平洋网络</h3>
-                        <p id="source-pconline-detail" class="detail-text">whois.pconline.com.cn · 检测访问国内站点时看到的公网 IP</p>
+                        <h3>国内检测 1 · 太平洋网络</h3>
+                        <p id="source-pconline-detail" class="detail-text">whois.pconline.com.cn · 国内检测优先 1</p>
                     </div>
                     <span id="source-pconline-status" class="status-pill status-loading">检测中</span>
                 </article>
                 <article class="source-row">
                     <div>
-                        <h3>国内备用 · IPW</h3>
-                        <p id="source-ipw-detail" class="detail-text">4.ipw.cn · 国内路径备用检测</p>
+                        <h3>国内检测 2 · 搜狐</h3>
+                        <p id="source-sohu-detail" class="detail-text">pv.sohu.com · 国内检测优先 2</p>
                     </div>
-                    <span id="source-ipw-status" class="status-pill status-loading">检测中</span>
+                    <span id="source-sohu-status" class="status-pill status-loading">检测中</span>
+                </article>
+                <article class="source-row">
+                    <div>
+                        <h3>国内检测 3 · 腾讯新闻</h3>
+                        <p id="source-tencent-detail" class="detail-text">r.inews.qq.com · 国内检测优先 3</p>
+                    </div>
+                    <span id="source-tencent-status" class="status-pill status-loading">检测中</span>
+                </article>
+                <article class="source-row">
+                    <div>
+                        <h3>国内检测 4 · IPIP.NET</h3>
+                        <p id="source-ipip-detail" class="detail-text">myip.ipip.net · 国内检测优先 4</p>
+                    </div>
+                    <span id="source-ipip-status" class="status-pill status-loading">检测中</span>
                 </article>
                 <article class="source-row">
                     <div>
@@ -102,38 +116,38 @@
                 </article>
                 <article class="source-row">
                     <div>
-                        <h3>本站国际检测 · Cloudflare Worker</h3>
-                        <p id="source-firstparty-detail" class="detail-text">myip.cfw3.workers.dev · 国际主结果</p>
+                        <h3>国际检测 1 · 本站 Cloudflare Worker</h3>
+                        <p id="source-firstparty-detail" class="detail-text">myip.cfw3.workers.dev · 国际检测优先 1</p>
                     </div>
                     <span id="source-firstparty-status" class="status-pill status-loading">检测中</span>
                 </article>
                 <article class="source-row">
                     <div>
-                        <h3>IP.SB</h3>
-                        <p id="source-ipsb-detail" class="detail-text">api.ip.sb · 国际出口复核</p>
+                        <h3>国际检测 2 · IP.SB</h3>
+                        <p id="source-ipsb-detail" class="detail-text">api.ip.sb · 国际检测优先 2</p>
                     </div>
                     <span id="source-ipsb-status" class="status-pill status-loading">检测中</span>
                 </article>
                 <article class="source-row">
                     <div>
-                        <h3>IPify IPv4</h3>
-                        <p id="source-ipify4-detail" class="detail-text">api.ipify.org · IPv4 复核</p>
+                        <h3>国际检测 3 · IPify IPv4</h3>
+                        <p id="source-ipify4-detail" class="detail-text">api.ipify.org · 国际检测优先 3</p>
                     </div>
                     <span id="source-ipify4-status" class="status-pill status-loading">检测中</span>
                 </article>
                 <article class="source-row">
                     <div>
-                        <h3>IPify IPv6</h3>
-                        <p id="source-ipify6-detail" class="detail-text">api6.ipify.org · IPv6 复核</p>
+                        <h3>国际检测 4 · IPWho.is</h3>
+                        <p id="source-backup-detail" class="detail-text">ipwho.is · 国际检测优先 4</p>
                     </div>
-                    <span id="source-ipify6-status" class="status-pill status-loading">检测中</span>
+                    <span id="source-backup-status" class="status-pill status-loading">检测中</span>
                 </article>
                 <article class="source-row">
                     <div>
-                        <h3>IPWho.is（备用）</h3>
-                        <p id="source-backup-detail" class="detail-text">ipwho.is · 国际备用检测</p>
+                        <h3>IPv6 补充 · IPify</h3>
+                        <p id="source-ipify6-detail" class="detail-text">api6.ipify.org · IPv6 补充检测</p>
                     </div>
-                    <span id="source-backup-status" class="status-pill status-loading">检测中</span>
+                    <span id="source-ipify6-status" class="status-pill status-loading">检测中</span>
                 </article>
             </div>
         </details>

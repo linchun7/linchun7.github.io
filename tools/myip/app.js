@@ -18,6 +18,9 @@
     let activeRunId = 0;
     const $ = (id) => document.getElementById(id);
 
+    const DOMESTIC_PRIORITY = ['pconline', 'sohu', 'tencent', 'ipip'];
+    const INTERNATIONAL_IPV4_PRIORITY = ['firstparty', 'ipsb', 'ipify4', 'backup'];
+
     function normalizeText(value) {
         if (value === null || value === undefined) return '';
         return String(value).trim();
@@ -153,15 +156,6 @@
         return response.json();
     }
 
-    async function fetchText(url, timeoutMs = REQUEST_TIMEOUT_MS) {
-        const response = await fetchWithTimeout(url, {
-            method: 'GET',
-            mode: 'cors',
-            headers: { Accept: 'text/plain' }
-        }, timeoutMs);
-        return response.text();
-    }
-
     function formatError(error) {
         if (!error) return '未响应';
         if (error.name === 'TimeoutError') return '连接超时';
@@ -199,13 +193,14 @@
         }
     }
 
-    function makeObservation(ip, source, detail = '', role = 'verification') {
+    function makeObservation(ip, source, detail = '', role = 'verification', sourceId = '') {
         const normalized = normalizeText(ip);
         if (!isPublicIpAddress(normalized)) throw new Error(`${source} 返回了非公网 IP，已忽略`);
         return {
             ip: normalized,
             family: ipFamily(normalized),
             source,
+            sourceId,
             detail: normalizeText(detail),
             role
         };
@@ -261,12 +256,7 @@
         const domestic = preferredObservation('domestic', family);
         const international = preferredObservation('international', family);
         if (!domestic || !international) return null;
-        return {
-            family,
-            same: domestic.ip === international.ip,
-            domestic,
-            international
-        };
+        return { family, same: domestic.ip === international.ip, domestic, international };
     }
 
     function renderSummary() {
@@ -344,14 +334,16 @@
     }
 
     function resetSources() {
-        setSource('pconline', 'loading', '检测中', 'whois.pconline.com.cn · 检测访问国内站点时看到的公网 IP');
-        setSource('ipw', 'loading', '检测中', '4.ipw.cn · 国内路径备用检测');
+        setSource('pconline', 'loading', '检测中', 'whois.pconline.com.cn · 国内检测优先 1');
+        setSource('sohu', 'loading', '检测中', 'pv.sohu.com · 国内检测优先 2');
+        setSource('tencent', 'loading', '检测中', 'r.inews.qq.com · 国内检测优先 3');
+        setSource('ipip', 'loading', '检测中', 'myip.ipip.net · 国内检测优先 4');
         setSource('localref', 'loading', '检测中', 'STUN：stun.cloudflare.com / stun.l.google.com · 仅供参考，不参与分流判断');
-        setSource('firstparty', 'loading', '检测中', 'myip.cfw3.workers.dev · 国际主结果');
-        setSource('ipsb', 'loading', '检测中', 'api.ip.sb · 国际出口复核');
-        setSource('ipify4', 'loading', '检测中', 'api.ipify.org · IPv4 复核');
-        setSource('ipify6', 'loading', '检测中', 'api6.ipify.org · IPv6 复核');
-        setSource('backup', 'loading', '检测中', 'ipwho.is · 国际备用检测');
+        setSource('firstparty', 'loading', '检测中', 'myip.cfw3.workers.dev · 国际检测优先 1');
+        setSource('ipsb', 'loading', '检测中', 'api.ip.sb · 国际检测优先 2');
+        setSource('ipify4', 'loading', '检测中', 'api.ipify.org · 国际检测优先 3');
+        setSource('backup', 'loading', '检测中', 'ipwho.is · 国际检测优先 4');
+        setSource('ipify6', 'loading', '检测中', 'api6.ipify.org · IPv6 补充检测');
     }
 
     function loadJsonp(baseUrl, timeoutMs = REQUEST_TIMEOUT_MS) {
@@ -363,13 +355,8 @@
             const cleanup = () => {
                 window.clearTimeout(timer);
                 script.remove();
-                try {
-                    delete window[callbackName];
-                } catch {
-                    window[callbackName] = undefined;
-                }
+                try { delete window[callbackName]; } catch { window[callbackName] = undefined; }
             };
-
             const finish = (handler, value) => {
                 if (settled) return;
                 settled = true;
@@ -384,6 +371,41 @@
 
             const url = new URL(baseUrl);
             url.searchParams.set('callback', callbackName);
+            url.searchParams.set('_', String(Date.now()));
+            script.src = url.href;
+
+            const timer = window.setTimeout(() => finish(reject, createTimeoutError()), timeoutMs);
+            document.head.appendChild(script);
+        });
+    }
+
+    function loadGlobalScript(baseUrl, globalName, timeoutMs = REQUEST_TIMEOUT_MS) {
+        return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            let settled = false;
+            try { delete window[globalName]; } catch { window[globalName] = undefined; }
+
+            const cleanup = () => {
+                window.clearTimeout(timer);
+                script.remove();
+            };
+            const finish = (handler, value) => {
+                if (settled) return;
+                settled = true;
+                cleanup();
+                handler(value);
+            };
+
+            script.async = true;
+            script.referrerPolicy = 'no-referrer';
+            script.onerror = () => finish(reject, new Error('加载失败'));
+            script.onload = () => {
+                const payload = window[globalName];
+                if (!payload) return finish(reject, new Error('未返回结果'));
+                finish(resolve, payload);
+            };
+
+            const url = new URL(baseUrl);
             url.searchParams.set('_', String(Date.now()));
             script.src = url.href;
 
@@ -418,14 +440,31 @@
     async function loadPconline() {
         const payload = await loadJsonp('https://whois.pconline.com.cn/ipJson.jsp');
         const ip = normalizeText(payload && payload.ip);
-        const detail = domesticLocationDetail(payload, ip);
-        return makeObservation(ip, '太平洋网络', detail, 'domestic-primary');
+        return makeObservation(ip, '太平洋网络', domesticLocationDetail(payload, ip), 'domestic', 'pconline');
     }
 
-    async function loadIpw() {
-        const text = normalizeText(await fetchText('https://4.ipw.cn/'));
-        const ip = text.split(/\s+/)[0];
-        return makeObservation(ip, 'IPW', '', 'domestic-backup');
+    async function loadSohu() {
+        const payload = await loadGlobalScript('https://pv.sohu.com/cityjson?ie=utf-8', 'returnCitySN');
+        return makeObservation(payload && payload.cip, '搜狐', normalizeText(payload && payload.cname), 'domestic', 'sohu');
+    }
+
+    async function loadTencent() {
+        const payload = await loadJsonp('https://r.inews.qq.com/api/ip2city?otype=jsonp');
+        const detail = joinUniqueText([
+            payload && payload.country,
+            payload && payload.province,
+            payload && payload.city,
+            payload && payload.district,
+            payload && payload.isp
+        ]);
+        return makeObservation(payload && payload.ip, '腾讯新闻', detail, 'domestic', 'tencent');
+    }
+
+    async function loadIpip() {
+        const payload = await fetchJson('https://myip.ipip.net/json');
+        if (!payload || payload.ret !== 'ok' || !payload.data) throw new Error('返回格式不正确');
+        const location = Array.isArray(payload.data.location) ? payload.data.location : [];
+        return makeObservation(payload.data.ip, 'IPIP.NET', joinUniqueText(location), 'domestic', 'ipip');
     }
 
     function getCandidateAddress(candidate) {
@@ -442,7 +481,6 @@
 
         let pc;
         const found = [];
-
         try {
             pc = new PeerConnection({
                 iceServers: [
@@ -490,7 +528,7 @@
         }
 
         const preferred = found.find((ip) => ipFamily(ip) === 4) || found[0];
-        return preferred ? makeObservation(preferred, '本机网络参考', '', 'network-reference') : null;
+        return preferred ? makeObservation(preferred, '本机网络参考', '', 'network-reference', 'localref') : null;
     }
 
     async function loadLocalReference(runId) {
@@ -527,66 +565,93 @@
         }
     }
 
-    async function loadDomestic(runId) {
-        const pconlineTask = (async () => {
-            try {
-                const observation = await loadPconline();
-                if (runId !== activeRunId) return null;
+    function agreementSummary(observations, family) {
+        const relevant = observations.filter((item) => item.family === family);
+        if (!relevant.length) return '';
+        const unique = new Set(relevant.map((item) => item.ip));
+        if (relevant.length === 1) return '仅 1 个来源成功';
+        if (unique.size === 1) return `${relevant.length} 个来源一致`;
+        return `发现 ${unique.size} 个不同出口`;
+    }
+
+    function sourceOutcomeStatus(observation, adopted) {
+        if (!observation || !adopted) return null;
+        if (observation.sourceId === adopted.sourceId) return { state: 'success', text: '采用' };
+        if (observation.family !== adopted.family) return { state: 'success', text: `IPv${observation.family}` };
+        if (observation.ip === adopted.ip) return { state: 'success', text: '一致' };
+        return { state: 'warning', text: '其他出口' };
+    }
+
+    function adoptedOrderedObservations(observations, adopted) {
+        if (!adopted) return observations;
+        return [adopted, ...observations.filter((item) => item !== adopted)];
+    }
+
+    async function runDomesticSource(runId, config) {
+        try {
+            const observation = await config.loader();
+            if (runId !== activeRunId) return { ...config, status: 'stale', observation: null };
+            return { ...config, status: 'success', observation };
+        } catch (error) {
+            if (runId !== activeRunId) return { ...config, status: 'stale', observation: null };
+            return { ...config, status: 'error', observation: null, error };
+        }
+    }
+
+    function renderDomesticSourceOutcomes(outcomes, adopted) {
+        for (const outcome of outcomes) {
+            const { id, endpoint, priority, observation, error } = outcome;
+            if (observation) {
+                const status = sourceOutcomeStatus(observation, adopted);
                 setSource(
-                    'pconline',
-                    'success',
-                    '正常',
-                    joinText(['whois.pconline.com.cn', `IPv${observation.family} ${observation.ip}`, observation.detail, '国内主检测'])
+                    id,
+                    status.state,
+                    status.text,
+                    joinText([endpoint, `IPv${observation.family} ${observation.ip}`, observation.detail, `国内检测优先 ${priority}`])
                 );
-                return observation;
-            } catch (error) {
-                if (runId !== activeRunId) return null;
+            } else {
                 const invalid = /非公网 IP/.test(formatError(error));
                 setSource(
-                    'pconline',
+                    id,
                     'warning',
                     invalid ? '已忽略' : '未响应',
-                    joinText(['whois.pconline.com.cn', formatError(error), '国内主检测'])
+                    joinText([endpoint, formatError(error), `国内检测优先 ${priority}`])
                 );
-                return null;
             }
-        })();
+        }
+    }
 
-        const ipwTask = (async () => {
-            try {
-                const observation = await loadIpw();
-                if (runId !== activeRunId) return null;
-                setSource('ipw', 'success', '备用正常', `4.ipw.cn · IPv${observation.family} ${observation.ip} · 国内路径备用检测`);
-                return observation;
-            } catch (error) {
-                if (runId !== activeRunId) return null;
-                const invalid = /非公网 IP/.test(formatError(error));
-                setSource(
-                    'ipw',
-                    'warning',
-                    invalid ? '备用已忽略' : '备用未响应',
-                    joinText(['4.ipw.cn', formatError(error), '国内路径备用检测'])
-                );
-                return null;
-            }
-        })();
+    async function loadDomestic(runId) {
+        const configs = [
+            { id: 'pconline', endpoint: 'whois.pconline.com.cn', priority: 1, loader: loadPconline },
+            { id: 'sohu', endpoint: 'pv.sohu.com', priority: 2, loader: loadSohu },
+            { id: 'tencent', endpoint: 'r.inews.qq.com', priority: 3, loader: loadTencent },
+            { id: 'ipip', endpoint: 'myip.ipip.net', priority: 4, loader: loadIpip }
+        ];
 
-        const [pconline, ipw] = await Promise.all([pconlineTask, ipwTask]);
+        const outcomes = await Promise.all(configs.map((config) => runDomesticSource(runId, config)));
         if (runId !== activeRunId) return;
-        const observations = [pconline, ipw].filter(Boolean);
 
-        if (observations.length) {
-            const preferred = observations[0];
+        const observations = outcomes.filter((item) => item.observation).map((item) => item.observation);
+        const adopted = DOMESTIC_PRIORITY
+            .map((id) => observations.find((item) => item.sourceId === id && item.family === 4))
+            .find(Boolean)
+            || DOMESTIC_PRIORITY.map((id) => observations.find((item) => item.sourceId === id)).find(Boolean)
+            || null;
+
+        renderDomesticSourceOutcomes(outcomes, adopted);
+
+        if (adopted) {
             routeResults.domestic = {
                 status: 'success',
-                observations,
-                detail: preferred.detail || `来源：${preferred.source}${preferred.role === 'domestic-backup' ? ' 备用检测' : ''}`
+                observations: adoptedOrderedObservations(observations, adopted),
+                detail: joinText([adopted.detail, agreementSummary(observations, adopted.family)])
             };
         } else {
             routeResults.domestic = {
                 status: 'loading',
                 observations: [],
-                detail: '国内检测服务暂未响应，正在整理参考结果…'
+                detail: '国内检测源均未返回可用公网 IP，正在整理参考结果…'
             };
         }
         renderRoute('domestic');
@@ -603,96 +668,150 @@
         ]);
     }
 
-    async function internationalTask(runId, id, successLabel, endpoint, loader) {
+    async function runInternationalSource(runId, config) {
         try {
-            const result = await loader();
-            if (runId !== activeRunId) return [];
-            const observations = Array.isArray(result) ? result : [result];
-            const valid = observations.filter(Boolean);
-            if (!valid.length) throw new Error('未返回公网 IP');
-            const resultDetail = valid
-                .map((item) => joinText([`IPv${item.family} ${item.ip}`, item.detail]))
-                .join(' / ');
-            setSource(id, 'success', successLabel, joinText([endpoint, resultDetail]));
-            return valid;
+            const result = await config.loader();
+            if (runId !== activeRunId) return { ...config, status: 'stale', observations: [] };
+            const observations = (Array.isArray(result) ? result : [result]).filter(Boolean);
+            if (!observations.length) throw new Error('未返回公网 IP');
+            return { ...config, status: 'success', observations };
         } catch (error) {
-            if (runId !== activeRunId) return [];
-            const isIpv6 = id === 'ipify6';
-            const isBackup = id === 'backup';
-            setSource(
-                id,
-                isIpv6 ? 'idle' : 'warning',
-                isIpv6 ? '未检测到' : (isBackup ? '备用未响应' : '未响应'),
-                joinText([endpoint, formatError(error)])
-            );
-            return [];
+            if (runId !== activeRunId) return { ...config, status: 'stale', observations: [] };
+            return { ...config, status: 'error', observations: [], error };
+        }
+    }
+
+    function renderInternationalSourceOutcomes(outcomes, adoptedV4, adoptedV6) {
+        for (const outcome of outcomes) {
+            const { id, endpoint, priority, observations, error, ipv6Only } = outcome;
+            if (observations && observations.length) {
+                const v4 = observations.find((item) => item.family === 4);
+                const v6 = observations.find((item) => item.family === 6);
+                const compareTarget = v4 ? adoptedV4 : adoptedV6;
+                const status = sourceOutcomeStatus(v4 || v6, compareTarget);
+                const resultDetail = observations
+                    .map((item) => joinText([`IPv${item.family} ${item.ip}`, item.detail]))
+                    .join(' / ');
+                setSource(
+                    id,
+                    status ? status.state : 'success',
+                    status ? status.text : (ipv6Only ? 'IPv6' : '正常'),
+                    joinText([endpoint, resultDetail, ipv6Only ? 'IPv6 补充检测' : `国际检测优先 ${priority}`])
+                );
+            } else {
+                const isIpv6 = id === 'ipify6';
+                setSource(
+                    id,
+                    isIpv6 ? 'idle' : 'warning',
+                    isIpv6 ? '未检测到' : '未响应',
+                    joinText([endpoint, formatError(error), isIpv6 ? 'IPv6 补充检测' : `国际检测优先 ${priority}`])
+                );
+            }
         }
     }
 
     async function loadInternational(runId) {
         const firstPartyUrl = getFirstPartyProbeUrl();
-        const tasks = [
-            internationalTask(runId, 'firstparty', '正常', 'myip.cfw3.workers.dev', async () => {
-                if (!firstPartyUrl) throw new Error('本站检测地址未配置');
-                const data = await fetchJson(firstPartyUrl);
-                if (!data || data.schemaVersion !== 1 || data.role !== 'international-first-party') throw new Error('返回格式不正确');
-                const detail = firstPartyDetail(data);
-                const observations = [makeObservation(data.ip, '本站国际检测', detail, 'international-primary')];
-                if (data.originalIpv6 && normalizeText(data.originalIpv6) !== normalizeText(data.ip)) {
-                    observations.push(makeObservation(data.originalIpv6, '本站国际检测 IPv6', detail, 'international-primary'));
+        const configs = [
+            {
+                id: 'firstparty',
+                endpoint: 'myip.cfw3.workers.dev',
+                priority: 1,
+                loader: async () => {
+                    if (!firstPartyUrl) throw new Error('本站检测地址未配置');
+                    const data = await fetchJson(firstPartyUrl);
+                    if (!data || data.schemaVersion !== 1 || data.role !== 'international-first-party') throw new Error('返回格式不正确');
+                    const detail = firstPartyDetail(data);
+                    const observations = [makeObservation(data.ip, '本站国际检测', detail, 'international', 'firstparty')];
+                    if (data.originalIpv6 && normalizeText(data.originalIpv6) !== normalizeText(data.ip)) {
+                        observations.push(makeObservation(data.originalIpv6, '本站国际检测 IPv6', detail, 'international', 'firstparty'));
+                    }
+                    return observations;
                 }
-                return observations;
-            }),
-            internationalTask(runId, 'ipsb', '复核正常', 'api.ip.sb', async () => {
-                const data = await fetchJson('https://api.ip.sb/geoip');
-                const detail = joinUniqueText([
-                    data && data.country,
-                    data && data.region,
-                    data && data.city,
-                    data && (data.isp || data.organization || data.asn_organization)
-                ]);
-                return makeObservation(data && data.ip, 'IP.SB', detail);
-            }),
-            internationalTask(runId, 'ipify4', '复核正常', 'api.ipify.org', async () => {
-                const data = await fetchJson('https://api.ipify.org?format=json');
-                if (!data || ipFamily(data.ip) !== 4) throw new Error('未返回 IPv4');
-                return makeObservation(data.ip, 'IPify IPv4');
-            }),
-            internationalTask(runId, 'ipify6', '复核正常', 'api6.ipify.org', async () => {
-                const data = await fetchJson('https://api6.ipify.org?format=json', IPV6_TIMEOUT_MS);
-                if (!data || ipFamily(data.ip) !== 6) throw new Error('未返回 IPv6');
-                return makeObservation(data.ip, 'IPify IPv6');
-            }),
-            internationalTask(runId, 'backup', '备用正常', 'ipwho.is', async () => {
-                const data = await fetchJson('https://ipwho.is/');
-                if (!data || data.success === false) throw new Error('备用服务未返回结果');
-                const detail = joinUniqueText([
-                    data.country,
-                    data.region,
-                    data.city,
-                    data.connection && (data.connection.isp || data.connection.org)
-                ]);
-                return makeObservation(data.ip, 'IPWho.is', detail, 'international-backup');
-            })
+            },
+            {
+                id: 'ipsb',
+                endpoint: 'api.ip.sb',
+                priority: 2,
+                loader: async () => {
+                    const data = await fetchJson('https://api.ip.sb/geoip');
+                    const detail = joinUniqueText([
+                        data && data.country,
+                        data && data.region,
+                        data && data.city,
+                        data && (data.isp || data.organization || data.asn_organization)
+                    ]);
+                    return makeObservation(data && data.ip, 'IP.SB', detail, 'international', 'ipsb');
+                }
+            },
+            {
+                id: 'ipify4',
+                endpoint: 'api.ipify.org',
+                priority: 3,
+                loader: async () => {
+                    const data = await fetchJson('https://api.ipify.org?format=json');
+                    if (!data || ipFamily(data.ip) !== 4) throw new Error('未返回 IPv4');
+                    return makeObservation(data.ip, 'IPify IPv4', '', 'international', 'ipify4');
+                }
+            },
+            {
+                id: 'backup',
+                endpoint: 'ipwho.is',
+                priority: 4,
+                loader: async () => {
+                    const data = await fetchJson('https://ipwho.is/');
+                    if (!data || data.success === false) throw new Error('备用服务未返回结果');
+                    const detail = joinUniqueText([
+                        data.country,
+                        data.region,
+                        data.city,
+                        data.connection && (data.connection.isp || data.connection.org)
+                    ]);
+                    return makeObservation(data.ip, 'IPWho.is', detail, 'international', 'backup');
+                }
+            },
+            {
+                id: 'ipify6',
+                endpoint: 'api6.ipify.org',
+                priority: 5,
+                ipv6Only: true,
+                loader: async () => {
+                    const data = await fetchJson('https://api6.ipify.org?format=json', IPV6_TIMEOUT_MS);
+                    if (!data || ipFamily(data.ip) !== 6) throw new Error('未返回 IPv6');
+                    return makeObservation(data.ip, 'IPify IPv6', '', 'international', 'ipify6');
+                }
+            }
         ];
 
-        const groups = await Promise.all(tasks);
+        const outcomes = await Promise.all(configs.map((config) => runInternationalSource(runId, config)));
         if (runId !== activeRunId) return;
-        const observations = groups.flat();
 
-        if (observations.length) {
-            const preferred = observations.find((item) => item.family === 4) || observations[0];
+        const observations = outcomes.flatMap((item) => item.observations || []);
+        const adoptedV4 = INTERNATIONAL_IPV4_PRIORITY
+            .map((id) => observations.find((item) => item.sourceId === id && item.family === 4))
+            .find(Boolean) || null;
+        const adoptedV6 = observations.find((item) => item.sourceId === 'firstparty' && item.family === 6)
+            || observations.find((item) => item.sourceId === 'ipify6' && item.family === 6)
+            || observations.find((item) => item.family === 6)
+            || null;
+        const adopted = adoptedV4 || adoptedV6;
+
+        renderInternationalSourceOutcomes(outcomes, adoptedV4, adoptedV6);
+
+        if (adopted) {
+            const ordered = [
+                ...(adoptedV4 ? [adoptedV4] : []),
+                ...(adoptedV6 && adoptedV6 !== adoptedV4 ? [adoptedV6] : []),
+                ...observations.filter((item) => item !== adoptedV4 && item !== adoptedV6)
+            ];
+            const consistency = adoptedV4 ? agreementSummary(observations, 4) : agreementSummary(observations, 6);
             routeResults.international = {
                 status: 'success',
-                observations,
-                detail: preferred.detail || `来源：${preferred.source}`
+                observations: ordered,
+                detail: joinText([adopted.detail, consistency])
             };
         } else {
-            routeResults.international = {
-                status: 'error',
-                observations: [],
-                detail: '国际网站 IP 暂未获取。'
-            };
+            routeResults.international = { status: 'error', observations: [], detail: '国际网站 IP 暂未获取。' };
         }
         renderRoute('international');
     }
@@ -714,11 +833,7 @@
         if (routeResults.international.status === 'success') {
             const source = preferredAnyObservation('international');
             if (source) {
-                const reference = {
-                    ...source,
-                    source: '已确认公网 IP',
-                    role: 'generic-reference'
-                };
+                const reference = { ...source, source: '已确认公网 IP', sourceId: 'generic-reference', role: 'generic-reference' };
                 routeResults.domestic = {
                     status: 'reference',
                     observations: [reference],
@@ -729,11 +844,7 @@
             }
         }
 
-        routeResults.domestic = {
-            status: 'error',
-            observations: [],
-            detail: '国内网站 IP 暂未确认。'
-        };
+        routeResults.domestic = { status: 'error', observations: [], detail: '国内网站 IP 暂未确认。' };
         renderRoute('domestic');
     }
 
@@ -742,6 +853,7 @@
         const runId = activeRunId;
         resetRoutes();
         resetSources();
+
         await Promise.all([
             loadDomestic(runId),
             loadInternational(runId),

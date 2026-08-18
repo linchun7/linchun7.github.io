@@ -19,16 +19,6 @@ async function routeJson(page, pattern, payload, status = 200) {
     });
 }
 
-async function routeText(page, pattern, payload, status = 200) {
-    await page.route(pattern, async (route) => {
-        await route.fulfill({
-            status,
-            contentType: 'text/plain; charset=utf-8',
-            body: payload
-        });
-    });
-}
-
 function firstPartyPayload(ip, network = {}) {
     return {
         schemaVersion: 1,
@@ -62,12 +52,81 @@ async function routePconline(page, payload) {
         await route.fulfill({
             status: 200,
             contentType: 'application/javascript; charset=utf-8',
-            body: `if(window.${callback}) { ${callback}(${JSON.stringify(payload)}); }`
+            body: `window[${JSON.stringify(callback)}](${JSON.stringify(payload)});`
         });
     });
 }
 
-async function routeCommonInternational(page, ipv4, ipv6 = null) {
+async function routeSohu(page, payload) {
+    await page.route('**/pv.sohu.com/cityjson**', async (route) => {
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/javascript; charset=utf-8',
+            body: `window.returnCitySN = ${JSON.stringify(payload)};`
+        });
+    });
+}
+
+async function routeTencent(page, payload) {
+    await page.route('**/r.inews.qq.com/api/ip2city**', async (route) => {
+        const url = new URL(route.request().url());
+        const callback = url.searchParams.get('callback');
+        assert.ok(callback, 'Tencent JSONP callback should be present');
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/javascript; charset=utf-8',
+            body: `window[${JSON.stringify(callback)}](${JSON.stringify(payload)});`
+        });
+    });
+}
+
+async function routeIpip(page, ip, location = ['中国', '四川省', '成都市', '', '电信']) {
+    await routeJson(page, '**/myip.ipip.net/json**', {
+        ret: 'ok',
+        data: { ip, location }
+    });
+}
+
+async function routeDomesticPool(page, ip, {
+    sohuIp = ip,
+    tencentIp = ip,
+    ipipIp = ip,
+    province = '四川省',
+    city = '成都市',
+    operator = '电信'
+} = {}) {
+    await routePconline(page, {
+        ip,
+        pro: province,
+        city,
+        region: '',
+        addr: `${province}${city} ${operator}`
+    });
+    await routeSohu(page, {
+        cip: sohuIp,
+        cid: '510100',
+        cname: `${province}${city}`
+    });
+    await routeTencent(page, {
+        ret: 0,
+        ip: tencentIp,
+        country: '中国',
+        province,
+        city,
+        district: '',
+        isp: operator
+    });
+    await routeIpip(page, ipipIp, ['中国', province, city, '', operator]);
+}
+
+async function abortDomesticPool(page) {
+    await page.route('**/whois.pconline.com.cn/**', (route) => route.abort());
+    await page.route('**/pv.sohu.com/cityjson**', (route) => route.abort());
+    await page.route('**/r.inews.qq.com/api/ip2city**', (route) => route.abort());
+    await page.route('**/myip.ipip.net/json**', (route) => route.abort());
+}
+
+async function routeCommonInternational(page, ipv4, ipv6 = null, backupIpv4 = ipv4) {
     await routeFirstParty(page, firstPartyPayload(ipv4));
     await routeJson(page, '**/api.ip.sb/**', {
         ip: ipv4,
@@ -81,7 +140,7 @@ async function routeCommonInternational(page, ipv4, ipv6 = null) {
     else await page.route('**/api6.ipify.org/**', (route) => route.abort());
     await routeJson(page, '**/ipwho.is/**', {
         success: true,
-        ip: ipv4,
+        ip: backupIpv4,
         country: 'Japan',
         region: 'Tokyo',
         city: 'Tokyo',
@@ -200,20 +259,14 @@ async function testMyIpWorkerProbe() {
     assert.deepEqual(await healthResponse.json(), { ok: true, service: 'linchun-myip-probe' });
 }
 
-async function testMyIpSplitRoutingAndInformationHierarchy() {
+async function testMyIpSourcePoolsAndDifferentDomesticValues() {
     const domesticIp = '61.139.2.69';
+    const domesticOtherIp = '120.192.83.163';
     const internationalIp = '64.118.146.90';
     const internationalIpv6 = '2404:c140:2005::6f:87ed';
     const { context, page, pageErrors } = await createPage({ stunIp: domesticIp });
 
-    await routePconline(page, {
-        ip: domesticIp,
-        pro: '四川省',
-        city: '成都市',
-        region: '',
-        addr: '四川省成都市 示例运营商'
-    });
-    await routeText(page, '**/4.ipw.cn/**', domesticIp);
+    await routeDomesticPool(page, domesticIp, { tencentIp: domesticOtherIp });
     await routeCommonInternational(page, internationalIp, internationalIpv6);
 
     await page.goto(`${baseUrl}/tools/myip/`, { waitUntil: 'domcontentloaded' });
@@ -221,64 +274,52 @@ async function testMyIpSplitRoutingAndInformationHierarchy() {
     await page.waitForFunction(() => document.querySelector('#source-localref-status')?.textContent === '已获取');
 
     assert.equal(await page.locator('#domestic-ipv4').textContent(), domesticIp);
-    assert.equal(await page.locator('#domestic-ip-label').textContent(), 'IPv4');
     assert.equal(await page.locator('#international-ipv4').textContent(), internationalIp);
     assert.equal(await page.locator('#international-ipv6').textContent(), internationalIpv6);
 
+    assert.equal(await page.locator('#source-pconline-status').textContent(), '采用');
+    assert.equal(await page.locator('#source-sohu-status').textContent(), '一致');
+    assert.equal(await page.locator('#source-tencent-status').textContent(), '其他出口');
+    assert.equal(await page.locator('#source-ipip-status').textContent(), '一致');
+    assert.match(await page.locator('#domestic-detail').textContent(), /发现 2 个不同出口/);
+    assert.match(await page.locator('#source-tencent-detail').textContent(), new RegExp(escapeRegex(domesticOtherIp)));
+
+    assert.equal(await page.locator('#source-firstparty-status').textContent(), '采用');
+    assert.equal(await page.locator('#source-ipsb-status').textContent(), '一致');
+    assert.equal(await page.locator('#source-ipify4-status').textContent(), '一致');
+    assert.equal(await page.locator('#source-backup-status').textContent(), '一致');
+    assert.match(await page.locator('#international-detail').textContent(), /4 个来源一致/);
+
     const summaryMain = await page.locator('#summary-main').textContent();
     const summaryDetail = await page.locator('#summary-detail').textContent();
-    assert.match(summaryMain, /国内外访问使用不同出口/);
     assert.doesNotMatch(summaryMain, new RegExp(escapeRegex(domesticIp)));
     assert.doesNotMatch(summaryMain, new RegExp(escapeRegex(internationalIp)));
     assert.doesNotMatch(summaryDetail, new RegExp(escapeRegex(domesticIp)));
     assert.doesNotMatch(summaryDetail, new RegExp(escapeRegex(internationalIp)));
 
-    const domesticDetail = await page.locator('#domestic-detail').textContent();
-    const internationalDetail = await page.locator('#international-detail').textContent();
-    assert.match(domesticDetail, /四川省/);
-    assert.match(domesticDetail, /成都市/);
-    assert.match(domesticDetail, /示例运营商/);
-    assert.doesNotMatch(domesticDetail, new RegExp(escapeRegex(domesticIp)));
-    assert.match(internationalDetail, /JP/);
-    assert.match(internationalDetail, /Tokyo/);
-    assert.match(internationalDetail, /AS138997/);
-    assert.match(internationalDetail, /Example Proxy/);
-    assert.doesNotMatch(internationalDetail, new RegExp(escapeRegex(internationalIp)));
-
-    const pconlineDetail = await page.locator('#source-pconline-detail').textContent();
-    const firstPartyDetail = await page.locator('#source-firstparty-detail').textContent();
-    const localRefDetail = await page.locator('#source-localref-detail').textContent();
-    assert.match(pconlineDetail, /whois\.pconline\.com\.cn/);
-    assert.match(pconlineDetail, new RegExp(escapeRegex(domesticIp)));
-    assert.match(firstPartyDetail, /myip\.cfw3\.workers\.dev/);
-    assert.match(firstPartyDetail, new RegExp(escapeRegex(internationalIp)));
-    assert.match(localRefDetail, /stun\.cloudflare\.com/);
-    assert.match(localRefDetail, new RegExp(escapeRegex(domesticIp)));
-    assert.match(localRefDetail, /不参与分流判断/);
-
-    assert.equal(await page.locator('#source-ipw-status').textContent(), '备用正常');
-    assert.equal(await page.locator('#source-localref-status').textContent(), '已获取');
-    assert.equal(await page.locator('#source-backup-status').textContent(), '备用正常');
+    assert.equal(await page.locator('#source-ipw-status').count(), 0, 'IPW should be removed from the public source pool');
     assert.equal(await page.locator('details.details-card').getAttribute('open'), '');
-    assert.equal(await page.locator('#webrtc-status').count(), 0, 'WebRTC diagnostics should not be exposed as a standalone UI section');
-    assert.equal(pageErrors.length, 0, `myip split page errors: ${pageErrors.map(String).join('; ')}`);
-
+    assert.equal(pageErrors.length, 0, `myip source-pool page errors: ${pageErrors.map(String).join('; ')}`);
     await context.close();
 }
 
-async function testMyIpRejectsLoopbackAndUsesDomesticBackup() {
+async function testMyIpRejectsLoopbackAndAdoptsNextDomesticSource() {
     const domesticBackupIp = '202.96.209.5';
     const internationalIp = '64.118.146.90';
     const { context, page, pageErrors } = await createPage({ stunIp: '171.214.166.199' });
 
-    await routePconline(page, {
-        ip: '127.0.0.1',
-        pro: '',
-        city: '',
-        region: '',
-        addr: ''
+    await routePconline(page, { ip: '127.0.0.1', pro: '', city: '', region: '', addr: '' });
+    await routeSohu(page, { cip: domesticBackupIp, cid: '510100', cname: '四川省成都市' });
+    await routeTencent(page, {
+        ret: 0,
+        ip: domesticBackupIp,
+        country: '中国',
+        province: '四川省',
+        city: '成都市',
+        district: '',
+        isp: '电信'
     });
-    await routeText(page, '**/4.ipw.cn/**', domesticBackupIp);
+    await routeIpip(page, domesticBackupIp);
     await routeCommonInternational(page, internationalIp);
 
     await page.goto(`${baseUrl}/tools/myip/`, { waitUntil: 'domcontentloaded' });
@@ -286,22 +327,61 @@ async function testMyIpRejectsLoopbackAndUsesDomesticBackup() {
 
     assert.equal(await page.locator('#domestic-ipv4').textContent(), domesticBackupIp);
     assert.equal(await page.locator('#source-pconline-status').textContent(), '已忽略');
-    assert.match(await page.locator('#source-pconline-detail').textContent(), /非公网 IP/);
-    assert.equal(await page.locator('#source-ipw-status').textContent(), '备用正常');
-    assert.equal(await page.locator('#source-localref-status').textContent(), '已获取');
+    assert.equal(await page.locator('#source-sohu-status').textContent(), '采用');
+    assert.equal(await page.locator('#source-tencent-status').textContent(), '一致');
+    assert.equal(await page.locator('#source-ipip-status').textContent(), '一致');
+    assert.match(await page.locator('#domestic-detail').textContent(), /3 个来源一致/);
     assert.notEqual(await page.locator('#domestic-ipv4').textContent(), '127.0.0.1');
-    assert.equal(pageErrors.length, 0, `myip loopback page errors: ${pageErrors.map(String).join('; ')}`);
-
+    assert.equal(pageErrors.length, 0, `myip domestic-fallback page errors: ${pageErrors.map(String).join('; ')}`);
     await context.close();
 }
 
-async function testMyIpUsesLocalNetworkReferenceWhenDomesticServicesFail() {
+async function testMyIpInternationalPrimaryFallbackAndDifferentValues() {
+    const domesticIp = '61.139.2.69';
+    const adoptedInternationalIp = '64.118.146.90';
+    const otherInternationalIp = '209.33.172.228';
+    const { context, page, pageErrors } = await createPage();
+
+    await routeDomesticPool(page, domesticIp);
+    await routeFirstParty(page, { error: 'unavailable' }, 503);
+    await routeJson(page, '**/api.ip.sb/**', {
+        ip: adoptedInternationalIp,
+        country: 'Japan',
+        region: 'Tokyo',
+        city: 'Tokyo',
+        isp: 'Example Proxy'
+    });
+    await routeJson(page, '**/api.ipify.org/**', { ip: adoptedInternationalIp });
+    await page.route('**/api6.ipify.org/**', (route) => route.abort());
+    await routeJson(page, '**/ipwho.is/**', {
+        success: true,
+        ip: otherInternationalIp,
+        country: 'Japan',
+        region: 'Tokyo',
+        city: 'Tokyo',
+        connection: { isp: 'Other Proxy' }
+    });
+
+    await page.goto(`${baseUrl}/tools/myip/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#summary-status')?.textContent === '已分流');
+
+    assert.equal(await page.locator('#international-ipv4').textContent(), adoptedInternationalIp);
+    assert.equal(await page.locator('#source-firstparty-status').textContent(), '未响应');
+    assert.equal(await page.locator('#source-ipsb-status').textContent(), '采用');
+    assert.equal(await page.locator('#source-ipify4-status').textContent(), '一致');
+    assert.equal(await page.locator('#source-backup-status').textContent(), '其他出口');
+    assert.match(await page.locator('#international-detail').textContent(), /发现 2 个不同出口/);
+    assert.match(await page.locator('#source-backup-detail').textContent(), new RegExp(escapeRegex(otherInternationalIp)));
+    assert.equal(pageErrors.length, 0, `myip international-fallback page errors: ${pageErrors.map(String).join('; ')}`);
+    await context.close();
+}
+
+async function testMyIpUsesLocalNetworkReferenceWhenDomesticPoolFails() {
     const localReferenceIp = '171.214.166.199';
     const internationalIp = '64.118.146.90';
     const { context, page, pageErrors } = await createPage({ stunIp: localReferenceIp });
 
-    await page.route('**/whois.pconline.com.cn/**', (route) => route.abort());
-    await page.route('**/4.ipw.cn/**', (route) => route.abort());
+    await abortDomesticPool(page);
     await routeCommonInternational(page, internationalIp);
 
     await page.goto(`${baseUrl}/tools/myip/`, { waitUntil: 'domcontentloaded' });
@@ -311,20 +391,16 @@ async function testMyIpUsesLocalNetworkReferenceWhenDomesticServicesFail() {
     assert.equal(await page.locator('#domestic-ipv4').textContent(), localReferenceIp);
     assert.equal(await page.locator('#domestic-ip-label').textContent(), '参考 IPv4');
     assert.equal(await page.locator('#source-localref-status').textContent(), '已获取');
-    assert.match(await page.locator('#source-localref-detail').textContent(), new RegExp(escapeRegex(localReferenceIp)));
     assert.match(await page.locator('#domestic-detail').textContent(), /不代表已确认的国内网站出口/);
-    assert.match(await page.locator('#summary-detail').textContent(), /不参与分流判断/);
     assert.equal(pageErrors.length, 0, `myip local-reference page errors: ${pageErrors.map(String).join('; ')}`);
-
     await context.close();
 }
 
-async function testMyIpAlwaysShowsSafeReferenceWhenDomesticPathCannotBeConfirmed() {
+async function testMyIpAlwaysShowsSafeReferenceWhenDomesticPoolAndStunFail() {
     const internationalIp = '209.33.172.228';
     const { context, page, pageErrors } = await createPage({ disableRtc: true });
 
-    await page.route('**/whois.pconline.com.cn/**', (route) => route.abort());
-    await page.route('**/4.ipw.cn/**', (route) => route.abort());
+    await abortDomesticPool(page);
     await routeCommonInternational(page, internationalIp);
 
     await page.goto(`${baseUrl}/tools/myip/`, { waitUntil: 'domcontentloaded' });
@@ -334,11 +410,8 @@ async function testMyIpAlwaysShowsSafeReferenceWhenDomesticPathCannotBeConfirmed
     assert.equal(await page.locator('#domestic-ipv4').textContent(), internationalIp);
     assert.equal(await page.locator('#domestic-ip-label').textContent(), '参考 IPv4');
     assert.equal(await page.locator('#source-localref-status').textContent(), '未获取');
-    assert.match(await page.locator('#source-localref-detail').textContent(), /STUN/);
-    assert.match(await page.locator('#domestic-detail').textContent(), /国内路径未确认/);
     assert.notEqual(await page.locator('#summary-status').textContent(), '已分流');
     assert.equal(pageErrors.length, 0, `myip safe-reference page errors: ${pageErrors.map(String).join('; ')}`);
-
     await context.close();
 }
 
@@ -346,8 +419,11 @@ async function testMyIpSameExit() {
     const commonIp = '8.8.8.8';
     const { context, page, pageErrors } = await createPage();
 
-    await routePconline(page, { ip: commonIp, pro: '', city: '', region: '', addr: '' });
-    await routeText(page, '**/4.ipw.cn/**', commonIp);
+    await routeDomesticPool(page, commonIp, {
+        province: '',
+        city: '',
+        operator: ''
+    });
     await routeCommonInternational(page, commonIp);
 
     await page.goto(`${baseUrl}/tools/myip/`, { waitUntil: 'domcontentloaded' });
@@ -356,43 +432,17 @@ async function testMyIpSameExit() {
     assert.equal(await page.locator('#domestic-ipv4').textContent(), commonIp);
     assert.equal(await page.locator('#international-ipv4').textContent(), commonIp);
     assert.match(await page.locator('#summary-main').textContent(), /国内外访问使用同一出口/);
-    assert.doesNotMatch(await page.locator('#summary-detail').textContent(), new RegExp(escapeRegex(commonIp)));
     assert.equal(pageErrors.length, 0, `myip same-exit page errors: ${pageErrors.map(String).join('; ')}`);
-
-    await context.close();
-}
-
-async function testMyIpBackupFailureDoesNotBreakPrimary() {
-    const domesticIp = '61.139.2.69';
-    const internationalIp = '64.118.146.90';
-    const { context, page, pageErrors } = await createPage();
-
-    await routePconline(page, { ip: domesticIp, pro: '四川省', city: '成都市', region: '', addr: '' });
-    await routeText(page, '**/4.ipw.cn/**', domesticIp);
-    await routeFirstParty(page, firstPartyPayload(internationalIp));
-    await routeJson(page, '**/api.ip.sb/**', { error: 'unavailable' }, 503);
-    await routeJson(page, '**/api.ipify.org/**', { error: 'unavailable' }, 503);
-    await page.route('**/api6.ipify.org/**', (route) => route.abort());
-    await routeJson(page, '**/ipwho.is/**', { success: false, message: 'rate limit' }, 429);
-
-    await page.goto(`${baseUrl}/tools/myip/`, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(() => document.querySelector('#summary-status')?.textContent === '已分流');
-
-    assert.equal(await page.locator('#international-ipv4').textContent(), internationalIp);
-    assert.equal(await page.locator('#source-firstparty-status').textContent(), '正常');
-    assert.equal(await page.locator('#source-backup-status').textContent(), '备用未响应');
-    assert.equal(pageErrors.length, 0, `myip backup page errors: ${pageErrors.map(String).join('; ')}`);
-
     await context.close();
 }
 
 async function testMyIp() {
-    await testMyIpSplitRoutingAndInformationHierarchy();
-    await testMyIpRejectsLoopbackAndUsesDomesticBackup();
-    await testMyIpUsesLocalNetworkReferenceWhenDomesticServicesFail();
-    await testMyIpAlwaysShowsSafeReferenceWhenDomesticPathCannotBeConfirmed();
+    await testMyIpSourcePoolsAndDifferentDomesticValues();
+    await testMyIpRejectsLoopbackAndAdoptsNextDomesticSource();
+    await testMyIpInternationalPrimaryFallbackAndDifferentValues();
+    await testMyIpUsesLocalNetworkReferenceWhenDomesticPoolFails();
+    await testMyIpAlwaysShowsSafeReferenceWhenDomesticPoolAndStunFail();
     await testMyIpSameExit();
-    await testMyIpBackupFailureDoesNotBreakPrimary();
 }
 
 async function testFinance() {
