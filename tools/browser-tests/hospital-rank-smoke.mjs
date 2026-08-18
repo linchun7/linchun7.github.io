@@ -11,6 +11,8 @@ assert.equal(rankings.schemaVersion, 1, 'normalized ranking schema should be v1'
 assert.equal(rankings.hospitals.length, 128, 'migration should contain 128 hospital entities');
 assert.equal(rankings.years.reduce((sum, year) => sum + year.records.length, 0), 1430, 'all 2009–2023 records should be present');
 assert.equal(rankings.years.find(year => year.year === 2011)?.records.length, 100, '2011 missing legacy year should be recovered');
+const xijing = rankings.hospitals.find(hospital => /西京医院/.test(hospital.name));
+assert.ok(xijing?.aliases.includes('第四军医大学西京医院'), 'original 2011 published hospital name should be preserved as an alias');
 
 const baseUrl = (process.env.BASE_URL || 'http://127.0.0.1:4173').replace(/\/$/, '');
 const browser = await browserType.launch({ headless: true });
@@ -65,12 +67,18 @@ try {
     await page.locator('#hospitalSearch').fill('空军军医大学西京医院');
     await page.waitForTimeout(280);
     searchRows = page.locator('#hospitalList tr.data-row');
-    assert.ok(await searchRows.count() > 1, 'historical hospital name should return the full entity history');
+    assert.ok(await searchRows.count() > 1, 'historical hospital page-name should return the full entity history');
     assert.match(await searchRows.first().locator('td').nth(2).innerText(), /空军军医大学第一附属医院/);
     await searchRows.first().locator('.hospital-history-button').click();
     await page.waitForSelector('#hospitalList tr.rank-history-row');
     const renameHistory = await page.locator('#hospitalList tr.rank-history-row').innerText();
     assert.match(renameHistory, /当年榜单：空军军医大学西京医院/);
+
+    await page.locator('#hospitalSearch').fill('第四军医大学西京医院');
+    await page.waitForTimeout(280);
+    searchRows = page.locator('#hospitalList tr.data-row');
+    assert.ok(await searchRows.count() > 1, 'original 2011 published name should resolve to the same hospital entity');
+    assert.match(await searchRows.first().locator('td').nth(2).innerText(), /空军军医大学第一附属医院/);
 
     await page.locator('#hospitalSearch').fill('华西医院');
     await page.waitForTimeout(280);
