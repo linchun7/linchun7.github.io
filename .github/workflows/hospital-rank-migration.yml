@@ -1,0 +1,37 @@
+name: Hospital rank migration audit
+
+on:
+  pull_request:
+    paths:
+      - 'tools/hospital_rank/**'
+      - '.github/workflows/hospital-rank-migration.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+
+      - name: 配置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 抓取并核验 2009–2023 源站数据
+        run: |
+          python tools/hospital_rank/scripts/migrate_data.py \
+            --output-dir /tmp/hospital-rank-migration
+
+      - name: 上传迁移候选与审计报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hospital-rank-migration
+          path: /tmp/hospital-rank-migration
+          if-no-files-found: error
+          retention-days: 3
