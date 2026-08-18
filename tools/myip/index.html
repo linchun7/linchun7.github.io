@@ -4,168 +4,27 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="format-detection" content="telephone=no">
-    <meta name="description" content="通过多个独立数据源查询当前公网 IP、网络位置和常用网站可达性，并提供 WebRTC 辅助诊断。">
+    <meta name="description" content="识别当前国内与国际网络出口 IP、IPv4/IPv6 状态及代理分流情况，并提供 WebRTC/STUN 辅助诊断。">
+    <meta name="myip-first-party-probe" content="https://myip.cfw3.workers.dev/v1/ip">
     <link rel="shortcut icon" href="/images/favicon.ico">
     <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
     <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
-    <link rel="stylesheet" href="style.css?v=20260817-1">
-    <script src="app.js?v=20260817-1" defer></script>
-    <title>当前 IP 地址查询</title>
+    <link rel="stylesheet" href="style.css?v=20260818-2">
+    <script src="app.js?v=20260818-2" defer></script>
+    <title>网络出口 IP 与分流检测</title>
 </head>
 <body>
-    <main class="page-shell">
-        <header class="page-header">
-            <div>
-                <p class="eyebrow">NETWORK DIAGNOSTICS</p>
-                <h1>当前 IP 地址查询</h1>
-                <p class="page-intro">多个数据源独立查询；单个接口失败不会影响其他结果。Safari、VPN、代理或 iCloud Private Relay 开启时，显示的可能是中继或代理出口 IP。</p>
-            </div>
-            <button id="retry-all" class="primary-button" type="button">重新检测</button>
-        </header>
-
-        <section class="summary-card" aria-labelledby="summary-title">
-            <div class="card-heading">
-                <div>
-                    <p class="section-kicker">公网出口</p>
-                    <h2 id="summary-title">综合结果</h2>
-                </div>
-                <span id="summary-status" class="status-pill status-loading">查询中</span>
-            </div>
-            <p id="summary-ip" class="ip-value" aria-live="polite">正在获取公网 IP…</p>
-            <p id="summary-detail" class="detail-text">各数据源会独立重试，单个服务失败不会影响其他结果。</p>
-        </section>
-
-        <section aria-labelledby="source-title">
-            <div class="section-heading">
-                <div>
-                    <p class="section-kicker">INDEPENDENT SOURCES</p>
-                    <h2 id="source-title">多源查询</h2>
-                </div>
-                <p>不同服务可能分别走 IPv4、IPv6 或不同中继出口，结果不一致不一定代表异常。</p>
-            </div>
-
-            <div class="card-grid">
-                <article class="info-card">
-                    <div class="card-heading">
-                        <div>
-                            <h3>百度 BCE</h3>
-                            <p class="source-label">国内解析</p>
-                        </div>
-                        <span id="provider-baidu-status" class="status-pill status-loading">查询中</span>
-                    </div>
-                    <p id="provider-baidu-ip" class="ip-value" aria-live="polite">查询中…</p>
-                    <p id="provider-baidu-detail" class="detail-text">正在连接数据源</p>
-                </article>
-
-                <article class="info-card">
-                    <div class="card-heading">
-                        <div>
-                            <h3>IP.SB</h3>
-                            <p class="source-label">国际解析</p>
-                        </div>
-                        <span id="provider-ipsb-status" class="status-pill status-loading">查询中</span>
-                    </div>
-                    <p id="provider-ipsb-ip" class="ip-value" aria-live="polite">查询中…</p>
-                    <p id="provider-ipsb-detail" class="detail-text">正在连接数据源</p>
-                </article>
-
-                <article class="info-card">
-                    <div class="card-heading">
-                        <div>
-                            <h3>IPify + IPAPI</h3>
-                            <p class="source-label">备用解析</p>
-                        </div>
-                        <span id="provider-ipify-status" class="status-pill status-loading">查询中</span>
-                    </div>
-                    <p id="provider-ipify-ip" class="ip-value" aria-live="polite">查询中…</p>
-                    <p id="provider-ipify-detail" class="detail-text">正在连接数据源</p>
-                </article>
-            </div>
-        </section>
-
-        <section aria-labelledby="webrtc-title">
-            <div class="section-heading">
-                <div>
-                    <p class="section-kicker">BROWSER PRIVACY</p>
-                    <h2 id="webrtc-title">WebRTC 辅助诊断</h2>
-                </div>
-                <p>WebRTC 不再作为公网 IP 的主判断来源，浏览器隐藏本地地址属于正常隐私行为。</p>
-            </div>
-
-            <article class="info-card diagnostic-card">
-                <div class="card-heading">
-                    <div>
-                        <h3>ICE 网络候选</h3>
-                        <p class="source-label">Safari / WebKit 兼容</p>
-                    </div>
-                    <span id="webrtc-status" class="status-pill status-loading">检测中</span>
-                </div>
-                <p id="webrtc-ip" class="diagnostic-value" aria-live="polite">检测中…</p>
-                <p id="webrtc-detail" class="detail-text">WebRTC 仅作为辅助诊断，不影响公网 IP 查询。</p>
-            </article>
-        </section>
-
-        <section aria-labelledby="reachability-title">
-            <div class="section-heading">
-                <div>
-                    <p class="section-kicker">REACHABILITY</p>
-                    <h2 id="reachability-title">网站访问检查</h2>
-                </div>
-                <p>只检查当前浏览器能否发起网络请求，不代表目标网站全部功能或账号服务一定正常。</p>
-            </div>
-
-            <div class="reachability-grid">
-                <article class="reach-card">
-                    <div>
-                        <h3>百度</h3>
-                        <p id="reach-baidu-detail" class="detail-text">正在建立连接</p>
-                    </div>
-                    <span id="reach-baidu-status" class="status-pill status-loading">检测中</span>
-                </article>
-
-                <article class="reach-card">
-                    <div>
-                        <h3>网易云音乐</h3>
-                        <p id="reach-netease-detail" class="detail-text">正在建立连接</p>
-                    </div>
-                    <span id="reach-netease-status" class="status-pill status-loading">检测中</span>
-                </article>
-
-                <article class="reach-card">
-                    <div>
-                        <h3>GitHub</h3>
-                        <p id="reach-github-detail" class="detail-text">正在建立连接</p>
-                    </div>
-                    <span id="reach-github-status" class="status-pill status-loading">检测中</span>
-                </article>
-
-                <article class="reach-card">
-                    <div>
-                        <h3>YouTube</h3>
-                        <p id="reach-youtube-detail" class="detail-text">正在建立连接</p>
-                    </div>
-                    <span id="reach-youtube-status" class="status-pill status-loading">检测中</span>
-                </article>
-            </div>
-        </section>
-
-        <aside class="privacy-note">
-            <strong>隐私说明：</strong>
-            本页在浏览器中直接向所列 IP 查询服务发送请求，不会把查询结果上传到本站服务器。第三方服务会按其自身策略看到你的网络请求和出口 IP。
-        </aside>
+    <a class="skip-link" href="#main">跳到主要内容</a>
+    <header class="app-header"><div class="app-header-inner"><a class="app-brand" href="./" aria-label="网络出口 IP 与分流检测首页"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"></circle><path d="M4.5 9h15M4.5 15h15M12 4a13 13 0 0 1 0 16M12 4a13 13 0 0 0 0 16"></path></svg></span><span class="brand-copy"><strong>网络出口 IP 与分流检测</strong><p>国内直连 · 国际代理 · IPv4 / IPv6</p></span></a><button id="retry-all" class="primary-button" type="button">重新检测</button></div></header>
+    <main id="main" class="page-main">
+        <section class="overview-card" aria-labelledby="summary-title"><div class="overview-copy"><div class="section-title-row"><div><p class="eyebrow">ROUTING OVERVIEW</p><h1 id="summary-title">当前网络出口</h1></div><span id="summary-status" class="status-pill status-loading">检测中</span></div><p id="summary-main" class="summary-main" aria-live="polite">正在识别国内与国际请求路径…</p><p id="summary-detail" class="summary-detail">如果代理软件按域名或规则分流，本页会分别展示国内直连出口和国际代理出口。</p></div><dl class="overview-stats" aria-label="检测概览"><div><dt>国内线路</dt><dd id="summary-domestic">检测中</dd></div><div><dt>国际线路</dt><dd id="summary-international">检测中</dd></div><div><dt>分流判断</dt><dd id="summary-routing">待确认</dd></div></dl></section>
+        <section aria-labelledby="egress-title"><div class="section-heading"><div><p class="eyebrow">EGRESS PATHS</p><h2 id="egress-title">国内 / 国际出口</h2></div><p>不同地址不一定是异常：在 Clash、Surge、Shadowrocket 等按规则分流时，这正是预期结果。</p></div><div class="egress-grid"><article class="egress-card" aria-labelledby="domestic-title"><div class="card-heading"><div><p class="source-label">CHINA ROUTE</p><h3 id="domestic-title">国内线路探测</h3></div><span id="domestic-status" class="status-pill status-loading">检测中</span></div><div class="address-list"><div class="address-row"><span>IPv4</span><strong id="domestic-ipv4" aria-live="polite">检测中…</strong></div><div class="address-row"><span>IPv6</span><strong id="domestic-ipv6" aria-live="polite">检测中…</strong></div></div><p id="domestic-detail" class="detail-text">请求真实国内服务域名，用于观察 DIRECT / 直连规则实际使用的出口。</p></article><article class="egress-card" aria-labelledby="international-title"><div class="card-heading"><div><p class="source-label">GLOBAL ROUTE</p><h3 id="international-title">国际线路探测</h3></div><span id="international-status" class="status-pill status-loading">检测中</span></div><div class="address-list"><div class="address-row"><span>IPv4</span><strong id="international-ipv4" aria-live="polite">检测中…</strong></div><div class="address-row"><span>IPv6</span><strong id="international-ipv6" aria-live="polite">检测中…</strong></div></div><p id="international-detail" class="detail-text">优先使用本站第一方 Cloudflare Worker 探针，并由独立国际服务复核。</p></article></div></section>
+        <section aria-labelledby="sources-title"><div class="section-heading compact-heading"><div><p class="eyebrow">PROBE EVIDENCE</p><h2 id="sources-title">探测证据</h2></div><p>第一方探针负责国际主结果；第三方只用于交叉验证和故障降级，单个服务失败不会覆盖已成功结果。</p></div><div class="source-list"><article class="source-row"><div><h3>国内线路</h3><p id="source-domestic-detail" class="detail-text">优先太平洋网络，必要时切换搜狐国内备用。</p></div><span id="source-domestic-status" class="status-pill status-loading">检测中</span></article><article class="source-row"><div><h3>第一方国际探针</h3><p id="source-firstparty-detail" class="detail-text">本站第一方 Cloudflare Worker 国际主探针。</p></div><span id="source-firstparty-status" class="status-pill status-loading">检测中</span></article><article class="source-row"><div><h3>IP.SB</h3><p id="source-ipsb-detail" class="detail-text">国际公网地址与归属信息，用于独立复核。</p></div><span id="source-ipsb-status" class="status-pill status-loading">检测中</span></article><article class="source-row"><div><h3>IPify IPv4</h3><p id="source-ipify4-detail" class="detail-text">独立 IPv4 出口复核。</p></div><span id="source-ipify4-status" class="status-pill status-loading">检测中</span></article><article class="source-row"><div><h3>IPify IPv6</h3><p id="source-ipify6-detail" class="detail-text">独立 IPv6 出口探测；无 IPv6 时允许失败。</p></div><span id="source-ipify6-status" class="status-pill status-loading">检测中</span></article><article class="source-row"><div><h3>国际最后备用</h3><p id="source-fallback-detail" class="detail-text">仅在第一方与主要国际数据源均失败时按需启用。</p></div><span id="source-fallback-status" class="status-pill status-idle">待命</span></article></div></section>
+        <section aria-labelledby="webrtc-title"><div class="section-heading compact-heading"><div><p class="eyebrow">BROWSER NETWORK</p><h2 id="webrtc-title">WebRTC / STUN 辅助诊断</h2></div><p>只作为辅助证据，不参与国内 / 国际分流结论；浏览器隐藏本地地址属于正常隐私行为。</p></div><article class="diagnostic-card"><div class="card-heading"><div><h3>ICE 网络候选</h3><p class="source-label">Safari / WebKit / Chromium / Firefox</p></div><span id="webrtc-status" class="status-pill status-loading">检测中</span></div><p id="webrtc-ip" class="diagnostic-value" aria-live="polite">检测中…</p><p id="webrtc-detail" class="detail-text">尝试获取 STUN / relay 候选；不会把 WebRTC 结果当作公网出口的唯一依据。</p></article></section>
+        <aside class="privacy-note"><strong>隐私说明：</strong> 国内探测会直接访问所列国内第三方服务；国际主探针由本站自有 Cloudflare Worker 接收请求并返回该连接看到的出口 IP 与粗粒度网络信息，应用代码不持久化查询结果。IP.SB、IPify、IPWho.is 仅作为独立复核或备用，并受各自服务策略约束。</aside>
+        <noscript><p class="noscript-notice">此工具需要 JavaScript 才能执行网络探测。</p></noscript>
     </main>
-
-    <footer>
-        <p>&copy; 2026 <a href="https://www.linchun.com.cn">林春写字的地方</a></p>
-    </footer>
-
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-K2S9L4CHNP"></script>
-    <script>
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-        gtag('config', 'G-K2S9L4CHNP');
-    </script>
+    <footer class="page-footer"><p>&copy; 2026 <a href="https://www.linchun.com.cn">林春写字的地方</a></p></footer>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-K2S9L4CHNP"></script><script>window.dataLayer = window.dataLayer || []; function gtag(){dataLayer.push(arguments);} gtag('js', new Date()); gtag('config', 'G-K2S9L4CHNP');</script>
 </body>
 </html>
