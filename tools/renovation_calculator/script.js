@@ -252,15 +252,16 @@ function renderTable(schedule, totals, apr) {
 
 function generateSchedule(inputs) {
     const schedule = [];
-    const monthlyPrincipal = numberUtils.toFixed2(inputs.loanAmount / inputs.loanTerm);
     const monthlyFee = numberUtils.toFixed2(inputs.loanAmount * inputs.serviceFeeRate / 100);
     let totalPaidPrincipal = 0;
 
     for (let month = 1; month <= inputs.loanTerm; month++) {
-        const openingPrincipal = numberUtils.toFixed2(inputs.loanAmount - totalPaidPrincipal);
-        const principal = month === inputs.loanTerm
-            ? openingPrincipal
-            : monthlyPrincipal;
+        const openingPrincipal = Math.max(0, numberUtils.toFixed2(inputs.loanAmount - totalPaidPrincipal));
+        // 按累计目标分摊本金，而不是固定四舍五入后的“月本金”，避免长周期尾期出现负本金。
+        const targetPaidPrincipal = month === inputs.loanTerm
+            ? inputs.loanAmount
+            : numberUtils.toFixed2(inputs.loanAmount * month / inputs.loanTerm);
+        const principal = Math.max(0, numberUtils.toFixed2(targetPaidPrincipal - totalPaidPrincipal));
         const payment = numberUtils.toFixed2(principal + monthlyFee);
 
         totalPaidPrincipal = numberUtils.toFixed2(totalPaidPrincipal + principal);
@@ -281,7 +282,7 @@ function generateSchedule(inputs) {
         });
     }
 
-    // 用页面真实展示的逐期还款额构造现金流，包含最后一期的分厘修正。
+    // 用页面真实展示的逐期还款额构造现金流，包含逐期分厘修正。
     const totalCashFlows = [-inputs.loanAmount, ...schedule.map(row => row.payment)];
     const monthlyRate = IRR(totalCashFlows);
     const apr = annualizeMonthlyIRR(monthlyRate);
