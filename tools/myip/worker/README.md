@@ -12,21 +12,28 @@ This Worker is the first-party international-route probe for `tools/myip`.
 
 ## Endpoints
 
+Production base URL: `https://myip.cfw3.workers.dev`
+
 - `GET /v1/ip` (and `/`) — IP/network probe payload.
 - `GET /healthz` — service health only, without visitor IP details in the body.
 
-## Cloudflare Builds
+## Cloudflare deployment
 
-Recommended configuration:
+Current deployment is a manually created Cloudflare Worker:
 
-- Worker name: `linchun-myip-probe`
+- Worker name: `myip`
+- workers.dev route: `https://myip.cfw3.workers.dev`
+- Preview URLs: not required
+- Cloudflare Access: must remain disabled for the public workers.dev route used by the browser probe
+- No KV / D1 / R2 / Durable Objects / Queues / paid bindings are required
+
+If Git integration or Wrangler deployment is enabled later, use:
+
 - Git repository: `linchun7/linchun7.github.io`
 - Production branch: `main`
 - Root directory: `tools/myip/worker`
 - Build command: empty
 - Deploy command: `npx wrangler deploy`
 - Build watch include path: `tools/myip/worker/**`
-- Preview URLs: disabled (enforced in `wrangler.jsonc`)
-- `workers.dev`: enabled (enforced in `wrangler.jsonc`)
 
-After the Worker is deployed, wire its exact `https://linchun-myip-probe.<account-subdomain>.workers.dev/v1/ip` URL into the MyIP frontend and keep IP.SB/IPify/IPWho.is only as independent verification/fallback evidence.
+The frontend is wired to `https://myip.cfw3.workers.dev/v1/ip`. IP.SB/IPify/IPWho.is remain independent verification/fallback evidence only.
