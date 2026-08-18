@@ -27,6 +27,11 @@ jobs:
           python tools/hospital_rank/scripts/build_data.py \
             --output-dir /tmp/hospital-rank-migration
 
+      - name: 用跨年份医院实体补齐旧数据缺失年份
+        run: |
+          python tools/hospital_rank/scripts/complete_migration.py \
+            --output-dir /tmp/hospital-rank-migration
+
       - name: 上传迁移候选与审计报告
         if: always()
         uses: actions/upload-artifact@v4
