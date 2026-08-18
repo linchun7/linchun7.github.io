@@ -3,6 +3,7 @@
 
     const REQUEST_TIMEOUT_MS = 4500;
     const IPV6_TIMEOUT_MS = 2800;
+    const LOCAL_REFERENCE_TIMEOUT_MS = 2800;
 
     const routeResults = {
         domestic: { status: 'idle', observations: [], detail: '' },
@@ -197,8 +198,12 @@
         return (routeResults[route].observations || []).find((item) => item.family === family) || null;
     }
 
+    function preferredAnyObservation(route) {
+        return preferredObservation(route, 4) || preferredObservation(route, 6) || null;
+    }
+
     function routeIsFinal(route) {
-        return routeResults[route].status === 'success' || routeResults[route].status === 'error';
+        return ['success', 'reference', 'error'].includes(routeResults[route].status);
     }
 
     function displayIp(route, family) {
@@ -207,17 +212,20 @@
         return routeIsFinal(route) ? '未检测到' : '检测中…';
     }
 
-    function routeHasDisagreement(route, family) {
-        const ips = (routeResults[route].observations || [])
-            .filter((item) => item.family === family)
-            .map((item) => item.ip);
-        return new Set(ips).size > 1;
-    }
-
     function renderRoute(route) {
         const current = routeResults[route];
-        setText(`${route}-ipv4`, displayIp(route, 4));
-        if (route === 'international') setText(`${route}-ipv6`, displayIp(route, 6));
+
+        if (route === 'domestic') {
+            const observation = preferredAnyObservation('domestic');
+            setText('domestic-ipv4', observation ? observation.ip : (routeIsFinal('domestic') ? '未检测到' : '检测中…'));
+            setText('domestic-ip-label', observation
+                ? `${current.status === 'reference' ? '参考 ' : ''}IPv${observation.family}`
+                : 'IPv4');
+        } else {
+            setText('international-ipv4', displayIp('international', 4));
+            setText('international-ipv6', displayIp('international', 6));
+        }
+
         setText(`${route}-detail`, current.detail || (route === 'domestic'
             ? '通过国内 IP 查询网站检测。'
             : '通过本站检测服务和多个独立 IP 服务交叉确认。'));
@@ -226,6 +234,8 @@
             setStatus(`${route}-status`, 'loading', '检测中');
         } else if (current.status === 'error') {
             setStatus(`${route}-status`, 'warning', '未获取');
+        } else if (current.status === 'reference') {
+            setStatus(`${route}-status`, 'warning', '参考');
         } else {
             setStatus(`${route}-status`, 'success', '已获取');
         }
@@ -245,13 +255,14 @@
     }
 
     function firstRouteIp(route) {
-        return preferredObservation(route, 4)?.ip || preferredObservation(route, 6)?.ip || '';
+        return preferredAnyObservation(route)?.ip || '';
     }
 
     function renderSummary() {
         const domesticFinal = routeIsFinal('domestic');
         const internationalFinal = routeIsFinal('international');
         const domesticOk = routeResults.domestic.status === 'success';
+        const domesticReference = routeResults.domestic.status === 'reference';
         const internationalOk = routeResults.international.status === 'success';
 
         if (!domesticFinal || !internationalFinal) {
@@ -261,19 +272,32 @@
             return;
         }
 
-        if (!domesticOk && !internationalOk) {
-            setStatus('summary-status', 'error', '未获取');
-            setText('summary-main', '暂时没能获取公网 IP');
-            setText('summary-detail', '可以重新检测；代理规则、浏览器插件或当前网络都可能影响第三方检测请求。');
-            return;
-        }
-
         if (!domesticOk || !internationalOk) {
-            setStatus('summary-status', 'warning', '部分结果');
-            setText('summary-main', domesticOk ? '已获取国内网站 IP' : '已获取国际网站 IP');
-            setText('summary-detail', domesticOk
-                ? '国际网站 IP 暂未获取，因此现在还不能判断是否存在国内外分流。'
-                : '国内网站 IP 暂未获取，因此现在还不能判断是否存在国内外分流。');
+            if (domesticReference && internationalOk) {
+                const referenceIp = firstRouteIp('domestic');
+                setStatus('summary-status', 'warning', '部分结果');
+                setText('summary-main', '已获取国际网站 IP');
+                setText('summary-detail', `国内检测服务暂未直接确认；国内卡片中的 ${referenceIp} 是公网 IP 参考值，不用于判断国内外分流。`);
+                return;
+            }
+
+            if (domesticOk && !internationalOk) {
+                setStatus('summary-status', 'warning', '部分结果');
+                setText('summary-main', '已获取国内网站 IP');
+                setText('summary-detail', '国际网站 IP 暂未获取，因此现在还不能判断是否存在国内外分流。');
+                return;
+            }
+
+            if (!domesticOk && internationalOk) {
+                setStatus('summary-status', 'warning', '部分结果');
+                setText('summary-main', '已获取国际网站 IP');
+                setText('summary-detail', '国内网站 IP 暂未确认，因此现在还不能判断是否存在国内外分流。');
+                return;
+            }
+
+            setStatus('summary-status', 'error', '未获取');
+            setText('summary-main', '暂时没能确认网络出口');
+            setText('summary-detail', '可以重新检测；代理规则、浏览器插件或当前网络都可能影响检测请求。');
             return;
         }
 
@@ -312,6 +336,7 @@
     function resetSources() {
         setSource('pconline', 'loading', '检测中', '太平洋网络');
         setSource('ipw', 'loading', '检测中', 'IPW');
+        setSource('localref', 'idle', '待命', '仅在国内检测服务都失败时启用，不用于判断分流。');
         setSource('firstparty', 'loading', '检测中', 'Cloudflare Worker');
         setSource('ipsb', 'loading', '检测中', '国际 IP 复核');
         setSource('ipify4', 'loading', '检测中', 'IPv4 复核');
@@ -319,64 +344,46 @@
         setSource('backup', 'loading', '检测中', 'IPWho.is 备用检测');
     }
 
-    function escapeHtmlAttribute(value) {
-        return String(value)
-            .replaceAll('&', '&amp;')
-            .replaceAll('"', '&quot;')
-            .replaceAll('<', '&lt;');
-    }
-
-    function runSandboxedScriptProbe({ timeoutMs = REQUEST_TIMEOUT_MS, buildSrcdoc }) {
+    function loadJsonp(baseUrl, timeoutMs = REQUEST_TIMEOUT_MS) {
         return new Promise((resolve, reject) => {
-            const token = `probe-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-            const iframe = document.createElement('iframe');
+            const callbackName = `__myipJsonp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+            const script = document.createElement('script');
             let settled = false;
-
-            iframe.hidden = true;
-            iframe.tabIndex = -1;
-            iframe.setAttribute('aria-hidden', 'true');
-            iframe.setAttribute('sandbox', 'allow-scripts');
-            iframe.referrerPolicy = 'no-referrer';
 
             const cleanup = () => {
                 window.clearTimeout(timer);
-                window.removeEventListener('message', onMessage);
-                iframe.remove();
+                script.remove();
+                try {
+                    delete window[callbackName];
+                } catch {
+                    window[callbackName] = undefined;
+                }
             };
+
             const finish = (handler, value) => {
                 if (settled) return;
                 settled = true;
                 cleanup();
                 handler(value);
             };
-            const onMessage = (event) => {
-                if (event.source !== iframe.contentWindow) return;
-                const data = event.data;
-                if (!data || data.__myipProbe !== token) return;
-                if (data.ok) finish(resolve, data.payload);
-                else finish(reject, new Error(normalizeText(data.error) || '加载失败'));
-            };
+
+            window[callbackName] = (payload) => finish(resolve, payload);
+            script.async = true;
+            script.referrerPolicy = 'no-referrer';
+            script.onerror = () => finish(reject, new Error('加载失败'));
+
+            const url = new URL(baseUrl);
+            url.searchParams.set('callback', callbackName);
+            url.searchParams.set('_', String(Date.now()));
+            script.src = url.href;
 
             const timer = window.setTimeout(() => finish(reject, createTimeoutError()), timeoutMs);
-            window.addEventListener('message', onMessage);
-            iframe.srcdoc = buildSrcdoc(token);
-            document.body.appendChild(iframe);
+            document.head.appendChild(script);
         });
     }
 
     async function loadPconline() {
-        const src = `https://whois.pconline.com.cn/ipJson.jsp?json=true&callback=__myipProbeCallback&_=${Date.now()}`;
-        const payload = await runSandboxedScriptProbe({
-            buildSrcdoc(token) {
-                const tokenLiteral = JSON.stringify(token);
-                return `<!doctype html><meta charset="utf-8"><script>
-                    const __token = ${tokenLiteral};
-                    const __send = (ok, payload, error) => parent.postMessage({ __myipProbe: __token, ok, payload, error }, '*');
-                    window.__myipProbeCallback = (payload) => __send(true, payload, '');
-                    window.__myipProbeFail = () => __send(false, null, '加载失败');
-                </script><script src="${escapeHtmlAttribute(src)}" referrerpolicy="no-referrer" onerror="window.__myipProbeFail()"></script>`;
-            }
-        });
+        const payload = await loadJsonp('https://whois.pconline.com.cn/ipJson.jsp');
         const ip = normalizeText(payload && payload.ip);
         const detail = joinText([
             payload && (payload.country || payload.nation),
@@ -393,6 +400,71 @@
         const text = normalizeText(await fetchText('https://4.ipw.cn/'));
         const ip = text.split(/\s+/)[0];
         return makeObservation(ip, 'IPW', '', 'domestic-backup');
+    }
+
+    function getCandidateAddress(candidate) {
+        if (!candidate) return '';
+        if (candidate.address) return normalizeText(candidate.address);
+        const raw = normalizeText(candidate.candidate);
+        const parts = raw.split(/\s+/);
+        return parts.length >= 6 ? normalizeText(parts[4]) : '';
+    }
+
+    async function loadBrowserNetworkReference() {
+        const PeerConnection = window.RTCPeerConnection || window.webkitRTCPeerConnection;
+        if (typeof PeerConnection !== 'function') return null;
+
+        let pc;
+        const found = [];
+
+        try {
+            pc = new PeerConnection({
+                iceServers: [
+                    { urls: 'stun:stun.cloudflare.com:3478' },
+                    { urls: 'stun:stun.l.google.com:19302' }
+                ]
+            });
+            pc.createDataChannel('ip-reference');
+
+            await new Promise(async (resolve) => {
+                let settled = false;
+                const finish = () => {
+                    if (settled) return;
+                    settled = true;
+                    window.clearTimeout(timer);
+                    resolve();
+                };
+                const timer = window.setTimeout(finish, LOCAL_REFERENCE_TIMEOUT_MS);
+
+                pc.onicecandidate = (event) => {
+                    if (!event.candidate) {
+                        finish();
+                        return;
+                    }
+                    const type = normalizeText(event.candidate.type);
+                    if (type !== 'srflx' && type !== 'relay') return;
+                    const address = getCandidateAddress(event.candidate);
+                    if (isPublicIpAddress(address) && !found.includes(address)) found.push(address);
+                };
+                pc.onicecandidateerror = () => {};
+
+                try {
+                    const offer = await pc.createOffer();
+                    await pc.setLocalDescription(offer);
+                } catch {
+                    finish();
+                }
+            });
+        } finally {
+            if (pc) {
+                pc.onicecandidate = null;
+                pc.onicecandidateerror = null;
+                pc.close();
+            }
+        }
+
+        const preferred = found.find((ip) => ipFamily(ip) === 4) || found[0];
+        return preferred ? makeObservation(preferred, '本机网络参考', '', 'domestic-reference') : null;
     }
 
     async function loadDomestic(runId) {
@@ -436,12 +508,29 @@
                 observations,
                 detail: `访问国内检测网站时使用 ${preferred.ip}。${disagreement ? '备用检测返回了另一个 IP，可在检测详情中查看。' : ''}`
             };
+            setSource('localref', 'idle', '无需', '国内检测已成功，不需要使用本机网络参考。');
+            renderRoute('domestic');
+            return;
+        }
+
+        setSource('localref', 'loading', '尝试参考', '国内检测服务均未响应，正在尝试获取本机网络公网参考值。');
+        const reference = await loadBrowserNetworkReference();
+        if (runId !== activeRunId) return;
+
+        if (reference) {
+            routeResults.domestic = {
+                status: 'reference',
+                observations: [reference],
+                detail: `国内检测服务均未响应。显示本机网络公网 IP ${reference.ip} 作为参考；它不代表已确认的国内网站出口，也不参与分流判断。`
+            };
+            setSource('localref', 'warning', '参考可用', `本机网络公网参考 IP：${reference.ip}`);
         } else {
             routeResults.domestic = {
                 status: 'error',
                 observations: [],
-                detail: '国内网站 IP 暂未获取。'
+                detail: '国内网站 IP 暂未确认。'
             };
+            setSource('localref', 'warning', '未获取', '浏览器没有提供可用的公网参考地址。');
         }
         renderRoute('domestic');
     }
@@ -479,6 +568,11 @@
             );
             return [];
         }
+    }
+
+    function routeHasDisagreementFrom(observations, family) {
+        const ips = observations.filter((item) => item.family === family).map((item) => item.ip);
+        return new Set(ips).size > 1;
     }
 
     async function loadInternational(runId) {
@@ -547,18 +641,33 @@
         renderRoute('international');
     }
 
-    function routeHasDisagreementFrom(observations, family) {
-        const ips = observations.filter((item) => item.family === family).map((item) => item.ip);
-        return new Set(ips).size > 1;
+    function useInternationalAsLastReference() {
+        if (routeResults.domestic.status !== 'error' || routeResults.international.status !== 'success') return;
+        const source = preferredAnyObservation('international');
+        if (!source) return;
+
+        const reference = {
+            ...source,
+            source: '已确认公网 IP',
+            role: 'generic-reference'
+        };
+        routeResults.domestic = {
+            status: 'reference',
+            observations: [reference],
+            detail: `国内检测服务均未响应，本机网络参考也未获取。先显示已确认的公网 IP ${reference.ip} 作为参考；它不代表已确认的国内网站出口，也不参与分流判断。`
+        };
+        setSource('localref', 'warning', '参考', `国内路径未确认，暂以已确认公网 IP ${reference.ip} 作为参考。`);
+        renderRoute('domestic');
     }
 
-    function runAll() {
+    async function runAll() {
         activeRunId += 1;
         const runId = activeRunId;
         resetRoutes();
         resetSources();
-        loadDomestic(runId);
-        loadInternational(runId);
+        await Promise.all([loadDomestic(runId), loadInternational(runId)]);
+        if (runId !== activeRunId) return;
+        useInternationalAsLastReference();
     }
 
     function init() {
