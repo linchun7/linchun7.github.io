@@ -2,198 +2,238 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>数字转人民币大写金额</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, maximum-scale=1, user-scalable=no">
-    <link rel="stylesheet" href="../css/bootstrap.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/nzh/dist/nzh.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="format-detection" content="telephone=no">
+    <meta name="description" content="数字转人民币大写金额工具，支持整数、小数、负数和科学计数法输入，一键复制转换结果。">
+    <title>数字转人民币大写金额</title>
     <link rel="shortcut icon" href="/images/favicon.ico">
     <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
     <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
-    
+    <script src="dist/nzh.min.js"></script>
     <style>
-        body {
-            font-family: "Helvetica Neue", Helvetica, Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-            margin-right: calc(100% - 100vw);/* 部分浏览器滚动条问题 */
-            overflow-x: hidden;/* 横向滚动条问题 */
+        :root {
+            color-scheme: light;
+            --page: #eef2f6;
+            --surface: #fff;
+            --surface-soft: #f7f9fb;
+            --line: #dce4eb;
+            --ink: #17212b;
+            --muted: #5a6875;
+            --accent: #1168d4;
+            --accent-dark: #0755b5;
+            --accent-soft: #eaf3ff;
+            --green: #087a45;
+            --green-soft: #effaf4;
+            --danger: #b93632;
+            --danger-soft: #fff1f0;
+            --shadow: 0 8px 24px rgba(24, 43, 61, .06);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
         }
-
-        .container {
-            margin-top: 20px;
-            flex-grow: 1;
-            padding: 15px;
+        * { box-sizing: border-box; }
+        html { background: var(--page); scrollbar-gutter: stable; }
+        body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; color: var(--ink); background: var(--page); font-size: 14px; line-height: 1.5; }
+        button, input { font: inherit; }
+        button { cursor: pointer; }
+        a { color: var(--accent-dark); text-decoration: none; }
+        a:hover { color: var(--accent); }
+        button, a { touch-action: manipulation; -webkit-tap-highlight-color: rgba(0, 113, 227, .18); }
+        button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        .skip-link { position: fixed; top: 8px; left: 8px; z-index: 100; padding: 8px 12px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); transform: translateY(-150%); }
+        .skip-link:focus { transform: translateY(0); }
+        .app-header { background: var(--surface); border-bottom: 1px solid var(--line); }
+        .app-header-inner, .page-main, .page-footer { width: min(760px, calc(100% - 40px)); margin: 0 auto; }
+        .app-header-inner { min-height: 64px; display: flex; align-items: center; }
+        .app-brand { min-width: 0; display: flex; align-items: center; gap: 11px; color: inherit; }
+        .brand-mark { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; color: var(--accent); background: var(--accent-soft); border: 1px solid #cfe2fa; border-radius: 9px; }
+        .brand-mark svg { width: 20px; height: 20px; }
+        .brand-copy { min-width: 0; }
+        .brand-copy strong { display: block; font-size: 18px; line-height: 1.2; }
+        .brand-copy p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+        .page-main { flex: 1; display: grid; gap: 10px; padding: 14px 0 0; }
+        .tool-card, .result-card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
+        .tool-card { padding: 16px; }
+        .section-heading, .result-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+        .section-heading { margin-bottom: 12px; }
+        .section-heading h1, .result-heading h2 { margin: 0; font-size: 18px; line-height: 1.3; }
+        .section-heading p, .result-heading p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+        .help-link { flex: 0 0 auto; padding-top: 2px; font-size: 12px; font-weight: 700; }
+        label { display: block; margin-bottom: 6px; color: #42515e; font-size: 13px; font-weight: 700; }
+        .input-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+        input { width: 100%; min-width: 0; height: 42px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: #fff; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 16px; }
+        input:hover { border-color: #bdcad5; }
+        input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(17, 104, 212, .10); outline: none; }
+        .primary-button, .secondary-button { min-height: 42px; padding: 0 14px; border-radius: 8px; font-weight: 700; white-space: nowrap; }
+        .primary-button { border: 1px solid var(--accent); color: #fff; background: var(--accent); }
+        .primary-button:hover { border-color: var(--accent-dark); background: var(--accent-dark); }
+        .secondary-button { border: 1px solid var(--line); color: var(--ink); background: var(--surface); }
+        .secondary-button:hover { border-color: #bdcad5; background: var(--surface-soft); }
+        .primary-button:active, .secondary-button:active { transform: translateY(1px); }
+        .result-card { overflow: hidden; }
+        .result-heading { align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+        .result-actions { display: flex; align-items: center; gap: 8px; }
+        .status-text { min-width: 44px; color: var(--green); font-size: 12px; font-weight: 700; text-align: right; }
+        .result-text { min-height: 110px; display: flex; align-items: center; padding: 18px; overflow-wrap: anywhere; color: #263746; background: #fff; font-size: 20px; line-height: 1.8; }
+        .result-text.empty { color: var(--muted); font-size: 13px; justify-content: center; text-align: center; }
+        .result-text.error { color: var(--danger); background: var(--danger-soft); font-size: 14px; }
+        .calculator-note { margin: 2px 4px 0; color: var(--muted); font-size: 12px; text-align: center; }
+        .page-footer { padding: 10px 0 20px; color: var(--muted); text-align: center; font-size: 12px; }
+        .page-footer p { margin: 0; }
+        .page-footer a { color: inherit; }
+        .page-footer a:hover { color: var(--accent); text-decoration: underline; }
+        @media (max-width: 560px) {
+            .app-header-inner, .page-main, .page-footer { width: min(100% - 28px, 680px); }
+            .brand-copy strong { font-size: 16px; }
+            .brand-copy p { display: none; }
+            .tool-card { padding: 14px; }
+            .section-heading h1, .result-heading h2 { font-size: 16px; }
+            .result-heading { align-items: flex-start; flex-direction: column; }
+            .result-actions { width: 100%; justify-content: flex-end; }
+            .result-text { min-height: 100px; padding: 15px; font-size: 18px; }
         }
-        h1 {
-            text-align: center;
-            font-size: 24px;
-            margin-bottom: 20px;
-        }
-		
-		#prompt-a {
-			color: rgba(8, 66, 160, 1);
-		}
-
-		#prompt-a:visited {
-			color: rgba(8, 66, 160, 1);
-		}
-
-		#prompt-a:hover {
-			color: blue;
-			text-decoration: underline;
-		}
-
-		#prompt-a:active {
-			position: relative;
-			top: 1px;
-		}
-
-
-        .result-container {
-            margin-top: 30px;
-        }
-
-        .form-label {
-            margin: 0px;
-        }
-        .container .form-label {
-            font-size: 16px; /* 按需调整字体大小 */
-        }
-
-       .result-text {
-            font-size: 20px;
-            min-height: 2em; /* 设置最小高度为一个行高，以确保至少有一行高度 */
-            display: flex;
-            align-items: center; /* 垂直居中对齐内容 */
-            height: auto; /* 设置高度为自动 */
-            overflow-wrap: anywhere;
-        }
-        
-        .copy-button {
-        }
-        
-        footer {
-            text-align: center;
-            margin: 0px auto;
-            text-overflow: ellipsis;
-            overflow: hidden;
-            white-space: nowrap;
-            max-width: 600px;
-        }
-
-        footer p {
-            margin: 6px 0;
-        }
-
-        footer a {
-            color: inherit;
-            text-decoration: none; 
-        }
-
-        footer a:visited {
-            color: inherit;
-            text-decoration: none; 
-        }
-
-        footer a:hover {
-            color: rgba(8, 66, 160, 1);
-            text-decoration: underline;
-        }
-
-        footer a:active {
-            position: relative;
-            top: 1px;
-        }
-
+        @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; } }
     </style>
 </head>
-
 <body>
-    <div class="container">
-        <h1>数字转人民币大写金额</h1>
+    <a class="skip-link" href="#main">跳到主要内容</a>
 
-        <div class="row justify-content-center">
-            <div class="col-md-8">
-                <div class="mb-3">
-                    <label class="form-label fs-4">输入数字：</label>
-					<a id="prompt-a" href="https://www.linchun.com.cn/posts/f6f9d33e.html">查看说明</a>
-                    <div class="input-group">
-						<input id="inputmoney" type="text" class="form-control" oninput="show(this.value)">
-                        <button class="btn btn-danger" type="button" onclick="clearAndFocus()">清空</button>
-                    </div>
+    <header class="app-header">
+        <div class="app-header-inner">
+            <a class="app-brand" href="./" aria-label="数字转人民币大写金额首页">
+                <span class="brand-mark" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M6 5h12M6 9h12M8 13h8M12 5v14M7 19h10"></path>
+                    </svg>
+                </span>
+                <span class="brand-copy">
+                    <strong>数字转人民币大写金额</strong>
+                    <p>输入数字，实时转换为人民币大写金额</p>
+                </span>
+            </a>
+        </div>
+    </header>
+
+    <main id="main" class="page-main">
+        <section class="tool-card" aria-labelledby="input-title">
+            <div class="section-heading">
+                <div>
+                    <h1 id="input-title">输入金额</h1>
+                    <p>支持整数、小数、负数及科学计数法。</p>
                 </div>
+                <a class="help-link" href="https://www.linchun.com.cn/posts/f6f9d33e.html">查看说明</a>
+            </div>
+            <label for="inputmoney">数字金额</label>
+            <div class="input-actions">
+                <input id="inputmoney" type="text" inputmode="decimal" autocomplete="off" placeholder="例如：123456.78" autofocus>
+                <button class="secondary-button" type="button" id="clearBtn">清空</button>
+            </div>
+        </section>
 
-                <div class="result-container">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <label class="form-label fs-4">人民币大写金额：</label>
-                        <label id="alertTxet" class="form-label fs-4" style="background:#F0F0F0"></label>
-                        <button class="btn btn-success copy-button" onclick="copyResult1()">复制</button>
-                    </div>
-                    <div id="result1" class="form-control result-text" readonly></div>
+        <section class="result-card" aria-labelledby="result-title">
+            <div class="result-heading">
+                <div>
+                    <h2 id="result-title">人民币大写金额</h2>
+                    <p>转换结果可直接复制。</p>
+                </div>
+                <div class="result-actions">
+                    <span id="alertText" class="status-text" role="status" aria-live="polite"></span>
+                    <button class="primary-button" type="button" id="copyBtn">复制</button>
                 </div>
             </div>
-        </div>		
-    </div>
-	
-	<footer>
-        <p>&copy; 2023 <a href="https://www.linchun.com.cn">林春写字的地方</a></p>
+            <output id="result1" class="result-text empty" aria-live="polite">等待输入金额。</output>
+        </section>
+
+        <p class="calculator-note">转换仅用于文本书写辅助，请在票据、合同等正式场景中自行复核金额。</p>
+    </main>
+
+    <footer class="page-footer">
+        <p>&copy; 2026 <a href="https://www.linchun.com.cn">林春写字的地方</a></p>
     </footer>
 
     <script>
-        // 使用现代的语法定义 window.onload 事件
-        window.addEventListener('load', () => {
-            show($('inputmoney').value);
-            const inputElement = document.getElementById("inputmoney");
-            inputElement.focus();
-        });
+        (() => {
+            'use strict';
 
-        function clearAndFocus() {
-            const inputElement = document.getElementById("inputmoney");
-            inputElement.value = "";
-            inputElement.focus();
-            show("");
-        }
+            const input = document.getElementById('inputmoney');
+            const result = document.getElementById('result1');
+            const alertText = document.getElementById('alertText');
+            const validNumber = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
+            let statusTimer;
 
-        $ = function() {
-            return document.getElementById.apply(document, arguments);
-        }
+            function setStatus(message) {
+                alertText.textContent = message;
+                window.clearTimeout(statusTimer);
+                statusTimer = window.setTimeout(() => { alertText.textContent = ''; }, 2200);
+            }
 
-        function show(money) {
-            money = money.replace(/[^0-9eE+\-.]/g, "");
-            $('inputmoney').value = money;
-            $('result1').textContent = Nzh.cn.toMoney(money);
-        }
+            function render() {
+                const cleaned = input.value.replace(/[^0-9eE+\-.]/g, '');
+                if (cleaned !== input.value) input.value = cleaned;
 
-        function copyResult1() {
-			const result1Element = document.getElementById("result1");
-			const result1Value = result1Element.textContent.trim();
+                const value = cleaned.trim();
+                result.classList.remove('error');
 
-			const alertTextElement = document.getElementById("alertTxet");
+                if (!value) {
+                    result.textContent = '等待输入金额。';
+                    result.classList.add('empty');
+                    return;
+                }
 
-			if (result1Value === "") {
-				alertTextElement.textContent = "无金额";
-			} else {
-				const textArea = document.createElement("textarea");
-				textArea.value = result1Value;
-				document.body.appendChild(textArea);
-				textArea.select();
-				document.execCommand("copy");
-				document.body.removeChild(textArea);
+                result.classList.remove('empty');
+                if (!validNumber.test(value)) {
+                    result.textContent = '请输入有效数字。';
+                    result.classList.add('error');
+                    return;
+                }
 
-				alertTextElement.textContent = "已复制";
-			}
+                try {
+                    result.textContent = Nzh.cn.toMoney(value);
+                } catch (error) {
+                    result.textContent = '金额格式暂无法转换，请检查输入。';
+                    result.classList.add('error');
+                }
+            }
 
-			setTimeout(function() {
-				alertTextElement.textContent = "";
-			}, 3000);
-		}
+            async function copyText(text) {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(text);
+                    return;
+                }
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                textArea.setAttribute('readonly', '');
+                textArea.style.position = 'fixed';
+                textArea.style.opacity = '0';
+                document.body.appendChild(textArea);
+                textArea.select();
+                const copied = document.execCommand('copy');
+                textArea.remove();
+                if (!copied) throw new Error('copy failed');
+            }
+
+            document.getElementById('clearBtn').addEventListener('click', () => {
+                input.value = '';
+                render();
+                input.focus();
+            });
+
+            document.getElementById('copyBtn').addEventListener('click', async () => {
+                if (result.classList.contains('empty') || result.classList.contains('error')) {
+                    setStatus('无金额');
+                    return;
+                }
+                try {
+                    await copyText(result.textContent.trim());
+                    setStatus('已复制');
+                } catch (error) {
+                    setStatus('复制失败');
+                }
+            });
+
+            input.addEventListener('input', render);
+            render();
+        })();
     </script>
 
-    <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-K2S9L4CHNP"></script>
     <script>
         window.dataLayer = window.dataLayer || [];
