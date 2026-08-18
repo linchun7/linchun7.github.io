@@ -18,11 +18,8 @@ async function routeJson(page, pattern, payload, status = 200) {
     });
 }
 
-async function testMyIp() {
+async function createMyIpContext() {
     const context = await browser.newContext();
-
-    // Simulate Safari/WebKit privacy behavior: host candidate is an mDNS name,
-    // while all public-IP providers continue to run independently.
     await context.addInitScript(() => {
         class PrivacyPeerConnection {
             constructor() {
@@ -30,9 +27,7 @@ async function testMyIp() {
                 this.onicecandidateerror = null;
             }
             createDataChannel() {}
-            async createOffer() {
-                return { type: 'offer', sdp: '' };
-            }
+            async createOffer() { return { type: 'offer', sdp: '' }; }
             async setLocalDescription() {
                 setTimeout(() => {
                     if (this.onicecandidate) {
@@ -61,58 +56,133 @@ async function testMyIp() {
             value: undefined
         });
     });
+    return context;
+}
 
+async function testMyIpSplitRouting() {
+    const context = await createMyIpContext();
     const page = await context.newPage();
     const pageErrors = [];
     page.on('pageerror', (error) => pageErrors.push(error));
 
-    await routeJson(page, '**/qifu-api.baidubce.com/**', {
-        ip: '203.0.113.10',
+    await routeJson(page, '**/api.bilibili.com/**', {
+        code: 0,
+        message: '0',
         data: {
+            addr: '203.0.113.10',
             country: '中国',
-            prov: '四川省',
-            city: '成都市',
-            district: '',
+            province: '四川',
+            city: '成都',
             isp: '示例运营商'
         }
     });
-
-    // One provider intentionally fails to prove failures are isolated.
-    await routeJson(page, '**/api.ip.sb/**', { error: 'temporary' }, 503);
-
-    await routeJson(page, '**/api64.ipify.org/**', { ip: '203.0.113.10' });
-    await routeJson(page, '**/ipapi.co/**', {
-        country_name: 'China',
-        region: 'Sichuan',
-        city: 'Chengdu',
-        org: 'Example ISP'
+    await routeJson(page, '**/api.ip.sb/**', {
+        ip: '198.51.100.20',
+        country: 'Japan',
+        region: 'Tokyo',
+        city: 'Tokyo',
+        isp: 'Example Proxy'
     });
-
-    for (const target of [
-        '**/www.baidu.com/**',
-        '**/music.163.com/**',
-        '**/github.com/favicon.ico*',
-        '**/www.youtube.com/**'
-    ]) {
-        await page.route(target, (route) => route.fulfill({ status: 204, body: '' }));
-    }
-
+    await routeJson(page, '**/api.ipify.org/**', { ip: '198.51.100.20' });
+    await routeJson(page, '**/api6.ipify.org/**', { ip: '2001:db8::20' });
+    await page.route('**/ipwho.is/**', (route) => route.abort());
     await page.route('**/googletagmanager.com/**', (route) => route.abort());
 
     await page.goto(`${baseUrl}/tools/myip/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#summary-status')?.textContent === '已分流');
 
-    await page.waitForFunction(() => document.querySelector('#provider-baidu-status')?.textContent === '正常');
-    await page.waitForFunction(() => document.querySelector('#provider-ipify-status')?.textContent === '正常');
-    await page.waitForFunction(() => document.querySelector('#provider-ipsb-status')?.textContent === '失败');
-    await page.waitForFunction(() => document.querySelector('#webrtc-status')?.textContent === '隐私保护');
-
-    assert.equal(await page.locator('#provider-baidu-ip').textContent(), '203.0.113.10');
-    assert.equal(await page.locator('#provider-ipify-ip').textContent(), '203.0.113.10');
-    assert.match(await page.locator('#webrtc-ip').textContent(), /本地地址已被浏览器隐藏/);
-    assert.equal(await page.locator('#summary-ip').textContent(), '203.0.113.10');
-    assert.equal(pageErrors.length, 0, `myip page errors: ${pageErrors.map(String).join('; ')}`);
+    assert.equal(await page.locator('#domestic-ipv4').textContent(), '203.0.113.10');
+    assert.equal(await page.locator('#international-ipv4').textContent(), '198.51.100.20');
+    assert.equal(await page.locator('#international-ipv6').textContent(), '2001:db8::20');
+    assert.match(await page.locator('#summary-main').textContent(), /国内 \/ 国际不同出口/);
+    assert.equal(await page.locator('#summary-routing').textContent(), '国内 / 国际不同出口');
+    assert.equal(await page.locator('#webrtc-status').textContent(), '隐私保护');
+    assert.equal(pageErrors.length, 0, `myip split page errors: ${pageErrors.map(String).join('; ')}`);
 
     await context.close();
+}
+
+async function testMyIpDomesticFallbackAndOptionalIpv6() {
+    const context = await createMyIpContext();
+    const page = await context.newPage();
+    const pageErrors = [];
+    let domesticPrimaryAttempts = 0;
+    page.on('pageerror', (error) => pageErrors.push(error));
+
+    await page.route('**/api.bilibili.com/**', async (route) => {
+        domesticPrimaryAttempts += 1;
+        await route.fulfill({ status: 503, contentType: 'application/json', body: '{}' });
+    });
+    await page.route('**/whois.pconline.com.cn/**', async (route) => {
+        const callback = new URL(route.request().url()).searchParams.get('callback');
+        assert.ok(callback, 'PConline JSONP callback should be present');
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/javascript; charset=utf-8',
+            body: `${callback}(${JSON.stringify({
+                ip: '203.0.113.30',
+                pro: '四川省',
+                city: '成都市',
+                region: '',
+                addr: '四川省成都市 示例运营商'
+            })});`
+        });
+    });
+    await routeJson(page, '**/api.ip.sb/**', { error: 'temporary' }, 503);
+    await routeJson(page, '**/api.ipify.org/**', { ip: '198.51.100.77' });
+    await page.route('**/api6.ipify.org/**', (route) => route.abort());
+    await page.route('**/ipwho.is/**', (route) => route.abort());
+    await page.route('**/googletagmanager.com/**', (route) => route.abort());
+
+    await page.goto(`${baseUrl}/tools/myip/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#summary-status')?.textContent === '已分流');
+
+    assert.equal(domesticPrimaryAttempts, 2, 'domestic primary should retry once before fallback');
+    assert.equal(await page.locator('#source-domestic-status').textContent(), '备用成功');
+    assert.equal(await page.locator('#domestic-ipv4').textContent(), '203.0.113.30');
+    assert.equal(await page.locator('#international-ipv4').textContent(), '198.51.100.77');
+    assert.equal(await page.locator('#source-ipify6-status').textContent(), '未检测到');
+    assert.equal(await page.locator('#source-fallback-status').textContent(), '待命');
+    assert.equal(pageErrors.length, 0, `myip fallback page errors: ${pageErrors.map(String).join('; ')}`);
+
+    await context.close();
+}
+
+async function testMyIpAllFailuresReachFinalState() {
+    const context = await createMyIpContext();
+    const page = await context.newPage();
+    const pageErrors = [];
+    page.on('pageerror', (error) => pageErrors.push(error));
+
+    for (const pattern of [
+        '**/api.bilibili.com/**',
+        '**/api.ip.sb/**',
+        '**/api.ipify.org/**',
+        '**/ipwho.is/**'
+    ]) {
+        await routeJson(page, pattern, { error: 'unavailable' }, 503);
+    }
+    await page.route('**/api6.ipify.org/**', (route) => route.abort());
+    await page.route('**/whois.pconline.com.cn/**', (route) => route.abort());
+    await page.route('**/googletagmanager.com/**', (route) => route.abort());
+
+    await page.goto(`${baseUrl}/tools/myip/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#summary-status')?.textContent === '未确认');
+
+    assert.equal(await page.locator('#summary-routing').textContent(), '无法判断');
+    assert.match(await page.locator('#summary-main').textContent(), /未能确认当前公网出口/);
+    assert.equal(await page.locator('#domestic-status').textContent(), '未确认');
+    assert.equal(await page.locator('#international-status').textContent(), '未确认');
+    assert.equal(await page.locator('#source-ipify6-status').textContent(), '未检测到');
+    assert.equal(pageErrors.length, 0, `myip failure page errors: ${pageErrors.map(String).join('; ')}`);
+
+    await context.close();
+}
+
+async function testMyIp() {
+    await testMyIpSplitRouting();
+    await testMyIpDomesticFallbackAndOptionalIpv6();
+    await testMyIpAllFailuresReachFinalState();
 }
 
 async function testFinance() {
