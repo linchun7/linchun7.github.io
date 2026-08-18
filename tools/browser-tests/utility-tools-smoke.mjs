@@ -25,6 +25,12 @@ async function testRmbConverter() {
     assert.equal(await page.locator('script[src="dist/nzh.min.js"]').count(), 1, 'RMB converter should use local Nzh');
     assert.equal(await page.locator('#inputmoney').getAttribute('autofocus'), null, 'mobile page should not force-open the keyboard');
 
+    const initialResultBox = await page.locator('.result-card').boundingBox();
+    const initialToolBox = await page.locator('.tool-card').boundingBox();
+    assert.ok(initialResultBox && initialToolBox && initialResultBox.y < initialToolBox.y, 'result card should be above the input card from initial render');
+    assert.equal(await page.locator('.result-card').evaluate((el) => getComputedStyle(el).position), 'sticky');
+    assert.equal(await page.locator('#result1').evaluate((el) => getComputedStyle(el).overflowY), 'auto');
+
     await page.fill('#inputmoney', '123456.78');
     await page.waitForFunction(() => document.querySelector('#result1')?.textContent?.includes('壹拾贰万'));
     assert.equal(
@@ -34,17 +40,17 @@ async function testRmbConverter() {
 
     const focusedResultBox = await page.locator('.result-card').boundingBox();
     const focusedToolBox = await page.locator('.tool-card').boundingBox();
-    assert.ok(focusedResultBox && focusedToolBox && focusedResultBox.y < focusedToolBox.y, 'focused mobile input should place live result above the input card');
+    assert.ok(focusedResultBox && focusedToolBox && focusedResultBox.y < focusedToolBox.y, 'focused input must not reorder the stable result/input layout');
 
     await page.fill('#inputmoney', '.5');
     await page.waitForFunction(() => document.querySelector('#result1')?.textContent === '人民币伍角');
     assert.equal(await page.locator('#result1').textContent(), '人民币伍角');
 
     await page.evaluate(() => document.activeElement?.blur());
-    await page.waitForFunction(() => !document.body.classList.contains('rmb-input-active'));
     const blurredResultBox = await page.locator('.result-card').boundingBox();
     const blurredToolBox = await page.locator('.tool-card').boundingBox();
-    assert.ok(blurredResultBox && blurredToolBox && blurredResultBox.y > blurredToolBox.y, 'result should return below the input card after editing');
+    assert.ok(blurredResultBox && blurredToolBox && blurredResultBox.y < blurredToolBox.y, 'blur must keep result above input without a layout jump');
+    assert.equal(await page.locator('body').evaluate((el) => el.classList.contains('rmb-input-active')), false, 'focus-based layout state should be removed');
 
     assert.equal(pageErrors.length, 0, `RMB converter page errors: ${pageErrors.map(String).join('; ')}`);
     await context.close();
@@ -93,7 +99,6 @@ async function testRenovationCalculator() {
     await page.waitForFunction(() => document.querySelector('.summary-card')?.textContent?.includes('0.00%'));
     assert.match(await page.locator('.summary-card').first().textContent(), /0\.00%/);
 
-    // 旧算法把“固定四舍五入月本金”累加，1 元 / 60 期会在尾期出现负本金。
     await page.fill('#loanAmount', '1');
     await page.fill('#loanTerm', '60');
     await page.fill('#serviceFee', '0');
@@ -103,7 +108,6 @@ async function testRenovationCalculator() {
     assert.equal(principalCells.some(text => text.includes('-')), false, 'principal instalments must never become negative after cent rounding');
     assert.match(await page.locator('tbody tr').last().textContent(), /￥1\.00/, 'rounded principal instalments must sum back to the original loan amount');
 
-    // 贷款现金流按人民币“分”计算，超过两位小数的输入先规范到分，避免零手续费现金流出现亚分差额。
     await page.fill('#loanAmount', '100000.001');
     await page.fill('#loanTerm', '12');
     await page.fill('#serviceFee', '0');
@@ -111,6 +115,15 @@ async function testRenovationCalculator() {
     await page.waitForFunction(() => document.querySelector('.summary-card')?.textContent?.includes('0.00%'));
     assert.match(await page.locator('.summary-card').first().textContent(), /0\.00%/);
     assert.match(await page.locator('tbody tr').last().textContent(), /100,000\.00/);
+
+    // 最大支持期限也必须在浏览器中完整完成，覆盖 IRR 最重的正常输入路径。
+    await page.fill('#loanAmount', '100000');
+    await page.fill('#loanTerm', '600');
+    await page.fill('#serviceFee', '0.18');
+    await page.click('#calculateBtn');
+    await page.waitForFunction(() => document.querySelectorAll('tbody tr').length === 601);
+    assert.equal(await page.locator('tbody tr').count(), 601, '600 instalments plus total row expected');
+    assert.match(await page.locator('.summary-card').first().textContent(), /实际年化利率/);
 
     assert.equal(pageErrors.length, 0, `renovation calculator page errors: ${pageErrors.map(String).join('; ')}`);
     await context.close();
@@ -138,6 +151,30 @@ async function testFinancialCalculatorAlgorithms() {
 
     await page.click('#tab4');
     assert.match(await page.locator('label[for="annualRate3"]').textContent(), /名义年利率（APR）/);
+    assert.match(await page.locator('label[for="rateType4"]').textContent(), /周\/日年计息天数/);
+
+    await page.fill('#principal3', '10000');
+    await page.selectOption('#compoundingFrequency', 'monthly');
+    await page.fill('#depositPeriod', '12');
+    await page.fill('#annualRate3', '12');
+    await page.selectOption('#rateType4', '360');
+    await page.click('#calculate4');
+    const monthly360 = await page.locator('#result4').textContent();
+    await page.selectOption('#rateType4', '365');
+    await page.click('#calculate4');
+    const monthly365 = await page.locator('#result4').textContent();
+    assert.equal(monthly360, monthly365, '360/365 selection must not affect monthly APR compounding');
+    assert.match(monthly365, /11,268\.25/);
+
+    await page.selectOption('#compoundingFrequency', 'daily');
+    await page.fill('#depositPeriod', '365');
+    await page.selectOption('#rateType4', '360');
+    await page.click('#calculate4');
+    const daily360 = await page.locator('#result4').textContent();
+    await page.selectOption('#rateType4', '365');
+    await page.click('#calculate4');
+    const daily365 = await page.locator('#result4').textContent();
+    assert.notEqual(daily360, daily365, '360/365 selection should affect daily APR compounding');
 
     assert.equal(pageErrors.length, 0, `financial calculator page errors: ${pageErrors.map(String).join('; ')}`);
     await context.close();
