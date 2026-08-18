@@ -42,6 +42,15 @@ try {
     await page.fill('#inputInfo', '行长');
     assert.equal(await resultText(page, '#result2'), 'háng zhǎng');
 
+    await page.fill('#inputInfo', '重庆');
+    assert.equal(await resultText(page, '#result2'), 'chóng qìng');
+
+    await page.fill('#inputInfo', '音乐');
+    assert.equal(await resultText(page, '#result2'), 'yīn yuè');
+
+    await page.fill('#inputInfo', '银行');
+    assert.equal(await resultText(page, '#result2'), 'yín háng');
+
     await page.fill('#inputInfo', '行');
     const multiple = await resultText(page, '#result5');
     assert.match(multiple, /xíng/);
