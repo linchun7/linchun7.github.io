@@ -1,170 +1,208 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-	<meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, maximum-scale=1, user-scalable=no">
-    <link rel="stylesheet" href="../css/bootstrap.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/pangu/dist/browser/pangu.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="format-detection" content="telephone=no">
+    <meta name="description" content="中英文加空格工具：为中文与英文、数字等内容之间自动补充合适空格，并保留原有段落和换行。">
+    <title>中英文加空格工具</title>
     <link rel="shortcut icon" href="/images/favicon.ico">
     <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
     <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
-    <title>中英文加空格工具</title>
-
-	
-	
- <style>
-        body {
-            font-family: "Helvetica Neue", Helvetica, Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-			overflow-x:hidden;
-     
+    <script src="dist/browser/pangu.min.js"></script>
+    <style>
+        :root {
+            color-scheme: light;
+            --page: #eef2f6;
+            --surface: #fff;
+            --surface-soft: #f7f9fb;
+            --line: #dce4eb;
+            --ink: #17212b;
+            --muted: #5a6875;
+            --accent: #1168d4;
+            --accent-dark: #0755b5;
+            --accent-soft: #eaf3ff;
+            --green: #087a45;
+            --shadow: 0 8px 24px rgba(24, 43, 61, .06);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
         }
-
-        .container {
-            margin-top: 20px;
-            flex-grow: 1;
-            padding: 15px;
+        * { box-sizing: border-box; }
+        html { background: var(--page); scrollbar-gutter: stable; }
+        body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; color: var(--ink); background: var(--page); font-size: 14px; line-height: 1.5; }
+        button, textarea { font: inherit; }
+        button { cursor: pointer; }
+        a { color: var(--accent-dark); text-decoration: none; }
+        a:hover { color: var(--accent); }
+        button, a { touch-action: manipulation; -webkit-tap-highlight-color: rgba(0, 113, 227, .18); }
+        button:focus-visible, a:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        .skip-link { position: fixed; top: 8px; left: 8px; z-index: 100; padding: 8px 12px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); transform: translateY(-150%); }
+        .skip-link:focus { transform: translateY(0); }
+        .app-header { background: var(--surface); border-bottom: 1px solid var(--line); }
+        .app-header-inner, .page-main, .page-footer { width: min(820px, calc(100% - 40px)); margin: 0 auto; }
+        .app-header-inner { min-height: 64px; display: flex; align-items: center; }
+        .app-brand { min-width: 0; display: flex; align-items: center; gap: 11px; color: inherit; }
+        .brand-mark { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; color: var(--accent); background: var(--accent-soft); border: 1px solid #cfe2fa; border-radius: 9px; }
+        .brand-mark svg { width: 20px; height: 20px; }
+        .brand-copy { min-width: 0; }
+        .brand-copy strong { display: block; font-size: 18px; line-height: 1.2; }
+        .brand-copy p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+        .page-main { flex: 1; padding: 14px 0 0; }
+        .tool-card { padding: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
+        .section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+        .section-heading h1 { margin: 0; font-size: 18px; line-height: 1.3; }
+        .section-heading p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+        .button-row { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+        .primary-button, .secondary-button { min-height: 38px; padding: 0 13px; border-radius: 8px; font-weight: 700; white-space: nowrap; }
+        .primary-button { border: 1px solid var(--accent); color: #fff; background: var(--accent); }
+        .primary-button:hover { border-color: var(--accent-dark); background: var(--accent-dark); }
+        .secondary-button { border: 1px solid var(--line); color: var(--ink); background: var(--surface); }
+        .secondary-button:hover { border-color: #bdcad5; background: var(--surface-soft); }
+        .primary-button:active, .secondary-button:active { transform: translateY(1px); }
+        textarea { width: 100%; min-height: 360px; margin-top: 10px; padding: 12px; resize: vertical; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: #fff; font-size: 15px; line-height: 1.7; }
+        textarea:hover { border-color: #bdcad5; }
+        textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(17, 104, 212, .10); outline: none; }
+        .input-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; color: var(--muted); font-size: 12px; }
+        .status-text { min-width: 48px; color: var(--green); font-weight: 700; text-align: right; }
+        .calculator-note { margin: 12px 4px 0; color: var(--muted); font-size: 12px; text-align: center; }
+        .page-footer { padding: 10px 0 20px; color: var(--muted); text-align: center; font-size: 12px; }
+        .page-footer p { margin: 0; }
+        .page-footer a { color: inherit; }
+        .page-footer a:hover { color: var(--accent); text-decoration: underline; }
+        @media (max-width: 560px) {
+            .app-header-inner, .page-main, .page-footer { width: min(100% - 28px, 680px); }
+            .brand-copy strong { font-size: 16px; }
+            .brand-copy p { display: none; }
+            .tool-card { padding: 14px; }
+            .section-heading { align-items: stretch; flex-direction: column; }
+            .section-heading h1 { font-size: 16px; }
+            .button-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+            .primary-button, .secondary-button { min-height: 42px; padding: 0 8px; }
+            textarea { min-height: 320px; margin-top: 12px; font-size: 16px; }
         }
-
-        h1 {
-            text-align: center;
-            font-size: 24px;
-            margin-bottom: 30px;
-        }
-
-        .clear-button, .copy-button, .add-button{
-			margin:3px;
-            margin-left: 20px;
-        }
-	 
-		 #info {
-			 resize: none; 
-			 height: 25em;
-			 margin: 0;
-			 margin-bottom: 10px;
-			 padding: 5px;
-
-	 	}
-		 .bg-light {
-		background-color: #959595; 
-		}
-
-	 
-        footer {
-            text-align: center;
-            margin: 0 auto;
-            text-overflow: ellipsis;
-            overflow: hidden;
-            white-space: nowrap;
-            max-width: 600px;
-        }
-
-        footer p {
-            margin: 5px 0;
-        }
-
-        footer a {
-            color: inherit;
-            text-decoration: none;
-        }
-
-        footer a:visited {
-            color: inherit;
-            text-decoration: none;
-        }
-
-        footer a:hover {
-            color: rgba(8, 66, 160, 1);
-            text-decoration: underline;
-        }
-
-        footer a:active {
-            position: relative;
-            top: 1px;
-        }
-</style>
-   
+        @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; } }
+    </style>
 </head>
-
 <body>
+    <a class="skip-link" href="#main">跳到主要内容</a>
 
-	 <div class="container">
-        <h1>中英文加空格工具</h1>
-        <div class="row justify-content-center">
-            <div class="col-md-8">
-                <div class="d-flex justify-content-end">
-					<button class="btn btn-success add-button" type="button" onclick="addInfo()">加空格</button>
-                    <button class="btn btn-danger clear-button" type="button" onclick="clearAndFocus()">清空</button>
-                    <button class="btn btn-warning copy-button" onclick="copyInfo()">复制</button>
-                </div>
-                    <div>
-						<textarea type="text" id="info" class="form-control" oninput="handleTextareaInput(this)"></textarea>
-
-						 <label id="countText" class="form-label fs-4">已输入字符：0</label>
-						<label id="alertText" class="form-label fs-4 bg-light"></label>
-                    </div>
-            </div>
+    <header class="app-header">
+        <div class="app-header-inner">
+            <a class="app-brand" href="./" aria-label="中英文加空格工具首页">
+                <span class="brand-mark" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 7h7M4 12h5M4 17h7M15 7h5M15 12h5M15 17h5"></path>
+                    </svg>
+                </span>
+                <span class="brand-copy">
+                    <strong>中英文加空格工具</strong>
+                    <p>自动补齐中文与英文、数字之间的排版空格</p>
+                </span>
+            </a>
         </div>
-    </div>
+    </header>
 
+    <main id="main" class="page-main">
+        <section class="tool-card" aria-labelledby="tool-title">
+            <div class="section-heading">
+                <div>
+                    <h1 id="tool-title">文本处理</h1>
+                    <p>保留原有段落与换行，只补充需要的中英文间距。</p>
+                </div>
+                <div class="button-row">
+                    <button class="primary-button" type="button" id="addBtn">加空格</button>
+                    <button class="secondary-button" type="button" id="copyBtn">复制</button>
+                    <button class="secondary-button" type="button" id="clearBtn">清空</button>
+                </div>
+            </div>
 
-    <footer>
-        <p>&copy; 2023 <a href="https://www.linchun.com.cn">林春写字的地方</a></p>
+            <label for="info" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">待处理文本</label>
+            <textarea id="info" placeholder="粘贴或输入需要处理的文本" spellcheck="false" autofocus></textarea>
+            <div class="input-meta">
+                <span id="countText">已输入字符：0</span>
+                <span id="alertText" class="status-text" role="status" aria-live="polite"></span>
+            </div>
+        </section>
+
+        <p class="calculator-note">处理由 Pangu.js 完成；不会上传或保存输入内容。</p>
+    </main>
+
+    <footer class="page-footer">
+        <p>&copy; 2026 <a href="https://www.linchun.com.cn">林春写字的地方</a></p>
     </footer>
 
     <script>
-			function addInfo() {
-				const infoTextArea = document.getElementById("info");
-				const content = infoTextArea.value.replace(/\s+/g, ' ').trim();
-				const spacedContent = pangu.spacing(content);
-				infoTextArea.value = spacedContent;
-    			handleTextareaInput(infoTextArea);
-			}
-		
-			window.onload = function() {
-				const infoTextArea = document.getElementById("info");
-				infoTextArea.focus();
-			};
+        (() => {
+            'use strict';
 
-			function clearAndFocus() {
-				const inputElement = document.getElementById("info");
-				inputElement.value = "";
-				inputElement.focus();
-				
-    			handleTextareaInput(inputElement);
-			}
+            const textarea = document.getElementById('info');
+            const countText = document.getElementById('countText');
+            const alertText = document.getElementById('alertText');
+            let statusTimer;
 
-    		function copyInfo() {
-				var infoTextArea = document.getElementById("info");
-				var alertText = document.getElementById("alertText");
+            function updateCount() {
+                countText.textContent = `已输入字符：${Array.from(textarea.value).length}`;
+            }
 
-				if (infoTextArea.value.trim() === "") {
-					alertText.textContent = "无内容";
-				} else {
-					infoTextArea.select();
-					document.execCommand("copy");
-					alertText.textContent = "已复制";
-				}
+            function setStatus(message) {
+                alertText.textContent = message;
+                window.clearTimeout(statusTimer);
+                statusTimer = window.setTimeout(() => { alertText.textContent = ''; }, 2200);
+            }
 
-				setTimeout(function() {
-					alertText.textContent = "";
-				}, 3000);
-			}
-			function handleTextareaInput(textarea) {
-				const content = textarea.value;
-				const characterCount = content.length;
-				const countText = document.getElementById("countText");
-				countText.textContent = `已输入字符：${characterCount}`;
-			}
-		
-	</script>
+            async function copyText(text) {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(text);
+                    return;
+                }
+                const helper = document.createElement('textarea');
+                helper.value = text;
+                helper.setAttribute('readonly', '');
+                helper.style.position = 'fixed';
+                helper.style.opacity = '0';
+                document.body.appendChild(helper);
+                helper.select();
+                const copied = document.execCommand('copy');
+                helper.remove();
+                if (!copied) throw new Error('copy failed');
+            }
 
-    <!-- Google tag (gtag.js) -->
+            document.getElementById('addBtn').addEventListener('click', () => {
+                if (!textarea.value) {
+                    setStatus('无内容');
+                    textarea.focus();
+                    return;
+                }
+                textarea.value = pangu.spacing(textarea.value);
+                updateCount();
+                setStatus('已处理');
+                textarea.focus();
+            });
+
+            document.getElementById('copyBtn').addEventListener('click', async () => {
+                if (!textarea.value.trim()) {
+                    setStatus('无内容');
+                    return;
+                }
+                try {
+                    await copyText(textarea.value);
+                    setStatus('已复制');
+                } catch (error) {
+                    setStatus('复制失败');
+                }
+            });
+
+            document.getElementById('clearBtn').addEventListener('click', () => {
+                textarea.value = '';
+                updateCount();
+                setStatus('已清空');
+                textarea.focus();
+            });
+
+            textarea.addEventListener('input', updateCount);
+            updateCount();
+        })();
+    </script>
+
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-K2S9L4CHNP"></script>
     <script>
         window.dataLayer = window.dataLayer || [];
@@ -174,7 +212,3 @@
     </script>
 </body>
 </html>
-
-
-
-   
