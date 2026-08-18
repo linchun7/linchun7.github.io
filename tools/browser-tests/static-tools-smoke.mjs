@@ -194,7 +194,7 @@ async function testMyIpRejectsLoopbackAndUsesDomesticBackup() {
     await page.waitForFunction(() => document.querySelector('#summary-status')?.textContent === '已分流');
 
     assert.equal(await page.locator('#domestic-ipv4').textContent(), domesticBackupIp);
-    assert.equal(await page.locator('#source-pconline-status').textContent(), '未响应');
+    assert.equal(await page.locator('#source-pconline-status').textContent(), '已忽略');
     assert.match(await page.locator('#source-pconline-detail').textContent(), /非公网 IP/);
     assert.equal(await page.locator('#source-ipw-status').textContent(), '备用正常');
     assert.notEqual(await page.locator('#domestic-ipv4').textContent(), '127.0.0.1');
