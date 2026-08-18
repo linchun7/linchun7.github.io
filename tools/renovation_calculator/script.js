@@ -56,8 +56,9 @@ const validationUtils = {
         const amountRaw = document.getElementById('loanAmount').value.trim();
         const termRaw = document.getElementById('loanTerm').value.trim();
         const feeRaw = document.getElementById('serviceFee').value.trim();
+        const amountNumber = Number(amountRaw);
         const inputs = {
-            loanAmount: Number(amountRaw),
+            loanAmount: Number.isFinite(amountNumber) ? numberUtils.toFixed2(amountNumber) : NaN,
             loanTerm: Number(termRaw),
             serviceFeeRate: Number(feeRaw)
         };
