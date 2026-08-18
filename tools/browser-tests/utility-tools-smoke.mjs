@@ -93,6 +93,16 @@ async function testRenovationCalculator() {
     await page.waitForFunction(() => document.querySelector('.summary-card')?.textContent?.includes('0.00%'));
     assert.match(await page.locator('.summary-card').first().textContent(), /0\.00%/);
 
+    // 旧算法把“固定四舍五入月本金”累加，1 元 / 60 期会在尾期出现负本金。
+    await page.fill('#loanAmount', '1');
+    await page.fill('#loanTerm', '60');
+    await page.fill('#serviceFee', '0');
+    await page.click('#calculateBtn');
+    await page.waitForFunction(() => document.querySelectorAll('tbody tr').length === 61);
+    const principalCells = await page.locator('tbody tr:not(:last-child) td:nth-child(3)').allTextContents();
+    assert.equal(principalCells.some(text => text.includes('-')), false, 'principal instalments must never become negative after cent rounding');
+    assert.match(await page.locator('tbody tr').last().textContent(), /￥1\.00/, 'rounded principal instalments must sum back to the original loan amount');
+
     assert.equal(pageErrors.length, 0, `renovation calculator page errors: ${pageErrors.map(String).join('; ')}`);
     await context.close();
 }
