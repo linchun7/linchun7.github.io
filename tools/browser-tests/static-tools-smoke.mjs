@@ -30,16 +30,6 @@ async function routePconline(page, payload) {
     });
 }
 
-async function routeSohu(page, payload) {
-    await page.route('**/pv.sohu.com/cityjson**', async (route) => {
-        await route.fulfill({
-            status: 200,
-            contentType: 'application/javascript; charset=utf-8',
-            body: `var returnCitySN = ${JSON.stringify(payload)};`
-        });
-    });
-}
-
 async function createMyIpContext() {
     const context = await browser.newContext();
     await context.addInitScript(() => {
@@ -121,26 +111,38 @@ async function testMyIpSplitRouting() {
     assert.match(await page.locator('#summary-main').textContent(), /国内 \/ 国际不同出口/);
     assert.equal(await page.locator('#summary-routing').textContent(), '国内 / 国际不同出口');
     assert.equal(await page.locator('#webrtc-status').textContent(), '隐私保护');
+    assert.equal(await page.locator('iframe[sandbox]').count(), 0, 'completed sandbox probes should be removed');
     assert.equal(pageErrors.length, 0, `myip split page errors: ${pageErrors.map(String).join('; ')}`);
 
     await context.close();
 }
 
-async function testMyIpDomesticFallbackAndOptionalIpv6() {
+async function testMyIpDomesticFallbackAndRetryReset() {
     const context = await createMyIpContext();
     const page = await context.newPage();
     const pageErrors = [];
     let domesticPrimaryAttempts = 0;
+    let failSohu = false;
     page.on('pageerror', (error) => pageErrors.push(error));
 
     await page.route('**/whois.pconline.com.cn/**', async (route) => {
         domesticPrimaryAttempts += 1;
         await route.abort();
     });
-    await routeSohu(page, {
-        cip: '203.0.113.30',
-        cid: '510100',
-        cname: '四川省成都市'
+    await page.route('**/pv.sohu.com/cityjson**', async (route) => {
+        if (failSohu) {
+            await route.abort();
+            return;
+        }
+        await route.fulfill({
+            status: 200,
+            contentType: 'application/javascript; charset=utf-8',
+            body: `var returnCitySN = ${JSON.stringify({
+                cip: '203.0.113.30',
+                cid: '510100',
+                cname: '四川省成都市'
+            })};`
+        });
     });
     await routeJson(page, '**/api.ip.sb/**', { error: 'temporary' }, 503);
     await routeJson(page, '**/api.ipify.org/**', { ip: '198.51.100.77' });
@@ -157,6 +159,17 @@ async function testMyIpDomesticFallbackAndOptionalIpv6() {
     assert.equal(await page.locator('#international-ipv4').textContent(), '198.51.100.77');
     assert.equal(await page.locator('#source-ipify6-status').textContent(), '未检测到');
     assert.equal(await page.locator('#source-fallback-status').textContent(), '待命');
+
+    failSohu = true;
+    await page.click('#retry-all');
+    await page.waitForFunction(() => document.querySelector('#domestic-status')?.textContent === '未确认');
+    await page.waitForFunction(() => document.querySelector('#summary-status')?.textContent === '部分结果');
+
+    assert.equal(domesticPrimaryAttempts, 4, 'second detection should run fresh PConline retries');
+    assert.equal(await page.locator('#domestic-ipv4').textContent(), '未检测到');
+    assert.equal(await page.locator('#source-domestic-status').textContent(), '未确认');
+    assert.equal(await page.locator('#summary-routing').textContent(), '证据不足');
+    assert.equal(await page.locator('iframe[sandbox]').count(), 0, 'failed sandbox probes should be removed');
     assert.equal(pageErrors.length, 0, `myip fallback page errors: ${pageErrors.map(String).join('; ')}`);
 
     await context.close();
@@ -226,6 +239,7 @@ async function testMyIpAllFailuresReachFinalState() {
     assert.equal(await page.locator('#domestic-status').textContent(), '未确认');
     assert.equal(await page.locator('#international-status').textContent(), '未确认');
     assert.equal(await page.locator('#source-ipify6-status').textContent(), '未检测到');
+    assert.equal(await page.locator('iframe[sandbox]').count(), 0, 'failed sandbox probes should be removed');
     assert.equal(pageErrors.length, 0, `myip failure page errors: ${pageErrors.map(String).join('; ')}`);
 
     await context.close();
@@ -233,7 +247,7 @@ async function testMyIpAllFailuresReachFinalState() {
 
 async function testMyIp() {
     await testMyIpSplitRouting();
-    await testMyIpDomesticFallbackAndOptionalIpv6();
+    await testMyIpDomesticFallbackAndRetryReset();
     await testMyIpDifferentFamiliesAreNotSplit();
     await testMyIpAllFailuresReachFinalState();
 }
