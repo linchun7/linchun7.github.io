@@ -214,7 +214,7 @@
         const config = frequencyConfig[frequency];
         if (!config) throw new Error('复利方式无效');
 
-        // 360 / 365 天只参与按周、按日复利；其他复利频率直接按 APR 的名义周期数折算。
+        // 360 / 365 天只参与按周、按日复利；其他频率完全忽略该选择。
         const annualDays = config.dayBased ? readAnnualDays('rateType4') : 365;
         const periodicRate = getPeriodicRate(annualRate, frequency, annualDays);
         const growthFactor = Math.pow(1 + periodicRate, periods);
@@ -258,7 +258,6 @@
     function updateFrequencyLabel() {
         const config = frequencyConfig[$('compoundingFrequency').value] || frequencyConfig.annually;
         $('frequency').textContent = config.label;
-        $('rateType4').disabled = !config.dayBased;
     }
 
     function init() {
