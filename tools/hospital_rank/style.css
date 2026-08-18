@@ -163,3 +163,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .rank-history-header { align-items: flex-start; flex-direction: column; gap: 3px; }
   .workspace-footer, .data-disclaimer { padding-left: 14px; padding-right: 14px; }
 }
+
+.history-source-name {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
