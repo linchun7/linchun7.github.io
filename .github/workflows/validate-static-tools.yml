@@ -6,8 +6,12 @@ on:
       - '.github/workflows/validate-static-tools.yml'
       - 'tools/myip/**'
       - 'tools/financial_calculator/**'
+      - 'tools/renovation_calculator/**'
+      - 'tools/rmb_converter/**'
+      - 'tools/space/**'
       - 'tools/card_number_new/**'
       - 'tools/pinyin/**'
+      - 'tools/vendor/**'
       - 'tools/browser-tests/**'
   push:
     branches: [main]
@@ -15,8 +19,12 @@ on:
       - '.github/workflows/validate-static-tools.yml'
       - 'tools/myip/**'
       - 'tools/financial_calculator/**'
+      - 'tools/renovation_calculator/**'
+      - 'tools/rmb_converter/**'
+      - 'tools/space/**'
       - 'tools/card_number_new/**'
       - 'tools/pinyin/**'
+      - 'tools/vendor/**'
       - 'tools/browser-tests/**'
   schedule:
     - cron: '23 4 * * *'
@@ -72,6 +80,7 @@ jobs:
           node tools/browser-tests/static-tools-smoke.mjs
           node tools/browser-tests/card-number-new-smoke.mjs
           node tools/browser-tests/pinyin-smoke.mjs
+          node tools/browser-tests/utility-tools-smoke.mjs
 
       - name: 检查差异格式
         if: github.event_name == 'pull_request'
@@ -167,3 +176,106 @@ jobs:
           git add tools/pinyin/index.html
           git commit -m "chore(pinyin): update pinyin-pro to ${LATEST}"
           git push origin HEAD:main
+
+  update-static-vendors:
+    if: github.event_name == 'schedule'
+    needs: update-pinyin-pro
+    name: 检查并验证 Nzh / Pangu.js 更新
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+
+    steps:
+      - name: 检出最新 main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: 记录生成基线
+        id: base
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: 配置 Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: 检查最新版并运行库级测试
+        run: node tools/vendor/update-static-vendors.mjs
+
+      - name: 判断是否有新版本
+        id: changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          allowed='^(tools/rmb_converter/dist/nzh\.min\.js|tools/space/dist/browser/pangu\.min\.js)$'
+          changed_files=$(git diff --name-only)
+          if [[ -z "$changed_files" ]]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Nzh / Pangu.js 已是当前最新版。" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          unexpected=$(printf '%s\n' "$changed_files" | grep -Ev "$allowed" || true)
+          if [[ -n "$unexpected" ]]; then
+            echo "Unexpected changed files:"
+            printf '%s\n' "$unexpected"
+            exit 1
+          fi
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          git diff --stat
+
+      - name: 安装浏览器测试依赖
+        if: steps.changes.outputs.changed == 'true'
+        working-directory: tools/browser-tests
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: 安装三浏览器
+        if: steps.changes.outputs.changed == 'true'
+        working-directory: tools/browser-tests
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: 验证候选版本
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          BASE_URL: http://127.0.0.1:4173
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/static-tools-http.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          sleep 1
+
+          for browser in chromium firefox webkit; do
+            echo "验证 $browser"
+            PLAYWRIGHT_BROWSER="$browser" node tools/browser-tests/utility-tools-smoke.mjs
+          done
+
+          git diff --check
+
+      - name: 提交通过验证的版本
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          BASE_SHA: ${{ steps.base.outputs.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --depth=1
+          if [[ "$(git rev-parse origin/main)" != "$BASE_SHA" ]]; then
+            echo "::error title=main 已在测试期间前进::本次不发布，下一次定时任务会基于最新 main 重新检查。"
+            exit 1
+          fi
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add tools/rmb_converter/dist/nzh.min.js tools/space/dist/browser/pangu.min.js
+          git commit -m 'chore: update static tool vendor scripts'
+
+          auth_header=$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" push origin HEAD:main

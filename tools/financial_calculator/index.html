@@ -6,14 +6,13 @@
     <meta name="format-detection" content="telephone=no">
     <meta name="description" content="金融计算器：计算年化收益率、利息收益、净值年化收益率和复利收益。">
     <link rel="stylesheet" href="../css/bootstrap.min.css">
-    <link rel="stylesheet" href="styles.css?v=20260817-1">
+    <link rel="stylesheet" href="styles.css?v=20260818-1">
     <link rel="shortcut icon" href="/images/favicon.ico">
     <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
     <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
-    <script src="script.js?v=20260817-1" defer></script>
+    <script src="script.js?v=20260818-1" defer></script>
     <title>金融计算器 - 年化收益率、利息收益、净值收益率、复利收益</title>
 
-    <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-K2S9L4CHNP"></script>
     <script>
         window.dataLayer = window.dataLayer || [];
@@ -23,185 +22,200 @@
     </script>
 </head>
 <body>
-    <main class="container my-4">
-        <header class="calculator-header">
-            <h1>金融计算器</h1>
-            <p>计算年化收益率、利息收益、净值年化收益率和复利收益。</p>
-        </header>
+    <a class="skip-link" href="#main">跳到主要内容</a>
 
-        <div class="nav nav-tabs justify-content-center" id="myTabs" role="tablist" aria-label="金融计算类型">
-            <button class="nav-link active" id="tab1" type="button" data-target="content1" role="tab" aria-controls="content1" aria-selected="true">年化收益率</button>
-            <button class="nav-link" id="tab2" type="button" data-target="content2" role="tab" aria-controls="content2" aria-selected="false">利息收益</button>
-            <button class="nav-link" id="tab3" type="button" data-target="content3" role="tab" aria-controls="content3" aria-selected="false">净值收益率</button>
-            <button class="nav-link" id="tab4" type="button" data-target="content4" role="tab" aria-controls="content4" aria-selected="false">复利收益</button>
+    <header class="app-header">
+        <div class="app-header-inner">
+            <a class="app-brand" href="./" aria-label="金融计算器首页">
+                <span class="brand-mark" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 5h16v14H4z"></path>
+                        <path d="M8 9h2M14 9h2M8 13h2M14 13h2M8 17h2M14 17h2"></path>
+                    </svg>
+                </span>
+                <span class="brand-copy">
+                    <strong>金融计算器</strong>
+                    <p>年化收益、利息、净值与复利，一页完成常用计算</p>
+                </span>
+            </a>
         </div>
+    </header>
 
-        <div class="tab-content" id="contents">
-            <section id="content1" class="function-content tab-pane show active" role="tabpanel" aria-labelledby="tab1">
-                <div class="mb-3 row align-items-center">
-                    <label for="principal1" class="form-label col-auto mb-0">本金：</label>
-                    <div class="col"><input type="number" class="form-control" id="principal1" min="0" step="0.01" inputmode="decimal"></div>
-                    <span class="col-auto">元</span>
+    <main id="main" class="page-main">
+        <section class="tool-card" aria-labelledby="calculator-title">
+            <div class="section-heading">
+                <div>
+                    <h1 id="calculator-title">选择计算方式</h1>
+                    <p>输入必要参数即可计算；360 / 365 天口径可按实际产品规则选择。</p>
                 </div>
-                <div class="mb-3 row align-items-center">
-                    <label for="days1" class="form-label col-auto mb-0">天数：</label>
-                    <div class="col"><input type="number" class="form-control" id="days1" min="1" step="1" inputmode="numeric"></div>
-                    <span class="col-auto">天</span>
-                </div>
-                <div class="mb-3 row align-items-center">
-                    <label for="interest1" class="form-label col-auto mb-0">收益：</label>
-                    <div class="col"><input type="number" class="form-control" id="interest1" step="0.01" inputmode="decimal"></div>
-                    <span class="col-auto">元</span>
-                </div>
-                <div class="mb-3 row align-items-center">
-                    <label for="rateType1" class="form-label col-auto mb-0">年投资天数：</label>
-                    <div class="col">
-                        <select class="form-control select-style" id="rateType1">
-                            <option value="360">按 360 天</option>
-                            <option value="365">按 365 天</option>
-                        </select>
-                    </div>
-                    <span class="col-auto placeholder">&#12288;</span>
-                </div>
-                <div class="mb-3 row justify-content-center">
-                    <div class="col-auto">
-                        <button id="empty1" type="button" class="btn btn-outline-secondary">清空</button>
-                        <button id="calculate1" type="button" class="btn btn-primary">计算</button>
-                    </div>
-                </div>
-                <div class="mt-3 result-info" id="result1" role="status" aria-live="polite"></div>
-            </section>
+            </div>
 
-            <section id="content2" class="function-content tab-pane" role="tabpanel" aria-labelledby="tab2" hidden>
-                <div class="mb-3 row align-items-center">
-                    <label for="principal2" class="form-label col-auto mb-0">本金：</label>
-                    <div class="col"><input type="number" class="form-control" id="principal2" min="0" step="0.01" inputmode="decimal"></div>
-                    <span class="col-auto">元</span>
-                </div>
-                <div class="mb-3 row align-items-center">
-                    <label for="days2" class="form-label col-auto mb-0">天数：</label>
-                    <div class="col"><input type="number" class="form-control" id="days2" min="1" step="1" inputmode="numeric"></div>
-                    <span class="col-auto">天</span>
-                </div>
-                <div class="mb-3 row align-items-center">
-                    <label for="annualRate2" class="form-label col-auto mb-0">年化收益率：</label>
-                    <div class="col"><input type="number" class="form-control" id="annualRate2" step="0.01" inputmode="decimal"></div>
-                    <span class="col-auto">%</span>
-                </div>
-                <div class="mb-3 row align-items-center">
-                    <label for="rateType2" class="form-label col-auto mb-0">年投资天数：</label>
-                    <div class="col">
-                        <select class="form-control select-style" id="rateType2">
-                            <option value="360">按 360 天</option>
-                            <option value="365">按 365 天</option>
-                        </select>
-                    </div>
-                    <span class="col-auto placeholder">&#12288;</span>
-                </div>
-                <div class="mb-3 row justify-content-center">
-                    <div class="col-auto">
-                        <button id="empty2" type="button" class="btn btn-outline-secondary">清空</button>
-                        <button id="calculate2" type="button" class="btn btn-primary">计算</button>
-                    </div>
-                </div>
-                <div class="mt-3 result-info" id="result2" role="status" aria-live="polite"></div>
-            </section>
+            <div class="nav nav-tabs calculator-tabs" id="myTabs" role="tablist" aria-label="金融计算类型">
+                <button class="nav-link active" id="tab1" type="button" data-target="content1" role="tab" aria-controls="content1" aria-selected="true">年化收益率</button>
+                <button class="nav-link" id="tab2" type="button" data-target="content2" role="tab" aria-controls="content2" aria-selected="false">利息收益</button>
+                <button class="nav-link" id="tab3" type="button" data-target="content3" role="tab" aria-controls="content3" aria-selected="false">净值收益率</button>
+                <button class="nav-link" id="tab4" type="button" data-target="content4" role="tab" aria-controls="content4" aria-selected="false">复利收益</button>
+            </div>
 
-            <section id="content3" class="function-content tab-pane" role="tabpanel" aria-labelledby="tab3" hidden>
-                <div class="mb-3 row align-items-center">
-                    <label for="startDate" class="form-label col-auto mb-0">起始日期：</label>
-                    <div class="col"><input type="date" class="form-control" id="startDate"></div>
-                    <span class="col-auto placeholder">&#12288;</span>
-                </div>
-                <div class="mb-3 row align-items-center">
-                    <label for="startNetValue" class="form-label col-auto mb-0">起始净值：</label>
-                    <div class="col"><input type="number" class="form-control" id="startNetValue" min="0" step="0.0001" inputmode="decimal"></div>
-                    <span class="col-auto placeholder">&#12288;</span>
-                </div>
-                <div class="mb-3 row align-items-center">
-                    <label for="endDate" class="form-label col-auto mb-0">终止日期：</label>
-                    <div class="col"><input type="date" class="form-control" id="endDate"></div>
-                    <span class="col-auto placeholder">&#12288;</span>
-                </div>
-                <div class="mb-3 row align-items-center">
-                    <label for="endNetValue" class="form-label col-auto mb-0">终止净值：</label>
-                    <div class="col"><input type="number" class="form-control" id="endNetValue" min="0" step="0.0001" inputmode="decimal"></div>
-                    <span class="col-auto placeholder">&#12288;</span>
-                </div>
-                <div class="mb-3 row align-items-center">
-                    <label for="rateType3" class="form-label col-auto mb-0">年投资天数：</label>
-                    <div class="col">
-                        <select class="form-control select-style" id="rateType3">
-                            <option value="360">按 360 天</option>
-                            <option value="365">按 365 天</option>
-                        </select>
+            <div class="tab-content" id="contents">
+                <section id="content1" class="function-content tab-pane show active" role="tabpanel" aria-labelledby="tab1">
+                    <div class="mb-3 row align-items-center">
+                        <label for="principal1" class="form-label col-auto mb-0">本金：</label>
+                        <div class="col"><input type="number" class="form-control" id="principal1" min="0" step="0.01" inputmode="decimal"></div>
+                        <span class="col-auto unit">元</span>
                     </div>
-                    <span class="col-auto placeholder">&#12288;</span>
-                </div>
-                <div class="mb-3 row justify-content-center">
-                    <div class="col-auto">
-                        <button id="empty3" type="button" class="btn btn-outline-secondary">清空</button>
-                        <button id="calculate3" type="button" class="btn btn-primary">计算</button>
+                    <div class="mb-3 row align-items-center">
+                        <label for="days1" class="form-label col-auto mb-0">天数：</label>
+                        <div class="col"><input type="number" class="form-control" id="days1" min="1" step="1" inputmode="numeric"></div>
+                        <span class="col-auto unit">天</span>
                     </div>
-                </div>
-                <div class="mt-3 result-info" id="result3" role="status" aria-live="polite"></div>
-            </section>
+                    <div class="mb-3 row align-items-center">
+                        <label for="interest1" class="form-label col-auto mb-0">收益：</label>
+                        <div class="col"><input type="number" class="form-control" id="interest1" step="0.01" inputmode="decimal"></div>
+                        <span class="col-auto unit">元</span>
+                    </div>
+                    <div class="mb-3 row align-items-center">
+                        <label for="rateType1" class="form-label col-auto mb-0">年投资天数：</label>
+                        <div class="col">
+                            <select class="form-control select-style" id="rateType1">
+                                <option value="360">按 360 天</option>
+                                <option value="365">按 365 天</option>
+                            </select>
+                        </div>
+                        <span class="col-auto placeholder" aria-hidden="true">&#12288;</span>
+                    </div>
+                    <div class="button-row">
+                        <button id="empty1" type="button" class="secondary-button">清空</button>
+                        <button id="calculate1" type="button" class="primary-button">计算</button>
+                    </div>
+                    <div class="result-info" id="result1" role="status" aria-live="polite"></div>
+                </section>
 
-            <section id="content4" class="function-content tab-pane" role="tabpanel" aria-labelledby="tab4" hidden>
-                <div class="mb-3 row align-items-center">
-                    <label for="principal3" class="form-label col-auto mb-0">本金：</label>
-                    <div class="col"><input type="number" class="form-control" id="principal3" min="0" step="0.01" inputmode="decimal"></div>
-                    <span class="col-auto">元</span>
-                </div>
-                <div class="mb-3 row align-items-center">
-                    <label for="compoundingFrequency" class="form-label col-auto mb-0">复利方式：</label>
-                    <div class="col">
-                        <select class="form-control select-style" id="compoundingFrequency">
-                            <option value="annually">按年复利</option>
-                            <option value="semi-annually">按半年复利</option>
-                            <option value="quarterly">按季复利</option>
-                            <option value="monthly">按月复利</option>
-                            <option value="weekly">按周复利</option>
-                            <option value="daily">按日复利</option>
-                        </select>
+                <section id="content2" class="function-content tab-pane" role="tabpanel" aria-labelledby="tab2" hidden>
+                    <div class="mb-3 row align-items-center">
+                        <label for="principal2" class="form-label col-auto mb-0">本金：</label>
+                        <div class="col"><input type="number" class="form-control" id="principal2" min="0" step="0.01" inputmode="decimal"></div>
+                        <span class="col-auto unit">元</span>
                     </div>
-                    <span class="col-auto placeholder">&#12288;</span>
-                </div>
-                <div class="mb-3 row align-items-center">
-                    <label for="depositPeriod" class="form-label col-auto mb-0">存期：</label>
-                    <div class="col"><input type="number" class="form-control" id="depositPeriod" min="1" step="1" inputmode="numeric"></div>
-                    <span class="col-auto" id="frequency">年</span>
-                </div>
-                <div class="mb-3 row align-items-center">
-                    <label for="annualRate3" class="form-label col-auto mb-0">年化收益率：</label>
-                    <div class="col"><input type="number" class="form-control" id="annualRate3" step="0.01" inputmode="decimal"></div>
-                    <span class="col-auto">%</span>
-                </div>
-                <div class="mb-3 row align-items-center">
-                    <label for="rateType4" class="form-label col-auto mb-0">年投资天数：</label>
-                    <div class="col">
-                        <select class="form-control select-style" id="rateType4">
-                            <option value="360">按 360 天</option>
-                            <option value="365">按 365 天</option>
-                        </select>
+                    <div class="mb-3 row align-items-center">
+                        <label for="days2" class="form-label col-auto mb-0">天数：</label>
+                        <div class="col"><input type="number" class="form-control" id="days2" min="1" step="1" inputmode="numeric"></div>
+                        <span class="col-auto unit">天</span>
                     </div>
-                    <span class="col-auto placeholder">&#12288;</span>
-                </div>
-                <div class="mb-3 row justify-content-center">
-                    <div class="col-auto">
-                        <button id="empty4" type="button" class="btn btn-outline-secondary">清空</button>
-                        <button id="calculate4" type="button" class="btn btn-primary">计算</button>
+                    <div class="mb-3 row align-items-center">
+                        <label for="annualRate2" class="form-label col-auto mb-0">年化收益率：</label>
+                        <div class="col"><input type="number" class="form-control" id="annualRate2" step="0.01" inputmode="decimal"></div>
+                        <span class="col-auto unit">%</span>
                     </div>
-                </div>
-                <div class="mt-3 result-info" id="result4" role="status" aria-live="polite"></div>
-                <div class="mt-3" id="result4-table"></div>
-            </section>
-        </div>
+                    <div class="mb-3 row align-items-center">
+                        <label for="rateType2" class="form-label col-auto mb-0">年投资天数：</label>
+                        <div class="col">
+                            <select class="form-control select-style" id="rateType2">
+                                <option value="360">按 360 天</option>
+                                <option value="365">按 365 天</option>
+                            </select>
+                        </div>
+                        <span class="col-auto placeholder" aria-hidden="true">&#12288;</span>
+                    </div>
+                    <div class="button-row">
+                        <button id="empty2" type="button" class="secondary-button">清空</button>
+                        <button id="calculate2" type="button" class="primary-button">计算</button>
+                    </div>
+                    <div class="result-info" id="result2" role="status" aria-live="polite"></div>
+                </section>
+
+                <section id="content3" class="function-content tab-pane" role="tabpanel" aria-labelledby="tab3" hidden>
+                    <div class="mb-3 row align-items-center">
+                        <label for="startDate" class="form-label col-auto mb-0">起始日期：</label>
+                        <div class="col"><input type="date" class="form-control" id="startDate"></div>
+                        <span class="col-auto placeholder" aria-hidden="true">&#12288;</span>
+                    </div>
+                    <div class="mb-3 row align-items-center">
+                        <label for="startNetValue" class="form-label col-auto mb-0">起始净值：</label>
+                        <div class="col"><input type="number" class="form-control" id="startNetValue" min="0" step="0.0001" inputmode="decimal"></div>
+                        <span class="col-auto placeholder" aria-hidden="true">&#12288;</span>
+                    </div>
+                    <div class="mb-3 row align-items-center">
+                        <label for="endDate" class="form-label col-auto mb-0">终止日期：</label>
+                        <div class="col"><input type="date" class="form-control" id="endDate"></div>
+                        <span class="col-auto placeholder" aria-hidden="true">&#12288;</span>
+                    </div>
+                    <div class="mb-3 row align-items-center">
+                        <label for="endNetValue" class="form-label col-auto mb-0">终止净值：</label>
+                        <div class="col"><input type="number" class="form-control" id="endNetValue" min="0" step="0.0001" inputmode="decimal"></div>
+                        <span class="col-auto placeholder" aria-hidden="true">&#12288;</span>
+                    </div>
+                    <div class="mb-3 row align-items-center">
+                        <label for="rateType3" class="form-label col-auto mb-0">年投资天数：</label>
+                        <div class="col">
+                            <select class="form-control select-style" id="rateType3">
+                                <option value="360">按 360 天</option>
+                                <option value="365">按 365 天</option>
+                            </select>
+                        </div>
+                        <span class="col-auto placeholder" aria-hidden="true">&#12288;</span>
+                    </div>
+                    <div class="button-row">
+                        <button id="empty3" type="button" class="secondary-button">清空</button>
+                        <button id="calculate3" type="button" class="primary-button">计算</button>
+                    </div>
+                    <div class="result-info" id="result3" role="status" aria-live="polite"></div>
+                </section>
+
+                <section id="content4" class="function-content tab-pane" role="tabpanel" aria-labelledby="tab4" hidden>
+                    <div class="mb-3 row align-items-center">
+                        <label for="principal3" class="form-label col-auto mb-0">本金：</label>
+                        <div class="col"><input type="number" class="form-control" id="principal3" min="0" step="0.01" inputmode="decimal"></div>
+                        <span class="col-auto unit">元</span>
+                    </div>
+                    <div class="mb-3 row align-items-center">
+                        <label for="compoundingFrequency" class="form-label col-auto mb-0">复利方式：</label>
+                        <div class="col">
+                            <select class="form-control select-style" id="compoundingFrequency">
+                                <option value="annually">按年复利</option>
+                                <option value="semi-annually">按半年复利</option>
+                                <option value="quarterly">按季复利</option>
+                                <option value="monthly">按月复利</option>
+                                <option value="weekly">按周复利</option>
+                                <option value="daily">按日复利</option>
+                            </select>
+                        </div>
+                        <span class="col-auto placeholder" aria-hidden="true">&#12288;</span>
+                    </div>
+                    <div class="mb-3 row align-items-center">
+                        <label for="depositPeriod" class="form-label col-auto mb-0">存期：</label>
+                        <div class="col"><input type="number" class="form-control" id="depositPeriod" min="1" step="1" inputmode="numeric"></div>
+                        <span class="col-auto unit" id="frequency">年</span>
+                    </div>
+                    <div class="mb-3 row align-items-center">
+                        <label for="annualRate3" class="form-label col-auto mb-0">年化收益率：</label>
+                        <div class="col"><input type="number" class="form-control" id="annualRate3" step="0.01" inputmode="decimal"></div>
+                        <span class="col-auto unit">%</span>
+                    </div>
+                    <div class="mb-3 row align-items-center">
+                        <label for="rateType4" class="form-label col-auto mb-0">年投资天数：</label>
+                        <div class="col">
+                            <select class="form-control select-style" id="rateType4">
+                                <option value="360">按 360 天</option>
+                                <option value="365">按 365 天</option>
+                            </select>
+                        </div>
+                        <span class="col-auto placeholder" aria-hidden="true">&#12288;</span>
+                    </div>
+                    <div class="button-row">
+                        <button id="empty4" type="button" class="secondary-button">清空</button>
+                        <button id="calculate4" type="button" class="primary-button">计算</button>
+                    </div>
+                    <div class="result-info" id="result4" role="status" aria-live="polite"></div>
+                    <div id="result4-table"></div>
+                </section>
+            </div>
+        </section>
 
         <p class="calculator-note">计算结果仅基于输入参数和所选计息口径，不构成投资、贷款或税务建议。</p>
     </main>
 
-    <footer>
+    <footer class="page-footer">
         <p>&copy; 2026 <a href="https://www.linchun.com.cn">林春写字的地方</a></p>
     </footer>
 </body>
