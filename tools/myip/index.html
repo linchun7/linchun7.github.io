@@ -9,8 +9,8 @@
     <link rel="shortcut icon" href="/images/favicon.ico">
     <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
     <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
-    <link rel="stylesheet" href="style.css?v=20260818-3">
-    <script src="app.js?v=20260818-3" defer></script>
+    <link rel="stylesheet" href="style.css?v=20260818-4">
+    <script src="app.js?v=20260818-4" defer></script>
     <title>IP 地址与分流检测</title>
 </head>
 <body>
@@ -55,7 +55,7 @@
                     <span id="domestic-status" class="status-pill status-loading">检测中</span>
                 </div>
                 <div class="ip-primary">
-                    <span>IPv4</span>
+                    <span id="domestic-ip-label">IPv4</span>
                     <strong id="domestic-ipv4" aria-live="polite">检测中…</strong>
                 </div>
                 <p id="domestic-detail" class="detail-text">通过国内 IP 查询网站检测。</p>
@@ -83,8 +83,8 @@
 
         <p class="plain-note">两个地址不同不一定是异常。开启规则分流时，国内网站直连、国际网站走代理，正是常见结果。</p>
 
-        <details class="details-card">
-            <summary>查看检测详情</summary>
+        <details class="details-card" open>
+            <summary>检测详情</summary>
             <div class="source-list">
                 <article class="source-row">
                     <div><h3>国内检测</h3><p id="source-pconline-detail" class="detail-text">太平洋网络</p></div>
@@ -93,6 +93,10 @@
                 <article class="source-row">
                     <div><h3>国内备用</h3><p id="source-ipw-detail" class="detail-text">IPW</p></div>
                     <span id="source-ipw-status" class="status-pill status-loading">检测中</span>
+                </article>
+                <article class="source-row">
+                    <div><h3>本机网络参考</h3><p id="source-localref-detail" class="detail-text">仅在国内检测服务都失败时启用，不用于判断分流。</p></div>
+                    <span id="source-localref-status" class="status-pill status-idle">待命</span>
                 </article>
                 <article class="source-row">
                     <div><h3>本站国际检测</h3><p id="source-firstparty-detail" class="detail-text">Cloudflare Worker</p></div>
