@@ -23,7 +23,6 @@
             --accent-dark: #0755b5;
             --accent-soft: #eaf3ff;
             --green: #087a45;
-            --green-soft: #effaf4;
             --danger: #b93632;
             --danger-soft: #fff1f0;
             --shadow: 0 8px 24px rgba(24, 43, 61, .06);
@@ -37,7 +36,7 @@
         a { color: var(--accent-dark); text-decoration: none; }
         a:hover { color: var(--accent); }
         button, a { touch-action: manipulation; -webkit-tap-highlight-color: rgba(0, 113, 227, .18); }
-        button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        button:focus-visible, a:focus-visible, input:focus-visible, .result-text:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
         .skip-link { position: fixed; top: 8px; left: 8px; z-index: 100; padding: 8px 12px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); transform: translateY(-150%); }
         .skip-link:focus { transform: translateY(0); }
         .app-header { background: var(--surface); border-bottom: 1px solid var(--line); }
@@ -49,7 +48,7 @@
         .brand-copy { min-width: 0; }
         .brand-copy strong { display: block; font-size: 18px; line-height: 1.2; }
         .brand-copy p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
-        .page-main { flex: 1; display: grid; gap: 10px; padding: 14px 0 0; }
+        .page-main { flex: 1; display: grid; align-content: start; gap: 10px; padding: 14px 0 0; }
         .tool-card, .result-card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
         .tool-card { padding: 16px; }
         .section-heading, .result-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
@@ -72,8 +71,8 @@
         .result-heading { align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--line); }
         .result-actions { display: flex; align-items: center; gap: 8px; }
         .status-text { min-width: 44px; color: var(--green); font-size: 12px; font-weight: 700; text-align: right; }
-        .result-text { min-height: 110px; display: flex; align-items: center; padding: 18px; overflow-wrap: anywhere; color: #263746; background: #fff; font-size: 20px; line-height: 1.8; }
-        .result-text.empty { color: var(--muted); font-size: 13px; justify-content: center; text-align: center; }
+        .result-text { min-height: 110px; max-height: 240px; display: flex; align-items: flex-start; padding: 18px; overflow-x: hidden; overflow-y: auto; overflow-wrap: anywhere; color: #263746; background: #fff; font-size: 20px; line-height: 1.8; overscroll-behavior: contain; }
+        .result-text.empty { align-items: center; color: var(--muted); font-size: 13px; justify-content: center; text-align: center; }
         .result-text.error { color: var(--danger); background: var(--danger-soft); font-size: 14px; }
         .calculator-note { margin: 2px 4px 0; color: var(--muted); font-size: 12px; text-align: center; }
         .page-footer { padding: 10px 0 20px; color: var(--muted); text-align: center; font-size: 12px; }
@@ -84,11 +83,16 @@
             .app-header-inner, .page-main, .page-footer { width: min(100% - 28px, 680px); }
             .brand-copy strong { font-size: 16px; }
             .brand-copy p { display: none; }
+            .page-main { gap: 8px; padding-top: 10px; }
             .tool-card { padding: 14px; }
             .section-heading h1, .result-heading h2 { font-size: 16px; }
-            .result-heading { align-items: flex-start; flex-direction: column; }
-            .result-actions { width: 100%; justify-content: flex-end; }
-            .result-text { min-height: 100px; padding: 15px; font-size: 18px; }
+            .result-card { position: sticky; top: 8px; z-index: 20; box-shadow: 0 10px 28px rgba(24, 43, 61, .12); }
+            .result-heading { padding: 9px 11px; }
+            .result-heading p { display: none; }
+            .result-actions { margin-left: auto; }
+            .result-text { min-height: 96px; max-height: 180px; max-height: min(30dvh, 180px); padding: 12px; font-size: 17px; line-height: 1.65; }
+            .result-text.empty { font-size: 12px; }
+            .calculator-note { margin-top: 4px; }
         }
         @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; } }
     </style>
@@ -113,6 +117,20 @@
     </header>
 
     <main id="main" class="page-main">
+        <section class="result-card" aria-labelledby="result-title">
+            <div class="result-heading">
+                <div>
+                    <h2 id="result-title">人民币大写金额</h2>
+                    <p>转换结果可直接复制；内容较长时可在结果区内滚动查看。</p>
+                </div>
+                <div class="result-actions">
+                    <span id="alertText" class="status-text" role="status" aria-live="polite"></span>
+                    <button class="primary-button" type="button" id="copyBtn">复制</button>
+                </div>
+            </div>
+            <output id="result1" class="result-text empty" aria-live="polite" tabindex="0">等待输入金额。</output>
+        </section>
+
         <section class="tool-card" aria-labelledby="input-title">
             <div class="section-heading">
                 <div>
@@ -123,23 +141,9 @@
             </div>
             <label for="inputmoney">数字金额</label>
             <div class="input-actions">
-                <input id="inputmoney" type="text" inputmode="decimal" autocomplete="off" placeholder="例如：123456.78" autofocus>
+                <input id="inputmoney" type="text" inputmode="decimal" autocomplete="off" placeholder="例如：123456.78">
                 <button class="secondary-button" type="button" id="clearBtn">清空</button>
             </div>
-        </section>
-
-        <section class="result-card" aria-labelledby="result-title">
-            <div class="result-heading">
-                <div>
-                    <h2 id="result-title">人民币大写金额</h2>
-                    <p>转换结果可直接复制。</p>
-                </div>
-                <div class="result-actions">
-                    <span id="alertText" class="status-text" role="status" aria-live="polite"></span>
-                    <button class="primary-button" type="button" id="copyBtn">复制</button>
-                </div>
-            </div>
-            <output id="result1" class="result-text empty" aria-live="polite">等待输入金额。</output>
         </section>
 
         <p class="calculator-note">转换仅用于文本书写辅助，请在票据、合同等正式场景中自行复核金额。</p>
@@ -189,6 +193,7 @@
 
                 try {
                     result.textContent = Nzh.cn.toMoney(normalized);
+                    result.scrollTop = 0;
                 } catch (error) {
                     result.textContent = '金额格式暂无法转换，请检查输入。';
                     result.classList.add('error');

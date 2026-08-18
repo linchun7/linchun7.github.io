@@ -57,7 +57,7 @@
 
     function readAnnualDays(id) {
         const value = Number($(id).value);
-        if (value !== 360 && value !== 365) throw new Error('年投资天数必须为 360 或 365');
+        if (value !== 360 && value !== 365) throw new Error('年化天数必须为 360 或 365');
         return value;
     }
 
@@ -91,13 +91,13 @@
         const annualizedReturn = (earnings / principal / days) * annualDays * 100;
         if (!Number.isFinite(annualizedReturn)) throw new Error('计算结果异常，请检查输入');
 
-        return `年化收益率：${formatPercent(annualizedReturn)}`;
+        return `单利年化收益率：${formatPercent(annualizedReturn)}`;
     }
 
     function calculateInterest() {
         const principal = readPositiveNumber('principal2', '本金');
         const days = readPositiveInteger('days2', '天数');
-        const annualRate = readFiniteNumber('annualRate2', '年化收益率');
+        const annualRate = readFiniteNumber('annualRate2', '单利年化收益率');
         const annualDays = readAnnualDays('rateType2');
 
         const earnings = principal * (annualRate / 100) * (days / annualDays);
@@ -116,10 +116,11 @@
         if (endDate <= startDate) throw new Error('终止日期必须晚于起始日期');
 
         const days = (endDate - startDate) / DAY_MS;
-        const annualizedReturn = ((endValue - startValue) / startValue) / days * annualDays * 100;
+        const growthRatio = endValue / startValue;
+        const annualizedReturn = (Math.pow(growthRatio, annualDays / days) - 1) * 100;
 
         if (!Number.isFinite(annualizedReturn)) throw new Error('计算结果异常，请检查输入');
-        return `净值年化收益率：${formatPercent(annualizedReturn)}（持有 ${days} 天）`;
+        return `净值年化收益率（CAGR）：${formatPercent(annualizedReturn)}（持有 ${days} 天）`;
     }
 
     const frequencyConfig = {
@@ -141,7 +142,7 @@
 
         const rate = periodicPercent / 100;
         if (!Number.isFinite(rate) || rate <= -1) {
-            throw new Error('该年化收益率在当前复利方式下会使单期本金小于等于 0，请调整参数');
+            throw new Error('该名义年利率在当前复利方式下会使单期本金小于等于 0，请调整参数');
         }
         return rate;
     }
@@ -208,10 +209,13 @@
     function calculateCompound() {
         const principal = readPositiveNumber('principal3', '本金');
         const periods = readPositiveInteger('depositPeriod', '存期');
-        const annualRate = readFiniteNumber('annualRate3', '年化收益率');
-        const annualDays = readAnnualDays('rateType4');
+        const annualRate = readFiniteNumber('annualRate3', '名义年利率');
         const frequency = $('compoundingFrequency').value;
+        const config = frequencyConfig[frequency];
+        if (!config) throw new Error('复利方式无效');
 
+        // 360 / 365 天只参与按周、按日复利；其他频率完全忽略该选择。
+        const annualDays = config.dayBased ? readAnnualDays('rateType4') : 365;
         const periodicRate = getPeriodicRate(annualRate, frequency, annualDays);
         const growthFactor = Math.pow(1 + periodicRate, periods);
         const futureValue = principal * growthFactor;

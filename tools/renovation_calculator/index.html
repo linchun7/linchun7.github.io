@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="format-detection" content="telephone=no">
-    <meta name="description" content="装修贷款实际利率计算器：按贷款金额、期限和月手续费率估算实际年化利率与还款明细。">
+    <meta name="description" content="装修贷款实际利率计算器：按贷款金额、期限和月手续费率，用复利 IRR 估算实际年化利率与还款明细。">
     <link rel="shortcut icon" href="/images/favicon.ico">
     <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
     <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
@@ -115,7 +115,7 @@
             <div class="result-heading">
                 <div>
                     <h2 id="result-title">计算结果</h2>
-                    <p>计算完成后显示实际年化利率、还款汇总和逐期明细。</p>
+                    <p>计算完成后显示复利 IRR 年化利率、还款汇总和逐期明细。</p>
                 </div>
             </div>
             <div class="result" id="result" aria-live="polite">
@@ -123,13 +123,13 @@
             </div>
         </section>
 
-        <p class="calculator-note">结果按输入条件估算，银行实际扣款、提前还款规则和其他费用可能不同，请以合同约定为准。</p>
+        <p class="calculator-note">实际年化按逐期真实还款现金流计算月 IRR，再按复利口径折算为年化；不含合同另行约定的提前还款违约金等额外费用。结果仅供估算，请以贷款合同和机构披露为准。</p>
     </main>
 
     <footer class="page-footer">
         <p>&copy; 2026 <a href="https://www.linchun.com.cn">林春写字的地方</a></p>
     </footer>
 
-    <script src="script.js?v=20260818-1"></script>
+    <script src="script.js?v=20260818-2"></script>
 </body>
 </html>

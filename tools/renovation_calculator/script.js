@@ -2,7 +2,7 @@
 const errorMessages = {
     loanAmount: '贷款金额必须大于 0，请重新输入',
     loanTerm: '贷款期限必须是 1-600 之间的整数，请重新输入',
-    serviceFee: '月手续费率必须大于 0，请重新输入',
+    serviceFee: '月手续费率必须大于等于 0，请重新输入',
     irrDiverge: '计算结果异常，请检查输入的数据是否合理'
 };
 
@@ -14,33 +14,15 @@ const warningMessages = {
     serviceFeeTooLarge: '当前月手续费率偏高，请确认是否准确'
 };
 
-// 合并后的数值处理工具函数
 const numberUtils = {
-    // 转换为2位小数的数字
-    toFixed2: (num) => {
-        return Math.round(num * 100) / 100;
-    },
-    
-    // 移除千分位分隔符并转为数字
-    parseAmount: (str) => {
-        return Number(String(str).replace(/,/g, ''));
-    },
-
-    // 金额格式化函数
-    formatMoney: (amount) => {
-        return new Intl.NumberFormat('zh-CN', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        }).format(numberUtils.toFixed2(amount));
-    },
-
-    // 格式化百分比
-    formatPercent: (value) => {
-        return numberUtils.toFixed2(value).toFixed(2);
-    }
+    toFixed2: (num) => Math.round((num + Number.EPSILON) * 100) / 100,
+    formatMoney: (amount) => new Intl.NumberFormat('zh-CN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    }).format(numberUtils.toFixed2(amount)),
+    formatPercent: (value) => numberUtils.toFixed2(value).toFixed(2)
 };
 
-// 验证和错误处理工具函数
 const validationUtils = {
     showError: (elementId, message) => {
         const errorEl = document.getElementById(elementId + 'Error');
@@ -70,132 +52,106 @@ const validationUtils = {
 
     validateInputs() {
         let isValid = true;
+        const amountRaw = document.getElementById('loanAmount').value.trim();
+        const termRaw = document.getElementById('loanTerm').value.trim();
+        const feeRaw = document.getElementById('serviceFee').value.trim();
+        const amountNumber = Number(amountRaw);
         const inputs = {
-            loanAmount: Number(document.getElementById('loanAmount').value),
-            loanTerm: Number(document.getElementById('loanTerm').value),
-            serviceFeeRate: Number(document.getElementById('serviceFee').value)
+            loanAmount: Number.isFinite(amountNumber) ? numberUtils.toFixed2(amountNumber) : NaN,
+            loanTerm: Number(termRaw),
+            serviceFeeRate: Number(feeRaw)
         };
 
-        // 清除所有错误和警告信息
         ['loanAmount', 'loanTerm', 'serviceFee'].forEach(id => {
             this.clearError(id);
             this.clearWarning(id);
         });
 
-        // 验证贷款金额
-        if (!inputs.loanAmount || inputs.loanAmount <= 0) {
+        if (!amountRaw || !Number.isFinite(inputs.loanAmount) || inputs.loanAmount <= 0) {
             this.showError('loanAmount', errorMessages.loanAmount);
             isValid = false;
-        } else {
-            if (inputs.loanAmount < 1000) {
-                this.showWarning('loanAmount', warningMessages.loanAmountTooSmall);
-            } else if (inputs.loanAmount > 10000000) {
-                this.showWarning('loanAmount', warningMessages.loanAmountTooLarge);
-            }
+        } else if (inputs.loanAmount < 1000) {
+            this.showWarning('loanAmount', warningMessages.loanAmountTooSmall);
+        } else if (inputs.loanAmount > 10000000) {
+            this.showWarning('loanAmount', warningMessages.loanAmountTooLarge);
         }
 
-        // 验证贷款期限
-        if (!Number.isInteger(inputs.loanTerm) || inputs.loanTerm <= 0 || inputs.loanTerm > 600) {
+        if (!termRaw || !Number.isInteger(inputs.loanTerm) || inputs.loanTerm <= 0 || inputs.loanTerm > 600) {
             this.showError('loanTerm', errorMessages.loanTerm);
             isValid = false;
         }
 
-        // 验证月手续费率
-        if (!inputs.serviceFeeRate || inputs.serviceFeeRate <= 0) {
+        if (!feeRaw || !Number.isFinite(inputs.serviceFeeRate) || inputs.serviceFeeRate < 0) {
             this.showError('serviceFee', errorMessages.serviceFee);
             isValid = false;
-        } else {
-            if (inputs.serviceFeeRate > 0 && inputs.serviceFeeRate < 0.01) {
-                this.showWarning('serviceFee', warningMessages.serviceFeeTooSmall);
-            } else if (inputs.serviceFeeRate > 100) {
-                this.showWarning('serviceFee', warningMessages.serviceFeeTooLarge);
-            }
+        } else if (inputs.serviceFeeRate > 0 && inputs.serviceFeeRate < 0.01) {
+            this.showWarning('serviceFee', warningMessages.serviceFeeTooSmall);
+        } else if (inputs.serviceFeeRate > 100) {
+            this.showWarning('serviceFee', warningMessages.serviceFeeTooLarge);
         }
 
         return isValid ? inputs : null;
     }
 };
 
-// 改进的IRR计算函数
-function IRR(cashFlows, apr = null) {
-    if (!cashFlows?.length) return NaN;
-
-    // 归一化现金流
-    const maxAbsFlow = Math.abs(Math.max(...cashFlows.map(x => Math.abs(x))));
-    const normalizedFlows = cashFlows.map(flow => flow / maxAbsFlow);
-
-    // 牛顿法
-    let irr = apr ? apr/1200 : 0.1;
-    const maxNewtonIterations = 50;
-    const tolerance = 1e-10;
-
-    for (let i = 0; i < maxNewtonIterations; i++) {
-        let npv = 0;
-        let derivativeNpv = 0;
-
-        for (let j = 0; j < normalizedFlows.length; j++) {
-            const factor = Math.pow(1 + irr, j);
-            npv += normalizedFlows[j] / factor;
-            if (j > 0) {
-                derivativeNpv -= j * normalizedFlows[j] / (factor * (1 + irr));
-            }
-        }
-
-        if (Math.abs(npv) < tolerance) {
-            return irr;
-        }
-
-        const adjustment = npv / derivativeNpv;
-        irr -= adjustment;
-
-        if (Math.abs(adjustment) < tolerance) {
-            return irr;
-        }
+// Horner 形式与逐项折现数学等价，但避免在每个现金流上重复调用 Math.pow。
+function npv(cashFlows, rate) {
+    const divisor = 1 + rate;
+    let total = cashFlows[cashFlows.length - 1];
+    for (let i = cashFlows.length - 2; i >= 0; i--) {
+        total = cashFlows[i] + total / divisor;
     }
-
-    // 如果牛顿法未收敛，使用二分法
-    let left = 0;
-    let right = 1;
-    const maxBisectionIterations = 100;
-
-    for (let i = 0; i < maxBisectionIterations; i++) {
-        const mid = (left + right) / 2;
-        let npv = 0;
-
-        for (let j = 0; j < normalizedFlows.length; j++) {
-            npv += normalizedFlows[j] / Math.pow(1 + mid, j);
-        }
-
-        if (Math.abs(npv) < tolerance) {
-            return mid;
-        }
-
-        if (npv > 0) {
-            left = mid;
-        } else {
-            right = mid;
-        }
-
-        if (right - left < tolerance) {
-            return mid;
-        }
-    }
-
-    console.error(errorMessages.irrDiverge);
-    return NaN;
+    return total;
 }
 
-// CSV导出功能
-function exportToCSV(schedule, totals, apr) {
-    // 添加BOM以支持中文
+// 本工具现金流固定为“首期一笔借款、后续均为还款”，NPV 对非负利率单调递减。
+// 使用带动态上界的二分法，比牛顿法更稳定，也更容易验证。
+function IRR(cashFlows) {
+    if (!Array.isArray(cashFlows) || cashFlows.length < 2) return NaN;
+
+    const maxAbsFlow = Math.max(...cashFlows.map(flow => Math.abs(flow)));
+    if (!Number.isFinite(maxAbsFlow) || maxAbsFlow === 0) return NaN;
+
+    const normalizedFlows = cashFlows.map(flow => flow / maxAbsFlow);
+    const tolerance = 1e-12;
+    const atZero = npv(normalizedFlows, 0);
+
+    if (Math.abs(atZero) <= tolerance) return 0;
+    if (atZero < 0) return NaN;
+
+    let left = 0;
+    let right = 0.01;
+    while (npv(normalizedFlows, right) > 0 && right < 1024) {
+        right *= 2;
+    }
+
+    if (npv(normalizedFlows, right) > 0) return NaN;
+
+    for (let i = 0; i < 120; i++) {
+        const mid = (left + right) / 2;
+        const value = npv(normalizedFlows, mid);
+
+        if (Math.abs(value) <= tolerance || right - left <= tolerance) {
+            return mid;
+        }
+
+        if (value > 0) left = mid;
+        else right = mid;
+    }
+
+    return (left + right) / 2;
+}
+
+function annualizeMonthlyIRR(monthlyRate) {
+    if (!Number.isFinite(monthlyRate) || monthlyRate <= -1) return NaN;
+    return (Math.pow(1 + monthlyRate, 12) - 1) * 100;
+}
+
+function exportToCSV(schedule, totals) {
     const BOM = '\uFEFF';
-    
-    // 准备CSV内容
-    const headers = ['期数', '月还款总额', '应还本金', '手续费', '剩余本金', '累计已还本金', '当期年利率', '提前还款年利率'];
-    
+    const headers = ['期数', '月还款总额', '应还本金', '手续费', '剩余本金', '累计已还本金', '当期手续费折年（单利）', '提前还款年化利率（复利IRR）'];
     let csvContent = BOM + headers.join(',') + '\n';
-    
-    // 添加数据行
+
     schedule.forEach(row => {
         const rowData = [
             row.month,
@@ -204,46 +160,40 @@ function exportToCSV(schedule, totals, apr) {
             `"¥${numberUtils.formatMoney(row.serviceFee)}"`,
             `"¥${numberUtils.formatMoney(row.remainingPrincipal)}"`,
             `"¥${numberUtils.formatMoney(row.totalPaidPrincipal)}"`,
-            `"${numberUtils.formatPercent(row.currentAPR)}%"`,
+            `"${numberUtils.formatPercent(row.annualizedFeeRate)}%"`,
             `"${numberUtils.formatPercent(row.earlyRepaymentAPR)}%"`
         ];
         csvContent += rowData.join(',') + '\n';
     });
 
-    // 添加合计行
-    const totalRow = [
+    csvContent += [
         '总计',
         `"¥${numberUtils.formatMoney(totals.totalPayment)}"`,
         `"¥${numberUtils.formatMoney(totals.totalPrincipal)}"`,
         `"¥${numberUtils.formatMoney(totals.totalServiceFee)}"`,
-        '-',
-        '-',
-        '-',
-        '-'
-    ];
-    csvContent += totalRow.join(',') + '\n';
+        '-', '-', '-', '-'
+    ].join(',') + '\n';
 
-    // 创建下载链接
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', '装修贷款还款明细表.csv');
+    link.href = url;
+    link.download = '装修贷款还款明细表.csv';
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    link.remove();
+    window.URL.revokeObjectURL(url);
 }
 
-// 表格渲染函数
 function renderTable(schedule, totals, apr) {
     return `
         <div class="summary-grid">
             <div class="summary-card">
-                <div>实际年化利率</div>
+                <div>实际年化利率（复利 IRR）</div>
                 <div>${numberUtils.formatPercent(apr)}%</div>
             </div>
             <div class="summary-card">
-                <div>月还款总额</div>
+                <div>首月还款总额</div>
                 <div>￥${numberUtils.formatMoney(schedule[0].payment)}</div>
             </div>
             <div class="summary-card">
@@ -256,7 +206,7 @@ function renderTable(schedule, totals, apr) {
             </div>
         </div>
         <div class="table-container">
-            <h3 class="table-title">装修贷款还款明细表 - <a href="#" onclick="window.lastExportData && exportToCSV(window.lastExportData.schedule, window.lastExportData.totals, window.lastExportData.apr); return false;" class="export-link">导出</a></h3>
+            <h3 class="table-title">装修贷款还款明细表 - <a href="#" onclick="window.lastExportData && exportToCSV(window.lastExportData.schedule, window.lastExportData.totals); return false;" class="export-link">导出</a></h3>
             <table>
                 <thead>
                     <tr>
@@ -266,8 +216,8 @@ function renderTable(schedule, totals, apr) {
                         <th>手续费</th>
                         <th>剩余本金</th>
                         <th>累计已还本金</th>
-                        <th>当期年利率</th>
-                        <th>提前还款年利率</th>
+                        <th>当期手续费折年（单利）</th>
+                        <th>提前还款年化利率（复利 IRR）</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -279,7 +229,7 @@ function renderTable(schedule, totals, apr) {
                             <td>￥${numberUtils.formatMoney(row.serviceFee)}</td>
                             <td>￥${numberUtils.formatMoney(row.remainingPrincipal)}</td>
                             <td>￥${numberUtils.formatMoney(row.totalPaidPrincipal)}</td>
-                            <td>${numberUtils.formatPercent(row.currentAPR)}%</td>
+                            <td>${numberUtils.formatPercent(row.annualizedFeeRate)}%</td>
                             <td>${numberUtils.formatPercent(row.earlyRepaymentAPR)}%</td>
                         </tr>
                     `).join('')}
@@ -296,93 +246,82 @@ function renderTable(schedule, totals, apr) {
                 </tbody>
             </table>
             <div class="export-btn-container">
-                <button class="export-btn" onclick="window.lastExportData && exportToCSV(window.lastExportData.schedule, window.lastExportData.totals, window.lastExportData.apr)">导出还款明细表</button>
+                <button class="export-btn" onclick="window.lastExportData && exportToCSV(window.lastExportData.schedule, window.lastExportData.totals)">导出还款明细表</button>
             </div>
         </div>
     `;
 }
 
-// 生成还款计划表
 function generateSchedule(inputs) {
     const schedule = [];
-    const monthlyPrincipal = numberUtils.toFixed2(inputs.loanAmount / inputs.loanTerm);
     const monthlyFee = numberUtils.toFixed2(inputs.loanAmount * inputs.serviceFeeRate / 100);
-
     let totalPaidPrincipal = 0;
-    const totalPrincipalToRepay = inputs.loanAmount;
-    let lastRemainingPrincipal = totalPrincipalToRepay;
-
-    // 计算总体实际年化利率
-    const totalCashFlows = [-inputs.loanAmount];
-    for (let i = 0; i < inputs.loanTerm; i++) {
-        totalCashFlows.push(monthlyPrincipal + monthlyFee);
-    }
-    const monthlyRate = IRR(totalCashFlows);
-    const apr = monthlyRate * 12 * 100;
 
     for (let month = 1; month <= inputs.loanTerm; month++) {
-        const principal = month === inputs.loanTerm ? 
-            numberUtils.toFixed2(totalPrincipalToRepay - totalPaidPrincipal) : 
-            monthlyPrincipal;
-        
+        const openingPrincipal = Math.max(0, numberUtils.toFixed2(inputs.loanAmount - totalPaidPrincipal));
+        // 按累计目标分摊本金，而不是固定四舍五入后的“月本金”，避免长周期尾期出现负本金。
+        const targetPaidPrincipal = month === inputs.loanTerm
+            ? inputs.loanAmount
+            : numberUtils.toFixed2(inputs.loanAmount * month / inputs.loanTerm);
+        const principal = Math.max(0, numberUtils.toFixed2(targetPaidPrincipal - totalPaidPrincipal));
         const payment = numberUtils.toFixed2(principal + monthlyFee);
 
-        totalPaidPrincipal = numberUtils.parseAmount(numberUtils.formatMoney(totalPaidPrincipal + principal));
-        const remainingPrincipal = numberUtils.parseAmount(numberUtils.formatMoney(totalPrincipalToRepay - totalPaidPrincipal));
-
-        const currentAPR = numberUtils.toFixed2(monthlyFee * 12 / (month === 1 ? totalPrincipalToRepay : numberUtils.parseAmount(numberUtils.formatMoney(lastRemainingPrincipal))) * 100);
-        
-        let earlyRepaymentAPR;
-        
-        if (month === inputs.loanTerm) {
-            earlyRepaymentAPR = apr;
-        } else {
-            // 构造提前还款的现金流
-            const cashFlows = [-inputs.loanAmount];  // 第0期是借款金额的负值
-            
-            // 添加正常还款期的现金流
-            for (let i = 0; i < month - 1; i++) {
-                cashFlows.push(monthlyPrincipal + monthlyFee);
-            }
-            
-            // 最后一期合并当期还款和提前还款金额
-            cashFlows.push(monthlyPrincipal + monthlyFee + remainingPrincipal);
-            
-            const monthlyIRR = IRR(cashFlows, apr);
-            earlyRepaymentAPR = monthlyIRR ? numberUtils.toFixed2(monthlyIRR * 12 * 100) : 0;
-        }
+        totalPaidPrincipal = numberUtils.toFixed2(totalPaidPrincipal + principal);
+        const remainingPrincipal = Math.max(0, numberUtils.toFixed2(inputs.loanAmount - totalPaidPrincipal));
+        const annualizedFeeRate = openingPrincipal > 0
+            ? monthlyFee * 12 / openingPrincipal * 100
+            : 0;
 
         schedule.push({
             month,
             payment,
             principal,
             serviceFee: monthlyFee,
-            remainingPrincipal: Math.max(0, remainingPrincipal),
+            remainingPrincipal,
             totalPaidPrincipal,
-            currentAPR,
-            earlyRepaymentAPR
+            annualizedFeeRate,
+            earlyRepaymentAPR: 0
         });
-
-        lastRemainingPrincipal = remainingPrincipal;
     }
 
-    // 优化统计计算
+    // 用页面真实展示的逐期还款额构造现金流，包含逐期分厘修正。
+    const totalCashFlows = [-inputs.loanAmount, ...schedule.map(row => row.payment)];
+    const monthlyRate = IRR(totalCashFlows);
+    const apr = annualizeMonthlyIRR(monthlyRate);
+    if (!Number.isFinite(apr)) throw new Error(errorMessages.irrDiverge);
+
+    schedule.forEach((row, index) => {
+        if (index === schedule.length - 1) {
+            row.earlyRepaymentAPR = apr;
+            return;
+        }
+
+        const cashFlows = [-inputs.loanAmount];
+        for (let i = 0; i < index; i++) {
+            cashFlows.push(schedule[i].payment);
+        }
+        cashFlows.push(numberUtils.toFixed2(row.payment + row.remainingPrincipal));
+
+        const earlyMonthlyRate = IRR(cashFlows);
+        const earlyAnnualRate = annualizeMonthlyIRR(earlyMonthlyRate);
+        if (!Number.isFinite(earlyAnnualRate)) throw new Error(errorMessages.irrDiverge);
+        row.earlyRepaymentAPR = earlyAnnualRate;
+    });
+
     const totals = schedule.reduce((acc, row) => ({
-        totalPayment: acc.totalPayment + numberUtils.parseAmount(numberUtils.formatMoney(row.payment)),
-        totalPrincipal: acc.totalPrincipal + numberUtils.parseAmount(numberUtils.formatMoney(row.principal)),
-        totalServiceFee: acc.totalServiceFee + numberUtils.parseAmount(numberUtils.formatMoney(row.serviceFee))
+        totalPayment: numberUtils.toFixed2(acc.totalPayment + row.payment),
+        totalPrincipal: numberUtils.toFixed2(acc.totalPrincipal + row.principal),
+        totalServiceFee: numberUtils.toFixed2(acc.totalServiceFee + row.serviceFee)
     }), {
         totalPayment: 0,
         totalPrincipal: 0,
         totalServiceFee: 0
     });
 
-    return {schedule, apr, totals};
+    return { schedule, apr, totals };
 }
 
-// DOM加载完成后初始化事件监听
 document.addEventListener('DOMContentLoaded', () => {
-    // 统一处理快速选择按钮点击事件
     const setupQuickSelectButtons = (container, inputId) => {
         container.addEventListener('click', e => {
             const button = e.target.closest('[data-value]');
@@ -404,51 +343,42 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // 初始化所有快速选择按钮
-    const quickSelectFields = [
-        {container: '.quick-amounts', inputId: 'loanAmount'},
-        {container: '.quick-terms', inputId: 'loanTerm'},
-        {container: '.quick-fees', inputId: 'serviceFee'}
-    ];
-
-    quickSelectFields.forEach(({container, inputId}) => {
+    [
+        { container: '.quick-amounts', inputId: 'loanAmount' },
+        { container: '.quick-terms', inputId: 'loanTerm' },
+        { container: '.quick-fees', inputId: 'serviceFee' }
+    ].forEach(({ container, inputId }) => {
         setupQuickSelectButtons(document.querySelector(container), inputId);
     });
 
-    // 添加输入框焦点管理和回车事件处理
-    const inputs = ['loanAmount', 'loanTerm', 'serviceFee'];
-    
-    // 设置初始焦点
-    document.getElementById('loanAmount').focus();
-    
-    // 为每个输入框添加回车键处理
-    inputs.forEach((inputId, index) => {
-        document.getElementById(inputId).addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                if (index < inputs.length - 1) {
-                    // 如果不是最后一个输入框，焦点移到下一个
-                    document.getElementById(inputs[index + 1]).focus();
-                } else {
-                    // 如果是最后一个输入框，触发计算
-                    document.getElementById('calculateBtn').click();
-                }
+    const inputIds = ['loanAmount', 'loanTerm', 'serviceFee'];
+    inputIds.forEach((inputId, index) => {
+        document.getElementById(inputId).addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter') return;
+            event.preventDefault();
+            if (index < inputIds.length - 1) {
+                document.getElementById(inputIds[index + 1]).focus();
+            } else {
+                document.getElementById('calculateBtn').click();
             }
         });
     });
 
-    // 计算按钮点击事件处理
     document.getElementById('calculateBtn').addEventListener('click', () => {
-        document.getElementById('result').innerHTML = '';
-        document.getElementById('result').classList.remove('show');
+        const resultElement = document.getElementById('result');
+        resultElement.innerHTML = '';
+        resultElement.classList.remove('show');
         const inputs = validationUtils.validateInputs();
         if (!inputs) return;
-       
-        const result = generateSchedule(inputs);
-        // 保存数据用于导出
-        window.lastExportData = result;
-        
-        document.getElementById('result').innerHTML = renderTable(result.schedule, result.totals, result.apr);
-        document.getElementById('result').classList.add('show');
+
+        try {
+            const result = generateSchedule(inputs);
+            window.lastExportData = result;
+            resultElement.innerHTML = renderTable(result.schedule, result.totals, result.apr);
+            resultElement.classList.add('show');
+        } catch (error) {
+            resultElement.innerHTML = `<div class="empty-placeholder">${error instanceof Error ? error.message : errorMessages.irrDiverge}</div>`;
+            resultElement.classList.add('show');
+        }
     });
-}); 
+});
