@@ -21,8 +21,11 @@ try {
     await page.locator('#yearSelect').selectOption('2023');
     await page.waitForFunction(() => document.querySelectorAll('#hospitalList tr.data-row').length === 100);
 
-    const firstRank = (await page.locator('#hospitalList tr.data-row').first().locator('td').nth(1).innerText()).trim();
+    const firstRow = page.locator('#hospitalList tr.data-row').first();
+    const firstRank = (await firstRow.locator('td').nth(1).innerText()).trim();
+    const firstHospital = (await firstRow.locator('td').nth(2).innerText()).trim();
     assert.equal(firstRank, 'A++++', '2023 should render official grade values');
+    assert.match(firstHospital, /北京协和医院/, 'same-grade display order should use nearest prior numeric rank');
 
     const notice = await page.locator('.overview-note').innerText();
     assert.match(notice, /同等级官方不分先后/);
@@ -35,6 +38,7 @@ try {
     assert.match(historyText, /2022年/);
     assert.match(historyText, /改为等级制/);
 
+    await page.locator('#yearSelect').selectOption('');
     await page.locator('#hospitalSearch').fill('华西医院');
     await page.waitForTimeout(280);
     const searchRows = page.locator('#hospitalList tr.data-row');
@@ -43,7 +47,6 @@ try {
 
     await page.locator('#hospitalSearch').fill('');
     await page.waitForTimeout(280);
-    await page.locator('#yearSelect').selectOption('');
     await page.locator('button[data-sort="排名"]').click();
     const topRows = page.locator('#hospitalList tr.data-row');
     assert.equal((await topRows.nth(0).locator('td').nth(0).innerText()).trim(), '2023');
