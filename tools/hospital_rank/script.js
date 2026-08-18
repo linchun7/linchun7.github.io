@@ -1,633 +1,618 @@
-// 在文件开头添加一个全局变量来存储医院名称映射
+const GRADE_ORDER = Object.freeze({
+    'A++++': 1,
+    'A+++': 2,
+    'A++': 3,
+    'A+': 4,
+    'A': 5
+});
+
 let hospitalAliasMap = new Map();
-// 添加新的映射用于年份特定的曾用名
 let yearlyAliasMap = new Map();
+let hospitalHistoryMap = new Map();
+let sourceOrderMap = new WeakMap();
+let expandedRowKey = null;
 
-// 直接使用 data.js 中定义的 hospitalData
-function initYearSelect() {
-    const yearSelect = document.getElementById('yearSelect');
-    if (!yearSelect) {
-        console.error('未找到年份选择器元素');
-        return;
-    }
-
-    const years = [...new Set(hospitalData.map(item => item.年份))]
-        .filter(year => year)
-        .sort((a, b) => b - a);
-
-    years.forEach(year => {
-        const option = document.createElement('option');
-        option.value = year;
-        option.textContent = year + '年';
-        yearSelect.appendChild(option);
-    });
-}
-
-// 初始化省份选择器
-function initProvinceSelect() {
-    const provinceSelect = document.getElementById('provinceSelect');
-    const yearSelect = document.getElementById('yearSelect');
-    if (!provinceSelect) return;
-
-    // 获取当前选择的年份
-    const selectedYear = yearSelect.value;
-    
-    // 根据年份筛选数据
-    let filteredData = hospitalData;
-    if (selectedYear) {
-        filteredData = hospitalData.filter(item => item.年份 == selectedYear);
-    }
-
-    // 获取筛选后数据中的省份
-    const provinces = [...new Set(filteredData.map(item => item.省份))]
-        .filter(province => province)
-        .sort();
-
-    // 清空现有选项（除了默认选项）
-    while (provinceSelect.options.length > 1) {
-        provinceSelect.remove(1);
-    }
-
-    provinces.forEach(province => {
-        const option = document.createElement('option');
-        option.value = province;
-        option.textContent = province;
-        provinceSelect.appendChild(option);
-    });
-}
-
-// 更新城市选择器
-function updateCitySelect(province) {
-    const citySelect = document.getElementById('citySelect');
-    const yearSelect = document.getElementById('yearSelect');
-    if (!citySelect) return;
-
-    // 清空现有选项（除了默认选项）
-    while (citySelect.options.length > 1) {
-        citySelect.remove(1);
-    }
-
-    if (province) {
-        // 获取当前选择的年份
-        const selectedYear = yearSelect.value;
-
-        // 根据年份和省份筛选数据
-        const cities = [...new Set(
-            hospitalData
-                .filter(item => selectedYear ? item.年份 == selectedYear : true)
-                .filter(item => item.省份 === province)
-                .map(item => item.城市)
-        )].sort();
-
-        cities.forEach(city => {
-            const option = document.createElement('option');
-            option.value = city;
-            option.textContent = city;
-            citySelect.appendChild(option);
-        });
-    }
-}
-
-// 排序状态
-let sortConfig = {
+const sortConfig = {
     column: null,
     direction: 'asc'
 };
 
-// 比较函数
-function compareValues(a, b, isAsc = true) {
-    // 处理空值
-    if (a === '' || a === null || a === undefined) return isAsc ? 1 : -1;
-    if (b === '' || b === null || b === undefined) return isAsc ? -1 : 1;
-    
-    // 数字比较
-    if (!isNaN(a) && !isNaN(b)) {
-        return isAsc ? a - b : b - a;
-    }
-    
-    // 字符串比较
-    return isAsc ? 
-        String(a).localeCompare(String(b), 'zh-CN') : 
-        String(b).localeCompare(String(a), 'zh-CN');
+function isEmptyValue(value) {
+    return value === '' || value === null || value === undefined;
 }
 
-// 添加防抖函数
+function isNumericRank(value) {
+    if (isEmptyValue(value)) return false;
+    const numeric = Number(value);
+    return Number.isFinite(numeric);
+}
+
+function isGradeRank(value) {
+    return Object.prototype.hasOwnProperty.call(GRADE_ORDER, value);
+}
+
+function formatRank(value) {
+    if (isNumericRank(value)) return `第${Number(value)}名`;
+    return String(value || '-');
+}
+
+function formatNumber(value) {
+    if (isEmptyValue(value)) return '-';
+    if (typeof value === 'number') {
+        return value.toFixed(2).replace(/\.?0+$/, '');
+    }
+    return String(value);
+}
+
 function debounce(func, wait) {
     let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
+    return (...args) => {
         clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
+        timeout = setTimeout(() => func(...args), wait);
     };
 }
 
-// 显示医院列表
-function displayHospitals() {
+function buildIndexes() {
+    hospitalAliasMap = new Map();
+    yearlyAliasMap = new Map();
+    hospitalHistoryMap = new Map();
+    sourceOrderMap = new WeakMap();
+
+    hospitalData.forEach((hospital, index) => {
+        sourceOrderMap.set(hospital, index);
+
+        if (!hospitalHistoryMap.has(hospital.医院名称)) {
+            hospitalHistoryMap.set(hospital.医院名称, []);
+        }
+        hospitalHistoryMap.get(hospital.医院名称).push(hospital);
+
+        if (!hospitalAliasMap.has(hospital.医院名称)) {
+            hospitalAliasMap.set(hospital.医院名称, new Set());
+        }
+
+        const aliases = hospital.曾用名称
+            ? hospital.曾用名称.split('、').map(name => name.trim()).filter(Boolean)
+            : [];
+        const aliasSet = hospitalAliasMap.get(hospital.医院名称);
+        aliases.forEach(alias => aliasSet.add(alias));
+
+        if (!yearlyAliasMap.has(hospital.年份)) {
+            yearlyAliasMap.set(hospital.年份, new Map());
+        }
+        if (aliases.length) {
+            yearlyAliasMap.get(hospital.年份).set(hospital.医院名称, aliases);
+        }
+    });
+
+    hospitalHistoryMap.forEach(history => {
+        history.sort((a, b) => Number(b.年份) - Number(a.年份));
+    });
+}
+
+function getAliases(hospital) {
+    const yearMap = yearlyAliasMap.get(hospital.年份);
+    const yearlyAliases = yearMap?.get(hospital.医院名称) || [];
+    if (yearlyAliases.length) return yearlyAliases;
+    return [...(hospitalAliasMap.get(hospital.医院名称) || [])];
+}
+
+function getNearestPreviousNumericRank(hospitalName, beforeYear) {
+    const history = hospitalHistoryMap.get(hospitalName) || [];
+    const record = history.find(item => Number(item.年份) < Number(beforeYear) && isNumericRank(item.排名));
+    return record ? Number(record.排名) : null;
+}
+
+function compareNullableNumeric(a, b, isAsc) {
+    const aEmpty = isEmptyValue(a);
+    const bEmpty = isEmptyValue(b);
+    if (aEmpty && bEmpty) return 0;
+    if (aEmpty) return 1;
+    if (bEmpty) return -1;
+    const diff = Number(a) - Number(b);
+    return isAsc ? diff : -diff;
+}
+
+function compareRankWithinYear(a, b, isAsc = true) {
+    const aNumeric = isNumericRank(a.排名);
+    const bNumeric = isNumericRank(b.排名);
+    const aGrade = isGradeRank(a.排名);
+    const bGrade = isGradeRank(b.排名);
+
+    if (aNumeric && bNumeric) {
+        const diff = Number(a.排名) - Number(b.排名);
+        return isAsc ? diff : -diff;
+    }
+
+    if (aGrade && bGrade) {
+        const gradeDiff = GRADE_ORDER[a.排名] - GRADE_ORDER[b.排名];
+        if (gradeDiff !== 0) return isAsc ? gradeDiff : -gradeDiff;
+
+        const aHistoryRank = getNearestPreviousNumericRank(a.医院名称, a.年份);
+        const bHistoryRank = getNearestPreviousNumericRank(b.医院名称, b.年份);
+        if (aHistoryRank !== null && bHistoryRank !== null && aHistoryRank !== bHistoryRank) {
+            const historyDiff = aHistoryRank - bHistoryRank;
+            return isAsc ? historyDiff : -historyDiff;
+        }
+        if (aHistoryRank !== null && bHistoryRank === null) return -1;
+        if (aHistoryRank === null && bHistoryRank !== null) return 1;
+
+        return (sourceOrderMap.get(a) || 0) - (sourceOrderMap.get(b) || 0);
+    }
+
+    if (aNumeric !== bNumeric) return aNumeric ? -1 : 1;
+    if (aGrade !== bGrade) return aGrade ? -1 : 1;
+    return String(a.排名).localeCompare(String(b.排名), 'zh-CN');
+}
+
+function sortFilteredData(filteredData) {
+    if (!sortConfig.column) {
+        filteredData.sort((a, b) => {
+            const yearDiff = Number(b.年份) - Number(a.年份);
+            if (yearDiff !== 0) return yearDiff;
+            return compareRankWithinYear(a, b, true);
+        });
+        return;
+    }
+
+    const { column, direction } = sortConfig;
+    const isAsc = direction === 'asc';
+
+    filteredData.sort((a, b) => {
+        if (column === '排名') {
+            const yearDiff = Number(b.年份) - Number(a.年份);
+            if (yearDiff !== 0) return yearDiff;
+            return compareRankWithinYear(a, b, isAsc);
+        }
+
+        if (column === '年份') {
+            const diff = Number(a.年份) - Number(b.年份);
+            if (diff !== 0) return isAsc ? diff : -diff;
+            return compareRankWithinYear(a, b, true);
+        }
+
+        if (['专科声誉', '科研学术', '综合得分'].includes(column)) {
+            const diff = compareNullableNumeric(a[column], b[column], isAsc);
+            if (diff !== 0) return diff;
+        } else {
+            const diff = String(a[column] || '').localeCompare(String(b[column] || ''), 'zh-CN');
+            if (diff !== 0) return isAsc ? diff : -diff;
+        }
+
+        const yearDiff = Number(b.年份) - Number(a.年份);
+        if (yearDiff !== 0) return yearDiff;
+        return compareRankWithinYear(a, b, true);
+    });
+}
+
+function initYearSelect() {
+    const yearSelect = document.getElementById('yearSelect');
+    const years = [...new Set(hospitalData.map(item => Number(item.年份)).filter(Boolean))].sort((a, b) => b - a);
+
+    years.forEach(year => {
+        const option = document.createElement('option');
+        option.value = String(year);
+        option.textContent = `${year}年`;
+        yearSelect.appendChild(option);
+    });
+
+    const latestYear = years[0];
+    const oldestYear = years[years.length - 1];
+    const latestCount = hospitalData.filter(item => Number(item.年份) === latestYear).length;
+
+    document.getElementById('yearRange').textContent = `${oldestYear}–${latestYear}`;
+    document.getElementById('latestYear').textContent = `${latestYear}年`;
+    document.getElementById('latestCount').textContent = `${latestCount}家`;
+    document.getElementById('dataStatus').textContent = `数据截至 ${latestYear} 年`;
+}
+
+function initProvinceSelect() {
+    const provinceSelect = document.getElementById('provinceSelect');
+    const selectedYear = document.getElementById('yearSelect').value;
+    const previousValue = provinceSelect.value;
+
+    const filteredData = selectedYear
+        ? hospitalData.filter(item => String(item.年份) === selectedYear)
+        : hospitalData;
+    const provinces = [...new Set(filteredData.map(item => item.省份).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'zh-CN'));
+
+    provinceSelect.replaceChildren(new Option('全部省份', ''));
+    provinces.forEach(province => provinceSelect.add(new Option(province, province)));
+    provinceSelect.value = provinces.includes(previousValue) ? previousValue : '';
+}
+
+function updateCitySelect(province) {
+    const citySelect = document.getElementById('citySelect');
+    const selectedYear = document.getElementById('yearSelect').value;
+    const previousValue = citySelect.value;
+
+    citySelect.replaceChildren(new Option('全部城市', ''));
+    if (!province) return;
+
+    const cities = [...new Set(
+        hospitalData
+            .filter(item => !selectedYear || String(item.年份) === selectedYear)
+            .filter(item => item.省份 === province)
+            .map(item => item.城市)
+            .filter(Boolean)
+    )].sort((a, b) => a.localeCompare(b, 'zh-CN'));
+
+    cities.forEach(city => citySelect.add(new Option(city, city)));
+    citySelect.value = cities.includes(previousValue) ? previousValue : '';
+}
+
+function matchesSearch(hospitalName, keywords) {
+    const searchableValues = [hospitalName, ...(hospitalAliasMap.get(hospitalName) || [])]
+        .map(value => String(value).toLowerCase());
+    return keywords.every(keyword => searchableValues.some(value => value.includes(keyword)));
+}
+
+function getFilteredData() {
     const year = document.getElementById('yearSelect').value;
     const province = document.getElementById('provinceSelect').value;
     const city = document.getElementById('citySelect').value;
     const searchKeyword = document.getElementById('hospitalSearch').value.trim().toLowerCase();
-    
-    const hospitalList = document.getElementById('hospitalList');
-    if (!hospitalList) return;
 
-    hospitalList.innerHTML = '';
-    
-    let filteredData = hospitalData;
+    let filteredData = [...hospitalData];
 
-    // 按关键词筛选
     if (searchKeyword) {
-        // 将搜索关键词按空格分割成数组，并去除空字符串
-        const keywords = searchKeyword.split(/\s+/).filter(k => k);
-        
-        // 先找出所有匹配的医院名称
+        const keywords = searchKeyword.split(/\s+/).filter(Boolean);
         const matchedHospitals = new Set();
-        
-        hospitalData.forEach(item => {
-            // 检查是否所有关键词都匹配
-            const matchesAllKeywords = keywords.every(keyword => {
-                // 检查当前名称
-                if (item.医院名称.toLowerCase().includes(keyword)) {
-                    return true;
-                }
-                // 检查基本曾用名称
-                const baseAliases = hospitalAliasMap.get(item.医院名称) || [];
-                if (baseAliases.some(alias => alias.toLowerCase().includes(keyword))) {
-                    return true;
-                }
-                // 检查年份特定的曾用名称
-                const yearMap = yearlyAliasMap.get(item.年份);
-                if (yearMap) {
-                    const yearlyAliases = yearMap.get(item.医院名称) || [];
-                    if (yearlyAliases.some(alias => alias.toLowerCase().includes(keyword))) {
-                        return true;
-                    }
-                }
-                return false;
-            });
-
-            if (matchesAllKeywords) {
-                matchedHospitals.add(item.医院名称);
-            }
+        hospitalHistoryMap.forEach((_history, hospitalName) => {
+            if (matchesSearch(hospitalName, keywords)) matchedHospitals.add(hospitalName);
         });
-
-        // 过滤数据，显示所有匹配医院的所有年份记录
-        filteredData = filteredData.filter(item => 
-            matchedHospitals.has(item.医院名称)
-        );
+        filteredData = filteredData.filter(item => matchedHospitals.has(item.医院名称));
     }
 
-    // 按年份筛选
-    if (year) {
-        filteredData = filteredData.filter(item => item.年份 == year);
-    }
+    if (year) filteredData = filteredData.filter(item => String(item.年份) === year);
+    if (province) filteredData = filteredData.filter(item => item.省份 === province);
+    if (city) filteredData = filteredData.filter(item => item.城市 === city);
 
-    // 按省份筛选
-    if (province) {
-        filteredData = filteredData.filter(item => item.省份 === province);
-    }
+    sortFilteredData(filteredData);
+    return filteredData;
+}
 
-    // 按城市筛选
-    if (city) {
-        filteredData = filteredData.filter(item => item.城市 === city);
-    }
+function createTextCell(value, className = '') {
+    const cell = document.createElement('td');
+    if (className) cell.className = className;
+    const text = isEmptyValue(value) ? '-' : String(value);
+    cell.textContent = text;
+    if (text === '-') cell.classList.add('empty-value');
+    return cell;
+}
 
-    if (filteredData.length === 0) {
-        // 添加空数据提示
-        const emptyRow = document.createElement('tr');
-        emptyRow.innerHTML = `
-            <td colspan="8" class="empty-message">
-                没有找到符合条件的医院数据
-            </td>
-        `;
-        hospitalList.appendChild(emptyRow);
+function createRankCell(hospital) {
+    const cell = document.createElement('td');
+    if (isGradeRank(hospital.排名)) {
+        const badge = document.createElement('span');
+        badge.className = 'grade-badge';
+        badge.textContent = hospital.排名;
+        badge.title = '官方等级制结果；同等级内不代表具体名次';
+        cell.appendChild(badge);
     } else {
-        // 应用排序
-        if (sortConfig.column) {
-            const isAsc = sortConfig.direction === 'asc';
-            
-            filteredData.sort((a, b) => {
-                let aValue = a[sortConfig.column];
-                let bValue = b[sortConfig.column];
+        const rank = document.createElement('span');
+        rank.className = 'rank-value';
+        rank.textContent = isNumericRank(hospital.排名) ? String(Number(hospital.排名)) : String(hospital.排名 || '-');
+        cell.appendChild(rank);
+    }
+    return cell;
+}
 
-                // 特殊处理2023年的排名
-                if (sortConfig.column === '排名' && a.年份 == 2023) {
-                    const rankOrder = {'A++++': 1, 'A+++': 2, 'A++': 3, 'A+': 4, 'A': 5};
-                    // 获取等级数值
-                    const aRank = rankOrder[aValue];
-                    const bRank = rankOrder[bValue];
-                    
-                    if (aRank !== bRank) {
-                        // 不同等级，直接比较等级
-                        return isAsc ? aRank - bRank : bRank - aRank;
-                    } else {
-                        // 同等级，查找2022年排名
-                        const aHospital = a.医院名称;
-                        const bHospital = b.医院名称;
-                        
-                        const a2022 = hospitalData.find(item => 
-                            item.医院名称 === aHospital && item.年份 === 2022
-                        );
-                        const b2022 = hospitalData.find(item => 
-                            item.医院名称 === bHospital && item.年份 === 2022
-                        );
-                        
-                        // 如果都有2022年排名，按2022年排名排序
-                        if (a2022 && b2022) {
-                            const a2022Rank = Number(a2022.排名);
-                            const b2022Rank = Number(b2022.排名);
-                            return isAsc ? a2022Rank - b2022Rank : b2022Rank - a2022Rank;
-                        }
-                        // 如果只有一个有2022年排名，有排名的排在前面
-                        else if (a2022) {
-                            return isAsc ? -1 : 1;
-                        }
-                        else if (b2022) {
-                            return isAsc ? 1 : -1;
-                        }
-                        // 都没有2022年排名，按医院名称排序
-                        return isAsc ? 
-                            aHospital.localeCompare(bHospital, 'zh-CN') : 
-                            bHospital.localeCompare(aHospital, 'zh-CN');
-                    }
-                }
+function createHospitalCell(hospital, rowKey) {
+    const cell = document.createElement('td');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'hospital-history-button';
+    button.dataset.rowKey = rowKey;
+    button.dataset.hospitalName = hospital.医院名称;
+    button.setAttribute('aria-expanded', String(expandedRowKey === rowKey));
 
-                // 数字类型字段
-                if (['专科声誉', '科研学术', '综合得分', '年份'].includes(sortConfig.column)) {
-                    // 处理空值
-                    if (aValue === '') {
-                        return isAsc ? -1 : 1;  // 升序时空值排最前，降序时排最后
-                    }
-                    if (bValue === '') {
-                        return isAsc ? 1 : -1;  // 升序时空值排最前，降序时排最后
-                    }
-                    aValue = Number(aValue);
-                    bValue = Number(bValue);
-                }
+    const name = document.createElement('span');
+    name.className = 'hospital-name';
+    name.textContent = hospital.医院名称;
 
-                return compareValues(aValue, bValue, isAsc);
-            });
-        } else {
-            // 默认按年份降序，排名升序排列
-            filteredData.sort((a, b) => {
-                const yearCompare = compareValues(b.年份, a.年份); // 年份降序
-                if (yearCompare !== 0) return yearCompare;
-                
-                // 年份相同时按排名升序
-                if (a.年份 == 2023) {
-                    const rankOrder = {'A++++': 1, 'A+++': 2, 'A++': 3, 'A+': 4, 'A': 5};
-                    // 获取等级数值
-                    const aRank = rankOrder[a.排名];
-                    const bRank = rankOrder[b.排名];
-                    
-                    if (aRank !== bRank) {
-                        return aRank - bRank;
-                    } else {
-                        // 同等级，查找2022年排名
-                        const a2022 = hospitalData.find(item => 
-                            item.医院名称 === a.医院名称 && item.年份 === 2022
-                        );
-                        const b2022 = hospitalData.find(item => 
-                            item.医院名称 === b.医院名称 && item.年份 === 2022
-                        );
-                        
-                        if (a2022 && b2022) {
-                            return Number(a2022.排名) - Number(b2022.排名);
-                        }
-                        else if (a2022) return -1;
-                        else if (b2022) return 1;
-                        return a.医院名称.localeCompare(b.医院名称, 'zh-CN');
-                    }
-                }
-                return Number(a.排名) - Number(b.排名);
-            });
-        }
+    const aliases = getAliases(hospital);
+    if (aliases.length) button.title = `曾用名称：${aliases.join('、')}`;
+    else button.title = '查看历年排名变化';
 
-        // 优化表格渲染
-        const fragment = document.createDocumentFragment();
-        filteredData.forEach(hospital => {
-            const row = document.createElement('tr');
-            // 获取基本曾用名
-            const baseAliases = hospitalAliasMap.get(hospital.医院名称) || [];
-            // 获取年份特定的曾用名
-            const yearMap = yearlyAliasMap.get(hospital.年份);
-            const yearlyAliases = yearMap ? yearMap.get(hospital.医院名称) || [] : [];
-            
-            // 如果有年份特定的曾用名，使用它，否则使用基本曾用名
-            const aliases = yearlyAliases.length > 0 ? yearlyAliases : baseAliases;
-            const aliasesText = aliases.length > 0 ? `\n曾用名称：${aliases.join('、')}` : '';
-            
-            row.innerHTML = `
-                <td>${hospital.年份}</td>
-                <td>${hospital.排名}</td>
-                <td title="${hospital.医院名称}${aliasesText}">${hospital.医院名称}</td>
-                <td>${formatNumber(hospital.专科声誉)}</td>
-                <td>${formatNumber(hospital.科研学术)}</td>
-                <td>${formatNumber(hospital.综合得分)}</td>
-                <td>${hospital.省份}</td>
-                <td>${hospital.城市}</td>
-            `;
-            fragment.appendChild(row);
-        });
-        hospitalList.appendChild(fragment);
+    const affordance = document.createElement('span');
+    affordance.className = 'history-affordance';
+    affordance.setAttribute('aria-hidden', 'true');
+    affordance.textContent = '›';
+
+    button.append(name, affordance);
+    cell.appendChild(button);
+    return cell;
+}
+
+function createLocationCell(hospital, type) {
+    const field = type === 'province' ? '省份' : '城市';
+    const cell = document.createElement('td');
+    const value = hospital[field];
+    if (!value) {
+        cell.textContent = '-';
+        cell.className = 'empty-value';
+        return cell;
+    }
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'location-button';
+    button.dataset.locationType = type;
+    button.dataset.location = value;
+    button.dataset.year = String(hospital.年份);
+    button.textContent = value;
+    button.setAttribute('aria-label', `查看 ${hospital.年份} 年 ${value} 上榜医院数量`);
+    cell.appendChild(button);
+    return cell;
+}
+
+function getRankChange(current, previous) {
+    if (!previous) return { text: '首次记录', className: 'is-neutral' };
+
+    if (isNumericRank(current.排名) && isNumericRank(previous.排名)) {
+        const improvement = Number(previous.排名) - Number(current.排名);
+        if (improvement > 0) return { text: `↑ 上升 ${improvement} 位`, className: 'is-up' };
+        if (improvement < 0) return { text: `↓ 下降 ${Math.abs(improvement)} 位`, className: 'is-down' };
+        return { text: '— 持平', className: 'is-neutral' };
+    }
+
+    if (isGradeRank(current.排名) && isGradeRank(previous.排名)) {
+        const currentOrder = GRADE_ORDER[current.排名];
+        const previousOrder = GRADE_ORDER[previous.排名];
+        if (currentOrder < previousOrder) return { text: '↑ 等级提升', className: 'is-up' };
+        if (currentOrder > previousOrder) return { text: '↓ 等级下降', className: 'is-down' };
+        return { text: '— 等级持平', className: 'is-neutral' };
+    }
+
+    if (isGradeRank(current.排名) && isNumericRank(previous.排名)) {
+        return { text: '改为等级制', className: 'is-system' };
+    }
+    if (isNumericRank(current.排名) && isGradeRank(previous.排名)) {
+        return { text: '恢复数字排名', className: 'is-system' };
+    }
+    return { text: '制度变化', className: 'is-system' };
+}
+
+function createHistoryRow(hospitalName, rowKey) {
+    const row = document.createElement('tr');
+    row.className = 'rank-history-row';
+    row.dataset.historyFor = rowKey;
+
+    const cell = document.createElement('td');
+    cell.colSpan = 8;
+
+    const panel = document.createElement('div');
+    panel.className = 'rank-history-panel';
+
+    const header = document.createElement('div');
+    header.className = 'rank-history-header';
+    const title = document.createElement('strong');
+    title.textContent = `${hospitalName} · 历年排名变化`;
+    const note = document.createElement('span');
+    note.textContent = '等级制年份不换算为具体名次';
+    header.append(title, note);
+
+    const list = document.createElement('ol');
+    list.className = 'rank-history-list';
+    const history = hospitalHistoryMap.get(hospitalName) || [];
+
+    history.forEach((record, index) => {
+        const item = document.createElement('li');
+        item.className = 'rank-history-item';
+
+        const year = document.createElement('span');
+        year.className = 'history-year';
+        year.textContent = `${record.年份}年`;
+
+        const rank = document.createElement('span');
+        rank.className = 'history-rank';
+        rank.textContent = formatRank(record.排名);
+
+        const change = getRankChange(record, history[index + 1]);
+        const changeText = document.createElement('span');
+        changeText.className = `history-change ${change.className}`;
+        changeText.textContent = change.text;
+
+        item.append(year, rank, changeText);
+        list.appendChild(item);
+    });
+
+    panel.append(header, list);
+    cell.appendChild(panel);
+    row.appendChild(cell);
+    return row;
+}
+
+function updateResultSummary(filteredData) {
+    const selectedYear = document.getElementById('yearSelect').value;
+    const uniqueHospitals = new Set(filteredData.map(item => item.医院名称)).size;
+    if (selectedYear) {
+        document.getElementById('resultSummary').textContent = `${selectedYear} 年 · ${filteredData.length} 条记录`;
+    } else {
+        document.getElementById('resultSummary').textContent = `${filteredData.length} 条历年记录 · ${uniqueHospitals} 家医院`;
     }
 }
 
-// 处理表头点击排序
-function handleSort(e) {
-    const th = e.target.closest('th');
-    if (!th) return;
+function displayHospitals() {
+    const hospitalList = document.getElementById('hospitalList');
+    hospitalList.replaceChildren();
 
-    const column = th.dataset.sort;
-    
-    // 更新排序图标
-    document.querySelectorAll('th').forEach(header => {
-        header.classList.remove('sort-asc', 'sort-desc');
+    const filteredData = getFilteredData();
+    updateResultSummary(filteredData);
+
+    if (!filteredData.length) {
+        const row = document.createElement('tr');
+        const cell = document.createElement('td');
+        cell.colSpan = 8;
+        cell.className = 'empty-message';
+        cell.textContent = '没有找到符合条件的医院数据';
+        row.appendChild(cell);
+        hospitalList.appendChild(row);
+        return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    filteredData.forEach(hospital => {
+        const rowKey = `${hospital.年份}::${hospital.医院名称}`;
+        const row = document.createElement('tr');
+        row.className = 'data-row';
+        row.dataset.rowKey = rowKey;
+        if (expandedRowKey === rowKey) row.classList.add('is-expanded');
+
+        row.append(
+            createTextCell(hospital.年份),
+            createRankCell(hospital),
+            createHospitalCell(hospital, rowKey),
+            createTextCell(formatNumber(hospital.专科声誉)),
+            createTextCell(formatNumber(hospital.科研学术)),
+            createTextCell(formatNumber(hospital.综合得分)),
+            createLocationCell(hospital, 'province'),
+            createLocationCell(hospital, 'city')
+        );
+        fragment.appendChild(row);
+
+        if (expandedRowKey === rowKey) {
+            fragment.appendChild(createHistoryRow(hospital.医院名称, rowKey));
+        }
     });
 
+    hospitalList.appendChild(fragment);
+}
+
+function updateSortIndicators() {
+    document.querySelectorAll('#hospitalTable thead th').forEach(th => th.setAttribute('aria-sort', 'none'));
+    if (!sortConfig.column) return;
+    const button = document.querySelector(`#hospitalTable thead button[data-sort="${sortConfig.column}"]`);
+    if (!button) return;
+    button.closest('th').setAttribute('aria-sort', sortConfig.direction === 'asc' ? 'ascending' : 'descending');
+}
+
+function handleSort(event) {
+    const button = event.target.closest('button[data-sort]');
+    if (!button) return;
+
+    const column = button.dataset.sort;
     if (sortConfig.column === column) {
-        // 切换排序方向
         sortConfig.direction = sortConfig.direction === 'asc' ? 'desc' : 'asc';
     } else {
-        // 新的排序列
         sortConfig.column = column;
         sortConfig.direction = 'asc';
     }
 
-    // 添加排序图标
-    th.classList.add(`sort-${sortConfig.direction}`);
-
-    // 重新显示数据
+    expandedRowKey = null;
+    updateSortIndicators();
     displayHospitals();
 }
 
-// 绘制排名趋势图
-function drawRankingTrend(hospitalName) {
-    const chart = echarts.init(document.getElementById('rankingTrend'));
-    
-    // 获取年份范围
-    const years = [...new Set(hospitalData.map(item => item.年份))].sort();
-    
-    // 准备数据
-    const data = years.map(year => {
-        const record = hospitalData.find(item => 
-            item.医院名称 === hospitalName && item.年份 === year
-        );
-        if (!record) return null;
-        // 2023年特殊处理
-        if (year === 2023) {
-            const rankMap = {
-                'A++++': '1-20', 
-                'A+++': '21-40', 
-                'A++': '41-60', 
-                'A+': '61-80', 
-                'A': '81-100'
-            };
-            return rankMap[record.排名] || null;
-        }
-        return record.排名;
-    });
+function showLocationStats(button) {
+    const tooltip = document.getElementById('statsTooltip');
+    const { locationType, location, year } = button.dataset;
+    const field = locationType === 'province' ? '省份' : '城市';
+    const count = hospitalData.filter(item => String(item.年份) === year && item[field] === location).length;
+    tooltip.textContent = `${year} 年 ${location} 有 ${count} 家上榜医院`;
+    tooltip.hidden = false;
 
-    const series = [{
-        name: hospitalName,
-        type: 'line',
-        data: data,
-        connectNulls: true,
-        symbol: 'circle',
-        symbolSize: 8,
-        label: {
-            show: true,
-            formatter: function(params) {
-                return params.value;
-            }
-        }
-    }];
-
-    const option = {
-        title: {
-            text: `${hospitalName}排名趋势`,
-            left: 'center'
-        },
-        tooltip: {
-            trigger: 'axis',
-            backgroundColor: 'rgba(50, 50, 50, 0.9)',
-            borderWidth: 0,
-            textStyle: {
-                color: '#fff'
-            },
-            formatter: function(params) {
-                return params.map(param => {
-                    const year = years[param.dataIndex];
-                    let rank = param.value;
-                    return `${param.seriesName}<br/>
-                            ${year}年: ${rank}`;
-                }).join('<br/>');
-            }
-        },
-        legend: {
-            type: 'scroll',
-            orient: 'horizontal',
-            bottom: 0
-        },
-        grid: {
-            left: '3%',
-            right: '4%',
-            bottom: '15%',
-            containLabel: true
-        },
-        xAxis: {
-            type: 'category',
-            data: years,
-            name: '年份'
-        },
-        yAxis: {
-            type: 'value',
-            name: '排名',
-            inverse: true,
-            minInterval: 1,  // 最小间隔为1，确保只显示整数
-            axisLabel: {
-                formatter: function(value) {
-                    return Math.floor(value);  // 确保显示整数
-                }
-            }
-        },
-        series: series
-    };
-
-    chart.setOption(option);
+    const rect = button.getBoundingClientRect();
+    const left = Math.min(rect.left, window.innerWidth - tooltip.offsetWidth - 12);
+    const top = Math.min(rect.bottom + 6, window.innerHeight - tooltip.offsetHeight - 12);
+    tooltip.style.left = `${Math.max(12, left)}px`;
+    tooltip.style.top = `${Math.max(12, top)}px`;
 }
 
-// 主函数
+function hideLocationStats() {
+    const tooltip = document.getElementById('statsTooltip');
+    tooltip.hidden = true;
+}
+
+function bindEvents() {
+    document.getElementById('hospitalTable').querySelector('thead').addEventListener('click', handleSort);
+
+    document.getElementById('yearSelect').addEventListener('change', () => {
+        initProvinceSelect();
+        document.getElementById('citySelect').value = '';
+        updateCitySelect(document.getElementById('provinceSelect').value);
+        expandedRowKey = null;
+        displayHospitals();
+    });
+
+    document.getElementById('provinceSelect').addEventListener('change', event => {
+        updateCitySelect(event.target.value);
+        expandedRowKey = null;
+        displayHospitals();
+    });
+
+    document.getElementById('citySelect').addEventListener('change', () => {
+        expandedRowKey = null;
+        displayHospitals();
+    });
+
+    document.getElementById('hospitalSearch').addEventListener('input', debounce(() => {
+        expandedRowKey = null;
+        displayHospitals();
+    }, 220));
+
+    const hospitalList = document.getElementById('hospitalList');
+    hospitalList.addEventListener('click', event => {
+        const historyButton = event.target.closest('.hospital-history-button');
+        if (historyButton) {
+            const rowKey = historyButton.dataset.rowKey;
+            expandedRowKey = expandedRowKey === rowKey ? null : rowKey;
+            displayHospitals();
+            if (expandedRowKey) {
+                const expandedRow = [...document.querySelectorAll('#hospitalList tr.data-row')]
+                    .find(row => row.dataset.rowKey === rowKey);
+                expandedRow?.querySelector('.hospital-history-button')?.focus({ preventScroll: true });
+            }
+            return;
+        }
+
+        const locationButton = event.target.closest('.location-button');
+        if (locationButton) showLocationStats(locationButton);
+    });
+
+    hospitalList.addEventListener('mouseover', event => {
+        const button = event.target.closest('.location-button');
+        if (button) showLocationStats(button);
+    });
+    hospitalList.addEventListener('mouseout', event => {
+        if (event.target.closest('.location-button')) hideLocationStats();
+    });
+    hospitalList.addEventListener('focusin', event => {
+        const button = event.target.closest('.location-button');
+        if (button) showLocationStats(button);
+    });
+    hospitalList.addEventListener('focusout', event => {
+        if (event.target.closest('.location-button')) hideLocationStats();
+    });
+}
+
+function showInitError(error) {
+    console.error('初始化失败:', error);
+    const hospitalList = document.getElementById('hospitalList');
+    hospitalList.replaceChildren();
+    const row = document.createElement('tr');
+    const cell = document.createElement('td');
+    cell.colSpan = 8;
+    cell.className = 'error-message';
+    cell.textContent = '系统初始化失败，请刷新页面重试';
+    row.appendChild(cell);
+    hospitalList.appendChild(row);
+    document.getElementById('resultSummary').textContent = '加载失败';
+}
+
 function init() {
-    // 初始化医院别名映射
-    initHospitalAliasMap();
-    
-    // 添加错误处理
     try {
+        buildIndexes();
         initYearSelect();
         initProvinceSelect();
-        // 初始显示数据
+        updateCitySelect('');
+        bindEvents();
+        updateSortIndicators();
         displayHospitals();
+        document.getElementById('copyrightYear').textContent = String(new Date().getFullYear());
     } catch (error) {
-        console.error('初始化失败:', error);
-        // 在表格中显示错误信息
-        const hospitalList = document.getElementById('hospitalList');
-        if (hospitalList) {
-            const errorRow = document.createElement('tr');
-            errorRow.innerHTML = `
-                <td colspan="8" class="error-message-row">
-                    系统初始化失败，请刷新页面重试
-                </td>
-            `;
-            hospitalList.appendChild(errorRow);
-        }
+        showInitError(error);
     }
-    
-    // 监听年份选择变化
-    document.getElementById('yearSelect').addEventListener('change', () => {
-        // 重新初始化省份选择器
-        initProvinceSelect();
-        // 清空城市选择
-        document.getElementById('citySelect').selectedIndex = 0;
-        // 更新显示
-        displayHospitals();
-    });
-
-    // 监听省份选择变化
-    const provinceSelect = document.getElementById('provinceSelect');
-    provinceSelect.addEventListener('change', (e) => {
-        updateCitySelect(e.target.value);
-        displayHospitals();
-    });
-
-    // 监听城市选择变化
-    document.getElementById('citySelect').addEventListener('change', displayHospitals);
-
-    // 添加表头排序事件监听
-    document.querySelector('thead').addEventListener('click', handleSort);
-    
-    // 添加医院名称点击事件
-    document.getElementById('hospitalList').addEventListener('click', (e) => {
-        const cell = e.target.closest('td');
-        if (!cell) return;
-
-        if (cell.cellIndex === 2) { // 医院名称列
-            const hospitalName = cell.textContent;
-            document.querySelector('.charts-container').style.display = 'block';
-            drawRankingTrend(hospitalName);
-            document.querySelector('.charts-container').scrollIntoView({ behavior: 'smooth' });
-        } else if (cell.cellIndex === 6 || cell.cellIndex === 7) { // 省份或城市列
-            showLocationStats(e);
-        }
-    });
-
-    // 添加鼠标移入移出事件
-    document.getElementById('hospitalList').addEventListener('mouseover', (e) => {
-        const cell = e.target.closest('td');
-        if (cell && (cell.cellIndex === 6 || cell.cellIndex === 7)) {
-            showLocationStats(e);
-        }
-    });
-
-    document.getElementById('hospitalList').addEventListener('mouseout', (e) => {
-        const cell = e.target.closest('td');
-        if (cell && (cell.cellIndex === 6 || cell.cellIndex === 7)) {
-            hideLocationStats();
-        }
-    });
-
-    // 优化窗口resize事件
-    window.addEventListener('resize', debounce(() => {
-        const rankingChart = echarts.getInstanceByDom(document.getElementById('rankingTrend'));
-        if (rankingChart) rankingChart.resize();
-    }, 250));
-
-    // 添加搜索框事件监听
-    document.getElementById('hospitalSearch').addEventListener('input', debounce(() => {
-        displayHospitals();
-    }, 300));
 }
 
-// 确保DOM加载完成后再执行初始化
 document.addEventListener('DOMContentLoaded', init);
-
-// 添加数字格式化函数
-function formatNumber(value) {
-    if (value === '' || value === null || value === undefined) return '-';
-    if (typeof value === 'number') {
-        return value.toFixed(2).replace(/\.?0+$/, '');
-    }
-    return value;
-}
-
-// 显示位置统计信息
-function showLocationStats(e) {
-    const cell = e.target.closest('td');
-    if (!cell) return;
-
-    // 获取当前行的年份
-    const row = cell.closest('tr');
-    const rowYear = row.cells[0].textContent;
-
-    const isProvince = cell.cellIndex === 6;
-    const location = cell.textContent;
-    const yearData = hospitalData.filter(item => item.年份 == rowYear);
-    
-    let count;
-    let tooltip = document.querySelector('.stats-tooltip');
-    if (!tooltip) {
-        tooltip = document.createElement('div');
-        tooltip.className = 'stats-tooltip';
-        document.body.appendChild(tooltip);
-    }
-
-    if (isProvince) {
-        count = yearData.filter(item => item.省份 === location).length;
-        tooltip.textContent = `${rowYear} 年 ${location} 有 ${count} 家上榜医院`;
-    } else {
-        count = yearData.filter(item => item.城市 === location).length;
-        tooltip.textContent = `${rowYear} 年 ${location} 有 ${count} 家上榜医院`;
-    }
-
-    // 设置提示框位置
-    const rect = cell.getBoundingClientRect();
-    tooltip.style.left = rect.left + 'px';
-    tooltip.style.top = (rect.bottom + 5) + 'px';
-    tooltip.style.opacity = '1';
-}
-
-// 隐藏统计信息
-function hideLocationStats() {
-    const tooltip = document.querySelector('.stats-tooltip');
-    if (tooltip) {
-        tooltip.style.opacity = '0';
-    }
-}
-
-// 添加初始化医院别名映射的函数
-function initHospitalAliasMap() {
-    // 保持原有的初始化逻辑
-    hospitalData.forEach(hospital => {
-        if (hospital.曾用名称) {
-            const aliases = hospital.曾用名称.split('、').filter(name => name.trim());
-            hospitalAliasMap.set(hospital.医院名称, aliases);
-        }
-    });
-
-    // 添加年份特定的曾用名初始化
-    hospitalData.forEach(hospital => {
-        const year = hospital.年份;
-        if (!yearlyAliasMap.has(year)) {
-            yearlyAliasMap.set(year, new Map());
-        }
-        const yearMap = yearlyAliasMap.get(year);
-        
-        if (hospital.曾用名称) {
-            const aliases = hospital.曾用名称.split('、').filter(name => name.trim());
-            yearMap.set(hospital.医院名称, aliases);
-        }
-    });
-} 
