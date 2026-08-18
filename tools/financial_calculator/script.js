@@ -91,13 +91,13 @@
         const annualizedReturn = (earnings / principal / days) * annualDays * 100;
         if (!Number.isFinite(annualizedReturn)) throw new Error('计算结果异常，请检查输入');
 
-        return `年化收益率：${formatPercent(annualizedReturn)}`;
+        return `单利年化收益率：${formatPercent(annualizedReturn)}`;
     }
 
     function calculateInterest() {
         const principal = readPositiveNumber('principal2', '本金');
         const days = readPositiveInteger('days2', '天数');
-        const annualRate = readFiniteNumber('annualRate2', '年化收益率');
+        const annualRate = readFiniteNumber('annualRate2', '单利年化收益率');
         const annualDays = readAnnualDays('rateType2');
 
         const earnings = principal * (annualRate / 100) * (days / annualDays);
@@ -116,10 +116,11 @@
         if (endDate <= startDate) throw new Error('终止日期必须晚于起始日期');
 
         const days = (endDate - startDate) / DAY_MS;
-        const annualizedReturn = ((endValue - startValue) / startValue) / days * annualDays * 100;
+        const growthRatio = endValue / startValue;
+        const annualizedReturn = (Math.pow(growthRatio, annualDays / days) - 1) * 100;
 
         if (!Number.isFinite(annualizedReturn)) throw new Error('计算结果异常，请检查输入');
-        return `净值年化收益率：${formatPercent(annualizedReturn)}（持有 ${days} 天）`;
+        return `净值年化收益率（CAGR）：${formatPercent(annualizedReturn)}（持有 ${days} 天）`;
     }
 
     const frequencyConfig = {
@@ -135,13 +136,14 @@
         const config = frequencyConfig[frequency];
         if (!config) throw new Error('复利方式无效');
 
+        // 本工具的复利输入采用名义年利率（APR）：按复利频率折算单期利率后逐期复利。
         const periodicPercent = config.dayBased
             ? annualRatePercent * config.dayBased / annualDays
             : annualRatePercent / config.divisor;
 
         const rate = periodicPercent / 100;
         if (!Number.isFinite(rate) || rate <= -1) {
-            throw new Error('该年化收益率在当前复利方式下会使单期本金小于等于 0，请调整参数');
+            throw new Error('该名义年利率在当前复利方式下会使单期本金小于等于 0，请调整参数');
         }
         return rate;
     }
@@ -208,7 +210,7 @@
     function calculateCompound() {
         const principal = readPositiveNumber('principal3', '本金');
         const periods = readPositiveInteger('depositPeriod', '存期');
-        const annualRate = readFiniteNumber('annualRate3', '年化收益率');
+        const annualRate = readFiniteNumber('annualRate3', '名义年利率');
         const annualDays = readAnnualDays('rateType4');
         const frequency = $('compoundingFrequency').value;
 
