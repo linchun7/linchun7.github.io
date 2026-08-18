@@ -89,6 +89,13 @@
             .result-heading { align-items: flex-start; flex-direction: column; }
             .result-actions { width: 100%; justify-content: flex-end; }
             .result-text { min-height: 100px; padding: 15px; font-size: 18px; }
+
+            body.rmb-input-active .result-card { order: -1; }
+            body.rmb-input-active .result-heading { align-items: center; flex-direction: row; padding: 8px 12px; }
+            body.rmb-input-active .result-heading p { display: none; }
+            body.rmb-input-active .result-actions { width: auto; margin-left: auto; }
+            body.rmb-input-active .result-text { min-height: 68px; padding: 10px 12px; font-size: 16px; line-height: 1.55; }
+            body.rmb-input-active .result-text.empty { font-size: 12px; }
         }
         @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; } }
     </style>
@@ -123,7 +130,7 @@
             </div>
             <label for="inputmoney">数字金额</label>
             <div class="input-actions">
-                <input id="inputmoney" type="text" inputmode="decimal" autocomplete="off" placeholder="例如：123456.78" autofocus>
+                <input id="inputmoney" type="text" inputmode="decimal" autocomplete="off" placeholder="例如：123456.78">
                 <button class="secondary-button" type="button" id="clearBtn">清空</button>
             </div>
         </section>
@@ -211,6 +218,13 @@
                 textArea.remove();
                 if (!copied) throw new Error('copy failed');
             }
+
+            input.addEventListener('focus', () => {
+                document.body.classList.add('rmb-input-active');
+            });
+            input.addEventListener('blur', () => {
+                document.body.classList.remove('rmb-input-active');
+            });
 
             document.getElementById('clearBtn').addEventListener('click', () => {
                 input.value = '';
