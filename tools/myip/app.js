@@ -320,47 +320,24 @@
                 handler(value);
             };
 
-            const timer = window.setTimeout(() => finish(reject, createTimeoutError('国内备用接口')), timeoutMs);
+            const timer = window.setTimeout(() => finish(reject, createTimeoutError('国内主接口')), timeoutMs);
             window[callbackName] = (payload) => finish(resolve, payload);
             script.async = true;
             script.referrerPolicy = 'no-referrer';
-            script.onerror = () => finish(reject, new Error('国内备用接口加载失败'));
+            script.onerror = () => finish(reject, new Error('国内主接口加载失败'));
             script.src = `https://whois.pconline.com.cn/ipJson.jsp?json=true&callback=${encodeURIComponent(callbackName)}&_=${Date.now()}`;
             document.head.appendChild(script);
         });
     }
 
     async function loadDomestic(runId) {
-        setSource('domestic', 'loading', '检测中', '优先国内 HTTPS API，必要时切换国内备用接口。');
-
-        try {
-            const data = await withRetry(() => fetchJson('https://api.bilibili.com/x/web-interface/zone'));
-            if (runId !== activeRunId) return;
-            if (!data || data.code !== 0 || !data.data || !isIpAddress(data.data.addr)) {
-                throw new Error('国内主接口未返回有效 IP');
-            }
-
-            const detail = joinText([data.data.country, data.data.province, data.data.city, data.data.isp]);
-            routeResults.domestic = {
-                status: 'success',
-                observations: [makeObservation(data.data.addr, 'Bilibili', detail)],
-                detail: detail
-                    ? `国内站点返回：${detail}。用于观察 DIRECT / 直连规则实际出口。`
-                    : '已通过国内站点确认请求出口，用于观察 DIRECT / 直连规则实际路径。'
-            };
-            setSource('domestic', 'success', '已获取', 'Bilibili 国内线路探测成功。');
-            renderRoute('domestic');
-            return;
-        } catch (primaryError) {
-            if (runId !== activeRunId) return;
-            setSource('domestic', 'warning', '切换备用', `主接口未确认（${formatError(primaryError)}），正在尝试太平洋网络备用接口。`);
-        }
+        setSource('domestic', 'loading', '检测中', '优先使用国内站点的浏览器回调接口，必要时切换国内 HTTPS 备用。');
 
         try {
             const payload = await withRetry(() => loadPconlineJsonp(), { attempts: 2 });
             if (runId !== activeRunId) return;
             const ip = normalizeText(payload && (payload.ip || payload.addr));
-            if (!isIpAddress(ip)) throw new Error('国内备用接口未返回有效 IP');
+            if (!isIpAddress(ip)) throw new Error('国内主接口未返回有效 IP');
             const detail = joinText([
                 payload.country || payload.nation,
                 payload.pro,
@@ -373,10 +350,32 @@
                 status: 'success',
                 observations: [makeObservation(ip, 'PConline', detail)],
                 detail: detail
+                    ? `国内站点返回：${detail}。用于观察 DIRECT / 直连规则实际出口。`
+                    : '已通过国内站点确认请求出口，用于观察 DIRECT / 直连规则实际路径。'
+            };
+            setSource('domestic', 'success', '已获取', '太平洋网络国内线路探测成功。');
+            renderRoute('domestic');
+            return;
+        } catch (primaryError) {
+            if (runId !== activeRunId) return;
+            setSource('domestic', 'warning', '切换备用', `国内主接口未确认（${formatError(primaryError)}），正在尝试国内 HTTPS 备用。`);
+        }
+
+        try {
+            const data = await withRetry(() => fetchJson('https://api.bilibili.com/x/web-interface/zone'));
+            if (runId !== activeRunId) return;
+            if (!data || data.code !== 0 || !data.data || !isIpAddress(data.data.addr)) {
+                throw new Error('国内备用接口未返回有效 IP');
+            }
+            const detail = joinText([data.data.country, data.data.province, data.data.city, data.data.isp]);
+            routeResults.domestic = {
+                status: 'success',
+                observations: [makeObservation(data.data.addr, 'Bilibili', detail)],
+                detail: detail
                     ? `国内备用站点返回：${detail}。用于观察 DIRECT / 直连规则实际出口。`
                     : '已通过国内备用站点确认请求出口，用于观察 DIRECT / 直连规则实际路径。'
             };
-            setSource('domestic', 'success', '备用成功', 'Bilibili 未确认，已由太平洋网络国内备用接口返回结果。');
+            setSource('domestic', 'success', '备用成功', '太平洋网络未确认，已由国内 HTTPS 备用接口返回结果。');
         } catch (fallbackError) {
             if (runId !== activeRunId) return;
             routeResults.domestic = {
