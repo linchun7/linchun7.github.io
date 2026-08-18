@@ -301,16 +301,29 @@
         renderRoute('international');
     }
 
-    async function loadPconlineJsonp(timeoutMs = REQUEST_TIMEOUT_MS) {
+    function escapeHtmlAttribute(value) {
+        return String(value)
+            .replaceAll('&', '&amp;')
+            .replaceAll('"', '&quot;')
+            .replaceAll('<', '&lt;');
+    }
+
+    function runSandboxedScriptProbe({ label, timeoutMs = REQUEST_TIMEOUT_MS, buildSrcdoc }) {
         return new Promise((resolve, reject) => {
-            const callbackName = `__myipPconline_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-            const script = document.createElement('script');
+            const token = `probe-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            const iframe = document.createElement('iframe');
             let settled = false;
+
+            iframe.hidden = true;
+            iframe.tabIndex = -1;
+            iframe.setAttribute('aria-hidden', 'true');
+            iframe.setAttribute('sandbox', 'allow-scripts');
+            iframe.referrerPolicy = 'no-referrer';
 
             const cleanup = () => {
                 window.clearTimeout(timer);
-                script.remove();
-                try { delete window[callbackName]; } catch (_) { window[callbackName] = undefined; }
+                window.removeEventListener('message', onMessage);
+                iframe.remove();
             };
 
             const finish = (handler, value) => {
@@ -320,48 +333,60 @@
                 handler(value);
             };
 
-            const timer = window.setTimeout(() => finish(reject, createTimeoutError('国内主接口')), timeoutMs);
-            window[callbackName] = (payload) => finish(resolve, payload);
-            script.async = true;
-            script.referrerPolicy = 'no-referrer';
-            script.onerror = () => finish(reject, new Error('国内主接口加载失败'));
-            script.src = `https://whois.pconline.com.cn/ipJson.jsp?json=true&callback=${encodeURIComponent(callbackName)}&_=${Date.now()}`;
-            document.head.appendChild(script);
+            const onMessage = (event) => {
+                if (event.source !== iframe.contentWindow) return;
+                const data = event.data;
+                if (!data || data.__myipProbe !== token) return;
+                if (data.ok) {
+                    finish(resolve, data.payload);
+                } else {
+                    finish(reject, new Error(normalizeText(data.error) || `${label}加载失败`));
+                }
+            };
+
+            const timer = window.setTimeout(() => finish(reject, createTimeoutError(label)), timeoutMs);
+            window.addEventListener('message', onMessage);
+            iframe.srcdoc = buildSrcdoc(token);
+            document.body.appendChild(iframe);
+        });
+    }
+
+    async function loadPconlineJsonp(timeoutMs = REQUEST_TIMEOUT_MS) {
+        const src = `https://whois.pconline.com.cn/ipJson.jsp?json=true&callback=__myipProbeCallback&_=${Date.now()}`;
+        return runSandboxedScriptProbe({
+            label: '国内主接口',
+            timeoutMs,
+            buildSrcdoc(token) {
+                const tokenLiteral = JSON.stringify(token);
+                return `<!doctype html><meta charset="utf-8"><script>
+                    const __token = ${tokenLiteral};
+                    const __send = (ok, payload, error) => parent.postMessage({ __myipProbe: __token, ok, payload, error }, '*');
+                    window.__myipProbeCallback = (payload) => __send(true, payload, '');
+                    window.__myipProbeFail = () => __send(false, null, '国内主接口加载失败');
+                </script><script src="${escapeHtmlAttribute(src)}" referrerpolicy="no-referrer" onerror="window.__myipProbeFail()"></script>`;
+            }
         });
     }
 
     async function loadSohuScript(timeoutMs = REQUEST_TIMEOUT_MS) {
-        return new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            let settled = false;
-
-            const cleanup = () => {
-                window.clearTimeout(timer);
-                script.remove();
-            };
-
-            const finish = (handler, value) => {
-                if (settled) return;
-                settled = true;
-                cleanup();
-                handler(value);
-            };
-
-            window.returnCitySN = null;
-            const timer = window.setTimeout(() => finish(reject, createTimeoutError('国内备用接口')), timeoutMs);
-            script.async = true;
-            script.referrerPolicy = 'no-referrer';
-            script.onerror = () => finish(reject, new Error('国内备用接口加载失败'));
-            script.onload = () => {
-                const payload = window.returnCitySN;
-                if (!payload || !isIpAddress(payload.cip)) {
-                    finish(reject, new Error('国内备用接口未返回有效 IP'));
-                    return;
-                }
-                finish(resolve, payload);
-            };
-            script.src = `https://pv.sohu.com/cityjson?ie=utf-8&_=${Date.now()}`;
-            document.head.appendChild(script);
+        const src = `https://pv.sohu.com/cityjson?ie=utf-8&_=${Date.now()}`;
+        return runSandboxedScriptProbe({
+            label: '国内备用接口',
+            timeoutMs,
+            buildSrcdoc(token) {
+                const tokenLiteral = JSON.stringify(token);
+                return `<!doctype html><meta charset="utf-8"><script>
+                    const __token = ${tokenLiteral};
+                    const __send = (ok, payload, error) => parent.postMessage({ __myipProbe: __token, ok, payload, error }, '*');
+                    window.returnCitySN = null;
+                    window.__myipProbeDone = () => {
+                        const payload = window.returnCitySN;
+                        if (payload && payload.cip) __send(true, payload, '');
+                        else __send(false, null, '国内备用接口未返回有效 IP');
+                    };
+                    window.__myipProbeFail = () => __send(false, null, '国内备用接口加载失败');
+                </script><script src="${escapeHtmlAttribute(src)}" referrerpolicy="no-referrer" onload="window.__myipProbeDone()" onerror="window.__myipProbeFail()"></script>`;
+            }
         });
     }
 
@@ -399,6 +424,7 @@
         try {
             const payload = await loadSohuScript();
             if (runId !== activeRunId) return;
+            if (!payload || !isIpAddress(payload.cip)) throw new Error('国内备用接口未返回有效 IP');
             const detail = joinText([payload.cname]);
             routeResults.domestic = {
                 status: 'success',
