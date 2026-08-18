@@ -87,7 +87,6 @@ async function testMyIpSplitRouting() {
     });
     await page.route('**/api.bilibili.com/**', async (route) => {
         domesticFallbackCalls += 1;
-        await routeJson(page, '**/never-used/**', {});
         await route.fulfill({ status: 500, contentType: 'application/json', body: '{}' });
     });
     await routeJson(page, '**/api.ip.sb/**', {
@@ -159,6 +158,44 @@ async function testMyIpDomesticFallbackAndOptionalIpv6() {
     await context.close();
 }
 
+async function testMyIpDifferentFamiliesAreNotSplit() {
+    const context = await createMyIpContext();
+    const page = await context.newPage();
+    const pageErrors = [];
+    page.on('pageerror', (error) => pageErrors.push(error));
+
+    await routePconline(page, {
+        ip: '203.0.113.80',
+        pro: '广东省',
+        city: '深圳市',
+        region: '',
+        addr: '广东省深圳市 示例运营商'
+    });
+    await page.route('**/api.bilibili.com/**', (route) => route.abort());
+    await routeJson(page, '**/api.ip.sb/**', {
+        ip: '2001:db8::80',
+        country: 'Singapore',
+        region: 'Singapore',
+        city: 'Singapore',
+        isp: 'Example IPv6 Proxy'
+    });
+    await routeJson(page, '**/api.ipify.org/**', { error: 'no ipv4' }, 503);
+    await routeJson(page, '**/api6.ipify.org/**', { ip: '2001:db8::80' });
+    await page.route('**/ipwho.is/**', (route) => route.abort());
+    await page.route('**/googletagmanager.com/**', (route) => route.abort());
+
+    await page.goto(`${baseUrl}/tools/myip/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#summary-routing')?.textContent === '地址族不同');
+
+    assert.equal(await page.locator('#summary-status').textContent(), '已获取');
+    assert.equal(await page.locator('#domestic-ipv4').textContent(), '203.0.113.80');
+    assert.equal(await page.locator('#international-ipv6').textContent(), '2001:db8::80');
+    assert.match(await page.locator('#summary-detail').textContent(), /IPv4 与 IPv6 不同本身不能证明存在代理分流/);
+    assert.equal(pageErrors.length, 0, `myip family page errors: ${pageErrors.map(String).join('; ')}`);
+
+    await context.close();
+}
+
 async function testMyIpAllFailuresReachFinalState() {
     const context = await createMyIpContext();
     const page = await context.newPage();
@@ -193,6 +230,7 @@ async function testMyIpAllFailuresReachFinalState() {
 async function testMyIp() {
     await testMyIpSplitRouting();
     await testMyIpDomesticFallbackAndOptionalIpv6();
+    await testMyIpDifferentFamiliesAreNotSplit();
     await testMyIpAllFailuresReachFinalState();
 }
 
