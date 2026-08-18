@@ -147,10 +147,28 @@
         setText(`source-${id}-detail`, detail);
     }
 
-    function makeObservation(ip, source, detail = '') {
+    function getFirstPartyProbeUrl() {
+        const meta = document.querySelector('meta[name="myip-first-party-probe"]');
+        const raw = normalizeText(meta && meta.getAttribute('content'));
+        if (!raw) return '';
+        try {
+            const url = new URL(raw);
+            return url.protocol === 'https:' ? url.href : '';
+        } catch {
+            return '';
+        }
+    }
+
+    function makeObservation(ip, source, detail = '', role = 'verification') {
         const normalized = normalizeText(ip);
         if (!isIpAddress(normalized)) throw new Error(`${source} 未返回有效 IP`);
-        return { ip: normalized, family: ipFamily(normalized), source, detail: normalizeText(detail) };
+        return {
+            ip: normalized,
+            family: ipFamily(normalized),
+            source,
+            detail: normalizeText(detail),
+            role
+        };
     }
 
     function uniqueIps(route, family) {
@@ -180,8 +198,8 @@
         setText(`${route}-ipv4`, formatIpList(ipv4, pending));
         setText(`${route}-ipv6`, formatIpList(ipv6, pending));
         setText(`${route}-detail`, current.detail || (route === 'domestic'
-            ? '请求国内站点，用于观察 DIRECT / 直连规则实际使用的出口。'
-            : '请求国际 IP 服务，用于观察代理、VPN 或国际策略路由实际使用的出口。'));
+            ? '请求真实国内服务域名，用于观察 DIRECT / 直连规则实际使用的出口。'
+            : '优先使用本站第一方国际探针，并由独立国际服务复核。'));
 
         if (current.status === 'loading' || current.status === 'idle') {
             setStatus(`${route}-status`, 'loading', '检测中');
@@ -274,8 +292,8 @@
         if (multiInternational) {
             setStatus('summary-status', 'warning', '多出口');
             setText('summary-routing', '国际源存在差异');
-            setText('summary-main', '国际探测源使用了多个出口');
-            setText('summary-detail', '不同国际域名返回了不同的同地址族 IP，常见于不同代理组、策略路由或代理节点负载分配。');
+            setText('summary-main', '国际探测域名使用了多个出口');
+            setText('summary-detail', '第一方探针与独立国际服务返回了不同的同地址族 IP，常见于更细粒度的域名规则、不同代理组或节点负载分配。');
             return;
         }
 
@@ -337,11 +355,8 @@
                 if (event.source !== iframe.contentWindow) return;
                 const data = event.data;
                 if (!data || data.__myipProbe !== token) return;
-                if (data.ok) {
-                    finish(resolve, data.payload);
-                } else {
-                    finish(reject, new Error(normalizeText(data.error) || `${label}加载失败`));
-                }
+                if (data.ok) finish(resolve, data.payload);
+                else finish(reject, new Error(normalizeText(data.error) || `${label}加载失败`));
             };
 
             const timer = window.setTimeout(() => finish(reject, createTimeoutError(label)), timeoutMs);
@@ -391,7 +406,7 @@
     }
 
     async function loadDomestic(runId) {
-        setSource('domestic', 'loading', '检测中', '优先使用太平洋网络浏览器回调接口，必要时切换搜狐国内备用。');
+        setSource('domestic', 'loading', '检测中', '优先使用太平洋网络，必要时切换搜狐国内备用。');
 
         try {
             const payload = await withRetry(() => loadPconlineJsonp(), { attempts: 2 });
@@ -408,10 +423,10 @@
             ]);
             routeResults.domestic = {
                 status: 'success',
-                observations: [makeObservation(ip, 'PConline', detail)],
+                observations: [makeObservation(ip, 'PConline', detail, 'domestic-primary')],
                 detail: detail
                     ? `国内站点返回：${detail}。用于观察 DIRECT / 直连规则实际出口。`
-                    : '已通过国内站点确认请求出口，用于观察 DIRECT / 直连规则实际路径。'
+                    : '已通过真实国内服务域名确认请求出口，用于观察 DIRECT / 直连规则实际路径。'
             };
             setSource('domestic', 'success', '已获取', '太平洋网络国内线路探测成功。');
             renderRoute('domestic');
@@ -428,10 +443,10 @@
             const detail = joinText([payload.cname]);
             routeResults.domestic = {
                 status: 'success',
-                observations: [makeObservation(payload.cip, 'Sohu', detail)],
+                observations: [makeObservation(payload.cip, 'Sohu', detail, 'domestic-fallback')],
                 detail: detail
                     ? `国内备用站点返回：${detail}。用于观察 DIRECT / 直连规则实际出口。`
-                    : '已通过国内备用站点确认请求出口，用于观察 DIRECT / 直连规则实际路径。'
+                    : '已通过搜狐国内备用站点确认请求出口。'
             };
             setSource('domestic', 'success', '备用成功', '太平洋网络未确认，已由搜狐国内备用接口返回结果。');
         } catch (fallbackError) {
@@ -447,73 +462,122 @@
         renderRoute('domestic');
     }
 
+    function firstPartyDetail(data) {
+        const network = data && data.network ? data.network : {};
+        const asn = network.asn ? `AS${network.asn}` : '';
+        const colo = network.colo ? `Cloudflare ${network.colo}` : '';
+        return joinText([
+            network.country,
+            network.region,
+            network.city,
+            asn,
+            network.organization,
+            colo
+        ]);
+    }
+
     async function loadInternational(runId) {
-        setSource('ipsb', 'loading', '检测中', '国际公网地址与归属信息。');
+        const firstPartyUrl = getFirstPartyProbeUrl();
+        if (firstPartyUrl) {
+            setSource('firstparty', 'loading', '检测中', '本站第一方 Cloudflare Worker 国际主探针。');
+        } else {
+            setSource('firstparty', 'idle', '待配置', '第一方 Worker 已就绪，等待绑定正式 workers.dev 地址；当前由外部服务临时承担国际线路检测。');
+        }
+        setSource('ipsb', 'loading', '检测中', '国际公网地址与归属信息，用于独立复核。');
         setSource('ipify4', 'loading', '检测中', '独立 IPv4 出口复核。');
         setSource('ipify6', 'loading', '检测中', '独立 IPv6 出口探测；无 IPv6 时允许失败。');
-        setSource('fallback', 'idle', '待命', '仅在主要国际数据源全部失败时按需启用。');
+        setSource('fallback', 'idle', '待命', '仅在第一方与主要国际数据源均失败时按需启用。');
 
         const observations = [];
-        let geoDetail = '';
+        let firstPartySucceeded = false;
+        let primaryDetail = '';
+        let externalDetail = '';
+        const tasks = [];
 
-        const ipsbTask = (async () => {
+        if (firstPartyUrl) {
+            tasks.push((async () => {
+                try {
+                    const data = await withRetry(() => fetchJson(firstPartyUrl));
+                    if (runId !== activeRunId) return;
+                    if (!data || data.schemaVersion !== 1 || data.role !== 'international-first-party' || !isIpAddress(data.ip)) {
+                        throw new Error('第一方探针返回格式无效');
+                    }
+                    const detail = firstPartyDetail(data);
+                    firstPartySucceeded = true;
+                    primaryDetail = detail;
+                    observations.push(makeObservation(data.ip, 'First-party Worker', detail, 'international-primary'));
+                    if (data.originalIpv6 && isIpAddress(data.originalIpv6) && data.originalIpv6 !== data.ip) {
+                        observations.push(makeObservation(data.originalIpv6, 'First-party Worker IPv6', detail, 'international-primary'));
+                    }
+                    setSource('firstparty', 'success', '主探针正常', detail || `IP ${data.ip}`);
+                    routeResults.international = { status: 'loading', observations: [...observations], detail };
+                    renderRoute('international');
+                } catch (error) {
+                    if (runId !== activeRunId) return;
+                    setSource('firstparty', 'warning', '主探针未确认', formatError(error));
+                }
+            })());
+        }
+
+        tasks.push((async () => {
             try {
                 const data = await withRetry(() => fetchJson('https://api.ip.sb/geoip'));
                 if (runId !== activeRunId) return;
                 if (!data || !isIpAddress(data.ip)) throw new Error('IP.SB 未返回有效 IP');
-                geoDetail = joinText([data.country, data.region, data.city, data.isp || data.organization || data.asn_organization]);
-                observations.push(makeObservation(data.ip, 'IP.SB', geoDetail));
-                setSource('ipsb', 'success', '已获取', geoDetail || 'IP.SB 已返回公网地址。');
-                routeResults.international = { status: 'loading', observations: [...observations], detail: geoDetail };
+                const detail = joinText([data.country, data.region, data.city, data.isp || data.organization || data.asn_organization]);
+                externalDetail = externalDetail || detail;
+                observations.push(makeObservation(data.ip, 'IP.SB', detail));
+                setSource('ipsb', 'success', '复核成功', detail || `IP ${data.ip}`);
+                routeResults.international = { status: 'loading', observations: [...observations], detail: primaryDetail || externalDetail };
                 renderRoute('international');
             } catch (error) {
                 if (runId !== activeRunId) return;
                 setSource('ipsb', 'warning', '未确认', formatError(error));
             }
-        })();
+        })());
 
-        const ipify4Task = (async () => {
+        tasks.push((async () => {
             try {
                 const data = await withRetry(() => fetchJson('https://api.ipify.org?format=json'));
                 if (runId !== activeRunId) return;
                 if (!data || ipFamily(data.ip) !== 4) throw new Error('IPify IPv4 未返回有效 IPv4');
                 observations.push(makeObservation(data.ip, 'IPify IPv4'));
-                setSource('ipify4', 'success', '已获取', `IPv4 ${data.ip}`);
-                routeResults.international = { status: 'loading', observations: [...observations], detail: geoDetail };
+                setSource('ipify4', 'success', '复核成功', `IPv4 ${data.ip}`);
+                routeResults.international = { status: 'loading', observations: [...observations], detail: primaryDetail || externalDetail };
                 renderRoute('international');
             } catch (error) {
                 if (runId !== activeRunId) return;
                 setSource('ipify4', 'warning', '未确认', formatError(error));
             }
-        })();
+        })());
 
-        const ipify6Task = (async () => {
+        tasks.push((async () => {
             try {
                 const data = await fetchJson('https://api6.ipify.org?format=json', IPV6_TIMEOUT_MS);
                 if (runId !== activeRunId) return;
                 if (!data || ipFamily(data.ip) !== 6) throw new Error('当前路径未返回 IPv6');
                 observations.push(makeObservation(data.ip, 'IPify IPv6'));
-                setSource('ipify6', 'success', '已获取', `IPv6 ${data.ip}`);
-                routeResults.international = { status: 'loading', observations: [...observations], detail: geoDetail };
+                setSource('ipify6', 'success', '复核成功', `IPv6 ${data.ip}`);
+                routeResults.international = { status: 'loading', observations: [...observations], detail: primaryDetail || externalDetail };
                 renderRoute('international');
             } catch (error) {
                 if (runId !== activeRunId) return;
                 setSource('ipify6', 'idle', '未检测到', '当前网络没有可用 IPv6，或 IPv6 请求被代理 / 网络策略阻断。');
             }
-        })();
+        })());
 
-        await Promise.allSettled([ipsbTask, ipify4Task, ipify6Task]);
+        await Promise.allSettled(tasks);
         if (runId !== activeRunId) return;
 
         if (observations.length === 0) {
-            setSource('fallback', 'loading', '启用备用', '主要国际数据源均未确认，正在使用 IPWho.is 备用探测。');
+            setSource('fallback', 'loading', '启用备用', '第一方与主要国际数据源均未确认，正在使用 IPWho.is 最后备用。');
             try {
                 const data = await withRetry(() => fetchJson('https://ipwho.is/'), { attempts: 2 });
                 if (runId !== activeRunId) return;
                 if (!data || data.success === false || !isIpAddress(data.ip)) throw new Error('国际备用接口未返回有效 IP');
                 const detail = joinText([data.country, data.region, data.city, data.connection && (data.connection.isp || data.connection.org)]);
-                observations.push(makeObservation(data.ip, 'IPWho.is', detail));
-                geoDetail = detail;
+                observations.push(makeObservation(data.ip, 'IPWho.is', detail, 'international-last-resort'));
+                externalDetail = detail;
                 setSource('fallback', 'success', '备用成功', detail || `IP ${data.ip}`);
             } catch (error) {
                 if (runId !== activeRunId) return;
@@ -525,18 +589,27 @@
             const distinctV4 = [...new Set(observations.filter((item) => item.family === 4).map((item) => item.ip))];
             const distinctV6 = [...new Set(observations.filter((item) => item.family === 6).map((item) => item.ip))];
             const parts = [];
-            if (geoDetail) parts.push(geoDetail);
+            if (primaryDetail || externalDetail) parts.push(primaryDetail || externalDetail);
+            if (!firstPartyUrl) {
+                parts.push('第一方 Worker 尚未绑定正式地址，当前由独立国际服务临时提供主结果');
+            } else if (!firstPartySucceeded) {
+                parts.push('第一方国际主探针未确认，已由独立国际服务降级恢复');
+            } else {
+                parts.push('第一方 Worker 作为国际主探针，外部服务仅用于交叉验证');
+            }
             if (distinctV4.length > 1 || distinctV6.length > 1) {
                 parts.push('不同国际探测域名返回了多个同地址族出口，可能存在更细粒度的代理规则或代理组分流');
-            } else {
-                parts.push('用于观察代理、VPN 或国际策略路由实际出口');
             }
-            routeResults.international = { status: 'success', observations: [...observations], detail: parts.join('。') + '。' };
+            routeResults.international = {
+                status: 'success',
+                observations: [...observations],
+                detail: `${parts.join('。')}。`
+            };
         } else {
             routeResults.international = {
                 status: 'error',
                 observations: [],
-                detail: '国际线路未确认。多个独立国际服务均未成功，这不等同于“无法访问国际网络”；浏览器插件、代理规则或网络策略也可能阻止探测。'
+                detail: '国际线路未确认。第一方与多个独立国际服务均未成功；这不等同于“无法访问国际网络”，浏览器插件、代理规则或网络策略也可能阻止探测。'
             };
         }
         renderRoute('international');
