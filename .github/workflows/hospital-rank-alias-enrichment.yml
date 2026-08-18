@@ -1,0 +1,46 @@
+name: Hospital rank alias enrichment
+
+on:
+  pull_request:
+    paths:
+      - 'tools/hospital_rank/scripts/enrich_2011_aliases.py'
+      - '.github/workflows/hospital-rank-alias-enrichment.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  enrich-and-publish:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 检出当前 PR 分支
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: 补充 2011 原始发布名称别名
+        run: |
+          set -euo pipefail
+          python3 tools/hospital_rank/scripts/enrich_2011_aliases.py
+          python3 tools/hospital_rank/scripts/validate_data.py
+          rm -f tools/hospital_rank/scripts/enrich_2011_aliases.py
+          rm -f .github/workflows/hospital-rank-alias-enrichment.yml
+          git diff --check
+
+      - name: 提交到当前 PR 分支
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TARGET_BRANCH: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all tools/hospital_rank .github/workflows/hospital-rank-alias-enrichment.yml
+          git diff --cached --check
+          git commit -m "enrich hospital historical aliases from 2011 archive"
+          auth_header=$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" push origin "HEAD:$TARGET_BRANCH"
