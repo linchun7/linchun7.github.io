@@ -230,7 +230,7 @@ function initProvinceSelect() {
         currentYearRecords().map(record => getHospital(record)?.province).filter(Boolean)
     )].sort((a, b) => a.localeCompare(b, 'zh-CN'));
 
-    provinceSelect.replaceChildren(new Option('省份', ''));
+    provinceSelect.replaceChildren(new Option('全部省份', ''));
     provinces.forEach(province => provinceSelect.add(new Option(province, province)));
     provinceSelect.value = provinces.includes(previousValue) ? previousValue : '';
 }
