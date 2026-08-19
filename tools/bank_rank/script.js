@@ -99,6 +99,10 @@ function displayName(record) {
   return record.sourceName || getBank(record.bankId)?.name || '';
 }
 
+function isDirectOfficialPage(url) {
+  return /\/Index\/show\//.test(String(url || ''));
+}
+
 function sortRecords(records) {
   const multiplier = sortState.direction === 'asc' ? 1 : -1;
   const field = sortState.field;
@@ -206,7 +210,9 @@ function render() {
   document.getElementById('resultSummary').textContent = `数据口径：${block.dataYear} 年末${filters ? ` · ${filters}` : ''}`;
   const sourceLink = document.getElementById('officialSource');
   sourceLink.href = block.officialUrl;
-  sourceLink.textContent = `${selectedYear} 年中国银行业协会官方发布页`;
+  sourceLink.textContent = isDirectOfficialPage(block.officialUrl)
+    ? `${selectedYear} 年中国银行业协会官方发布页`
+    : `${selectedYear} 年中国银行业协会来源页`;
   const yearNote = document.getElementById('yearNote');
   yearNote.hidden = !block.note;
   yearNote.textContent = block.note || '';
