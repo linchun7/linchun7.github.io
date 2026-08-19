@@ -428,6 +428,26 @@ function selectedYearBlock() {
     return rankingDataset.years.find(block => String(block.year) === year) || null;
 }
 
+function getGradeReferenceNote(records) {
+    const counts = new Map();
+    let referenced = 0;
+    records.forEach(record => {
+        const previous = getNearestPreviousNumericRecord(record.hospitalId, record.year);
+        if (!previous) return;
+        referenced += 1;
+        counts.set(previous.year, (counts.get(previous.year) || 0) + 1);
+    });
+
+    if (!counts.size) return '';
+    const [mainYear, mainCount] = [...counts.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0];
+    const otherReferenced = referenced - mainCount;
+    const noReference = records.length - referenced;
+    const details = [];
+    if (otherReferenced > 0) details.push(`其余 ${otherReferenced} 家按各自最近记录`);
+    if (noReference > 0) details.push(`${noReference} 家无历史数字排名时保留来源顺序`);
+    return `（主要参考 ${mainYear} 年${details.length ? `，${details.join('；')}` : ''}）`;
+}
+
 function updateContext(records) {
     const year = document.getElementById('yearSelect').value;
     const title = document.getElementById('workspaceTitle');
@@ -449,9 +469,8 @@ function updateContext(records) {
     }
 
     if (gradeMode) {
-        const referenceYears = new Set(records.map(record => getNearestPreviousNumericRecord(record.hospitalId, record.year)?.year).filter(Boolean));
-        const suffix = referenceYears.size === 1 ? `（主要参考 ${[...referenceYears][0]} 年）` : '';
-        modeNote.textContent = `同等级内按最近一次可用数字排名作历史参考排序${suffix}，非官方档内名次。`;
+        const referenceNote = getGradeReferenceNote(records);
+        modeNote.textContent = `同等级内按最近一次可用数字排名作历史参考排序${referenceNote}，非官方档内名次。`;
         modeNote.hidden = false;
     } else {
         modeNote.hidden = true;
