@@ -34,8 +34,23 @@ for (let year = 2016; year <= 2025; year += 1) {
 assert.ok(loadedYears.reduce((sum, block) => sum + block.records.length, 0) >= 1000, 'verified 2016–2025 baseline should retain at least 1000 records');
 const latestYear = Math.max(...years);
 const oldestYear = Math.min(...years);
+const latestBlock = loadedYears.find(block => Number(block.rankingYear) === latestYear);
 
-// Lock known transcription repairs as part of the verified historical baseline.
+// Lock known source/transcription repairs and re-audit corrections.
+const records2016 = JSON.parse(await readFile(new URL('../bank_rank/data/years/2016.json', import.meta.url), 'utf8'));
+const tianjinRural2016 = records2016.find(record => record.sourceName === '天津农村商业银行');
+assert.equal(tianjinRural2016?.netProfit, 26.35, '2016 Tianjin Rural Commercial Bank net profit must match its 2015 annual report');
+const audit = JSON.parse(await readFile(new URL('../bank_rank/data/audit.json', import.meta.url), 'utf8'));
+const tianjinAudit = audit.normalizations.find(item => item.rankingYear === 2016 && item.entity === '天津农村商业银行' && item.field === 'netProfit');
+assert.equal(tianjinAudit?.evidenceUrl, 'https://www.trcbank.com.cn/ImgFiles/tzzgx/201604/2016042918291766558.pdf', '2016 Tianjin Rural correction must retain the official annual-report evidence URL');
+assert.match(tianjinAudit?.evidenceLocation || '', /会计数据和业务数据摘要/, '2016 Tianjin Rural correction must retain an evidence location inside the annual report');
+
+const records2021 = JSON.parse(await readFile(new URL('../bank_rank/data/years/2021.json', import.meta.url), 'utf8'));
+const ccb2021 = records2021.find(record => record.sourceName === '中国建设银行');
+const mengshang2021 = records2021.find(record => record.sourceName === '蒙商银行');
+assert.equal(ccb2021?.assets, 281322.54, '2021 CCB assets must match the 2020 official financial highlights');
+assert.equal(mengshang2021?.netProfit, -34.94, '2021 Mengshang Bank net profit must retain the verified loss sign');
+
 const records2022 = JSON.parse(await readFile(new URL('../bank_rank/data/years/2022.json', import.meta.url), 'utf8'));
 const suzhou2022 = records2022.find(record => record.sourceName === '苏州银行');
 const shenzhenRural2022 = records2022.find(record => record.sourceName === '深圳农商银行');
@@ -60,9 +75,24 @@ try {
 
   assert.equal(await page.locator('#yearSelect').inputValue(), String(latestYear), 'latest year should be selected by default');
   assert.equal(await page.locator('#bankList tr.data-row').count(), 100, 'default view should render the full latest-year top 100');
-  assert.equal((await page.locator('#workspaceTitle').innerText()).trim(), `${latestYear} 年中国银行业100强 · 100 家`);
+  assert.equal((await page.locator('#workspaceTitle').innerText()).trim(), `${latestYear} 年中国银行业100强`);
+  assert.equal((await page.locator('#resultSummary').innerText()).trim(), `100 家银行 · ${latestBlock.dataYear} 年末数据`);
   assert.equal((await page.locator('#dataStatus').innerText()).trim(), `最新数据 ${latestYear} 年`);
-  assert.match(await page.locator('#officialSource').innerText(), /官方发布页$/, 'latest year has a direct association detail page');
+  assert.equal((await page.locator('#brandSubtitle').innerText()).trim(), `核心一级资本排名 · ${oldestYear}–${latestYear}`);
+
+  assert.equal(await page.locator('.scope-note').count(), 0, 'yellow data-range/year-note UI should stay removed');
+  assert.equal(await page.locator('#officialSource').count(), 0, 'per-year association source link should stay removed from the page');
+  assert.equal(await page.locator('.data-disclaimer').count(), 0, 'duplicate disclaimer block should stay removed');
+  const sourceSummary = (await page.locator('.workspace-footer .source-summary').innerText()).trim();
+  assert.match(sourceSummary, /数据来源：中国银行业协会 · 单位：亿元/);
+  assert.match(sourceSummary, /核心一级资本净额/);
+  assert.match(sourceSummary, /2023 年起纳入外资法人银行/);
+  assert.match(sourceSummary, /合并或新设合并/);
+  assert.equal((await page.locator('body').innerText()).match(/数据来源：中国银行业协会/g)?.length, 1, 'data source should appear once below the table');
+
+  assert.match(await page.locator('link[rel="stylesheet"]').getAttribute('href'), /^style\.css\?v=[0-9a-f]{8}$/i, 'stylesheet should use a content version');
+  assert.match(await page.locator('script[src^="script.js"]').getAttribute('src'), /^script\.js\?v=[0-9a-f]{8}$/i, 'script should use a content version');
+
   const hydratedFirstRow = page.locator('#bankList tr.data-row').first();
   assert.equal(await hydratedFirstRow.locator('td').nth(0).locator('.rank-value').count(), 1, 'hydrated ranking cells should retain the static rank-value structure');
   assert.equal(await hydratedFirstRow.locator('td').nth(2).locator('.type-badge').count(), 1, 'hydrated type cells should retain the static type-badge structure');
@@ -74,14 +104,17 @@ try {
     await page.waitForFunction(year => document.querySelector('#workspaceTitle')?.textContent.includes(`${year} 年中国银行业100强`), oldestYear);
     assert.equal(await page.locator('#bankList tr.data-row').count(), 100, `${oldestYear} should render 100 banks`);
     const oldestBlock = loadedYears.find(block => Number(block.rankingYear) === oldestYear);
-    assert.match(await page.locator('#resultSummary').innerText(), new RegExp(`${oldestBlock.dataYear} 年末`));
+    assert.match(await page.locator('#resultSummary').innerText(), new RegExp(`100 家银行 · ${oldestBlock.dataYear} 年末数据`));
+    await page.locator('#bankSearch').fill('天津农村商业银行');
+    const tianjinRow = page.locator('#bankList tr.data-row').first();
+    assert.equal((await tianjinRow.locator('td').nth(5).innerText()).trim(), '26.35', '2016 Tianjin Rural verified net profit should render in the UI');
+    await page.locator('#bankSearch').fill('');
   }
 
   await page.locator('#yearSelect').selectOption('2018');
   await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2018 年中国银行业100强'));
   assert.equal(await page.locator('#bankList tr.data-row').count(), 100, '2018 recovered ranking should render all 100 banks');
   assert.match(await page.locator('#bankList tr.data-row').first().innerText(), /中国工商银行/, '2018 recovered ranking should retain ICBC at the top');
-  assert.match(await page.locator('#officialSource').innerText(), /中国银行业协会来源页$/, 'archived association entry must not be mislabeled as a direct release page');
 
   await page.locator('#bankSearch').fill('中国工商银行');
   assert.equal(await page.locator('#bankList tr.data-row').count(), 1, 'bank search should narrow to ICBC');
@@ -97,9 +130,15 @@ try {
 
   await page.locator('#yearSelect').selectOption('2021');
   await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2021 年中国银行业100强'));
+  await page.locator('#bankSearch').fill('中国建设银行');
+  let row = page.locator('#bankList tr.data-row').first();
+  assert.equal((await row.locator('td').nth(4).innerText()).trim(), '281,322.54', 'reverified CCB assets should render in the UI');
+  await page.locator('#bankSearch').fill('蒙商银行');
+  row = page.locator('#bankList tr.data-row').first();
+  assert.equal((await row.locator('td').nth(5).innerText()).trim(), '-34.94', 'verified Mengshang Bank loss should render with the negative sign');
   await page.locator('#bankSearch').fill('华融湘江银行');
   assert.equal(await page.locator('#bankList tr.data-row').count(), 1, 'historical source-name search should resolve the bank entity in 2021');
-  let renamedRow = page.locator('#bankList tr.data-row').first();
+  const renamedRow = page.locator('#bankList tr.data-row').first();
   assert.match(await renamedRow.innerText(), /华融湘江银行/, '2021 yearly ranking should preserve the name published that year');
   const renamedHistoryButton = renamedRow.locator('.bank-history-button');
   await renamedHistoryButton.click();
@@ -116,17 +155,15 @@ try {
   assert.match(await page.locator('#bankList tr.data-row').first().innerText(), /湖南银行/, 'post-rename yearly ranking should display the newer published name');
   await page.locator('#bankSearch').fill('');
 
-  if (years.includes(2022)) {
-    await page.locator('#yearSelect').selectOption('2022');
-    await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2022 年中国银行业100强'));
-    await page.locator('#bankSearch').fill('苏州银行');
-    let row = page.locator('#bankList tr.data-row').first();
-    assert.equal((await row.locator('td').nth(3).innerText()).trim(), '331.86', 'corrected Suzhou Bank value should render in the UI');
-    await page.locator('#bankSearch').fill('深圳农商银行');
-    row = page.locator('#bankList tr.data-row').first();
-    assert.equal((await row.locator('td').nth(4).innerText()).trim(), '5,868.54', '2022 Shenzhen Rural assets should render in the UI');
-    await page.locator('#bankSearch').fill('');
-  }
+  await page.locator('#yearSelect').selectOption('2022');
+  await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2022 年中国银行业100强'));
+  await page.locator('#bankSearch').fill('苏州银行');
+  row = page.locator('#bankList tr.data-row').first();
+  assert.equal((await row.locator('td').nth(3).innerText()).trim(), '331.86', 'corrected Suzhou Bank value should render in the UI');
+  await page.locator('#bankSearch').fill('深圳农商银行');
+  row = page.locator('#bankList tr.data-row').first();
+  assert.equal((await row.locator('td').nth(4).innerText()).trim(), '5,868.54', '2022 Shenzhen Rural assets should render in the UI');
+  await page.locator('#bankSearch').fill('');
 
   await page.locator('#typeSelect').selectOption('农村商业银行');
   const ruralCount = await page.locator('#bankList tr.data-row').count();
@@ -138,6 +175,52 @@ try {
   assert.equal(await capitalSort.locator('xpath=ancestor::th').getAttribute('aria-sort'), 'descending', 'capital sort should default to descending');
   await capitalSort.click();
   assert.equal(await capitalSort.locator('xpath=ancestor::th').getAttribute('aria-sort'), 'ascending', 'capital sort should toggle ascending');
+
+  // Mobile layout follows the shared tools pattern: controls stack, the page itself stays within the viewport,
+  // only the data table receives horizontal scrolling, and focusable form controls stay at 16px to avoid iOS zoom.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('#yearSelect').selectOption(String(latestYear));
+  await page.locator('#bankSearch').fill('');
+  await page.locator('#typeSelect').selectOption('');
+  const mobileLayout = await page.evaluate(() => {
+    const yearBox = document.querySelector('.year-field').getBoundingClientRect();
+    const typeBox = document.querySelector('.type-field').getBoundingClientRect();
+    const searchBox = document.querySelector('.search-field').getBoundingClientRect();
+    const tableScroll = document.querySelector('.table-scroll');
+    const tableBox = tableScroll.getBoundingClientRect();
+    return {
+      viewportWidth: window.innerWidth,
+      documentWidth: document.documentElement.scrollWidth,
+      yearTop: yearBox.top,
+      typeTop: typeBox.top,
+      searchTop: searchBox.top,
+      tableClientWidth: tableScroll.clientWidth,
+      tableScrollWidth: tableScroll.scrollWidth,
+      tableLeft: tableBox.left,
+      tableRight: tableBox.right,
+      yearFontSize: parseFloat(getComputedStyle(document.querySelector('#yearSelect')).fontSize),
+      typeFontSize: parseFloat(getComputedStyle(document.querySelector('#typeSelect')).fontSize),
+      searchFontSize: parseFloat(getComputedStyle(document.querySelector('#bankSearch')).fontSize)
+    };
+  });
+  assert.ok(mobileLayout.documentWidth <= mobileLayout.viewportWidth + 1, `mobile page should not overflow horizontally: ${JSON.stringify(mobileLayout)}`);
+  assert.ok(mobileLayout.typeTop > mobileLayout.yearTop && mobileLayout.searchTop > mobileLayout.typeTop, 'mobile filters should stack vertically');
+  assert.ok(mobileLayout.tableScrollWidth > mobileLayout.tableClientWidth, 'wide bank table should scroll inside its own container on mobile');
+  assert.ok(mobileLayout.tableLeft >= -1 && mobileLayout.tableRight <= mobileLayout.viewportWidth + 1, 'table scroll container should stay inside the mobile viewport');
+  assert.ok(mobileLayout.yearFontSize >= 16 && mobileLayout.typeFontSize >= 16 && mobileLayout.searchFontSize >= 16, `mobile form controls should stay at 16px or larger: ${JSON.stringify(mobileLayout)}`);
+
+  // Dynamic data failure must preserve the static top-20 fallback instead of blanking the ranking.
+  const fallbackPage = await context.newPage();
+  await fallbackPage.route('**/tools/bank_rank/data/rankings.json', route => route.abort());
+  await fallbackPage.goto(`${baseUrl}/tools/bank_rank/`, { waitUntil: 'domcontentloaded' });
+  await fallbackPage.waitForFunction(() => document.querySelector('#dataStatus')?.textContent.includes('数据加载失败'));
+  assert.equal(await fallbackPage.locator('#bankList tr.data-row[data-static-prerendered="true"]').count(), 20, 'failed dynamic load should preserve all 20 static preview rows');
+  assert.match(await fallbackPage.locator('#bankList tr.data-row').first().innerText(), /中国工商银行/, 'static fallback should preserve the latest-year first bank');
+  assert.match(await fallbackPage.locator('#resultSummary').innerText(), /20 家静态预览 · 动态数据加载失败/);
+  assert.equal(await fallbackPage.locator('#yearSelect').isDisabled(), true, 'failed dynamic load should disable year switching');
+  assert.equal(await fallbackPage.locator('#typeSelect').isDisabled(), true, 'failed dynamic load should disable type filtering');
+  assert.equal(await fallbackPage.locator('#bankSearch').isDisabled(), true, 'failed dynamic load should disable search');
+  await fallbackPage.close();
 
   assert.deepEqual(pageErrors, [], `page errors in ${browserName}: ${pageErrors.map(error => error.message).join(' | ')}`);
   assert.deepEqual(consoleErrors, [], `console errors in ${browserName}: ${consoleErrors.join(' | ')}`);
