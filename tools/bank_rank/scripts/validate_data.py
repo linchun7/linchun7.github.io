@@ -2,6 +2,7 @@
 """Validate bank_rank manifest, entities, yearly records and source digests."""
 from __future__ import annotations
 import argparse, hashlib, json
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -106,6 +107,22 @@ def validate_dataset(data: dict[str, Any], snapshot: dict[str, Any]) -> list[str
             if rank != expected_rank: errors.append(f"{prefix}: competition rank mismatch; expected {expected_rank}, got {rank}")
             if previous_core is not None and core > previous_core: errors.append(f"{prefix}: core Tier 1 capital is not non-increasing")
             previous_core, previous_rank = float(core), rank
+
+        composition = block.get("officialComposition")
+        if composition is not None:
+            if not isinstance(composition, dict) or not all(isinstance(key, str) and isinstance(value, int) and value >= 0 for key, value in composition.items()):
+                errors.append(f"{year}: officialComposition must map bank types to non-negative integer counts")
+            else:
+                unknown_types = set(composition) - ALLOWED_TYPES
+                if unknown_types: errors.append(f"{year}: officialComposition contains unsupported bank types: {sorted(unknown_types)}")
+                if sum(composition.values()) != 100: errors.append(f"{year}: officialComposition must sum to 100")
+                actual_counts = Counter(bank_by_id[record["bankId"]]["type"] for record in records if record.get("bankId") in bank_by_id)
+                for bank_type in ALLOWED_TYPES:
+                    expected_count = composition.get(bank_type, 0)
+                    actual_count = actual_counts.get(bank_type, 0)
+                    if actual_count != expected_count:
+                        errors.append(f"{year}: bank type count mismatch for {bank_type}: table={actual_count}, official={expected_count}")
+
         metric_map = {"coreTier1CapitalTrillion":"coreTier1Capital","assetsTrillion":"assets","netProfitTrillion":"netProfit"}
         for summary_key, field in metric_map.items():
             if summary_key in block.get("officialSummary", {}):
@@ -114,7 +131,9 @@ def validate_dataset(data: dict[str, Any], snapshot: dict[str, Any]) -> list[str
         snap = snap_map.get(year)
         if not snap: continue
         if snap.get("recordCount") != len(records): errors.append(f"{year}: snapshot recordCount mismatch")
-        if snap.get("normalizedRecordsSha256") != records_digest(records): errors.append(f"{year}: source snapshot digest mismatch")
+        actual_digest = records_digest(records)
+        expected_digest = snap.get("normalizedRecordsSha256")
+        if expected_digest != actual_digest: errors.append(f"{year}: source snapshot digest mismatch: snapshot={expected_digest}, actual={actual_digest}")
         for field in ("dataYear","publishedAt","officialUrl","transcriptionUrl"):
             if snap.get(field) != block.get(field): errors.append(f"{year}: source snapshot metadata mismatch for {field}")
 
