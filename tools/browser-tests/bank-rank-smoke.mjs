@@ -17,7 +17,7 @@ execFileSync('python3', [renderStaticScript, '--check'], { stdio: 'inherit' });
 
 const manifest = JSON.parse(await readFile(new URL('../bank_rank/data/rankings.json', import.meta.url), 'utf8'));
 assert.equal(manifest.schemaVersion, 1, 'bank ranking schema should remain v1');
-assert.ok(Array.isArray(manifest.years) && manifest.years.length >= 3, 'bank ranking manifest should expose verified years');
+assert.ok(Array.isArray(manifest.years), 'bank ranking manifest should expose verified years');
 
 const loadedYears = await Promise.all(manifest.years.map(async block => ({
   ...block,
@@ -28,10 +28,14 @@ for (const block of loadedYears) {
 }
 const years = loadedYears.map(block => Number(block.rankingYear));
 assert.deepEqual(years, [...years].sort((a, b) => a - b), 'ranking years should remain sorted ascending');
+for (let year = 2016; year <= 2025; year += 1) {
+  assert.ok(years.includes(year), `verified historical baseline must retain ${year}`);
+}
+assert.ok(loadedYears.reduce((sum, block) => sum + block.records.length, 0) >= 1000, 'verified 2016–2025 baseline should retain at least 1000 records');
 const latestYear = Math.max(...years);
 const oldestYear = Math.min(...years);
 
-// Keep the known 2022 transcription fixes locked even before all historical years are exposed in the manifest.
+// Lock known transcription repairs as part of the verified historical baseline.
 const records2022 = JSON.parse(await readFile(new URL('../bank_rank/data/years/2022.json', import.meta.url), 'utf8'));
 const suzhou2022 = records2022.find(record => record.sourceName === '苏州银行');
 const shenzhenRural2022 = records2022.find(record => record.sourceName === '深圳农商银行');
@@ -67,6 +71,11 @@ try {
     assert.match(await page.locator('#resultSummary').innerText(), new RegExp(`${oldestBlock.dataYear} 年末`));
   }
 
+  await page.locator('#yearSelect').selectOption('2018');
+  await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2018 年中国银行业100强'));
+  assert.equal(await page.locator('#bankList tr.data-row').count(), 100, '2018 recovered ranking should render all 100 banks');
+  assert.match(await page.locator('#bankList tr.data-row').first().innerText(), /中国工商银行/, '2018 recovered ranking should retain ICBC at the top');
+
   await page.locator('#bankSearch').fill('中国工商银行');
   assert.equal(await page.locator('#bankList tr.data-row').count(), 1, 'bank search should narrow to ICBC');
   const historyButton = page.locator('#bankList .bank-history-button').first();
@@ -77,6 +86,13 @@ try {
   await page.locator('#dialogClose').click();
   await page.locator('#historyDialog').waitFor({ state: 'hidden' });
   assert.equal(await historyButton.evaluate(element => element === document.activeElement), true, 'closing history should restore focus');
+  await page.locator('#bankSearch').fill('');
+
+  await page.locator('#yearSelect').selectOption('2023');
+  await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2023 年中国银行业100强'));
+  await page.locator('#bankSearch').fill('华融湘江银行');
+  assert.equal(await page.locator('#bankList tr.data-row').count(), 1, 'historical-name search should resolve the renamed bank entity');
+  assert.match(await page.locator('#bankList tr.data-row').first().innerText(), /湖南银行/, 'historical-name search should display the current bank name');
   await page.locator('#bankSearch').fill('');
 
   if (years.includes(2022)) {
