@@ -5,6 +5,7 @@ const SORT_FIELD_MAP = Object.freeze({
     '综合得分': 'overallScore'
 });
 const LUCIDE_MODULE_URL = '../icloud_price_comparison/vendor/lucide-subset.js?v=1afb95ee';
+const DISCLAIMER_COPY = '数字年份按官方名次展示；等级年份仅展示官方等级，同等级无官方先后。本站按各医院最近一次可用的数字排名作同等级内历史参考排序，不代表官方档内名次。历史名称与来源值按已核验资料保留。';
 
 let rankingDataset = null;
 let hospitalById = new Map();
@@ -648,6 +649,18 @@ function primeStaticChrome() {
     const countMatch = summary?.textContent.match(/共\s*\d+\s*家医院/);
     if (title && countMatch && !title.textContent.includes('·')) title.textContent = `${title.textContent} · ${countMatch[0]}`;
     title?.setAttribute('aria-live', 'polite');
+
+    const staticYear = document.getElementById('yearSelect')?.value;
+    const dataStatus = document.getElementById('dataStatus');
+    if (dataStatus && staticYear) dataStatus.textContent = `最新数据 ${staticYear} 年`;
+
+    const disclaimer = document.querySelector('.data-disclaimer p');
+    if (disclaimer) {
+        const label = document.createElement('strong');
+        label.textContent = '榜单说明：';
+        disclaimer.replaceChildren(label, document.createTextNode(DISCLAIMER_COPY));
+    }
+
     ensureSortHeaderMarkup();
     refreshIcons();
 }
