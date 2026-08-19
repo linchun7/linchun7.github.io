@@ -41,6 +41,8 @@ def rank_change(record: dict, previous: dict | None) -> tuple[str, str]:
 def render(data: dict, current_html: str) -> str:
     latest = max(data["years"], key=lambda block: block["rankingYear"])
     latest_year = latest["rankingYear"]
+    oldest_year = min(block["rankingYear"] for block in data["years"])
+    total_records = sum(len(block["records"]) for block in data["years"])
     bank_by_id = {bank["id"]: bank for bank in data["banks"]}
     version = hashlib.sha256((ROOT / "data" / "rankings.json").read_bytes()).hexdigest()[:10]
     options = "\n".join(f'                            <option value="{year}"{" selected" if year == latest_year else ""}>{year}年</option>' for year in sorted((b["rankingYear"] for b in data["years"]), reverse=True))
@@ -60,6 +62,15 @@ def render(data: dict, current_html: str) -> str:
     text = re.sub(r'data-rankings-version="[^"]*"', f'data-rankings-version="{version}"', text, count=1)
     text = replace_marker_block(text, YEAR_START, YEAR_END, options)
     text = replace_marker_block(text, ROWS_START, ROWS_END, "\n".join(rows))
+    text = re.sub(r'<p id="brandSubtitle">.*?</p>', f'<p id="brandSubtitle">中国银行业协会 · {oldest_year}–{latest_year}</p>', text, count=1)
+    scope = (
+        '<section class="scope-note" aria-label="数据范围说明">\n'
+        f'      <strong>数据范围：</strong>当前已完成 {oldest_year}–{latest_year} 共 {len(data["years"])} 个年度、{total_records} 条榜单记录的结构化核验。'
+        f'榜单年度对应上一年末数据，例如 {latest_year} 年榜单使用 {latest["dataYear"]} 年末数据。\n'
+        '    </section>'
+    )
+    text, count = re.subn(r'<section class="scope-note" aria-label="数据范围说明">.*?</section>', scope, text, count=1, flags=re.S)
+    if count != 1: raise RuntimeError("data scope section not found exactly once")
     text = re.sub(r'<h1 id="workspaceTitle">.*?</h1>', f'<h1 id="workspaceTitle">{latest_year} 年中国银行业100强 · {len(latest["records"])} 家</h1>', text, count=1)
     text = re.sub(r'<p id="resultSummary">.*?</p>', f'<p id="resultSummary">数据口径：{latest["dataYear"]} 年末</p>', text, count=1)
     text = re.sub(r'<div class="data-status" id="dataStatus" aria-live="polite">.*?</div>', f'<div class="data-status" id="dataStatus" aria-live="polite">最新数据 {latest_year} 年</div>', text, count=1)
