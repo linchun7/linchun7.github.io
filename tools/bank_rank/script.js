@@ -346,14 +346,22 @@ async function start() {
     render();
   } catch (error) {
     console.error(error);
-    document.getElementById('dataStatus').textContent = '数据加载失败';
     const tbody = document.getElementById('bankList');
-    tbody.replaceChildren();
-    const tr = document.createElement('tr');
-    const td = createCell('数据加载失败，请稍后重试。', 'error-message');
-    td.colSpan = 7;
-    tr.appendChild(td);
-    tbody.appendChild(tr);
+    const staticRows = tbody.querySelectorAll('tr.data-row[data-static-prerendered="true"]');
+    document.getElementById('dataStatus').textContent = '数据加载失败 · 静态预览';
+    document.getElementById('resultSummary').textContent = staticRows.length
+      ? `${staticRows.length} 家静态预览 · 动态数据加载失败`
+      : '动态数据加载失败';
+    document.querySelectorAll('#yearSelect, #typeSelect, #bankSearch, #bankTable [data-sort]').forEach(control => {
+      control.disabled = true;
+    });
+    if (!staticRows.length) {
+      const tr = document.createElement('tr');
+      const td = createCell('数据加载失败，请稍后重试。', 'error-message');
+      td.colSpan = 7;
+      tr.appendChild(td);
+      tbody.replaceChildren(tr);
+    }
   }
 }
 
