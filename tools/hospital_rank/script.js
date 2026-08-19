@@ -215,7 +215,7 @@ function initYearSelect() {
     const oldestYear = years[years.length - 1];
     yearSelect.value = String(latestYear);
     document.getElementById('brandSubtitle').textContent = `中国医院综合排行榜 · ${oldestYear}–${latestYear}`;
-    document.getElementById('dataStatus').textContent = `最新数据 ${latestYear} 年 · 已结构化核验`;
+    document.getElementById('dataStatus').textContent = `最新数据 ${latestYear} 年`;
 }
 
 function currentYearRecords() {
@@ -490,7 +490,7 @@ function updateContext(records) {
     }
 
     const rankColumnLabel = document.getElementById('rankColumnLabel');
-    if (rankColumnLabel) rankColumnLabel.textContent = gradeMode ? '等级' : (year ? '排名' : '榜单结果');
+    if (rankColumnLabel) rankColumnLabel.textContent = gradeMode ? '等级' : (year ? '排名' : '排名 / 等级');
     const rankButton = getRankHeaderButton();
     if (rankButton) rankButton.title = gradeMode ? '同等级内按最近一次可用数字排名作历史参考排序。' : '';
 }
