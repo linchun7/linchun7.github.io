@@ -1,4 +1,10 @@
 const DATA_URL = './data/rankings.json';
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const SORT_ICON_PATHS = Object.freeze({
+  'arrow-down': ['M12 5v14', 'm19 12-7 7-7-7'],
+  'arrow-up': ['m5 12 7-7 7 7', 'M12 19V5'],
+  'arrow-up-down': ['m21 16-4 4-4-4', 'M17 20V4', 'm3 8 4-4 4 4', 'M7 4v16']
+});
 
 let dataset = null;
 let bankById = new Map();
@@ -126,14 +132,43 @@ function filteredRecords() {
   return records;
 }
 
+function createSortIcon(iconName) {
+  const paths = SORT_ICON_PATHS[iconName];
+  if (!paths) throw new Error(`未知排序图标：${iconName}`);
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('class', `lucide lucide-${iconName}`);
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '2');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.dataset.sortIcon = '';
+  paths.forEach(pathData => {
+    const path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', pathData);
+    svg.appendChild(path);
+  });
+  return svg;
+}
+
+function replaceSortIcon(button, iconName) {
+  if (!button) return;
+  const current = button.querySelector('[data-sort-icon]');
+  if (current?.classList.contains(`lucide-${iconName}`)) return;
+  const replacement = createSortIcon(iconName);
+  if (current) current.replaceWith(replacement);
+  else button.appendChild(replacement);
+}
+
 function updateSortHeaders() {
   document.querySelectorAll('#bankTable thead th').forEach(th => {
     const button = th.querySelector('[data-sort]');
     if (!button) return;
     const active = button.dataset.sort === sortState.field;
     th.setAttribute('aria-sort', active ? (sortState.direction === 'asc' ? 'ascending' : 'descending') : 'none');
-    const indicator = th.querySelector('.sort-indicator');
-    if (indicator) indicator.textContent = active ? (sortState.direction === 'asc' ? '↑' : '↓') : '↕';
+    replaceSortIcon(button, active ? (sortState.direction === 'asc' ? 'arrow-up' : 'arrow-down') : 'arrow-up-down');
   });
 }
 
@@ -210,9 +245,9 @@ function render() {
   const block = getYearBlock(selectedYear);
   const type = document.getElementById('typeSelect').value;
   const query = document.getElementById('bankSearch').value.trim();
-  const filters = [type, query ? `搜索“${query}”` : ''].filter(Boolean).join(' · ');
-  document.getElementById('workspaceTitle').textContent = `${selectedYear} 年中国银行业100强`;
-  document.getElementById('resultSummary').textContent = `${records.length} 家银行 · ${block.dataYear} 年末数据${filters ? ` · ${filters}` : ''}`;
+  const filters = [type ? `类型：${type}` : '', query ? `搜索：${query}` : ''].filter(Boolean).join(' · ');
+  document.getElementById('workspaceTitle').textContent = `${selectedYear} 年中国银行业100强榜单`;
+  document.getElementById('resultSummary').textContent = `${records.length} 家银行 · 榜单基于 ${block.dataYear} 年末财务数据${filters ? ` · ${filters}` : ''}`;
   updateSortHeaders();
 }
 
@@ -229,10 +264,13 @@ function initControls() {
   typeSelect.replaceChildren(new Option('全部类型', ''));
   dataset.bankTypes.forEach(type => typeSelect.add(new Option(type, type)));
 
-  const oldest = Math.min(...dataset.years.map(block => Number(block.rankingYear)));
   const latest = Math.max(...dataset.years.map(block => Number(block.rankingYear)));
-  document.getElementById('brandSubtitle').textContent = `核心一级资本排名 · ${oldest}–${latest}`;
-  document.getElementById('dataStatus').textContent = `最新数据 ${latest} 年`;
+  document.getElementById('dataStatus').textContent = `最新榜单 ${latest} 年`;
+
+  const bankSearch = document.getElementById('bankSearch');
+  [yearSelect, typeSelect, bankSearch, ...document.querySelectorAll('#bankTable [data-sort]')].forEach(control => {
+    control.disabled = false;
+  });
 
   yearSelect.addEventListener('change', () => {
     selectedYear = Number(yearSelect.value);
@@ -240,7 +278,7 @@ function initControls() {
     render();
   });
   typeSelect.addEventListener('change', render);
-  document.getElementById('bankSearch').addEventListener('input', render);
+  bankSearch.addEventListener('input', render);
   document.querySelectorAll('#bankTable [data-sort]').forEach(button => {
     button.addEventListener('click', () => {
       const field = button.dataset.sort;
@@ -264,6 +302,24 @@ function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 }
 
+function formatYearRanges(history) {
+  const years = [...new Set(history.map(item => Number(item.rankingYear)).filter(Number.isFinite))].sort((a, b) => a - b);
+  if (!years.length) return '—';
+  const ranges = [];
+  let start = years[0];
+  let previous = years[0];
+  for (const year of years.slice(1)) {
+    if (year === previous + 1) {
+      previous = year;
+      continue;
+    }
+    ranges.push(start === previous ? String(start) : `${start}–${previous}`);
+    start = previous = year;
+  }
+  ranges.push(start === previous ? String(start) : `${start}–${previous}`);
+  return ranges.join('、');
+}
+
 function openHistory(bankId, trigger) {
   const bank = getBank(bankId);
   const history = historyByBankId.get(bankId) || [];
@@ -272,7 +328,7 @@ function openHistory(bankId, trigger) {
   const dialog = document.getElementById('historyDialog');
   const body = document.getElementById('historyDialogBody');
   document.getElementById('historyDialogTitle').textContent = `${bank.name} · 历年排名`;
-  document.getElementById('historyDialogMeta').textContent = `${bank.type} · 当前数据覆盖 ${Math.min(...history.map(i => i.rankingYear))}–${Math.max(...history.map(i => i.rankingYear))}`;
+  document.getElementById('historyDialogMeta').textContent = `${bank.type} · 上榜记录：${formatYearRanges(history)}`;
   body.replaceChildren();
 
   if (bank.aliases?.length) {
