@@ -5,7 +5,7 @@ const SORT_FIELD_MAP = Object.freeze({
     '综合得分': 'overallScore'
 });
 const LUCIDE_MODULE_URL = '../icloud_price_comparison/vendor/lucide-subset.js?v=1afb95ee';
-const DISCLAIMER_COPY = '数字年份按官方名次展示；等级年份仅展示官方等级，同等级无官方先后。本站按各医院最近一次可用的数字排名作同等级内历史参考排序，不代表官方档内名次。历史名称与来源值按已核验资料保留。';
+const DISCLAIMER_COPY = '数字年份按官方名次展示；等级年份仅展示官方等级，同等级无官方先后。本站按各医院最近一次可用的数字排名作同等级内历史参考排序，不代表官方档内名次。';
 
 let rankingDataset = null;
 let hospitalById = new Map();
