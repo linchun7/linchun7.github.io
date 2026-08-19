@@ -4,12 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="format-detection" content="telephone=no">
+  <meta name="theme-color" content="#eef2f6">
   <meta name="description" content="中国银行业协会中国银行业100强历年榜单查询，支持按年份和银行类型筛选，并查看银行历年排名、历史名称和机构沿革。">
   <link rel="shortcut icon" href="/images/favicon.ico">
   <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
   <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
   <title>中国银行业100强榜单｜历年排名与银行查询</title>
-  <link rel="stylesheet" href="style.css?v=d3135bec">
+  <link rel="stylesheet" href="style.css?v=6b5edb3e">
 </head>
 <body>
   <a class="skip-link" href="#bankTable">跳到银行榜单</a>
@@ -68,7 +69,7 @@
           <label class="filter-field search-field" for="bankSearch">
             <span class="filter-label">银行</span>
             <span class="field-control">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
               <input type="search" id="bankSearch" placeholder="搜索银行或历史名称" autocomplete="off" disabled>
             </span>
           </label>
@@ -121,7 +122,7 @@
         <p class="source-summary"><strong>数据来源：</strong>中国银行业协会 · 排名口径：核心一级资本净额 · 单位：亿元</p>
       </div>
       <div class="data-disclaimer">
-        <p>榜单年份为发布标称年度，财务数据对应上一年末；2023 年起纳入外资法人银行。更名银行按同一主体连续追踪；合并或新设合并形成的新机构不承接前身历史排名。</p>
+        <p>榜单年份按中国银行业协会的标称年度展示，所用财务数据对应上一年末；部分历史榜单实际发布日期晚于标称年度。2023 年起纳入外资法人银行。更名银行按同一主体连续追踪；合并或新设合并形成的新机构不承接前身历史排名。</p>
       </div>
     </section>
   </main>
@@ -135,7 +136,7 @@
           <h2 id="historyDialogTitle">银行历年排名</h2>
           <p id="historyDialogMeta"></p>
         </div>
-        <button class="dialog-close" id="dialogClose" type="button" aria-label="关闭">×</button>
+        <button class="dialog-close" id="dialogClose" type="button" aria-label="关闭" title="关闭">×</button>
       </div>
       <div class="history-dialog-body" id="historyDialogBody"></div>
     </div>
