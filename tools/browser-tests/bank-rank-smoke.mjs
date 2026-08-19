@@ -71,40 +71,50 @@ await page.route('**/googletagmanager.com/**', route => route.abort());
 
 try {
   await page.goto(`${baseUrl}/tools/bank_rank/`, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('#bankList tr.data-row .bank-history-button');
+  await page.waitForSelector('#bankList tr.data-row .bank-history-button:not(:disabled)');
 
   assert.equal(await page.locator('#yearSelect').inputValue(), String(latestYear), 'latest year should be selected by default');
   assert.equal(await page.locator('#bankList tr.data-row').count(), 100, 'default view should render the full latest-year top 100');
-  assert.equal((await page.locator('#workspaceTitle').innerText()).trim(), `${latestYear} 年中国银行业100强`);
-  assert.equal((await page.locator('#resultSummary').innerText()).trim(), `100 家银行 · ${latestBlock.dataYear} 年末数据`);
-  assert.equal((await page.locator('#dataStatus').innerText()).trim(), `最新数据 ${latestYear} 年`);
-  assert.equal((await page.locator('#brandSubtitle').innerText()).trim(), `核心一级资本排名 · ${oldestYear}–${latestYear}`);
+  assert.equal((await page.locator('.brand-copy strong').innerText()).trim(), '中国银行业100强榜单');
+  assert.equal(await page.locator('#brandSubtitle').count(), 0, 'old capital-ranking/year-range brand subtitle should stay removed');
+  assert.equal((await page.locator('#workspaceTitle').innerText()).trim(), `${latestYear} 年中国银行业100强榜单`);
+  assert.equal((await page.locator('#resultSummary').innerText()).trim(), `100 家银行 · 榜单基于 ${latestBlock.dataYear} 年末财务数据`);
+  assert.equal((await page.locator('#dataStatus').innerText()).trim(), `最新榜单 ${latestYear} 年`);
 
   assert.equal(await page.locator('.scope-note').count(), 0, 'yellow data-range/year-note UI should stay removed');
   assert.equal(await page.locator('#officialSource').count(), 0, 'per-year association source link should stay removed from the page');
-  assert.equal(await page.locator('.data-disclaimer').count(), 0, 'duplicate disclaimer block should stay removed');
+  assert.equal(await page.locator('.data-disclaimer').count(), 1, 'method/disclaimer should be a second footer row like iCloud');
   const sourceSummary = (await page.locator('.workspace-footer .source-summary').innerText()).trim();
-  assert.match(sourceSummary, /数据来源：中国银行业协会 · 单位：亿元/);
-  assert.match(sourceSummary, /核心一级资本净额/);
-  assert.match(sourceSummary, /2023 年起纳入外资法人银行/);
-  assert.match(sourceSummary, /合并或新设合并/);
+  assert.match(sourceSummary, /数据来源：中国银行业协会/);
+  assert.match(sourceSummary, /排名口径：核心一级资本净额/);
+  assert.match(sourceSummary, /单位：亿元/);
+  const disclaimer = (await page.locator('.data-disclaimer').innerText()).trim();
+  assert.match(disclaimer, /榜单年份为发布标称年度，财务数据对应上一年末/);
+  assert.match(disclaimer, /2023 年起纳入外资法人银行/);
+  assert.match(disclaimer, /合并或新设合并/);
   assert.equal((await page.locator('body').innerText()).match(/数据来源：中国银行业协会/g)?.length, 1, 'data source should appear once below the table');
+  assert.equal((await page.locator('.page-footer').innerText()).trim(), '© 2026 林春写字的地方');
 
   assert.match(await page.locator('link[rel="stylesheet"]').getAttribute('href'), /^style\.css\?v=[0-9a-f]{8}$/i, 'stylesheet should use a content version');
   assert.match(await page.locator('script[src^="script.js"]').getAttribute('src'), /^script\.js\?v=[0-9a-f]{8}$/i, 'script should use a content version');
 
   const hydratedFirstRow = page.locator('#bankList tr.data-row').first();
   assert.equal(await hydratedFirstRow.locator('td').nth(0).locator('.rank-value').count(), 1, 'hydrated ranking cells should retain the static rank-value structure');
+  assert.equal(await hydratedFirstRow.locator('td').nth(1).locator('.bank-history-button .history-affordance').count(), 1, 'hydrated bank cells should retain the static history affordance structure');
   assert.equal(await hydratedFirstRow.locator('td').nth(2).locator('.type-badge').count(), 1, 'hydrated type cells should retain the static type-badge structure');
+  assert.equal(await page.locator('#bankTable .sort-indicator').count(), 0, 'text glyph sort indicators should stay removed');
+  assert.equal(await page.locator('#bankTable thead [data-sort-icon]').count(), 6, 'all sortable headers should use iCloud-style SVG sort icons');
+  assert.equal(await page.locator('#bankTable [data-sort="rank"] .lucide-arrow-up').count(), 1, 'default rank sort should show the iCloud-style arrow-up icon');
+  assert.equal(await page.locator('#bankTable [data-sort="name"] .lucide-arrow-up-down').count(), 1, 'inactive headers should show the iCloud-style arrow-up-down icon');
   assert.equal(await page.locator('#bankTable th').nth(0).locator('button').evaluate(element => getComputedStyle(element).justifyContent), 'center', 'rank header should align with centered rank cells');
   assert.equal(await page.locator('#bankTable th').nth(2).locator('button').evaluate(element => getComputedStyle(element).justifyContent), 'flex-start', 'bank-type header should align with left-aligned type cells');
 
   if (oldestYear !== latestYear) {
     await page.locator('#yearSelect').selectOption(String(oldestYear));
-    await page.waitForFunction(year => document.querySelector('#workspaceTitle')?.textContent.includes(`${year} 年中国银行业100强`), oldestYear);
+    await page.waitForFunction(year => document.querySelector('#workspaceTitle')?.textContent.includes(`${year} 年中国银行业100强榜单`), oldestYear);
     assert.equal(await page.locator('#bankList tr.data-row').count(), 100, `${oldestYear} should render 100 banks`);
     const oldestBlock = loadedYears.find(block => Number(block.rankingYear) === oldestYear);
-    assert.match(await page.locator('#resultSummary').innerText(), new RegExp(`100 家银行 · ${oldestBlock.dataYear} 年末数据`));
+    assert.match(await page.locator('#resultSummary').innerText(), new RegExp(`100 家银行 · 榜单基于 ${oldestBlock.dataYear} 年末财务数据`));
     await page.locator('#bankSearch').fill('天津农村商业银行');
     const tianjinRow = page.locator('#bankList tr.data-row').first();
     assert.equal((await tianjinRow.locator('td').nth(5).innerText()).trim(), '26.35', '2016 Tianjin Rural verified net profit should render in the UI');
@@ -112,7 +122,7 @@ try {
   }
 
   await page.locator('#yearSelect').selectOption('2018');
-  await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2018 年中国银行业100强'));
+  await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2018 年中国银行业100强榜单'));
   assert.equal(await page.locator('#bankList tr.data-row').count(), 100, '2018 recovered ranking should render all 100 banks');
   assert.match(await page.locator('#bankList tr.data-row').first().innerText(), /中国工商银行/, '2018 recovered ranking should retain ICBC at the top');
 
@@ -122,6 +132,7 @@ try {
   await historyButton.click();
   await page.locator('#historyDialog').waitFor({ state: 'visible' });
   assert.match(await page.locator('#historyDialogTitle').innerText(), /中国工商银行 · 历年排名/);
+  assert.equal((await page.locator('#historyDialogMeta').innerText()).trim(), `大型商业银行 · 上榜记录：${oldestYear}–${latestYear}`);
   assert.match(await page.locator('#historyDialogBody').innerText(), new RegExp(String(latestYear)));
   await page.locator('#dialogClose').click();
   await page.locator('#historyDialog').waitFor({ state: 'hidden' });
@@ -129,7 +140,7 @@ try {
   await page.locator('#bankSearch').fill('');
 
   await page.locator('#yearSelect').selectOption('2021');
-  await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2021 年中国银行业100强'));
+  await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2021 年中国银行业100强榜单'));
   await page.locator('#bankSearch').fill('中国建设银行');
   let row = page.locator('#bankList tr.data-row').first();
   assert.equal((await row.locator('td').nth(4).innerText()).trim(), '281,322.54', 'reverified CCB assets should render in the UI');
@@ -144,19 +155,21 @@ try {
   await renamedHistoryButton.click();
   await page.locator('#historyDialog').waitFor({ state: 'visible' });
   assert.match(await page.locator('#historyDialogTitle').innerText(), /湖南银行 · 历年排名/, 'history dialog should aggregate the renamed entity under its current canonical name');
+  assert.match(await page.locator('#historyDialogMeta').innerText(), /上榜记录：/);
+  assert.doesNotMatch(await page.locator('#historyDialogMeta').innerText(), /当前数据覆盖/);
   await page.locator('#dialogClose').click();
   await page.locator('#historyDialog').waitFor({ state: 'hidden' });
   await page.locator('#bankSearch').fill('');
 
   await page.locator('#yearSelect').selectOption('2023');
-  await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2023 年中国银行业100强'));
+  await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2023 年中国银行业100强榜单'));
   await page.locator('#bankSearch').fill('华融湘江银行');
   assert.equal(await page.locator('#bankList tr.data-row').count(), 1, 'historical-name search should resolve the renamed bank entity');
   assert.match(await page.locator('#bankList tr.data-row').first().innerText(), /湖南银行/, 'post-rename yearly ranking should display the newer published name');
   await page.locator('#bankSearch').fill('');
 
   await page.locator('#yearSelect').selectOption('2022');
-  await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2022 年中国银行业100强'));
+  await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2022 年中国银行业100强榜单'));
   await page.locator('#bankSearch').fill('苏州银行');
   row = page.locator('#bankList tr.data-row').first();
   assert.equal((await row.locator('td').nth(3).innerText()).trim(), '331.86', 'corrected Suzhou Bank value should render in the UI');
@@ -168,13 +181,16 @@ try {
   await page.locator('#typeSelect').selectOption('农村商业银行');
   const ruralCount = await page.locator('#bankList tr.data-row').count();
   assert.ok(ruralCount > 0 && ruralCount < 100, 'bank type filter should narrow the ranking');
+  assert.match(await page.locator('#resultSummary').innerText(), /类型：农村商业银行/);
   await page.locator('#typeSelect').selectOption('');
 
   const capitalSort = page.locator('#bankTable [data-sort="coreTier1Capital"]');
   await capitalSort.click();
   assert.equal(await capitalSort.locator('xpath=ancestor::th').getAttribute('aria-sort'), 'descending', 'capital sort should default to descending');
+  assert.equal(await capitalSort.locator('.lucide-arrow-down').count(), 1, 'descending sort should use the iCloud-style arrow-down icon');
   await capitalSort.click();
   assert.equal(await capitalSort.locator('xpath=ancestor::th').getAttribute('aria-sort'), 'ascending', 'capital sort should toggle ascending');
+  assert.equal(await capitalSort.locator('.lucide-arrow-up').count(), 1, 'ascending sort should use the iCloud-style arrow-up icon');
 
   // Mobile layout follows the shared tools pattern: controls stack, the page itself stays within the viewport,
   // only the data table receives horizontal scrolling, and focusable form controls stay at 16px to avoid iOS zoom.
@@ -209,13 +225,18 @@ try {
   assert.ok(mobileLayout.tableLeft >= -1 && mobileLayout.tableRight <= mobileLayout.viewportWidth + 1, 'table scroll container should stay inside the mobile viewport');
   assert.ok(mobileLayout.yearFontSize >= 16 && mobileLayout.typeFontSize >= 16 && mobileLayout.searchFontSize >= 16, `mobile form controls should stay at 16px or larger: ${JSON.stringify(mobileLayout)}`);
 
-  // Dynamic data failure must preserve the static top-20 fallback instead of blanking the ranking.
+  // Dynamic data failure must preserve an already fully styled static top-20 fallback.
+  // The history chevron and sort icons must be present before hydration so refresh does not flash a different layout.
   const fallbackPage = await context.newPage();
   await fallbackPage.route('**/tools/bank_rank/data/rankings.json', route => route.abort());
   await fallbackPage.goto(`${baseUrl}/tools/bank_rank/`, { waitUntil: 'domcontentloaded' });
   await fallbackPage.waitForFunction(() => document.querySelector('#dataStatus')?.textContent.includes('数据加载失败'));
   assert.equal(await fallbackPage.locator('#bankList tr.data-row[data-static-prerendered="true"]').count(), 20, 'failed dynamic load should preserve all 20 static preview rows');
-  assert.match(await fallbackPage.locator('#bankList tr.data-row').first().innerText(), /中国工商银行/, 'static fallback should preserve the latest-year first bank');
+  const fallbackFirstRow = fallbackPage.locator('#bankList tr.data-row').first();
+  assert.match(await fallbackFirstRow.innerText(), /中国工商银行/, 'static fallback should preserve the latest-year first bank');
+  assert.equal(await fallbackFirstRow.locator('.bank-history-button').isDisabled(), true, 'static history affordance should remain non-interactive without dynamic data');
+  assert.equal(await fallbackFirstRow.locator('.history-affordance').isVisible(), true, 'static history chevron should remain visible before hydration');
+  assert.equal(await fallbackPage.locator('#bankTable [data-sort-icon]').count(), 6, 'static table headers should already contain the final SVG sort icons');
   assert.match(await fallbackPage.locator('#resultSummary').innerText(), /20 家静态预览 · 动态数据加载失败/);
   assert.equal(await fallbackPage.locator('#yearSelect').isDisabled(), true, 'failed dynamic load should disable year switching');
   assert.equal(await fallbackPage.locator('#typeSelect').isDisabled(), true, 'failed dynamic load should disable type filtering');
