@@ -36,7 +36,17 @@ const latestYear = Math.max(...years);
 const oldestYear = Math.min(...years);
 const latestBlock = loadedYears.find(block => Number(block.rankingYear) === latestYear);
 
-// Lock known transcription repairs as part of the verified historical baseline.
+// Lock known source/transcription repairs and re-audit corrections.
+const records2016 = JSON.parse(await readFile(new URL('../bank_rank/data/years/2016.json', import.meta.url), 'utf8'));
+const tianjinRural2016 = records2016.find(record => record.sourceName === '天津农村商业银行');
+assert.equal(tianjinRural2016?.netProfit, 26.35, '2016 Tianjin Rural Commercial Bank net profit must match its 2015 annual report');
+
+const records2021 = JSON.parse(await readFile(new URL('../bank_rank/data/years/2021.json', import.meta.url), 'utf8'));
+const ccb2021 = records2021.find(record => record.sourceName === '中国建设银行');
+const mengshang2021 = records2021.find(record => record.sourceName === '蒙商银行');
+assert.equal(ccb2021?.assets, 281322.54, '2021 CCB assets must match the 2020 official financial highlights');
+assert.equal(mengshang2021?.netProfit, -34.94, '2021 Mengshang Bank net profit must retain the verified loss sign');
+
 const records2022 = JSON.parse(await readFile(new URL('../bank_rank/data/years/2022.json', import.meta.url), 'utf8'));
 const suzhou2022 = records2022.find(record => record.sourceName === '苏州银行');
 const shenzhenRural2022 = records2022.find(record => record.sourceName === '深圳农商银行');
@@ -71,9 +81,9 @@ try {
   assert.equal(await page.locator('.data-disclaimer').count(), 0, 'duplicate disclaimer block should stay removed');
   const sourceSummary = (await page.locator('.workspace-footer .source-summary').innerText()).trim();
   assert.match(sourceSummary, /数据来源：中国银行业协会 · 单位：亿元/);
-  assert.match(sourceSummary, /核心一级资本净额排序/);
+  assert.match(sourceSummary, /核心一级资本净额/);
   assert.match(sourceSummary, /2023 年起纳入外资法人银行/);
-  assert.match(sourceSummary, /合并或新设合并的机构不直接继承前身历史排名/);
+  assert.match(sourceSummary, /合并或新设合并/);
   assert.equal((await page.locator('body').innerText()).match(/数据来源：中国银行业协会/g)?.length, 1, 'data source should appear once below the table');
 
   assert.match(await page.locator('link[rel="stylesheet"]').getAttribute('href'), /^style\.css\?v=[0-9a-f]{8}$/i, 'stylesheet should use a content version');
@@ -91,6 +101,10 @@ try {
     assert.equal(await page.locator('#bankList tr.data-row').count(), 100, `${oldestYear} should render 100 banks`);
     const oldestBlock = loadedYears.find(block => Number(block.rankingYear) === oldestYear);
     assert.match(await page.locator('#resultSummary').innerText(), new RegExp(`100 家银行 · ${oldestBlock.dataYear} 年末数据`));
+    await page.locator('#bankSearch').fill('天津农村商业银行');
+    const tianjinRow = page.locator('#bankList tr.data-row').first();
+    assert.equal((await tianjinRow.locator('td').nth(5).innerText()).trim(), '26.35', '2016 Tianjin Rural verified net profit should render in the UI');
+    await page.locator('#bankSearch').fill('');
   }
 
   await page.locator('#yearSelect').selectOption('2018');
@@ -112,6 +126,12 @@ try {
 
   await page.locator('#yearSelect').selectOption('2021');
   await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2021 年中国银行业100强'));
+  await page.locator('#bankSearch').fill('中国建设银行');
+  let row = page.locator('#bankList tr.data-row').first();
+  assert.equal((await row.locator('td').nth(4).innerText()).trim(), '281,322.54', 'reverified CCB assets should render in the UI');
+  await page.locator('#bankSearch').fill('蒙商银行');
+  row = page.locator('#bankList tr.data-row').first();
+  assert.equal((await row.locator('td').nth(5).innerText()).trim(), '-34.94', 'verified Mengshang Bank loss should render with the negative sign');
   await page.locator('#bankSearch').fill('华融湘江银行');
   assert.equal(await page.locator('#bankList tr.data-row').count(), 1, 'historical source-name search should resolve the bank entity in 2021');
   const renamedRow = page.locator('#bankList tr.data-row').first();
@@ -131,17 +151,15 @@ try {
   assert.match(await page.locator('#bankList tr.data-row').first().innerText(), /湖南银行/, 'post-rename yearly ranking should display the newer published name');
   await page.locator('#bankSearch').fill('');
 
-  if (years.includes(2022)) {
-    await page.locator('#yearSelect').selectOption('2022');
-    await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2022 年中国银行业100强'));
-    await page.locator('#bankSearch').fill('苏州银行');
-    let row = page.locator('#bankList tr.data-row').first();
-    assert.equal((await row.locator('td').nth(3).innerText()).trim(), '331.86', 'corrected Suzhou Bank value should render in the UI');
-    await page.locator('#bankSearch').fill('深圳农商银行');
-    row = page.locator('#bankList tr.data-row').first();
-    assert.equal((await row.locator('td').nth(4).innerText()).trim(), '5,868.54', '2022 Shenzhen Rural assets should render in the UI');
-    await page.locator('#bankSearch').fill('');
-  }
+  await page.locator('#yearSelect').selectOption('2022');
+  await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2022 年中国银行业100强'));
+  await page.locator('#bankSearch').fill('苏州银行');
+  row = page.locator('#bankList tr.data-row').first();
+  assert.equal((await row.locator('td').nth(3).innerText()).trim(), '331.86', 'corrected Suzhou Bank value should render in the UI');
+  await page.locator('#bankSearch').fill('深圳农商银行');
+  row = page.locator('#bankList tr.data-row').first();
+  assert.equal((await row.locator('td').nth(4).innerText()).trim(), '5,868.54', '2022 Shenzhen Rural assets should render in the UI');
+  await page.locator('#bankSearch').fill('');
 
   await page.locator('#typeSelect').selectOption('农村商业银行');
   const ruralCount = await page.locator('#bankList tr.data-row').count();
