@@ -20,10 +20,30 @@ async function createPage(contextOptions = {}) {
 
 async function testRmbConverter() {
     const { context, page, pageErrors } = await createPage({ viewport: { width: 390, height: 844 } });
+    await page.addInitScript(() => {
+        const nativeVisualViewport = window.visualViewport;
+        if (!nativeVisualViewport) return;
+
+        let offsetTop = 0;
+        const testVisualViewport = new EventTarget();
+        Object.defineProperty(testVisualViewport, 'offsetTop', { get: () => offsetTop });
+        Object.defineProperty(window, 'visualViewport', {
+            configurable: true,
+            value: testVisualViewport
+        });
+        Object.defineProperty(window, '__setTestVisualViewportOffset', {
+            configurable: true,
+            value: (nextOffset) => {
+                offsetTop = nextOffset;
+                testVisualViewport.dispatchEvent(new Event('scroll'));
+            }
+        });
+    });
     await page.goto(`${baseUrl}/tools/rmb_converter/`, { waitUntil: 'domcontentloaded' });
 
     assert.equal(await page.locator('script[src="dist/nzh.min.js"]').count(), 1, 'RMB converter should use local Nzh');
     assert.equal(await page.locator('#inputmoney').getAttribute('autofocus'), null, 'mobile page should not force-open the keyboard');
+    assert.equal(await page.evaluate(() => typeof window.__setTestVisualViewportOffset), 'function', 'visual viewport test shim should be installed');
 
     const initialResultBox = await page.locator('.result-card').boundingBox();
     const initialToolBox = await page.locator('.tool-card').boundingBox();
@@ -42,7 +62,7 @@ async function testRmbConverter() {
     const focusedToolBox = await page.locator('.tool-card').boundingBox();
     assert.ok(focusedResultBox && focusedToolBox && focusedResultBox.y < focusedToolBox.y, 'focused input must not reorder the stable result/input layout');
 
-    // 用缩短后的可视区近似模拟手机软键盘弹出，滚到输入框后结果卡仍应完整留在视口内。
+    // 缩短视口后再叠加 visualViewport.offsetTop，模拟手机软键盘触发的真实可视区平移。
     await page.setViewportSize({ width: 390, height: 480 });
     await page.locator('#inputmoney').scrollIntoViewIfNeeded();
     const keyboardResultBox = await page.locator('.result-card').boundingBox();
@@ -51,11 +71,27 @@ async function testRmbConverter() {
         'result card should remain fully visible in a keyboard-reduced viewport'
     );
 
+    await page.locator('#inputmoney').focus();
+    await page.evaluate(() => window.__setTestVisualViewportOffset(84));
+    await page.waitForFunction(() => (
+        getComputedStyle(document.documentElement).getPropertyValue('--mobile-viewport-top').trim() === '84px'
+    ));
+    const offsetStickyTop = parseFloat(await page.locator('.result-card').evaluate((el) => getComputedStyle(el).top));
+    assert.ok(offsetStickyTop >= 100, 'sticky top should include the 84px visual viewport offset plus mobile top spacing');
+    const copyButtonBox = await page.locator('#copyBtn').boundingBox();
+    assert.ok(
+        copyButtonBox && copyButtonBox.y >= 84 && copyButtonBox.y + copyButtonBox.height <= 480,
+        'copy button must remain fully visible when the mobile visual viewport is shifted by the keyboard'
+    );
+
     await page.fill('#inputmoney', '.5');
     await page.waitForFunction(() => document.querySelector('#result1')?.textContent === '人民币伍角');
     assert.equal(await page.locator('#result1').textContent(), '人民币伍角');
 
     await page.evaluate(() => document.activeElement?.blur());
+    await page.waitForFunction(() => (
+        getComputedStyle(document.documentElement).getPropertyValue('--mobile-viewport-top').trim() === '0px'
+    ));
     const blurredResultBox = await page.locator('.result-card').boundingBox();
     const blurredToolBox = await page.locator('.tool-card').boundingBox();
     assert.ok(blurredResultBox && blurredToolBox && blurredResultBox.y < blurredToolBox.y, 'blur must keep result above input without a layout jump');
