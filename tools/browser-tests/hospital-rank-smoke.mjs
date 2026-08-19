@@ -44,6 +44,9 @@ try {
     assert.equal(await staticRows.first().getAttribute('data-year'), String(latestYear), 'static HTML rows should come from the latest year in rankings.json');
     assert.match(await staticPage.locator('noscript').innerText(), /最新年度静态榜单/);
     assert.equal((await staticPage.locator('#rankColumnLabel').innerText()).trim(), latestYearBlock.rankingMode === 'grade' ? '等级' : '排名', 'no-JS static header should match the latest ranking mode');
+    assert.equal(await staticPage.locator('#hospitalTable thead .sort-indicator').count(), 0, 'static HTML must not expose legacy text sort arrows');
+    assert.equal(await staticPage.locator('#hospitalTable thead svg.lucide-arrow-up-down[data-sort-icon]').count(), 8, 'all static sort headers should already contain final Lucide SVGs');
+    assert.equal(await staticPage.locator('#hospitalTable thead i[data-lucide]').count(), 0, 'static sort icons must not depend on async Lucide placeholders');
     assert.equal(await staticPage.locator('#hospitalList .hospital-history-button').count(), 0, 'no-JS static hospital names must not be dead buttons');
     assert.equal(await staticPage.locator('head > style').count(), 0, 'hospital page-specific CSS should stay in the versioned external stylesheet');
     assert.match((await staticPage.locator('html').getAttribute('data-rankings-version')) || '', /^[0-9a-f]{8}$/, 'static HTML should carry a rankings content version');
@@ -65,9 +68,29 @@ try {
     assert.equal((await hydrationPage.locator('#rankColumnLabel').innerText()).trim(), latestYearBlock.rankingMode === 'grade' ? '等级' : '排名', 'rank label must not flash a generic mixed-mode placeholder while data is loading');
     assert.equal((await hydrationPage.locator('#workspaceTitle').innerText()).trim(), `${latestYear} 年医院榜单 · 共 ${latestYearBlock.records.length} 家医院`, 'title must not change during initial data hydration');
     assert.equal((await hydrationPage.locator('.data-disclaimer').innerText()).trim(), '榜单说明：有排名的年份按官方名次展示；等级年份按各医院最近一次可用的排名作同等级内参考排序。', 'disclaimer must already be final before interactive data loads');
+    assert.equal(await hydrationPage.locator('#hospitalTable thead .sort-indicator').count(), 0, 'legacy sort arrows must never appear during hydration');
+    assert.equal(await hydrationPage.locator('#hospitalTable thead svg.lucide-arrow-up-down[data-sort-icon]').count(), 8, 'final Lucide sort icons should exist before rankings JSON is released');
+    const beforeNameBox = await hydrationPage.locator('#hospitalList tr.data-row').first().locator('.hospital-name').boundingBox();
+    const beforeTableBox = await hydrationPage.locator('#hospitalTable').boundingBox();
+    const visibleRankIcon = hydrationPage.locator('#hospitalTable thead button[data-sort="排名"] [data-sort-icon]');
+    const beforeIconBox = await visibleRankIcon.boundingBox();
+    const beforeIconHtml = await visibleRankIcon.evaluate(element => element.outerHTML);
+    assert.ok(beforeNameBox && beforeTableBox && beforeIconBox, 'pre-hydration geometry should be measurable');
     releaseRankings();
     await hydrationPage.waitForSelector('#hospitalList .hospital-history-button');
     assert.equal((await hydrationPage.locator('#rankColumnLabel').innerText()).trim(), latestYearBlock.rankingMode === 'grade' ? '等级' : '排名', 'rank label should remain stable after hydration');
+    assert.equal(await hydrationPage.locator('#hospitalTable thead .sort-indicator').count(), 0, 'legacy sort arrows must stay removed after hydration');
+    assert.equal(await hydrationPage.locator('#hospitalTable thead i[data-lucide]').count(), 0, 'sort states must be rendered synchronously as SVGs');
+    const afterNameBox = await hydrationPage.locator('#hospitalList tr.data-row').first().locator('.hospital-name').boundingBox();
+    const afterTableBox = await hydrationPage.locator('#hospitalTable').boundingBox();
+    const afterIconBox = await visibleRankIcon.boundingBox();
+    const afterIconHtml = await visibleRankIcon.evaluate(element => element.outerHTML);
+    assert.ok(afterNameBox && afterTableBox && afterIconBox, 'post-hydration geometry should be measurable');
+    const maxDelta = (before, after) => Math.max(...['x', 'y', 'width', 'height'].map(key => Math.abs(before[key] - after[key])));
+    assert.ok(maxDelta(beforeNameBox, afterNameBox) <= 1, `hospital-name geometry must stay stable through hydration, delta=${maxDelta(beforeNameBox, afterNameBox)}`);
+    assert.ok(maxDelta(beforeTableBox, afterTableBox) <= 1, `table geometry must stay stable through hydration, delta=${maxDelta(beforeTableBox, afterTableBox)}`);
+    assert.ok(maxDelta(beforeIconBox, afterIconBox) <= 1, `sort-icon geometry must stay stable through hydration, delta=${maxDelta(beforeIconBox, afterIconBox)}`);
+    assert.equal(afterIconHtml, beforeIconHtml, 'initial hydration must not replace an already-final sort SVG');
 } finally {
     await hydrationContext.close();
 }
@@ -92,8 +115,12 @@ const context = await browser.newContext({ viewport: { width: 1365, height: 900 
 const page = await context.newPage();
 const pageErrors = [];
 const rankingRequests = [];
+const lucideRequests = [];
 page.on('pageerror', error => pageErrors.push(error));
-page.on('request', request => { if (request.url().includes('/tools/hospital_rank/data/rankings.json')) rankingRequests.push(request.url()); });
+page.on('request', request => {
+    if (request.url().includes('/tools/hospital_rank/data/rankings.json')) rankingRequests.push(request.url());
+    if (request.url().includes('lucide-subset.js')) lucideRequests.push(request.url());
+});
 await page.route('**/googletagmanager.com/**', route => route.abort());
 
 try {
@@ -106,6 +133,7 @@ try {
     assert.equal((await page.locator('#dataStatus').innerText()).trim(), `最新数据 ${latestYear} 年`, 'latest-data status should stay concise');
     assert.equal(rankingRequests.length, 1, 'rankings JSON should be requested once during initialization');
     assert.match(rankingRequests[0], /rankings\.json\?v=[0-9a-f]{8}(?:&|$)/, 'rankings JSON request should be cache-busted by its content version');
+    assert.equal(lucideRequests.length, 0, 'sort icons should not require an async Lucide module request');
     assert.doesNotMatch(await page.locator('#dataStatus').innerText(), /已结构化核验/);
 
     assert.equal(await page.locator('#yearSelect').inputValue(), String(latestYear), 'latest year should be selected by default');
