@@ -34,6 +34,7 @@ for (let year = 2016; year <= 2025; year += 1) {
 assert.ok(loadedYears.reduce((sum, block) => sum + block.records.length, 0) >= 1000, 'verified 2016–2025 baseline should retain at least 1000 records');
 const latestYear = Math.max(...years);
 const oldestYear = Math.min(...years);
+const latestBlock = loadedYears.find(block => Number(block.rankingYear) === latestYear);
 
 // Lock known transcription repairs as part of the verified historical baseline.
 const records2022 = JSON.parse(await readFile(new URL('../bank_rank/data/years/2022.json', import.meta.url), 'utf8'));
@@ -60,9 +61,24 @@ try {
 
   assert.equal(await page.locator('#yearSelect').inputValue(), String(latestYear), 'latest year should be selected by default');
   assert.equal(await page.locator('#bankList tr.data-row').count(), 100, 'default view should render the full latest-year top 100');
-  assert.equal((await page.locator('#workspaceTitle').innerText()).trim(), `${latestYear} 年中国银行业100强 · 100 家`);
+  assert.equal((await page.locator('#workspaceTitle').innerText()).trim(), `${latestYear} 年中国银行业100强`);
+  assert.equal((await page.locator('#resultSummary').innerText()).trim(), `100 家银行 · ${latestBlock.dataYear} 年末数据`);
   assert.equal((await page.locator('#dataStatus').innerText()).trim(), `最新数据 ${latestYear} 年`);
-  assert.match(await page.locator('#officialSource').innerText(), /官方发布页$/, 'latest year has a direct association detail page');
+  assert.equal((await page.locator('#brandSubtitle').innerText()).trim(), `核心一级资本排名 · ${oldestYear}–${latestYear}`);
+
+  assert.equal(await page.locator('.scope-note').count(), 0, 'yellow data-range/year-note UI should stay removed');
+  assert.equal(await page.locator('#officialSource').count(), 0, 'per-year association source link should stay removed from the page');
+  assert.equal(await page.locator('.data-disclaimer').count(), 0, 'duplicate disclaimer block should stay removed');
+  const sourceSummary = (await page.locator('.workspace-footer .source-summary').innerText()).trim();
+  assert.match(sourceSummary, /数据来源：中国银行业协会 · 单位：亿元/);
+  assert.match(sourceSummary, /核心一级资本净额排序/);
+  assert.match(sourceSummary, /2023 年起纳入外资法人银行/);
+  assert.match(sourceSummary, /合并或新设合并的机构不直接继承前身历史排名/);
+  assert.equal((await page.locator('body').innerText()).match(/数据来源：中国银行业协会/g)?.length, 1, 'data source should appear once below the table');
+
+  assert.match(await page.locator('link[rel="stylesheet"]').getAttribute('href'), /^style\.css\?v=[0-9a-f]{8}$/i, 'stylesheet should use a content version');
+  assert.match(await page.locator('script[src^="script.js"]').getAttribute('src'), /^script\.js\?v=[0-9a-f]{8}$/i, 'script should use a content version');
+
   const hydratedFirstRow = page.locator('#bankList tr.data-row').first();
   assert.equal(await hydratedFirstRow.locator('td').nth(0).locator('.rank-value').count(), 1, 'hydrated ranking cells should retain the static rank-value structure');
   assert.equal(await hydratedFirstRow.locator('td').nth(2).locator('.type-badge').count(), 1, 'hydrated type cells should retain the static type-badge structure');
@@ -74,14 +90,13 @@ try {
     await page.waitForFunction(year => document.querySelector('#workspaceTitle')?.textContent.includes(`${year} 年中国银行业100强`), oldestYear);
     assert.equal(await page.locator('#bankList tr.data-row').count(), 100, `${oldestYear} should render 100 banks`);
     const oldestBlock = loadedYears.find(block => Number(block.rankingYear) === oldestYear);
-    assert.match(await page.locator('#resultSummary').innerText(), new RegExp(`${oldestBlock.dataYear} 年末`));
+    assert.match(await page.locator('#resultSummary').innerText(), new RegExp(`100 家银行 · ${oldestBlock.dataYear} 年末数据`));
   }
 
   await page.locator('#yearSelect').selectOption('2018');
   await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2018 年中国银行业100强'));
   assert.equal(await page.locator('#bankList tr.data-row').count(), 100, '2018 recovered ranking should render all 100 banks');
   assert.match(await page.locator('#bankList tr.data-row').first().innerText(), /中国工商银行/, '2018 recovered ranking should retain ICBC at the top');
-  assert.match(await page.locator('#officialSource').innerText(), /中国银行业协会来源页$/, 'archived association entry must not be mislabeled as a direct release page');
 
   await page.locator('#bankSearch').fill('中国工商银行');
   assert.equal(await page.locator('#bankList tr.data-row').count(), 1, 'bank search should narrow to ICBC');
@@ -99,7 +114,7 @@ try {
   await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2021 年中国银行业100强'));
   await page.locator('#bankSearch').fill('华融湘江银行');
   assert.equal(await page.locator('#bankList tr.data-row').count(), 1, 'historical source-name search should resolve the bank entity in 2021');
-  let renamedRow = page.locator('#bankList tr.data-row').first();
+  const renamedRow = page.locator('#bankList tr.data-row').first();
   assert.match(await renamedRow.innerText(), /华融湘江银行/, '2021 yearly ranking should preserve the name published that year');
   const renamedHistoryButton = renamedRow.locator('.bank-history-button');
   await renamedHistoryButton.click();
