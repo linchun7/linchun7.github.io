@@ -184,6 +184,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     .function-content .form-label { width: 100%; margin: 0 0 5px !important; }
     .function-content .row { display: grid; grid-template-columns: minmax(0, 1fr) 38px; gap: 0; }
     .function-content .form-label { grid-column: 1 / -1; }
+    .form-control { font-size: 16px; }
     .unit, .placeholder { width: auto; display: flex; align-items: center; justify-content: flex-end; }
     .button-row { display: grid; grid-template-columns: 1fr 1fr; }
     .primary-button, .secondary-button { min-height: 42px; }
