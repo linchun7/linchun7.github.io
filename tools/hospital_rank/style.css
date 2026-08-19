@@ -173,3 +173,59 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Hospital ranking interaction polish. Keep these selectors specific so they also
+   override the page's small inline layout layer without duplicating it. */
+.workspace-heading #resultSummary,
+.workspace-heading #rankingModeNote {
+  display: none !important;
+}
+
+.hospital-table th button svg[data-sort-icon] {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  stroke-width: 2.25;
+}
+
+@media (max-width: 680px) {
+  #hospitalTable.hospital-table.single-year.grade-mode {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+  }
+
+  #hospitalTable.hospital-table.single-year.grade-mode th,
+  #hospitalTable.hospital-table.single-year.grade-mode td {
+    padding-inline: 5px;
+  }
+
+  #hospitalTable.hospital-table.single-year.grade-mode th:nth-child(2),
+  #hospitalTable.hospital-table.single-year.grade-mode td:nth-child(2) {
+    width: 68px;
+  }
+
+  #hospitalTable.hospital-table.single-year.grade-mode th:nth-child(3),
+  #hospitalTable.hospital-table.single-year.grade-mode td:nth-child(3) {
+    width: auto;
+  }
+
+  #hospitalTable.hospital-table.single-year.grade-mode th:nth-child(7),
+  #hospitalTable.hospital-table.single-year.grade-mode td:nth-child(7),
+  #hospitalTable.hospital-table.single-year.grade-mode th:nth-child(8),
+  #hospitalTable.hospital-table.single-year.grade-mode td:nth-child(8) {
+    width: 60px;
+    white-space: normal;
+    line-height: 1.25;
+  }
+
+  #hospitalTable.hospital-table.single-year.grade-mode td:nth-child(3) {
+    white-space: normal;
+  }
+
+  #hospitalTable.hospital-table.single-year.grade-mode .hospital-name {
+    overflow: visible;
+    white-space: normal;
+    text-overflow: clip;
+  }
+}
