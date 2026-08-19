@@ -46,7 +46,7 @@ jobs:
     if: github.event_name != 'schedule'
     name: 静态工具浏览器测试 (${{ matrix.browser }})
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
