@@ -40,6 +40,10 @@ const latestBlock = loadedYears.find(block => Number(block.rankingYear) === late
 const records2016 = JSON.parse(await readFile(new URL('../bank_rank/data/years/2016.json', import.meta.url), 'utf8'));
 const tianjinRural2016 = records2016.find(record => record.sourceName === '天津农村商业银行');
 assert.equal(tianjinRural2016?.netProfit, 26.35, '2016 Tianjin Rural Commercial Bank net profit must match its 2015 annual report');
+const audit = JSON.parse(await readFile(new URL('../bank_rank/data/audit.json', import.meta.url), 'utf8'));
+const tianjinAudit = audit.normalizations.find(item => item.rankingYear === 2016 && item.entity === '天津农村商业银行' && item.field === 'netProfit');
+assert.equal(tianjinAudit?.evidenceUrl, 'https://www.trcbank.com.cn/ImgFiles/tzzgx/201604/2016042918291766558.pdf', '2016 Tianjin Rural correction must retain the official annual-report evidence URL');
+assert.match(tianjinAudit?.evidenceLocation || '', /会计数据和业务数据摘要/, '2016 Tianjin Rural correction must retain an evidence location inside the annual report');
 
 const records2021 = JSON.parse(await readFile(new URL('../bank_rank/data/years/2021.json', import.meta.url), 'utf8'));
 const ccb2021 = records2021.find(record => record.sourceName === '中国建设银行');
@@ -173,7 +177,7 @@ try {
   assert.equal(await capitalSort.locator('xpath=ancestor::th').getAttribute('aria-sort'), 'ascending', 'capital sort should toggle ascending');
 
   // Mobile layout follows the shared tools pattern: controls stack, the page itself stays within the viewport,
-  // and only the data table receives horizontal scrolling.
+  // only the data table receives horizontal scrolling, and focusable form controls stay at 16px to avoid iOS zoom.
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('#yearSelect').selectOption(String(latestYear));
   await page.locator('#bankSearch').fill('');
@@ -193,13 +197,30 @@ try {
       tableClientWidth: tableScroll.clientWidth,
       tableScrollWidth: tableScroll.scrollWidth,
       tableLeft: tableBox.left,
-      tableRight: tableBox.right
+      tableRight: tableBox.right,
+      yearFontSize: parseFloat(getComputedStyle(document.querySelector('#yearSelect')).fontSize),
+      typeFontSize: parseFloat(getComputedStyle(document.querySelector('#typeSelect')).fontSize),
+      searchFontSize: parseFloat(getComputedStyle(document.querySelector('#bankSearch')).fontSize)
     };
   });
   assert.ok(mobileLayout.documentWidth <= mobileLayout.viewportWidth + 1, `mobile page should not overflow horizontally: ${JSON.stringify(mobileLayout)}`);
   assert.ok(mobileLayout.typeTop > mobileLayout.yearTop && mobileLayout.searchTop > mobileLayout.typeTop, 'mobile filters should stack vertically');
   assert.ok(mobileLayout.tableScrollWidth > mobileLayout.tableClientWidth, 'wide bank table should scroll inside its own container on mobile');
   assert.ok(mobileLayout.tableLeft >= -1 && mobileLayout.tableRight <= mobileLayout.viewportWidth + 1, 'table scroll container should stay inside the mobile viewport');
+  assert.ok(mobileLayout.yearFontSize >= 16 && mobileLayout.typeFontSize >= 16 && mobileLayout.searchFontSize >= 16, `mobile form controls should stay at 16px or larger: ${JSON.stringify(mobileLayout)}`);
+
+  // Dynamic data failure must preserve the static top-20 fallback instead of blanking the ranking.
+  const fallbackPage = await context.newPage();
+  await fallbackPage.route('**/tools/bank_rank/data/rankings.json', route => route.abort());
+  await fallbackPage.goto(`${baseUrl}/tools/bank_rank/`, { waitUntil: 'domcontentloaded' });
+  await fallbackPage.waitForFunction(() => document.querySelector('#dataStatus')?.textContent.includes('数据加载失败'));
+  assert.equal(await fallbackPage.locator('#bankList tr.data-row[data-static-prerendered="true"]').count(), 20, 'failed dynamic load should preserve all 20 static preview rows');
+  assert.match(await fallbackPage.locator('#bankList tr.data-row').first().innerText(), /中国工商银行/, 'static fallback should preserve the latest-year first bank');
+  assert.match(await fallbackPage.locator('#resultSummary').innerText(), /20 家静态预览 · 动态数据加载失败/);
+  assert.equal(await fallbackPage.locator('#yearSelect').isDisabled(), true, 'failed dynamic load should disable year switching');
+  assert.equal(await fallbackPage.locator('#typeSelect').isDisabled(), true, 'failed dynamic load should disable type filtering');
+  assert.equal(await fallbackPage.locator('#bankSearch').isDisabled(), true, 'failed dynamic load should disable search');
+  await fallbackPage.close();
 
   assert.deepEqual(pageErrors, [], `page errors in ${browserName}: ${pageErrors.map(error => error.message).join(' | ')}`);
   assert.deepEqual(consoleErrors, [], `console errors in ${browserName}: ${consoleErrors.join(' | ')}`);
