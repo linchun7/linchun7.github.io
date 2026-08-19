@@ -9,7 +9,9 @@ const browserType = { chromium, firefox, webkit }[browserName];
 if (!browserType) throw new Error(`Unsupported browser: ${browserName}`);
 
 const renderStaticScript = fileURLToPath(new URL('../hospital_rank/scripts/render_static.py', import.meta.url));
+const futureYearScript = fileURLToPath(new URL('../hospital_rank/scripts/test_future_year.py', import.meta.url));
 execFileSync('python3', [renderStaticScript, '--check'], { stdio: 'inherit' });
+execFileSync('python3', [futureYearScript], { stdio: 'inherit' });
 
 const rankings = JSON.parse(await readFile(new URL('../hospital_rank/data/rankings.json', import.meta.url), 'utf8'));
 assert.equal(rankings.schemaVersion, 1, 'normalized ranking schema should be v1');
@@ -56,7 +58,7 @@ try {
     const rankingsGate = new Promise(resolve => { releaseRankings = resolve; });
     await hydrationPage.route('**/tools/hospital_rank/data/rankings.json*', async route => {
         await rankingsGate;
-        await route.continue();
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rankings) });
     });
     await hydrationPage.route('**/googletagmanager.com/**', route => route.abort());
     await hydrationPage.goto(`${baseUrl}/tools/hospital_rank/`, { waitUntil: 'domcontentloaded' });
@@ -64,7 +66,8 @@ try {
     assert.equal((await hydrationPage.locator('#workspaceTitle').innerText()).trim(), `${latestYear} 年医院榜单 · 共 ${latestYearBlock.records.length} 家医院`, 'title must not change during initial data hydration');
     assert.equal((await hydrationPage.locator('.data-disclaimer').innerText()).trim(), '榜单说明：有排名的年份按官方名次展示；等级年份按各医院最近一次可用的排名作同等级内参考排序。', 'disclaimer must already be final before interactive data loads');
     releaseRankings();
-    await hydrationPage.waitForFunction(() => !document.querySelector('#hospitalList tr.data-row')?.hasAttribute('data-static-prerendered'));
+    await hydrationPage.waitForSelector('#hospitalList .hospital-history-button');
+    assert.equal((await hydrationPage.locator('#rankColumnLabel').innerText()).trim(), latestYearBlock.rankingMode === 'grade' ? '等级' : '排名', 'rank label should remain stable after hydration');
 } finally {
     await hydrationContext.close();
 }
@@ -73,7 +76,7 @@ const failureContext = await browser.newContext({ viewport: { width: 1365, heigh
 try {
     const failurePage = await failureContext.newPage();
     await failurePage.route('**/googletagmanager.com/**', route => route.abort());
-    await failurePage.route('**/tools/hospital_rank/data/rankings.json', route => route.abort());
+    await failurePage.route('**/tools/hospital_rank/data/rankings.json*', route => route.abort());
     await failurePage.goto(`${baseUrl}/tools/hospital_rank/`, { waitUntil: 'domcontentloaded' });
     await failurePage.waitForFunction(() => document.querySelector('#dataStatus')?.textContent.includes('交互加载失败'));
     const fallbackRows = failurePage.locator('#hospitalList tr.data-row[data-static-prerendered="true"]');
