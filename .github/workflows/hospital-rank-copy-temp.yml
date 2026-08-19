@@ -1,0 +1,150 @@
+name: TEMP hospital-rank final copy sync
+
+on:
+  push:
+    branches:
+      - agent/hospital-rank-future-proof-20260819
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: ${{ !contains(github.event.head_commit.message, '[copy-sync-generated]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: agent/hospital-rank-future-proof-20260819
+          fetch-depth: 0
+
+      - name: Apply final copy and no-flash rules
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path('tools/hospital_rank')
+          script_path = root / 'script.js'
+          render_path = root / 'scripts/render_static.py'
+          smoke_path = Path('tools/browser-tests/hospital-rank-smoke.mjs')
+
+          script = script_path.read_text(encoding='utf-8')
+          old_copy = "const DISCLAIMER_COPY = '数字年份按官方名次展示；等级年份仅展示官方等级，同等级无官方先后。本站按各医院最近一次可用的数字排名作同等级内历史参考排序，不代表官方档内名次。';\n"
+          if old_copy not in script:
+              raise SystemExit('missing old disclaimer constant')
+          script = script.replace(old_copy, '', 1)
+          script = script.replace('同等级内按最近一次可用数字排名作历史参考排序。', '同等级内按最近一次可用的排名作参考排序。')
+          old_prime = '''function primeStaticChrome() {
+              const title = document.getElementById('workspaceTitle');
+              const summary = document.getElementById('resultSummary');
+              const countMatch = summary?.textContent.match(/共\\s*\\d+\\s*家医院/);
+              if (title && countMatch && !title.textContent.includes('·')) title.textContent = `${title.textContent} · ${countMatch[0]}`;
+              title?.setAttribute('aria-live', 'polite');
+
+              const staticYear = document.getElementById('yearSelect')?.value;
+              const dataStatus = document.getElementById('dataStatus');
+              if (dataStatus && staticYear) dataStatus.textContent = `最新数据 ${staticYear} 年`;
+
+              const disclaimer = document.querySelector('.data-disclaimer p');
+              if (disclaimer) {
+                  const label = document.createElement('strong');
+                  label.textContent = '榜单说明：';
+                  disclaimer.replaceChildren(label, document.createTextNode(DISCLAIMER_COPY));
+              }
+
+              ensureSortHeaderMarkup();
+              refreshIcons();
+          }
+          '''
+          new_prime = '''function primeStaticChrome() {
+              document.getElementById('workspaceTitle')?.setAttribute('aria-live', 'polite');
+              ensureSortHeaderMarkup();
+              refreshIcons();
+          }
+          '''
+          if old_prime not in script:
+              raise SystemExit('missing old primeStaticChrome block')
+          script = script.replace(old_prime, new_prime, 1)
+          script_path.write_text(script, encoding='utf-8')
+
+          render = render_path.read_text(encoding='utf-8')
+          old_disclaimer = '''DISCLAIMER_HTML = (
+              '<p><strong>榜单说明：</strong>数字年份按官方名次展示；等级年份仅展示官方等级，同等级无官方先后。'
+              '本站按各医院最近一次可用的数字排名作同等级内历史参考排序，不代表官方档内名次。</p>'
+          )'''
+          new_disclaimer = '''DISCLAIMER_HTML = (
+              '<p><strong>榜单说明：</strong>有排名的年份按官方名次展示；'
+              '等级年份按各医院最近一次可用的排名作同等级内参考排序。</p>'
+          )'''
+          if old_disclaimer not in render:
+              raise SystemExit('missing old renderer disclaimer')
+          render = render.replace(old_disclaimer, new_disclaimer, 1)
+          old_title = 'result = replace_tag_text(result, "workspaceTitle", f"{year} 年医院榜单")'
+          new_title = 'result = replace_tag_text(result, "workspaceTitle", f"{year} 年医院榜单 · 共 {len(rows)} 家医院")'
+          if old_title not in render:
+              raise SystemExit('missing renderer workspace title')
+          render = render.replace(old_title, new_title, 1)
+          render_path.write_text(render, encoding='utf-8')
+
+          smoke = smoke_path.read_text(encoding='utf-8')
+          old_fallback = "    assert.equal(await fallbackRows.first().locator('.hospital-history-button').isDisabled(), true, 'static fallback should not expose a dead history action');"
+          new_fallback = "    assert.equal(await fallbackRows.locator('.hospital-history-button').count(), 0, 'static fallback should not expose a dead history action');"
+          if old_fallback not in smoke:
+              raise SystemExit('missing old fallback assertion')
+          smoke = smoke.replace(old_fallback, new_fallback, 1)
+          old_nojs_title = "    assert.match(await staticPage.locator('#workspaceTitle').textContent(), new RegExp(`${latestYear} 年医院榜单`));"
+          new_nojs_title = "    assert.equal((await staticPage.locator('#workspaceTitle').innerText()).trim(), `${latestYear} 年医院榜单 · 共 ${latestYearBlock.records.length} 家医院`, 'static title should already be in its final hydrated form');"
+          if old_nojs_title not in smoke:
+              raise SystemExit('missing no-JS title assertion')
+          smoke = smoke.replace(old_nojs_title, new_nojs_title, 1)
+          marker = "const failureContext = await browser.newContext({ viewport: { width: 1365, height: 900 } });"
+          stability = '''const hydrationContext = await browser.newContext({ viewport: { width: 1365, height: 900 } });
+          try {
+              const hydrationPage = await hydrationContext.newPage();
+              let releaseRankings;
+              const rankingsGate = new Promise(resolve => { releaseRankings = resolve; });
+              await hydrationPage.route('**/tools/hospital_rank/data/rankings.json*', async route => {
+                  await rankingsGate;
+                  await route.continue();
+              });
+              await hydrationPage.route('**/googletagmanager.com/**', route => route.abort());
+              await hydrationPage.goto(`${baseUrl}/tools/hospital_rank/`, { waitUntil: 'domcontentloaded' });
+              assert.equal((await hydrationPage.locator('#rankColumnLabel').innerText()).trim(), latestYearBlock.rankingMode === 'grade' ? '等级' : '排名', 'rank label must not flash a generic mixed-mode placeholder while data is loading');
+              assert.equal((await hydrationPage.locator('#workspaceTitle').innerText()).trim(), `${latestYear} 年医院榜单 · 共 ${latestYearBlock.records.length} 家医院`, 'title must not change during initial data hydration');
+              assert.equal((await hydrationPage.locator('.data-disclaimer').innerText()).trim(), '榜单说明：有排名的年份按官方名次展示；等级年份按各医院最近一次可用的排名作同等级内参考排序。', 'disclaimer must already be final before interactive data loads');
+              releaseRankings();
+              await hydrationPage.waitForFunction(() => !document.querySelector('#hospitalList tr.data-row')?.hasAttribute('data-static-prerendered'));
+          } finally {
+              await hydrationContext.close();
+          }
+
+          '''
+          if marker not in smoke:
+              raise SystemExit('missing hydration insertion marker')
+          smoke = smoke.replace(marker, stability + marker, 1)
+          old_bottom = "    assert.match(bottomNotice, /最近一次可用的数字排名/);\n    assert.match(bottomNotice, /不代表官方档内名次/);\n    assert.doesNotMatch(bottomNotice, /历史名称与来源值|为提升查询参考价值|不擅自改写来源数据/, 'bottom explanation should stay concise');"
+          new_bottom = "    assert.equal(bottomNotice.trim(), '榜单说明：有排名的年份按官方名次展示；等级年份按各医院最近一次可用的排名作同等级内参考排序。', 'bottom explanation should stay concise and final');"
+          if old_bottom not in smoke:
+              raise SystemExit('missing bottom disclaimer assertions')
+          smoke = smoke.replace(old_bottom, new_bottom, 1)
+          smoke_path.write_text(smoke, encoding='utf-8')
+          PY
+
+          python3 tools/hospital_rank/scripts/render_static.py
+          python3 tools/hospital_rank/scripts/validate_data.py
+          python3 tools/hospital_rank/scripts/test_future_year.py
+          python3 tools/hospital_rank/scripts/render_static.py --check
+          git diff --check
+
+      - name: Commit synchronized result
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add tools/hospital_rank tools/browser-tests/hospital-rank-smoke.mjs
+          git commit -m '[copy-sync-generated] 优化榜单说明并消除刷新文案跳变'
+          git push origin HEAD:agent/hospital-rank-future-proof-20260819
