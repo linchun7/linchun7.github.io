@@ -5,6 +5,7 @@ const SORT_FIELD_MAP = Object.freeze({
     '综合得分': 'overallScore'
 });
 const LUCIDE_MODULE_URL = '../icloud_price_comparison/vendor/lucide-subset.js?v=1afb95ee';
+const DISCLAIMER_COPY = '数字年份按官方名次展示；等级年份仅展示官方等级，同等级无官方先后。本站按各医院最近一次可用的数字排名作同等级内历史参考排序，不代表官方档内名次。';
 
 let rankingDataset = null;
 let hospitalById = new Map();
@@ -215,7 +216,7 @@ function initYearSelect() {
     const oldestYear = years[years.length - 1];
     yearSelect.value = String(latestYear);
     document.getElementById('brandSubtitle').textContent = `中国医院综合排行榜 · ${oldestYear}–${latestYear}`;
-    document.getElementById('dataStatus').textContent = `最新数据 ${latestYear} 年 · 已结构化核验`;
+    document.getElementById('dataStatus').textContent = `最新数据 ${latestYear} 年`;
 }
 
 function currentYearRecords() {
@@ -230,7 +231,7 @@ function initProvinceSelect() {
         currentYearRecords().map(record => getHospital(record)?.province).filter(Boolean)
     )].sort((a, b) => a.localeCompare(b, 'zh-CN'));
 
-    provinceSelect.replaceChildren(new Option('省份', ''));
+    provinceSelect.replaceChildren(new Option('全部省份', ''));
     provinces.forEach(province => provinceSelect.add(new Option(province, province)));
     provinceSelect.value = provinces.includes(previousValue) ? previousValue : '';
 }
@@ -490,7 +491,7 @@ function updateContext(records) {
     }
 
     const rankColumnLabel = document.getElementById('rankColumnLabel');
-    if (rankColumnLabel) rankColumnLabel.textContent = gradeMode ? '等级' : (year ? '排名' : '榜单结果');
+    if (rankColumnLabel) rankColumnLabel.textContent = gradeMode ? '等级' : (year ? '排名' : '排名 / 等级');
     const rankButton = getRankHeaderButton();
     if (rankButton) rankButton.title = gradeMode ? '同等级内按最近一次可用数字排名作历史参考排序。' : '';
 }
@@ -648,6 +649,18 @@ function primeStaticChrome() {
     const countMatch = summary?.textContent.match(/共\s*\d+\s*家医院/);
     if (title && countMatch && !title.textContent.includes('·')) title.textContent = `${title.textContent} · ${countMatch[0]}`;
     title?.setAttribute('aria-live', 'polite');
+
+    const staticYear = document.getElementById('yearSelect')?.value;
+    const dataStatus = document.getElementById('dataStatus');
+    if (dataStatus && staticYear) dataStatus.textContent = `最新数据 ${staticYear} 年`;
+
+    const disclaimer = document.querySelector('.data-disclaimer p');
+    if (disclaimer) {
+        const label = document.createElement('strong');
+        label.textContent = '榜单说明：';
+        disclaimer.replaceChildren(label, document.createTextNode(DISCLAIMER_COPY));
+    }
+
     ensureSortHeaderMarkup();
     refreshIcons();
 }
