@@ -181,6 +181,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   display: none !important;
 }
 
+.workspace-toolbar .workspace-heading {
+  align-self: center;
+  padding-bottom: 0;
+}
+
 .hospital-table th button svg[data-sort-icon] {
   width: 15px;
   height: 15px;
