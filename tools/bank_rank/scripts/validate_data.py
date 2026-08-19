@@ -35,6 +35,13 @@ def validate_dataset(data: dict[str, Any], snapshot: dict[str, Any]) -> list[str
     if not isinstance(banks, list) or not isinstance(years, list): return errors + ["rankings banks/years must be arrays"]
     if not isinstance(snapshot_years, list): return errors + ["source snapshot years must be an array"]
 
+    bank_types = data.get("bankTypes")
+    if not isinstance(bank_types, list) or not all(isinstance(value, str) for value in bank_types):
+        errors.append("bankTypes must be an array of strings")
+    else:
+        if len(bank_types) != len(set(bank_types)): errors.append("bankTypes must not contain duplicates")
+        if set(bank_types) != ALLOWED_TYPES: errors.append("bankTypes must exactly cover the supported bank types")
+
     bank_ids: set[str] = set(); all_names: dict[str, str] = {}; bank_by_id: dict[str, dict[str, Any]] = {}
     for bank in banks:
         bank_id, name, bank_type, aliases = bank.get("id"), bank.get("name"), bank.get("type"), bank.get("aliases", [])
@@ -53,6 +60,23 @@ def validate_dataset(data: dict[str, Any], snapshot: dict[str, Any]) -> list[str
     year_numbers = [b.get("rankingYear") for b in years]
     if len(year_numbers) != len(set(year_numbers)): errors.append("duplicate rankingYear")
     if year_numbers != sorted(year_numbers): errors.append("years must be sorted ascending by rankingYear")
+    integer_years = [year for year in year_numbers if isinstance(year, int)]
+    scope = data.get("scope")
+    if not isinstance(scope, dict):
+        errors.append("scope must be an object")
+    elif integer_years and len(integer_years) == len(year_numbers):
+        if scope.get("minRankingYear") != min(integer_years): errors.append("scope minRankingYear does not match loaded years")
+        if scope.get("maxRankingYear") != max(integer_years): errors.append("scope maxRankingYear does not match loaded years")
+        pending = scope.get("historicalBackfillPending")
+        if not isinstance(pending, list) or not all(isinstance(year, int) for year in pending):
+            errors.append("scope historicalBackfillPending must be an array of years")
+        else:
+            if len(pending) != len(set(pending)): errors.append("scope historicalBackfillPending must not contain duplicates")
+            covered = set(integer_years)
+            pending_set = set(pending)
+            if covered & pending_set: errors.append("scope historicalBackfillPending contains an already loaded year")
+            expected = set(range(min(integer_years), max(integer_years) + 1))
+            if covered | pending_set != expected: errors.append("scope years and historicalBackfillPending do not form a complete range")
     snap_map = {b.get("rankingYear"): b for b in snapshot_years}
     if set(year_numbers) != set(snap_map): errors.append("rankings/source-snapshot year sets differ")
 
@@ -64,10 +88,11 @@ def validate_dataset(data: dict[str, Any], snapshot: dict[str, Any]) -> list[str
         if len(records) != 100: errors.append(f"{year}: expected 100 records, got {len(records)}")
         seen_banks: set[str] = set(); previous_core: float | None = None; previous_rank: int | None = None
         for index, record in enumerate(records):
-            prefix = f"{year} row {index + 1}"; bank_id = record.get("bankId"); rank = record.get("rank"); core = record.get("coreTier1Capital"); assets = record.get("assets"); profit = record.get("netProfit")
+            prefix = f"{year} row {index + 1}"; bank_id = record.get("bankId"); rank = record.get("rank"); core = record.get("coreTier1Capital"); assets = record.get("assets"); profit = record.get("netProfit"); source_name = record.get("sourceName")
             if bank_id not in bank_by_id: errors.append(f"{prefix}: unknown bankId {bank_id!r}")
             if bank_id in seen_banks: errors.append(f"{prefix}: duplicate bankId within year {bank_id}")
             seen_banks.add(bank_id)
+            if not isinstance(source_name, str) or not source_name.strip(): errors.append(f"{prefix}: invalid sourceName")
             if not isinstance(rank, int) or rank < 1 or rank > 100: errors.append(f"{prefix}: invalid rank {rank!r}")
             if not isinstance(core, (int,float)) or core <= 0: errors.append(f"{prefix}: invalid coreTier1Capital {core!r}"); continue
             if not isinstance(assets, (int,float)) or assets <= 0: errors.append(f"{prefix}: invalid assets {assets!r}")
