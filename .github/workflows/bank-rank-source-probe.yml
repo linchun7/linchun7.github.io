@@ -1,4 +1,4 @@
-name: Bank rank historical source probe
+name: Bank rank historical digest probe
 
 on:
   pull_request:
@@ -12,7 +12,7 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 3
     steps:
       - name: Checkout branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -39,19 +39,3 @@ jobs:
                   'netProfit': round(sum(float(r['netProfit']) for r in rows), 2),
               }, ensure_ascii=False))
           PY
-
-      - name: Resolve official historical list URLs
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/cba-pages
-          for page in $(seq 24 62); do
-            url="https://www.china-cba.net/Index/lists/catid/14/p/${page}.html"
-            out="/tmp/cba-pages/${page}.html"
-            curl -fsSL --connect-timeout 8 --max-time 20 -A 'Mozilla/5.0' "$url" -o "$out" || continue
-            if grep -Eq '2017年中国银行业100强|2018年中国银行业100强|2022年中国银行业100强' "$out"; then
-              echo "===== CBA_PAGE ${page} ${url} ====="
-              grep -oE 'href="[^"]+"[^>]*>[^<]*(2017年中国银行业100强|2018年中国银行业100强|2022年中国银行业100强)[^<]*' "$out" || true
-              grep -nE -B2 -A2 '2017年中国银行业100强|2018年中国银行业100强|2022年中国银行业100强' "$out" || true
-            fi
-          done
