@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Render latest-year metadata, resource versions and full no-JS ranking preview."""
 from __future__ import annotations
-import argparse, base64, gzip, hashlib, html, importlib.util, re
+import argparse, hashlib, html, importlib.util, re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -117,37 +117,13 @@ def render(data: dict, current_html: str) -> str:
     return text
 
 
-def dump_base64_chunks(label: str, raw: bytes, chunk_size: int = 3000) -> None:
-    encoded = base64.b64encode(raw).decode("ascii")
-    chunks = [encoded[i:i + chunk_size] for i in range(0, len(encoded), chunk_size)]
-    print(f"{label}_CHUNKS={len(chunks)}")
-    for index, chunk in enumerate(chunks):
-        print(f"{label}_{index:03d}={chunk}")
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(); parser.add_argument("--check", action="store_true"); args = parser.parse_args()
     data = MODULE.load_rankings(); current = HTML_PATH.read_text(encoding="utf-8"); expected = render(data, current)
     if args.check:
         if current != expected:
             rankings_version, style_version, script_version = content_versions()
-            current_raw = current.encode("utf-8")
-            expected_raw = expected.encode("utf-8")
             print(f"index.html static preview is stale: rankings={rankings_version} style={style_version} script={script_version}")
-            print(f"STATIC_HTML_SIZE current={len(current_raw)} expected={len(expected_raw)} delta={len(expected_raw)-len(current_raw)} gzip_current={len(gzip.compress(current_raw, compresslevel=9))} gzip_expected={len(gzip.compress(expected_raw, compresslevel=9))}")
-            dump_base64_chunks("INDEX_B64", expected_raw)
-            smoke_path = ROOT.parent / "browser-tests" / "bank-rank-smoke.mjs"
-            smoke = smoke_path.read_text(encoding="utf-8")
-            smoke_expected = smoke.replace(
-                "count(), 20, 'failed dynamic load should preserve all 20 static preview rows'",
-                "count(), 100, 'failed dynamic load should preserve all 100 static ranking rows'",
-            ).replace(
-                "/20 家静态预览 · 动态数据加载失败/",
-                "/100 家静态预览 · 动态数据加载失败/",
-            )
-            if smoke_expected == smoke:
-                raise RuntimeError("bank-rank smoke replacements did not apply")
-            dump_base64_chunks("SMOKE_B64", smoke_expected.encode("utf-8"))
             return 1
         print("index.html static preview is up to date")
         return 0
