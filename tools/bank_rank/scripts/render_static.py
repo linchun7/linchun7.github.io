@@ -28,6 +28,13 @@ def resource_version(path: Path) -> str:
     return hashlib.sha1(blob).hexdigest()[:8]
 
 
+def content_versions() -> tuple[str, str, str]:
+    rankings_version = hashlib.sha256((ROOT / "data" / "rankings.json").read_bytes()).hexdigest()[:10]
+    style_version = resource_version(ROOT / "style.css")
+    script_version = resource_version(ROOT / "script.js")
+    return rankings_version, style_version, script_version
+
+
 def previous_record(data: dict, bank_id: str, before_year: int) -> dict | None:
     target_year = before_year - 1
     for block in data["years"]:
@@ -58,9 +65,7 @@ def render(data: dict, current_html: str) -> str:
     latest_year = latest["rankingYear"]
     oldest_year = min(block["rankingYear"] for block in data["years"])
     bank_by_id = {bank["id"]: bank for bank in data["banks"]}
-    rankings_version = hashlib.sha256((ROOT / "data" / "rankings.json").read_bytes()).hexdigest()[:10]
-    style_version = resource_version(ROOT / "style.css")
-    script_version = resource_version(ROOT / "script.js")
+    rankings_version, style_version, script_version = content_versions()
     options = "\n".join(f'                            <option value="{year}"{" selected" if year == latest_year else ""}>{year}年</option>' for year in sorted((b["rankingYear"] for b in data["years"]), reverse=True))
     rows = []
     for record in latest["records"][:20]:
@@ -99,8 +104,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(); parser.add_argument("--check", action="store_true"); args = parser.parse_args()
     data = MODULE.load_rankings(); current = HTML_PATH.read_text(encoding="utf-8"); expected = render(data, current)
     if args.check:
-        if current != expected: print("index.html static preview is stale"); return 1
-        print("index.html static preview is up to date"); return 0
+        if current != expected:
+            rankings_version, style_version, script_version = content_versions()
+            print(f"index.html static preview is stale: rankings={rankings_version} style={style_version} script={script_version}")
+            return 1
+        print("index.html static preview is up to date")
+        return 0
     HTML_PATH.write_text(expected, encoding="utf-8"); print(f"rendered latest year {max(b['rankingYear'] for b in data['years'])}"); return 0
 
 
