@@ -65,9 +65,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .bank-table th button { width: 100%; min-height: 44px; padding: 9px 8px; display: inline-flex; align-items: center; justify-content: flex-end; gap: 5px; color: inherit; background: transparent; border: 0; font-weight: inherit; }
 .bank-table th[aria-sort="ascending"], .bank-table th[aria-sort="descending"] { color: var(--accent-dark); background: #e3effd; box-shadow: inset 0 -3px var(--accent); }
 .bank-table th:first-child, .bank-table td:first-child { width: 76px; text-align: center; }
+.bank-table th:first-child button { justify-content: center; }
 .bank-table th:nth-child(2), .bank-table td:nth-child(2) { width: 250px; text-align: left; }
 .bank-table th:nth-child(2) button { justify-content: flex-start; }
 .bank-table th:nth-child(3), .bank-table td:nth-child(3) { width: 150px; text-align: left; }
+.bank-table th:nth-child(3) button { justify-content: flex-start; }
 .bank-table th:nth-child(4), .bank-table td:nth-child(4) { width: 146px; }
 .bank-table th:nth-child(5), .bank-table td:nth-child(5) { width: 146px; }
 .bank-table th:nth-child(6), .bank-table td:nth-child(6) { width: 126px; }
