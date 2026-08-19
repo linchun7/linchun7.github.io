@@ -36,7 +36,6 @@ const latestYear = Math.max(...years);
 const oldestYear = Math.min(...years);
 const latestBlock = loadedYears.find(block => Number(block.rankingYear) === latestYear);
 
-// Lock known source/transcription repairs and re-audit corrections.
 const records2016 = JSON.parse(await readFile(new URL('../bank_rank/data/years/2016.json', import.meta.url), 'utf8'));
 const tianjinRural2016 = records2016.find(record => record.sourceName === '天津农村商业银行');
 assert.equal(tianjinRural2016?.netProfit, 26.35, '2016 Tianjin Rural Commercial Bank net profit must match its 2015 annual report');
@@ -80,6 +79,14 @@ try {
   assert.equal((await page.locator('#workspaceTitle').innerText()).trim(), `${latestYear} 年中国银行业100强榜单`);
   assert.equal((await page.locator('#resultSummary').innerText()).trim(), `100 家银行 · 榜单基于 ${latestBlock.dataYear} 年末财务数据`);
   assert.equal((await page.locator('#dataStatus').innerText()).trim(), `最新榜单 ${latestYear} 年`);
+  assert.equal(await page.locator('meta[name="theme-color"]').getAttribute('content'), '#eef2f6', 'theme color should match the shared iCloud page chrome');
+  const statusIconStyle = await page.locator('#dataStatus').evaluate(element => {
+    const style = getComputedStyle(element, '::before');
+    return { width: style.width, height: style.height, mask: style.maskImage || style.webkitMaskImage };
+  });
+  assert.equal(statusIconStyle.width, '16px', 'status icon should match iCloud sizing');
+  assert.equal(statusIconStyle.height, '16px', 'status icon should match iCloud sizing');
+  assert.notEqual(statusIconStyle.mask, 'none', 'status icon should be present without hydration DOM changes');
 
   assert.equal(await page.locator('.scope-note').count(), 0, 'yellow data-range/year-note UI should stay removed');
   assert.equal(await page.locator('#officialSource').count(), 0, 'per-year association source link should stay removed from the page');
@@ -89,7 +96,8 @@ try {
   assert.match(sourceSummary, /排名口径：核心一级资本净额/);
   assert.match(sourceSummary, /单位：亿元/);
   const disclaimer = (await page.locator('.data-disclaimer').innerText()).trim();
-  assert.match(disclaimer, /榜单年份为发布标称年度，财务数据对应上一年末/);
+  assert.match(disclaimer, /榜单年份按中国银行业协会的标称年度展示，所用财务数据对应上一年末/);
+  assert.match(disclaimer, /部分历史榜单实际发布日期晚于标称年度/);
   assert.match(disclaimer, /2023 年起纳入外资法人银行/);
   assert.match(disclaimer, /合并或新设合并/);
   assert.equal((await page.locator('body').innerText()).match(/数据来源：中国银行业协会/g)?.length, 1, 'data source should appear once below the table');
@@ -133,6 +141,15 @@ try {
   await page.locator('#historyDialog').waitFor({ state: 'visible' });
   assert.match(await page.locator('#historyDialogTitle').innerText(), /中国工商银行 · 历年排名/);
   assert.equal((await page.locator('#historyDialogMeta').innerText()).trim(), `大型商业银行 · 上榜记录：${oldestYear}–${latestYear}`);
+  const closeStyle = await page.locator('#dialogClose').evaluate(element => {
+    const button = getComputedStyle(element);
+    const icon = getComputedStyle(element, '::before');
+    return { width: button.width, height: button.height, iconWidth: icon.width, mask: icon.maskImage || icon.webkitMaskImage };
+  });
+  assert.equal(closeStyle.width, '44px', 'dialog close button should match iCloud control size');
+  assert.equal(closeStyle.height, '44px', 'dialog close button should match iCloud control size');
+  assert.equal(closeStyle.iconWidth, '18px', 'dialog close icon should match iCloud icon size');
+  assert.notEqual(closeStyle.mask, 'none', 'dialog close icon should use the shared Lucide x shape');
   assert.match(await page.locator('#historyDialogBody').innerText(), new RegExp(String(latestYear)));
   await page.locator('#dialogClose').click();
   await page.locator('#historyDialog').waitFor({ state: 'hidden' });
@@ -192,8 +209,6 @@ try {
   assert.equal(await capitalSort.locator('xpath=ancestor::th').getAttribute('aria-sort'), 'ascending', 'capital sort should toggle ascending');
   assert.equal(await capitalSort.locator('.lucide-arrow-up').count(), 1, 'ascending sort should use the iCloud-style arrow-up icon');
 
-  // Mobile layout follows the shared tools pattern: controls stack, the page itself stays within the viewport,
-  // only the data table receives horizontal scrolling, and focusable form controls stay at 16px to avoid iOS zoom.
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('#yearSelect').selectOption(String(latestYear));
   await page.locator('#bankSearch').fill('');
@@ -225,8 +240,6 @@ try {
   assert.ok(mobileLayout.tableLeft >= -1 && mobileLayout.tableRight <= mobileLayout.viewportWidth + 1, 'table scroll container should stay inside the mobile viewport');
   assert.ok(mobileLayout.yearFontSize >= 16 && mobileLayout.typeFontSize >= 16 && mobileLayout.searchFontSize >= 16, `mobile form controls should stay at 16px or larger: ${JSON.stringify(mobileLayout)}`);
 
-  // Dynamic data failure must preserve an already fully styled static top-20 fallback.
-  // The history chevron and sort icons must be present before hydration so refresh does not flash a different layout.
   const fallbackPage = await context.newPage();
   await fallbackPage.route('**/tools/bank_rank/data/rankings.json', route => route.abort());
   await fallbackPage.goto(`${baseUrl}/tools/bank_rank/`, { waitUntil: 'domcontentloaded' });
@@ -241,6 +254,8 @@ try {
   assert.equal(await fallbackPage.locator('#yearSelect').isDisabled(), true, 'failed dynamic load should disable year switching');
   assert.equal(await fallbackPage.locator('#typeSelect').isDisabled(), true, 'failed dynamic load should disable type filtering');
   assert.equal(await fallbackPage.locator('#bankSearch').isDisabled(), true, 'failed dynamic load should disable search');
+  const fallbackStatusIcon = await fallbackPage.locator('#dataStatus').evaluate(element => getComputedStyle(element, '::before').maskImage || getComputedStyle(element, '::before').webkitMaskImage);
+  assert.notEqual(fallbackStatusIcon, 'none', 'status icon should survive the dynamic-load failure state without DOM replacement');
   await fallbackPage.close();
 
   assert.deepEqual(pageErrors, [], `page errors in ${browserName}: ${pageErrors.map(error => error.message).join(' | ')}`);
