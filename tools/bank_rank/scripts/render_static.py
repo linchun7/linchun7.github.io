@@ -60,10 +60,18 @@ def rank_change(record: dict, previous: dict | None, has_earlier: bool = False) 
     return "— 持平", "same"
 
 
+def history_title(bank: dict, shown_name: str) -> str:
+    aliases = bank.get("aliases") or []
+    if bank.get("name") and bank["name"] != shown_name:
+        return f"现名：{bank['name']}；查看历年排名与更名信息"
+    if aliases:
+        return f"查看历年排名与历史名称：{'、'.join(aliases)}"
+    return "查看历年排名"
+
+
 def render(data: dict, current_html: str) -> str:
     latest = max(data["years"], key=lambda block: block["rankingYear"])
     latest_year = latest["rankingYear"]
-    oldest_year = min(block["rankingYear"] for block in data["years"])
     bank_by_id = {bank["id"]: bank for bank in data["banks"]}
     rankings_version, style_version, script_version = content_versions()
     options = "\n".join(f'                            <option value="{year}"{" selected" if year == latest_year else ""}>{year}年</option>' for year in sorted((b["rankingYear"] for b in data["years"]), reverse=True))
@@ -75,10 +83,14 @@ def render(data: dict, current_html: str) -> str:
             previous_record(data, record["bankId"], latest_year),
             has_earlier_record(data, record["bankId"], latest_year),
         )
+        bank_id = html.escape(record["bankId"])
+        shown_name = html.escape(record["sourceName"])
+        title = html.escape(history_title(bank, record["sourceName"]), quote=True)
         rows.append(
-            f'                        <tr class="data-row" data-bank-id="{html.escape(record["bankId"])}" data-static-prerendered="true">'
+            f'                        <tr class="data-row" data-bank-id="{bank_id}" data-static-prerendered="true">'
             f'<td><span class="rank-value">{record["rank"]}</span></td>'
-            f'<td><span class="bank-name">{html.escape(record["sourceName"])}</span></td>'
+            f'<td><button class="bank-history-button" type="button" data-bank-id="{bank_id}" aria-haspopup="dialog" title="{title}" disabled>'
+            f'<span class="bank-name">{shown_name}</span><span class="history-affordance" aria-hidden="true">›</span></button></td>'
             f'<td><span class="type-badge">{html.escape(bank["type"])}</span></td>'
             f'<td>{record["coreTier1Capital"]:,.2f}</td><td>{record["assets"]:,.2f}</td><td>{record["netProfit"]:,.2f}</td>'
             f'<td><span class="change {change_class}">{change}</span></td></tr>'
@@ -87,16 +99,15 @@ def render(data: dict, current_html: str) -> str:
     text = re.sub(r'data-rankings-version="[^"]*"', f'data-rankings-version="{rankings_version}"', text, count=1)
     text = replace_marker_block(text, YEAR_START, YEAR_END, options)
     text = replace_marker_block(text, ROWS_START, ROWS_END, "\n".join(rows))
-    text = re.sub(r'<p id="brandSubtitle">.*?</p>', f'<p id="brandSubtitle">核心一级资本排名 · {oldest_year}–{latest_year}</p>', text, count=1)
-    text = re.sub(r'<h1 id="workspaceTitle">.*?</h1>', f'<h1 id="workspaceTitle">{latest_year} 年中国银行业100强</h1>', text, count=1)
-    text = re.sub(r'<p id="resultSummary">.*?</p>', f'<p id="resultSummary">{len(latest["records"])} 家银行 · {latest["dataYear"]} 年末数据</p>', text, count=1)
-    text = re.sub(r'<div class="data-status" id="dataStatus" aria-live="polite">.*?</div>', f'<div class="data-status" id="dataStatus" aria-live="polite">最新数据 {latest_year} 年</div>', text, count=1)
+    text = re.sub(r'<h1 id="workspaceTitle">.*?</h1>', f'<h1 id="workspaceTitle">{latest_year} 年中国银行业100强榜单</h1>', text, count=1)
+    text = re.sub(r'<p id="resultSummary">.*?</p>', f'<p id="resultSummary">{len(latest["records"])} 家银行 · 榜单基于 {latest["dataYear"]} 年末财务数据</p>', text, count=1)
+    text = re.sub(r'<div class="data-status" id="dataStatus" aria-live="polite">.*?</div>', f'<div class="data-status" id="dataStatus" aria-live="polite">最新榜单 {latest_year} 年</div>', text, count=1)
     text, count = re.subn(r'<link rel="stylesheet" href="style\.css(?:\?v=[^"]*)?">', f'<link rel="stylesheet" href="style.css?v={style_version}">', text, count=1)
     if count != 1: raise RuntimeError("stylesheet link not found exactly once")
     text, count = re.subn(r'<script src="script\.js(?:\?v=[^"]*)?" defer></script>', f'<script src="script.js?v={script_version}" defer></script>', text, count=1)
     if count != 1: raise RuntimeError("script tag not found exactly once")
-    if re.search(r'class="scope-note"|id="officialSource"|id="yearNote"', text):
-        raise RuntimeError("deprecated scope/source UI remains in index.html")
+    if re.search(r'class="scope-note"|id="officialSource"|id="yearNote"|id="brandSubtitle"', text):
+        raise RuntimeError("deprecated scope/source/brand-subtitle UI remains in index.html")
     return text
 
 
