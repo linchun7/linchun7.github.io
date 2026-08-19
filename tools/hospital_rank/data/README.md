@@ -4,7 +4,7 @@
 
 ## 文件
 
-- `rankings.json`：前端唯一正式数据源。包含医院实体注册表与 2009–2023 各年度榜单。
+- `rankings.json`：前端唯一正式数据源。包含医院实体注册表与 2009–2023 已核验历史基线，以及后续经同等来源核验后新增的正式年度榜单。
 - `source-snapshot.json`：2026-08-18 UTC 从健康界复旦排行榜逐年页面重新抓取并规范化得到的源站结构化快照。**不保存原始 HTML**。
 - `audit.json`：本次迁移审计记录，包括旧数据核对、更名归并、缺失年度恢复、历史原始名称补充、源站内部校验 warning 等。
 
@@ -89,10 +89,25 @@ python tools/hospital_rank/scripts/validate_data.py
 
 validator 会检查：
 
-- 2009–2023 年份完整性与每年记录数；
+- 2009–2023 已核验历史基线完整性与固定记录数；
+- 允许 2024 及之后新增正式年度，但要求 `rankings.json` 与 `source-snapshot.json` 年份集合、记录数和来源值一致；
 - 医院 ID、实体引用和别名唯一性；
 - 数字排名/等级制字段互斥；
 - 2023 等级合法性与 20×5 分布；
 - `rankings.json` 与 `source-snapshot.json` 的逐条一致性；
 - 迁移审计不存在 unresolved mismatch；
 - 1430 条历史记录全部归入医院实体。
+
+
+## 新增年度发布流程
+
+新增正式年度时，同时更新 `rankings.json` 与 `source-snapshot.json`，完成实体/历史名称核验后运行：
+
+```bash
+python tools/hospital_rank/scripts/validate_data.py
+python tools/hospital_rank/scripts/test_future_year.py
+python tools/hospital_rank/scripts/render_static.py
+python tools/hospital_rank/scripts/render_static.py --check
+```
+
+`render_static.py` 会自动选择数据中的最大年份作为静态 HTML 默认榜单，并同步 CSS/JS 内容版本与 `rankings.json` 内容版本；因此新增 2024 后页面静态快照、默认年份和数据请求会一起切换到 2024。

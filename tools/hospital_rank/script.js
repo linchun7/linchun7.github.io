@@ -6,6 +6,7 @@ const SORT_FIELD_MAP = Object.freeze({
 });
 const LUCIDE_MODULE_URL = '../icloud_price_comparison/vendor/lucide-subset.js?v=1afb95ee';
 const DISCLAIMER_COPY = '数字年份按官方名次展示；等级年份仅展示官方等级，同等级无官方先后。本站按各医院最近一次可用的数字排名作同等级内历史参考排序，不代表官方档内名次。';
+const RANKINGS_VERSION = document.documentElement.dataset.rankingsVersion || '';
 
 let rankingDataset = null;
 let hospitalById = new Map();
@@ -60,7 +61,8 @@ function getHospital(recordOrId) {
 }
 
 async function loadRankingData() {
-    const response = await fetch('./data/rankings.json');
+    const dataUrl = RANKINGS_VERSION ? `./data/rankings.json?v=${encodeURIComponent(RANKINGS_VERSION)}` : './data/rankings.json';
+    const response = await fetch(dataUrl);
     if (!response.ok) throw new Error(`数据加载失败：HTTP ${response.status}`);
 
     const data = await response.json();
@@ -322,7 +324,7 @@ function createHospitalCell(record) {
     affordance.textContent = '›';
 
     const aliases = hospital?.aliases || [];
-    button.title = aliases.length ? `查看历年排名与历史名称：${aliases.join('、')}` : '查看历年排名';
+    button.title = aliases.length ? `查看历年榜单与历史名称：${aliases.join('、')}` : '查看历年榜单';
     button.append(name, affordance);
     cell.appendChild(button);
     return cell;
@@ -363,7 +365,7 @@ function openHistoryDialog(hospitalId, trigger) {
     if (!hospital || !history.length) return;
 
     lastHistoryTrigger = trigger;
-    document.getElementById('historyDialogTitle').textContent = `${hospital.name} · 历年排名`;
+    document.getElementById('historyDialogTitle').textContent = `${hospital.name} · 历年榜单`;
     document.getElementById('historyDialogMeta').textContent = [hospital.province, hospital.city].filter(Boolean).join(' · ');
     body.replaceChildren();
 
@@ -677,10 +679,6 @@ function showInitError(error) {
 
         ['yearSelect', 'provinceSelect', 'citySelect', 'hospitalSearch'].forEach(id => {
             document.getElementById(id).disabled = true;
-        });
-        hospitalList.querySelectorAll('button').forEach(button => {
-            button.disabled = true;
-            button.title = '交互数据加载失败，当前仅显示静态榜单';
         });
         return;
     }

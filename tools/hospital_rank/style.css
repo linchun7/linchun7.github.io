@@ -47,16 +47,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .data-status { min-width: 0; color: var(--muted); font-size: 12px; white-space: nowrap; }
 
 .page-main { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
-.overview { padding-top: 14px; }
-.overview-reference, .workspace { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }
-.overview-reference { padding: 20px 22px 18px; }
-.eyebrow { margin: 0 0 3px; color: var(--accent-dark); font-size: 12px; font-weight: 760; }
-.overview-copy h1 { margin: 0; font-size: 22px; line-height: 1.22; letter-spacing: -.012em; }
-.overview-note { max-width: 920px; margin: 7px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
-.overview-stats { margin: 17px 0 0; display: flex; flex-wrap: wrap; gap: 7px; }
-.overview-stats div { min-height: 31px; padding: 6px 10px; display: inline-flex; align-items: baseline; gap: 5px; background: var(--surface-soft); border: 1px solid var(--line); border-radius: 999px; }
-.overview-stats dt { color: var(--muted); font-size: 12px; }
-.overview-stats dd { margin: 0; font-size: 13px; font-weight: 720; font-variant-numeric: tabular-nums; }
 
 .workspace { overflow: hidden; scroll-margin-top: 16px; }
 .workspace-toolbar { min-height: 92px; padding: 15px 18px 16px; display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; background: var(--surface); border-bottom: 1px solid var(--line); }
@@ -103,24 +93,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .hospital-history-button:hover .hospital-name { color: var(--accent-dark); }
 .history-affordance { position: absolute; top: 50%; right: 2px; color: var(--muted); font-size: 19px; line-height: 1; opacity: .75; transform: translateY(-50%); transition: transform 140ms ease-out, color 120ms ease-out; }
 .hospital-history-button[aria-expanded="true"] .history-affordance { color: var(--accent-dark); transform: translateY(-50%) rotate(90deg); }
-.location-button { padding: 5px 4px; color: inherit; background: transparent; border: 0; border-radius: 4px; }
-.location-button:hover, .location-button:focus-visible { color: var(--accent-dark); }
 .empty-value { color: #97a3ad; }
 
-.rank-history-row td { padding: 0 !important; text-align: left !important; white-space: normal !important; background: var(--surface-blue); border-bottom: 1px solid #d6e5f5; }
-.rank-history-panel { padding: 15px 18px 17px 176px; }
-.rank-history-header { margin-bottom: 11px; display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
-.rank-history-header strong { font-size: 13px; }
-.rank-history-header span { color: var(--muted); font-size: 11px; }
-.rank-history-list { margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 18px; list-style: none; }
-.rank-history-item { min-width: 0; min-height: 34px; padding: 6px 9px; display: grid; grid-template-columns: 54px 78px minmax(0, 1fr); align-items: center; gap: 7px; background: rgba(255, 255, 255, .7); border: 1px solid #dbe7f3; border-radius: 6px; }
-.history-year { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
-.history-rank { color: var(--ink); font-size: 12px; font-weight: 760; }
-.history-change { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-.history-change.is-up { color: var(--green); }
-.history-change.is-down { color: var(--danger); }
-.history-change.is-neutral { color: var(--muted); }
-.history-change.is-system { color: var(--accent-dark); }
 
 .empty-message, .error-message { height: 220px; text-align: center !important; color: var(--muted); }
 .error-message { color: var(--danger); }
@@ -133,7 +107,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .page-footer a { color: inherit; }
 .page-footer a:hover { color: var(--accent-dark); }
 
-.stats-tooltip { position: fixed; z-index: 1000; max-width: min(320px, calc(100vw - 24px)); padding: 7px 10px; color: #fff; background: rgba(27, 38, 49, .92); border-radius: 5px; box-shadow: 0 7px 20px rgba(15, 31, 45, .18); font-size: 12px; line-height: 1.4; pointer-events: none; }
 
 @media (hover: hover) and (pointer: fine) {
   .hospital-table th button:hover { color: var(--accent-dark); background: rgba(17, 104, 212, .08); }
@@ -158,21 +131,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .workspace-toolbar { padding: 14px; }
   .filters { grid-template-columns: 1fr; }
   .hospital-table { min-width: 900px; }
-  .rank-history-list { grid-template-columns: 1fr; }
-  .rank-history-panel { padding: 14px; }
-  .rank-history-header { align-items: flex-start; flex-direction: column; gap: 3px; }
   .workspace-footer, .data-disclaimer { padding-left: 14px; padding-right: 14px; }
 }
 
-.history-source-name {
-  grid-column: 1 / -1;
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 /* Hospital ranking interaction polish. Keep these selectors specific so they also
    override the page's small inline layout layer without duplicating it. */
@@ -236,3 +197,86 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
     text-overflow: clip;
   }
 }
+
+/* Hospital ranking page-specific layout. Kept external so cache/version checks cover every visual change. */
+.page-main { padding-top: 14px; }
+        .workspace-toolbar { align-items: flex-end; }
+        .workspace-heading h1 { margin: 0; font-size: 19px; line-height: 1.2; }
+        .filters { grid-template-columns: repeat(3, minmax(125px, .8fr)) minmax(220px, 1.45fr); }
+        .search-field { order: 4; }
+        .year-field { order: 1; }
+        .province-field { order: 2; }
+        .city-field { order: 3; }
+        .hospital-table.single-year { min-width: 900px; }
+        .hospital-table.single-year th:nth-child(1),
+        .hospital-table.single-year td:nth-child(1) { display: none; }
+        .hospital-table.grade-mode { min-width: 650px; }
+        .hospital-table.single-year.grade-mode { min-width: 560px; }
+        .hospital-table.grade-mode th:nth-child(4),
+        .hospital-table.grade-mode th:nth-child(5),
+        .hospital-table.grade-mode th:nth-child(6),
+        .hospital-table.grade-mode td:nth-child(4),
+        .hospital-table.grade-mode td:nth-child(5),
+        .hospital-table.grade-mode td:nth-child(6) { display: none; }
+        .hospital-table.grade-mode th:nth-child(3),
+        .hospital-table.grade-mode td:nth-child(3) { width: 330px; }
+        .pagination { min-height: 48px; padding: 8px 18px; display: flex; align-items: center; justify-content: center; gap: 12px; background: var(--surface); border-top: 1px solid var(--line); }
+        .pagination[hidden] { display: none; }
+        .pagination button { min-width: 72px; min-height: 32px; padding: 5px 12px; color: var(--accent-dark); background: var(--surface); border: 1px solid var(--line-strong); border-radius: 6px; font-weight: 650; }
+        .pagination button:hover:not(:disabled) { background: var(--accent-soft); border-color: #bdd7f5; }
+        .pagination button:disabled { color: #9aa5ae; cursor: default; }
+        .pagination-status { min-width: 92px; color: var(--muted); font-size: 12px; text-align: center; font-variant-numeric: tabular-nums; }
+        .ranking-mode-note { margin-top: 4px; color: var(--accent-dark); font-size: 11px; line-height: 1.45; }
+        .source-links strong { color: var(--ink-soft); }
+
+        .history-dialog { width: min(720px, calc(100vw - 32px)); max-height: min(82vh, 780px); padding: 0; overflow: hidden; color: var(--ink); background: var(--surface); border: 0; border-radius: 12px; box-shadow: 0 24px 70px rgba(15, 31, 45, .24); }
+        .history-dialog::backdrop { background: rgba(20, 31, 42, .42); backdrop-filter: blur(2px); }
+        .history-dialog-shell { max-height: min(82vh, 780px); display: flex; flex-direction: column; }
+        .history-dialog-header { padding: 18px 20px 15px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); }
+        .history-dialog-title { min-width: 0; }
+        .history-dialog-title h2 { margin: 0; font-size: 19px; line-height: 1.3; }
+        .history-dialog-title p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+        .dialog-close { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; color: var(--muted); background: var(--surface-soft); border: 1px solid var(--line); border-radius: 8px; font-size: 22px; line-height: 1; }
+        .dialog-close:hover { color: var(--ink); background: var(--accent-soft); }
+        .history-dialog-body { padding: 16px 20px 20px; overflow: auto; overscroll-behavior: contain; }
+        .history-aliases { margin: 0 0 14px; padding: 9px 11px; color: var(--ink-soft); background: var(--surface-soft); border: 1px solid var(--line); border-radius: 7px; font-size: 12px; line-height: 1.55; }
+        .history-aliases strong { color: var(--ink); }
+        .dialog-history-list { margin: 0; padding: 0; display: grid; gap: 7px; list-style: none; }
+        .dialog-history-item { padding: 10px 11px; display: grid; grid-template-columns: 60px 86px minmax(110px, 1fr); align-items: start; gap: 8px 10px; background: #fbfcfd; border: 1px solid var(--line); border-radius: 8px; }
+        .dialog-history-year { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+        .dialog-history-rank { font-size: 12px; font-weight: 760; }
+        .dialog-history-change { font-size: 12px; }
+        .dialog-history-source, .dialog-history-note { grid-column: 2 / -1; font-size: 11px; line-height: 1.5; }
+        .dialog-history-source { color: var(--muted); }
+        .dialog-history-note { padding: 6px 8px; color: #674500; background: #fff8e6; border: 1px solid #ecd28a; border-radius: 6px; }
+        .history-change.is-up { color: var(--green); }
+        .history-change.is-down { color: var(--danger); }
+        .history-change.is-neutral { color: var(--muted); }
+        .history-change.is-system { color: var(--accent-dark); }
+        .dialog-method-note { margin: 14px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
+
+        @media (max-width: 980px) {
+            .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .search-field, .year-field, .province-field, .city-field { order: initial; }
+            .year-field { order: 1; }
+            .search-field { order: 2; }
+            .province-field { order: 3; }
+            .city-field { order: 4; }
+        }
+        @media (max-width: 680px) {
+            .page-main { padding-top: 10px; }
+            .workspace-toolbar { gap: 12px; }
+            .filters { grid-template-columns: 1fr 1fr; }
+            .field-control input, .field-control select { font-size: 16px; }
+            .hospital-table.single-year { min-width: 850px; }
+            .hospital-table.grade-mode { min-width: 560px; }
+            .hospital-table.single-year.grade-mode { min-width: 540px; }
+            .hospital-table.grade-mode th:nth-child(3),
+            .hospital-table.grade-mode td:nth-child(3) { width: 250px; }
+            .history-dialog { width: 100vw; max-width: none; height: min(88dvh, 820px); max-height: 88dvh; margin: auto 0 0; border-radius: 14px 14px 0 0; }
+            .history-dialog-shell { max-height: 88dvh; }
+            .history-dialog-header { padding: 15px 16px 12px; }
+            .history-dialog-body { padding: 13px 14px calc(18px + env(safe-area-inset-bottom, 0px)); }
+            .dialog-history-item { grid-template-columns: 54px 76px minmax(0, 1fr); gap: 6px 8px; }
+            .pagination { padding-inline: 12px; }
+        }

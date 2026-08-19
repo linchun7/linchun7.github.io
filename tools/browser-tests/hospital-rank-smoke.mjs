@@ -41,6 +41,10 @@ try {
     assert.equal(await staticPage.locator('#yearSelect').inputValue(), String(latestYear), 'static HTML should preselect the latest year from rankings.json');
     assert.equal(await staticRows.first().getAttribute('data-year'), String(latestYear), 'static HTML rows should come from the latest year in rankings.json');
     assert.match(await staticPage.locator('noscript').innerText(), /最新年度静态榜单/);
+    assert.equal((await staticPage.locator('#rankColumnLabel').innerText()).trim(), latestYearBlock.rankingMode === 'grade' ? '等级' : '排名', 'no-JS static header should match the latest ranking mode');
+    assert.equal(await staticPage.locator('#hospitalList .hospital-history-button').count(), 0, 'no-JS static hospital names must not be dead buttons');
+    assert.equal(await staticPage.locator('head > style').count(), 0, 'hospital page-specific CSS should stay in the versioned external stylesheet');
+    assert.match((await staticPage.locator('html').getAttribute('data-rankings-version')) || '', /^[0-9a-f]{8}$/, 'static HTML should carry a rankings content version');
 } finally {
     await noJsContext.close();
 }
@@ -64,7 +68,9 @@ try {
 const context = await browser.newContext({ viewport: { width: 1365, height: 900 } });
 const page = await context.newPage();
 const pageErrors = [];
+const rankingRequests = [];
 page.on('pageerror', error => pageErrors.push(error));
+page.on('request', request => { if (request.url().includes('/tools/hospital_rank/data/rankings.json')) rankingRequests.push(request.url()); });
 await page.route('**/googletagmanager.com/**', route => route.abort());
 
 try {
@@ -75,6 +81,8 @@ try {
     assert.equal(await page.locator('script[src$="data.js"]').count(), 0, 'legacy data.js should stay removed');
     assert.equal(await page.locator('.overview').count(), 0, 'duplicated top ranking explanation should be removed');
     assert.equal((await page.locator('#dataStatus').innerText()).trim(), `最新数据 ${latestYear} 年`, 'latest-data status should stay concise');
+    assert.equal(rankingRequests.length, 1, 'rankings JSON should be requested once during initialization');
+    assert.match(rankingRequests[0], /rankings\.json\?v=[0-9a-f]{8}(?:&|$)/, 'rankings JSON request should be cache-busted by its content version');
     assert.doesNotMatch(await page.locator('#dataStatus').innerText(), /已结构化核验/);
 
     assert.equal(await page.locator('#yearSelect').inputValue(), String(latestYear), 'latest year should be selected by default');
@@ -126,7 +134,7 @@ try {
     assert.equal(await page.locator('#hospitalList tr.data-row').first().getAttribute('data-performance-sentinel'), 'preserve-me', 'opening history must not rebuild the ranking table');
 
     const historyText = await page.locator('#historyDialog').innerText();
-    assert.match(historyText, /历年排名/);
+    assert.match(historyText, /历年榜单/);
     assert.match(historyText, /2023年/);
     assert.match(historyText, /2022年/);
     assert.doesNotMatch(historyText, /同等级内/, 'hospital detail should not repeat global grade-ordering methodology');

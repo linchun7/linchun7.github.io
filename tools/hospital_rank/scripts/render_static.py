@@ -14,6 +14,7 @@ DATA_PATH = ROOT / "data" / "rankings.json"
 INDEX_PATH = ROOT / "index.html"
 STYLE_PATH = ROOT / "style.css"
 SCRIPT_PATH = ROOT / "script.js"
+RANKINGS_PATH = ROOT / "data" / "rankings.json"
 ROWS_START = "<!-- STATIC_LATEST_ROWS_START -->"
 ROWS_END = "<!-- STATIC_LATEST_ROWS_END -->"
 OPTIONS_START = "<!-- STATIC_YEAR_OPTIONS_START -->"
@@ -109,18 +110,12 @@ def render_rows(data: dict, block: dict) -> str:
     for record in sorted_latest_records(data, block):
         hospital = hospitals[record["hospitalId"]]
         aliases = hospital.get("aliases") or []
-        title = "查看历年排名"
-        if aliases:
-            title = "查看历年排名与历史名称：" + "、".join(aliases)
         lines.extend([
             f'                        <tr class="data-row" data-hospital-id="{esc(record["hospitalId"])}" data-year="{year}" data-static-prerendered="true">',
             f"                            <td>{year}</td>",
             f"                            {render_rank_cell(record)}",
             "                            <td>",
-            f'                                <button type="button" class="hospital-history-button" data-hospital-id="{esc(record["hospitalId"])}" aria-haspopup="dialog" title="{esc(title)}">',
-            f'                                    <span class="hospital-name">{esc(hospital.get("name") or record.get("sourceName"))}</span>',
-            '                                    <span class="history-affordance" aria-hidden="true">›</span>',
-            "                                </button>",
+            f'                                <span class="hospital-name static-hospital-name">{esc(hospital.get("name") or record.get("sourceName"))}</span>',
             "                            </td>",
             f"                            {render_number_cell(record.get('specialtyReputation'))}",
             f"                            {render_number_cell(record.get('researchAcademic'))}",
@@ -167,6 +162,10 @@ def asset_version() -> str:
     return f"{git_blob_short_hash(STYLE_PATH)}-{git_blob_short_hash(SCRIPT_PATH)}"
 
 
+def rankings_version() -> str:
+    return git_blob_short_hash(RANKINGS_PATH)
+
+
 def replace_disclaimer(text: str) -> str:
     pattern = re.compile(r'(<div class="data-disclaimer">\s*)<p>.*?</p>(\s*</div>)', re.S)
     if not pattern.search(text):
@@ -187,6 +186,15 @@ def render_index(source: str, data: dict) -> str:
     result = replace_tag_text(result, "brandSubtitle", f"中国医院综合排行榜 · {oldest}–{year}")
     result = replace_tag_text(result, "dataStatus", f"最新数据 {year} 年")
     result = replace_disclaimer(result)
+
+    rank_label = "等级" if block.get("rankingMode") == "grade" else "排名"
+    result = replace_tag_text(result, "rankColumnLabel", rank_label)
+    result = re.sub(
+        r'<html lang="zh-CN"(?: data-rankings-version="[^"]*")?>',
+        f'<html lang="zh-CN" data-rankings-version="{rankings_version()}">',
+        result,
+        count=1,
+    )
 
     version = asset_version()
     result = re.sub(
@@ -231,6 +239,8 @@ def main() -> None:
             "latestYear": int(latest_block(data)["year"]),
             "staticRows": len(latest_block(data)["records"]),
             "assetVersion": asset_version(),
+        "rankingsVersion": rankings_version(),
+            "rankingsVersion": rankings_version(),
         }, ensure_ascii=False))
         return
 

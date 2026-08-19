@@ -12,7 +12,9 @@ from pathlib import Path
 from typing import Any
 
 GRADE_ORDER = ["A++++", "A+++", "A++", "A+", "A"]
-EXPECTED_COUNTS = {2009: 50, 2010: 80, **{year: 100 for year in range(2011, 2024)}}
+BASELINE_COUNTS = {2009: 50, 2010: 80, **{year: 100 for year in range(2011, 2024)}}
+BASELINE_RECORDS = sum(BASELINE_COUNTS.values())
+BASELINE_HOSPITAL_ENTITIES = 128
 
 
 def load(path: Path) -> Any:
@@ -93,28 +95,48 @@ def main() -> int:
 
     source_by_year = {int(block["year"]): block for block in snapshot.get("years", [])}
     normalized_by_year = {int(block["year"]): block for block in years}
-    if set(source_by_year) != set(EXPECTED_COUNTS) or set(normalized_by_year) != set(EXPECTED_COUNTS):
-        fail("expected complete 2009–2023 year coverage")
+    if len(source_by_year) != len(snapshot.get("years", [])) or len(normalized_by_year) != len(years):
+        fail("duplicate year blocks are not allowed")
+    if not set(BASELINE_COUNTS).issubset(source_by_year) or not set(BASELINE_COUNTS).issubset(normalized_by_year):
+        fail("verified 2009–2023 historical baseline must remain complete")
+    if set(source_by_year) != set(normalized_by_year):
+        fail("source snapshot and normalized rankings must contain the same years")
 
     used_hospital_ids: set[str] = set()
     total_records = 0
-    for year, expected_count in EXPECTED_COUNTS.items():
+    baseline_records = 0
+    for year in sorted(normalized_by_year):
         source_block = source_by_year[year]
         block = normalized_by_year[year]
         if source_block.get("rankingMode") != block.get("rankingMode"):
             fail(f"{year}: source and normalized rankingMode differ")
-        if len(source_block.get("records", [])) != expected_count or len(block.get("records", [])) != expected_count:
-            fail(f"{year}: unexpected record count")
 
-        mode = block["rankingMode"]
-        source_records = {record["sourceName"]: record for record in source_block["records"]}
+        source_rows = source_block.get("records", [])
+        normalized_rows = block.get("records", [])
+        if year in BASELINE_COUNTS:
+            expected_count = BASELINE_COUNTS[year]
+            if len(source_rows) != expected_count or len(normalized_rows) != expected_count:
+                fail(f"{year}: verified baseline record count changed")
+        elif year <= 2023:
+            fail(f"unexpected pre-baseline year: {year}")
+        elif not source_rows or len(source_rows) != len(normalized_rows):
+            fail(f"{year}: future year must have a non-empty source-aligned record set")
+
+        mode = block.get("rankingMode")
+        if mode not in {"numeric", "grade"}:
+            fail(f"{year}: unsupported rankingMode {mode!r}")
+        source_records = {record["sourceName"]: record for record in source_rows}
+        if len(source_records) != len(source_rows):
+            fail(f"{year}: duplicate source names in source snapshot")
         seen_ids: set[str] = set()
         seen_source_names: set[str] = set()
         previous_rank = 0
         grades = Counter()
 
-        for record in block["records"]:
+        for record in normalized_rows:
             total_records += 1
+            if year in BASELINE_COUNTS:
+                baseline_records += 1
             hospital_id = record.get("hospitalId")
             source_name = record.get("sourceName")
             if hospital_id not in hospital_by_id:
@@ -144,7 +166,7 @@ def main() -> int:
                 for field in ("rank", "specialtyReputation", "researchAcademic", "overallScore"):
                     if not same_number(record.get(field), source.get(field)):
                         fail(f"{year}: {field} differs from source snapshot for {source_name}")
-            elif mode == "grade":
+            else:
                 if record.get("rank") is not None:
                     fail(f"{year}: grade row has numeric rank: {source_name}")
                 grade = record.get("grade")
@@ -156,25 +178,28 @@ def main() -> int:
                         fail(f"{year}: grade row must not invent {field}: {source_name}")
                 if source.get("grade") != grade:
                     fail(f"{year}: grade differs from source snapshot for {source_name}")
-            else:
-                fail(f"{year}: unsupported rankingMode {mode!r}")
 
-        if mode == "grade" and year == 2023:
-            if any(grades[grade] != 20 for grade in GRADE_ORDER):
-                fail(f"2023: expected 20 hospitals per grade, got {dict(grades)}")
+        if mode == "grade" and any(grade not in GRADE_ORDER for grade in grades):
+            fail(f"{year}: unsupported grade values")
+        if year == 2023 and any(grades[grade] != 20 for grade in GRADE_ORDER):
+            fail(f"2023: expected verified 20 hospitals per grade, got {dict(grades)}")
 
-    if total_records != 1430:
-        fail(f"expected 1430 historical records, got {total_records}")
+    if baseline_records != BASELINE_RECORDS:
+        fail(f"verified historical baseline must remain {BASELINE_RECORDS} records, got {baseline_records}")
+    if total_records < BASELINE_RECORDS:
+        fail(f"record count cannot fall below verified baseline {BASELINE_RECORDS}")
     unused = set(hospital_by_id) - used_hospital_ids
     if unused:
         fail(f"unused hospital entities: {sorted(unused)}")
-    if len(hospital_by_id) != 128:
-        fail(f"expected 128 hospital entities after migration, got {len(hospital_by_id)}")
+    if len(hospital_by_id) < BASELINE_HOSPITAL_ENTITIES:
+        fail(f"hospital entities cannot fall below verified baseline {BASELINE_HOSPITAL_ENTITIES}")
 
     print(json.dumps({
         "status": "ok",
-        "years": len(EXPECTED_COUNTS),
+        "years": len(normalized_by_year),
+        "latestYear": max(normalized_by_year),
         "records": total_records,
+        "baselineRecords": baseline_records,
         "hospitalEntities": len(hospital_by_id),
         "sourceValidationWarnings": len(audit.get("sourceValidationWarnings", [])),
     }, ensure_ascii=False))
