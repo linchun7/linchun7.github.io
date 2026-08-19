@@ -78,7 +78,7 @@ try {
     assert.equal(await page.locator('#resultSummary').evaluate(element => getComputedStyle(element).display), 'none', 'duplicate result summary should stay visually hidden');
     assert.equal(await page.locator('#rankingModeNote').evaluate(element => getComputedStyle(element).display), 'none', 'grade methodology must not occupy toolbar height');
     assert.equal((await page.locator('#rankColumnLabel').innerText()).trim(), latestYearBlock.rankingMode === 'grade' ? '等级' : '排名', 'latest-year result label should match its ranking mode');
-    assert.equal((await page.locator('#provinceSelect option').first().innerText()).trim(), '省份', 'province filter should use concise placeholder');
+    assert.equal((await page.locator('#provinceSelect option').first().innerText()).trim(), '全部省份', 'province filter should use the full default label');
 
     const headingBox = await page.locator('.workspace-heading').boundingBox();
     const filtersBox = await page.locator('.filters').boundingBox();
