@@ -172,6 +172,35 @@ try {
   await capitalSort.click();
   assert.equal(await capitalSort.locator('xpath=ancestor::th').getAttribute('aria-sort'), 'ascending', 'capital sort should toggle ascending');
 
+  // Mobile layout follows the shared tools pattern: controls stack, the page itself stays within the viewport,
+  // and only the data table receives horizontal scrolling.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('#yearSelect').selectOption(String(latestYear));
+  await page.locator('#bankSearch').fill('');
+  await page.locator('#typeSelect').selectOption('');
+  const mobileLayout = await page.evaluate(() => {
+    const yearBox = document.querySelector('.year-field').getBoundingClientRect();
+    const typeBox = document.querySelector('.type-field').getBoundingClientRect();
+    const searchBox = document.querySelector('.search-field').getBoundingClientRect();
+    const tableScroll = document.querySelector('.table-scroll');
+    const tableBox = tableScroll.getBoundingClientRect();
+    return {
+      viewportWidth: window.innerWidth,
+      documentWidth: document.documentElement.scrollWidth,
+      yearTop: yearBox.top,
+      typeTop: typeBox.top,
+      searchTop: searchBox.top,
+      tableClientWidth: tableScroll.clientWidth,
+      tableScrollWidth: tableScroll.scrollWidth,
+      tableLeft: tableBox.left,
+      tableRight: tableBox.right
+    };
+  });
+  assert.ok(mobileLayout.documentWidth <= mobileLayout.viewportWidth + 1, `mobile page should not overflow horizontally: ${JSON.stringify(mobileLayout)}`);
+  assert.ok(mobileLayout.typeTop > mobileLayout.yearTop && mobileLayout.searchTop > mobileLayout.typeTop, 'mobile filters should stack vertically');
+  assert.ok(mobileLayout.tableScrollWidth > mobileLayout.tableClientWidth, 'wide bank table should scroll inside its own container on mobile');
+  assert.ok(mobileLayout.tableLeft >= -1 && mobileLayout.tableRight <= mobileLayout.viewportWidth + 1, 'table scroll container should stay inside the mobile viewport');
+
   assert.deepEqual(pageErrors, [], `page errors in ${browserName}: ${pageErrors.map(error => error.message).join(' | ')}`);
   assert.deepEqual(consoleErrors, [], `console errors in ${browserName}: ${consoleErrors.join(' | ')}`);
   console.log(`bank_rank browser smoke OK (${browserName}): ${oldestYear}–${latestYear}`);
