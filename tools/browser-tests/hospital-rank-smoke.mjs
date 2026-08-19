@@ -16,6 +16,22 @@ assert.ok(xijing, 'original 2011 published hospital name should be preserved as 
 
 const baseUrl = (process.env.BASE_URL || 'http://127.0.0.1:4173').replace(/\/$/, '');
 const browser = await browserType.launch({ headless: true });
+
+const noJsContext = await browser.newContext({ viewport: { width: 1365, height: 900 }, javaScriptEnabled: false });
+try {
+    const staticPage = await noJsContext.newPage();
+    await staticPage.goto(`${baseUrl}/tools/hospital_rank/`, { waitUntil: 'domcontentloaded' });
+    const staticRows = staticPage.locator('#hospitalList tr.data-row[data-static-prerendered="true"]');
+    assert.equal(await staticRows.count(), 100, 'static HTML should contain the complete latest-year ranking before JavaScript runs');
+    assert.match(await staticPage.locator('#workspaceTitle').innerText(), /2023 年医院榜单/);
+    assert.match(await staticPage.locator('#resultSummary').innerText(), /共 100 家医院/);
+    assert.equal(await staticPage.locator('#yearSelect').inputValue(), '2023', 'static HTML should preselect the latest year');
+    assert.match(await staticRows.first().locator('.hospital-name').innerText(), /北京协和医院/, 'static HTML order should match the historical-reference sort');
+    assert.match(await staticPage.locator('noscript').innerText(), /最新年度静态榜单/);
+} finally {
+    await noJsContext.close();
+}
+
 const context = await browser.newContext({ viewport: { width: 1365, height: 900 } });
 const page = await context.newPage();
 const pageErrors = [];
@@ -39,6 +55,8 @@ try {
     assert.match(await page.locator('#rankingModeNote').innerText(), /最近一次可用数字排名/);
     assert.match(await page.locator('#rankingModeNote').innerText(), /2022 年/);
 
+    const yearHeaderDisplay = await page.locator('#hospitalTable th').nth(0).evaluate(element => getComputedStyle(element).display);
+    assert.equal(yearHeaderDisplay, 'none', 'single-year view should hide the repeated year column');
     const scoreHeaderDisplay = await page.locator('#hospitalTable th').nth(3).evaluate(element => getComputedStyle(element).display);
     assert.equal(scoreHeaderDisplay, 'none', 'score columns should be hidden for grade-only years');
 
@@ -70,6 +88,8 @@ try {
     assert.equal(await page.locator('#pagination').isVisible(), true, 'pagination should appear for all-years mode');
     assert.match(await page.locator('#paginationStatus').innerText(), /第 1 \/ 15 页/);
     assert.equal((await rows.first().locator('td').nth(0).innerText()).trim(), '2023');
+    const allYearsHeaderDisplay = await page.locator('#hospitalTable th').nth(0).evaluate(element => getComputedStyle(element).display);
+    assert.notEqual(allYearsHeaderDisplay, 'none', 'all-years view should restore the year column');
 
     await page.locator('#nextPage').click();
     await page.waitForFunction(() => document.querySelector('#paginationStatus')?.textContent.includes('第 2 / 15 页'));
