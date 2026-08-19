@@ -63,6 +63,11 @@ try {
   assert.equal((await page.locator('#workspaceTitle').innerText()).trim(), `${latestYear} 年中国银行业100强 · 100 家`);
   assert.equal((await page.locator('#dataStatus').innerText()).trim(), `最新数据 ${latestYear} 年`);
   assert.match(await page.locator('#officialSource').innerText(), /官方发布页$/, 'latest year has a direct association detail page');
+  const hydratedFirstRow = page.locator('#bankList tr.data-row').first();
+  assert.equal(await hydratedFirstRow.locator('td').nth(0).locator('.rank-value').count(), 1, 'hydrated ranking cells should retain the static rank-value structure');
+  assert.equal(await hydratedFirstRow.locator('td').nth(2).locator('.type-badge').count(), 1, 'hydrated type cells should retain the static type-badge structure');
+  assert.equal(await page.locator('#bankTable th').nth(0).locator('button').evaluate(element => getComputedStyle(element).justifyContent), 'center', 'rank header should align with centered rank cells');
+  assert.equal(await page.locator('#bankTable th').nth(2).locator('button').evaluate(element => getComputedStyle(element).justifyContent), 'flex-start', 'bank-type header should align with left-aligned type cells');
 
   if (oldestYear !== latestYear) {
     await page.locator('#yearSelect').selectOption(String(oldestYear));
