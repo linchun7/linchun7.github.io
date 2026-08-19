@@ -437,6 +437,7 @@ function updateContext(records) {
     const block = selectedYearBlock();
     const gradeMode = block?.rankingMode === 'grade';
 
+    table.classList.toggle('single-year', Boolean(year));
     table.classList.toggle('grade-mode', gradeMode);
     title.textContent = year ? `${year} 年医院榜单` : '历年医院榜单';
 
@@ -598,6 +599,24 @@ function bindEvents() {
 function showInitError(error) {
     console.error('初始化失败:', error);
     const hospitalList = document.getElementById('hospitalList');
+    const staticRows = hospitalList.querySelectorAll('tr[data-static-prerendered="true"]');
+
+    if (staticRows.length) {
+        document.getElementById('dataStatus').textContent = '交互加载失败 · 已显示静态最新榜单';
+        const summary = document.getElementById('resultSummary');
+        if (!summary.textContent.includes('静态模式')) summary.textContent += ' · 静态模式';
+        document.getElementById('rankingModeNote').hidden = true;
+
+        ['yearSelect', 'provinceSelect', 'citySelect', 'hospitalSearch'].forEach(id => {
+            document.getElementById(id).disabled = true;
+        });
+        hospitalList.querySelectorAll('button').forEach(button => {
+            button.disabled = true;
+            button.title = '交互数据加载失败，当前仅显示静态榜单';
+        });
+        return;
+    }
+
     hospitalList.replaceChildren();
     const row = document.createElement('tr');
     const cell = document.createElement('td');
@@ -611,6 +630,7 @@ function showInitError(error) {
 }
 
 async function init() {
+    document.getElementById('copyrightYear').textContent = String(new Date().getFullYear());
     try {
         await loadRankingData();
         buildIndexes();
@@ -620,7 +640,6 @@ async function init() {
         bindEvents();
         updateSortIndicators();
         displayHospitals();
-        document.getElementById('copyrightYear').textContent = String(new Date().getFullYear());
     } catch (error) {
         showInitError(error);
     }
