@@ -7,12 +7,14 @@ import hashlib
 import json
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data"
 VERIFICATION_FILE = "verification-v4.json"
 ALLOWED_STATUSES = {"verified", "verified_with_legacy_primary_gap"}
 ALLOWED_GRADES = {"A1", "A2", "B1", "B2", "C"}
+SELF_HOSTS = {"linchun.com.cn"}
 
 
 def load_json(path: Path) -> Any:
@@ -26,6 +28,28 @@ def digest(records: list[dict[str, Any]]) -> str:
 
 def _https(value: Any) -> bool:
     return isinstance(value, str) and value.startswith("https://") and len(value) > 8
+
+
+def _host(value: Any) -> str:
+    if not _https(value):
+        return ""
+    host = (urlparse(value).hostname or "").lower()
+    return host[4:] if host.startswith("www.") else host
+
+
+def _url_key(value: Any) -> tuple[str, str, str] | None:
+    if not _https(value):
+        return None
+    parsed = urlparse(value)
+    host = (parsed.hostname or "").lower()
+    if host.startswith("www."):
+        host = host[4:]
+    path = parsed.path.rstrip("/") or "/"
+    return host, path, parsed.query
+
+
+def _is_self_source(value: Any) -> bool:
+    return _host(value) in SELF_HOSTS
 
 
 def validate(data_dir: Path = DATA_DIR) -> list[str]:
@@ -106,6 +130,10 @@ def validate(data_dir: Path = DATA_DIR) -> list[str]:
         if snapshot_years.get(year, {}).get("normalizedRecordsSha256") != actual_sha:
             errors.append(f"{year}: source-snapshot SHA does not match records")
 
+        source_urls: dict[str, set[tuple[str, str, str]]] = {
+            "authoritativeSources": set(),
+            "completeTableCrossChecks": set(),
+        }
         for key in ("authoritativeSources", "completeTableCrossChecks"):
             sources = audit.get(key)
             if not isinstance(sources, list) or not sources:
@@ -115,12 +143,33 @@ def validate(data_dir: Path = DATA_DIR) -> list[str]:
                 if not isinstance(source, dict):
                     errors.append(f"{year}: invalid {key} entry")
                     continue
-                if not _https(source.get("url")):
+                url = source.get("url")
+                if not _https(url):
                     errors.append(f"{year}: {key} source must use HTTPS")
+                else:
+                    key_value = _url_key(url)
+                    if key_value is not None:
+                        source_urls[key].add(key_value)
+                    if _is_self_source(url):
+                        errors.append(f"{year}: active evidence must not self-reference linchun.com.cn: {url}")
                 if source.get("grade") not in ALLOWED_GRADES:
                     errors.append(f"{year}: unsupported source grade {source.get('grade')!r}")
                 if not isinstance(source.get("role"), str) or not source["role"].strip():
                     errors.append(f"{year}: source role must be documented")
+
+        official_url = block.get("officialUrl")
+        transcription_url = block.get("transcriptionUrl")
+        if not _https(official_url):
+            errors.append(f"{year}: rankings officialUrl must use HTTPS")
+        elif _url_key(official_url) not in source_urls["authoritativeSources"]:
+            errors.append(f"{year}: rankings officialUrl must be anchored in V4 authoritativeSources")
+        if not _https(transcription_url):
+            errors.append(f"{year}: rankings transcriptionUrl must use HTTPS")
+        else:
+            if _is_self_source(transcription_url):
+                errors.append(f"{year}: rankings transcriptionUrl must not self-reference linchun.com.cn")
+            if _url_key(transcription_url) not in source_urls["completeTableCrossChecks"]:
+                errors.append(f"{year}: rankings transcriptionUrl must be anchored in V4 completeTableCrossChecks")
 
         if not isinstance(audit.get("aggregateChecks"), list) or not audit["aggregateChecks"]:
             errors.append(f"{year}: aggregateChecks must be non-empty")
