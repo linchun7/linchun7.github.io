@@ -99,10 +99,6 @@ function displayName(record) {
   return record.sourceName || getBank(record.bankId)?.name || '';
 }
 
-function isDirectOfficialPage(url) {
-  return /\/Index\/show\//.test(String(url || ''));
-}
-
 function sortRecords(records) {
   const multiplier = sortState.direction === 'asc' ? 1 : -1;
   const field = sortState.field;
@@ -215,16 +211,8 @@ function render() {
   const type = document.getElementById('typeSelect').value;
   const query = document.getElementById('bankSearch').value.trim();
   const filters = [type, query ? `搜索“${query}”` : ''].filter(Boolean).join(' · ');
-  document.getElementById('workspaceTitle').textContent = `${selectedYear} 年中国银行业100强 · ${records.length} 家`;
-  document.getElementById('resultSummary').textContent = `数据口径：${block.dataYear} 年末${filters ? ` · ${filters}` : ''}`;
-  const sourceLink = document.getElementById('officialSource');
-  sourceLink.href = block.officialUrl;
-  sourceLink.textContent = isDirectOfficialPage(block.officialUrl)
-    ? `${selectedYear} 年中国银行业协会官方发布页`
-    : `${selectedYear} 年中国银行业协会来源页`;
-  const yearNote = document.getElementById('yearNote');
-  yearNote.hidden = !block.note;
-  yearNote.textContent = block.note || '';
+  document.getElementById('workspaceTitle').textContent = `${selectedYear} 年中国银行业100强`;
+  document.getElementById('resultSummary').textContent = `${records.length} 家银行 · ${block.dataYear} 年末数据${filters ? ` · ${filters}` : ''}`;
   updateSortHeaders();
 }
 
@@ -243,7 +231,7 @@ function initControls() {
 
   const oldest = Math.min(...dataset.years.map(block => Number(block.rankingYear)));
   const latest = Math.max(...dataset.years.map(block => Number(block.rankingYear)));
-  document.getElementById('brandSubtitle').textContent = `中国银行业协会 · ${oldest}–${latest}`;
+  document.getElementById('brandSubtitle').textContent = `核心一级资本排名 · ${oldest}–${latest}`;
   document.getElementById('dataStatus').textContent = `最新数据 ${latest} 年`;
 
   yearSelect.addEventListener('change', () => {
