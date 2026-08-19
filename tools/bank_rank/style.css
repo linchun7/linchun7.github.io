@@ -38,7 +38,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .brand-mark svg { width: 20px; height: 20px; }
 .brand-copy { min-width: 0; }
 .brand-copy strong { display: block; overflow: hidden; font-size: 18px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
-.data-status { min-width: 0; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.data-status { min-width: 0; display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.data-status svg { width: 16px; height: 16px; }
 
 .page-main { padding-top: 14px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .workspace { overflow: clip; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }
@@ -108,7 +109,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .history-dialog-header { padding: 18px 20px 15px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); }
 .history-dialog-title h2 { margin: 0; font-size: 19px; }
 .history-dialog-title p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
-.dialog-close { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; color: var(--muted); background: var(--surface-soft); border: 1px solid var(--line); border-radius: 8px; font-size: 22px; }
+.dialog-close { width: 44px; height: 44px; flex: 0 0 44px; display: grid; place-items: center; padding: 0; color: var(--ink-soft); background: var(--surface-soft); border: 1px solid var(--line); border-radius: 6px; }
+.dialog-close:hover { color: var(--ink); background: #edf2f6; }
+.dialog-close svg { width: 18px; height: 18px; }
 .history-dialog-body { padding: 16px 20px 20px; overflow: auto; }
 .history-aliases, .history-event { margin: 0 0 12px; padding: 9px 11px; color: var(--ink-soft); background: var(--surface-soft); border: 1px solid var(--line); border-radius: 7px; font-size: 12px; }
 .history-event { border-left: 3px solid var(--accent); }
