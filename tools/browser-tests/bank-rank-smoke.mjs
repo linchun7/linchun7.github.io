@@ -88,11 +88,25 @@ try {
   assert.equal(await historyButton.evaluate(element => element === document.activeElement), true, 'closing history should restore focus');
   await page.locator('#bankSearch').fill('');
 
+  await page.locator('#yearSelect').selectOption('2021');
+  await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2021 年中国银行业100强'));
+  await page.locator('#bankSearch').fill('华融湘江银行');
+  assert.equal(await page.locator('#bankList tr.data-row').count(), 1, 'historical source-name search should resolve the bank entity in 2021');
+  let renamedRow = page.locator('#bankList tr.data-row').first();
+  assert.match(await renamedRow.innerText(), /华融湘江银行/, '2021 yearly ranking should preserve the name published that year');
+  const renamedHistoryButton = renamedRow.locator('.bank-history-button');
+  await renamedHistoryButton.click();
+  await page.locator('#historyDialog').waitFor({ state: 'visible' });
+  assert.match(await page.locator('#historyDialogTitle').innerText(), /湖南银行 · 历年排名/, 'history dialog should aggregate the renamed entity under its current canonical name');
+  await page.locator('#dialogClose').click();
+  await page.locator('#historyDialog').waitFor({ state: 'hidden' });
+  await page.locator('#bankSearch').fill('');
+
   await page.locator('#yearSelect').selectOption('2023');
   await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2023 年中国银行业100强'));
   await page.locator('#bankSearch').fill('华融湘江银行');
   assert.equal(await page.locator('#bankList tr.data-row').count(), 1, 'historical-name search should resolve the renamed bank entity');
-  assert.match(await page.locator('#bankList tr.data-row').first().innerText(), /湖南银行/, 'historical-name search should display the current bank name');
+  assert.match(await page.locator('#bankList tr.data-row').first().innerText(), /湖南银行/, 'post-rename yearly ranking should display the newer published name');
   await page.locator('#bankSearch').fill('');
 
   if (years.includes(2022)) {
