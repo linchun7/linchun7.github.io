@@ -1,4 +1,4 @@
-name: Bank rank historical digest probe
+name: Bank rank legacy URL probe
 
 on:
   pull_request:
@@ -14,28 +14,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Checkout branch
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Report yearly digests and totals
+      - name: Resolve China Banking Association historical links
         shell: bash
         run: |
-          python3 - <<'PY'
-          import hashlib, json
-          from pathlib import Path
-          root = Path('tools/bank_rank/data/years')
-          for year in range(2016, 2026):
-              path = root / f'{year}.json'
-              rows = json.loads(path.read_text(encoding='utf-8'))
-              raw = json.dumps(rows, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
-              print(json.dumps({
-                  'year': year,
-                  'rows': len(rows),
-                  'sha256': hashlib.sha256(raw).hexdigest(),
-                  'coreTier1Capital': round(sum(float(r['coreTier1Capital']) for r in rows), 2),
-                  'assets': round(sum(float(r['assets']) for r in rows), 2),
-                  'netProfit': round(sum(float(r['netProfit']) for r in rows), 2),
-              }, ensure_ascii=False))
-          PY
+          set -euo pipefail
+          mkdir -p /tmp/cba
+          seq 20 65 | xargs -P12 -I{} bash -c '
+            url="https://www.china-cba.net/Index/lists/catid/14/p/{}.html"
+            curl -fsSL --connect-timeout 3 --max-time 8 -A "Mozilla/5.0" "$url" -o "/tmp/cba/{}.html" || true
+          '
+          grep -RniE -B2 -A2 '2017年中国银行业100强|2018年中国银行业100强|2022年中国银行业100强' /tmp/cba || true
+          grep -RhoE 'href="[^"]+"[^>]*>[^<]*(2017年中国银行业100强|2018年中国银行业100强|2022年中国银行业100强)[^<]*' /tmp/cba || true
