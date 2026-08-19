@@ -176,6 +176,7 @@ tr:hover td:first-child { background: #f4f7f9; }
     .section-heading h1, .result-heading h2 { font-size: 16px; }
     .form-group { grid-template-columns: 1fr; gap: 5px; padding: 9px 0; }
     label { padding-top: 0; }
+    input { font-size: 16px; }
     .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
