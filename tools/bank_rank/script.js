@@ -148,6 +148,15 @@ function createCell(text, className = '') {
   return td;
 }
 
+function createWrappedCell(text, className) {
+  const td = document.createElement('td');
+  const span = document.createElement('span');
+  span.className = className;
+  span.textContent = text;
+  td.appendChild(span);
+  return td;
+}
+
 function createBankCell(record) {
   const bank = getBank(record.bankId);
   const td = document.createElement('td');
@@ -190,9 +199,9 @@ function render() {
       tr.className = 'data-row';
       tr.dataset.bankId = record.bankId;
       tr.append(
-        createCell(String(record.rank)),
+        createWrappedCell(String(record.rank), 'rank-value'),
         createBankCell(record),
-        createCell(bank?.type || '—'),
+        createWrappedCell(bank?.type || '—', 'type-badge'),
         createCell(formatNumber(record.coreTier1Capital)),
         createCell(formatNumber(record.assets)),
         createCell(formatNumber(record.netProfit)),
