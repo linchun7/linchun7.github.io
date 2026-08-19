@@ -52,16 +52,16 @@ jobs:
 
           smoke_path = Path('tools/browser-tests/hospital-rank-smoke.mjs')
           smoke = smoke_path.read_text(encoding='utf-8')
-          old_top = '''const renderStaticScript = fileURLToPath(new URL('../hospital_rank/scripts/render_static.py', import.meta.url));
-          execFileSync('python3', [renderStaticScript, '--check'], { stdio: 'inherit' });'''
-          new_top = '''const renderStaticScript = fileURLToPath(new URL('../hospital_rank/scripts/render_static.py', import.meta.url));
-          const futureYearScript = fileURLToPath(new URL('../hospital_rank/scripts/test_future_year.py', import.meta.url));
-          execFileSync('python3', [renderStaticScript, '--check'], { stdio: 'inherit' });
-          execFileSync('python3', [futureYearScript], { stdio: 'inherit' });'''
+          old_top = "const renderStaticScript = fileURLToPath(new URL('../hospital_rank/scripts/render_static.py', import.meta.url));\nexecFileSync('python3', [renderStaticScript, '--check'], { stdio: 'inherit' });"
+          new_top = "const renderStaticScript = fileURLToPath(new URL('../hospital_rank/scripts/render_static.py', import.meta.url));\nconst futureYearScript = fileURLToPath(new URL('../hospital_rank/scripts/test_future_year.py', import.meta.url));\nexecFileSync('python3', [renderStaticScript, '--check'], { stdio: 'inherit' });\nexecFileSync('python3', [futureYearScript], { stdio: 'inherit' });"
           if old_top not in smoke:
               raise SystemExit('missing smoke script bootstrap')
           smoke = smoke.replace(old_top, new_top, 1)
-          smoke = smoke.replace("await failurePage.route('**/tools/hospital_rank/data/rankings.json', route => route.abort());", "await failurePage.route('**/tools/hospital_rank/data/rankings.json*', route => route.abort());", 1)
+          old_route = "await failurePage.route('**/tools/hospital_rank/data/rankings.json', route => route.abort());"
+          new_route = "await failurePage.route('**/tools/hospital_rank/data/rankings.json*', route => route.abort());"
+          if old_route not in smoke:
+              raise SystemExit('missing failure route')
+          smoke = smoke.replace(old_route, new_route, 1)
           smoke_path.write_text(smoke, encoding='utf-8')
           PY
 
