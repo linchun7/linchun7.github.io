@@ -48,13 +48,14 @@ def render(data: dict, current_html: str) -> str:
     for record in latest["records"][:20]:
         bank = bank_by_id[record["bankId"]]
         change, change_class = rank_change(record, previous_record(data, record["bankId"], latest_year))
-        rows.append(f'''                        <tr class="data-row" data-bank-id="{html.escape(record["bankId"])}" data-static-prerendered="true">
-                            <td><span class="rank-value">{record["rank"]}</span></td>
-                            <td><span class="bank-name">{html.escape(bank["name"])}</span></td>
-                            <td><span class="type-badge">{html.escape(bank["type"])}</span></td>
-                            <td>{record["coreTier1Capital"]:,.2f}</td><td>{record["assets"]:,.2f}</td><td>{record["netProfit"]:,.2f}</td>
-                            <td><span class="change {change_class}">{change}</span></td>
-                        </tr>''')
+        rows.append(
+            f'                        <tr class="data-row" data-bank-id="{html.escape(record["bankId"])}" data-static-prerendered="true">'
+            f'<td><span class="rank-value">{record["rank"]}</span></td>'
+            f'<td><span class="bank-name">{html.escape(bank["name"])}</span></td>'
+            f'<td><span class="type-badge">{html.escape(bank["type"])}</span></td>'
+            f'<td>{record["coreTier1Capital"]:,.2f}</td><td>{record["assets"]:,.2f}</td><td>{record["netProfit"]:,.2f}</td>'
+            f'<td><span class="change {change_class}">{change}</span></td></tr>'
+        )
     text = re.sub(r'data-latest-year="\d+"', f'data-latest-year="{latest_year}"', current_html, count=1)
     text = re.sub(r'data-rankings-version="[^"]*"', f'data-rankings-version="{version}"', text, count=1)
     text = replace_marker_block(text, YEAR_START, YEAR_END, options)
