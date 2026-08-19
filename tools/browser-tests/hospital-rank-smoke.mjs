@@ -37,6 +37,22 @@ try {
     await noJsContext.close();
 }
 
+const failureContext = await browser.newContext({ viewport: { width: 1365, height: 900 } });
+try {
+    const failurePage = await failureContext.newPage();
+    await failurePage.route('**/googletagmanager.com/**', route => route.abort());
+    await failurePage.route('**/tools/hospital_rank/data/rankings.json', route => route.abort());
+    await failurePage.goto(`${baseUrl}/tools/hospital_rank/`, { waitUntil: 'domcontentloaded' });
+    await failurePage.waitForFunction(() => document.querySelector('#dataStatus')?.textContent.includes('交互加载失败'));
+    const fallbackRows = failurePage.locator('#hospitalList tr.data-row[data-static-prerendered="true"]');
+    assert.equal(await fallbackRows.count(), 100, 'failed interactive data load should preserve the static latest-year ranking');
+    assert.match(await failurePage.locator('#dataStatus').innerText(), /已显示静态最新榜单/);
+    assert.equal(await failurePage.locator('#yearSelect').isDisabled(), true, 'failed interactive data load should disable inactive filters');
+    assert.equal(await fallbackRows.first().locator('.hospital-history-button').isDisabled(), true, 'static fallback should not expose a dead history action');
+} finally {
+    await failureContext.close();
+}
+
 const context = await browser.newContext({ viewport: { width: 1365, height: 900 } });
 const page = await context.newPage();
 const pageErrors = [];
