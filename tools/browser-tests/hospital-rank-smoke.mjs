@@ -208,8 +208,7 @@ try {
     const bottomNotice = await page.locator('.data-disclaimer').innerText();
     assert.match(bottomNotice, /最近一次可用的数字排名/);
     assert.match(bottomNotice, /不代表官方档内名次/);
-    assert.match(bottomNotice, /历史名称/);
-    assert.doesNotMatch(bottomNotice, /为提升查询参考价值|不擅自改写来源数据/, 'bottom explanation should stay concise');
+    assert.doesNotMatch(bottomNotice, /历史名称与来源值|为提升查询参考价值|不擅自改写来源数据/, 'bottom explanation should stay concise');
 
     assert.deepEqual(pageErrors.map(error => error.message), [], 'page should not emit runtime errors');
 } finally {
