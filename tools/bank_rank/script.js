@@ -71,12 +71,17 @@ function buildIndexes() {
 }
 
 function previousRecord(bankId, year) {
-  return (historyByBankId.get(bankId) || []).find(record => record.rankingYear < Number(year)) || null;
+  const targetYear = Number(year) - 1;
+  return (historyByBankId.get(bankId) || []).find(record => Number(record.rankingYear) === targetYear) || null;
 }
 
 function rankChange(record) {
+  const history = historyByBankId.get(record.bankId) || [];
   const previous = previousRecord(record.bankId, record.rankingYear);
-  if (!previous) return { text: '首次记录', className: 'new' };
+  if (!previous) {
+    const hasEarlierRecord = history.some(item => Number(item.rankingYear) < Number(record.rankingYear));
+    return { text: hasEarlierRecord ? '上年未上榜' : '首次记录', className: 'new' };
+  }
   const delta = Number(previous.rank) - Number(record.rank);
   if (delta > 0) return { text: `↑ ${delta} 位`, className: 'up' };
   if (delta < 0) return { text: `↓ ${Math.abs(delta)} 位`, className: 'down' };
