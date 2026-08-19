@@ -28,8 +28,8 @@ try {
     await staticPage.goto(`${baseUrl}/tools/hospital_rank/`, { waitUntil: 'domcontentloaded' });
     const staticRows = staticPage.locator('#hospitalList tr.data-row[data-static-prerendered="true"]');
     assert.equal(await staticRows.count(), 100, 'static HTML should contain the complete latest-year ranking before JavaScript runs');
-    assert.match(await staticPage.locator('#workspaceTitle').innerText(), /2023 年医院榜单/);
-    assert.match(await staticPage.locator('#resultSummary').innerText(), /共 100 家医院/);
+    assert.match(await staticPage.locator('#workspaceTitle').textContent(), /2023 年医院榜单/);
+    assert.match(await staticPage.locator('#resultSummary').textContent(), /共 100 家医院/);
     assert.equal(await staticPage.locator('#yearSelect').inputValue(), '2023', 'static HTML should preselect the latest year');
     assert.match(await staticRows.first().locator('.hospital-name').innerText(), /北京协和医院/, 'static HTML order should match the historical-reference sort');
     assert.match(await staticPage.locator('noscript').innerText(), /最新年度静态榜单/);
@@ -71,16 +71,32 @@ try {
     assert.equal(await page.locator('#yearSelect').inputValue(), '2023', 'latest year should be selected by default');
     let rows = page.locator('#hospitalList tr.data-row');
     assert.equal(await rows.count(), 100, 'default view should render only the latest 100 hospitals');
-    assert.match(await page.locator('#workspaceTitle').innerText(), /2023 年医院榜单/);
-    assert.match(await page.locator('#resultSummary').innerText(), /共 100 家医院/);
-    assert.match(await page.locator('#rankingModeNote').innerText(), /最近一次可用数字排名/);
-    assert.match(await page.locator('#rankingModeNote').innerText(), /2022 年/);
+    assert.equal((await page.locator('#workspaceTitle').innerText()).trim(), '2023 年医院榜单 · 共 100 家医院');
+    assert.equal(await page.locator('#resultSummary').evaluate(element => getComputedStyle(element).display), 'none', 'duplicate result summary should stay visually hidden');
+    assert.equal(await page.locator('#rankingModeNote').evaluate(element => getComputedStyle(element).display), 'none', 'grade methodology must not occupy toolbar height');
+    assert.equal((await page.locator('#rankColumnLabel').innerText()).trim(), '等级', 'grade year should label the result column as 等级');
+    assert.equal((await page.locator('#provinceSelect option').first().innerText()).trim(), '省份', 'province filter should use concise placeholder');
+
+    await page.waitForSelector('#hospitalTable thead button[data-sort="医院名称"] svg.lucide-arrow-up-down');
+    const unsortedIconClass = await page.locator('#hospitalTable thead button[data-sort="医院名称"] svg').getAttribute('class');
+    assert.match(unsortedIconClass || '', /lucide-arrow-up-down/, 'unsorted header should use the shared iCloud Lucide arrow-up-down icon');
 
     const yearHeaderDisplay = await page.locator('#hospitalTable th').nth(0).evaluate(element => getComputedStyle(element).display);
     assert.equal(yearHeaderDisplay, 'none', 'single-year view should hide the repeated year column');
     const scoreHeaderDisplay = await page.locator('#hospitalTable th').nth(3).evaluate(element => getComputedStyle(element).display);
     assert.equal(scoreHeaderDisplay, 'none', 'score columns should be hidden for grade-only years');
 
+    const gradeToolbarHeight = await page.locator('.workspace-toolbar').evaluate(element => element.getBoundingClientRect().height);
+    await page.locator('#yearSelect').selectOption('2022');
+    await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2022 年医院榜单'));
+    assert.equal((await page.locator('#rankColumnLabel').innerText()).trim(), '排名', 'numeric year should label the result column as 排名');
+    assert.equal((await page.locator('#workspaceTitle').innerText()).trim(), '2022 年医院榜单 · 共 100 家医院');
+    const numericToolbarHeight = await page.locator('.workspace-toolbar').evaluate(element => element.getBoundingClientRect().height);
+    assert.ok(Math.abs(gradeToolbarHeight - numericToolbarHeight) <= 1, 'switching grade/numeric years must not change toolbar height');
+
+    await page.locator('#yearSelect').selectOption('2023');
+    await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2023 年医院榜单'));
+    rows = page.locator('#hospitalList tr.data-row');
     const firstRow = rows.first();
     assert.equal((await firstRow.locator('td').nth(1).innerText()).trim(), 'A++++', '2023 should render official grade values');
     assert.match(await firstRow.locator('td').nth(2).innerText(), /北京协和医院/, 'same-grade display should use the nearest numeric ranking as historical reference');
@@ -95,17 +111,26 @@ try {
     assert.match(historyText, /历年排名/);
     assert.match(historyText, /2023年/);
     assert.match(historyText, /2022年/);
-    assert.match(historyText, /同等级内的先后顺序使用最近一次可用数字排名/);
+    assert.doesNotMatch(historyText, /同等级内/, 'hospital detail should not repeat global grade-ordering methodology');
 
     await page.locator('#historyDialogClose').click();
     await page.locator('#historyDialog').waitFor({ state: 'hidden' });
     assert.equal(await firstHistoryButton.evaluate(element => element === document.activeElement), true, 'dialog close should restore focus to the hospital trigger');
 
+    const rankSortButton = page.locator('#hospitalTable thead button[data-sort="排名"]');
+    await rankSortButton.click();
+    await page.waitForSelector('#hospitalTable thead button[data-sort="排名"] svg.lucide-arrow-up');
+    assert.equal(await rankSortButton.locator('svg.lucide-arrow-up').count(), 1, 'ascending sort should use iCloud Lucide arrow-up');
+    await rankSortButton.click();
+    await page.waitForSelector('#hospitalTable thead button[data-sort="排名"] svg.lucide-arrow-down');
+    assert.equal(await rankSortButton.locator('svg.lucide-arrow-down').count(), 1, 'descending sort should use iCloud Lucide arrow-down');
+
     await page.locator('#yearSelect').selectOption('');
     await page.waitForFunction(() => document.querySelectorAll('#hospitalList tr.data-row').length === 100);
     rows = page.locator('#hospitalList tr.data-row');
     assert.equal(await rows.count(), 100, 'all-years mode should be paginated to 100 rows');
-    assert.match(await page.locator('#resultSummary').innerText(), /1430 条历年记录/);
+    assert.match(await page.locator('#workspaceTitle').innerText(), /历年医院榜单 · 共 1430 条记录 · 128 家医院/);
+    assert.equal((await page.locator('#rankColumnLabel').innerText()).trim(), '榜单结果', 'mixed all-years view should use a neutral result-column label');
     assert.equal(await page.locator('#pagination').isVisible(), true, 'pagination should appear for all-years mode');
     assert.match(await page.locator('#paginationStatus').innerText(), /第 1 \/ 15 页/);
     assert.equal((await rows.first().locator('td').nth(0).innerText()).trim(), '2023');
@@ -149,6 +174,19 @@ try {
     assert.match(anomalyText, /14\.799/);
     assert.match(anomalyText, /保留来源展示值/);
     await page.locator('#historyDialogClose').click();
+
+    await page.locator('#hospitalSearch').fill('');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.locator('#yearSelect').selectOption('2023');
+    await page.waitForFunction(() => document.querySelector('#hospitalTable')?.classList.contains('grade-mode'));
+    const tableOverflow = await page.locator('.table-scroll').evaluate(element => element.scrollWidth - element.clientWidth);
+    assert.ok(tableOverflow <= 1, `single-year grade table should fit a 390px viewport, overflow=${tableOverflow}`);
+    const cityHeaderBox = await page.locator('#hospitalTable th').nth(7).boundingBox();
+    const scrollBox = await page.locator('.table-scroll').boundingBox();
+    assert.ok(cityHeaderBox && scrollBox && cityHeaderBox.x + cityHeaderBox.width <= scrollBox.x + scrollBox.width + 1, 'city column should stay visible on narrow phones');
+    const firstMobileRow = page.locator('#hospitalList tr.data-row').first();
+    assert.match(await firstMobileRow.locator('td').nth(6).innerText(), /市|省|区/);
+    assert.match(await firstMobileRow.locator('td').nth(7).innerText(), /市|州|区|县/);
 
     const bottomNotice = await page.locator('.data-disclaimer').innerText();
     assert.match(bottomNotice, /最近一次可用的数字排名/);
