@@ -1,10 +1,15 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import { chromium, firefox, webkit } from 'playwright';
 
 const browserName = process.env.PLAYWRIGHT_BROWSER || 'chromium';
 const browserType = { chromium, firefox, webkit }[browserName];
 if (!browserType) throw new Error(`Unsupported browser: ${browserName}`);
+
+const renderStaticScript = fileURLToPath(new URL('../hospital_rank/scripts/render_static.py', import.meta.url));
+execFileSync('python3', [renderStaticScript, '--check'], { stdio: 'inherit' });
 
 const rankings = JSON.parse(await readFile(new URL('../hospital_rank/data/rankings.json', import.meta.url), 'utf8'));
 assert.equal(rankings.schemaVersion, 1, 'normalized ranking schema should be v1');
