@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import html
 import json
 import math
@@ -11,6 +12,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DATA_PATH = ROOT / "data" / "rankings.json"
 INDEX_PATH = ROOT / "index.html"
+STYLE_PATH = ROOT / "style.css"
+SCRIPT_PATH = ROOT / "script.js"
 ROWS_START = "<!-- STATIC_LATEST_ROWS_START -->"
 ROWS_END = "<!-- STATIC_LATEST_ROWS_END -->"
 OPTIONS_START = "<!-- STATIC_YEAR_OPTIONS_START -->"
@@ -150,6 +153,16 @@ def replace_tag_text(text: str, element_id: str, value: str) -> str:
     return pattern.sub(lambda match: f"{match.group(1)}{esc(value)}{match.group(2)}", text, count=1)
 
 
+def git_blob_short_hash(path: Path) -> str:
+    content = path.read_bytes()
+    header = f"blob {len(content)}\0".encode("ascii")
+    return hashlib.sha1(header + content).hexdigest()[:8]
+
+
+def asset_version() -> str:
+    return f"{git_blob_short_hash(STYLE_PATH)}-{git_blob_short_hash(SCRIPT_PATH)}"
+
+
 def render_index(source: str, data: dict) -> str:
     block = latest_block(data)
     year = int(block["year"])
@@ -161,7 +174,21 @@ def render_index(source: str, data: dict) -> str:
     result = replace_tag_text(result, "workspaceTitle", f"{year} 年医院榜单")
     result = replace_tag_text(result, "resultSummary", f"{year} 年 · 共 {len(rows)} 家医院")
     result = replace_tag_text(result, "brandSubtitle", f"中国医院综合排行榜 · {oldest}–{year}")
-    result = replace_tag_text(result, "dataStatus", f"最新数据 {year} 年 · 已结构化核验")
+    result = replace_tag_text(result, "dataStatus", f"最新数据 {year} 年")
+
+    version = asset_version()
+    result = re.sub(
+        r'href="style\.css(?:\?v=[^"]*)?"',
+        f'href="style.css?v={version}"',
+        result,
+        count=1,
+    )
+    result = re.sub(
+        r'src="script\.js(?:\?v=[^"]*)?"',
+        f'src="script.js?v={version}"',
+        result,
+        count=1,
+    )
 
     table_classes = "hospital-table single-year"
     if block.get("rankingMode") == "grade":
@@ -191,6 +218,7 @@ def main() -> None:
             "status": "ok",
             "latestYear": int(latest_block(data)["year"]),
             "staticRows": len(latest_block(data)["records"]),
+            "assetVersion": asset_version(),
         }, ensure_ascii=False))
         return
 
@@ -199,6 +227,7 @@ def main() -> None:
         "status": "rendered",
         "latestYear": int(latest_block(data)["year"]),
         "staticRows": len(latest_block(data)["records"]),
+        "assetVersion": asset_version(),
     }, ensure_ascii=False))
 
 
