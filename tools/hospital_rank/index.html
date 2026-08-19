@@ -4,13 +4,89 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="format-detection" content="telephone=no">
-    <meta name="description" content="复旦版中国医院综合排行榜查询，支持年份、省份、城市筛选与医院历年排名变化查看。">
+    <meta name="description" content="复旦版中国医院综合排行榜查询，支持按年份、省份、城市筛选，并查看医院历年排名、等级与历史名称。">
 
     <link rel="shortcut icon" href="/images/favicon.ico">
     <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
     <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
     <title>复旦版医院排名查询</title>
     <link rel="stylesheet" href="style.css">
+    <style>
+        .page-main { padding-top: 14px; }
+        .workspace-toolbar { align-items: flex-end; }
+        .filters { grid-template-columns: repeat(3, minmax(125px, .8fr)) minmax(220px, 1.45fr); }
+        .search-field { order: 4; }
+        .year-field { order: 1; }
+        .province-field { order: 2; }
+        .city-field { order: 3; }
+        .hospital-table.grade-mode { min-width: 650px; }
+        .hospital-table.grade-mode th:nth-child(4),
+        .hospital-table.grade-mode th:nth-child(5),
+        .hospital-table.grade-mode th:nth-child(6),
+        .hospital-table.grade-mode td:nth-child(4),
+        .hospital-table.grade-mode td:nth-child(5),
+        .hospital-table.grade-mode td:nth-child(6) { display: none; }
+        .hospital-table.grade-mode th:nth-child(3),
+        .hospital-table.grade-mode td:nth-child(3) { width: 330px; }
+        .pagination { min-height: 48px; padding: 8px 18px; display: flex; align-items: center; justify-content: center; gap: 12px; background: var(--surface); border-top: 1px solid var(--line); }
+        .pagination[hidden] { display: none; }
+        .pagination button { min-width: 72px; min-height: 32px; padding: 5px 12px; color: var(--accent-dark); background: var(--surface); border: 1px solid var(--line-strong); border-radius: 6px; font-weight: 650; }
+        .pagination button:hover:not(:disabled) { background: var(--accent-soft); border-color: #bdd7f5; }
+        .pagination button:disabled { color: #9aa5ae; cursor: default; }
+        .pagination-status { min-width: 92px; color: var(--muted); font-size: 12px; text-align: center; font-variant-numeric: tabular-nums; }
+        .ranking-mode-note { margin-top: 4px; color: var(--accent-dark); font-size: 11px; line-height: 1.45; }
+        .source-links strong { color: var(--ink-soft); }
+
+        .history-dialog { width: min(720px, calc(100vw - 32px)); max-height: min(82vh, 780px); padding: 0; overflow: hidden; color: var(--ink); background: var(--surface); border: 0; border-radius: 12px; box-shadow: 0 24px 70px rgba(15, 31, 45, .24); }
+        .history-dialog::backdrop { background: rgba(20, 31, 42, .42); backdrop-filter: blur(2px); }
+        .history-dialog-shell { max-height: min(82vh, 780px); display: flex; flex-direction: column; }
+        .history-dialog-header { padding: 18px 20px 15px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); }
+        .history-dialog-title { min-width: 0; }
+        .history-dialog-title h2 { margin: 0; font-size: 19px; line-height: 1.3; }
+        .history-dialog-title p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+        .dialog-close { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; color: var(--muted); background: var(--surface-soft); border: 1px solid var(--line); border-radius: 8px; font-size: 22px; line-height: 1; }
+        .dialog-close:hover { color: var(--ink); background: var(--accent-soft); }
+        .history-dialog-body { padding: 16px 20px 20px; overflow: auto; overscroll-behavior: contain; }
+        .history-aliases { margin: 0 0 14px; padding: 9px 11px; color: var(--ink-soft); background: var(--surface-soft); border: 1px solid var(--line); border-radius: 7px; font-size: 12px; line-height: 1.55; }
+        .history-aliases strong { color: var(--ink); }
+        .dialog-history-list { margin: 0; padding: 0; display: grid; gap: 7px; list-style: none; }
+        .dialog-history-item { padding: 10px 11px; display: grid; grid-template-columns: 60px 86px minmax(110px, 1fr); align-items: start; gap: 8px 10px; background: #fbfcfd; border: 1px solid var(--line); border-radius: 8px; }
+        .dialog-history-year { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+        .dialog-history-rank { font-size: 12px; font-weight: 760; }
+        .dialog-history-change { font-size: 12px; }
+        .dialog-history-source, .dialog-history-note { grid-column: 2 / -1; font-size: 11px; line-height: 1.5; }
+        .dialog-history-source { color: var(--muted); }
+        .dialog-history-note { padding: 6px 8px; color: #674500; background: #fff8e6; border: 1px solid #ecd28a; border-radius: 6px; }
+        .history-change.is-up { color: var(--green); }
+        .history-change.is-down { color: var(--danger); }
+        .history-change.is-neutral { color: var(--muted); }
+        .history-change.is-system { color: var(--accent-dark); }
+        .dialog-method-note { margin: 14px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
+
+        @media (max-width: 980px) {
+            .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .search-field, .year-field, .province-field, .city-field { order: initial; }
+            .year-field { order: 1; }
+            .search-field { order: 2; }
+            .province-field { order: 3; }
+            .city-field { order: 4; }
+        }
+        @media (max-width: 680px) {
+            .page-main { padding-top: 10px; }
+            .workspace-toolbar { gap: 12px; }
+            .filters { grid-template-columns: 1fr 1fr; }
+            .field-control input, .field-control select { font-size: 16px; }
+            .hospital-table.grade-mode { min-width: 560px; }
+            .hospital-table.grade-mode th:nth-child(3),
+            .hospital-table.grade-mode td:nth-child(3) { width: 250px; }
+            .history-dialog { width: 100vw; max-width: none; height: min(88dvh, 820px); max-height: 88dvh; margin: auto 0 0; border-radius: 14px 14px 0 0; }
+            .history-dialog-shell { max-height: 88dvh; }
+            .history-dialog-header { padding: 15px 16px 12px; }
+            .history-dialog-body { padding: 13px 14px calc(18px + env(safe-area-inset-bottom, 0px)); }
+            .dialog-history-item { grid-template-columns: 54px 76px minmax(0, 1fr); gap: 6px 8px; }
+            .pagination { padding-inline: 12px; }
+        }
+    </style>
 </head>
 <body>
     <a class="skip-link" href="#hospitalTable">跳到医院榜单</a>
@@ -26,7 +102,7 @@
                 </span>
                 <span class="brand-copy">
                     <strong>复旦版医院排名查询</strong>
-                    <p>中国医院综合排行榜 · 历年查询</p>
+                    <p id="brandSubtitle">中国医院综合排行榜 · 历年查询</p>
                 </span>
             </a>
             <div class="data-status" id="dataStatus" aria-live="polite">正在读取榜单数据…</div>
@@ -34,60 +110,40 @@
     </header>
 
     <main class="page-main" id="mainContent">
-        <section class="overview" aria-labelledby="rankingNoteTitle">
-            <div class="overview-reference">
-                <div class="overview-copy">
-                    <p class="eyebrow">排名说明</p>
-                    <h1 id="rankingNoteTitle">数字排名与等级制统一查询</h1>
-                    <p class="overview-note">2009–2022 年为数字排名；2023 年榜单采用等级制。同等级官方不分先后，本站仅为便于浏览，按该医院最近一次数字排名辅助排序，不代表官方档内名次。</p>
-                </div>
-                <dl class="overview-stats" aria-label="榜单概览">
-                    <div><dt>数据范围</dt><dd id="yearRange">—</dd></div>
-                    <div><dt>最新榜单</dt><dd id="latestYear">—</dd></div>
-                    <div><dt>最新上榜</dt><dd id="latestCount">—</dd></div>
-                </dl>
-            </div>
-        </section>
-
         <section class="workspace" aria-labelledby="workspaceTitle">
             <div class="workspace-toolbar">
                 <div class="workspace-heading">
-                    <h2 id="workspaceTitle">医院榜单</h2>
+                    <h1 id="workspaceTitle">医院榜单</h1>
                     <p id="resultSummary" aria-live="polite">正在加载…</p>
+                    <p class="ranking-mode-note" id="rankingModeNote" hidden></p>
                 </div>
                 <div class="filters" aria-label="榜单筛选">
+                    <label class="filter-field select-field year-field" for="yearSelect">
+                        <span class="filter-label">年份</span>
+                        <span class="field-control">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+                            <select id="yearSelect"></select>
+                        </span>
+                    </label>
+                    <label class="filter-field select-field province-field" for="provinceSelect">
+                        <span class="filter-label">省份</span>
+                        <span class="field-control">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s7-5.2 7-12a7 7 0 1 0-14 0c0 6.8 7 12 7 12Z"/><circle cx="12" cy="9" r="2.3"/></svg>
+                            <select id="provinceSelect"><option value="">全部省份</option></select>
+                        </span>
+                    </label>
+                    <label class="filter-field select-field city-field" for="citySelect">
+                        <span class="filter-label">城市</span>
+                        <span class="field-control">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 21V9l8-4 8 4v12M8 21v-5h8v5M8 11h2m4 0h2"/></svg>
+                            <select id="citySelect"><option value="">全部城市</option></select>
+                        </span>
+                    </label>
                     <label class="filter-field search-field" for="hospitalSearch">
                         <span class="filter-label">医院</span>
                         <span class="field-control">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-                            <input type="search" id="hospitalSearch" placeholder="搜索医院或曾用名" autocomplete="off">
-                        </span>
-                    </label>
-                    <label class="filter-field select-field" for="yearSelect">
-                        <span class="filter-label">年份</span>
-                        <span class="field-control">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
-                            <select id="yearSelect">
-                                <option value="">全部年份</option>
-                            </select>
-                        </span>
-                    </label>
-                    <label class="filter-field select-field" for="provinceSelect">
-                        <span class="filter-label">省份</span>
-                        <span class="field-control">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s7-5.2 7-12a7 7 0 1 0-14 0c0 6.8 7 12 7 12Z"/><circle cx="12" cy="9" r="2.3"/></svg>
-                            <select id="provinceSelect">
-                                <option value="">全部省份</option>
-                            </select>
-                        </span>
-                    </label>
-                    <label class="filter-field select-field" for="citySelect">
-                        <span class="filter-label">城市</span>
-                        <span class="field-control">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 21V9l8-4 8 4v12M8 21v-5h8v5M8 11h2m4 0h2"/></svg>
-                            <select id="citySelect">
-                                <option value="">全部城市</option>
-                            </select>
+                            <input type="search" id="hospitalSearch" placeholder="搜索医院或历史名称" autocomplete="off">
                         </span>
                     </label>
                 </div>
@@ -113,14 +169,20 @@
                 </table>
             </div>
 
+            <nav class="pagination" id="pagination" aria-label="历年榜单分页" hidden>
+                <button type="button" id="prevPage">上一页</button>
+                <span class="pagination-status" id="paginationStatus"></span>
+                <button type="button" id="nextPage">下一页</button>
+            </nav>
+
             <div class="workspace-footer">
                 <div class="source-links">
-                    <span>数据来源</span>
-                    <a href="https://rank.cn-healthcare.com/fudan/national-general" target="_blank" rel="noopener noreferrer">中国医院及专科声誉排行榜 · 复旦大学医院管理研究所</a>
+                    <strong>数据来源</strong>
+                    <a href="https://rank.cn-healthcare.com/fudan/national-general" target="_blank" rel="noopener noreferrer">复旦大学医院管理研究所中国医院排行榜（健康界发布页）</a>
                 </div>
             </div>
             <div class="data-disclaimer">
-                <p>说明：等级制年份只展示官方等级，不换算为具体名次；同等级内的历史排名辅助排序仅用于本站浏览。点击医院名称可展开历年排名变化。</p>
+                <p><strong>榜单说明：</strong>数字排名年份按官方名次展示；等级制年份只展示官方等级，同等级官方不分先后。为提升查询参考价值，本站在同等级内按各医院最近一次可用的数字排名进行历史参考排序，不代表官方档内名次。医院更名与来源页面名称可能随时间变化，本站保留已核验的历史名称与来源值，不擅自改写来源数据。</p>
             </div>
         </section>
     </main>
@@ -129,7 +191,18 @@
         <p>&copy; <span id="copyrightYear"></span> <a href="https://www.linchun.com.cn">林春写字的地方</a></p>
     </footer>
 
-    <div class="stats-tooltip" id="statsTooltip" role="status" hidden></div>
+    <dialog class="history-dialog" id="historyDialog" aria-labelledby="historyDialogTitle">
+        <div class="history-dialog-shell">
+            <header class="history-dialog-header">
+                <div class="history-dialog-title">
+                    <h2 id="historyDialogTitle">医院历年排名</h2>
+                    <p id="historyDialogMeta"></p>
+                </div>
+                <button class="dialog-close" id="historyDialogClose" type="button" aria-label="关闭">×</button>
+            </header>
+            <div class="history-dialog-body" id="historyDialogBody"></div>
+        </div>
+    </dialog>
 
     <script src="script.js"></script>
     <!-- Google tag (gtag.js) -->
