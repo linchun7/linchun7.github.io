@@ -47,13 +47,22 @@ def validate(data_dir: Path = DATA_DIR) -> list[str]:
             if not isinstance(policy.get(key), str) or not policy[key].strip():
                 errors.append(f"verification policy.{key} must be documented")
         hierarchy = policy.get("sourceHierarchy")
-        grades = {
-            item.get("grade")
-            for item in hierarchy
-            if isinstance(hierarchy, list) and isinstance(item, dict)
-        }
-        if grades != ALLOWED_GRADES:
-            errors.append(f"source hierarchy must cover {sorted(ALLOWED_GRADES)}")
+        if not isinstance(hierarchy, list):
+            errors.append("source hierarchy must be an array")
+        else:
+            grades = {item.get("grade") for item in hierarchy if isinstance(item, dict)}
+            if grades != ALLOWED_GRADES:
+                errors.append(f"source hierarchy must cover {sorted(ALLOWED_GRADES)}")
+            if len(hierarchy) != len(ALLOWED_GRADES):
+                errors.append("source hierarchy must contain exactly one entry per supported grade")
+            for item in hierarchy:
+                if not isinstance(item, dict):
+                    errors.append("source hierarchy entries must be objects")
+                    continue
+                if item.get("grade") not in ALLOWED_GRADES:
+                    errors.append(f"unsupported source hierarchy grade {item.get('grade')!r}")
+                if not isinstance(item.get("description"), str) or not item["description"].strip():
+                    errors.append("source hierarchy descriptions must be documented")
 
     manifest_years = {block["rankingYear"]: block for block in manifest.get("years", [])}
     snapshot_years = {block["rankingYear"]: block for block in snapshot.get("years", [])}
@@ -72,7 +81,10 @@ def validate(data_dir: Path = DATA_DIR) -> list[str]:
 
     if set(audit_years) != set(manifest_years):
         errors.append("verification year set must exactly match rankings.json")
-    scope = verification.get("scope", {})
+    scope = verification.get("scope")
+    if not isinstance(scope, dict):
+        errors.append("verification scope must be an object")
+        scope = {}
     if scope.get("rankingYears") != sorted(manifest_years):
         errors.append("verification scope.rankingYears must match rankings.json")
 
@@ -134,7 +146,10 @@ def validate(data_dir: Path = DATA_DIR) -> list[str]:
             if not isinstance(source.get("reason"), str) or not source["reason"].strip():
                 errors.append("rejected source reason must be documented")
 
-    conclusion = verification.get("conclusion", {})
+    conclusion = verification.get("conclusion")
+    if not isinstance(conclusion, dict):
+        errors.append("verification conclusion must be an object")
+        conclusion = {}
     if conclusion.get("recordsReverified") != total_records:
         errors.append("conclusion.recordsReverified must match production records")
     if conclusion.get("yearsVerified") != len(manifest_years):
