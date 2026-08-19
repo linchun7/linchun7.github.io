@@ -1,0 +1,43 @@
+name: TEMP hospital-rank render static
+
+on:
+  push:
+    branches:
+      - agent/hospital-rank-future-proof-20260819
+
+permissions:
+  contents: write
+
+jobs:
+  render:
+    if: ${{ !contains(github.event.head_commit.message, '[render-static-generated]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: agent/hospital-rank-future-proof-20260819
+          fetch-depth: 0
+
+      - name: Render and validate
+        run: |
+          set -euo pipefail
+          python3 tools/hospital_rank/scripts/render_static.py
+          python3 tools/hospital_rank/scripts/validate_data.py
+          python3 tools/hospital_rank/scripts/test_future_year.py
+          python3 tools/hospital_rank/scripts/render_static.py --check
+          git diff --check
+
+      - name: Commit generated HTML
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- tools/hospital_rank/index.html; then
+            echo 'index.html already current'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add tools/hospital_rank/index.html
+          git commit -m '[render-static-generated] 同步医院榜单静态快照与资源版本'
+          git push origin HEAD:agent/hospital-rank-future-proof-20260819
