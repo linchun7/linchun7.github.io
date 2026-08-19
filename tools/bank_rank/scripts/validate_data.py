@@ -89,10 +89,15 @@ def validate_dataset(data: dict[str, Any], snapshot: dict[str, Any]) -> list[str
         seen_banks: set[str] = set(); previous_core: float | None = None; previous_rank: int | None = None
         for index, record in enumerate(records):
             prefix = f"{year} row {index + 1}"; bank_id = record.get("bankId"); rank = record.get("rank"); core = record.get("coreTier1Capital"); assets = record.get("assets"); profit = record.get("netProfit"); source_name = record.get("sourceName")
-            if bank_id not in bank_by_id: errors.append(f"{prefix}: unknown bankId {bank_id!r}")
+            bank = bank_by_id.get(bank_id)
+            if bank is None: errors.append(f"{prefix}: unknown bankId {bank_id!r}")
             if bank_id in seen_banks: errors.append(f"{prefix}: duplicate bankId within year {bank_id}")
             seen_banks.add(bank_id)
-            if not isinstance(source_name, str) or not source_name.strip(): errors.append(f"{prefix}: invalid sourceName")
+            if not isinstance(source_name, str) or not source_name.strip():
+                errors.append(f"{prefix}: invalid sourceName")
+            elif bank is not None:
+                aliases = bank.get("aliases", []) if isinstance(bank.get("aliases", []), list) else []
+                if source_name not in {bank.get("name"), *aliases}: errors.append(f"{prefix}: sourceName {source_name!r} does not belong to bankId {bank_id}")
             if not isinstance(rank, int) or rank < 1 or rank > 100: errors.append(f"{prefix}: invalid rank {rank!r}")
             if not isinstance(core, (int,float)) or core <= 0: errors.append(f"{prefix}: invalid coreTier1Capital {core!r}"); continue
             if not isinstance(assets, (int,float)) or assets <= 0: errors.append(f"{prefix}: invalid assets {assets!r}")
