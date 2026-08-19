@@ -14,7 +14,12 @@ def main() -> int:
     errors=MODULE.validate_dataset(data,snapshot)
     if errors:
         print("future-year smoke test FAILED"); [print(f"- {e}") for e in errors]; return 1
-    broken=copy.deepcopy(data); broken["years"][-1]["records"][1]["bankId"]=broken["years"][-1]["records"][0]["bankId"]
-    if not MODULE.validate_dataset(broken,snapshot): print("future-year negative test FAILED: duplicate entity was not rejected"); return 1
-    print(f"future-year smoke test OK: synthetic {new_year} accepted"); return 0
+    broken=copy.deepcopy(data); broken_snapshot=copy.deepcopy(snapshot)
+    broken["years"][-1]["records"][1]["bankId"]=broken["years"][-1]["records"][0]["bankId"]
+    broken_snapshot["years"][-1]["normalizedRecordsSha256"]=MODULE.records_digest(broken["years"][-1]["records"])
+    broken_errors=MODULE.validate_dataset(broken,broken_snapshot)
+    if not any("duplicate bankId within year" in error for error in broken_errors):
+        print("future-year negative test FAILED: duplicate entity was not rejected specifically"); [print(f"- {e}") for e in broken_errors]; return 1
+    print(f"future-year smoke test OK: synthetic {new_year} accepted; duplicate entity rejected")
+    return 0
 if __name__ == "__main__": raise SystemExit(main())
