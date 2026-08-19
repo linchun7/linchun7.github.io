@@ -20,8 +20,8 @@ ROWS_END = "<!-- STATIC_LATEST_ROWS_END -->"
 OPTIONS_START = "<!-- STATIC_YEAR_OPTIONS_START -->"
 OPTIONS_END = "<!-- STATIC_YEAR_OPTIONS_END -->"
 DISCLAIMER_HTML = (
-    '<p><strong>榜单说明：</strong>数字年份按官方名次展示；等级年份仅展示官方等级，同等级无官方先后。'
-    '本站按各医院最近一次可用的数字排名作同等级内历史参考排序，不代表官方档内名次。</p>'
+    '<p><strong>榜单说明：</strong>有排名的年份按官方名次展示；'
+    '等级年份按各医院最近一次可用的排名作同等级内参考排序。</p>'
 )
 
 
@@ -181,7 +181,7 @@ def render_index(source: str, data: dict) -> str:
 
     result = replace_between(source, ROWS_START, ROWS_END, render_rows(data, block))
     result = replace_between(result, OPTIONS_START, OPTIONS_END, render_options(data, year))
-    result = replace_tag_text(result, "workspaceTitle", f"{year} 年医院榜单")
+    result = replace_tag_text(result, "workspaceTitle", f"{year} 年医院榜单 · 共 {len(rows)} 家医院")
     result = replace_tag_text(result, "resultSummary", f"{year} 年 · 共 {len(rows)} 家医院")
     result = replace_tag_text(result, "brandSubtitle", f"中国医院综合排行榜 · {oldest}–{year}")
     result = replace_tag_text(result, "dataStatus", f"最新数据 {year} 年")
