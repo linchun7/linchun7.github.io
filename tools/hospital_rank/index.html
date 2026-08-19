@@ -4,13 +4,96 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="format-detection" content="telephone=no">
-    <meta name="description" content="复旦版中国医院综合排行榜查询，支持年份、省份、城市筛选与医院历年排名变化查看。">
+    <meta name="description" content="复旦版中国医院综合排行榜查询，支持按年份、省份、城市筛选，并查看医院历年排名、等级与历史名称。">
 
     <link rel="shortcut icon" href="/images/favicon.ico">
     <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
     <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
     <title>复旦版医院排名查询</title>
     <link rel="stylesheet" href="style.css">
+    <style>
+        .page-main { padding-top: 14px; }
+        .workspace-toolbar { align-items: flex-end; }
+        .workspace-heading h1 { margin: 0; font-size: 19px; line-height: 1.2; }
+        .filters { grid-template-columns: repeat(3, minmax(125px, .8fr)) minmax(220px, 1.45fr); }
+        .search-field { order: 4; }
+        .year-field { order: 1; }
+        .province-field { order: 2; }
+        .city-field { order: 3; }
+        .hospital-table.single-year { min-width: 900px; }
+        .hospital-table.single-year th:nth-child(1),
+        .hospital-table.single-year td:nth-child(1) { display: none; }
+        .hospital-table.grade-mode { min-width: 650px; }
+        .hospital-table.single-year.grade-mode { min-width: 560px; }
+        .hospital-table.grade-mode th:nth-child(4),
+        .hospital-table.grade-mode th:nth-child(5),
+        .hospital-table.grade-mode th:nth-child(6),
+        .hospital-table.grade-mode td:nth-child(4),
+        .hospital-table.grade-mode td:nth-child(5),
+        .hospital-table.grade-mode td:nth-child(6) { display: none; }
+        .hospital-table.grade-mode th:nth-child(3),
+        .hospital-table.grade-mode td:nth-child(3) { width: 330px; }
+        .pagination { min-height: 48px; padding: 8px 18px; display: flex; align-items: center; justify-content: center; gap: 12px; background: var(--surface); border-top: 1px solid var(--line); }
+        .pagination[hidden] { display: none; }
+        .pagination button { min-width: 72px; min-height: 32px; padding: 5px 12px; color: var(--accent-dark); background: var(--surface); border: 1px solid var(--line-strong); border-radius: 6px; font-weight: 650; }
+        .pagination button:hover:not(:disabled) { background: var(--accent-soft); border-color: #bdd7f5; }
+        .pagination button:disabled { color: #9aa5ae; cursor: default; }
+        .pagination-status { min-width: 92px; color: var(--muted); font-size: 12px; text-align: center; font-variant-numeric: tabular-nums; }
+        .ranking-mode-note { margin-top: 4px; color: var(--accent-dark); font-size: 11px; line-height: 1.45; }
+        .source-links strong { color: var(--ink-soft); }
+
+        .history-dialog { width: min(720px, calc(100vw - 32px)); max-height: min(82vh, 780px); padding: 0; overflow: hidden; color: var(--ink); background: var(--surface); border: 0; border-radius: 12px; box-shadow: 0 24px 70px rgba(15, 31, 45, .24); }
+        .history-dialog::backdrop { background: rgba(20, 31, 42, .42); backdrop-filter: blur(2px); }
+        .history-dialog-shell { max-height: min(82vh, 780px); display: flex; flex-direction: column; }
+        .history-dialog-header { padding: 18px 20px 15px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); }
+        .history-dialog-title { min-width: 0; }
+        .history-dialog-title h2 { margin: 0; font-size: 19px; line-height: 1.3; }
+        .history-dialog-title p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+        .dialog-close { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; color: var(--muted); background: var(--surface-soft); border: 1px solid var(--line); border-radius: 8px; font-size: 22px; line-height: 1; }
+        .dialog-close:hover { color: var(--ink); background: var(--accent-soft); }
+        .history-dialog-body { padding: 16px 20px 20px; overflow: auto; overscroll-behavior: contain; }
+        .history-aliases { margin: 0 0 14px; padding: 9px 11px; color: var(--ink-soft); background: var(--surface-soft); border: 1px solid var(--line); border-radius: 7px; font-size: 12px; line-height: 1.55; }
+        .history-aliases strong { color: var(--ink); }
+        .dialog-history-list { margin: 0; padding: 0; display: grid; gap: 7px; list-style: none; }
+        .dialog-history-item { padding: 10px 11px; display: grid; grid-template-columns: 60px 86px minmax(110px, 1fr); align-items: start; gap: 8px 10px; background: #fbfcfd; border: 1px solid var(--line); border-radius: 8px; }
+        .dialog-history-year { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+        .dialog-history-rank { font-size: 12px; font-weight: 760; }
+        .dialog-history-change { font-size: 12px; }
+        .dialog-history-source, .dialog-history-note { grid-column: 2 / -1; font-size: 11px; line-height: 1.5; }
+        .dialog-history-source { color: var(--muted); }
+        .dialog-history-note { padding: 6px 8px; color: #674500; background: #fff8e6; border: 1px solid #ecd28a; border-radius: 6px; }
+        .history-change.is-up { color: var(--green); }
+        .history-change.is-down { color: var(--danger); }
+        .history-change.is-neutral { color: var(--muted); }
+        .history-change.is-system { color: var(--accent-dark); }
+        .dialog-method-note { margin: 14px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
+
+        @media (max-width: 980px) {
+            .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .search-field, .year-field, .province-field, .city-field { order: initial; }
+            .year-field { order: 1; }
+            .search-field { order: 2; }
+            .province-field { order: 3; }
+            .city-field { order: 4; }
+        }
+        @media (max-width: 680px) {
+            .page-main { padding-top: 10px; }
+            .workspace-toolbar { gap: 12px; }
+            .filters { grid-template-columns: 1fr 1fr; }
+            .field-control input, .field-control select { font-size: 16px; }
+            .hospital-table.single-year { min-width: 850px; }
+            .hospital-table.grade-mode { min-width: 560px; }
+            .hospital-table.single-year.grade-mode { min-width: 540px; }
+            .hospital-table.grade-mode th:nth-child(3),
+            .hospital-table.grade-mode td:nth-child(3) { width: 250px; }
+            .history-dialog { width: 100vw; max-width: none; height: min(88dvh, 820px); max-height: 88dvh; margin: auto 0 0; border-radius: 14px 14px 0 0; }
+            .history-dialog-shell { max-height: 88dvh; }
+            .history-dialog-header { padding: 15px 16px 12px; }
+            .history-dialog-body { padding: 13px 14px calc(18px + env(safe-area-inset-bottom, 0px)); }
+            .dialog-history-item { grid-template-columns: 54px 76px minmax(0, 1fr); gap: 6px 8px; }
+            .pagination { padding-inline: 12px; }
+        }
+    </style>
 </head>
 <body>
     <a class="skip-link" href="#hospitalTable">跳到医院榜单</a>
@@ -26,77 +109,76 @@
                 </span>
                 <span class="brand-copy">
                     <strong>复旦版医院排名查询</strong>
-                    <p>中国医院综合排行榜 · 历年查询</p>
+                    <p id="brandSubtitle">中国医院综合排行榜 · 2009–2023</p>
                 </span>
             </a>
-            <div class="data-status" id="dataStatus" aria-live="polite">正在读取榜单数据…</div>
+            <div class="data-status" id="dataStatus" aria-live="polite">最新数据 2023 年 · 已结构化核验</div>
         </div>
     </header>
 
     <main class="page-main" id="mainContent">
-        <section class="overview" aria-labelledby="rankingNoteTitle">
-            <div class="overview-reference">
-                <div class="overview-copy">
-                    <p class="eyebrow">排名说明</p>
-                    <h1 id="rankingNoteTitle">数字排名与等级制统一查询</h1>
-                    <p class="overview-note">2009–2022 年为数字排名；2023 年榜单采用等级制。同等级官方不分先后，本站仅为便于浏览，按该医院最近一次数字排名辅助排序，不代表官方档内名次。</p>
-                </div>
-                <dl class="overview-stats" aria-label="榜单概览">
-                    <div><dt>数据范围</dt><dd id="yearRange">—</dd></div>
-                    <div><dt>最新榜单</dt><dd id="latestYear">—</dd></div>
-                    <div><dt>最新上榜</dt><dd id="latestCount">—</dd></div>
-                </dl>
-            </div>
-        </section>
-
         <section class="workspace" aria-labelledby="workspaceTitle">
             <div class="workspace-toolbar">
                 <div class="workspace-heading">
-                    <h2 id="workspaceTitle">医院榜单</h2>
-                    <p id="resultSummary" aria-live="polite">正在加载…</p>
+                    <h1 id="workspaceTitle">2023 年医院榜单</h1>
+                    <p id="resultSummary" aria-live="polite">2023 年 · 共 100 家医院</p>
+                    <p class="ranking-mode-note" id="rankingModeNote" hidden></p>
                 </div>
                 <div class="filters" aria-label="榜单筛选">
-                    <label class="filter-field search-field" for="hospitalSearch">
-                        <span class="filter-label">医院</span>
-                        <span class="field-control">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-                            <input type="search" id="hospitalSearch" placeholder="搜索医院或曾用名" autocomplete="off">
-                        </span>
-                    </label>
-                    <label class="filter-field select-field" for="yearSelect">
+                    <label class="filter-field select-field year-field" for="yearSelect">
                         <span class="filter-label">年份</span>
                         <span class="field-control">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
                             <select id="yearSelect">
+                            <!-- STATIC_YEAR_OPTIONS_START -->
+                                <option value="2023" selected>2023年</option>
+                                <option value="2022">2022年</option>
+                                <option value="2021">2021年</option>
+                                <option value="2020">2020年</option>
+                                <option value="2019">2019年</option>
+                                <option value="2018">2018年</option>
+                                <option value="2017">2017年</option>
+                                <option value="2016">2016年</option>
+                                <option value="2015">2015年</option>
+                                <option value="2014">2014年</option>
+                                <option value="2013">2013年</option>
+                                <option value="2012">2012年</option>
+                                <option value="2011">2011年</option>
+                                <option value="2010">2010年</option>
+                                <option value="2009">2009年</option>
                                 <option value="">全部年份</option>
+                            <!-- STATIC_YEAR_OPTIONS_END -->
                             </select>
                         </span>
                     </label>
-                    <label class="filter-field select-field" for="provinceSelect">
+                    <label class="filter-field select-field province-field" for="provinceSelect">
                         <span class="filter-label">省份</span>
                         <span class="field-control">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s7-5.2 7-12a7 7 0 1 0-14 0c0 6.8 7 12 7 12Z"/><circle cx="12" cy="9" r="2.3"/></svg>
-                            <select id="provinceSelect">
-                                <option value="">全部省份</option>
-                            </select>
+                            <select id="provinceSelect"><option value="">全部省份</option></select>
                         </span>
                     </label>
-                    <label class="filter-field select-field" for="citySelect">
+                    <label class="filter-field select-field city-field" for="citySelect">
                         <span class="filter-label">城市</span>
                         <span class="field-control">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 21V9l8-4 8 4v12M8 21v-5h8v5M8 11h2m4 0h2"/></svg>
-                            <select id="citySelect">
-                                <option value="">全部城市</option>
-                            </select>
+                            <select id="citySelect"><option value="">全部城市</option></select>
+                        </span>
+                    </label>
+                    <label class="filter-field search-field" for="hospitalSearch">
+                        <span class="filter-label">医院</span>
+                        <span class="field-control">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                            <input type="search" id="hospitalSearch" placeholder="搜索医院或历史名称" autocomplete="off">
                         </span>
                     </label>
                 </div>
             </div>
 
-            <noscript><p class="noscript-notice">需要启用 JavaScript 才能筛选、排序和查看医院历年排名。</p></noscript>
+            <noscript><p class="noscript-notice">当前已展示最新年度静态榜单；启用 JavaScript 后可切换年份、筛选、排序和查看医院历年排名。</p></noscript>
 
             <div class="table-scroll">
-                <table id="hospitalTable" class="hospital-table">
+                <table id="hospitalTable" class="hospital-table single-year grade-mode">
                     <thead>
                         <tr>
                             <th aria-sort="none"><button type="button" data-sort="年份">年份 <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
@@ -109,18 +191,1527 @@
                             <th aria-sort="none"><button type="button" data-sort="城市">城市 <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
                         </tr>
                     </thead>
-                    <tbody id="hospitalList"></tbody>
+                    <tbody id="hospitalList">
+                        <!-- STATIC_LATEST_ROWS_START -->
+                        <tr class="data-row" data-hospital-id="h_933e572411" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_933e572411" aria-haspopup="dialog" title="查看历年排名与历史名称：北京协和医院">
+                                    <span class="hospital-name">中国医学科学院北京协和医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>北京市</td>
+                            <td>北京市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_b81d6bf8bf" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_b81d6bf8bf" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">四川大学华西医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>四川省</td>
+                            <td>成都市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_3cfd7279c0" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_3cfd7279c0" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">中国人民解放军总医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>北京市</td>
+                            <td>北京市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_853281ebe3" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_853281ebe3" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">上海交通大学医学院附属瑞金医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>上海市</td>
+                            <td>上海市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_777034def1" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_777034def1" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">复旦大学附属中山医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>上海市</td>
+                            <td>上海市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_5e41fa3513" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_5e41fa3513" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">华中科技大学同济医学院附属同济医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>湖北省</td>
+                            <td>武汉市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_f73b651f8e" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_f73b651f8e" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">复旦大学附属华山医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>上海市</td>
+                            <td>上海市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_110675a0fb" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_110675a0fb" aria-haspopup="dialog" title="查看历年排名与历史名称：浙江医科大学附属第二医院">
+                                    <span class="hospital-name">浙江大学医学院附属第二医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>浙江省</td>
+                            <td>杭州市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_4e519aadaa" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_4e519aadaa" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">华中科技大学同济医学院附属协和医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>湖北省</td>
+                            <td>武汉市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_6013828594" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_6013828594" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">浙江大学医学院附属第一医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>浙江省</td>
+                            <td>杭州市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_b38599d45e" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_b38599d45e" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">北京大学第一医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>北京市</td>
+                            <td>北京市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_fe1dddbf21" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_fe1dddbf21" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">北京大学第三医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>北京市</td>
+                            <td>北京市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_fcf153bdc6" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_fcf153bdc6" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">中南大学湘雅医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>湖南省</td>
+                            <td>长沙市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_9013bee792" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_9013bee792" aria-haspopup="dialog" title="查看历年排名与历史名称：空军军医大学西京医院、第四军医大学西京医院">
+                                    <span class="hospital-name">空军军医大学第一附属医院（西京医院）</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>陕西省</td>
+                            <td>西安市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_3784e1c17a" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_3784e1c17a" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">中山大学附属第一医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>广东省</td>
+                            <td>广州市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_6469b003e2" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_6469b003e2" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">上海交通大学医学院附属仁济医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>上海市</td>
+                            <td>上海市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_7ab1de17cb" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_7ab1de17cb" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">南方医科大学南方医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>广东省</td>
+                            <td>广州市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_ba8befe6a9" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_ba8befe6a9" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">中国医科大学附属第一医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>辽宁省</td>
+                            <td>沈阳市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_d36be87688" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_d36be87688" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">郑州大学第一附属医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>河南省</td>
+                            <td>郑州市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_fd268f9309" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_fd268f9309" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">中南大学湘雅二医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>湖南省</td>
+                            <td>长沙市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_4f051936eb" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_4f051936eb" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">北京大学人民医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>北京市</td>
+                            <td>北京市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_a7ea69b366" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_a7ea69b366" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">上海交通大学医学院附属第九人民医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>上海市</td>
+                            <td>上海市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_aed493d15f" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_aed493d15f" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">山东大学齐鲁医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>山东省</td>
+                            <td>济南市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_b54d59ad90" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_b54d59ad90" aria-haspopup="dialog" title="查看历年排名与历史名称：江苏省人民医院">
+                                    <span class="hospital-name">江苏省人民医院（南京医科大学第一附属医院）</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>江苏省</td>
+                            <td>南京市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_ed57c24c72" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_ed57c24c72" aria-haspopup="dialog" title="查看历年排名与历史名称：南京鼓楼医院">
+                                    <span class="hospital-name">南京大学医学院附属鼓楼医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>江苏省</td>
+                            <td>南京市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_7c9f2e7e2f" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_7c9f2e7e2f" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">中国医学科学院肿瘤医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>北京市</td>
+                            <td>北京市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_a8c9643720" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_a8c9643720" aria-haspopup="dialog" title="查看历年排名与历史名称：第三军医大学西南医院">
+                                    <span class="hospital-name">陆军军医大学第一附属医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>重庆市</td>
+                            <td>重庆市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_c3711ecdc4" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_c3711ecdc4" aria-haspopup="dialog" title="查看历年排名与历史名称：上海交通大学医学院附属第六人民医院">
+                                    <span class="hospital-name">上海市第六人民医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>上海市</td>
+                            <td>上海市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_1601595daa" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_1601595daa" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">中日友好医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>北京市</td>
+                            <td>北京市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_c174aa6ac5" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_c174aa6ac5" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">复旦大学附属肿瘤医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>上海市</td>
+                            <td>上海市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_500faa0c94" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_500faa0c94" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">首都医科大学附属北京天坛医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>北京市</td>
+                            <td>北京市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_ae33a0484f" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_ae33a0484f" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">中山大学肿瘤防治中心</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>广东省</td>
+                            <td>广州市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_73093111b2" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_73093111b2" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">广东省人民医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>广东省</td>
+                            <td>广州市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_cbbb96ded5" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_cbbb96ded5" aria-haspopup="dialog" title="查看历年排名与历史名称：四川省医学科学院•四川省人民医院">
+                                    <span class="hospital-name">四川省人民医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>四川省</td>
+                            <td>成都市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_18ffe4dd12" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_18ffe4dd12" aria-haspopup="dialog" title="查看历年排名与历史名称：中国医学科学院阜外心血管病医院">
+                                    <span class="hospital-name">中国医学科学院阜外医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>北京市</td>
+                            <td>北京市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_f05dcff5f9" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_f05dcff5f9" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">首都医科大学附属北京同仁医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>北京市</td>
+                            <td>北京市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_c1b98c0a94" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_c1b98c0a94" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">首都医科大学附属北京儿童医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>北京市</td>
+                            <td>北京市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_6c46fbceeb" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_6c46fbceeb" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">复旦大学附属儿科医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>上海市</td>
+                            <td>上海市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_5324359dc1" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_5324359dc1" aria-haspopup="dialog" title="查看历年排名与历史名称：第二军医大学长海医院">
+                                    <span class="hospital-name">海军军医大学第一附属医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>上海市</td>
+                            <td>上海市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_8def121e57" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_8def121e57" aria-haspopup="dialog" title="查看历年排名与历史名称：广州医学院第一附属医院">
+                                    <span class="hospital-name">广州医科大学附属第一医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>广东省</td>
+                            <td>广州市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_3d74b591d5" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_3d74b591d5" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">中国医科大学附属盛京医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>辽宁省</td>
+                            <td>沈阳市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_823bdee70d" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_823bdee70d" aria-haspopup="dialog" title="查看历年排名与历史名称：首都医科大学北京宣武医院">
+                                    <span class="hospital-name">首都医科大学宣武医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>北京市</td>
+                            <td>北京市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_d618757a31" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_d618757a31" aria-haspopup="dialog" title="查看历年排名与历史名称：山东省立医院">
+                                    <span class="hospital-name">山东第一医科大学附属省立医院（山东省立医院）</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>山东省</td>
+                            <td>济南市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_788fa3c30f" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_788fa3c30f" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">上海交通大学医学院附属新华医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>上海市</td>
+                            <td>上海市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_73ed80dba7" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_73ed80dba7" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">四川大学华西口腔医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>四川省</td>
+                            <td>成都市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_fac9fd33a1" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_fac9fd33a1" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">东南大学附属中大医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>江苏省</td>
+                            <td>南京市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_b07990f85b" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_b07990f85b" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">武汉大学人民医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>湖北省</td>
+                            <td>武汉市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_969ecba906" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_969ecba906" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">苏州大学附属第一医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>江苏省</td>
+                            <td>苏州市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_2dca56453f" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_2dca56453f" aria-haspopup="dialog" title="查看历年排名与历史名称：同济大学附属上海市肺科医院">
+                                    <span class="hospital-name">上海市肺科医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>上海市</td>
+                            <td>上海市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_5378b40679" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_5378b40679" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">浙江大学医学院附属邵逸夫医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>浙江省</td>
+                            <td>杭州市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_02f7b24882" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_02f7b24882" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">南昌大学第一附属医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>江西省</td>
+                            <td>南昌市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_3d6078f899" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_3d6078f899" aria-haspopup="dialog" title="查看历年排名与历史名称：东部战区总医院、南京军区南京总医院">
+                                    <span class="hospital-name">中国人民解放军东部战区总医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>江苏省</td>
+                            <td>南京市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_637cd5ec91" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_637cd5ec91" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">重庆医科大学附属第一医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>重庆市</td>
+                            <td>重庆市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_860207926d" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_860207926d" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">复旦大学附属眼耳鼻喉科医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>上海市</td>
+                            <td>上海市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_4939c66ed2" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_4939c66ed2" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">北京积水潭医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>北京市</td>
+                            <td>北京市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_03efed2d13" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_03efed2d13" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">青岛大学附属医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>山东省</td>
+                            <td>青岛市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_3bfcadea47" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_3bfcadea47" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">中山大学附属第三医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>广东省</td>
+                            <td>广州市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_787937bed8" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_787937bed8" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">首都医科大学附属北京安贞医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>北京市</td>
+                            <td>北京市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_6ba4c7d3f2" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_6ba4c7d3f2" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">福建医科大学附属第一医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>福建省</td>
+                            <td>福州市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_946b5ccfc3" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A++</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_946b5ccfc3" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">武汉大学中南医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>湖北省</td>
+                            <td>武汉市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_b5430e604d" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_b5430e604d" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">重庆医科大学附属儿童医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>重庆市</td>
+                            <td>重庆市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_18c794ebf2" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_18c794ebf2" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">浙江大学医学院附属儿童医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>浙江省</td>
+                            <td>杭州市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_fa81b0fbe6" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_fa81b0fbe6" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">吉林大学第一医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>吉林省</td>
+                            <td>长春市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_9d0d64e5e3" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_9d0d64e5e3" aria-haspopup="dialog" title="查看历年排名与历史名称：西安交通大学医学院第一附属医院">
+                                    <span class="hospital-name">西安交通大学第一附属医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>陕西省</td>
+                            <td>西安市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_9da51a15c9" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_9da51a15c9" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">中山大学孙逸仙纪念医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>广东省</td>
+                            <td>广州市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_53053b4def" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_53053b4def" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">北京大学肿瘤医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>北京市</td>
+                            <td>北京市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_3ef487dfc5" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_3ef487dfc5" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">天津医科大学总医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>天津市</td>
+                            <td>天津市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_329371dbfd" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_329371dbfd" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">广州市妇女儿童医疗中心</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>广东省</td>
+                            <td>广州市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_5505d532be" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_5505d532be" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">北京医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>北京市</td>
+                            <td>北京市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_de611fd8c5" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_de611fd8c5" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">中山大学中山眼科中心</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>广东省</td>
+                            <td>广州市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_4d07015a0e" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_4d07015a0e" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">四川大学华西第二医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>四川省</td>
+                            <td>成都市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_1accd991b7" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_1accd991b7" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">中南大学湘雅三医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>湖南省</td>
+                            <td>长沙市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_d8873335ed" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_d8873335ed" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">安徽医科大学第一附属医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>安徽省</td>
+                            <td>合肥市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_58404ab76e" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_58404ab76e" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">北京大学口腔医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>北京市</td>
+                            <td>北京市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_0b662881f2" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_0b662881f2" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">哈尔滨医科大学附属第二医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>黑龙江省</td>
+                            <td>哈尔滨市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_26d5159167" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_26d5159167" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">首都医科大学附属北京友谊医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>北京市</td>
+                            <td>北京市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_e10718a4b4" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_e10718a4b4" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">首都医科大学附属北京朝阳医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>北京市</td>
+                            <td>北京市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_ee898ac033" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_ee898ac033" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">南方医科大学珠江医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>广东省</td>
+                            <td>广州市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_aaa6ef055b" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_aaa6ef055b" aria-haspopup="dialog" title="查看历年排名与历史名称：天津医科大学附属肿瘤医院">
+                                    <span class="hospital-name">天津医科大学肿瘤医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>天津市</td>
+                            <td>天津市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_f93098699e" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A+</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_f93098699e" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">中国科学技术大学附属第一医院（安徽省立医院）</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>安徽省</td>
+                            <td>合肥市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_978fc1ff79" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_978fc1ff79" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">哈尔滨医科大学附属第一医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>黑龙江省</td>
+                            <td>哈尔滨市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_d3bf33adbe" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_d3bf33adbe" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">浙江大学医学院附属妇产科医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>浙江省</td>
+                            <td>杭州市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_1a7b8941a8" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_1a7b8941a8" aria-haspopup="dialog" title="查看历年排名与历史名称：上海交通大学医学院附属第一人民医院">
+                                    <span class="hospital-name">上海市第一人民医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>上海市</td>
+                            <td>上海市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_4e5af6bec6" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_4e5af6bec6" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">上海交通大学医学院附属上海儿童医学中心</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>上海市</td>
+                            <td>上海市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_e4fe2686b5" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_e4fe2686b5" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">河南省人民医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>河南省</td>
+                            <td>郑州市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_340c14831e" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_340c14831e" aria-haspopup="dialog" title="查看历年排名与历史名称：中国医学科学院血液学研究所、中国医学科学院血液病医院（血液学研究所）">
+                                    <span class="hospital-name">中国医学科学院血液病医院（研究所）</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>天津市</td>
+                            <td>天津市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_75ccb7f105" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_75ccb7f105" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">复旦大学附属妇产科医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>上海市</td>
+                            <td>上海市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_09cda620b5" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_09cda620b5" aria-haspopup="dialog" title="查看历年排名与历史名称：上海交通大学医学院附属胸科医院、上海市胸科医院、上海市胸科医院（暨上海交通大学附属胸科医院）">
+                                    <span class="hospital-name">上海市胸科医院（暨上海交通大学医学院附属胸科医院）</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>上海市</td>
+                            <td>上海市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_7a50330c1c" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_7a50330c1c" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">福建医科大学附属协和医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>福建省</td>
+                            <td>福州市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_39ffe58b62" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_39ffe58b62" aria-haspopup="dialog" title="查看历年排名与历史名称：北部战区总医院">
+                                    <span class="hospital-name">中国人民解放军北部战区总医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>辽宁省</td>
+                            <td>沈阳市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_92d059fa6a" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_92d059fa6a" aria-haspopup="dialog" title="查看历年排名与历史名称：第二军医大学长征医院">
+                                    <span class="hospital-name">海军军医大学第二附属医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>上海市</td>
+                            <td>上海市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_bc13969c86" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_bc13969c86" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">上海市精神卫生中心</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>上海市</td>
+                            <td>上海市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_79997b8bd1" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_79997b8bd1" aria-haspopup="dialog" title="查看历年排名与历史名称：空军军医大学唐都医院、第四军医大学唐都医院">
+                                    <span class="hospital-name">空军军医大学第二附属医院(唐都医院)</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>陕西省</td>
+                            <td>西安市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_3368537b49" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_3368537b49" aria-haspopup="dialog" title="查看历年排名与历史名称：第三军医大学新桥医院">
+                                    <span class="hospital-name">陆军军医大学第二附属医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>重庆市</td>
+                            <td>重庆市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_e7b8b5d012" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_e7b8b5d012" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">北京大学第六医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>北京市</td>
+                            <td>北京市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_1bdedddaab" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_1bdedddaab" aria-haspopup="dialog" title="查看历年排名与历史名称：西安交通大学医学院第二附属医院">
+                                    <span class="hospital-name">西安交通大学第二附属医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>陕西省</td>
+                            <td>西安市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_47850f4873" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_47850f4873" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">武汉大学口腔医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>湖北省</td>
+                            <td>武汉市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_b972f4e487" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_b972f4e487" aria-haspopup="dialog" title="查看历年排名与历史名称：温州医学院附属眼视光医院、温州医科大学附属眼视光医院（浙江省眼科医院）">
+                                    <span class="hospital-name">温州医科大学附属眼视光医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>浙江省</td>
+                            <td>温州市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_7696f0bc42" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_7696f0bc42" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">深圳市人民医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>广东省</td>
+                            <td>深圳市</td>
+                        </tr>
+                        <tr class="data-row" data-hospital-id="h_587d7dc99f" data-year="2023" data-static-prerendered="true">
+                            <td>2023</td>
+                            <td><span class="grade-badge">A</span></td>
+                            <td>
+                                <button type="button" class="hospital-history-button" data-hospital-id="h_587d7dc99f" aria-haspopup="dialog" title="查看历年排名">
+                                    <span class="hospital-name">首都医科大学附属北京世纪坛医院</span>
+                                    <span class="history-affordance" aria-hidden="true">›</span>
+                                </button>
+                            </td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td class="empty-value">-</td>
+                            <td>北京市</td>
+                            <td>北京市</td>
+                        </tr>
+                        <!-- STATIC_LATEST_ROWS_END -->
+                    </tbody>
                 </table>
             </div>
 
+            <nav class="pagination" id="pagination" aria-label="历年榜单分页" hidden>
+                <button type="button" id="prevPage">上一页</button>
+                <span class="pagination-status" id="paginationStatus"></span>
+                <button type="button" id="nextPage">下一页</button>
+            </nav>
+
             <div class="workspace-footer">
                 <div class="source-links">
-                    <span>数据来源</span>
-                    <a href="https://rank.cn-healthcare.com/fudan/national-general" target="_blank" rel="noopener noreferrer">中国医院及专科声誉排行榜 · 复旦大学医院管理研究所</a>
+                    <strong>数据来源</strong>
+                    <a href="https://rank.cn-healthcare.com/fudan/national-general" target="_blank" rel="noopener noreferrer">复旦大学医院管理研究所中国医院排行榜（健康界发布页）</a>
                 </div>
             </div>
             <div class="data-disclaimer">
-                <p>说明：等级制年份只展示官方等级，不换算为具体名次；同等级内的历史排名辅助排序仅用于本站浏览。点击医院名称可展开历年排名变化。</p>
+                <p><strong>榜单说明：</strong>数字排名年份按官方名次展示；等级制年份只展示官方等级，同等级官方不分先后。为提升查询参考价值，本站在同等级内按各医院最近一次可用的数字排名进行历史参考排序，不代表官方档内名次。医院更名与来源页面名称可能随时间变化，本站保留已核验的历史名称与来源值，不擅自改写来源数据。</p>
             </div>
         </section>
     </main>
@@ -129,9 +1720,20 @@
         <p>&copy; <span id="copyrightYear"></span> <a href="https://www.linchun.com.cn">林春写字的地方</a></p>
     </footer>
 
-    <div class="stats-tooltip" id="statsTooltip" role="status" hidden></div>
+    <dialog class="history-dialog" id="historyDialog" aria-labelledby="historyDialogTitle">
+        <div class="history-dialog-shell">
+            <header class="history-dialog-header">
+                <div class="history-dialog-title">
+                    <h2 id="historyDialogTitle">医院历年排名</h2>
+                    <p id="historyDialogMeta"></p>
+                </div>
+                <button class="dialog-close" id="historyDialogClose" type="button" aria-label="关闭">×</button>
+            </header>
+            <div class="history-dialog-body" id="historyDialogBody"></div>
+        </div>
+    </dialog>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=20260819-2"></script>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-K2S9L4CHNP"></script>
     <script>
