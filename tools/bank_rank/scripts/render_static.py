@@ -23,15 +23,24 @@ def replace_marker_block(text: str, start: str, end: str, content: str) -> str:
 
 
 def previous_record(data: dict, bank_id: str, before_year: int) -> dict | None:
-    for block in sorted(data["years"], key=lambda x: x["rankingYear"], reverse=True):
-        if block["rankingYear"] >= before_year: continue
+    target_year = before_year - 1
+    for block in data["years"]:
+        if block["rankingYear"] != target_year: continue
         for record in block["records"]:
             if record["bankId"] == bank_id: return record
     return None
 
 
-def rank_change(record: dict, previous: dict | None) -> tuple[str, str]:
-    if previous is None: return "首次记录", "new"
+def has_earlier_record(data: dict, bank_id: str, before_year: int) -> bool:
+    return any(
+        record["bankId"] == bank_id
+        for block in data["years"] if block["rankingYear"] < before_year
+        for record in block["records"]
+    )
+
+
+def rank_change(record: dict, previous: dict | None, has_earlier: bool = False) -> tuple[str, str]:
+    if previous is None: return ("上年未上榜" if has_earlier else "首次记录"), "new"
     delta = previous["rank"] - record["rank"]
     if delta > 0: return f"↑ {delta} 位", "up"
     if delta < 0: return f"↓ {abs(delta)} 位", "down"
@@ -49,7 +58,11 @@ def render(data: dict, current_html: str) -> str:
     rows = []
     for record in latest["records"][:20]:
         bank = bank_by_id[record["bankId"]]
-        change, change_class = rank_change(record, previous_record(data, record["bankId"], latest_year))
+        change, change_class = rank_change(
+            record,
+            previous_record(data, record["bankId"], latest_year),
+            has_earlier_record(data, record["bankId"], latest_year),
+        )
         rows.append(
             f'                        <tr class="data-row" data-bank-id="{html.escape(record["bankId"])}" data-static-prerendered="true">'
             f'<td><span class="rank-value">{record["rank"]}</span></td>'
