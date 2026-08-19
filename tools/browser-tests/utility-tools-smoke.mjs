@@ -18,6 +18,13 @@ async function createPage(contextOptions = {}) {
     return { context, page, pageErrors };
 }
 
+async function assertMobileFormFonts(page, selector, message) {
+    const sizes = await page.locator(selector).evaluateAll((elements) => (
+        elements.map((element) => parseFloat(getComputedStyle(element).fontSize))
+    ));
+    assert.ok(sizes.length > 0 && sizes.every((size) => size >= 16), `${message}: ${sizes.join(', ')}`);
+}
+
 async function testRmbConverter() {
     const { context, page, pageErrors } = await createPage({ viewport: { width: 390, height: 844 } });
     await page.addInitScript(() => {
@@ -44,6 +51,7 @@ async function testRmbConverter() {
     assert.equal(await page.locator('script[src="dist/nzh.min.js"]').count(), 1, 'RMB converter should use local Nzh');
     assert.equal(await page.locator('#inputmoney').getAttribute('autofocus'), null, 'mobile page should not force-open the keyboard');
     assert.equal(await page.evaluate(() => typeof window.__setTestVisualViewportOffset), 'function', 'visual viewport test shim should be installed');
+    await assertMobileFormFonts(page, '#inputmoney', 'RMB mobile input should stay at least 16px to avoid iOS focus zoom');
 
     const initialResultBox = await page.locator('.result-card').boundingBox();
     const initialToolBox = await page.locator('.tool-card').boundingBox();
@@ -115,10 +123,11 @@ async function testSpaceTool() {
 }
 
 async function testRenovationCalculator() {
-    const { context, page, pageErrors } = await createPage();
+    const { context, page, pageErrors } = await createPage({ viewport: { width: 390, height: 844 } });
     await page.goto(`${baseUrl}/tools/renovation_calculator/`, { waitUntil: 'domcontentloaded' });
 
     assert.equal(await page.locator('#loanTerm').getAttribute('max'), '600');
+    await assertMobileFormFonts(page, 'input', 'renovation calculator mobile inputs should stay at least 16px to avoid iOS focus zoom');
     await page.click('.quick-amount[data-value="100000"]');
     await page.click('.quick-term[data-value="60"]');
     await page.click('.quick-fee[data-value="0.18"]');
@@ -175,9 +184,10 @@ async function testRenovationCalculator() {
 }
 
 async function testFinancialCalculatorAlgorithms() {
-    const { context, page, pageErrors } = await createPage();
+    const { context, page, pageErrors } = await createPage({ viewport: { width: 390, height: 844 } });
     await page.goto(`${baseUrl}/tools/financial_calculator/`, { waitUntil: 'domcontentloaded' });
 
+    await assertMobileFormFonts(page, '.form-control', 'financial calculator mobile inputs/selects should stay at least 16px to avoid iOS focus zoom');
     await page.fill('#principal1', '10000');
     await page.fill('#days1', '30');
     await page.fill('#interest1', '100');
