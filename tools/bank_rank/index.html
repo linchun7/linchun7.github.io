@@ -9,7 +9,7 @@
   <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
   <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
   <title>中国银行业100强查询</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=5320e5f7">
 </head>
 <body>
   <a class="skip-link" href="#bankTable">跳到银行榜单</a>
@@ -24,7 +24,7 @@
         </span>
         <span class="brand-copy">
           <strong>中国银行业100强查询</strong>
-          <p id="brandSubtitle">中国银行业协会 · 2016–2025</p>
+          <p id="brandSubtitle">核心一级资本排名 · 2016–2025</p>
         </span>
       </a>
       <div class="data-status" id="dataStatus" aria-live="polite">最新数据 2025 年</div>
@@ -32,15 +32,11 @@
   </header>
 
   <main class="page-main">
-    <section class="scope-note" aria-label="数据范围说明">
-      <strong>数据范围：</strong>当前已完成 2016–2025 共 10 个年度、1000 条榜单记录的结构化核验。榜单年度对应上一年末数据，例如 2025 年榜单使用 2024 年末数据。
-    </section>
-
     <section class="workspace" aria-labelledby="workspaceTitle">
       <div class="workspace-toolbar">
         <div class="workspace-heading">
-          <h1 id="workspaceTitle">2025 年中国银行业100强 · 100 家</h1>
-          <p id="resultSummary">数据口径：2024 年末</p>
+          <h1 id="workspaceTitle">2025 年中国银行业100强</h1>
+          <p id="resultSummary">100 家银行 · 2024 年末数据</p>
         </div>
         <div class="filters" aria-label="榜单筛选">
           <label class="filter-field year-field" for="yearSelect">
@@ -80,7 +76,6 @@
         </div>
       </div>
 
-      <p class="scope-note" id="yearNote" hidden></p>
       <noscript><p class="noscript-notice">当前静态页仅预览最新年度前 20 家银行；启用 JavaScript 后可查看完整100强、切换年份、筛选、排序和历年排名。</p></noscript>
 
       <div class="table-scroll">
@@ -124,14 +119,14 @@
       </div>
 
       <div class="workspace-footer">
-        <span>单位：亿元 · 排序指标：核心一级资本净额</span>
-        <a class="source-link" id="officialSource" href="https://www.china-cba.net/Index/show/catid/14/id/45489.html" target="_blank" rel="noopener noreferrer">2025 年中国银行业协会官方发布页</a>
+        <p class="source-summary"><strong>数据来源：</strong>中国银行业协会 · 单位：亿元
+          <span class="method-note">榜单按中国银行业协会公布的核心一级资本净额排序；2023 年起纳入外资法人银行。银行更名按同一主体连续追踪；合并或新设合并的机构不直接继承前身历史排名。</span>
+        </p>
       </div>
-      <p class="data-disclaimer">排名按中国银行业协会发布口径展示；2023 年起首次纳入外资法人银行。纯更名沿用同一银行实体，合并/新设合并不简单继承前身机构历史排名。</p>
     </section>
   </main>
 
-  <footer class="page-footer"><p>数据来源：中国银行业协会 · <a href="https://www.linchun.com.cn">林春写字的地方</a></p></footer>
+  <footer class="page-footer"><p><a href="https://www.linchun.com.cn">林春写字的地方</a></p></footer>
 
   <dialog class="history-dialog" id="historyDialog" aria-labelledby="historyDialogTitle">
     <div class="history-dialog-shell">
@@ -146,6 +141,6 @@
     </div>
   </dialog>
 
-  <script src="script.js" defer></script>
+  <script src="script.js?v=77ab01a7" defer></script>
 </body>
 </html>
