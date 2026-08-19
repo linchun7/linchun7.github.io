@@ -1,11 +1,10 @@
 const DATA_URL = './data/rankings.json';
-const LATEST_YEAR = Number(document.documentElement.dataset.latestYear || 2025);
 
 let dataset = null;
 let bankById = new Map();
 let historyByBankId = new Map();
 let searchValuesByBankId = new Map();
-let selectedYear = LATEST_YEAR;
+let selectedYear = 0;
 let sortState = { field: 'rank', direction: 'asc' };
 let lastDialogTrigger = null;
 
@@ -14,15 +13,36 @@ const numberFormatter = new Intl.NumberFormat('zh-CN', {
   maximumFractionDigits: 2
 });
 
+async function fetchJson(url) {
+  const response = await fetch(url, { cache: 'no-cache' });
+  if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
+  return response.json();
+}
+
+async function loadDataset() {
+  const manifest = await fetchJson(DATA_URL);
+  if (manifest?.schemaVersion !== 1 || !Array.isArray(manifest.years)) {
+    throw new Error('榜单清单结构无效');
+  }
+  const [banks, relations, ...yearRecords] = await Promise.all([
+    fetchJson(`./data/${manifest.banksFile}`),
+    fetchJson(`./data/${manifest.relationsFile}`),
+    ...manifest.years.map(block => fetchJson(`./data/${block.recordsFile}`))
+  ]);
+  return {
+    ...manifest,
+    banks,
+    relations,
+    years: manifest.years.map((block, index) => ({ ...block, records: yearRecords[index] }))
+  };
+}
+
 function formatNumber(value) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '—';
   return numberFormatter.format(Number(value));
 }
 
-function getBank(bankId) {
-  return bankById.get(bankId);
-}
-
+function getBank(bankId) { return bankById.get(bankId); }
 function getYearBlock(year) {
   return dataset.years.find(block => Number(block.rankingYear) === Number(year));
 }
@@ -31,7 +51,6 @@ function buildIndexes() {
   bankById = new Map(dataset.banks.map(bank => [bank.id, bank]));
   historyByBankId = new Map();
   searchValuesByBankId = new Map();
-
   dataset.years.forEach(block => {
     block.records.forEach(record => {
       const item = { ...record, rankingYear: block.rankingYear, dataYear: block.dataYear };
@@ -39,7 +58,6 @@ function buildIndexes() {
       historyByBankId.get(record.bankId).push(item);
     });
   });
-
   historyByBankId.forEach((history, bankId) => {
     history.sort((a, b) => b.rankingYear - a.rankingYear);
     const bank = getBank(bankId);
@@ -53,8 +71,7 @@ function buildIndexes() {
 }
 
 function previousRecord(bankId, year) {
-  return (historyByBankId.get(bankId) || [])
-    .find(record => record.rankingYear < Number(year)) || null;
+  return (historyByBankId.get(bankId) || []).find(record => record.rankingYear < Number(year)) || null;
 }
 
 function rankChange(record) {
@@ -76,24 +93,14 @@ function matchesSearch(bankId, query) {
 function sortRecords(records) {
   const multiplier = sortState.direction === 'asc' ? 1 : -1;
   const field = sortState.field;
-
   records.sort((a, b) => {
     if (field === 'name') {
-      const diff = (getBank(a.bankId)?.name || '').localeCompare(
-        getBank(b.bankId)?.name || '', 'zh-CN'
-      );
-      return diff * multiplier || a.rank - b.rank;
+      return ((getBank(a.bankId)?.name || '').localeCompare(getBank(b.bankId)?.name || '', 'zh-CN') * multiplier) || a.rank - b.rank;
     }
     if (field === 'type') {
-      const diff = (getBank(a.bankId)?.type || '').localeCompare(
-        getBank(b.bankId)?.type || '', 'zh-CN'
-      );
-      return diff * multiplier || a.rank - b.rank;
+      return ((getBank(a.bankId)?.type || '').localeCompare(getBank(b.bankId)?.type || '', 'zh-CN') * multiplier) || a.rank - b.rank;
     }
-    const aValue = Number(a[field]);
-    const bValue = Number(b[field]);
-    const diff = aValue - bValue;
-    return diff * multiplier || a.rank - b.rank;
+    return ((Number(a[field]) - Number(b[field])) * multiplier) || a.rank - b.rank;
   });
 }
 
@@ -115,13 +122,9 @@ function updateSortHeaders() {
     const button = th.querySelector('[data-sort]');
     if (!button) return;
     const active = button.dataset.sort === sortState.field;
-    th.setAttribute('aria-sort', active
-      ? (sortState.direction === 'asc' ? 'ascending' : 'descending')
-      : 'none');
+    th.setAttribute('aria-sort', active ? (sortState.direction === 'asc' ? 'ascending' : 'descending') : 'none');
     const indicator = th.querySelector('.sort-indicator');
-    if (indicator) indicator.textContent = active
-      ? (sortState.direction === 'asc' ? '↑' : '↓')
-      : '↕';
+    if (indicator) indicator.textContent = active ? (sortState.direction === 'asc' ? '↑' : '↓') : '↕';
   });
 }
 
@@ -140,19 +143,14 @@ function createBankCell(record) {
   button.className = 'bank-history-button';
   button.dataset.bankId = record.bankId;
   button.setAttribute('aria-haspopup', 'dialog');
-  button.title = bank?.aliases?.length
-    ? `查看历年排名与历史名称：${bank.aliases.join('、')}`
-    : '查看历年排名';
-
+  button.title = bank?.aliases?.length ? `查看历年排名与历史名称：${bank.aliases.join('、')}` : '查看历年排名';
   const name = document.createElement('span');
   name.className = 'bank-name';
   name.textContent = bank?.name || record.sourceName;
-
   const affordance = document.createElement('span');
   affordance.className = 'history-affordance';
   affordance.setAttribute('aria-hidden', 'true');
   affordance.textContent = '›';
-
   button.append(name, affordance);
   td.appendChild(button);
   return td;
@@ -162,7 +160,6 @@ function render() {
   const records = filteredRecords();
   const tbody = document.getElementById('bankList');
   tbody.replaceChildren();
-
   if (!records.length) {
     const tr = document.createElement('tr');
     const td = createCell('没有符合条件的银行', 'empty-message');
@@ -193,35 +190,23 @@ function render() {
   const type = document.getElementById('typeSelect').value;
   const query = document.getElementById('bankSearch').value.trim();
   const filters = [type, query ? `搜索“${query}”` : ''].filter(Boolean).join(' · ');
-  document.getElementById('workspaceTitle').textContent =
-    `${selectedYear} 年中国银行业100强 · ${records.length} 家`;
-  document.getElementById('resultSummary').textContent =
-    `数据口径：${block.dataYear} 年末${filters ? ` · ${filters}` : ''}`;
-
+  document.getElementById('workspaceTitle').textContent = `${selectedYear} 年中国银行业100强 · ${records.length} 家`;
+  document.getElementById('resultSummary').textContent = `数据口径：${block.dataYear} 年末${filters ? ` · ${filters}` : ''}`;
   const sourceLink = document.getElementById('officialSource');
   sourceLink.href = block.officialUrl;
   sourceLink.textContent = `${selectedYear} 年中国银行业协会官方发布页`;
-
   const yearNote = document.getElementById('yearNote');
-  if (block.note) {
-    yearNote.hidden = false;
-    yearNote.textContent = block.note;
-  } else {
-    yearNote.hidden = true;
-    yearNote.textContent = '';
-  }
-
+  yearNote.hidden = !block.note;
+  yearNote.textContent = block.note || '';
   updateSortHeaders();
 }
 
 function initControls() {
   const yearSelect = document.getElementById('yearSelect');
   yearSelect.replaceChildren();
-  [...dataset.years]
-    .sort((a, b) => b.rankingYear - a.rankingYear)
-    .forEach(block => yearSelect.add(
-      new Option(`${block.rankingYear}年`, String(block.rankingYear))
-    ));
+  [...dataset.years].sort((a, b) => b.rankingYear - a.rankingYear).forEach(block => {
+    yearSelect.add(new Option(`${block.rankingYear}年`, String(block.rankingYear)));
+  });
   selectedYear = Math.max(...dataset.years.map(block => Number(block.rankingYear)));
   yearSelect.value = String(selectedYear);
 
@@ -231,8 +216,7 @@ function initControls() {
 
   const oldest = Math.min(...dataset.years.map(block => Number(block.rankingYear)));
   const latest = Math.max(...dataset.years.map(block => Number(block.rankingYear)));
-  document.getElementById('brandSubtitle').textContent =
-    `中国银行业协会 · ${oldest}–${latest}`;
+  document.getElementById('brandSubtitle').textContent = `中国银行业协会 · ${oldest}–${latest}`;
   document.getElementById('dataStatus').textContent = `最新数据 ${latest} 年`;
 
   yearSelect.addEventListener('change', () => {
@@ -242,17 +226,13 @@ function initControls() {
   });
   typeSelect.addEventListener('change', render);
   document.getElementById('bankSearch').addEventListener('input', render);
-
   document.querySelectorAll('#bankTable [data-sort]').forEach(button => {
     button.addEventListener('click', () => {
       const field = button.dataset.sort;
-      if (sortState.field === field) {
-        sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
-      } else {
+      if (sortState.field === field) sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+      else {
         sortState.field = field;
-        sortState.direction = field === 'rank' || field === 'name' || field === 'type'
-          ? 'asc'
-          : 'desc';
+        sortState.direction = ['rank', 'name', 'type'].includes(field) ? 'asc' : 'desc';
       }
       render();
     });
@@ -260,26 +240,24 @@ function initControls() {
 }
 
 function relationText(relation) {
-  if (relation.type === 'renamed') {
-    return `${relation.date}：${relation.fromName}更名为${relation.toName}。${relation.note || ''}`;
-  }
-  if (relation.type === 'formed_from') {
-    return `${relation.date}：${relation.toName}由${relation.fromName}以新设合并方式组建。${relation.note || ''}`;
-  }
+  if (relation.type === 'renamed') return `${relation.date}：${relation.fromName}更名为${relation.toName}。${relation.note || ''}`;
+  if (relation.type === 'formed_from') return `${relation.date}：${relation.toName}由${relation.fromName}以新设合并方式组建。${relation.note || ''}`;
   return relation.note || '';
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 }
 
 function openHistory(bankId, trigger) {
   const bank = getBank(bankId);
   const history = historyByBankId.get(bankId) || [];
   if (!bank || !history.length) return;
-
   lastDialogTrigger = trigger;
   const dialog = document.getElementById('historyDialog');
   const body = document.getElementById('historyDialogBody');
   document.getElementById('historyDialogTitle').textContent = `${bank.name} · 历年排名`;
-  document.getElementById('historyDialogMeta').textContent =
-    `${bank.type} · 当前数据覆盖 ${Math.min(...history.map(i => i.rankingYear))}–${Math.max(...history.map(i => i.rankingYear))}`;
+  document.getElementById('historyDialogMeta').textContent = `${bank.type} · 当前数据覆盖 ${Math.min(...history.map(i => i.rankingYear))}–${Math.max(...history.map(i => i.rankingYear))}`;
   body.replaceChildren();
 
   if (bank.aliases?.length) {
@@ -288,13 +266,10 @@ function openHistory(bankId, trigger) {
     aliases.innerHTML = `<strong>历史名称 / 榜单名称：</strong>${bank.aliases.map(value => escapeHtml(value)).join('、')}`;
     body.appendChild(aliases);
   }
-
-  const relations = (dataset.relations || []).filter(item => item.bankId === bankId);
-  relations.forEach(relation => {
+  (dataset.relations || []).filter(item => item.bankId === bankId).forEach(relation => {
     const p = document.createElement('p');
     p.className = 'history-event';
-    const text = document.createTextNode(relationText(relation));
-    p.appendChild(text);
+    p.append(document.createTextNode(relationText(relation)));
     if (relation.sourceUrl) {
       p.append(' ');
       const link = document.createElement('a');
@@ -311,27 +286,18 @@ function openHistory(bankId, trigger) {
   scroll.style.overflowX = 'auto';
   const table = document.createElement('table');
   table.className = 'history-table';
-  const thead = document.createElement('thead');
-  thead.innerHTML = '<tr><th>年份</th><th>排名</th><th>较上年</th><th>核心一级资本</th><th>资产规模</th><th>净利润</th></tr>';
+  table.innerHTML = '<thead><tr><th>年份</th><th>排名</th><th>较上年</th><th>核心一级资本</th><th>资产规模</th><th>净利润</th></tr></thead>';
   const tbody = document.createElement('tbody');
-
   history.forEach(record => {
     const tr = document.createElement('tr');
     const change = rankChange(record);
-    [
-      String(record.rankingYear),
-      String(record.rank),
-      change.text,
-      formatNumber(record.coreTier1Capital),
-      formatNumber(record.assets),
-      formatNumber(record.netProfit)
-    ].forEach(text => tr.appendChild(createCell(text)));
+    [String(record.rankingYear), String(record.rank), change.text, formatNumber(record.coreTier1Capital), formatNumber(record.assets), formatNumber(record.netProfit)]
+      .forEach(text => tr.appendChild(createCell(text)));
     tbody.appendChild(tr);
   });
-  table.append(thead, tbody);
+  table.appendChild(tbody);
   scroll.appendChild(table);
   body.appendChild(scroll);
-
   const sourceNames = [...new Set(history.map(item => item.sourceName).filter(Boolean))];
   if (sourceNames.some(name => name !== bank.name)) {
     const p = document.createElement('p');
@@ -339,14 +305,7 @@ function openHistory(bankId, trigger) {
     p.textContent = `历年榜单原始名称：${sourceNames.join('、')}`;
     body.appendChild(p);
   }
-
   dialog.showModal();
-}
-
-function escapeHtml(value) {
-  return String(value).replace(/[&<>"']/g, char => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[char]));
 }
 
 function bindDialog() {
@@ -356,9 +315,7 @@ function bindDialog() {
   });
   const dialog = document.getElementById('historyDialog');
   document.getElementById('dialogClose').addEventListener('click', () => dialog.close());
-  dialog.addEventListener('click', event => {
-    if (event.target === dialog) dialog.close();
-  });
+  dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
   dialog.addEventListener('close', () => {
     if (lastDialogTrigger?.isConnected) lastDialogTrigger.focus();
     lastDialogTrigger = null;
@@ -367,18 +324,14 @@ function bindDialog() {
 
 async function start() {
   try {
-    const response = await fetch(DATA_URL, { cache: 'no-cache' });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    dataset = await response.json();
-    if (dataset?.schemaVersion !== 1 || !Array.isArray(dataset.banks) || !Array.isArray(dataset.years)) {
-      throw new Error('榜单数据结构无效');
-    }
+    dataset = await loadDataset();
     buildIndexes();
     initControls();
     bindDialog();
     render();
   } catch (error) {
     console.error(error);
+    document.getElementById('dataStatus').textContent = '数据加载失败';
     const tbody = document.getElementById('bankList');
     tbody.replaceChildren();
     const tr = document.createElement('tr');
