@@ -14,7 +14,7 @@ DATA_PATH = ROOT / "data" / "rankings.json"
 INDEX_PATH = ROOT / "index.html"
 STYLE_PATH = ROOT / "style.css"
 SCRIPT_PATH = ROOT / "script.js"
-RANKINGS_PATH = ROOT / "data" / "rankings.json"
+RANKINGS_PATH = DATA_PATH
 ROWS_START = "<!-- STATIC_LATEST_ROWS_START -->"
 ROWS_END = "<!-- STATIC_LATEST_ROWS_END -->"
 OPTIONS_START = "<!-- STATIC_YEAR_OPTIONS_START -->"
@@ -109,7 +109,6 @@ def render_rows(data: dict, block: dict) -> str:
     lines: list[str] = []
     for record in sorted_latest_records(data, block):
         hospital = hospitals[record["hospitalId"]]
-        aliases = hospital.get("aliases") or []
         lines.extend([
             f'                        <tr class="data-row" data-hospital-id="{esc(record["hospitalId"])}" data-year="{year}" data-static-prerendered="true">',
             f"                            <td>{year}</td>",
@@ -239,7 +238,6 @@ def main() -> None:
             "latestYear": int(latest_block(data)["year"]),
             "staticRows": len(latest_block(data)["records"]),
             "assetVersion": asset_version(),
-        "rankingsVersion": rankings_version(),
             "rankingsVersion": rankings_version(),
         }, ensure_ascii=False))
         return
@@ -250,6 +248,7 @@ def main() -> None:
         "latestYear": int(latest_block(data)["year"]),
         "staticRows": len(latest_block(data)["records"]),
         "assetVersion": asset_version(),
+        "rankingsVersion": rankings_version(),
     }, ensure_ascii=False))
 
 
