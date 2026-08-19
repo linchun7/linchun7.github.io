@@ -5,7 +5,7 @@ const SORT_FIELD_MAP = Object.freeze({
     '综合得分': 'overallScore'
 });
 const LUCIDE_MODULE_URL = '../icloud_price_comparison/vendor/lucide-subset.js?v=1afb95ee';
-const DISCLAIMER_COPY = '数字年份按官方名次展示；等级年份仅展示官方等级，同等级无官方先后。本站按各医院最近一次可用的数字排名作同等级内历史参考排序，不代表官方档内名次。';
+const RANKINGS_VERSION = document.documentElement.dataset.rankingsVersion || '';
 
 let rankingDataset = null;
 let hospitalById = new Map();
@@ -60,7 +60,8 @@ function getHospital(recordOrId) {
 }
 
 async function loadRankingData() {
-    const response = await fetch('./data/rankings.json');
+    const dataUrl = RANKINGS_VERSION ? `./data/rankings.json?v=${encodeURIComponent(RANKINGS_VERSION)}` : './data/rankings.json';
+    const response = await fetch(dataUrl);
     if (!response.ok) throw new Error(`数据加载失败：HTTP ${response.status}`);
 
     const data = await response.json();
@@ -292,7 +293,7 @@ function createRankCell(record) {
         const badge = document.createElement('span');
         badge.className = 'grade-badge';
         badge.textContent = record.grade;
-        badge.title = '同等级内按最近一次可用数字排名作历史参考排序。';
+        badge.title = '同等级内按最近一次可用的排名作参考排序。';
         cell.appendChild(badge);
     } else {
         const value = document.createElement('span');
@@ -322,7 +323,7 @@ function createHospitalCell(record) {
     affordance.textContent = '›';
 
     const aliases = hospital?.aliases || [];
-    button.title = aliases.length ? `查看历年排名与历史名称：${aliases.join('、')}` : '查看历年排名';
+    button.title = aliases.length ? `查看历年榜单与历史名称：${aliases.join('、')}` : '查看历年榜单';
     button.append(name, affordance);
     cell.appendChild(button);
     return cell;
@@ -363,7 +364,7 @@ function openHistoryDialog(hospitalId, trigger) {
     if (!hospital || !history.length) return;
 
     lastHistoryTrigger = trigger;
-    document.getElementById('historyDialogTitle').textContent = `${hospital.name} · 历年排名`;
+    document.getElementById('historyDialogTitle').textContent = `${hospital.name} · 历年榜单`;
     document.getElementById('historyDialogMeta').textContent = [hospital.province, hospital.city].filter(Boolean).join(' · ');
     body.replaceChildren();
 
@@ -493,7 +494,7 @@ function updateContext(records) {
     const rankColumnLabel = document.getElementById('rankColumnLabel');
     if (rankColumnLabel) rankColumnLabel.textContent = gradeMode ? '等级' : (year ? '排名' : '排名 / 等级');
     const rankButton = getRankHeaderButton();
-    if (rankButton) rankButton.title = gradeMode ? '同等级内按最近一次可用数字排名作历史参考排序。' : '';
+    if (rankButton) rankButton.title = gradeMode ? '同等级内按最近一次可用的排名作参考排序。' : '';
 }
 
 function renderPagination(totalRecords) {
@@ -644,23 +645,7 @@ function bindEvents() {
 }
 
 function primeStaticChrome() {
-    const title = document.getElementById('workspaceTitle');
-    const summary = document.getElementById('resultSummary');
-    const countMatch = summary?.textContent.match(/共\s*\d+\s*家医院/);
-    if (title && countMatch && !title.textContent.includes('·')) title.textContent = `${title.textContent} · ${countMatch[0]}`;
-    title?.setAttribute('aria-live', 'polite');
-
-    const staticYear = document.getElementById('yearSelect')?.value;
-    const dataStatus = document.getElementById('dataStatus');
-    if (dataStatus && staticYear) dataStatus.textContent = `最新数据 ${staticYear} 年`;
-
-    const disclaimer = document.querySelector('.data-disclaimer p');
-    if (disclaimer) {
-        const label = document.createElement('strong');
-        label.textContent = '榜单说明：';
-        disclaimer.replaceChildren(label, document.createTextNode(DISCLAIMER_COPY));
-    }
-
+    document.getElementById('workspaceTitle')?.setAttribute('aria-live', 'polite');
     ensureSortHeaderMarkup();
     refreshIcons();
 }
@@ -677,10 +662,6 @@ function showInitError(error) {
 
         ['yearSelect', 'provinceSelect', 'citySelect', 'hospitalSearch'].forEach(id => {
             document.getElementById(id).disabled = true;
-        });
-        hospitalList.querySelectorAll('button').forEach(button => {
-            button.disabled = true;
-            button.title = '交互数据加载失败，当前仅显示静态榜单';
         });
         return;
     }

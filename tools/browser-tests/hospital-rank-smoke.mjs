@@ -9,7 +9,9 @@ const browserType = { chromium, firefox, webkit }[browserName];
 if (!browserType) throw new Error(`Unsupported browser: ${browserName}`);
 
 const renderStaticScript = fileURLToPath(new URL('../hospital_rank/scripts/render_static.py', import.meta.url));
+const futureYearScript = fileURLToPath(new URL('../hospital_rank/scripts/test_future_year.py', import.meta.url));
 execFileSync('python3', [renderStaticScript, '--check'], { stdio: 'inherit' });
+execFileSync('python3', [futureYearScript], { stdio: 'inherit' });
 
 const rankings = JSON.parse(await readFile(new URL('../hospital_rank/data/rankings.json', import.meta.url), 'utf8'));
 assert.equal(rankings.schemaVersion, 1, 'normalized ranking schema should be v1');
@@ -36,27 +38,52 @@ try {
     await staticPage.goto(`${baseUrl}/tools/hospital_rank/`, { waitUntil: 'domcontentloaded' });
     const staticRows = staticPage.locator('#hospitalList tr.data-row[data-static-prerendered="true"]');
     assert.equal(await staticRows.count(), latestYearBlock.records.length, 'static HTML should contain the complete latest-year ranking before JavaScript runs');
-    assert.match(await staticPage.locator('#workspaceTitle').textContent(), new RegExp(`${latestYear} 年医院榜单`));
+    assert.equal((await staticPage.locator('#workspaceTitle').innerText()).trim(), `${latestYear} 年医院榜单 · 共 ${latestYearBlock.records.length} 家医院`, 'static title should already be in its final hydrated form');
     assert.match(await staticPage.locator('#resultSummary').textContent(), new RegExp(`共 ${latestYearBlock.records.length} 家医院`));
     assert.equal(await staticPage.locator('#yearSelect').inputValue(), String(latestYear), 'static HTML should preselect the latest year from rankings.json');
     assert.equal(await staticRows.first().getAttribute('data-year'), String(latestYear), 'static HTML rows should come from the latest year in rankings.json');
     assert.match(await staticPage.locator('noscript').innerText(), /最新年度静态榜单/);
+    assert.equal((await staticPage.locator('#rankColumnLabel').innerText()).trim(), latestYearBlock.rankingMode === 'grade' ? '等级' : '排名', 'no-JS static header should match the latest ranking mode');
+    assert.equal(await staticPage.locator('#hospitalList .hospital-history-button').count(), 0, 'no-JS static hospital names must not be dead buttons');
+    assert.equal(await staticPage.locator('head > style').count(), 0, 'hospital page-specific CSS should stay in the versioned external stylesheet');
+    assert.match((await staticPage.locator('html').getAttribute('data-rankings-version')) || '', /^[0-9a-f]{8}$/, 'static HTML should carry a rankings content version');
 } finally {
     await noJsContext.close();
+}
+
+const hydrationContext = await browser.newContext({ viewport: { width: 1365, height: 900 } });
+try {
+    const hydrationPage = await hydrationContext.newPage();
+    let releaseRankings;
+    const rankingsGate = new Promise(resolve => { releaseRankings = resolve; });
+    await hydrationPage.route('**/tools/hospital_rank/data/rankings.json*', async route => {
+        await rankingsGate;
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(rankings) });
+    });
+    await hydrationPage.route('**/googletagmanager.com/**', route => route.abort());
+    await hydrationPage.goto(`${baseUrl}/tools/hospital_rank/`, { waitUntil: 'domcontentloaded' });
+    assert.equal((await hydrationPage.locator('#rankColumnLabel').innerText()).trim(), latestYearBlock.rankingMode === 'grade' ? '等级' : '排名', 'rank label must not flash a generic mixed-mode placeholder while data is loading');
+    assert.equal((await hydrationPage.locator('#workspaceTitle').innerText()).trim(), `${latestYear} 年医院榜单 · 共 ${latestYearBlock.records.length} 家医院`, 'title must not change during initial data hydration');
+    assert.equal((await hydrationPage.locator('.data-disclaimer').innerText()).trim(), '榜单说明：有排名的年份按官方名次展示；等级年份按各医院最近一次可用的排名作同等级内参考排序。', 'disclaimer must already be final before interactive data loads');
+    releaseRankings();
+    await hydrationPage.waitForSelector('#hospitalList .hospital-history-button');
+    assert.equal((await hydrationPage.locator('#rankColumnLabel').innerText()).trim(), latestYearBlock.rankingMode === 'grade' ? '等级' : '排名', 'rank label should remain stable after hydration');
+} finally {
+    await hydrationContext.close();
 }
 
 const failureContext = await browser.newContext({ viewport: { width: 1365, height: 900 } });
 try {
     const failurePage = await failureContext.newPage();
     await failurePage.route('**/googletagmanager.com/**', route => route.abort());
-    await failurePage.route('**/tools/hospital_rank/data/rankings.json', route => route.abort());
+    await failurePage.route('**/tools/hospital_rank/data/rankings.json*', route => route.abort());
     await failurePage.goto(`${baseUrl}/tools/hospital_rank/`, { waitUntil: 'domcontentloaded' });
     await failurePage.waitForFunction(() => document.querySelector('#dataStatus')?.textContent.includes('交互加载失败'));
     const fallbackRows = failurePage.locator('#hospitalList tr.data-row[data-static-prerendered="true"]');
     assert.equal(await fallbackRows.count(), latestYearBlock.records.length, 'failed interactive data load should preserve the static latest-year ranking');
     assert.match(await failurePage.locator('#dataStatus').innerText(), /已显示静态最新榜单/);
     assert.equal(await failurePage.locator('#yearSelect').isDisabled(), true, 'failed interactive data load should disable inactive filters');
-    assert.equal(await fallbackRows.first().locator('.hospital-history-button').isDisabled(), true, 'static fallback should not expose a dead history action');
+    assert.equal(await fallbackRows.locator('.hospital-history-button').count(), 0, 'static fallback should not expose a dead history action');
 } finally {
     await failureContext.close();
 }
@@ -64,7 +91,9 @@ try {
 const context = await browser.newContext({ viewport: { width: 1365, height: 900 } });
 const page = await context.newPage();
 const pageErrors = [];
+const rankingRequests = [];
 page.on('pageerror', error => pageErrors.push(error));
+page.on('request', request => { if (request.url().includes('/tools/hospital_rank/data/rankings.json')) rankingRequests.push(request.url()); });
 await page.route('**/googletagmanager.com/**', route => route.abort());
 
 try {
@@ -75,6 +104,8 @@ try {
     assert.equal(await page.locator('script[src$="data.js"]').count(), 0, 'legacy data.js should stay removed');
     assert.equal(await page.locator('.overview').count(), 0, 'duplicated top ranking explanation should be removed');
     assert.equal((await page.locator('#dataStatus').innerText()).trim(), `最新数据 ${latestYear} 年`, 'latest-data status should stay concise');
+    assert.equal(rankingRequests.length, 1, 'rankings JSON should be requested once during initialization');
+    assert.match(rankingRequests[0], /rankings\.json\?v=[0-9a-f]{8}(?:&|$)/, 'rankings JSON request should be cache-busted by its content version');
     assert.doesNotMatch(await page.locator('#dataStatus').innerText(), /已结构化核验/);
 
     assert.equal(await page.locator('#yearSelect').inputValue(), String(latestYear), 'latest year should be selected by default');
@@ -126,7 +157,7 @@ try {
     assert.equal(await page.locator('#hospitalList tr.data-row').first().getAttribute('data-performance-sentinel'), 'preserve-me', 'opening history must not rebuild the ranking table');
 
     const historyText = await page.locator('#historyDialog').innerText();
-    assert.match(historyText, /历年排名/);
+    assert.match(historyText, /历年榜单/);
     assert.match(historyText, /2023年/);
     assert.match(historyText, /2022年/);
     assert.doesNotMatch(historyText, /同等级内/, 'hospital detail should not repeat global grade-ordering methodology');
@@ -206,9 +237,7 @@ try {
     assert.match(await firstMobileRow.locator('td').nth(7).innerText(), /市|州|区|县/);
 
     const bottomNotice = await page.locator('.data-disclaimer').innerText();
-    assert.match(bottomNotice, /最近一次可用的数字排名/);
-    assert.match(bottomNotice, /不代表官方档内名次/);
-    assert.doesNotMatch(bottomNotice, /历史名称与来源值|为提升查询参考价值|不擅自改写来源数据/, 'bottom explanation should stay concise');
+    assert.equal(bottomNotice.trim(), '榜单说明：有排名的年份按官方名次展示；等级年份按各医院最近一次可用的排名作同等级内参考排序。', 'bottom explanation should stay concise and final');
 
     assert.deepEqual(pageErrors.map(error => error.message), [], 'page should not emit runtime errors');
 } finally {
