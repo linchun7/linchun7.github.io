@@ -4,7 +4,12 @@ const SORT_FIELD_MAP = Object.freeze({
     '科研学术': 'researchAcademic',
     '综合得分': 'overallScore'
 });
-const LUCIDE_MODULE_URL = '../icloud_price_comparison/vendor/lucide-subset.js?v=1afb95ee';
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const SORT_ICON_PATHS = Object.freeze({
+    'arrow-down': ['M12 5v14', 'm19 12-7 7-7-7'],
+    'arrow-up': ['m5 12 7-7 7 7', 'M12 19V5'],
+    'arrow-up-down': ['m21 16-4 4-4-4', 'M17 20V4', 'm3 8 4-4 4 4', 'M7 4v16']
+});
 const RANKINGS_VERSION = document.documentElement.dataset.rankingsVersion || '';
 
 let rankingDataset = null;
@@ -15,7 +20,6 @@ let hospitalSearchMap = new Map();
 let gradeOrder = new Map();
 let currentPage = 1;
 let lastHistoryTrigger = null;
-let lucideModulePromise = null;
 
 const sortConfig = {
     column: null,
@@ -317,14 +321,9 @@ function createHospitalCell(record) {
     name.className = 'hospital-name';
     name.textContent = hospital?.name || record.sourceName;
 
-    const affordance = document.createElement('span');
-    affordance.className = 'history-affordance';
-    affordance.setAttribute('aria-hidden', 'true');
-    affordance.textContent = '›';
-
     const aliases = hospital?.aliases || [];
     button.title = aliases.length ? `查看历年榜单与历史名称：${aliases.join('、')}` : '查看历年榜单';
-    button.append(name, affordance);
+    button.append(name);
     cell.appendChild(button);
     return cell;
 }
@@ -431,20 +430,34 @@ function getRankHeaderButton() {
     return document.querySelector('#hospitalTable thead button[data-sort="排名"]');
 }
 
-function createSortIconPlaceholder(iconName) {
-    const icon = document.createElement('i');
-    icon.dataset.lucide = iconName;
-    icon.dataset.sortIcon = '';
-    icon.setAttribute('aria-hidden', 'true');
-    return icon;
+function createSortIcon(iconName) {
+    const paths = SORT_ICON_PATHS[iconName];
+    if (!paths) throw new Error(`未知排序图标：${iconName}`);
+
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('class', `lucide lucide-${iconName}`);
+    svg.dataset.sortIcon = '';
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('xmlns', SVG_NS);
+    svg.setAttribute('width', '24');
+    svg.setAttribute('height', '24');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '1.8');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+    paths.forEach(d => {
+        const path = document.createElementNS(SVG_NS, 'path');
+        path.setAttribute('d', d);
+        svg.appendChild(path);
+    });
+    return svg;
 }
 
 function ensureSortHeaderMarkup() {
     document.querySelectorAll('#hospitalTable thead button[data-sort]').forEach(button => {
-        const legacyIcon = button.querySelector('.sort-indicator');
-        const currentIcon = button.querySelector('[data-sort-icon]');
-        if (legacyIcon) legacyIcon.replaceWith(createSortIconPlaceholder('arrow-up-down'));
-        else if (!currentIcon) button.appendChild(createSortIconPlaceholder('arrow-up-down'));
+        if (!button.querySelector('[data-sort-icon]')) button.appendChild(createSortIcon('arrow-up-down'));
     });
 
     const rankButton = getRankHeaderButton();
@@ -459,17 +472,11 @@ function ensureSortHeaderMarkup() {
     rankButton.prepend(label);
 }
 
-function refreshIcons() {
-    if (!lucideModulePromise) lucideModulePromise = import(LUCIDE_MODULE_URL);
-    lucideModulePromise
-        .then(({ createIcons }) => createIcons({ attrs: { 'stroke-width': 1.8 } }))
-        .catch(error => console.warn(`排序图标加载失败：${error.message}`));
-}
-
 function replaceSortIcon(button, iconName) {
     if (!button) return;
     const current = button.querySelector('[data-sort-icon]');
-    const replacement = createSortIconPlaceholder(iconName);
+    if (current?.classList.contains(`lucide-${iconName}`)) return;
+    const replacement = createSortIcon(iconName);
     if (current) current.replaceWith(replacement);
     else button.appendChild(replacement);
 }
@@ -571,7 +578,6 @@ function updateSortIndicators() {
             replaceSortIcon(button, sortConfig.direction === 'asc' ? 'arrow-up' : 'arrow-down');
         }
     }
-    refreshIcons();
 }
 
 function handleSort(event) {
@@ -647,7 +653,6 @@ function bindEvents() {
 function primeStaticChrome() {
     document.getElementById('workspaceTitle')?.setAttribute('aria-live', 'polite');
     ensureSortHeaderMarkup();
-    refreshIcons();
 }
 
 function showInitError(error) {

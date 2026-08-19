@@ -86,10 +86,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .hospital-table th button svg[data-sort-icon] { width: 15px; height: 15px; flex: 0 0 15px; stroke-width: 2.25; }
 .hospital-table th:nth-child(3) button { justify-content: flex-start; }
 .hospital-table th[aria-sort="ascending"], .hospital-table th[aria-sort="descending"] { color: var(--accent-dark); background: #e3effd; box-shadow: inset 0 -3px var(--accent), 0 2px 5px rgba(24, 43, 61, .06); }
-.hospital-table th[aria-sort="ascending"] .sort-indicator::before { content: "↑"; }
-.hospital-table th[aria-sort="descending"] .sort-indicator::before { content: "↓"; }
-.hospital-table th[aria-sort="ascending"] .sort-indicator, .hospital-table th[aria-sort="descending"] .sort-indicator { font-size: 0; }
-.hospital-table th[aria-sort="ascending"] .sort-indicator::before, .hospital-table th[aria-sort="descending"] .sort-indicator::before { font-size: 13px; }
 .hospital-table tbody tr.data-row { height: 56px; }
 .hospital-table tbody tr.data-row:hover td { background: #f8fbfe; }
 .hospital-table tbody tr:last-child td { border-bottom: 0; }
@@ -106,11 +102,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 
 .rank-value { color: var(--ink); font-weight: 740; }
 .grade-badge { min-width: 48px; padding: 3px 7px; display: inline-block; color: var(--accent-dark); background: var(--accent-soft); border: 1px solid #cfe2fa; border-radius: 999px; font-size: 11px; font-weight: 800; line-height: 1.25; letter-spacing: .01em; }
-.hospital-history-button { position: relative; width: 100%; min-width: 0; padding: 4px 28px 4px 0; color: inherit; background: transparent; border: 0; text-align: left; }
+.hospital-history-button { position: relative; width: 100%; min-width: 0; padding: 0; display: block; color: inherit; background: transparent; border: 0; text-align: left; }
 .hospital-history-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-.hospital-name { display: block; overflow: hidden; color: var(--ink); font-size: 14px; font-weight: 680; line-height: 1.2; text-overflow: ellipsis; }
-.hospital-history-button:hover .hospital-name { color: var(--accent-dark); }
-.history-affordance { position: absolute; top: 50%; right: 2px; color: var(--muted); font-size: 19px; line-height: 1; opacity: .75; transform: translateY(-50%); transition: transform 140ms ease-out, color 120ms ease-out; }
+.hospital-name { position: relative; padding: 4px 28px 4px 0; display: block; overflow: hidden; color: var(--ink); font-size: 14px; font-weight: 680; line-height: 1.2; text-overflow: ellipsis; }
+.hospital-table .hospital-name::after { content: "›"; position: absolute; top: 50%; right: 2px; color: var(--muted); font-size: 19px; line-height: 1; opacity: .75; transform: translateY(-50%); }
+.hospital-history-button:hover .hospital-name,
+.hospital-history-button:hover .hospital-name::after { color: var(--accent-dark); }
 .empty-value { color: #97a3ad; }
 .empty-message, .error-message { height: 220px; color: var(--muted); text-align: center !important; }
 .error-message { color: var(--danger); }
