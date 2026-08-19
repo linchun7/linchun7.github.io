@@ -1,4 +1,4 @@
-name: Bank rank 2018 source probe
+name: Bank rank historical source probe
 
 on:
   pull_request:
@@ -12,49 +12,46 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
-      - name: Fetch 2018 text mirrors and original table images
+      - name: Checkout branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Report yearly digests and totals
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          root = Path('tools/bank_rank/data/years')
+          for year in range(2016, 2026):
+              path = root / f'{year}.json'
+              rows = json.loads(path.read_text(encoding='utf-8'))
+              raw = json.dumps(rows, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
+              print(json.dumps({
+                  'year': year,
+                  'rows': len(rows),
+                  'sha256': hashlib.sha256(raw).hexdigest(),
+                  'coreTier1Capital': round(sum(float(r['coreTier1Capital']) for r in rows), 2),
+                  'assets': round(sum(float(r['assets']) for r in rows), 2),
+                  'netProfit': round(sum(float(r['netProfit']) for r in rows), 2),
+              }, ensure_ascii=False))
+          PY
+
+      - name: Resolve official historical list URLs
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p /tmp/bank-rank-2018
-
-          fetch_optional() {
-            url="$1"
-            out="$2"
-            echo "::group::Fetch $url"
-            if curl -fL --retry 2 --connect-timeout 10 --max-time 45 -A 'Mozilla/5.0' "$url" -o "$out"; then
-              wc -c "$out"
-              file "$out" || true
-              sha256sum "$out"
-            else
-              echo "FETCH_FAILED $url"
-              rm -f "$out"
+          mkdir -p /tmp/cba-pages
+          for page in $(seq 24 62); do
+            url="https://www.china-cba.net/Index/lists/catid/14/p/${page}.html"
+            out="/tmp/cba-pages/${page}.html"
+            curl -fsSL --connect-timeout 8 --max-time 20 -A 'Mozilla/5.0' "$url" -o "$out" || continue
+            if grep -Eq '2017年中国银行业100强|2018年中国银行业100强|2022年中国银行业100强' "$out"; then
+              echo "===== CBA_PAGE ${page} ${url} ====="
+              grep -oE 'href="[^"]+"[^>]*>[^<]*(2017年中国银行业100强|2018年中国银行业100强|2022年中国银行业100强)[^<]*' "$out" || true
+              grep -nE -B2 -A2 '2017年中国银行业100强|2018年中国银行业100强|2022年中国银行业100强' "$out" || true
             fi
-            echo "::endgroup::"
-          }
-
-          fetch_optional 'https://resource.emagecompany.com/finance/2018banking100.html' /tmp/bank-rank-2018/emage.html
-          fetch_optional 'https://resource.emagecompany.com/big5/finance/2018banking100.html' /tmp/bank-rank-2018/emage-big5.html
-          fetch_optional 'https://5b0988e595225.cdn.sohucs.com/images/20190228/d10f13e9b89d4e3683406ec39f580d3c.jpeg' /tmp/bank-rank-2018/table-1.jpeg
-          fetch_optional 'https://5b0988e595225.cdn.sohucs.com/images/20190228/dc304fdeb07a4354a6fb734a8afb429c.jpeg' /tmp/bank-rank-2018/table-2.jpeg
-
-          if [[ -f /tmp/bank-rank-2018/emage.html ]]; then
-            echo '::group::Emage HTML body'
-            cat /tmp/bank-rank-2018/emage.html
-            echo '::endgroup::'
-          fi
-          if [[ -f /tmp/bank-rank-2018/emage-big5.html ]]; then
-            echo '::group::Emage Big5 HTML body'
-            cat /tmp/bank-rank-2018/emage-big5.html
-            echo '::endgroup::'
-          fi
-
-      - name: Upload recovered source artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: bank-rank-2018-source
-          path: /tmp/bank-rank-2018/
-          if-no-files-found: error
-          retention-days: 1
+          done
