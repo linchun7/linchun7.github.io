@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render latest-year metadata, resource versions and top-20 no-JS preview."""
+"""Render latest-year metadata, resource versions and full no-JS ranking preview."""
 from __future__ import annotations
 import argparse, hashlib, html, importlib.util, re
 from pathlib import Path
@@ -76,7 +76,7 @@ def render(data: dict, current_html: str) -> str:
     rankings_version, style_version, script_version = content_versions()
     options = "\n".join(f'                            <option value="{year}"{" selected" if year == latest_year else ""}>{year}年</option>' for year in sorted((b["rankingYear"] for b in data["years"]), reverse=True))
     rows = []
-    for record in latest["records"][:20]:
+    for record in latest["records"]:
         bank = bank_by_id[record["bankId"]]
         change, change_class = rank_change(
             record,
@@ -101,6 +101,12 @@ def render(data: dict, current_html: str) -> str:
     text = replace_marker_block(text, ROWS_START, ROWS_END, "\n".join(rows))
     text = re.sub(r'<h1 id="workspaceTitle">.*?</h1>', f'<h1 id="workspaceTitle">{latest_year} 年中国银行业100强榜单</h1>', text, count=1)
     text = re.sub(r'<p id="resultSummary">.*?</p>', f'<p id="resultSummary">{len(latest["records"])} 家银行 · 榜单基于 {latest["dataYear"]} 年末财务数据</p>', text, count=1)
+    text = re.sub(
+        r'<noscript><p class="noscript-notice">.*?</p></noscript>',
+        '<noscript><p class="noscript-notice">当前静态页已显示最新完整100强；启用 JavaScript 后可切换年份、筛选、排序和查看历年排名。</p></noscript>',
+        text,
+        count=1,
+    )
     text = re.sub(r'<div class="data-status" id="dataStatus" aria-live="polite">.*?</div>', f'<div class="data-status" id="dataStatus" aria-live="polite">最新榜单 {latest_year} 年</div>', text, count=1)
     text, count = re.subn(r'<link rel="stylesheet" href="style\.css(?:\?v=[^"]*)?">', f'<link rel="stylesheet" href="style.css?v={style_version}">', text, count=1)
     if count != 1: raise RuntimeError("stylesheet link not found exactly once")

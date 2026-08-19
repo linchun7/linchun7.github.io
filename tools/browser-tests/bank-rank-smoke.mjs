@@ -244,20 +244,19 @@ try {
   await fallbackPage.route('**/tools/bank_rank/data/rankings.json', route => route.abort());
   await fallbackPage.goto(`${baseUrl}/tools/bank_rank/`, { waitUntil: 'domcontentloaded' });
   await fallbackPage.waitForFunction(() => document.querySelector('#dataStatus')?.textContent.includes('数据加载失败'));
-  assert.equal(await fallbackPage.locator('#bankList tr.data-row[data-static-prerendered="true"]').count(), 20, 'failed dynamic load should preserve all 20 static preview rows');
+  assert.equal(await fallbackPage.locator('#bankList tr.data-row[data-static-prerendered="true"]').count(), 100, 'failed dynamic load should preserve all 100 static ranking rows');
   const fallbackFirstRow = fallbackPage.locator('#bankList tr.data-row').first();
   assert.match(await fallbackFirstRow.innerText(), /中国工商银行/, 'static fallback should preserve the latest-year first bank');
   assert.equal(await fallbackFirstRow.locator('.bank-history-button').isDisabled(), true, 'static history affordance should remain non-interactive without dynamic data');
   assert.equal(await fallbackFirstRow.locator('.history-affordance').isVisible(), true, 'static history chevron should remain visible before hydration');
   assert.equal(await fallbackPage.locator('#bankTable [data-sort-icon]').count(), 6, 'static table headers should already contain the final SVG sort icons');
-  assert.match(await fallbackPage.locator('#resultSummary').innerText(), /20 家静态预览 · 动态数据加载失败/);
+  assert.match(await fallbackPage.locator('#resultSummary').innerText(), /100 家静态预览 · 动态数据加载失败/);
   assert.equal(await fallbackPage.locator('#yearSelect').isDisabled(), true, 'failed dynamic load should disable year switching');
   assert.equal(await fallbackPage.locator('#typeSelect').isDisabled(), true, 'failed dynamic load should disable type filtering');
   assert.equal(await fallbackPage.locator('#bankSearch').isDisabled(), true, 'failed dynamic load should disable search');
   const fallbackStatusIcon = await fallbackPage.locator('#dataStatus').evaluate(element => getComputedStyle(element, '::before').maskImage || getComputedStyle(element, '::before').webkitMaskImage);
   assert.notEqual(fallbackStatusIcon, 'none', 'status icon should survive the dynamic-load failure state without DOM replacement');
   await fallbackPage.close();
-
   assert.deepEqual(pageErrors, [], `page errors in ${browserName}: ${pageErrors.map(error => error.message).join(' | ')}`);
   assert.deepEqual(consoleErrors, [], `console errors in ${browserName}: ${consoleErrors.join(' | ')}`);
   console.log(`bank_rank browser smoke OK (${browserName}): ${oldestYear}–${latestYear}`);
