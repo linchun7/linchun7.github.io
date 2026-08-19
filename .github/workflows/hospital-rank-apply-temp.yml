@@ -1,0 +1,40 @@
+name: TEMP apply hospital-rank future proof
+
+on:
+  push:
+    branches:
+      - agent/hospital-rank-future-proof-20260819
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: ${{ !contains(github.event.head_commit.message, '[future-proof-generated]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: agent/hospital-rank-future-proof-20260819
+          fetch-depth: 0
+
+      - name: Apply deterministic cleanup
+        run: |
+          set -euo pipefail
+          python3 tools/hospital_rank/scripts/apply_future_proof_temp.py
+          python3 tools/hospital_rank/scripts/render_static.py
+          python3 tools/hospital_rank/scripts/validate_data.py
+          python3 tools/hospital_rank/scripts/test_future_year.py
+          python3 tools/hospital_rank/scripts/render_static.py --check
+          git diff --check
+
+      - name: Commit generated result to feature branch
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add tools/hospital_rank tools/browser-tests/hospital-rank-smoke.mjs
+          git commit -m '[future-proof-generated] 收口医院榜单未来年份与静态发布链路'
+          git push origin HEAD:agent/hospital-rank-future-proof-20260819
