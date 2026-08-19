@@ -95,12 +95,16 @@ function matchesSearch(bankId, query) {
   return keywords.every(keyword => values.some(value => value.includes(keyword)));
 }
 
+function displayName(record) {
+  return record.sourceName || getBank(record.bankId)?.name || '';
+}
+
 function sortRecords(records) {
   const multiplier = sortState.direction === 'asc' ? 1 : -1;
   const field = sortState.field;
   records.sort((a, b) => {
     if (field === 'name') {
-      return ((getBank(a.bankId)?.name || '').localeCompare(getBank(b.bankId)?.name || '', 'zh-CN') * multiplier) || a.rank - b.rank;
+      return (displayName(a).localeCompare(displayName(b), 'zh-CN') * multiplier) || a.rank - b.rank;
     }
     if (field === 'type') {
       return ((getBank(a.bankId)?.type || '').localeCompare(getBank(b.bankId)?.type || '', 'zh-CN') * multiplier) || a.rank - b.rank;
@@ -148,10 +152,13 @@ function createBankCell(record) {
   button.className = 'bank-history-button';
   button.dataset.bankId = record.bankId;
   button.setAttribute('aria-haspopup', 'dialog');
-  button.title = bank?.aliases?.length ? `查看历年排名与历史名称：${bank.aliases.join('、')}` : '查看历年排名';
+  const shownName = displayName(record);
+  button.title = bank?.name && bank.name !== shownName
+    ? `现名：${bank.name}；查看历年排名与更名信息`
+    : (bank?.aliases?.length ? `查看历年排名与历史名称：${bank.aliases.join('、')}` : '查看历年排名');
   const name = document.createElement('span');
   name.className = 'bank-name';
-  name.textContent = bank?.name || record.sourceName;
+  name.textContent = shownName;
   const affordance = document.createElement('span');
   affordance.className = 'history-affordance';
   affordance.setAttribute('aria-hidden', 'true');
