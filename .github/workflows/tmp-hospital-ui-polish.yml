@@ -1,9 +1,9 @@
 name: Temporary hospital UI polish
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/hospital-rank-copy-layout-20260819
+      - main
     paths:
       - '.github/workflows/tmp-hospital-ui-polish.yml'
 
@@ -30,6 +30,7 @@ jobs:
 
           exact = {
             '        .ranking-mode-note { margin-top: 4px; color: var(--accent-dark); font-size: 11px; line-height: 1.45; }\n': '',
+            '        .dialog-method-note { margin: 14px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }\n': '',
             '                    <h1 id="workspaceTitle">2023 年医院榜单</h1>\n                    <p id="resultSummary" aria-live="polite">2023 年 · 共 100 家医院</p>\n                    <p class="ranking-mode-note" id="rankingModeNote" hidden></p>': '                    <h1 id="workspaceTitle" aria-live="polite">2023 年医院榜单 · 共 100 家医院</h1>',
             '<button type="button" data-sort="排名">排名/等级 <span class="sort-indicator" aria-hidden="true">↕</span></button>': '<button type="button" data-sort="排名"><span id="rankColumnLabel">等级</span> <i data-lucide="arrow-up-down" data-sort-icon aria-hidden="true"></i></button>',
             '<option value="">全部省份</option>': '<option value="">省份</option>',
@@ -41,7 +42,6 @@ jobs:
               raise SystemExit(f'index replacement missing: {old[:100]!r}')
             s = s.replace(old, new, 1)
 
-          # Replace every remaining text arrow sort indicator with the same Lucide placeholder used by iCloud.
           s = re.sub(r'<span class="sort-indicator" aria-hidden="true">↕</span>', '<i data-lucide="arrow-up-down" data-sort-icon aria-hidden="true"></i>', s)
 
           mobile_marker = '''            .hospital-table.single-year { min-width: 850px; }\n            .hospital-table.grade-mode { min-width: 560px; }\n            .hospital-table.single-year.grade-mode { min-width: 540px; }\n            .hospital-table.grade-mode th:nth-child(3),\n            .hospital-table.grade-mode td:nth-child(3) { width: 250px; }'''
@@ -50,8 +50,7 @@ jobs:
             raise SystemExit('mobile grade table marker missing')
           s = s.replace(mobile_marker, mobile_replacement, 1)
 
-          # Match the iCloud sort icon sizing instead of the old text-arrow CSS.
-          sort_css = '''        .hospital-table th button svg { width: 15px; height: 15px; stroke-width: 2.25; flex: 0 0 15px; }\n'''
+          sort_css = '        .hospital-table th button svg { width: 15px; height: 15px; stroke-width: 2.25; flex: 0 0 15px; }\n'
           anchor = '        .source-links strong { color: var(--ink-soft); }\n'
           if anchor not in s:
             raise SystemExit('sort css anchor missing')
@@ -65,7 +64,16 @@ jobs:
           s = "import { createIcons } from '../icloud_price_comparison/vendor/lucide-subset.js?v=1afb95ee';\n\n" + s
           s = s.replace("provinceSelect.replaceChildren(new Option('全部省份', ''));", "provinceSelect.replaceChildren(new Option('省份', ''));", 1)
           s = s.replace("badge.title = '官方等级；同等级内本站按最近一次数字排名作历史参考排序';", "badge.title = '同等级内按最近一次可用数字排名作历史参考排序。';", 1)
-          s = s.replace("methodNote.textContent = '等级制年份仅展示官方等级；同等级内的先后顺序使用最近一次可用数字排名作为本站历史参考，不代表官方档内名次。';", "methodNote.textContent = '等级制年份仅展示官方等级，同等级官方不分先后。同等级内按最近一次可用数字排名作历史参考排序。该排序为本站历史参考，不代表官方档内名次。';", 1)
+
+          method_block = '''    const methodNote = document.createElement('p');
+    methodNote.className = 'dialog-method-note';
+    methodNote.textContent = '等级制年份仅展示官方等级；同等级内的先后顺序使用最近一次可用数字排名作为本站历史参考，不代表官方档内名次。';
+    body.appendChild(methodNote);
+
+'''
+          if method_block not in s:
+            raise SystemExit('dialog method note block missing')
+          s = s.replace(method_block, '', 1)
 
           grade_block = re.compile(r"\nfunction getGradeReferenceNote\(records\) \{.*?\n\}\n\nfunction updateContext\(records\) \{.*?\n\}\n", re.S)
           replacement = '''
@@ -207,9 +215,9 @@ function updateSortIndicators() {
             raise SystemExit('smoke toolbar marker missing')
           s = s.replace(marker, insert, 1)
 
+          s = s.replace("    assert.match(historyText, /同等级内的先后顺序使用最近一次可用数字排名/);", "    assert.doesNotMatch(historyText, /同等级内/, 'hospital detail should not repeat global grade-ordering methodology');")
           s = s.replace("    assert.match(await page.locator('#resultSummary').innerText(), /1430 条历年记录/);", "    assert.match(await page.locator('#workspaceTitle').innerText(), /历年医院榜单 · 共 1430 条记录 · 128 家医院/);\n    assert.equal((await page.locator('#rankColumnLabel').innerText()).trim(), '榜单结果');")
 
-          # Add a narrow-phone viewport regression: no horizontal overflow for single-year grade table.
           mobile_check = '''
     await page.setViewportSize({ width: 390, height: 844 });
     await page.locator('#yearSelect').selectOption('2023');
