@@ -109,10 +109,10 @@
                 </span>
                 <span class="brand-copy">
                     <strong>复旦版医院排名查询</strong>
-                    <p id="brandSubtitle">中国医院综合排行榜 · 历年查询</p>
+                    <p id="brandSubtitle">中国医院综合排行榜 · 2009–2023</p>
                 </span>
             </a>
-            <div class="data-status" id="dataStatus" aria-live="polite">正在读取榜单数据…</div>
+            <div class="data-status" id="dataStatus" aria-live="polite">最新数据 2023 年 · 已结构化核验</div>
         </div>
     </header>
 
@@ -120,8 +120,8 @@
         <section class="workspace" aria-labelledby="workspaceTitle">
             <div class="workspace-toolbar">
                 <div class="workspace-heading">
-                    <h1 id="workspaceTitle">医院榜单</h1>
-                    <p id="resultSummary" aria-live="polite">正在加载…</p>
+                    <h1 id="workspaceTitle">2023 年医院榜单</h1>
+                    <p id="resultSummary" aria-live="polite">2023 年 · 共 100 家医院</p>
                     <p class="ranking-mode-note" id="rankingModeNote" hidden></p>
                 </div>
                 <div class="filters" aria-label="榜单筛选">
@@ -129,7 +129,12 @@
                         <span class="filter-label">年份</span>
                         <span class="field-control">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
-                            <select id="yearSelect"></select>
+                            <select id="yearSelect">
+                            <!-- STATIC_YEAR_OPTIONS_START -->
+                                <option value="2023" selected>2023年</option>
+                                <option value="">全部年份</option>
+                            <!-- STATIC_YEAR_OPTIONS_END -->
+                            </select>
                         </span>
                     </label>
                     <label class="filter-field select-field province-field" for="provinceSelect">
@@ -156,10 +161,10 @@
                 </div>
             </div>
 
-            <noscript><p class="noscript-notice">需要启用 JavaScript 才能筛选、排序和查看医院历年排名。</p></noscript>
+            <noscript><p class="noscript-notice">当前已展示最新年度静态榜单；启用 JavaScript 后可切换年份、筛选、排序和查看医院历年排名。</p></noscript>
 
             <div class="table-scroll">
-                <table id="hospitalTable" class="hospital-table">
+                <table id="hospitalTable" class="hospital-table single-year grade-mode">
                     <thead>
                         <tr>
                             <th aria-sort="none"><button type="button" data-sort="年份">年份 <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
@@ -172,7 +177,10 @@
                             <th aria-sort="none"><button type="button" data-sort="城市">城市 <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
                         </tr>
                     </thead>
-                    <tbody id="hospitalList"></tbody>
+                    <tbody id="hospitalList">
+                        <!-- STATIC_LATEST_ROWS_START -->
+                        <!-- STATIC_LATEST_ROWS_END -->
+                    </tbody>
                 </table>
             </div>
 
@@ -211,7 +219,7 @@
         </div>
     </dialog>
 
-    <script src="script.js?v=20260819-1"></script>
+    <script src="script.js?v=20260819-2"></script>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-K2S9L4CHNP"></script>
     <script>
