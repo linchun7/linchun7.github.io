@@ -51,10 +51,10 @@ python tools/bank_rank/scripts/render_static.py --check
 PLAYWRIGHT_BROWSER=chromium node tools/browser-tests/bank-rank-smoke.mjs
 ```
 
-`validate_data.py` 检查正式清单中的每年100条、榜单/数据年度关系、稳定实体引用、名称/别名冲突、核心一级资本非增序、竞赛排名、已记录的官方汇总值，以及来源摘要中的年度 SHA-256 和元数据。
+`validate_data.py` 检查正式清单中的每年100条、榜单/数据年度关系、`scope` 年份范围与历史缺口声明、前端 `bankTypes` 完整性、稳定实体引用、记录原始名称、名称/别名冲突、核心一级资本非增序、竞赛排名、已记录的官方汇总值，以及来源摘要中的年度 SHA-256 和元数据。
 
-`test_future_year.py` 用合成未来年度验证新增年份无需修改 validator，并包含重复实体负例。
+`test_future_year.py` 用合成未来年度验证新增年份只需按数据契约更新清单和 scope，无需修改 validator；负例会在同步摘要 SHA 后明确验证同一年重复实体仍被拒绝，避免由无关校验造成假通过。
 
 `render_static.py` 自动选择最大年份生成页面元数据与最新年度前20家无 JavaScript 静态预览；启用 JavaScript 后展示完整100强、年份切换、筛选、排序和历年排名。
 
-`bank-rank-smoke.mjs` 接入现有 Playwright Chromium / Firefox / WebKit 矩阵，覆盖默认最新年、历史年份切换、搜索、历史详情、筛选、排序、控制台错误和已知历史转录修正回归。
+`bank-rank-smoke.mjs` 接入现有 Playwright Chromium / Firefox / WebKit 矩阵，覆盖默认最新年、历史年份切换、2018 完整恢复、历史名称搜索、历史详情、筛选、排序、控制台错误和已知历史转录修正回归。
