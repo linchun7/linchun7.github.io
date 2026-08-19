@@ -62,6 +62,7 @@ try {
   assert.equal(await page.locator('#bankList tr.data-row').count(), 100, 'default view should render the full latest-year top 100');
   assert.equal((await page.locator('#workspaceTitle').innerText()).trim(), `${latestYear} 年中国银行业100强 · 100 家`);
   assert.equal((await page.locator('#dataStatus').innerText()).trim(), `最新数据 ${latestYear} 年`);
+  assert.match(await page.locator('#officialSource').innerText(), /官方发布页$/, 'latest year has a direct association detail page');
 
   if (oldestYear !== latestYear) {
     await page.locator('#yearSelect').selectOption(String(oldestYear));
@@ -75,6 +76,7 @@ try {
   await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2018 年中国银行业100强'));
   assert.equal(await page.locator('#bankList tr.data-row').count(), 100, '2018 recovered ranking should render all 100 banks');
   assert.match(await page.locator('#bankList tr.data-row').first().innerText(), /中国工商银行/, '2018 recovered ranking should retain ICBC at the top');
+  assert.match(await page.locator('#officialSource').innerText(), /中国银行业协会来源页$/, 'archived association entry must not be mislabeled as a direct release page');
 
   await page.locator('#bankSearch').fill('中国工商银行');
   assert.equal(await page.locator('#bankList tr.data-row').count(), 1, 'bank search should narrow to ICBC');
@@ -117,7 +119,7 @@ try {
     assert.equal((await row.locator('td').nth(3).innerText()).trim(), '331.86', 'corrected Suzhou Bank value should render in the UI');
     await page.locator('#bankSearch').fill('深圳农商银行');
     row = page.locator('#bankList tr.data-row').first();
-    assert.equal((await row.locator('td').nth(4).innerText()).trim(), '5,868.54', 'corrected Shenzhen Rural assets should render in the UI');
+    assert.equal((await row.locator('td').nth(4).innerText()).trim(), '5,868.54', '2022 Shenzhen Rural assets should render in the UI');
     await page.locator('#bankSearch').fill('');
   }
 
