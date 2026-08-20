@@ -1,0 +1,70 @@
+name: Probe bank rank V5 source tables
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/bank-rank-v5-source-probe.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Probe ten yearly complete-table sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet pandas lxml beautifulsoup4 requests
+          python3 - <<'PY'
+          import io, json, re
+          import pandas as pd
+          import requests
+
+          sources = {
+            2016: 'https://resource.emagecompany.com/finance/2016banking100.html',
+            2017: 'https://www.maigoo.com/news/502207.html',
+            2018: 'https://resource.emagecompany.com/finance/2018banking100.html',
+            2019: 'https://resource.emagecompany.com/finance/2019banking100.html',
+            2020: 'https://resource.emagecompany.com/finance/2020banking100.html',
+            2021: 'https://m.maigoo.com/news/599884.html',
+            2022: 'https://finance.sina.com.cn/zt_d/2022zgyhy/index.shtml',
+            2023: 'https://m.maigoo.com/news/684140.html',
+            2024: 'https://resource.emagecompany.com/finance/2024bank100.html',
+            2025: 'https://www.cnpp.cn/focus/3527597.html',
+          }
+          headers={'User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/131 Safari/537.36'}
+          for year,url in sources.items():
+            print(f'=== YEAR {year} {url} ===')
+            try:
+              r=requests.get(url,headers=headers,timeout=25)
+              print('HTTP',r.status_code,'bytes',len(r.content),'final',r.url)
+              r.raise_for_status()
+            except Exception as e:
+              print('FETCH_ERROR',repr(e)); continue
+            text=r.content.decode(r.encoding or 'utf-8',errors='replace')
+            try:
+              tables=pd.read_html(io.StringIO(text))
+            except Exception as e:
+              print('READ_HTML_ERROR',repr(e)); tables=[]
+            print('TABLE_COUNT',len(tables))
+            scored=[]
+            for idx,t in enumerate(tables):
+              rows,cols=t.shape
+              head=' | '.join(map(str,t.columns))
+              score=(100 if 95<=rows<=105 else 0)+(20 if cols>=5 else 0)+(10 if any(k in head for k in ['资本','资产','利润','机构','排名','序号']) else 0)
+              scored.append((score,idx,rows,cols,head))
+            for item in sorted(scored,reverse=True)[:5]:
+              print('TABLE',json.dumps(item,ensure_ascii=False))
+              t=tables[item[1]]
+              print('HEAD_ROWS',t.head(3).to_json(force_ascii=False,orient='values'))
+              print('TAIL_ROWS',t.tail(3).to_json(force_ascii=False,orient='values'))
+            # fallback: report count of text lines that begin with a rank and contain >=3 numbers
+            plain=re.sub(r'<[^>]+>',' ',text)
+            plain=re.sub(r'\s+',' ',plain)
+            candidates=re.findall(r'(?<!\d)(\d{1,3})\s+([^\d]{2,40}?)\s+(-?[\d.,]+)\s+(-?[\d.,]+)\s+(-?[\d.,]+)',plain)
+            ranked=[x for x in candidates if 1<=int(x[0])<=100]
+            print('REGEX_RANKED_COUNT',len(ranked),'SAMPLE',json.dumps(ranked[:3],ensure_ascii=False))
+          PY
