@@ -98,6 +98,6 @@ PLAYWRIGHT_BROWSER=chromium node tools/browser-tests/bank-rank-smoke.mjs
 
 `test_future_year.py` 先验证当前生产数据证据台账，再用合成未来年度验证新增年份只需按数据契约更新清单和 scope，无需修改结构 validator；负例会在同步摘要 SHA 后明确验证同一年重复实体仍被拒绝。合成未来年不会被要求伪造一份生产证据台账，因此证据约束与未来扩展性互不干扰。
 
-`render_static.py` 自动选择最大年份生成页面元数据与最新年度前20家无 JavaScript 静态预览，并使用 CSS/JS 内容版本避免 CDN 或浏览器继续命中旧资源；`--check` 同时阻止已移除的黄色范围提示和逐年来源链接重新进入静态页。
+`render_static.py` 自动选择最大年份生成页面元数据与最新年度完整100强无 JavaScript 静态榜单，并使用 CSS/JS 内容版本避免 CDN 或浏览器继续命中旧资源；`--check` 同时阻止已移除的黄色范围提示和逐年来源链接重新进入静态页。
 
-`bank-rank-smoke.mjs` 接入现有 Playwright Chromium / Firefox / WebKit 矩阵，覆盖默认最新年、历史年份切换、2018 完整恢复、历史名称搜索与实体聚合、筛选、排序、来源/文案约束、缓存版本、控制台错误，以及关键历史数据回归。由于 smoke 会执行 `test_future_year.py`，三浏览器 CI 同时会执行 V4 生产证据台账校验。
+`bank-rank-smoke.mjs` 接入现有 Playwright Chromium / Firefox / WebKit 矩阵，覆盖默认最新年、历史年份切换、2018 完整恢复、历史名称搜索与实体聚合、筛选、排序、来源/文案约束、缓存版本、控制台错误、完整100条静态 fallback，以及关键历史数据回归。由于 smoke 会执行 `test_future_year.py`，三浏览器 CI 同时会执行 V4 生产证据台账校验。
