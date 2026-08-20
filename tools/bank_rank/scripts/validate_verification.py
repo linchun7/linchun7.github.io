@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Validate the bank_rank V4 evidence ledger against the exact production records."""
+"""Validate the bank_rank V4 evidence ledger and V5 frozen source crosschecks."""
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -12,9 +13,11 @@ from urllib.parse import urlparse
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data"
 VERIFICATION_FILE = "verification-v4.json"
+CROSSCHECK_DIR = "crosschecks"
 ALLOWED_STATUSES = {"verified", "verified_with_legacy_primary_gap"}
 ALLOWED_GRADES = {"A1", "A2", "B1", "B2", "C"}
 SELF_HOSTS = {"linchun.com.cn"}
+CROSSCHECK_FIELDS = {"rank", "sourceName", "coreTier1Capital", "assets", "netProfit"}
 
 
 def load_json(path: Path) -> Any:
@@ -50,6 +53,235 @@ def _url_key(value: Any) -> tuple[str, str, str] | None:
 
 def _is_self_source(value: Any) -> bool:
     return _host(value) in SELF_HOSTS
+
+
+def _decimal(value: Any) -> Decimal | None:
+    if value is None or isinstance(value, bool):
+        return None
+    text = str(value).strip().replace(",", "").replace("，", "")
+    if not text or text.lower() == "nan":
+        return None
+    negative = text.startswith("(") and text.endswith(")")
+    if negative:
+        text = text[1:-1].strip()
+    try:
+        number = Decimal(text)
+    except InvalidOperation:
+        return None
+    return -number if negative else number
+
+
+def _numeric_equal(left: Any, right: Any) -> bool:
+    left_number = _decimal(left)
+    right_number = _decimal(right)
+    if left_number is not None and right_number is not None:
+        return left_number == right_number
+    return str(left).strip() == str(right).strip()
+
+
+def _valid_sha256(value: Any) -> bool:
+    return isinstance(value, str) and len(value) == 64 and all(ch in "0123456789abcdef" for ch in value.lower())
+
+
+def _validate_crosschecks(
+    data_dir: Path,
+    manifest: dict[str, Any],
+    audit_years: dict[int, dict[str, Any]],
+) -> list[str]:
+    errors: list[str] = []
+    crosscheck_dir = data_dir / CROSSCHECK_DIR
+    manifest_years = {block["rankingYear"]: block for block in manifest.get("years", [])}
+    expected_years = set(manifest_years)
+
+    if not crosscheck_dir.is_dir():
+        return ["V5 crosscheck directory is missing"]
+
+    actual_years: set[int] = set()
+    for path in crosscheck_dir.glob("*.json"):
+        try:
+            actual_years.add(int(path.stem))
+        except ValueError:
+            errors.append(f"V5 crosscheck has unexpected file: {path.name}")
+    if actual_years != expected_years:
+        errors.append(
+            f"V5 crosscheck year set must exactly match production years: "
+            f"expected={sorted(expected_years)} actual={sorted(actual_years)}"
+        )
+
+    banks = load_json(data_dir / manifest["banksFile"])
+    name_to_id: dict[str, str] = {}
+    for bank in banks:
+        for name in [bank.get("name"), *bank.get("aliases", [])]:
+            if isinstance(name, str) and name:
+                name_to_id[name] = bank["id"]
+
+    for year in sorted(expected_years):
+        path = crosscheck_dir / f"{year}.json"
+        if not path.exists():
+            continue
+        crosscheck = load_json(path)
+        production = load_json(data_dir / manifest_years[year]["recordsFile"])
+        audit = audit_years.get(year, {})
+        prefix = f"V5 {year}"
+
+        if crosscheck.get("schemaVersion") != 1:
+            errors.append(f"{prefix}: schemaVersion must be 1")
+        if crosscheck.get("rankingYear") != year:
+            errors.append(f"{prefix}: rankingYear does not match filename")
+        if not isinstance(crosscheck.get("capturedAt"), str) or not crosscheck["capturedAt"].strip():
+            errors.append(f"{prefix}: capturedAt must be documented")
+
+        source = crosscheck.get("source")
+        if not isinstance(source, dict):
+            errors.append(f"{prefix}: source must be an object")
+            source = {}
+        source_url = source.get("url")
+        if not _https(source_url):
+            errors.append(f"{prefix}: source URL must use HTTPS")
+        elif _is_self_source(source_url):
+            errors.append(f"{prefix}: source must not self-reference linchun.com.cn")
+        if source.get("grade") not in ALLOWED_GRADES:
+            errors.append(f"{prefix}: invalid source grade {source.get('grade')!r}")
+        if not isinstance(source.get("captureMethod"), str) or not source["captureMethod"].strip():
+            errors.append(f"{prefix}: captureMethod must be documented")
+        if not _valid_sha256(source.get("sourceContentSha256")):
+            errors.append(f"{prefix}: sourceContentSha256 must be a SHA-256 hex digest")
+
+        crosscheck_sources = audit.get("completeTableCrossChecks", []) if isinstance(audit, dict) else []
+        anchored_source = next(
+            (
+                item for item in crosscheck_sources
+                if isinstance(item, dict) and _url_key(item.get("url")) == _url_key(source_url)
+            ),
+            None,
+        )
+        if anchored_source is None:
+            errors.append(f"{prefix}: source URL must be anchored in V4 completeTableCrossChecks")
+        elif source.get("grade") != anchored_source.get("grade"):
+            errors.append(f"{prefix}: source grade must match V4 evidence grade")
+
+        fields = crosscheck.get("availableFields")
+        if not isinstance(fields, list) or not all(isinstance(field, str) for field in fields):
+            errors.append(f"{prefix}: availableFields must be an array of strings")
+            fields = []
+        elif len(fields) != len(set(fields)) or not set(fields).issubset(CROSSCHECK_FIELDS):
+            errors.append(f"{prefix}: availableFields contains duplicates or unsupported fields")
+        required_machine_fields = {"rank", "sourceName", "coreTier1Capital", "assets"}
+        if not required_machine_fields.issubset(fields):
+            errors.append(f"{prefix}: machine-readable snapshot must cover rank/name/core capital/assets")
+
+        records = crosscheck.get("records")
+        if not isinstance(records, list) or len(records) != 100:
+            errors.append(f"{prefix}: records must contain exactly 100 source rows")
+            records = []
+        if len(production) != 100:
+            errors.append(f"{prefix}: production year must contain exactly 100 rows")
+
+        declared = crosscheck.get("resolvedDifferences")
+        if not isinstance(declared, list):
+            errors.append(f"{prefix}: resolvedDifferences must be an array")
+            declared = []
+        resolution_map: dict[tuple[int, str], dict[str, Any]] = {}
+        for item in declared:
+            if not isinstance(item, dict):
+                errors.append(f"{prefix}: invalid resolvedDifferences entry")
+                continue
+            row = item.get("row")
+            field = item.get("field")
+            if not isinstance(row, int) or row < 1 or row > 100 or field not in CROSSCHECK_FIELDS:
+                errors.append(f"{prefix}: invalid resolved difference row/field: {row!r}/{field!r}")
+                continue
+            key = (row, field)
+            if key in resolution_map:
+                errors.append(f"{prefix}: duplicate resolved difference {key}")
+            resolution_map[key] = item
+            if not isinstance(item.get("reason"), str) or not item["reason"].strip():
+                errors.append(f"{prefix}: resolved difference {key} must document a reason")
+
+        used_resolutions: set[tuple[int, str]] = set()
+        for index, (source_row, production_row) in enumerate(zip(records, production), start=1):
+            if not isinstance(source_row, dict):
+                errors.append(f"{prefix} row {index}: source row must be an object")
+                continue
+            for field in fields:
+                if field not in source_row:
+                    errors.append(f"{prefix} row {index}: missing snapshotted field {field}")
+                    continue
+                source_value = source_row[field]
+                production_value = production_row.get(field)
+                if field == "sourceName":
+                    source_name = source_value if isinstance(source_value, str) else ""
+                    equal = name_to_id.get(source_name) == production_row.get("bankId")
+                elif field == "rank":
+                    equal = source_value == production_value
+                else:
+                    equal = _numeric_equal(source_value, production_value)
+                if equal:
+                    continue
+                key = (index, field)
+                resolution = resolution_map.get(key)
+                if resolution is None:
+                    errors.append(
+                        f"{prefix} row {index} {field}: unexplained source/production mismatch "
+                        f"{source_value!r} != {production_value!r}"
+                    )
+                    continue
+                used_resolutions.add(key)
+                if resolution.get("sourceValue") != source_value:
+                    errors.append(f"{prefix}: resolution {key} sourceValue no longer matches snapshot")
+                if resolution.get("productionValue") != production_value:
+                    errors.append(f"{prefix}: resolution {key} productionValue no longer matches production")
+
+        unused = set(resolution_map) - used_resolutions
+        if unused:
+            errors.append(f"{prefix}: stale/unused resolved differences: {sorted(unused)}")
+
+        missing_fields = CROSSCHECK_FIELDS - set(fields)
+        supplemental = crosscheck.get("supplementalCoverage")
+        if not isinstance(supplemental, list):
+            errors.append(f"{prefix}: supplementalCoverage must be an array")
+            supplemental = []
+        supplemental_fields: set[str] = set()
+        for item in supplemental:
+            if not isinstance(item, dict):
+                errors.append(f"{prefix}: invalid supplemental coverage entry")
+                continue
+            field = item.get("field")
+            if field not in CROSSCHECK_FIELDS:
+                errors.append(f"{prefix}: invalid supplemental field {field!r}")
+                continue
+            if field in supplemental_fields:
+                errors.append(f"{prefix}: duplicate supplemental coverage for {field}")
+            supplemental_fields.add(field)
+            if item.get("verifiedRows") != 100:
+                errors.append(f"{prefix}: supplemental {field} must cover all 100 rows")
+            if not isinstance(item.get("machineReadable"), bool):
+                errors.append(f"{prefix}: supplemental {field} must declare machineReadable")
+            supplemental_url = item.get("sourceUrl")
+            if not _https(supplemental_url) or _is_self_source(supplemental_url):
+                errors.append(f"{prefix}: supplemental {field} must use an external HTTPS source")
+            if item.get("grade") not in ALLOWED_GRADES:
+                errors.append(f"{prefix}: supplemental {field} has invalid grade")
+            if not isinstance(item.get("method"), str) or not item["method"].strip():
+                errors.append(f"{prefix}: supplemental {field} must document its method")
+            anchored = next(
+                (
+                    evidence for evidence in crosscheck_sources
+                    if isinstance(evidence, dict) and _url_key(evidence.get("url")) == _url_key(supplemental_url)
+                ),
+                None,
+            )
+            if anchored is None:
+                errors.append(f"{prefix}: supplemental {field} source must be anchored in V4 completeTableCrossChecks")
+            elif item.get("grade") != anchored.get("grade"):
+                errors.append(f"{prefix}: supplemental {field} grade must match V4 evidence grade")
+        if supplemental_fields != missing_fields:
+            errors.append(
+                f"{prefix}: supplemental coverage must exactly cover non-machine fields: "
+                f"expected={sorted(missing_fields)} actual={sorted(supplemental_fields)}"
+            )
+
+    return errors
 
 
 def validate(data_dir: Path = DATA_DIR) -> list[str]:
@@ -209,6 +441,8 @@ def validate(data_dir: Path = DATA_DIR) -> list[str]:
     )
     if conclusion.get("legacyPrimaryGaps") != expected_legacy_gaps:
         errors.append("conclusion.legacyPrimaryGaps must match legacy-gap year statuses")
+
+    errors.extend(_validate_crosschecks(data_dir, manifest, audit_years))
     return errors
 
 
@@ -223,11 +457,14 @@ def main() -> int:
             print(f"- {error}")
         return 1
     verification = load_json(args.data_dir / VERIFICATION_FILE)
+    crosschecks = [load_json(path) for path in sorted((args.data_dir / CROSSCHECK_DIR).glob("*.json"))]
+    source_rows = sum(len(item.get("records", [])) for item in crosschecks)
+    resolved = sum(len(item.get("resolvedDifferences", [])) for item in crosschecks)
     print(
         f"bank_rank evidence verification OK: "
-        f"{verification['conclusion']['recordsReverified']} records, "
-        f"{verification['conclusion']['yearsVerified']} years, "
-        f"{verification['auditVersion']}"
+        f"{verification['conclusion']['recordsReverified']} production records, "
+        f"{verification['conclusion']['yearsVerified']} years, {verification['auditVersion']}; "
+        f"V5 crosschecks {source_rows} source rows, {resolved} resolved source differences, 0 unexplained"
     )
     return 0
 
