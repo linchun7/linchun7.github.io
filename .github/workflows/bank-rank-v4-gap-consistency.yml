@@ -1,0 +1,63 @@
+name: Fix bank rank V4 gap consistency
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/bank-rank-v4-gap-consistency.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out PR branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Fix conclusion and enforce status consistency
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          data_path = Path('tools/bank_rank/data/verification-v4.json')
+          data = json.loads(data_path.read_text(encoding='utf-8'))
+          data['conclusion']['legacyPrimaryGaps'] = [2017]
+          data['conclusion']['result'] = (
+              'V4.1 已恢复2022年协会正式详情页 exact URL，并以协会历史归档和官方《2022年度中国银行业发展报告》目录形成冗余A1锚点；'
+              '2022 legacy primary gap 已关闭。正式1000条记录未变；当前仅2017年仍保留历史一手详情页缺口。'
+          )
+          data_path.write_text(json.dumps(data, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
+
+          validator_path = Path('tools/bank_rank/scripts/validate_verification.py')
+          text = validator_path.read_text(encoding='utf-8')
+          needle = '''    if conclusion.get("yearsVerified") != len(manifest_years):\n        errors.append("conclusion.yearsVerified must match production years")\n    return errors\n'''
+          replacement = '''    if conclusion.get("yearsVerified") != len(manifest_years):\n        errors.append("conclusion.yearsVerified must match production years")\n    expected_legacy_gaps = sorted(\n        year for year, item in audit_years.items()\n        if item.get("status") == "verified_with_legacy_primary_gap"\n    )\n    if conclusion.get("legacyPrimaryGaps") != expected_legacy_gaps:\n        errors.append("conclusion.legacyPrimaryGaps must match legacy-gap year statuses")\n    return errors\n'''
+          if needle not in text:
+              raise SystemExit('validator insertion point not found')
+          validator_path.write_text(text.replace(needle, replacement), encoding='utf-8')
+          PY
+
+          python3 tools/bank_rank/scripts/validate_data.py
+          python3 tools/bank_rank/scripts/validate_verification.py
+          python3 tools/bank_rank/scripts/test_future_year.py
+          python3 tools/bank_rank/scripts/render_static.py --check
+          git diff --check
+
+      - name: Commit consistency fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- tools/bank_rank/data/verification-v4.json tools/bank_rank/scripts/validate_verification.py
+          git commit -m 'test(bank-rank): lock legacy gap summary to year statuses'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
