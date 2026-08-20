@@ -1,35 +1,44 @@
-name: Probe bank rank V5 source tables
+name: Build bank rank V5 crosschecks
 
 on:
   pull_request:
     paths:
       - '.github/workflows/bank-rank-v5-source-probe.yml'
-      - 'tools/bank_rank/data/**'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  probe:
+  build:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
       - name: Check out PR branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
 
-      - name: Compare ten yearly complete-table sources with production
+      - name: Build source-derived V5 snapshots
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m pip install --quiet pandas lxml beautifulsoup4 requests
+          python3 -m pip install --quiet pandas lxml requests
           python3 - <<'PY'
-          import io, json, math, re
+          from __future__ import annotations
+          import hashlib, io, json, math
+          from decimal import Decimal, InvalidOperation
           from pathlib import Path
+          from urllib.parse import urlparse
           import pandas as pd
           import requests
 
-          root = Path('tools/bank_rank/data')
-          sources = {
+          ROOT = Path('tools/bank_rank/data')
+          OUT = ROOT / 'crosschecks'
+          OUT.mkdir(exist_ok=True)
+          CAPTURED_AT = '2026-08-20'
+          SOURCES = {
             2016: 'https://resource.emagecompany.com/finance/2016banking100.html',
             2017: 'https://www.maigoo.com/news/502207.html',
             2018: 'https://resource.emagecompany.com/finance/2018banking100.html',
@@ -41,81 +50,146 @@ jobs:
             2024: 'https://resource.emagecompany.com/finance/2024bank100.html',
             2025: 'https://www.cnpp.cn/focus/3527597.html',
           }
-          headers={'User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/131 Safari/537.36'}
+          HEADERS={'User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/131 Safari/537.36'}
 
-          banks=json.loads((root/'banks.json').read_text(encoding='utf-8'))
-          name_to_id={}
-          for b in banks:
-            for n in [b['name'], *b.get('aliases',[])]:
-              name_to_id[n]=b['id']
+          # Exact source-production differences independently rediscovered by the V5 probe.
+          # A missing or extra difference is fatal: this list is an allow-list, not a blanket waiver.
+          REASONS = {
+            (2017,97,'sourceName'): '完整转录将“阜新银行”误写为“埠新银行”；正式银行名称、稳定实体映射及唐山银行官网转载均支持“阜新银行”。',
+            (2018,5,'assets'): '公开文本镜像漏写一位；V4 已按原始榜单图片校正为90382.54。',
+            (2018,7,'coreTier1Capital'): '公开文本镜像转录误差；V4 已按原始榜单图片校正为3914.25。',
+            (2018,25,'assets'): '公开文本镜像转录误差；V4 已按原始榜单图片校正为8020.58。',
+            (2018,26,'coreTier1Capital'): '公开文本镜像尾数误差；V4 已按原始榜单图片校正为516.05。',
+            (2018,33,'assets'): '公开文本镜像漏写一位；V4 已按原始榜单图片校正为8333.39。',
+            (2018,34,'assets'): '公开文本镜像尾数误差；V4 已按原始榜单图片校正为5642.55。',
+            (2018,36,'assets'): '公开文本镜像转录误差；V4 已按原始榜单图片校正为7055.62。',
+            (2018,37,'assets'): '公开文本镜像转录误差；V4 已按原始榜单图片校正为5559.40。',
+            (2018,39,'sourceName'): '公开文本镜像错误重复“重庆农村商业银行”；V4 已按原始榜单图片确认第39名为“重庆银行”。',
+            (2018,44,'assets'): '公开文本镜像转录误差；V4 已按原始榜单图片校正为4358.29。',
+            (2018,57,'assets'): '公开文本镜像尾数误差；V4 已按原始榜单图片校正为2708.27。',
+            (2018,68,'assets'): '公开文本镜像尾数误差；V4 已按原始榜单图片校正为2362.95。',
+            (2018,77,'assets'): '公开文本镜像首位误写；V4 已按原始榜单图片校正为2139.73。',
+            (2018,89,'coreTier1Capital'): '公开文本镜像字符识别错误“1P0.09”；V4 已按原始榜单图片校正为120.09。',
+            (2019,22,'netProfit'): '完整文本缺失小数点；V4 结合宁波银行官方年报校正为112.21。',
+            (2019,73,'netProfit'): '完整文本缺失小数点；V4 结合银行公开经营数据校正为14.37。',
+            (2019,84,'sourceName'): '完整文本机构名称漏字“广东华行银行”；按正式名称及跨年实体校正为“广东华兴银行”。',
+            (2019,94,'assets'): '完整文本小数点格式错误“1.642.53”；V4 交叉核验为1642.53。',
+            (2021,36,'coreTier1Capital'): '完整文本漏小数点43955；按排序、相邻年份和交叉来源校正为439.55。',
+            (2021,74,'netProfit'): '完整文本漏负号；V4 以年报/权威披露确认蒙商银行净亏损34.94亿元。',
+            (2025,71,'sourceName'): '完整转录将“广西北部湾银行”误写为“西北部湾银行”；按正式机构名称和稳定实体校正。',
+          }
 
-          def as_rank(v):
+          def url_key(value: str):
+            p=urlparse(value); host=(p.hostname or '').lower()
+            if host.startswith('www.'): host=host[4:]
+            return host, p.path.rstrip('/') or '/', p.query
+
+          verification=json.loads((ROOT/'verification-v4.json').read_text(encoding='utf-8'))
+          grades={}
+          for y in verification['years']:
+            for s in y['completeTableCrossChecks']:
+              grades[(y['rankingYear'],url_key(s['url']))]=s['grade']
+
+          def rank_value(v):
             try:
-              f=float(str(v).strip())
-              i=int(f)
-              return i if f==i and 1<=i<=100 else None
-            except Exception:
-              return None
+              d=Decimal(str(v).strip()); i=int(d)
+              return i if d==i and 1<=i<=100 else None
+            except Exception: return None
 
-          def as_num(v):
+          def raw_value(v):
+            if v is None or (isinstance(v,float) and math.isnan(v)): return None
+            s=str(v).strip()
+            if not s or s.lower()=='nan': return None
+            # Preserve malformed source strings; normal numeric strings become JSON numbers.
+            n=number_value(s)
+            if n is None: return s
+            return int(n) if n==n.to_integral() else float(n)
+
+          def number_value(v):
             if v is None: return None
-            if isinstance(v,float) and math.isnan(v): return None
             s=str(v).strip().replace(',','').replace('，','')
             if not s or s.lower()=='nan': return None
-            try: return float(s)
-            except Exception: return s
+            neg=s.startswith('(') and s.endswith(')')
+            if neg: s=s[1:-1].strip()
+            try:
+              d=Decimal(s)
+              return -d if neg else d
+            except InvalidOperation: return None
 
-          def same_num(a,b):
-            a=as_num(a); b=as_num(b)
-            if isinstance(a,(int,float)) and isinstance(b,(int,float)):
-              return abs(float(a)-float(b)) < 1e-9
-            return a==b
+          def values_equal(a,b):
+            na=number_value(a); nb=number_value(b)
+            if na is not None and nb is not None: return na==nb
+            return str(a).strip()==str(b).strip()
 
-          def select_rows(content):
-            tables=pd.read_html(io.BytesIO(content))
+          def pick_table(content: bytes):
             choices=[]
-            for idx,t in enumerate(tables):
+            for idx,t in enumerate(pd.read_html(io.BytesIO(content))):
               rows=[]
               for _,row in t.iterrows():
                 vals=list(row.values)
-                if not vals: continue
-                rank=as_rank(vals[0])
-                if rank is not None:
-                  rows.append(vals)
+                if vals and rank_value(vals[0]) is not None: rows.append(vals)
               if len(rows)==100 and min(len(r) for r in rows)>=4:
-                choices.append((max(len(r) for r in rows), idx, rows))
-            if not choices:
-              raise RuntimeError(f'no exact 100-row ranking table; shapes={[t.shape for t in tables]}')
-            choices.sort(reverse=True,key=lambda x:x[0])
-            return choices[0][2]
+                choices.append((max(len(r) for r in rows),idx,rows))
+            if not choices: raise RuntimeError('no exact 100-row source table')
+            choices.sort(reverse=True,key=lambda x:x[0]); return choices[0][2]
 
-          total_mismatches=0
-          for year,url in sources.items():
-            r=requests.get(url,headers=headers,timeout=25)
-            r.raise_for_status()
-            rows=select_rows(r.content)
-            prod=json.loads((root/'years'/f'{year}.json').read_text(encoding='utf-8'))
+          seen_differences=set()
+          for year,url in SOURCES.items():
+            response=requests.get(url,headers=HEADERS,timeout=25); response.raise_for_status()
+            rows=pick_table(response.content)
+            production=json.loads((ROOT/'years'/f'{year}.json').read_text(encoding='utf-8'))
             available=['rank','sourceName','coreTier1Capital','assets'] + (['netProfit'] if len(rows[0])>=5 else [])
-            mismatches=[]
-            for pos,(src,p) in enumerate(zip(rows,prod),start=1):
-              srank=as_rank(src[0]); sname=str(src[1]).strip()
-              values={'rank':srank,'sourceName':sname,'coreTier1Capital':src[2],'assets':src[3]}
-              if 'netProfit' in available: values['netProfit']=src[4]
-              mapped=name_to_id.get(sname)
-              if srank != p.get('rank'):
-                mismatches.append({'row':pos,'field':'rank','source':srank,'production':p.get('rank')})
-              if mapped is None:
-                if sname != p.get('sourceName'):
-                  mismatches.append({'row':pos,'field':'sourceName','source':sname,'production':p.get('sourceName'),'kind':'unmapped-name'})
-              elif mapped != p.get('bankId'):
-                mismatches.append({'row':pos,'field':'bankId','sourceName':sname,'sourceBankId':mapped,'productionBankId':p.get('bankId')})
-              for field in ('coreTier1Capital','assets','netProfit'):
-                if field in available and not same_num(values[field],p.get(field)):
-                  mismatches.append({'row':pos,'rank':p.get('rank'),'bank':p.get('sourceName'),'field':field,'source':as_num(values[field]),'production':p.get(field)})
-            total_mismatches += len(mismatches)
-            print('YEAR_RESULT',json.dumps({
-              'year':year,'url':url,'availableFields':available,'sourceRows':len(rows),
-              'mismatchCount':len(mismatches),'mismatches':mismatches
-            },ensure_ascii=False))
-          print('TOTAL_MISMATCHES',total_mismatches)
+            source_records=[]; resolved=[]
+            for row_no,(src,prod) in enumerate(zip(rows,production),start=1):
+              record={'rank':rank_value(src[0]),'sourceName':str(src[1]).strip(),
+                      'coreTier1Capital':raw_value(src[2]),'assets':raw_value(src[3])}
+              if 'netProfit' in available: record['netProfit']=raw_value(src[4])
+              source_records.append(record)
+              for field in available:
+                source_v=record[field]; prod_v=prod[field]
+                equal = source_v==prod_v if field in ('rank','sourceName') else values_equal(source_v,prod_v)
+                if equal: continue
+                key=(year,row_no,field); seen_differences.add(key)
+                reason=REASONS.get(key)
+                if not reason: raise RuntimeError(f'UNEXPLAINED {key}: {source_v!r} != {prod_v!r}')
+                resolved.append({'row':row_no,'rank':prod['rank'],'field':field,
+                                 'sourceValue':source_v,'productionValue':prod_v,'reason':reason})
+            missing_fields=[f for f in ('rank','sourceName','coreTier1Capital','assets','netProfit') if f not in available]
+            supplemental=[]
+            if year==2018 and missing_fields==['netProfit']:
+              supplemental.append({
+                'field':'netProfit','verifiedRows':100,'machineReadable':False,
+                'sourceUrl':'https://www.sohu.com/a/298193321_355066','grade':'B1',
+                'method':'V4逐行回看原始榜单图片；公开文本镜像没有净利润列。',
+              })
+            elif missing_fields:
+              raise RuntimeError(f'{year}: uncovered fields {missing_fields}')
+            grade=grades.get((year,url_key(url)))
+            if not grade: raise RuntimeError(f'{year}: source URL is not anchored in V4 completeTableCrossChecks')
+            snapshot={
+              'schemaVersion':1,'rankingYear':year,'capturedAt':CAPTURED_AT,
+              'source':{'url':url,'grade':grade,'captureMethod':'GitHub-hosted runner HTML table normalization',
+                        'sourceContentSha256':hashlib.sha256(response.content).hexdigest()},
+              'availableFields':available,'records':source_records,
+              'resolvedDifferences':resolved,'supplementalCoverage':supplemental,
+            }
+            (OUT/f'{year}.json').write_text(json.dumps(snapshot,ensure_ascii=False,separators=(',',':')),encoding='utf-8')
+            print(year,'rows=',len(source_records),'resolved=',len(resolved),'sourceSha=',snapshot['source']['sourceContentSha256'])
+
+          expected=set(REASONS)
+          if seen_differences != expected:
+            raise RuntimeError(f'difference allow-list drift: missing={sorted(expected-seen_differences)} extra={sorted(seen_differences-expected)}')
+          print('V5 snapshots built:',len(SOURCES),'years; resolved source differences:',len(seen_differences))
           PY
+
+          git diff --check
+
+      - name: Commit generated snapshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- tools/bank_rank/data/crosschecks/2016.json tools/bank_rank/data/crosschecks/2017.json tools/bank_rank/data/crosschecks/2018.json tools/bank_rank/data/crosschecks/2019.json tools/bank_rank/data/crosschecks/2020.json tools/bank_rank/data/crosschecks/2021.json tools/bank_rank/data/crosschecks/2022.json tools/bank_rank/data/crosschecks/2023.json tools/bank_rank/data/crosschecks/2024.json tools/bank_rank/data/crosschecks/2025.json
+          git commit -m 'audit(bank-rank): freeze V5 source crosschecks'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
