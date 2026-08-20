@@ -10,18 +10,17 @@ permissions:
 
 jobs:
   probe:
-    name: Probe CBA 2017 via historical crawls
+    name: Probe CBA 2017 via alternate fetchers
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
-      - name: Scan exact IDs in Common Crawl and Wayback
+      - name: Probe Jina Reader and search engines
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from __future__ import annotations
           import concurrent.futures
-          import gzip
           import html
           import json
           import re
@@ -29,20 +28,13 @@ jobs:
           import urllib.parse
           import urllib.request
 
-          IDS = range(18790, 18811)
-          INDEXES = [
-              'CC-MAIN-2017-43', 'CC-MAIN-2017-47', 'CC-MAIN-2017-51',
-              'CC-MAIN-2018-05', 'CC-MAIN-2018-09', 'CC-MAIN-2018-13',
-          ]
+          IDS = range(18795, 18806)
           TERMS = ('2017中国银行业100强榜单', '2017年中国银行业100强榜单', '中国银行业100强榜单')
           UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/131 Safari/537.36'
           ctx = ssl.create_default_context()
 
-          def fetch(url: str, timeout: float = 10.0, headers: dict | None = None):
-              h = {'User-Agent': UA, 'Accept': '*/*'}
-              if headers:
-                  h.update(headers)
-              req = urllib.request.Request(url, headers=h)
+          def fetch(url: str, timeout: float = 15.0):
+              req = urllib.request.Request(url, headers={'User-Agent': UA, 'Accept': '*/*'})
               try:
                   with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:
                       return r.status, r.geturl(), r.read()
@@ -57,13 +49,10 @@ jobs:
                       pass
               return body.decode('utf-8', errors='replace')
 
-          def inspect_payload(label: str, source_url: str, body: bytes):
-              text = decode(body)
-              title_m = re.search(r'<title[^>]*>(.*?)</title>', text, re.I | re.S)
-              title = html.unescape(re.sub(r'<[^>]+>', '', title_m.group(1))).strip() if title_m else ''
+          def score_text(text: str) -> int:
               score = 0
               for term in TERMS:
-                  if term in text or term in title:
+                  if term in text:
                       score += 10
               if '100强' in text and '银行业' in text:
                   score += 5
@@ -71,132 +60,79 @@ jobs:
                   score += 3
               if '中国工商银行' in text and '中国建设银行' in text:
                   score += 2
-              if score:
-                  media = []
-                  for attr in re.findall(r'''(?:href|src)\s*=\s*["']([^"']+)["']''', text, re.I):
-                      low = attr.lower()
-                      if any(x in low for x in ('.jpg', '.jpeg', '.png', '.gif', '.pdf', '.xls', '.xlsx', '/upload', '/uploads', '/attached', '/attachment')):
-                          media.append(urllib.parse.urljoin(source_url, html.unescape(attr)))
-                  plain = re.sub(r'(?is)<script.*?</script>|<style.*?</style>', ' ', text)
-                  plain = html.unescape(re.sub(r'(?s)<[^>]+>', ' ', plain))
-                  plain = re.sub(r'\s+', ' ', plain)
-                  positions = [plain.find(t) for t in TERMS if plain.find(t) >= 0]
-                  p = min(positions) if positions else plain.find('100强')
-                  print(f'*** CONTENT HIT score={score} {label}')
-                  print('SOURCE:', source_url)
-                  print('TITLE:', title[:300])
-                  print('MEDIA:', json.dumps(list(dict.fromkeys(media))[:80], ensure_ascii=False))
-                  print('CONTEXT:', plain[max(0,p-300):p+1800] if p >= 0 else plain[:1800])
-              return score, title
+              return score
 
-          print('=== COMMON CRAWL INDEX LOOKUP ===')
-          queries = []
-          for idx in INDEXES:
-              for i in IDS:
-                  for host in ('china-cba.net', 'www.china-cba.net'):
-                      original = f'https://{host}/Index/show/catid/14/id/{i}.html'
-                      q = f'https://index.commoncrawl.org/{idx}-index?' + urllib.parse.urlencode({'url': original, 'output': 'json'})
-                      queries.append((idx, i, original, q))
-
-          records = []
-          def query_cc(item):
-              idx, i, original, q = item
-              status, _, body = fetch(q, 8.0)
-              if status != 200:
-                  return []
-              out = []
-              for line in decode(body).splitlines():
-                  line = line.strip()
-                  if not line.startswith('{'):
-                      continue
-                  try:
-                      row = json.loads(line)
-                  except Exception:
-                      continue
-                  row['_index'] = idx
-                  row['_candidate_id'] = i
-                  row['_query_original'] = original
-                  out.append(row)
-              return out
-
-          with concurrent.futures.ThreadPoolExecutor(max_workers=32) as ex:
-              for rows in ex.map(query_cc, queries):
-                  records.extend(rows)
-
-          # Deduplicate captures and prioritize successful HTML responses near Nov 2017.
-          dedup = {}
-          for r in records:
-              key = (r.get('filename'), r.get('offset'), r.get('length'))
-              dedup[key] = r
-          records = list(dedup.values())
-          records.sort(key=lambda r: (r.get('_candidate_id', 0), r.get('timestamp', ''), r.get('_index', '')))
-          print('CC_RECORD_COUNT:', len(records))
-          for r in records:
-              print('CC_RECORD:', json.dumps({k:r.get(k) for k in ('_candidate_id','_index','url','timestamp','status','mime','filename','offset','length')}, ensure_ascii=False))
-
-          print('=== COMMON CRAWL WARC CONTENT ===')
-          hits = []
-          def fetch_warc(r):
-              try:
-                  offset = int(r['offset']); length = int(r['length'])
-                  warc_url = 'https://data.commoncrawl.org/' + r['filename']
-                  status, _, raw = fetch(warc_url, 15.0, {'Range': f'bytes={offset}-{offset+length-1}'})
-                  if status not in (200, 206):
-                      return r, b'', f'http {status}'
-                  try:
-                      data = gzip.decompress(raw)
-                  except Exception:
-                      data = raw
-                  # Strip WARC and HTTP headers; keeping whole decoded record is harmless for keyword search.
-                  return r, data, None
-              except Exception as e:
-                  return r, b'', f'{type(e).__name__}: {e}'
-
-          # Prefer 2xx HTML and snapshots from late 2017 / early 2018.
-          usable = [r for r in records if str(r.get('status','')).startswith('2') and 'html' in str(r.get('mime','html'))]
-          with concurrent.futures.ThreadPoolExecutor(max_workers=12) as ex:
-              for r, data, err in ex.map(fetch_warc, usable):
-                  if err:
-                      print('WARC_ERROR:', r.get('_candidate_id'), r.get('_index'), err)
-                      continue
-                  score, title = inspect_payload(f"CC id={r.get('_candidate_id')} index={r.get('_index')} ts={r.get('timestamp')}", r.get('url') or r.get('_query_original'), data)
-                  if score:
-                      hits.append((r, score, title))
-
-          print('CC_HIT_COUNT:', len(hits))
-          for r, score, title in sorted(hits, key=lambda x: (-x[1], x[0].get('_candidate_id', 0))):
-              print('CC_HIT_SUMMARY:', json.dumps({'id':r.get('_candidate_id'),'index':r.get('_index'),'timestamp':r.get('timestamp'),'url':r.get('url'),'score':score,'title':title}, ensure_ascii=False))
-
-          print('=== WAYBACK EXACT-ID CDX FALLBACK ===')
-          wayback_rows = []
-          wayback_queries = []
+          print('=== JINA READER PER-ID ===')
+          reader_targets = []
           for i in IDS:
-              for host in ('china-cba.net','www.china-cba.net'):
-                  original = f'https://{host}/Index/show/catid/14/id/{i}.html'
-                  q = 'https://web.archive.org/cdx/search/cdx?' + urllib.parse.urlencode({
-                      'url': original, 'from':'2017', 'to':'2019', 'output':'json',
-                      'filter':'statuscode:200', 'fl':'timestamp,original,statuscode,digest', 'limit':'20'
-                  })
-                  wayback_queries.append((i, original, q))
+              for scheme in ('https','http'):
+                  for host in ('china-cba.net','www.china-cba.net'):
+                      origin = f'{scheme}://{host}/Index/show/catid/14/id/{i}.html'
+                      reader_targets.append((i, origin, 'https://r.jina.ai/' + origin))
 
-          def query_wb(item):
-              i, original, q = item
-              status, _, body = fetch(q, 8.0)
-              if status != 200:
-                  return []
-              try:
-                  data = json.loads(decode(body))
-              except Exception:
-                  return []
-              return [(i, row) for row in data[1:]] if data and isinstance(data[0], list) else []
+          reader_hits = []
+          def probe_reader(item):
+              i, origin, reader = item
+              status, final, body = fetch(reader, 20.0)
+              text = decode(body)
+              return i, origin, reader, status, final, text
 
-          with concurrent.futures.ThreadPoolExecutor(max_workers=16) as ex:
-              for rows in ex.map(query_wb, wayback_queries):
-                  wayback_rows.extend(rows)
-          print('WAYBACK_EXACT_COUNT:', len(wayback_rows))
-          for i, row in wayback_rows:
-              print('WAYBACK_EXACT:', i, row)
+          with concurrent.futures.ThreadPoolExecutor(max_workers=12) as ex:
+              for i, origin, reader, status, final, text in ex.map(probe_reader, reader_targets):
+                  s = score_text(text)
+                  # Always print compact metadata for the critical gap around 18799-18801.
+                  if i in (18798,18799,18800,18801,18802) or s:
+                      first = re.sub(r'\s+', ' ', text[:900])
+                      print('READER_RESULT:', json.dumps({'id':i,'origin':origin,'status':status,'final':final,'score':s,'first':first}, ensure_ascii=False))
+                  if s:
+                      reader_hits.append((i, origin, s, text))
 
-          if not hits:
-              print('NO_CONTENT_HIT: no archived page in scanned IDs contained the ranking terms')
+          print('READER_HIT_COUNT:', len(reader_hits))
+          for i, origin, s, text in reader_hits:
+              p_candidates = [text.find(t) for t in TERMS if text.find(t) >= 0]
+              p = min(p_candidates) if p_candidates else text.find('100强')
+              print('*** READER_HIT:', i, origin, 'score=', s)
+              print(re.sub(r'\s+', ' ', text[max(0,p-400):p+2200] if p >= 0 else text[:2200]))
+
+          print('=== SEARCH ENGINE HTML ===')
+          queries = [
+              '"2017中国银行业100强榜单" site:china-cba.net/Index/show',
+              '"2017年中国银行业100强榜单" site:china-cba.net/Index/show',
+              '"中国银行业协会" "2017中国银行业100强榜单"',
+              '"18800" "中国银行业协会"',
+          ]
+          engines = []
+          for q in queries:
+              enc = urllib.parse.quote_plus(q)
+              engines.extend([
+                  ('bing', q, f'https://www.bing.com/search?q={enc}&count=50'),
+                  ('google', q, f'https://www.google.com/search?q={enc}&num=50'),
+                  ('baidu', q, f'https://www.baidu.com/s?wd={enc}&rn=50'),
+                  ('sogou', q, f'https://www.sogou.com/web?query={enc}&num=50'),
+              ])
+
+          def probe_engine(item):
+              name, q, url = item
+              status, final, body = fetch(url, 20.0)
+              text = decode(body)
+              return name, q, url, status, final, text
+
+          found_urls = set()
+          with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
+              for name, q, url, status, final, text in ex.map(probe_engine, engines):
+                  ids = sorted(set(re.findall(r'(?:china-cba\.net[^\s"<>]{0,120}?/id/|id%2F)(\d{4,6})', text, re.I)))
+                  urls = re.findall(r'https?://(?:www\.)?china-cba\.net/Index/show/(?:catid/\d+/)?id/\d+\.html', html.unescape(text), re.I)
+                  found_urls.update(urls)
+                  snippet_score = score_text(html.unescape(re.sub(r'<[^>]+>', ' ', text)))
+                  print('ENGINE_RESULT:', json.dumps({'engine':name,'query':q,'status':status,'ids':ids[:60],'url_hits':urls[:30],'score':snippet_score}, ensure_ascii=False))
+
+          print('FOUND_CBA_URLS:', json.dumps(sorted(found_urls), ensure_ascii=False))
+          print('=== SEQUENCE EVIDENCE ===')
+          print('KNOWN: id/18799 = 2017-11-11 association-dynamics article')
+          print('KNOWN: id/18801 = 2017-11-13 association-dynamics article')
+          print('KNOWN: id/18802 = 2017-11-13 speech article (catid 32)')
+          print('KNOWN: id/18803 = 2017-11-13 notice (catid 15)')
+          print('KNOWN: id/18804 = 2017-11-13 notice (catid 15)')
+          print('KNOWN: id/18805 = 2017-11-13 association-dynamics article')
+          print('CANDIDATE_GAP: id/18800 is the only integer ID between 18799 and 18801 and is not indexed by current search results')
           PY
