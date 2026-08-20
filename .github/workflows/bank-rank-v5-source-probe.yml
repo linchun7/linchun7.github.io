@@ -41,7 +41,7 @@ jobs:
             2020:'https://resource.emagecompany.com/finance/2020banking100.html',
             2021:'https://m.maigoo.com/news/599884.html',
             2022:'https://finance.sina.com.cn/zt_d/2022zgyhy/index.shtml',
-            2023:'https://m.maigoo.com/news/684140.html',
+            2023:'https://www.maigoo.com/news/684140.html',
             2024:'https://resource.emagecompany.com/finance/2024bank100.html',
             2025:'https://www.cnpp.cn/focus/3527597.html'}
           REASONS={
@@ -114,10 +114,8 @@ jobs:
               rec={'rank':rank(src[0]),'sourceName':str(src[1]).strip(),'coreTier1Capital':raw(src[2]),'assets':raw(src[3])}
               if 'netProfit' in fields:rec['netProfit']=raw(src[4])
               records.append(rec)
-              # Rank and financial cells are exact after numeric normalization. Names compare by stable entity alias first.
               checks=[('rank',rec['rank'],p['rank'])]
-              source_bank=name_to_id.get(rec['sourceName'])
-              if source_bank != p['bankId']:
+              if name_to_id.get(rec['sourceName']) != p['bankId']:
                 checks.append(('sourceName',rec['sourceName'],p['sourceName']))
               for f in ('coreTier1Capital','assets','netProfit'):
                 if f in fields:checks.append((f,rec[f],p[f]))
