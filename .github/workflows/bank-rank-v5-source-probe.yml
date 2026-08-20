@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/bank-rank-v5-source-probe.yml'
+      - 'tools/bank_rank/data/**'
 
 permissions:
   contents: read
@@ -13,16 +14,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
-      - name: Probe ten yearly complete-table sources
+      - name: Check out PR branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Compare ten yearly complete-table sources with production
         shell: bash
         run: |
           set -euo pipefail
           python3 -m pip install --quiet pandas lxml beautifulsoup4 requests
           python3 - <<'PY'
-          import io, json, re
+          import io, json, math, re
+          from pathlib import Path
           import pandas as pd
           import requests
 
+          root = Path('tools/bank_rank/data')
           sources = {
             2016: 'https://resource.emagecompany.com/finance/2016banking100.html',
             2017: 'https://www.maigoo.com/news/502207.html',
@@ -36,35 +42,80 @@ jobs:
             2025: 'https://www.cnpp.cn/focus/3527597.html',
           }
           headers={'User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/131 Safari/537.36'}
-          for year,url in sources.items():
-            print(f'=== YEAR {year} {url} ===')
+
+          banks=json.loads((root/'banks.json').read_text(encoding='utf-8'))
+          name_to_id={}
+          for b in banks:
+            for n in [b['name'], *b.get('aliases',[])]:
+              name_to_id[n]=b['id']
+
+          def as_rank(v):
             try:
-              r=requests.get(url,headers=headers,timeout=25)
-              print('HTTP',r.status_code,'bytes',len(r.content),'final',r.url)
-              r.raise_for_status()
-            except Exception as e:
-              print('FETCH_ERROR',repr(e)); continue
-            text=r.content.decode(r.encoding or 'utf-8',errors='replace')
-            try:
-              tables=pd.read_html(io.StringIO(text))
-            except Exception as e:
-              print('READ_HTML_ERROR',repr(e)); tables=[]
-            print('TABLE_COUNT',len(tables))
-            scored=[]
+              f=float(str(v).strip())
+              i=int(f)
+              return i if f==i and 1<=i<=100 else None
+            except Exception:
+              return None
+
+          def as_num(v):
+            if v is None: return None
+            if isinstance(v,float) and math.isnan(v): return None
+            s=str(v).strip().replace(',','').replace('，','')
+            if not s or s.lower()=='nan': return None
+            try: return float(s)
+            except Exception: return s
+
+          def same_num(a,b):
+            a=as_num(a); b=as_num(b)
+            if isinstance(a,(int,float)) and isinstance(b,(int,float)):
+              return abs(float(a)-float(b)) < 1e-9
+            return a==b
+
+          def select_rows(content):
+            tables=pd.read_html(io.BytesIO(content))
+            choices=[]
             for idx,t in enumerate(tables):
-              rows,cols=t.shape
-              head=' | '.join(map(str,t.columns))
-              score=(100 if 95<=rows<=105 else 0)+(20 if cols>=5 else 0)+(10 if any(k in head for k in ['资本','资产','利润','机构','排名','序号']) else 0)
-              scored.append((score,idx,rows,cols,head))
-            for item in sorted(scored,reverse=True)[:5]:
-              print('TABLE',json.dumps(item,ensure_ascii=False))
-              t=tables[item[1]]
-              print('HEAD_ROWS',t.head(3).to_json(force_ascii=False,orient='values'))
-              print('TAIL_ROWS',t.tail(3).to_json(force_ascii=False,orient='values'))
-            # fallback: report count of text lines that begin with a rank and contain >=3 numbers
-            plain=re.sub(r'<[^>]+>',' ',text)
-            plain=re.sub(r'\s+',' ',plain)
-            candidates=re.findall(r'(?<!\d)(\d{1,3})\s+([^\d]{2,40}?)\s+(-?[\d.,]+)\s+(-?[\d.,]+)\s+(-?[\d.,]+)',plain)
-            ranked=[x for x in candidates if 1<=int(x[0])<=100]
-            print('REGEX_RANKED_COUNT',len(ranked),'SAMPLE',json.dumps(ranked[:3],ensure_ascii=False))
+              rows=[]
+              for _,row in t.iterrows():
+                vals=list(row.values)
+                if not vals: continue
+                rank=as_rank(vals[0])
+                if rank is not None:
+                  rows.append(vals)
+              if len(rows)==100 and min(len(r) for r in rows)>=4:
+                choices.append((max(len(r) for r in rows), idx, rows))
+            if not choices:
+              raise RuntimeError(f'no exact 100-row ranking table; shapes={[t.shape for t in tables]}')
+            choices.sort(reverse=True,key=lambda x:x[0])
+            return choices[0][2]
+
+          total_mismatches=0
+          for year,url in sources.items():
+            r=requests.get(url,headers=headers,timeout=25)
+            r.raise_for_status()
+            rows=select_rows(r.content)
+            prod=json.loads((root/'years'/f'{year}.json').read_text(encoding='utf-8'))
+            available=['rank','sourceName','coreTier1Capital','assets'] + (['netProfit'] if len(rows[0])>=5 else [])
+            mismatches=[]
+            for pos,(src,p) in enumerate(zip(rows,prod),start=1):
+              srank=as_rank(src[0]); sname=str(src[1]).strip()
+              values={'rank':srank,'sourceName':sname,'coreTier1Capital':src[2],'assets':src[3]}
+              if 'netProfit' in available: values['netProfit']=src[4]
+              mapped=name_to_id.get(sname)
+              if srank != p.get('rank'):
+                mismatches.append({'row':pos,'field':'rank','source':srank,'production':p.get('rank')})
+              if mapped is None:
+                if sname != p.get('sourceName'):
+                  mismatches.append({'row':pos,'field':'sourceName','source':sname,'production':p.get('sourceName'),'kind':'unmapped-name'})
+              elif mapped != p.get('bankId'):
+                mismatches.append({'row':pos,'field':'bankId','sourceName':sname,'sourceBankId':mapped,'productionBankId':p.get('bankId')})
+              for field in ('coreTier1Capital','assets','netProfit'):
+                if field in available and not same_num(values[field],p.get(field)):
+                  mismatches.append({'row':pos,'rank':p.get('rank'),'bank':p.get('sourceName'),'field':field,'source':as_num(values[field]),'production':p.get(field)})
+            total_mismatches += len(mismatches)
+            print('YEAR_RESULT',json.dumps({
+              'year':year,'url':url,'availableFields':available,'sourceRows':len(rows),
+              'mismatchCount':len(mismatches),'mismatches':mismatches
+            },ensure_ascii=False))
+          print('TOTAL_MISMATCHES',total_mismatches)
           PY
