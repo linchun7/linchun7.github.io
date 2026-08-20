@@ -1,0 +1,99 @@
+name: Probe bank rank 2022 official source
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/bank-rank-source-probe-2022.yml'
+      - 'tools/bank_rank/**'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Probe CBA 2022 detail page
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fetch and inspect official page
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://china-cba.net/Index/show/catid/14/id/40979.html'
+          html=/tmp/cba-40979.html
+          headers=/tmp/cba-40979.headers
+
+          curl --http1.1 -L --fail-with-body \
+            --retry 3 --retry-all-errors --retry-delay 2 \
+            --connect-timeout 15 --max-time 60 \
+            -A 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/131 Safari/537.36' \
+            -D "$headers" -o "$html" "$url"
+
+          echo '=== RESPONSE HEADERS ==='
+          cat "$headers"
+          echo '=== FILE ==='
+          wc -c "$html"
+          sha256sum "$html"
+
+          python3 - <<'PY'
+          from __future__ import annotations
+          import html as html_lib
+          import re
+          from pathlib import Path
+          from urllib.parse import urljoin
+
+          url = 'https://china-cba.net/Index/show/catid/14/id/40979.html'
+          raw = Path('/tmp/cba-40979.html').read_bytes()
+          text = None
+          encoding = None
+          for enc in ('utf-8', 'gb18030', 'gbk'):
+              try:
+                  candidate = raw.decode(enc)
+              except UnicodeDecodeError:
+                  continue
+              if '中国银行业' in candidate or enc == 'utf-8':
+                  text = candidate
+                  encoding = enc
+                  break
+          if text is None:
+              text = raw.decode('utf-8', errors='replace')
+              encoding = 'utf-8-replace'
+
+          print('=== PARSE ===')
+          print('encoding:', encoding)
+          title_m = re.search(r'<title[^>]*>(.*?)</title>', text, re.I | re.S)
+          title = html_lib.unescape(re.sub(r'<[^>]+>', '', title_m.group(1))).strip() if title_m else ''
+          print('title:', title)
+
+          target = '2022年中国银行业100强榜单'
+          print('contains_target_title:', target in text)
+          print('contains_release_date:', '2022-06-17' in text)
+
+          plain = re.sub(r'(?is)<script.*?</script>|<style.*?</style>', ' ', text)
+          plain = re.sub(r'(?s)<[^>]+>', ' ', plain)
+          plain = html_lib.unescape(plain)
+          plain = re.sub(r'\s+', ' ', plain)
+          pos = plain.find(target)
+          if pos >= 0:
+              print('context:', plain[max(0, pos - 180):pos + 900])
+
+          attrs = re.findall(r'''(?:href|src)\s*=\s*["']([^"']+)["']''', text, re.I)
+          seen = set()
+          candidates = []
+          for value in attrs:
+              absolute = urljoin(url, html_lib.unescape(value.strip()))
+              low = absolute.lower()
+              if absolute in seen:
+                  continue
+              seen.add(absolute)
+              if any(token in low for token in ('.jpg', '.jpeg', '.png', '.webp', '.gif', '.pdf', '.xls', '.xlsx', '.doc', '.docx', '/upload', '/uploads', '/attachment', '/attached')):
+                  candidates.append(absolute)
+
+          print('=== MEDIA / ATTACHMENT CANDIDATES ===')
+          for candidate in candidates:
+              print(candidate)
+          print('candidate_count:', len(candidates))
+
+          if target not in text:
+              raise SystemExit('official detail page did not contain expected title')
+          PY
