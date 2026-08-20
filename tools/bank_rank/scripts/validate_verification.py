@@ -203,6 +203,12 @@ def validate(data_dir: Path = DATA_DIR) -> list[str]:
         errors.append("conclusion.recordsReverified must match production records")
     if conclusion.get("yearsVerified") != len(manifest_years):
         errors.append("conclusion.yearsVerified must match production years")
+    expected_legacy_gaps = sorted(
+        year for year, item in audit_years.items()
+        if item.get("status") == "verified_with_legacy_primary_gap"
+    )
+    if conclusion.get("legacyPrimaryGaps") != expected_legacy_gaps:
+        errors.append("conclusion.legacyPrimaryGaps must match legacy-gap year statuses")
     return errors
 
 
