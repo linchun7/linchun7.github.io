@@ -1,178 +1,127 @@
-const LANGUAGE_DATA = {
-  en: {
-    name: "英语",
-    native: "English",
-    lang: "en",
-    samples: [
-      ["短词 / UI", "Raw"],
-      ["新闻标题", "The world will again wait to see whether he folds when political costs pile up."],
-      ["习语", "The proposal is not a silver bullet, but it could buy policymakers some breathing room."],
-      ["技术说明", "The feature processes photos on the device, so the originals never leave your phone."],
-      ["财经语境", "The bank wrote down the value of the asset after higher-for-longer rates squeezed demand."],
-      ["歧义 / 语气", "She said the deal was still on the table, although neither side appeared ready to blink."],
-      ["长句", "While the update fixes the bug that caused some users to be signed out unexpectedly, the company says accounts created before June may still need to verify their recovery email the next time they log in."],
-      ["专名 / 法律", "Tiananmen vigil organizers found guilty of inciting subversion in Hong Kong."],
-    ],
-  },
-  ja: {
-    name: "日语",
-    native: "日本語",
-    lang: "ja",
-    samples: [
-      ["短词 / UI", "設定"],
-      ["新闻标题", "政府は追加対策を打ち出したが、市場の反応は限定的だった。"],
-      ["习语", "雨降って地固まる。"],
-      ["技术说明", "この機能は端末内で処理されるため、元の写真がサーバーに送信されることはありません。"],
-      ["口语表达", "彼は『話がうますぎる』と警戒し、契約書をもう一度読み直した。"],
-      ["文化语境", "空気を読むことが求められる場面でも、必要な異論はきちんと伝えるべきだ。"],
-      ["长句", "新しい制度は手続きを簡素化する一方で、申請時期によって必要書類が異なるため、利用者には事前確認が求められている。"],
-      ["歧义", "生で見るのと画面越しに見るのとでは、受ける印象がまるで違う。"],
-    ],
-  },
-  ko: {
-    name: "韩语",
-    native: "한국어",
-    lang: "ko",
-    samples: [
-      ["短词 / UI", "설정"],
-      ["新闻标题", "정부는 추가 대책을 내놨지만 시장 반응은 미지근했다."],
-      ["习语", "발등에 불이 떨어지고 나서야 대책을 찾기 시작했다."],
-      ["技术说明", "이 기능은 기기에서 직접 처리되므로 원본 사진이 서버로 전송되지 않습니다."],
-      ["口语表达", "그는 '말처럼 쉬운 일은 아니다'라며 선을 그었다."],
-      ["文化语境", "눈치가 빠른 사람이라도 모든 분위기를 정확히 읽을 수 있는 것은 아니다."],
-      ["长句", "업데이트는 로그인 오류를 해결했지만 지난달 이전에 만들어진 계정은 다음 접속 때 복구 이메일을 다시 확인해야 할 수도 있다."],
-      ["歧义", "그 회사는 비판이 커지자 결국 한발 물러섰다."],
-    ],
-  },
-  fr: {
-    name: "法语",
-    native: "Français",
-    lang: "fr",
-    samples: [
-      ["短词 / UI", "Paramètres"],
-      ["新闻标题", "Le gouvernement a présenté de nouvelles mesures, mais les marchés sont restés prudents."],
-      ["习语", "Ce n'est pas la mer à boire, mais il faudra s'y mettre sérieusement."],
-      ["技术说明", "L'application traite les photos sur l'appareil afin que les originaux ne quittent jamais votre téléphone."],
-      ["口语表达", "Après plusieurs semaines de tension, il a fini par mettre de l'eau dans son vin."],
-      ["财经语境", "La banque a revu la valeur de l'actif à la baisse après le recul de la demande."],
-      ["长句", "Même si la mise à jour corrige le problème principal, certains utilisateurs devront encore vérifier leur adresse de récupération lors de leur prochaine connexion."],
-      ["歧义", "Le ministre a assuré que la porte restait ouverte, sans préciser jusqu'à quand."],
-    ],
-  },
-  de: {
-    name: "德语",
-    native: "Deutsch",
-    lang: "de",
-    samples: [
-      ["短词 / UI", "Einstellungen"],
-      ["新闻标题", "Die Regierung legte weitere Maßnahmen vor, doch die Märkte reagierten verhalten."],
-      ["习语", "Das ist nicht das Gelbe vom Ei, aber für den Moment reicht es."],
-      ["技术说明", "Die Daten werden ausschließlich auf dem Gerät verarbeitet und nicht an den Server übertragen."],
-      ["口语表达", "Er wollte sich nicht zu weit aus dem Fenster lehnen und vermied eine klare Prognose."],
-      ["财经语境", "Höhere Zinsen setzten die Nachfrage unter Druck und zwangen die Bank zu einer Abschreibung."],
-      ["长句", "Obwohl das Update den Fehler behebt, können ältere Konten bei der nächsten Anmeldung weiterhin zur Bestätigung ihrer Wiederherstellungsadresse aufgefordert werden."],
-      ["歧义", "Der Vorstand ließ offen, ob die Entscheidung endgültig ist."],
-    ],
-  },
-  es: {
-    name: "西班牙语",
-    native: "Español",
-    lang: "es",
-    samples: [
-      ["短词 / UI", "Configuración"],
-      ["新闻标题", "El Gobierno anunció nuevas medidas, pero los mercados reaccionaron con cautela."],
-      ["习语", "No es para tirar cohetes, pero al menos nos da un poco de margen."],
-      ["技术说明", "La aplicación procesa las fotos en el dispositivo para que los originales nunca salgan del teléfono."],
-      ["口语表达", "La empresa dio marcha atrás después de que aumentaran las críticas."],
-      ["财经语境", "El banco redujo el valor del activo después de que los tipos altos frenaran la demanda."],
-      ["长句", "Aunque la actualización corrige el fallo principal, las cuentas creadas antes de junio todavía pueden tener que verificar su correo de recuperación al volver a iniciar sesión."],
-      ["歧义", "El ministro dijo que la oferta seguía sobre la mesa, pero evitó comprometerse con una fecha."],
-    ],
-  },
+const DATA = {
+  en: [
+    ["UI and short text", ["Raw", "Draft saved", "Turn off notifications"]],
+    ["News headlines", ["Markets rally as inflation cools, but investors remain cautious.", "Court blocks new rule hours before it was due to take effect.", "Wildfire forces thousands to evacuate as winds strengthen overnight."]],
+    ["Idioms and metaphors", ["The proposal is not a silver bullet, but it could buy policymakers some breathing room.", "After months of negotiations, the ball is now in the regulator's court.", "The company moved the goalposts after customers had already agreed to the original terms."]],
+    ["Colloquial tone", ["That's easier said than done.", "I'm not buying it.", "We were this close to calling it quits."]],
+    ["Ambiguity and polysemy", ["The bank raised its rate after the river flooded the lower bank.", "She left the file on the desktop before leaving the office.", "The light was too light to notice at first."]],
+    ["Negation and scope", ["Not everyone who opposed the plan voted against it.", "I didn't say he stole the money.", "Unless the deadline is extended, applications received after Friday will not be reviewed."]],
+    ["Pronouns and reference", ["Maya called Elena after she left the meeting, but she didn't answer.", "The company told the supplier it would cover the recall costs.", "When the server contacted the client, it had already timed out."]],
+    ["Technology and development", ["The API returns 204 even when the request succeeds, so do not expect a JSON body.", "If the cache key includes the query string, two otherwise identical URLs may produce different entries.", "The patch fixes a race condition that only appears when two workers update the same record at nearly the same time."]],
+    ["Products and UX", ["Photos are processed on-device, so the originals never leave your phone.", "Selecting Continue does not submit the form; you can still go back and change your answers.", "Your subscription renews automatically unless you cancel at least 24 hours before the current period ends."]],
+    ["Finance and economics", ["The bank wrote down the value of the asset after higher-for-longer rates squeezed demand.", "Bond yields fell even as the central bank signaled that rate cuts were not imminent.", "A weaker currency can help exporters while making imported energy more expensive."]],
+    ["Law and public policy", ["The court found the company liable for damages but declined to award punitive damages.", "The bill would exempt small businesses from the reporting requirement for two years.", "The regulator may impose a fine if the operator fails to remedy the breach within the stated period."]],
+    ["Health and medicine", ["A negative test does not necessarily rule out infection if it was taken too early.", "This medicine may cause drowsiness, so avoid driving until you know how it affects you.", "Seek urgent medical attention if chest pain is severe, persistent, or accompanied by difficulty breathing."]],
+    ["Travel and service", ["Your bags will be checked through to the final destination, but you must collect them for customs.", "Complimentary breakfast is available only to guests who booked the flexible rate.", "The room is non-refundable, although the hotel may waive the fee in exceptional circumstances."]],
+    ["Numbers, dates and units", ["Revenue rose 7.5% to $2.4 billion in Q2, up from $2.23 billion a year earlier.", "The train departs at 08:05 on 03/04/2027 and arrives 1 hour 45 minutes later.", "Add 1½ cups of water and bake at 350°F for 25–30 minutes."]],
+    ["Names, brands and identifiers", ["Apple says iCloud Private Relay does not hide all browsing activity from websites.", "OpenAI's API request failed because the model identifier did not match an available deployment.", "The fix landed in fishjar/kiss-translator, but the README still refers to the old option name."]],
+    ["Long and complex sentences", ["While the update fixes the bug that caused some users to be signed out unexpectedly, the company says accounts created before June may still need to verify their recovery email the next time they log in.", "Although the central bank left rates unchanged, its statement was interpreted as less hawkish because officials acknowledged that weaker hiring could become a greater risk than inflation.", "The committee, which had postponed the vote twice after members asked for more data, approved the proposal only after the agency agreed to publish a review within six months."]]
+  ],
+  ja: [
+    ["短いUI文言", ["未読", "下書きを保存しました", "通知をオフにする"]],
+    ["ニュース見出し", ["政府は追加対策を打ち出したが、市場の反応は限定的だった。", "施行直前、新たな規則を裁判所が差し止め。", "夜間に風が強まり、山火事で数千人に避難命令。"]],
+    ["慣用句・比喩", ["雨降って地固まる。", "二兎を追う者は一兎をも得ず。", "彼の不用意な発言は、ただでさえ険悪だった空気に火を注いだ。"]],
+    ["口語・語気", ["話がうますぎる。", "それはさすがに無理がある。", "もう少しで全部投げ出すところだった。"]],
+    ["多義・曖昧表現", ["生で見るのと画面越しに見るのとでは、受ける印象がまるで違う。", "彼は橋の端で端末を落としそうになった。", "『それで結構です』という返事が、承諾なのか断りなのか分からなかった。"]],
+    ["否定・範囲", ["計画に反対した人が全員、採決でも反対票を投じたわけではない。", "私は彼がお金を盗んだと言ったわけではない。", "期限が延長されない限り、金曜日を過ぎて届いた申請は審査されない。"]],
+    ["指示対象・省略", ["佐藤さんは会議を出たあと田中さんに電話したが、出なかった。", "会社は仕入先に、リコール費用はこちらで負担すると伝えた。", "サーバーがクライアントに応答した時点では、すでにタイムアウトしていた。"]],
+    ["技術・開発", ["APIは処理に成功しても204を返すため、JSONの本文が返るとは限らない。", "キャッシュキーにクエリ文字列を含めると、ほぼ同じURLでも別のエントリとして保存されることがある。", "この修正は、二つのワーカーがほぼ同時に同じレコードを更新した場合だけ発生する競合状態を解消する。"]],
+    ["製品・UX", ["写真は端末内で処理されるため、元の画像が端末の外に送られることはない。", "「続ける」を選んでもフォームは送信されず、前の画面に戻って回答を変更できる。", "現在の期間が終了する24時間前までに解約しない限り、サブスクリプションは自動更新される。"]],
+    ["金融・経済", ["高金利が長引いて需要が弱まったため、銀行は資産価値を減額した。", "中央銀行が利下げを急がない姿勢を示したにもかかわらず、国債利回りは低下した。", "通貨安は輸出企業の追い風になる一方、輸入エネルギーの価格を押し上げることがある。"]],
+    ["法律・政策", ["裁判所は会社の損害賠償責任を認めたが、懲罰的損害賠償は認めなかった。", "法案は小規模事業者を2年間、報告義務の対象外とする。", "事業者が指定期間内に違反を是正しなければ、当局は罰金を科すことができる。"]],
+    ["医療・健康", ["検査の時期が早すぎる場合、陰性でも感染を完全には否定できない。", "この薬は眠気を起こすことがあるため、影響が分かるまでは運転を避けてください。", "胸の痛みが強い、長く続く、または息苦しさを伴う場合は、速やかに医療機関を受診してください。"]],
+    ["旅行・サービス", ["手荷物は最終目的地まで預けられますが、税関手続きのため途中で一度受け取る必要があります。", "無料の朝食はフレキシブル料金で予約した宿泊客のみ利用できます。", "この客室は返金不可ですが、特別な事情がある場合はホテルが取消料を免除することがあります。"]],
+    ["数字・日付・単位", ["第2四半期の売上高は前年の2230億円から7.5%増え、2400億円となった。", "列車は2027年4月3日08時05分に出発し、1時間45分後に到着する。", "水を1.5カップ加え、180℃のオーブンで25〜30分焼く。"]],
+    ["固有名詞・識別子", ["Appleによると、iCloud Private Relayですべての閲覧行動がウェブサイトから隠されるわけではない。", "OpenAI APIへのリクエストは、モデル識別子が利用可能なデプロイと一致しなかったため失敗した。", "修正はfishjar/kiss-translatorに入ったが、READMEにはまだ古いオプション名が残っている。"]],
+    ["長文・複雑な構文", ["今回の更新で一部の利用者が突然ログアウトされる不具合は修正されたものの、6月以前に作成されたアカウントでは、次回ログイン時に復旧用メールアドレスの確認が必要になる場合がある。", "中央銀行は政策金利を据え置いたが、当局者が雇用の弱まりはインフレ以上のリスクになり得ると認めたため、市場では従来ほどタカ派的ではないとの受け止めが広がった。", "委員会は追加データを求める声を受けて採決を二度延期していたが、当局が6か月以内に検証結果を公表すると約束したことで、ようやく提案を承認した。"]]
+  ],
+  ko: [
+    ["짧은 UI 문구", ["읽지 않음", "초안이 저장되었습니다", "알림 끄기"]],
+    ["뉴스 제목", ["정부가 추가 대책을 내놨지만 시장 반응은 제한적이었다.", "시행을 몇 시간 앞두고 법원이 새 규정에 제동을 걸었다.", "밤사이 바람이 강해지며 산불로 수천 명에게 대피령이 내려졌다."]],
+    ["관용구와 비유", ["소 잃고 외양간 고친 격이다.", "공은 이제 규제 당국으로 넘어갔다.", "회사가 고객들이 기존 조건에 동의한 뒤에 골대를 옮겼다는 비판이 나왔다."]],
+    ["구어체와 뉘앙스", ["말처럼 쉬운 일은 아니다.", "나는 그 말을 곧이곧대로 믿지 않는다.", "우리는 정말 조금만 더 갔으면 포기할 뻔했다."]],
+    ["중의성과 다의어", ["배를 타기 전에 배가 고파서 배를 하나 먹었다.", "그는 차를 세워 두고 차 한 잔을 마셨다.", "그 회사는 비판이 커지자 결국 한발 물러섰다."]],
+    ["부정과 범위", ["계획에 반대한 모든 사람이 표결에서도 반대표를 던진 것은 아니다.", "나는 그가 돈을 훔쳤다고 말한 적이 없다.", "기한이 연장되지 않는 한 금요일 이후 접수된 신청서는 심사하지 않는다."]],
+    ["대명사와 지시 대상", ["민지는 회의가 끝난 뒤 수진에게 전화했지만 받지 않았다.", "회사는 공급업체에 리콜 비용을 부담하겠다고 말했다.", "서버가 클라이언트에 응답했을 때는 이미 시간 초과가 발생한 뒤였다."]],
+    ["기술과 개발", ["요청이 성공해도 API가 204를 반환할 수 있으므로 JSON 본문이 올 것이라고 가정하면 안 된다.", "캐시 키에 쿼리 문자열이 포함되면 거의 같은 URL도 서로 다른 항목으로 저장될 수 있다.", "이 패치는 두 워커가 거의 동시에 같은 레코드를 갱신할 때만 나타나는 경쟁 상태를 해결한다."]],
+    ["제품과 UX", ["사진은 기기에서 처리되므로 원본이 휴대전화 밖으로 전송되지 않는다.", "계속을 눌러도 양식이 제출되지는 않으며 이전 화면으로 돌아가 답변을 바꿀 수 있다.", "현재 이용 기간이 끝나기 최소 24시간 전에 해지하지 않으면 구독이 자동으로 갱신된다."]],
+    ["금융과 경제", ["고금리가 장기화되며 수요가 위축되자 은행은 해당 자산의 장부가를 낮췄다.", "중앙은행이 금리 인하를 서두르지 않겠다는 신호를 보냈는데도 국채 수익률은 하락했다.", "통화 약세는 수출업체에는 도움이 될 수 있지만 수입 에너지 가격은 끌어올릴 수 있다."]],
+    ["법률과 정책", ["법원은 회사의 손해배상 책임은 인정했지만 징벌적 손해배상은 명령하지 않았다.", "이 법안은 소규모 사업자에게 2년 동안 보고 의무를 면제한다.", "사업자가 정해진 기간 안에 위반 사항을 시정하지 않으면 규제 당국이 벌금을 부과할 수 있다."]],
+    ["의료와 건강", ["검사를 너무 일찍 했다면 음성 결과만으로 감염을 완전히 배제할 수는 없다.", "이 약은 졸음을 유발할 수 있으므로 자신에게 어떤 영향을 주는지 알기 전에는 운전을 피해야 한다.", "가슴 통증이 심하거나 계속되거나 호흡 곤란이 동반되면 즉시 진료를 받아야 한다."]],
+    ["여행과 서비스", ["수하물은 최종 목적지까지 연결되지만 세관 통과를 위해 중간에 한 번 찾아야 한다.", "무료 조식은 유연 요금제로 예약한 투숙객에게만 제공된다.", "이 객실은 환불이 불가능하지만 예외적인 사정이 있으면 호텔이 취소 수수료를 면제할 수 있다."]],
+    ["숫자·날짜·단위", ["2분기 매출은 전년 22억3천만 달러에서 7.5% 증가한 24억 달러를 기록했다.", "열차는 2027년 4월 3일 08시 05분에 출발해 1시간 45분 뒤 도착한다.", "물 1.5컵을 넣고 180℃에서 25~30분간 굽는다."]],
+    ["고유명사와 식별자", ["Apple은 iCloud Private Relay가 모든 웹 활동을 사이트로부터 숨겨 주는 것은 아니라고 설명한다.", "OpenAI API 요청은 모델 식별자가 사용 가능한 배포와 일치하지 않아 실패했다.", "수정 사항은 fishjar/kiss-translator에 반영됐지만 README에는 여전히 예전 옵션 이름이 남아 있다."]],
+    ["긴 문장과 복잡한 구조", ["이번 업데이트로 일부 사용자가 예기치 않게 로그아웃되는 오류는 해결됐지만 6월 이전에 만든 계정은 다음 로그인 때 복구 이메일을 다시 확인해야 할 수도 있다.", "중앙은행은 금리를 동결했지만 고용 둔화가 물가보다 더 큰 위험이 될 수 있다고 인정하면서 시장에서는 이전보다 덜 매파적인 신호로 받아들였다.", "위원회는 추가 자료를 요구한 위원들 때문에 표결을 두 차례 미뤘고, 기관이 6개월 안에 검토 결과를 공개하기로 한 뒤에야 제안을 승인했다."]]
+  ],
+  fr: [
+    ["Interface et textes courts", ["Brouillon", "Brouillon enregistré", "Désactiver les notifications"]],
+    ["Titres d'actualité", ["Les marchés progressent avec le ralentissement de l'inflation, mais la prudence demeure.", "La justice suspend une nouvelle règle quelques heures avant son entrée en vigueur.", "Des milliers de personnes évacuées alors que les vents attisent l'incendie pendant la nuit."]],
+    ["Expressions et métaphores", ["Ce n'est pas une solution miracle, mais cela peut donner un peu d'air aux décideurs.", "Après des mois de négociations, la balle est désormais dans le camp du régulateur.", "L'entreprise a changé les règles du jeu après l'accord des clients sur les conditions initiales."]],
+    ["Registre familier", ["C'est plus facile à dire qu'à faire.", "Je n'y crois pas une seconde.", "On était à deux doigts de tout laisser tomber."]],
+    ["Ambiguïté et polysémie", ["L'avocat a laissé son avocat sur la table avant de partir.", "La note était légère, mais la lumière ne l'était pas.", "Le ministre a assuré que la porte restait ouverte, sans préciser jusqu'à quand."]],
+    ["Négation et portée", ["Tous ceux qui s'opposaient au projet n'ont pas voté contre.", "Je n'ai pas dit qu'il avait volé l'argent.", "Sauf prolongation du délai, les demandes reçues après vendredi ne seront pas examinées."]],
+    ["Pronoms et référents", ["Camille a appelé Léa après qu'elle a quitté la réunion, mais elle n'a pas répondu.", "L'entreprise a indiqué au fournisseur qu'elle prendrait en charge les frais de rappel.", "Quand le serveur a contacté le client, il avait déjà expiré."]],
+    ["Technologie et développement", ["L'API renvoie 204 même lorsque la requête aboutit; il ne faut donc pas attendre de corps JSON.", "Si la clé de cache inclut la chaîne de requête, deux URL presque identiques peuvent produire des entrées différentes.", "Le correctif résout une condition de concurrence qui n'apparaît que lorsque deux workers modifient presque simultanément le même enregistrement."]],
+    ["Produits et UX", ["Les photos sont traitées sur l'appareil, de sorte que les originaux ne quittent jamais votre téléphone.", "Cliquer sur Continuer n'envoie pas le formulaire; vous pouvez encore revenir en arrière et modifier vos réponses.", "L'abonnement se renouvelle automatiquement sauf résiliation au moins 24 heures avant la fin de la période en cours."]],
+    ["Finance et économie", ["La banque a déprécié l'actif après que des taux durablement élevés ont pesé sur la demande.", "Les rendements obligataires ont baissé alors même que la banque centrale signalait qu'une baisse des taux n'était pas imminente.", "Une monnaie plus faible peut favoriser les exportateurs tout en renchérissant l'énergie importée."]],
+    ["Droit et politique publique", ["Le tribunal a jugé l'entreprise responsable des dommages, mais a refusé d'accorder des dommages-intérêts punitifs.", "Le projet de loi exempterait les petites entreprises de cette obligation déclarative pendant deux ans.", "Le régulateur peut infliger une amende si l'opérateur ne corrige pas le manquement dans le délai prévu."]],
+    ["Santé et médecine", ["Un test négatif n'exclut pas nécessairement une infection s'il a été réalisé trop tôt.", "Ce médicament peut provoquer une somnolence; évitez de conduire tant que vous ne savez pas comment il vous affecte.", "Consultez en urgence si la douleur thoracique est intense, persistante ou accompagnée de difficultés respiratoires."]],
+    ["Voyage et services", ["Vos bagages seront enregistrés jusqu'à la destination finale, mais vous devrez les récupérer pour passer la douane.", "Le petit-déjeuner offert est réservé aux clients ayant choisi le tarif flexible.", "La chambre est non remboursable, bien que l'hôtel puisse renoncer aux frais dans des circonstances exceptionnelles."]],
+    ["Nombres, dates et unités", ["Le chiffre d'affaires a progressé de 7,5 % à 2,4 milliards d'euros au deuxième trimestre, contre 2,23 milliards un an plus tôt.", "Le train part à 08 h 05 le 03/04/2027 et arrive 1 h 45 plus tard.", "Ajoutez 1,5 tasse d'eau et faites cuire à 180 °C pendant 25 à 30 minutes."]],
+    ["Noms, marques et identifiants", ["Apple précise qu'iCloud Private Relay ne masque pas toute l'activité de navigation aux sites web.", "La requête vers l'API OpenAI a échoué parce que l'identifiant du modèle ne correspondait à aucun déploiement disponible.", "Le correctif a été intégré à fishjar/kiss-translator, mais le README mentionne encore l'ancien nom de l'option."]],
+    ["Phrases longues et complexes", ["Bien que la mise à jour corrige le bug qui déconnectait certains utilisateurs de façon inattendue, l'entreprise précise que les comptes créés avant juin pourraient encore devoir confirmer leur adresse de récupération lors de leur prochaine connexion.", "Même si la banque centrale a maintenu ses taux, son communiqué a été jugé moins restrictif parce que les responsables ont reconnu que le ralentissement de l'emploi pouvait devenir un risque plus important que l'inflation.", "La commission, qui avait reporté le vote à deux reprises après des demandes de données supplémentaires, n'a approuvé le projet qu'après l'engagement de l'agence de publier un examen dans les six mois."]]
+  ],
+  de: [
+    ["UI und kurze Texte", ["Entwurf", "Entwurf gespeichert", "Benachrichtigungen ausschalten"]],
+    ["Nachrichtenüberschriften", ["Märkte steigen bei nachlassender Inflation, Anleger bleiben jedoch vorsichtig.", "Gericht stoppt neue Regel wenige Stunden vor ihrem Inkrafttreten.", "Tausende müssen wegen eines Waldbrands fliehen, während der Wind über Nacht auffrischt."]],
+    ["Redewendungen und Metaphern", ["Das ist kein Allheilmittel, könnte der Politik aber etwas Luft verschaffen.", "Nach monatelangen Verhandlungen liegt der Ball nun bei der Aufsichtsbehörde.", "Das Unternehmen verschob die Torpfosten, nachdem die Kunden den ursprünglichen Bedingungen bereits zugestimmt hatten."]],
+    ["Umgangssprache und Ton", ["Das ist leichter gesagt als getan.", "Das kaufe ich ihm nicht ab.", "Wir waren kurz davor, alles hinzuschmeißen."]],
+    ["Mehrdeutigkeit und Polysemie", ["Die Bank erhöhte den Zinssatz, nachdem das Hochwasser das untere Ufer der Bankfiliale erreicht hatte.", "Er stellte den Wagen ab und bestellte anschließend einen Wagen mit Getränken.", "Der Vorstand ließ offen, ob die Entscheidung endgültig ist."]],
+    ["Negation und Geltungsbereich", ["Nicht jeder, der den Plan ablehnte, stimmte auch dagegen.", "Ich habe nicht gesagt, dass er das Geld gestohlen hat.", "Sofern die Frist nicht verlängert wird, werden nach Freitag eingegangene Anträge nicht geprüft."]],
+    ["Pronomen und Bezug", ["Mara rief Lena an, nachdem sie die Sitzung verlassen hatte, aber sie ging nicht ans Telefon.", "Das Unternehmen teilte dem Lieferanten mit, es werde die Rückrufkosten übernehmen.", "Als der Server den Client kontaktierte, war er bereits abgelaufen."]],
+    ["Technik und Entwicklung", ["Die API gibt auch bei erfolgreicher Anfrage den Status 204 zurück; ein JSON-Body ist daher nicht zu erwarten.", "Wenn der Cache-Schlüssel die Query-Parameter enthält, können zwei ansonsten identische URLs unterschiedliche Einträge erzeugen.", "Der Patch behebt eine Race Condition, die nur auftritt, wenn zwei Worker nahezu gleichzeitig denselben Datensatz aktualisieren."]],
+    ["Produkte und UX", ["Fotos werden direkt auf dem Gerät verarbeitet, sodass die Originale das Telefon nie verlassen.", "Mit Weiter wird das Formular nicht abgesendet; Sie können weiterhin zurückgehen und Ihre Antworten ändern.", "Das Abonnement verlängert sich automatisch, sofern Sie nicht mindestens 24 Stunden vor Ende des aktuellen Zeitraums kündigen."]],
+    ["Finanzen und Wirtschaft", ["Die Bank schrieb den Wert des Vermögenswerts ab, nachdem länger hohe Zinsen die Nachfrage belastet hatten.", "Die Anleiherenditen fielen, obwohl die Zentralbank signalisierte, dass Zinssenkungen nicht unmittelbar bevorstehen.", "Eine schwächere Währung kann Exporteuren helfen, macht importierte Energie aber teurer."]],
+    ["Recht und Politik", ["Das Gericht stellte eine Schadenersatzpflicht des Unternehmens fest, lehnte Strafschadenersatz jedoch ab.", "Der Gesetzentwurf würde kleine Unternehmen zwei Jahre lang von der Meldepflicht befreien.", "Die Aufsicht kann ein Bußgeld verhängen, wenn der Betreiber den Verstoß nicht innerhalb der gesetzten Frist behebt."]],
+    ["Gesundheit und Medizin", ["Ein negatives Testergebnis schließt eine Infektion nicht zwingend aus, wenn der Test zu früh durchgeführt wurde.", "Dieses Arzneimittel kann schläfrig machen; fahren Sie nicht, bis Sie wissen, wie es auf Sie wirkt.", "Suchen Sie dringend ärztliche Hilfe, wenn Brustschmerzen stark oder anhaltend sind oder mit Atemnot einhergehen."]],
+    ["Reisen und Service", ["Ihr Gepäck wird bis zum Endziel durchgecheckt, muss für die Zollkontrolle jedoch zwischendurch abgeholt werden.", "Das kostenlose Frühstück gilt nur für Gäste, die den flexiblen Tarif gebucht haben.", "Das Zimmer ist nicht erstattungsfähig, wobei das Hotel die Gebühr in Ausnahmefällen erlassen kann."]],
+    ["Zahlen, Daten und Einheiten", ["Der Umsatz stieg im zweiten Quartal um 7,5 % auf 2,4 Milliarden Euro nach 2,23 Milliarden im Vorjahr.", "Der Zug fährt am 03.04.2027 um 08:05 Uhr ab und kommt 1 Stunde 45 Minuten später an.", "1,5 Tassen Wasser hinzufügen und bei 180 °C 25 bis 30 Minuten backen."]],
+    ["Namen, Marken und Kennungen", ["Apple weist darauf hin, dass iCloud Private Relay nicht sämtliche Browseraktivitäten vor Websites verbirgt.", "Die Anfrage an die OpenAI API schlug fehl, weil die Modellkennung keiner verfügbaren Bereitstellung entsprach.", "Der Fix wurde in fishjar/kiss-translator übernommen, doch im README steht noch der alte Optionsname."]],
+    ["Lange und komplexe Sätze", ["Obwohl das Update den Fehler behebt, durch den einige Nutzer unerwartet abgemeldet wurden, können Konten, die vor Juni erstellt wurden, bei der nächsten Anmeldung weiterhin zur Bestätigung ihrer Wiederherstellungsadresse aufgefordert werden.", "Die Zentralbank ließ die Zinsen zwar unverändert, doch ihre Erklärung wurde als weniger restriktiv verstanden, weil die Verantwortlichen einräumten, dass eine schwächere Beschäftigung zu einem größeren Risiko als die Inflation werden könnte.", "Der Ausschuss, der die Abstimmung nach Forderungen nach weiteren Daten zweimal verschoben hatte, billigte den Vorschlag erst, nachdem die Behörde zugesagt hatte, innerhalb von sechs Monaten eine Überprüfung zu veröffentlichen."]]
+  ],
+  es: [
+    ["Interfaz y textos breves", ["Borrador", "Borrador guardado", "Desactivar notificaciones"]],
+    ["Titulares de noticias", ["Los mercados suben al moderarse la inflación, aunque persiste la cautela.", "Un tribunal bloquea una nueva norma horas antes de su entrada en vigor.", "Miles de personas evacuadas por un incendio mientras el viento arrecia durante la noche."]],
+    ["Modismos y metáforas", ["No es una solución mágica, pero puede dar algo de oxígeno a los responsables políticos.", "Tras meses de negociaciones, la pelota está ahora en el tejado del regulador.", "La empresa cambió las reglas del juego después de que los clientes aceptaran las condiciones originales."]],
+    ["Lenguaje coloquial y tono", ["Es más fácil decirlo que hacerlo.", "No me lo trago.", "Estuvimos a punto de tirar la toalla."]],
+    ["Ambigüedad y polisemia", ["El banco subió el tipo después de que el río cubriera el banco de arena.", "Dejó la hoja sobre la mesa antes de salir a buscar una hoja del jardín.", "El ministro dijo que la oferta seguía sobre la mesa, pero no aclaró hasta cuándo."]],
+    ["Negación y alcance", ["No todos los que se opusieron al plan votaron en contra.", "Yo no dije que él hubiera robado el dinero.", "Salvo que se amplíe el plazo, no se revisarán las solicitudes recibidas después del viernes."]],
+    ["Pronombres y referentes", ["Marta llamó a Elena después de que saliera de la reunión, pero no contestó.", "La empresa dijo al proveedor que asumiría los costes de la retirada.", "Cuando el servidor contactó con el cliente, ya había caducado."]],
+    ["Tecnología y desarrollo", ["La API devuelve 204 incluso cuando la solicitud se completa correctamente, así que no debe esperarse un cuerpo JSON.", "Si la clave de caché incluye la cadena de consulta, dos URL por lo demás idénticas pueden generar entradas distintas.", "El parche corrige una condición de carrera que solo aparece cuando dos workers actualizan casi al mismo tiempo el mismo registro."]],
+    ["Productos y UX", ["Las fotos se procesan en el dispositivo, por lo que los originales nunca salen del teléfono.", "Pulsar Continuar no envía el formulario; todavía se puede volver atrás y modificar las respuestas.", "La suscripción se renueva automáticamente salvo que se cancele al menos 24 horas antes de que termine el periodo actual."]],
+    ["Finanzas y economía", ["El banco redujo el valor contable del activo después de que los tipos altos durante más tiempo debilitaran la demanda.", "Los rendimientos de los bonos cayeron aunque el banco central señaló que los recortes de tipos no eran inminentes.", "Una moneda más débil puede beneficiar a los exportadores, pero encarece la energía importada."]],
+    ["Derecho y política pública", ["El tribunal declaró a la empresa responsable de los daños, pero rechazó conceder daños punitivos.", "El proyecto de ley eximiría a las pequeñas empresas de la obligación de informar durante dos años.", "El regulador puede imponer una multa si el operador no subsana el incumplimiento dentro del plazo establecido."]],
+    ["Salud y medicina", ["Un resultado negativo no descarta necesariamente una infección si la prueba se hizo demasiado pronto.", "Este medicamento puede causar somnolencia; evite conducir hasta saber cómo le afecta.", "Busque atención médica urgente si el dolor de pecho es intenso, persistente o va acompañado de dificultad para respirar."]],
+    ["Viajes y servicios", ["El equipaje se facturará hasta el destino final, pero deberá recogerse durante el trayecto para pasar la aduana.", "El desayuno gratuito solo está disponible para los huéspedes que reservaron la tarifa flexible.", "La habitación no es reembolsable, aunque el hotel puede eximir la penalización en circunstancias excepcionales."]],
+    ["Números, fechas y unidades", ["Los ingresos aumentaron un 7,5 % hasta 2.400 millones de euros en el segundo trimestre, frente a 2.230 millones un año antes.", "El tren sale a las 08:05 del 03/04/2027 y llega 1 hora y 45 minutos después.", "Añada 1,5 tazas de agua y hornee a 180 °C durante 25–30 minutos."]],
+    ["Nombres, marcas e identificadores", ["Apple afirma que iCloud Private Relay no oculta a los sitios web toda la actividad de navegación.", "La solicitud a la API de OpenAI falló porque el identificador del modelo no coincidía con ningún despliegue disponible.", "La corrección llegó a fishjar/kiss-translator, pero el README todavía menciona el nombre anterior de la opción."]],
+    ["Frases largas y complejas", ["Aunque la actualización corrige el error que cerraba inesperadamente la sesión de algunos usuarios, la empresa señala que las cuentas creadas antes de junio todavía podrían tener que verificar el correo de recuperación la próxima vez que inicien sesión.", "Aunque el banco central mantuvo los tipos sin cambios, su comunicado se interpretó como menos restrictivo porque los responsables reconocieron que la debilidad del empleo podría convertirse en un riesgo mayor que la inflación.", "El comité, que había aplazado dos veces la votación después de que varios miembros pidieran más datos, solo aprobó la propuesta cuando la agencia aceptó publicar una revisión en un plazo de seis meses."]]
+  ]
 };
 
-const languageSelect = document.querySelector("#languageSelect");
-const languageTabs = document.querySelector("#languageTabs");
-const testList = document.querySelector("#testList");
-const activeLanguageLabel = document.querySelector("#activeLanguageLabel");
-const copyButton = document.querySelector("#copyButton");
-const resetButton = document.querySelector("#resetButton");
-const toast = document.querySelector("#toast");
+const language = document.body.dataset.language;
+const target = document.querySelector("#categoryList");
+const groups = DATA[language] || [];
+let number = 1;
 
-let activeLanguage = new URLSearchParams(window.location.search).get("lang");
-if (!LANGUAGE_DATA[activeLanguage]) activeLanguage = "en";
+target.innerHTML = groups.map(([title, samples]) => {
+  const items = samples.map((text) => {
+    const n = String(number++).padStart(2, "0");
+    return `<li class="sample-item"><span class="sample-index" aria-hidden="true">${n}</span><p class="sample-text">${escapeHtml(text)}</p></li>`;
+  }).join("");
+  return `<section class="category-section"><header class="category-header"><h2>${escapeHtml(title)}</h2><span class="category-count">3</span></header><ol class="sample-list">${items}</ol></section>`;
+}).join("");
 
 function escapeHtml(value) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
-
-function renderTabs() {
-  languageTabs.innerHTML = Object.entries(LANGUAGE_DATA)
-    .map(([key, item]) => `<button type="button" data-lang="${key}" aria-pressed="${key === activeLanguage}">${item.name}<span class="tab-native"> · ${item.native}</span></button>`)
-    .join("");
-}
-
-function renderSamples() {
-  const data = LANGUAGE_DATA[activeLanguage];
-  languageSelect.value = activeLanguage;
-  activeLanguageLabel.textContent = `${data.name} · ${data.native} · ${data.samples.length} 条固定样本`;
-  testList.innerHTML = data.samples
-    .map(([category, text], index) => `
-      <li class="test-item">
-        <span class="test-index" aria-hidden="true">${String(index + 1).padStart(2, "0")}</span>
-        <div class="test-copy"><p lang="${data.lang}" data-source-text="true">${escapeHtml(text)}</p></div>
-        <div class="test-meta"><span class="category-badge">${category}</span></div>
-      </li>`)
-    .join("");
-}
-
-function syncUrl() {
-  const url = new URL(window.location.href);
-  url.searchParams.set("lang", activeLanguage);
-  history.replaceState(null, "", url);
-}
-
-function setLanguage(lang) {
-  if (!LANGUAGE_DATA[lang]) return;
-  activeLanguage = lang;
-  renderTabs();
-  renderSamples();
-  syncUrl();
-}
-
-function showToast(message) {
-  toast.textContent = message;
-  toast.classList.add("is-visible");
-  clearTimeout(showToast.timer);
-  showToast.timer = setTimeout(() => toast.classList.remove("is-visible"), 1800);
-}
-
-languageTabs.addEventListener("click", (event) => {
-  const button = event.target.closest("button[data-lang]");
-  if (button) setLanguage(button.dataset.lang);
-});
-
-languageSelect.addEventListener("change", () => setLanguage(languageSelect.value));
-
-resetButton.addEventListener("click", () => {
-  renderSamples();
-  showToast("已恢复当前语言原文");
-});
-
-copyButton.addEventListener("click", async () => {
-  const data = LANGUAGE_DATA[activeLanguage];
-  const text = data.samples.map((sample, index) => `${index + 1}. ${sample[1]}`).join("\n\n");
-  try {
-    await navigator.clipboard.writeText(text);
-    showToast("已复制当前语言全部原文");
-  } catch {
-    showToast("复制失败，请手动选择文本");
-  }
-});
-
-renderTabs();
-renderSamples();
