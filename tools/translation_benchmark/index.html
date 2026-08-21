@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Browser Translation Benchmark</title>
+  <meta name="robots" content="noindex,nofollow">
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f6f7f9;
+      --card: #ffffff;
+      --text: #16181d;
+      --muted: #667085;
+      --line: #dfe3e8;
+      --accent: #2563eb;
+      --code: #f0f2f5;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #111318;
+        --card: #191c22;
+        --text: #f3f4f6;
+        --muted: #a5adba;
+        --line: #303641;
+        --accent: #7aa2ff;
+        --code: #242a33;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.58;
+    }
+    main {
+      width: min(1080px, calc(100% - 32px));
+      margin: 40px auto 72px;
+    }
+    header {
+      margin-bottom: 28px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(30px, 5vw, 48px);
+      letter-spacing: -0.03em;
+      line-height: 1.08;
+    }
+    .lead {
+      margin: 0;
+      color: var(--muted);
+      font-size: 17px;
+    }
+    section {
+      margin-top: 34px;
+    }
+    h2 {
+      margin: 0 0 14px;
+      font-size: 22px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 18px 20px;
+    }
+    .id {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .sample {
+      margin: 0;
+      font-size: 18px;
+    }
+    .headline {
+      font-size: 22px;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+    .token-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .token {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 8px 13px;
+      font-size: 16px;
+    }
+    .tech {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      background: var(--code);
+      border-radius: 8px;
+      padding: 2px 6px;
+    }
+    .wide { grid-column: 1 / -1; }
+    footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 14px;
+    }
+    @media (max-width: 760px) {
+      main { width: min(100% - 20px, 1080px); margin-top: 24px; }
+      .grid { grid-template-columns: 1fr; }
+      .wide { grid-column: auto; }
+      .sample { font-size: 17px; }
+      .headline { font-size: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Browser Translation Benchmark</h1>
+      <p class="lead">A compact stress test for webpage translation engines. Translate the whole page with the same settings each time.</p>
+    </header>
+
+    <section>
+      <h2>1. Short interface text and isolated terms</h2>
+      <div class="token-row">
+        <span class="token">Raw</span>
+        <span class="token">Issues</span>
+        <span class="token">Pull requests</span>
+        <span class="token">Watch</span>
+        <span class="token">Fork</span>
+        <span class="token">Home</span>
+        <span class="token">Breaking News</span>
+        <span class="token">Live Updates</span>
+        <span class="token">Mushroom murderer</span>
+        <span class="token">Bronze Age masterpiece</span>
+        <span class="token">Hind Rajab</span>
+        <span class="token">kiss-translator</span>
+        <span class="token">custom-api_v2.md</span>
+        <span class="token">Request Hook</span>
+        <span class="token">Response Hook</span>
+      </div>
+    </section>
+
+    <section>
+      <h2>2. News headlines</h2>
+      <div class="grid">
+        <article class="card">
+          <span class="id">H1</span>
+          <p class="sample headline">Tiananmen vigil organizers found guilty of inciting subversion in Hong Kong</p>
+        </article>
+        <article class="card">
+          <span class="id">H2</span>
+          <p class="sample headline">Trump rolls out yet another Iran war strategy</p>
+        </article>
+        <article class="card">
+          <span class="id">H3</span>
+          <p class="sample headline">Navy may strip Black war hero’s name from ship, potentially renaming for Trump, sources say</p>
+        </article>
+        <article class="card">
+          <span class="id">H4</span>
+          <p class="sample headline">Sandra Bullock opens up about loss of her partner and his private ALS battle</p>
+        </article>
+        <article class="card">
+          <span class="id">H5</span>
+          <p class="sample headline">Five unanswered questions around Harry and Meghan’s surprise move back to Britain</p>
+        </article>
+        <article class="card">
+          <span class="id">H6</span>
+          <p class="sample headline">Aircraft carrier heads home as political pressure over the conflict mounts</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>3. Idioms, ambiguity and implied meaning</h2>
+      <div class="grid">
+        <article class="card">
+          <span class="id">I1</span>
+          <p class="sample">The world will again wait to see whether he folds when political costs pile up.</p>
+        </article>
+        <article class="card">
+          <span class="id">I2</span>
+          <p class="sample">The policy is still up in the air, and officials are walking a fine line between deterrence and escalation.</p>
+        </article>
+        <article class="card">
+          <span class="id">I3</span>
+          <p class="sample">Such cooperation is hardly in the administration’s wheelhouse.</p>
+        </article>
+        <article class="card">
+          <span class="id">I4</span>
+          <p class="sample">The minister stopped short of endorsing the proposal, but he did not rule it out either.</p>
+        </article>
+        <article class="card">
+          <span class="id">I5</span>
+          <p class="sample">The company is trying to thread the needle: cut costs without hollowing out the product.</p>
+        </article>
+        <article class="card">
+          <span class="id">I6</span>
+          <p class="sample">The announcement was meant to save face, but it may have boxed the government into a corner.</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>4. News analysis and long sentences</h2>
+      <div class="grid">
+        <article class="card wide">
+          <span class="id">L1</span>
+          <p class="sample">President Donald Trump is rolling out yet another Iran war strategy in familiar fashion: with an all-caps threat. But the world will, as usual, have to wait to see whether he folds when the political costs pile up.</p>
+        </article>
+        <article class="card wide">
+          <span class="id">L2</span>
+          <p class="sample">His new approach is something of a face-saver after he failed to bomb the Islamic Republic into surrender or to coax it to nuclear talks with sweeteners in a memorandum of understanding.</p>
+        </article>
+        <article class="card wide">
+          <span class="id">L3</span>
+          <p class="sample">Many analysts are skeptical that a revolutionary regime known for inflicting intense repression and economic duress on civilians will back down simply because sanctions become more painful.</p>
+        </article>
+        <article class="card wide">
+          <span class="id">L4</span>
+          <p class="sample">Even if the president is willing to wait for economic warfare to squeeze Tehran, there is another variable that cannot be ignored: Tehran gets to respond, and it has incentives of its own.</p>
+        </article>
+        <article class="card wide">
+          <span class="id">L5</span>
+          <p class="sample">A blockade would be more effective if allies helped shut down the web of clandestine financial arrangements and trade routes built to evade sanctions, but such cooperation requires diplomatic patience that has often been in short supply.</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>5. Technology and product language</h2>
+      <div class="grid">
+        <article class="card">
+          <span class="id">T1</span>
+          <p class="sample">If the request body and response body conform to the default interface specification, you do not need to provide a Request Hook or Response Hook.</p>
+        </article>
+        <article class="card">
+          <span class="id">T2</span>
+          <p class="sample">The fallback is intentionally fail-closed: an unknown market must never be published silently.</p>
+        </article>
+        <article class="card">
+          <span class="id">T3</span>
+          <p class="sample">The patch fixes an edge case in which stale cached data could overwrite a newer registry entry during an automatic update.</p>
+        </article>
+        <article class="card">
+          <span class="id">T4</span>
+          <p class="sample">Do not translate identifiers such as <span class="tech">args.userPrompt</span>, <span class="tech">tencent/Hunyuan-MT-7B</span>, or <span class="tech">custom-api_v2.md</span>.</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>6. Finance and legal wording</h2>
+      <div class="grid">
+        <article class="card">
+          <span class="id">F1</span>
+          <p class="sample">Investors pared their bets on a September rate cut after the central bank stopped short of signaling that easing was imminent.</p>
+        </article>
+        <article class="card">
+          <span class="id">F2</span>
+          <p class="sample">The shares rose even though management warned that higher borrowing costs could weigh on margins for several quarters.</p>
+        </article>
+        <article class="card">
+          <span class="id">F3</span>
+          <p class="sample">The court found the defendants guilty of conspiracy to commit fraud but acquitted them of the more serious charge of money laundering.</p>
+        </article>
+        <article class="card">
+          <span class="id">F4</span>
+          <p class="sample">The agreement is non-binding and does not constitute an admission of liability by either party.</p>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>7. Pronouns and reference resolution</h2>
+      <div class="grid">
+        <article class="card wide">
+          <span class="id">R1</span>
+          <p class="sample">Maria told Anna that her report had been accepted, but she did not say when it would be published.</p>
+        </article>
+        <article class="card wide">
+          <span class="id">R2</span>
+          <p class="sample">The White House rejected the proposal after the president criticized it in a social media post, saying it would give the other side too much leverage.</p>
+        </article>
+        <article class="card wide">
+          <span class="id">R3</span>
+          <p class="sample">The company blamed the supplier for the delay, but the supplier said its own factories had shipped the parts on time.</p>
+        </article>
+      </div>
+    </section>
+
+    <footer>
+      Test page only. No expected translations are shown here so that the benchmark does not bias the translation engine.
+    </footer>
+  </main>
+</body>
+</html>
