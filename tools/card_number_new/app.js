@@ -109,7 +109,7 @@ function updateResultActions() {
     if (downloadMode === 'partial') {
         ui.downloadBtn.textContent = '下载当前结果（部分）';
     } else if (downloadMode === 'retained') {
-        ui.downloadBtn.textContent = '下载当前显示结果(.csv)';
+        ui.downloadBtn.textContent = '下载生成结果(.csv)';
     } else {
         ui.downloadBtn.textContent = '下载结果(.csv)';
     }
@@ -196,7 +196,7 @@ function initWorker() {
                 ui.resultContent.innerHTML = '<div class="empty-placeholder error-copy">未找到符合规则的卡号，请检查规则或放宽排除条件。</div>';
                 setStatus('计算完成，没有符合规则的结果', 'success');
             } else if (data.truncated) {
-                setStatus(`结果较多，当前保留前 ${formatIntegerString(results.length)} 条`, 'warning');
+                setStatus(`结果较多，仅生成前 ${formatIntegerString(results.length)} 条`, 'warning');
                 renderPage();
             } else {
                 setStatus(`计算完成，共 ${formatIntegerString(results.length)} 条`, 'success');
@@ -345,7 +345,7 @@ ui.stopBtn.addEventListener('click', () => {
     downloadMode = 'partial';
     setRunning(false);
     if (expectedCount === null) ui.expectedCount.textContent = '—';
-    setStatus(`已停止，当前保留 ${formatIntegerString(results.length)} 条`, 'warning');
+    setStatus(`已停止，已生成 ${formatIntegerString(results.length)} 条`, 'warning');
     if (results.length === 0) {
         ui.resultContent.innerHTML = '<div class="empty-placeholder">已停止计算，暂未生成结果。</div>';
     } else {
@@ -527,7 +527,7 @@ ui.downloadBtn.addEventListener('click', async () => {
         const blob = new Blob(parts, { type: 'text/csv;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
-        const suffix = exportMode === 'partial' ? '_部分结果' : exportMode === 'retained' ? '_当前显示结果' : '';
+        const suffix = exportMode === 'partial' ? '_部分结果' : '';
         link.href = url;
         link.download = `卡号生成结果_${exportResults.length}条${suffix}.csv`;
         document.body.appendChild(link);

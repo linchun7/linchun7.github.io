@@ -24,6 +24,7 @@ try {
     await page.route('**/googletagmanager.com/**', (route) => route.abort());
 
     await page.goto(`${baseUrl}/tools/card_number_new/`, { waitUntil: 'domcontentloaded' });
+    assert.match(await page.locator('.stat-item').nth(1).textContent(), /生成结果/);
 
     await page.fill('#inputField', '７９９２７３９８７１＊?');
     assert.equal(await page.locator('#inputField').inputValue(), '7992739871*');
@@ -47,6 +48,18 @@ try {
     await page.click('#calcBtn');
     await waitForDone(page);
     assert.equal(await page.locator('#expectedCount').textContent(), '10');
+
+    await page.click('#toggleAdvBtn');
+    await page.check('#numberCheckboxes input[value="0"]');
+    assert.equal(await page.locator('#expectedCount').textContent(), '10', 'Changing a filter should not invalidate existing results before recalculation');
+    assert.equal(await page.locator('#resultCount').textContent(), '10');
+
+    await page.click('#calcBtn');
+    await waitForDone(page);
+    assert.equal(await page.locator('#expectedCount').textContent(), '8');
+    assert.equal(await page.locator('#resultCount').textContent(), '8');
+    const filteredResults = await page.locator('.result-row').evaluateAll((rows) => rows.map((row) => row.getAttribute('data-clipboard')));
+    assert.ok(filteredResults.every((result) => !result.includes('0')), 'Excluded digit 0 appeared in a generated variable position');
 
     assert.equal(pageErrors.length, 0, `card number page errors: ${pageErrors.map(String).join('; ')}`);
     await context.close();
