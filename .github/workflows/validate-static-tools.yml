@@ -9,6 +9,7 @@ on:
       - 'tools/renovation_calculator/**'
       - 'tools/rmb_converter/**'
       - 'tools/space/**'
+      - 'tools/card_number/**'
       - 'tools/card_number_new/**'
       - 'tools/pinyin/**'
       - 'tools/hospital_rank/**'
@@ -24,6 +25,7 @@ on:
       - 'tools/renovation_calculator/**'
       - 'tools/rmb_converter/**'
       - 'tools/space/**'
+      - 'tools/card_number/**'
       - 'tools/card_number_new/**'
       - 'tools/pinyin/**'
       - 'tools/hospital_rank/**'
@@ -82,6 +84,8 @@ jobs:
           trap 'kill "$server_pid" 2>/dev/null || true' EXIT
           sleep 1
           node tools/browser-tests/static-tools-smoke.mjs
+          node tools/browser-tests/card-number-core-test.mjs
+          node tools/browser-tests/card-number-old-smoke.mjs
           node tools/browser-tests/card-number-new-smoke.mjs
           node tools/browser-tests/pinyin-smoke.mjs
           node tools/browser-tests/utility-tools-smoke.mjs
