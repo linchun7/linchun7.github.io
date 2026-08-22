@@ -24,7 +24,7 @@ try {
     await page.route('**/googletagmanager.com/**', (route) => route.abort());
 
     await page.goto(`${baseUrl}/tools/card_number_new/`, { waitUntil: 'domcontentloaded' });
-    assert.match(await page.locator('.stat-item').nth(1).textContent(), /已保留/);
+    assert.match(await page.locator('.stat-item').nth(1).textContent(), /生成结果/);
 
     await page.fill('#inputField', '７９９２７３９８７１＊?');
     assert.equal(await page.locator('#inputField').inputValue(), '7992739871*');
