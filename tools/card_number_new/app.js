@@ -109,7 +109,7 @@ function updateResultActions() {
     if (downloadMode === 'partial') {
         ui.downloadBtn.textContent = '下载当前结果（部分）';
     } else if (downloadMode === 'retained') {
-        ui.downloadBtn.textContent = '下载当前显示结果(.csv)';
+        ui.downloadBtn.textContent = '下载已保留结果(.csv)';
     } else {
         ui.downloadBtn.textContent = '下载结果(.csv)';
     }
@@ -527,7 +527,7 @@ ui.downloadBtn.addEventListener('click', async () => {
         const blob = new Blob(parts, { type: 'text/csv;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
-        const suffix = exportMode === 'partial' ? '_部分结果' : exportMode === 'retained' ? '_当前显示结果' : '';
+        const suffix = exportMode === 'partial' ? '_部分结果' : exportMode === 'retained' ? '_已保留结果' : '';
         link.href = url;
         link.download = `卡号生成结果_${exportResults.length}条${suffix}.csv`;
         document.body.appendChild(link);
