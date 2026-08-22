@@ -1870,6 +1870,32 @@ async function createTemporaryProductionPaths({ copySnapshots = true, copyRunLog
   return { root, paths };
 }
 
+async function prepareTemporaryFxFallbackTimeline(paths, { nowAfterLatestRunMs, previousFxAgeMs }) {
+  const [data, runLog] = await Promise.all([
+    readFile(paths.currentDataPath, 'utf8').then(JSON.parse),
+    readFile(paths.runLogPath, 'utf8').then(JSON.parse)
+  ]);
+  const latestRun = runLog.runs.at(-1);
+  const timelineAnchors = [
+    Date.parse(data.generatedAt),
+    Date.parse(data.run?.finishedAtUtc ?? ''),
+    Date.parse(runLog.updatedAtUtc),
+    Date.parse(latestRun?.finishedAtUtc ?? '')
+  ];
+  assert.equal(timelineAnchors.every(Number.isFinite), true);
+  const fixedNow = new Date(Math.max(...timelineAnchors) + nowAfterLatestRunMs);
+  const previousFxFetchedAt = new Date(fixedNow.getTime() - previousFxAgeMs).toISOString();
+
+  // Only normalize temporal metadata in the isolated copy. Business data stays identical to production.
+  data.fx.fetchedAt = previousFxFetchedAt;
+  latestRun.source.exchangeRatesFetchedAtUtc = previousFxFetchedAt;
+  await Promise.all([
+    writeFile(paths.currentDataPath, `${JSON.stringify(data, null, 2)}\n`, 'utf8'),
+    writeFile(paths.runLogPath, `${JSON.stringify(runLog, null, 2)}\n`, 'utf8')
+  ]);
+  return { data, fixedNow, previousFxFetchedAt };
+}
+
 async function createTemporaryBootstrapPaths() {
   const root = await mkdtemp(path.join(tmpdir(), 'icloud-bootstrap-'));
   const dataDir = path.join(root, 'data');
@@ -2065,8 +2091,12 @@ test('does not rewrite history when an observation has no historical changes', a
 
 test('rejects anomalous online FX when the previous safe fallback is expired', async (t) => {
   const { root, paths } = await createTemporaryProductionPaths();
-  const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
-  t.mock.timers.enable({ apis: ['Date'], now: new Date(Date.parse(data.fx.fetchedAt) + 37 * 60 * 60 * 1_000) });
+  const { data, fixedNow } = await prepareTemporaryFxFallbackTimeline(paths, {
+    nowAfterLatestRunMs: 2 * 60 * 60 * 1_000,
+    previousFxAgeMs: 37 * 60 * 60 * 1_000
+  });
+  assert.equal(fixedNow.getTime() - Date.parse(data.fx.fetchedAt), 37 * 60 * 60 * 1_000);
+  t.mock.timers.enable({ apis: ['Date'], now: fixedNow });
   const rates = compatibleExchangeRates(data);
   rates.JPY /= 2;
   const fxPayload = {
@@ -2103,8 +2133,12 @@ test('rejects anomalous online FX when the previous safe fallback is expired', a
 
 test('publishes with stale previous CNY values when every online FX candidate fails sanity', async (t) => {
   const { root, paths } = await createTemporaryProductionPaths();
-  const data = JSON.parse(await readFile(paths.currentDataPath, 'utf8'));
-  t.mock.timers.enable({ apis: ['Date'], now: new Date(Date.parse(data.generatedAt) + 60_000) });
+  const { data, fixedNow, previousFxFetchedAt } = await prepareTemporaryFxFallbackTimeline(paths, {
+    nowAfterLatestRunMs: 60_000,
+    previousFxAgeMs: 60 * 60 * 1_000
+  });
+  assert.equal(fixedNow.getTime() - Date.parse(data.fx.fetchedAt), 60 * 60 * 1_000);
+  t.mock.timers.enable({ apis: ['Date'], now: fixedNow });
   const rates = compatibleExchangeRates(data);
   rates.JPY /= 2;
   const fxPayload = {
@@ -2118,6 +2152,7 @@ test('publishes with stale previous CNY values when every online FX candidate fa
     const published = JSON.parse(await readFile(paths.currentDataPath, 'utf8'));
     assert.equal(published.fx.stale, true);
     assert.equal(published.fx.fallbackReason, 'source-unavailable');
+    assert.equal(published.fx.fetchedAt, previousFxFetchedAt);
     for (const previousCountry of data.countries) {
       const current = published.countries.find(({ marketId }) => marketId === previousCountry.marketId);
       for (const tier of data.tiers) {
