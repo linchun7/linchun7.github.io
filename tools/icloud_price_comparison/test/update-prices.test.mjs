@@ -2101,9 +2101,10 @@ test('rejects anomalous online FX when the previous safe fallback is expired', a
   }
 });
 
-test('publishes with stale previous CNY values when every online FX candidate fails sanity', async () => {
+test('publishes with stale previous CNY values when every online FX candidate fails sanity', async (t) => {
   const { root, paths } = await createTemporaryProductionPaths();
   const data = JSON.parse(await readFile(paths.currentDataPath, 'utf8'));
+  t.mock.timers.enable({ apis: ['Date'], now: new Date(Date.parse(data.generatedAt) + 60_000) });
   const rates = compatibleExchangeRates(data);
   rates.JPY /= 2;
   const fxPayload = {
