@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  latestRequiredWorkflowState,
   main,
+  requiredActionValidationWorkflows,
   resolveActionTagCommit,
   validateChangedFiles,
   validatePullRequest,
@@ -13,7 +15,8 @@ const BASE_SHA = 'a'.repeat(40);
 const HEAD_SHA = 'b'.repeat(40);
 const OLD_ACTION_SHA = 'c'.repeat(40);
 const NEW_ACTION_SHA = 'd'.repeat(40);
-const VALIDATION_WORKFLOW = 'Validate iCloud price comparison';
+const ICLOUD_WORKFLOW = 'Validate iCloud price comparison';
+const STATIC_WORKFLOW = 'Validate static tools';
 
 function validPullRequest() {
   return {
@@ -29,9 +32,9 @@ function validPullRequest() {
   };
 }
 
-function validWorkflowChange() {
+function validWorkflowChange(filename = '.github/workflows/update-icloud-prices.yml') {
   return {
-    filename: '.github/workflows/validate.yml',
+    filename,
     status: 'modified',
     changes: 2,
     patch: [
@@ -42,7 +45,7 @@ function validWorkflowChange() {
   };
 }
 
-function env() {
+function env(validationWorkflow = ICLOUD_WORKFLOW) {
   return {
     DEFAULT_BRANCH: 'main',
     GITHUB_TOKEN: 'test-token',
@@ -50,7 +53,21 @@ function env() {
     REPOSITORY: 'owner/repository',
     RUN_BASE_SHA: BASE_SHA,
     RUN_HEAD_SHA: HEAD_SHA,
-    VALIDATION_WORKFLOW,
+    VALIDATION_WORKFLOW: validationWorkflow,
+  };
+}
+
+function workflowRun(name, overrides = {}) {
+  return {
+    id: 100,
+    name,
+    head_sha: HEAD_SHA,
+    head_branch: 'dependabot/github_actions/checkout-123456',
+    event: 'pull_request',
+    status: 'completed',
+    conclusion: 'success',
+    pull_requests: [{ number: 42 }],
+    ...overrides,
   };
 }
 
@@ -80,7 +97,7 @@ test('accepts only the tested Dependabot GitHub Actions pull request', () => {
 test('accepts one-for-one full-SHA updates for exactly one official Action and rejects broader diffs', () => {
   assert.equal(validateChangedFiles([validWorkflowChange()]), 1);
   assert.throws(
-    () => validateChangedFiles(Array.from({ length: 21 }, validWorkflowChange)),
+    () => validateChangedFiles(Array.from({ length: 21 }, () => validWorkflowChange())),
     /Changed-file count is invalid/
   );
 
@@ -136,6 +153,74 @@ test('keeps GitHub Actions majors manual because production-only Action behavior
   assert.throws(() => validateChangedFiles([prerelease]), /exact stable vX\.Y\.Z release tag/);
 });
 
+test('requires static validation only when an Action PR actually changes the static validation workflow', () => {
+  assert.deepEqual(requiredActionValidationWorkflows([validWorkflowChange()]), [ICLOUD_WORKFLOW]);
+  assert.deepEqual(
+    requiredActionValidationWorkflows([
+      validWorkflowChange(),
+      validWorkflowChange('.github/workflows/validate-static-tools.yml'),
+    ]),
+    [ICLOUD_WORKFLOW, STATIC_WORKFLOW]
+  );
+});
+
+test('uses the latest exact-head workflow run and never lets an older success mask a newer failure', () => {
+  const runs = [
+    workflowRun(STATIC_WORKFLOW, { id: 100, conclusion: 'success' }),
+    workflowRun(STATIC_WORKFLOW, { id: 101, conclusion: 'failure' }),
+  ];
+  assert.deepEqual(latestRequiredWorkflowState(runs, STATIC_WORKFLOW), {
+    ready: false,
+    reason: `${STATIC_WORKFLOW} concluded failure`,
+  });
+});
+
+test('quietly ignores duplicate or superseded workflow_run events after the PR moved on', async () => {
+  for (const pullRequest of [
+    { ...validPullRequest(), state: 'closed' },
+    {
+      ...validPullRequest(),
+      head: { ...validPullRequest().head, sha: 'e'.repeat(40) },
+    },
+  ]) {
+    const requests = [];
+    const messages = [];
+    const fetchImpl = async (url) => {
+      requests.push(url);
+      if (url.endsWith('/pulls/42')) return Response.json(pullRequest);
+      return Response.json({ message: 'unexpected request' }, { status: 500 });
+    };
+    await main(env(), fetchImpl, (message) => messages.push(message));
+    assert.equal(requests.length, 1);
+    assert.ok(messages.length > 0);
+  }
+});
+
+test('updates a stale Dependabot branch instead of merging a result tested against an old base', async () => {
+  const staleBaseSha = 'e'.repeat(40);
+  const pullRequest = {
+    ...validPullRequest(),
+    base: { ref: 'main', sha: staleBaseSha },
+    changed_files: 1,
+  };
+  const requests = [];
+  const fetchImpl = async (url, options) => {
+    requests.push({ url, options });
+    if (url.endsWith('/pulls/42')) return Response.json(pullRequest);
+    if (url.endsWith('/pulls/42/update-branch')) {
+      assert.equal(options.method, 'PUT');
+      assert.deepEqual(JSON.parse(options.body), { expected_head_sha: HEAD_SHA });
+      return Response.json({ message: 'Updating pull request branch.' }, { status: 202 });
+    }
+    return Response.json({ message: 'unexpected request' }, { status: 500 });
+  };
+
+  const messages = [];
+  await main(env(), fetchImpl, (message) => messages.push(message));
+  assert.equal(requests.length, 2);
+  assert.match(messages.join('\n'), /waiting for fresh validation/);
+});
+
 test('rejects an oversized pull request before requesting its changed-file pages', async () => {
   const requests = [];
   const fetchImpl = async (url) => {
@@ -151,6 +236,63 @@ test('rejects an oversized pull request before requesting its changed-file pages
     /Pull request changed-file count is invalid/
   );
   assert.equal(requests.length, 1);
+});
+
+test('waits for the other required validation before merging a cross-workflow Action update', async () => {
+  const files = [
+    validWorkflowChange(),
+    validWorkflowChange('.github/workflows/validate-static-tools.yml'),
+  ];
+  const pullRequest = { ...validPullRequest(), changed_files: files.length };
+  let mergeRequested = false;
+  const fetchImpl = async (url) => {
+    if (url.endsWith('/pulls/42')) return Response.json(pullRequest);
+    if (url.includes('/pulls/42/files?')) return Response.json(files);
+    if (url.includes('/actions/runs?')) {
+      return Response.json({
+        workflow_runs: [workflowRun(STATIC_WORKFLOW, { status: 'in_progress', conclusion: null })],
+      });
+    }
+    if (url.endsWith('/pulls/42/merge')) {
+      mergeRequested = true;
+      return Response.json({ merged: true });
+    }
+    return Response.json({ message: 'unexpected request' }, { status: 404 });
+  };
+
+  const messages = [];
+  await main(env(ICLOUD_WORKFLOW), fetchImpl, (message) => messages.push(message));
+  assert.equal(mergeRequested, false);
+  assert.match(messages.join('\n'), /Validate static tools is in_progress/);
+});
+
+test('merges a cross-workflow Action update only after the other exact-head validation passed', async () => {
+  const files = [
+    validWorkflowChange(),
+    validWorkflowChange('.github/workflows/validate-static-tools.yml'),
+  ];
+  const pullRequest = { ...validPullRequest(), changed_files: files.length };
+  const requests = [];
+  const fetchImpl = async (url, options) => {
+    requests.push({ url, options });
+    if (url.endsWith('/pulls/42')) return Response.json(pullRequest);
+    if (url.includes('/pulls/42/files?')) return Response.json(files);
+    if (url.includes('/actions/runs?')) {
+      return Response.json({ workflow_runs: [workflowRun(ICLOUD_WORKFLOW)] });
+    }
+    if (url.endsWith('/pulls/42/merge')) {
+      const body = JSON.parse(options.body);
+      assert.equal(body.sha, HEAD_SHA);
+      return Response.json({ merged: true });
+    }
+    return Response.json({ message: 'unexpected request' }, { status: 404 });
+  };
+
+  await main(env(STATIC_WORKFLOW), fetchImpl, () => {}, async () => ({
+    stdout: `${NEW_ACTION_SHA}\trefs/tags/v6.1.0\n`,
+    stderr: ''
+  }));
+  assert.equal(requests.filter(({ url }) => url.endsWith('/pulls/42/merge')).length, 1);
 });
 
 test('merges a same-major official Action update only at the exact tested head SHA', async () => {
