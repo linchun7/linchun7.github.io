@@ -7,6 +7,7 @@ const dependabotUrl = new URL('../../../.github/dependabot.yml', import.meta.url
 const autoMergeWorkflowUrl = new URL('../../../.github/workflows/auto-merge-official-actions.yml', import.meta.url);
 const validationWorkflowUrl = new URL('../../../.github/workflows/validate-icloud-price-comparison.yml', import.meta.url);
 const updateWorkflowUrl = new URL('../../../.github/workflows/update-icloud-prices.yml', import.meta.url);
+const autoMergeScriptUrl = new URL('../scripts/auto-merge-official-actions.mjs', import.meta.url);
 const manifestUrl = new URL('../vendor/manifest.json', import.meta.url);
 const noticesUrl = new URL('../THIRD_PARTY_NOTICES.md', import.meta.url);
 
@@ -41,9 +42,10 @@ test('pins every long-lived GitHub Action to a full SHA with a stable release an
 });
 
 test('stages maintenance after production and keeps every dependency update in its own PR', async () => {
-  const [dependabot, updateWorkflow] = await Promise.all([
+  const [dependabot, updateWorkflow, autoMergeScript] = await Promise.all([
     readFile(dependabotUrl, 'utf8'),
     readFile(updateWorkflowUrl, 'utf8'),
+    readFile(autoMergeScriptUrl, 'utf8'),
   ]);
 
   assert.match(updateWorkflow, /cron:\s*['"]10 0 \* \* \*['"]/, 'daily GitHub fallback stays at 08:10 Beijing');
@@ -62,6 +64,7 @@ test('stages maintenance after production and keeps every dependency update in i
   );
   assert.doesNotMatch(dependabot, /^\s+groups:/m, 'grouped dependency PRs would re-couple failure domains');
   assert.doesNotMatch(dependabot, /^\s+ignore:/m, 'npm majors must still be proposed so tested candidates can auto-upgrade');
+  assert.match(autoMergeScript, /major update requires manual review/, 'GitHub Actions majors stay manual until production-only Action behavior is covered');
 });
 
 test('superseded PR validations cancel while main, manual, and scheduled validation remain complete', async () => {
