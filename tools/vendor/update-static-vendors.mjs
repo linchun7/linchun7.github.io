@@ -4,12 +4,12 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import vm from 'node:vm';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const execFile = promisify(execFileCallback);
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, '../..');
+const STABLE_SEMVER_PATTERN = /^(\d+)\.(\d+)\.(\d+)$/;
 
 const vendors = [
     {
@@ -19,8 +19,7 @@ const vendors = [
         packagePaths: ['package/dist/nzh.min.js'],
         targetPath: 'tools/rmb_converter/dist/nzh.min.js',
         currentVersionPatterns: [/\bnzh v([^\s*]+)/i],
-        candidateVersionPatterns: [/\bnzh v([^\s*]+)/i],
-        test: testNzh
+        candidateVersionPatterns: [/\bnzh v([^\s*]+)/i]
     },
     {
         id: 'pangu',
@@ -35,53 +34,12 @@ const vendors = [
             /linchun-vendor:\s*pangu@([^\s*]+)/i,
             /@version:\s*([^\s*]+)/i
         ],
-        prepareCode: preparePanguCode,
-        test: testPangu
+        prepareCode: preparePanguCode
     }
 ];
 
-export function evaluateBrowserBundle(code) {
-    const sandbox = { console };
-    sandbox.window = sandbox;
-    sandbox.self = sandbox;
-    sandbox.globalThis = sandbox;
-    vm.createContext(sandbox);
-    new vm.Script(code, { filename: 'vendor-candidate.js' }).runInContext(sandbox, { timeout: 3000 });
-    return sandbox;
-}
-
-function testNzh(code) {
-    const sandbox = evaluateBrowserBundle(code);
-    assert.equal(typeof sandbox.Nzh?.cn?.toMoney, 'function', 'Nzh.cn.toMoney missing');
-    assert.equal(
-        sandbox.Nzh.cn.toMoney('123456.78'),
-        '人民币壹拾贰万叁仟肆佰伍拾陆元柒角捌分',
-        'Nzh money conversion changed unexpectedly'
-    );
-    assert.equal(sandbox.Nzh.cn.toMoney('0.5'), '人民币伍角', 'Nzh decimal conversion changed unexpectedly');
-}
-
 export function preparePanguCode(code, version) {
     return `/*! linchun-vendor: pangu@${version} */\n${code}\n;(() => {\n    const pangu = globalThis.pangu;\n    if (pangu && typeof pangu.spacing !== 'function' && typeof pangu.spacingText === 'function') {\n        pangu.spacing = pangu.spacingText.bind(pangu);\n    }\n})();\n`;
-}
-
-function getPanguSpacingFunction(pangu) {
-    if (typeof pangu?.spacingText === 'function') return pangu.spacingText.bind(pangu);
-    if (typeof pangu?.spacing === 'function') return pangu.spacing.bind(pangu);
-    return null;
-}
-
-export function testPangu(code) {
-    const sandbox = evaluateBrowserBundle(code);
-    const spacing = getPanguSpacingFunction(sandbox.pangu);
-    assert.equal(typeof spacing, 'function', 'Pangu spacing API missing');
-    assert.equal(spacing('中文ABC123'), '中文 ABC123', 'Pangu CJK/Latin spacing changed unexpectedly');
-    assert.equal(
-        spacing('中文ABC\n第二行123'),
-        '中文 ABC\n第二行 123',
-        'Pangu must preserve line breaks while spacing text'
-    );
-    assert.equal(spacing('中文 ABC123'), '中文 ABC123', 'Pangu spacing must remain idempotent for already-spaced text');
 }
 
 function parseVersionFromPatterns(patterns, code) {
@@ -94,6 +52,22 @@ function parseVersionFromPatterns(patterns, code) {
 
 function parseCurrentVersion(vendor, code) {
     return parseVersionFromPatterns(vendor.currentVersionPatterns, code);
+}
+
+export function parseStableSemver(version, label = 'version') {
+    assert.equal(typeof version, 'string', `${label}: version must be a stable X.Y.Z semver`);
+    const match = version.match(STABLE_SEMVER_PATTERN);
+    assert.ok(match, `${label}: version must be a stable X.Y.Z semver`);
+    return match.slice(1).map(Number);
+}
+
+export function compareStableSemver(left, right) {
+    const leftParts = parseStableSemver(left, 'left');
+    const rightParts = parseStableSemver(right, 'right');
+    for (let index = 0; index < 3; index += 1) {
+        if (leftParts[index] !== rightParts[index]) return leftParts[index] - rightParts[index];
+    }
+    return 0;
 }
 
 export function assertCandidateBundleVersion(vendor, code, expectedVersion) {
@@ -121,6 +95,7 @@ async function readPackageMetadata(packageName) {
     const version = metadata.version;
     const tarball = metadata['dist.tarball'];
     assert.equal(typeof version, 'string', `${packageName}: latest version missing`);
+    parseStableSemver(version, `${packageName} latest`);
     assert.equal(typeof tarball, 'string', `${packageName}: tarball URL missing`);
     const url = new URL(tarball);
     assert.equal(url.protocol, 'https:', `${packageName}: tarball must use HTTPS`);
@@ -155,10 +130,13 @@ async function loadCandidate(vendor, tempRoot) {
     const currentCode = await readFile(target, 'utf8');
     const currentVersion = parseCurrentVersion(vendor, currentCode);
     assert.equal(typeof currentVersion, 'string', `${vendor.name}: current version cannot be parsed`);
+    parseStableSemver(currentVersion, `${vendor.name} current`);
 
     const metadata = await readPackageMetadata(vendor.packageName);
     console.log(`${vendor.name}: current=${currentVersion}, latest=${metadata.version}`);
-    if (currentVersion === metadata.version) return null;
+    const direction = compareStableSemver(metadata.version, currentVersion);
+    if (direction === 0) return null;
+    assert.ok(direction > 0, `${vendor.name}: npm latest would downgrade ${currentVersion} -> ${metadata.version}`);
 
     const vendorDir = path.join(tempRoot, vendor.packageName);
     const archive = path.join(vendorDir, `${vendor.packageName}.tgz`);
@@ -168,6 +146,7 @@ async function loadCandidate(vendor, tempRoot) {
     await execFile('tar', ['-xzf', archive, '-C', extracted], { timeout: 30000 });
 
     const packageJson = JSON.parse(await readFile(path.join(extracted, 'package/package.json'), 'utf8'));
+    assert.equal(packageJson.name, vendor.packageName, `${vendor.name}: package name does not match npm metadata`);
     assert.equal(packageJson.version, metadata.version, `${vendor.name}: package version does not match npm metadata`);
 
     const { code: rawCode, relativePath } = await readFirstExistingFile(extracted, vendor.packagePaths, vendor.name);
@@ -176,9 +155,10 @@ async function loadCandidate(vendor, tempRoot) {
     }
     assertCandidateBundleVersion(vendor, rawCode, metadata.version);
 
+    // Do not execute registry-delivered JavaScript in Node. The candidate is
+    // exercised only in the real browser smoke tests before publication.
     const code = vendor.prepareCode ? vendor.prepareCode(rawCode, metadata.version) : rawCode;
-    vendor.test(code);
-    console.log(`validated ${vendor.name}@${metadata.version} from ${relativePath}`);
+    console.log(`validated ${vendor.name}@${metadata.version} metadata and browser bundle from ${relativePath}`);
     return { vendor, version: metadata.version, code };
 }
 
