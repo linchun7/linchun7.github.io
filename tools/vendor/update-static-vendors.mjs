@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import vm from 'node:vm';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const execFile = promisify(execFileCallback);
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
@@ -39,7 +39,7 @@ const vendors = [
     }
 ];
 
-function evaluateBrowserBundle(code) {
+export function evaluateBrowserBundle(code) {
     const sandbox = { console };
     sandbox.window = sandbox;
     sandbox.self = sandbox;
@@ -60,7 +60,7 @@ function testNzh(code) {
     assert.equal(sandbox.Nzh.cn.toMoney('0.5'), '人民币伍角', 'Nzh decimal conversion changed unexpectedly');
 }
 
-function preparePanguCode(code, version) {
+export function preparePanguCode(code, version) {
     return `/*! linchun-vendor: pangu@${version} */\n${code}\n;(() => {\n    const pangu = globalThis.pangu;\n    if (pangu && typeof pangu.spacing !== 'function' && typeof pangu.spacingText === 'function') {\n        pangu.spacing = pangu.spacingText.bind(pangu);\n    }\n})();\n`;
 }
 
@@ -70,7 +70,7 @@ function getPanguSpacingFunction(pangu) {
     return null;
 }
 
-function testPangu(code) {
+export function testPangu(code) {
     const sandbox = evaluateBrowserBundle(code);
     const spacing = getPanguSpacingFunction(sandbox.pangu);
     assert.equal(typeof spacing, 'function', 'Pangu spacing API missing');
@@ -80,6 +80,7 @@ function testPangu(code) {
         '中文 ABC\n第二行 123',
         'Pangu must preserve line breaks while spacing text'
     );
+    assert.equal(spacing('中文 ABC123'), '中文 ABC123', 'Pangu spacing must remain idempotent for already-spaced text');
 }
 
 function parseCurrentVersion(vendor, code) {
@@ -90,10 +91,9 @@ function parseCurrentVersion(vendor, code) {
     return null;
 }
 
-function selectedVendors(argv = process.argv.slice(2)) {
-    if (argv.length === 0) return vendors;
-    assert.equal(argv.length, 2, 'Usage: node update-static-vendors.mjs [--vendor <id>]');
-    assert.equal(argv[0], '--vendor', 'Usage: node update-static-vendors.mjs [--vendor <id>]');
+export function selectedVendors(argv = process.argv.slice(2)) {
+    assert.equal(argv.length, 2, 'Usage: node update-static-vendors.mjs --vendor <id>');
+    assert.equal(argv[0], '--vendor', 'Usage: node update-static-vendors.mjs --vendor <id>');
     const vendor = vendors.find(({ id }) => id === argv[1]);
     assert.ok(vendor, `Unknown vendor: ${argv[1]}`);
     return [vendor];
@@ -169,8 +169,8 @@ async function loadCandidate(vendor, tempRoot) {
     return { vendor, version: metadata.version, code };
 }
 
-async function main() {
-    const targets = selectedVendors();
+export async function main(argv = process.argv.slice(2)) {
+    const targets = selectedVendors(argv);
     const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'linchun-static-vendors-'));
     try {
         const candidates = [];
@@ -195,4 +195,7 @@ async function main() {
     }
 }
 
-await main();
+const isDirectRun = process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
+if (isDirectRun) {
+    await main();
+}
