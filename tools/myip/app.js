@@ -4,7 +4,7 @@
     const REQUEST_TIMEOUT_MS = 4500;
     const IPV6_TIMEOUT_MS = 2800;
     const LOCAL_REFERENCE_TIMEOUT_MS = 2800;
-    const DOMESTIC_PRIORITY = ['pconline', 'sohu', 'tencent', 'ipip'];
+    const DOMESTIC_PRIORITY = ['ipip'];
     const INTERNATIONAL_IPV4_PRIORITY = ['firstparty', 'ipsb', 'ipify4', 'backup'];
 
     const routeResults = {
@@ -273,9 +273,6 @@
     }
 
     function resetSources() {
-        setSource('pconline', 'loading', '检测中', 'whois.pconline.com.cn');
-        setSource('sohu', 'loading', '检测中', 'pv.sohu.com');
-        setSource('tencent', 'loading', '检测中', 'r.inews.qq.com');
         setSource('ipip', 'loading', '检测中', 'myip.ipip.net');
         setSource('localref', 'loading', '检测中', 'stun.cloudflare.com / stun.l.google.com');
         setSource('firstparty', 'loading', '检测中', 'myip.cfw3.workers.dev');
@@ -283,85 +280,6 @@
         setSource('ipify4', 'loading', '检测中', 'api.ipify.org');
         setSource('backup', 'loading', '检测中', 'ipwho.is');
         setSource('ipify6', 'loading', '检测中', 'api6.ipify.org');
-    }
-
-    function loadJsonp(baseUrl, timeoutMs = REQUEST_TIMEOUT_MS) {
-        return new Promise((resolve, reject) => {
-            const callbackName = `__myipJsonp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-            const script = document.createElement('script');
-            let settled = false;
-            const finish = (handler, value) => {
-                if (settled) return;
-                settled = true;
-                window.clearTimeout(timer);
-                script.remove();
-                try { delete window[callbackName]; } catch { window[callbackName] = undefined; }
-                handler(value);
-            };
-            window[callbackName] = (payload) => finish(resolve, payload);
-            script.async = true;
-            script.referrerPolicy = 'no-referrer';
-            script.onerror = () => finish(reject, new Error('加载失败'));
-            const url = new URL(baseUrl);
-            url.searchParams.set('callback', callbackName);
-            url.searchParams.set('_', String(Date.now()));
-            script.src = url.href;
-            const timer = window.setTimeout(() => finish(reject, createTimeoutError()), timeoutMs);
-            document.head.appendChild(script);
-        });
-    }
-
-    function loadGlobalScript(baseUrl, globalName, timeoutMs = REQUEST_TIMEOUT_MS) {
-        return new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            let settled = false;
-            try { delete window[globalName]; } catch { window[globalName] = undefined; }
-            const finish = (handler, value) => {
-                if (settled) return;
-                settled = true;
-                window.clearTimeout(timer);
-                script.remove();
-                handler(value);
-            };
-            script.async = true;
-            script.referrerPolicy = 'no-referrer';
-            script.onerror = () => finish(reject, new Error('加载失败'));
-            script.onload = () => window[globalName] ? finish(resolve, window[globalName]) : finish(reject, new Error('未返回结果'));
-            const url = new URL(baseUrl);
-            url.searchParams.set('_', String(Date.now()));
-            script.src = url.href;
-            const timer = window.setTimeout(() => finish(reject, createTimeoutError()), timeoutMs);
-            document.head.appendChild(script);
-        });
-    }
-
-    function domesticLocationDetail(payload, ip) {
-        const province = normalizeText(payload?.pro);
-        const city = normalizeText(payload?.city);
-        const region = normalizeText(payload?.region);
-        let operator = normalizeText(payload?.isp);
-        let address = normalizeText(payload?.addr);
-        if (address && address !== ip) {
-            for (const prefix of [province, city, region].filter(Boolean)) address = address.replace(prefix, '').trim();
-        }
-        if (!operator) operator = address;
-        return joinUniqueText([payload?.country || payload?.nation, province, city, region, operator]);
-    }
-
-    async function loadPconline() {
-        const payload = await loadJsonp('https://whois.pconline.com.cn/ipJson.jsp');
-        const ip = normalizeText(payload?.ip);
-        return makeObservation(ip, '太平洋网络', domesticLocationDetail(payload, ip), 'pconline');
-    }
-
-    async function loadSohu() {
-        const payload = await loadGlobalScript('https://pv.sohu.com/cityjson?ie=utf-8', 'returnCitySN');
-        return makeObservation(payload?.cip, '搜狐', normalizeText(payload?.cname), 'sohu');
-    }
-
-    async function loadTencent() {
-        const payload = await loadJsonp('https://r.inews.qq.com/api/ip2city?otype=jsonp');
-        return makeObservation(payload?.ip, '腾讯新闻', joinUniqueText([payload?.country, payload?.province, payload?.city, payload?.district, payload?.isp]), 'tencent');
     }
 
     async function loadIpip() {
@@ -471,9 +389,6 @@
 
     async function loadDomestic(runId) {
         const configs = [
-            { id: 'pconline', endpoint: 'whois.pconline.com.cn', loader: loadPconline },
-            { id: 'sohu', endpoint: 'pv.sohu.com', loader: loadSohu },
-            { id: 'tencent', endpoint: 'r.inews.qq.com', loader: loadTencent },
             { id: 'ipip', endpoint: 'myip.ipip.net', loader: loadIpip }
         ];
         const outcomes = await Promise.all(configs.map((config) => runDomesticSource(runId, config)));
@@ -486,8 +401,8 @@
         if (adopted) {
             routeResults.domestic = {
                 status: 'success',
-                observations: [adopted, ...observations.filter((item) => item !== adopted)],
-                detail: joinText([adopted.detail, agreementSummary(observations, adopted.family)])
+                observations: [adopted],
+                detail: adopted.detail
             };
         } else {
             routeResults.domestic = { status: 'loading', observations: [], detail: '国内网络暂未确认…' };
