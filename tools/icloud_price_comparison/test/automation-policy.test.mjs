@@ -40,27 +40,28 @@ test('pins every long-lived GitHub Action to a full SHA with a stable release an
   }
 });
 
-test('stages maintenance after production and groups only routine version updates', async () => {
+test('stages maintenance after production and keeps every dependency update in its own PR', async () => {
   const [dependabot, updateWorkflow] = await Promise.all([
     readFile(dependabotUrl, 'utf8'),
     readFile(updateWorkflowUrl, 'utf8'),
   ]);
 
   assert.match(updateWorkflow, /cron:\s*['"]10 0 \* \* \*['"]/, 'daily GitHub fallback stays at 08:10 Beijing');
-  assert.match(dependabot, /package-ecosystem: npm[\s\S]*?day: monday[\s\S]*?time: ["']10:20["'][\s\S]*?timezone: Asia\/Shanghai/);
-  assert.match(dependabot, /package-ecosystem: github-actions[\s\S]*?day: monday[\s\S]*?time: ["']12:20["'][\s\S]*?timezone: Asia\/Shanghai/);
-
-  const npmStart = dependabot.indexOf('package-ecosystem: npm');
-  const actionsStart = dependabot.indexOf('package-ecosystem: github-actions');
-  assert.ok(npmStart >= 0 && actionsStart > npmStart);
-  const npmBlock = dependabot.slice(npmStart, actionsStart);
-  const actionsBlock = dependabot.slice(actionsStart);
-
-  assert.match(npmBlock, /routine-icloud-dependencies:[\s\S]*?applies-to: version-updates[\s\S]*?patterns:[\s\S]*?- ["']\*["'][\s\S]*?update-types:[\s\S]*?- ["']minor["'][\s\S]*?- ["']patch["']/);
-  assert.doesNotMatch(npmBlock, /update-types:[\s\S]*?- ["']major["']/);
-  assert.match(actionsBlock, /open-pull-requests-limit:\s*5/);
-  assert.match(actionsBlock, /official-github-actions:[\s\S]*?applies-to: version-updates[\s\S]*?patterns:[\s\S]*?- ["']actions\/\*["'][\s\S]*?update-types:[\s\S]*?- ["']minor["'][\s\S]*?- ["']patch["']/);
-  assert.doesNotMatch(actionsBlock, /update-types:[\s\S]*?- ["']major["']/);
+  assert.equal((dependabot.match(/package-ecosystem:\s*npm/g) || []).length, 2);
+  assert.match(
+    dependabot,
+    /package-ecosystem: npm[\s\S]*?directory: \/tools\/icloud_price_comparison[\s\S]*?day: monday[\s\S]*?time: ["']10:20["'][\s\S]*?timezone: Asia\/Shanghai[\s\S]*?open-pull-requests-limit:\s*5/
+  );
+  assert.match(
+    dependabot,
+    /package-ecosystem: npm[\s\S]*?directory: \/tools\/browser-tests[\s\S]*?day: monday[\s\S]*?time: ["']11:20["'][\s\S]*?timezone: Asia\/Shanghai[\s\S]*?open-pull-requests-limit:\s*5/
+  );
+  assert.match(
+    dependabot,
+    /package-ecosystem: github-actions[\s\S]*?day: monday[\s\S]*?time: ["']12:20["'][\s\S]*?timezone: Asia\/Shanghai[\s\S]*?open-pull-requests-limit:\s*5[\s\S]*?dependency-name: ["']actions\/\*["']/
+  );
+  assert.doesNotMatch(dependabot, /^\s+groups:/m, 'grouped dependency PRs would re-couple failure domains');
+  assert.doesNotMatch(dependabot, /^\s+ignore:/m, 'npm majors must still be proposed so tested candidates can auto-upgrade');
 });
 
 test('superseded PR validations cancel while main, manual, and scheduled validation remain complete', async () => {
@@ -70,16 +71,19 @@ test('superseded PR validations cancel while main, manual, and scheduled validat
   assert.doesNotMatch(workflow, /cancel-in-progress:\s*true/);
 });
 
-test('auto-merge is serialized, least-privileged, and limited to trusted Dependabot validations', async () => {
+test('auto-merge is serialized, least-privileged, and routes each dependency scope to its real validation workflow', async () => {
   const workflow = await readFile(autoMergeWorkflowUrl, 'utf8');
-  assert.match(workflow, /workflow_run:[\s\S]*?workflows:[\s\S]*?Validate iCloud price comparison[\s\S]*?branches:[\s\S]*?- ['"]dependabot\/\*\*['"][\s\S]*?types:[\s\S]*?- completed/);
+  assert.match(
+    workflow,
+    /workflow_run:[\s\S]*?workflows:[\s\S]*?- Validate iCloud price comparison[\s\S]*?- Validate static tools[\s\S]*?branches:[\s\S]*?- ['"]dependabot\/\*\*['"][\s\S]*?types:[\s\S]*?- completed/
+  );
   assert.match(workflow, /permissions:\s*\{\}[\s\S]*?concurrency:[\s\S]*?group: auto-merge-verified-dependabot[\s\S]*?cancel-in-progress: false/);
   assert.match(workflow, /merge:[\s\S]*?permissions:\s+contents: write\s+pull-requests: write/);
   assert.match(workflow, /workflow_run\.conclusion == 'success'/);
   assert.match(workflow, /workflow_run\.actor\.login == 'dependabot\[bot\]'/);
-  assert.match(workflow, /dependabot\/github_actions\//);
-  assert.match(workflow, /dependabot\/npm_and_yarn\/tools\/icloud_price_comparison\//);
-  assert.match(workflow, /RUN_BASE_SHA:[\s\S]*?RUN_HEAD_SHA:/);
+  assert.match(workflow, /workflow_run\.name == 'Validate iCloud price comparison'[\s\S]*?dependabot\/github_actions\/[\s\S]*?dependabot\/npm_and_yarn\/tools\/icloud_price_comparison\//);
+  assert.match(workflow, /workflow_run\.name == 'Validate static tools'[\s\S]*?dependabot\/npm_and_yarn\/tools\/browser-tests\//);
+  assert.match(workflow, /RUN_BASE_SHA:[\s\S]*?RUN_HEAD_SHA:[\s\S]*?VALIDATION_WORKFLOW:/);
   assert.doesNotMatch(workflow, /pull_request_target|secrets\./);
 });
 
