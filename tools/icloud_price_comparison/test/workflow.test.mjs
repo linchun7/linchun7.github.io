@@ -332,7 +332,7 @@ test('runs the same UI acceptance suite in Chromium, Firefox, and WebKit', async
   assert.match(webkitRunner, /PLAYWRIGHT_BROWSER = 'webkit'[\s\S]*?import\('\.\.\/test\/ui-smoke\.test\.mjs'\)/);
 });
 
-test('auto-merges only verified Dependabot dependency scopes after exact validation', async () => {
+test('auto-merges only isolated Dependabot scopes after the matching validation workflow succeeds', async () => {
   const [autoMergeWorkflow, dependabot] = await Promise.all([
     readFile(autoMergeWorkflowUrl, 'utf8'),
     readFile(dependabotUrl, 'utf8'),
@@ -341,16 +341,20 @@ test('auto-merges only verified Dependabot dependency scopes after exact validat
   assert.match(dependabot, /package-ecosystem: github-actions/);
   assert.match(dependabot, /interval: weekly/);
   assert.match(dependabot, /allow:[\s\S]*?dependency-name: ["']actions\/\*["']/);
-  assert.match(dependabot, /groups:[\s\S]*?official-github-actions:[\s\S]*?patterns:[\s\S]*?["']actions\/\*["']/);
   assert.match(dependabot, /package-ecosystem: npm[\s\S]*?directory: \/tools\/icloud_price_comparison/);
+  assert.match(dependabot, /package-ecosystem: npm[\s\S]*?directory: \/tools\/browser-tests/);
+  assert.doesNotMatch(dependabot, /^\s+groups:/m, 'dependency updates must remain isolated instead of grouped');
   assert.doesNotMatch(dependabot, /pip|docker/);
 
-  assert.match(autoMergeWorkflow, /workflow_run:[\s\S]*?Validate iCloud price comparison[\s\S]*?completed/);
+  assert.match(autoMergeWorkflow, /workflow_run:[\s\S]*?Validate iCloud price comparison[\s\S]*?Validate static tools[\s\S]*?completed/);
   assert.match(autoMergeWorkflow, /workflow_run\.conclusion == 'success'/);
   assert.match(autoMergeWorkflow, /workflow_run\.event == 'pull_request'/);
   assert.match(autoMergeWorkflow, /workflow_run\.actor\.login == 'dependabot\[bot\]'/);
+  assert.match(autoMergeWorkflow, /workflow_run\.name == 'Validate iCloud price comparison'/);
   assert.match(autoMergeWorkflow, /startsWith\(github\.event\.workflow_run\.head_branch, 'dependabot\/github_actions\/'\)/);
   assert.match(autoMergeWorkflow, /startsWith\(github\.event\.workflow_run\.head_branch, 'dependabot\/npm_and_yarn\/tools\/icloud_price_comparison\/'\)/);
+  assert.match(autoMergeWorkflow, /workflow_run\.name == 'Validate static tools'/);
+  assert.match(autoMergeWorkflow, /startsWith\(github\.event\.workflow_run\.head_branch, 'dependabot\/npm_and_yarn\/tools\/browser-tests\/'\)/);
   assert.match(autoMergeWorkflow, /pull_requests\[0\]\.number > 0/);
   assert.match(autoMergeWorkflow, /permissions:\s+contents: write\s+pull-requests: write/);
   assert.doesNotMatch(autoMergeWorkflow, /pull_request_target|secrets\.(?!GITHUB_TOKEN)/);
@@ -358,5 +362,6 @@ test('auto-merges only verified Dependabot dependency scopes after exact validat
   assert.match(autoMergeWorkflow, /actions\/setup-node@[a-f0-9]{40} # v\d+[\s\S]*?node-version: 22/);
   assert.match(autoMergeWorkflow, /RUN_BASE_SHA: \$\{\{ github\.event\.workflow_run\.pull_requests\[0\]\.base\.sha \}\}/);
   assert.match(autoMergeWorkflow, /RUN_HEAD_SHA: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/);
+  assert.match(autoMergeWorkflow, /VALIDATION_WORKFLOW: \$\{\{ github\.event\.workflow_run\.name \}\}/);
   assert.match(autoMergeWorkflow, /node tools\/icloud_price_comparison\/scripts\/auto-merge-official-actions\.mjs/);
 });

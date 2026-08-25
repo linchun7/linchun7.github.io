@@ -66,6 +66,9 @@ jobs:
         with:
           node-version: 22
 
+      - name: 运行静态依赖更新器单元测试
+        run: node --test tools/vendor/update-static-vendors.test.mjs
+
       - name: 安装浏览器测试依赖
         working-directory: tools/browser-tests
         run: npm install --ignore-scripts --no-audit --no-fund
@@ -188,14 +191,27 @@ jobs:
           git commit -m "chore(pinyin): update pinyin-pro to ${LATEST}"
           git push origin HEAD:main
 
-  update-static-vendors:
-    if: github.event_name == 'schedule'
+  update-static-vendor:
+    if: ${{ always() && github.event_name == 'schedule' }}
     needs: update-pinyin-pro
-    name: 检查并验证 Nzh / Pangu.js 更新
+    name: 检查并验证 ${{ matrix.name }} 更新
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: write
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - vendor: nzh
+            name: Nzh
+            target: tools/rmb_converter/dist/nzh.min.js
+            commit_message: 'chore(rmb): update Nzh vendor'
+          - vendor: pangu
+            name: Pangu.js
+            target: tools/space/dist/browser/pangu.min.js
+            commit_message: 'chore(space): update Pangu.js vendor'
 
     steps:
       - name: 检出最新 main
@@ -217,24 +233,25 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       - name: 检查最新版并运行库级测试
-        run: node tools/vendor/update-static-vendors.mjs
+        run: node tools/vendor/update-static-vendors.mjs --vendor '${{ matrix.vendor }}'
 
       - name: 判断是否有新版本
         id: changes
+        env:
+          TARGET: ${{ matrix.target }}
+          VENDOR_NAME: ${{ matrix.name }}
         shell: bash
         run: |
           set -euo pipefail
-          allowed='^(tools/rmb_converter/dist/nzh\.min\.js|tools/space/dist/browser/pangu\.min\.js)$'
           changed_files=$(git diff --name-only)
           if [[ -z "$changed_files" ]]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "Nzh / Pangu.js 已是当前最新版。" >> "$GITHUB_STEP_SUMMARY"
+            echo "${VENDOR_NAME} 已是当前最新版。" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          unexpected=$(printf '%s\n' "$changed_files" | grep -Ev "$allowed" || true)
-          if [[ -n "$unexpected" ]]; then
+          if [[ "$changed_files" != "$TARGET" ]]; then
             echo "Unexpected changed files:"
-            printf '%s\n' "$unexpected"
+            printf '%s\n' "$changed_files"
             exit 1
           fi
           echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -254,17 +271,18 @@ jobs:
         if: steps.changes.outputs.changed == 'true'
         env:
           BASE_URL: http://127.0.0.1:4173
+          STATIC_VENDOR: ${{ matrix.vendor }}
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/static-tools-http.log 2>&1 &
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/static-vendor-http.log 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid" 2>/dev/null || true' EXIT
           sleep 1
 
           for browser in chromium firefox webkit; do
-            echo "验证 $browser"
-            PLAYWRIGHT_BROWSER="$browser" node tools/browser-tests/utility-tools-smoke.mjs
+            echo "验证 ${{ matrix.name }} / $browser"
+            PLAYWRIGHT_BROWSER="$browser" node tools/browser-tests/static-vendor-smoke.mjs
           done
 
           git diff --check
@@ -273,7 +291,9 @@ jobs:
         if: steps.changes.outputs.changed == 'true'
         env:
           BASE_SHA: ${{ steps.base.outputs.sha }}
+          COMMIT_MESSAGE: ${{ matrix.commit_message }}
           GITHUB_TOKEN: ${{ github.token }}
+          TARGET: ${{ matrix.target }}
         shell: bash
         run: |
           set -euo pipefail
@@ -285,8 +305,8 @@ jobs:
 
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add tools/rmb_converter/dist/nzh.min.js tools/space/dist/browser/pangu.min.js
-          git commit -m 'chore: update static tool vendor scripts'
+          git add "$TARGET"
+          git commit -m "$COMMIT_MESSAGE"
 
           auth_header=$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)
           git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" push origin HEAD:main
