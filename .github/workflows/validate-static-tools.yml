@@ -413,13 +413,7 @@ jobs:
             curl --fail --silent --show-error --location --max-time 15 \
               -H 'Origin: https://www.linchun.com.cn' \
               https://myip.cfw3.workers.dev/v1/ip -o myip-ip.json || return 1
-            node - <<'NODE' || return 1
-            const fs = require('node:fs');
-            const health = JSON.parse(fs.readFileSync('myip-health.json', 'utf8'));
-            const probe = JSON.parse(fs.readFileSync('myip-ip.json', 'utf8'));
-            if (health.ok !== true || health.service !== 'linchun-myip-probe') process.exit(1);
-            if (probe.schemaVersion !== 1 || probe.role !== 'international-first-party' || typeof probe.ip !== 'string' || !probe.ip) process.exit(1);
-            NODE
+            node -e "const fs=require('node:fs'); const health=JSON.parse(fs.readFileSync('myip-health.json','utf8')); const probe=JSON.parse(fs.readFileSync('myip-ip.json','utf8')); if(health.ok!==true||health.service!=='linchun-myip-probe') process.exit(1); if(probe.schemaVersion!==1||probe.role!=='international-first-party'||typeof probe.ip!=='string'||!probe.ip) process.exit(1);" || return 1
           }
 
           for attempt in $(seq 1 30); do
