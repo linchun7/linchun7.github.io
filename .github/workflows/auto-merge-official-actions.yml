@@ -6,6 +6,7 @@ on:
     workflows:
       - Validate iCloud price comparison
       - Validate static tools
+      - Validate Action artifact roundtrip
     branches:
       - 'dependabot/**'
     types:
@@ -39,6 +40,10 @@ jobs:
             startsWith(github.event.workflow_run.head_branch, 'dependabot/github_actions/') ||
             startsWith(github.event.workflow_run.head_branch, 'dependabot/npm_and_yarn/tools/browser-tests/')
           )
+        ) ||
+        (
+          github.event.workflow_run.name == 'Validate Action artifact roundtrip' &&
+          startsWith(github.event.workflow_run.head_branch, 'dependabot/github_actions/')
         )
       )
     permissions:
