@@ -81,6 +81,14 @@ function groupedIcloudUpdate() {
   return value;
 }
 
+function unapprovedIcloudDependencyUpdate() {
+  const base = baseIcloudPackage();
+  base.devDependencies['future-tool'] = '1.0.0';
+  const head = structuredClone(base);
+  head.devDependencies['future-tool'] = '2.0.0';
+  return { base, head };
+}
+
 function baseStaticPackage() {
   return {
     name: 'linchun-static-tools-browser-tests',
@@ -253,6 +261,29 @@ test('refuses a grouped iCloud PR so one broken dependency cannot block or ride 
   assert.equal(mergeRequested, false);
 });
 
+test('requires explicit review before a future iCloud dependency enters automatic major upgrades', async () => {
+  const pullRequest = { ...validIcloudPullRequest(), changed_files: 2 };
+  const { base, head } = unapprovedIcloudDependencyUpdate();
+  let mergeRequested = false;
+  const fetchImpl = async (url) => {
+    if (url.endsWith('/pulls/42')) return Response.json(pullRequest);
+    if (url.includes('/pulls/42/files?')) return Response.json(icloudDirectChangedFiles());
+    if (url.includes('/contents/' + ICLOUD_PACKAGE_PATH + '?ref=' + BASE_SHA)) return Response.json(asContent(base));
+    if (url.includes('/contents/' + ICLOUD_PACKAGE_PATH + '?ref=' + HEAD_SHA)) return Response.json(asContent(head));
+    if (url.endsWith('/pulls/42/merge')) {
+      mergeRequested = true;
+      return Response.json({ merged: true });
+    }
+    return Response.json({ message: 'unexpected request' }, { status: 404 });
+  };
+
+  await assert.rejects(
+    main(env(ICLOUD_WORKFLOW), fetchImpl, () => {}),
+    /dependency is outside the approved auto-update scope/
+  );
+  assert.equal(mergeRequested, false);
+});
+
 test('auto-merges a Playwright major only after the static three-browser validation workflow', async () => {
   const pullRequest = { ...validStaticPullRequest(), changed_files: 1 };
   const requests = [];
@@ -280,6 +311,6 @@ test('auto-merges a Playwright major only after the static three-browser validat
   };
   await assert.rejects(
     main(env(ICLOUD_WORKFLOW), wrongWorkflowFetch, () => {}),
-    /must be validated by Validate static tools/
+    /cannot be handled by Validate iCloud price comparison/
   );
 });
