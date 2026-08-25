@@ -66,6 +66,9 @@ jobs:
         with:
           node-version: 22
 
+      - name: 运行静态依赖更新器单元测试
+        run: node --test tools/vendor/update-static-vendors.test.mjs
+
       - name: 安装浏览器测试依赖
         working-directory: tools/browser-tests
         run: npm install --ignore-scripts --no-audit --no-fund
