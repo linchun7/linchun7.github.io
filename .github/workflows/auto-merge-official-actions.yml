@@ -43,7 +43,11 @@ jobs:
         ) ||
         (
           github.event.workflow_run.name == 'Validate Action artifact roundtrip' &&
-          startsWith(github.event.workflow_run.head_branch, 'dependabot/github_actions/')
+          startsWith(github.event.workflow_run.head_branch, 'dependabot/github_actions/') &&
+          (
+            contains(github.event.workflow_run.head_branch, 'upload-artifact') ||
+            contains(github.event.workflow_run.head_branch, 'download-artifact')
+          )
         )
       )
     permissions:
