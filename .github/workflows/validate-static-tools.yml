@@ -366,7 +366,7 @@ jobs:
     needs:
       - update-pinyin-pro
       - update-static-vendor
-    name: 验证静态依赖与 MyIP 生产契约
+    name: 验证静态依赖生产契约
     runs-on: ubuntu-latest
     timeout-minutes: 8
     permissions:
@@ -406,14 +406,6 @@ jobs:
             [[ "$(sha256sum pangu.min.js | cut -d' ' -f1)" == "$expected_pangu" ]] || return 1
             grep -F "pinyin-pro@${pinyin_version}/dist/index.js" pinyin.html >/dev/null || return 1
             [[ "$(wc -c < pinyin-pro.js)" -gt 1000 ]] || return 1
-
-            curl --fail --silent --show-error --location --max-time 15 \
-              -H 'Origin: https://www.linchun.com.cn' \
-              https://myip.cfw3.workers.dev/healthz -o myip-health.json || return 1
-            curl --fail --silent --show-error --location --max-time 15 \
-              -H 'Origin: https://www.linchun.com.cn' \
-              https://myip.cfw3.workers.dev/v1/ip -o myip-ip.json || return 1
-            node -e "const fs=require('node:fs'); const health=JSON.parse(fs.readFileSync('myip-health.json','utf8')); const probe=JSON.parse(fs.readFileSync('myip-ip.json','utf8')); if(health.ok!==true||health.service!=='linchun-myip-probe') process.exit(1); if(probe.schemaVersion!==1||probe.role!=='international-first-party'||typeof probe.ip!=='string'||!probe.ip) process.exit(1);" || return 1
           }
 
           for attempt in $(seq 1 30); do
@@ -421,9 +413,9 @@ jobs:
               echo "生产契约已验证（第 ${attempt} 次）。"
               exit 0
             fi
-            echo "生产资源尚未同步或外部契约暂不可用（第 ${attempt}/30 次），10 秒后重试。"
+            echo "生产静态资源尚未同步或外部 CDN 暂不可用（第 ${attempt}/30 次），10 秒后重试。"
             sleep 10
           done
 
-          echo "::error title=生产契约验证失败::GitHub Pages/Cloudflare 静态资源或 MyIP Worker 与当前契约不一致。"
+          echo "::error title=生产契约验证失败::GitHub Pages 静态资源或 pinyin-pro CDN 与当前 main 不一致。"
           exit 1
