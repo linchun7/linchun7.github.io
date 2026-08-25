@@ -13,6 +13,7 @@ const BASE_SHA = 'a'.repeat(40);
 const HEAD_SHA = 'b'.repeat(40);
 const OLD_ACTION_SHA = 'c'.repeat(40);
 const NEW_ACTION_SHA = 'd'.repeat(40);
+const VALIDATION_WORKFLOW = 'Validate iCloud price comparison';
 
 function validPullRequest() {
   return {
@@ -21,7 +22,7 @@ function validPullRequest() {
     user: { login: 'dependabot[bot]' },
     base: { ref: 'main', sha: BASE_SHA },
     head: {
-      ref: 'dependabot/github_actions/official-github-actions-123456',
+      ref: 'dependabot/github_actions/checkout-123456',
       sha: HEAD_SHA,
       repo: { full_name: 'owner/repository' },
     },
@@ -38,6 +39,18 @@ function validWorkflowChange() {
       '-        uses: actions/checkout@' + OLD_ACTION_SHA + ' # v6.0.0',
       '+        uses: actions/checkout@' + NEW_ACTION_SHA + ' # v6.1.0',
     ].join('\n'),
+  };
+}
+
+function env() {
+  return {
+    DEFAULT_BRANCH: 'main',
+    GITHUB_TOKEN: 'test-token',
+    PR_NUMBER: '42',
+    REPOSITORY: 'owner/repository',
+    RUN_BASE_SHA: BASE_SHA,
+    RUN_HEAD_SHA: HEAD_SHA,
+    VALIDATION_WORKFLOW,
   };
 }
 
@@ -64,12 +77,13 @@ test('accepts only the tested Dependabot GitHub Actions pull request', () => {
   }
 });
 
-test('accepts one-for-one full-SHA routine actions/* replacements and rejects every broader diff', () => {
+test('accepts one-for-one full-SHA updates for exactly one official Action and rejects broader diffs', () => {
   assert.equal(validateChangedFiles([validWorkflowChange()]), 1);
   assert.throws(
     () => validateChangedFiles(Array.from({ length: 21 }, validWorkflowChange)),
     /Changed-file count is invalid/
   );
+
   const excessiveReferences = validWorkflowChange();
   excessiveReferences.patch = [
     '@@ -1,101 +1,101 @@',
@@ -78,6 +92,17 @@ test('accepts one-for-one full-SHA routine actions/* replacements and rejects ev
   ].join('\n');
   excessiveReferences.changes = 202;
   assert.throws(() => validateChangedFiles([excessiveReferences]), /Action reference count is invalid/);
+
+  const groupedActions = validWorkflowChange();
+  groupedActions.patch = [
+    '@@ -1,2 +1,2 @@',
+    '-        uses: actions/checkout@' + OLD_ACTION_SHA + ' # v6.0.0',
+    '+        uses: actions/checkout@' + NEW_ACTION_SHA + ' # v6.1.0',
+    '-        uses: actions/setup-node@' + OLD_ACTION_SHA + ' # v6.0.0',
+    '+        uses: actions/setup-node@' + NEW_ACTION_SHA + ' # v6.1.0',
+  ].join('\n');
+  groupedActions.changes = 4;
+  assert.throws(() => validateChangedFiles([groupedActions]), /must update exactly one Action/);
 
   const invalidChanges = [
     (file) => { file.filename = 'tools/icloud_price_comparison/script.js'; },
@@ -97,7 +122,7 @@ test('accepts one-for-one full-SHA routine actions/* replacements and rejects ev
   }
 });
 
-test('requires stable forward patch/minor Action releases and rejects majors', () => {
+test('keeps GitHub Actions majors manual because production-only Action behavior is not fully exercised', () => {
   const major = validWorkflowChange();
   major.patch = major.patch.replace('# v6.1.0', '# v7.0.0');
   assert.throws(() => validateChangedFiles([major]), /major update requires manual review/);
@@ -122,20 +147,13 @@ test('rejects an oversized pull request before requesting its changed-file pages
   };
 
   await assert.rejects(
-    main({
-      DEFAULT_BRANCH: 'main',
-      GITHUB_TOKEN: 'test-token',
-      PR_NUMBER: '42',
-      REPOSITORY: 'owner/repository',
-      RUN_BASE_SHA: BASE_SHA,
-      RUN_HEAD_SHA: HEAD_SHA,
-    }, fetchImpl, () => {}),
+    main(env(), fetchImpl, () => {}),
     /Pull request changed-file count is invalid/
   );
   assert.equal(requests.length, 1);
 });
 
-test('merges through the GitHub API only with the exact tested head SHA', async () => {
+test('merges a same-major official Action update only at the exact tested head SHA', async () => {
   const pullRequest = { ...validPullRequest(), changed_files: 1 };
   const requests = [];
   const fetchImpl = async (url, options) => {
@@ -147,19 +165,13 @@ test('merges through the GitHub API only with the exact tested head SHA', async 
       assert.equal(options.method, 'PUT');
       assert.equal(body.sha, HEAD_SHA);
       assert.equal(body.merge_method, 'squash');
+      assert.equal(body.commit_title, 'chore: update official GitHub Action (#42)');
       return Response.json({ merged: true });
     }
     return Response.json({ message: 'unexpected request' }, { status: 404 });
   };
 
-  await main({
-    DEFAULT_BRANCH: 'main',
-    GITHUB_TOKEN: 'test-token',
-    PR_NUMBER: '42',
-    REPOSITORY: 'owner/repository',
-    RUN_BASE_SHA: BASE_SHA,
-    RUN_HEAD_SHA: HEAD_SHA,
-  }, fetchImpl, () => {}, async () => ({
+  await main(env(), fetchImpl, () => {}, async () => ({
     stdout: `${NEW_ACTION_SHA}\trefs/tags/v6.1.0\n`,
     stderr: ''
   }));
