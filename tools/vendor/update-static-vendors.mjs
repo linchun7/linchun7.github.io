@@ -19,6 +19,7 @@ const vendors = [
         packagePaths: ['package/dist/nzh.min.js'],
         targetPath: 'tools/rmb_converter/dist/nzh.min.js',
         currentVersionPatterns: [/\bnzh v([^\s*]+)/i],
+        candidateVersionPatterns: [/\bnzh v([^\s*]+)/i],
         test: testNzh
     },
     {
@@ -83,12 +84,23 @@ export function testPangu(code) {
     assert.equal(spacing('中文 ABC123'), '中文 ABC123', 'Pangu spacing must remain idempotent for already-spaced text');
 }
 
-function parseCurrentVersion(vendor, code) {
-    for (const pattern of vendor.currentVersionPatterns) {
+function parseVersionFromPatterns(patterns, code) {
+    for (const pattern of patterns ?? []) {
         const version = pattern.exec(code)?.[1];
         if (version) return version;
     }
     return null;
+}
+
+function parseCurrentVersion(vendor, code) {
+    return parseVersionFromPatterns(vendor.currentVersionPatterns, code);
+}
+
+export function assertCandidateBundleVersion(vendor, code, expectedVersion) {
+    if (!vendor.candidateVersionPatterns?.length) return;
+    const candidateVersion = parseVersionFromPatterns(vendor.candidateVersionPatterns, code);
+    assert.equal(typeof candidateVersion, 'string', `${vendor.name}: candidate bundle version cannot be parsed`);
+    assert.equal(candidateVersion, expectedVersion, `${vendor.name}: bundle version does not match npm metadata`);
 }
 
 export function selectedVendors(argv = process.argv.slice(2)) {
@@ -162,6 +174,7 @@ async function loadCandidate(vendor, tempRoot) {
     if (rawCode.length < 1000 || /<html[\s>]/i.test(rawCode)) {
         throw new Error(`${vendor.name}: candidate bundle looks invalid`);
     }
+    assertCandidateBundleVersion(vendor, rawCode, metadata.version);
 
     const code = vendor.prepareCode ? vendor.prepareCode(rawCode, metadata.version) : rawCode;
     vendor.test(code);
