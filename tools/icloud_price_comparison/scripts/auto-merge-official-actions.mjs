@@ -11,6 +11,7 @@ const STABLE_SEMVER_PATTERN = /^(\d+)\.(\d+)\.(\d+)$/;
 const ACTION_BRANCH_PREFIX = 'dependabot/github_actions/';
 const ICLOUD_VALIDATION_WORKFLOW = 'Validate iCloud price comparison';
 const STATIC_VALIDATION_WORKFLOW = 'Validate static tools';
+const ACTION_ARTIFACT_VALIDATION_WORKFLOW = 'Validate Action artifact roundtrip';
 const STATIC_VALIDATION_WORKFLOW_PATH = '.github/workflows/validate-static-tools.yml';
 const MAX_CHANGED_FILES = 20;
 const MAX_ACTION_REFERENCES = 100;
@@ -81,7 +82,11 @@ function classifyDependabotPullRequest(pr, expected) {
   if (pr.head?.ref?.startsWith(ACTION_BRANCH_PREFIX)) {
     return {
       kind: 'github-actions',
-      triggerWorkflows: new Set([ICLOUD_VALIDATION_WORKFLOW, STATIC_VALIDATION_WORKFLOW]),
+      triggerWorkflows: new Set([
+        ICLOUD_VALIDATION_WORKFLOW,
+        STATIC_VALIDATION_WORKFLOW,
+        ACTION_ARTIFACT_VALIDATION_WORKFLOW,
+      ]),
     };
   }
   const npmProfile = npmProfileForBranch(pr.head?.ref);
@@ -165,7 +170,7 @@ export function validateChangedFiles(files) {
 }
 
 export function requiredActionValidationWorkflows(files) {
-  const required = [ICLOUD_VALIDATION_WORKFLOW];
+  const required = [ICLOUD_VALIDATION_WORKFLOW, ACTION_ARTIFACT_VALIDATION_WORKFLOW];
   if (files.some(({ filename }) => filename === STATIC_VALIDATION_WORKFLOW_PATH)) {
     required.push(STATIC_VALIDATION_WORKFLOW);
   }
