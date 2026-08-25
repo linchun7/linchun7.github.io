@@ -1,0 +1,49 @@
+name: Validate Action artifact roundtrip
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  artifact-roundtrip:
+    if: github.event_name == 'workflow_dispatch' || (github.actor == 'dependabot[bot]' && startsWith(github.head_ref, 'dependabot/github_actions/'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 生成校验文件
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/action-artifact-source"
+          printf 'artifact-roundtrip:%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/action-artifact-source/probe.txt"
+          cd "$RUNNER_TEMP/action-artifact-source"
+          sha256sum probe.txt > probe.txt.sha256
+
+      - name: 上传校验文件
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: action-artifact-roundtrip-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/action-artifact-source/probe.txt
+            ${{ runner.temp }}/action-artifact-source/probe.txt.sha256
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: 下载校验文件
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: action-artifact-roundtrip-${{ github.run_id }}
+          path: ${{ runner.temp }}/action-artifact-download
+
+      - name: 验证往返字节
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/action-artifact-download"
+          sha256sum --check probe.txt.sha256
+          cmp probe.txt "$RUNNER_TEMP/action-artifact-source/probe.txt"
