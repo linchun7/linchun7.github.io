@@ -11,7 +11,13 @@ permissions:
 
 jobs:
   artifact-roundtrip:
-    if: github.event_name == 'workflow_dispatch' || (github.actor == 'dependabot[bot]' && startsWith(github.head_ref, 'dependabot/github_actions/'))
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.actor == 'dependabot[bot]' &&
+        startsWith(github.head_ref, 'dependabot/github_actions/') &&
+        (contains(github.head_ref, 'upload-artifact') || contains(github.head_ref, 'download-artifact'))
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
