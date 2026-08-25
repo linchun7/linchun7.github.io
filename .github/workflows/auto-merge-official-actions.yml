@@ -80,12 +80,18 @@ jobs:
           const files = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
           if (!Array.isArray(files) || files.length === 0 || files.length > 20) process.exit(0);
           let uncertain = false;
+          const usesKey = 'uses' + ':';
           const relevant = files.some((file) => {
             if (typeof file.patch !== 'string') {
               uncertain = true;
               return false;
             }
-            return file.patch.split('\n').some((line) => /^[+-]\s*uses:\s*actions\/(?:upload-artifact|download-artifact)@/.test(line));
+            return file.patch.split('\n').some((line) => {
+              const content = line.replace(/^[+-]\s*/, '');
+              return ['upload-artifact', 'download-artifact'].some((action) => (
+                content.startsWith(`${usesKey} actions/${action}@`)
+              ));
+            });
           });
           if (relevant || uncertain) process.exit(0);
           process.exit(1);
