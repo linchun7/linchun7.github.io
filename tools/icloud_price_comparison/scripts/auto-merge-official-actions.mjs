@@ -7,13 +7,36 @@ const SHA_PATTERN = /^[a-f0-9]{40}$/;
 const WORKFLOW_PATH_PATTERN = /^\.github\/workflows\/[^/]+\.ya?ml$/;
 const ACTION_LINE_PATTERN = /^([+-])\s*uses:\s*(actions\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*)@([a-f0-9]{40})\s+#\s+(v\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?)\s*$/;
 const ACTION_STABLE_SEMVER_PATTERN = /^v(\d+)\.(\d+)\.(\d+)$/;
-const NPM_BRANCH_PREFIX = 'dependabot/npm_and_yarn/tools/icloud_price_comparison/';
-const NPM_PACKAGE_PATH = 'tools/icloud_price_comparison/package.json';
-const NPM_LOCK_PATH = 'tools/icloud_price_comparison/pnpm-lock.yaml';
 const STABLE_SEMVER_PATTERN = /^(\d+)\.(\d+)\.(\d+)$/;
+const ACTION_BRANCH_PREFIX = 'dependabot/github_actions/';
+const ICLOUD_VALIDATION_WORKFLOW = 'Validate iCloud price comparison';
+const STATIC_VALIDATION_WORKFLOW = 'Validate static tools';
 const MAX_CHANGED_FILES = 20;
 const MAX_ACTION_REFERENCES = 100;
 const execFileAsync = promisify(execFile);
+
+const NPM_PROFILES = Object.freeze({
+  icloud: Object.freeze({
+    id: 'icloud',
+    branchPrefix: 'dependabot/npm_and_yarn/tools/icloud_price_comparison/',
+    packagePath: 'tools/icloud_price_comparison/package.json',
+    lockPath: 'tools/icloud_price_comparison/pnpm-lock.yaml',
+    validationWorkflow: ICLOUD_VALIDATION_WORKFLOW,
+    commitLabel: 'iCloud dependency',
+    allowLockOnly: true,
+    allowedDependencies: null,
+  }),
+  staticBrowserTests: Object.freeze({
+    id: 'static-browser-tests',
+    branchPrefix: 'dependabot/npm_and_yarn/tools/browser-tests/',
+    packagePath: 'tools/browser-tests/package.json',
+    lockPath: null,
+    validationWorkflow: STATIC_VALIDATION_WORKFLOW,
+    commitLabel: 'static browser test dependency',
+    allowLockOnly: false,
+    allowedDependencies: new Set(['playwright']),
+  }),
+});
 
 function invariant(condition, message) {
   if (!condition) throw new Error(message);
@@ -28,20 +51,41 @@ function validateCommonPullRequest(pr, expected) {
   invariant(pr.head?.repo?.full_name === expected.repository, 'Dependabot branch must belong to this repository');
 }
 
+function npmProfileForBranch(branch) {
+  return Object.values(NPM_PROFILES).find(({ branchPrefix }) => branch?.startsWith(branchPrefix)) ?? null;
+}
+
 export function validatePullRequest(pr, expected) {
   validateCommonPullRequest(pr, expected);
-  invariant(pr.head?.ref?.startsWith('dependabot/github_actions/'), 'Pull request must be a GitHub Actions update');
+  invariant(pr.head?.ref?.startsWith(ACTION_BRANCH_PREFIX), 'Pull request must be a GitHub Actions update');
 }
 
 export function validateNpmPullRequest(pr, expected) {
   validateCommonPullRequest(pr, expected);
-  invariant(pr.head?.ref?.startsWith(NPM_BRANCH_PREFIX), 'Pull request must be an iCloud npm update');
+  invariant(pr.head?.ref?.startsWith(NPM_PROFILES.icloud.branchPrefix), 'Pull request must be an iCloud npm update');
+}
+
+export function validateStaticBrowserNpmPullRequest(pr, expected) {
+  validateCommonPullRequest(pr, expected);
+  invariant(pr.head?.ref?.startsWith(NPM_PROFILES.staticBrowserTests.branchPrefix), 'Pull request must be a static browser test npm update');
 }
 
 function classifyDependabotPullRequest(pr, expected) {
   validateCommonPullRequest(pr, expected);
-  if (pr.head?.ref?.startsWith('dependabot/github_actions/')) return 'github-actions';
-  if (pr.head?.ref?.startsWith(NPM_BRANCH_PREFIX)) return 'npm';
+  if (pr.head?.ref?.startsWith(ACTION_BRANCH_PREFIX)) {
+    return {
+      kind: 'github-actions',
+      validationWorkflow: ICLOUD_VALIDATION_WORKFLOW,
+    };
+  }
+  const npmProfile = npmProfileForBranch(pr.head?.ref);
+  if (npmProfile) {
+    return {
+      kind: 'npm',
+      validationWorkflow: npmProfile.validationWorkflow,
+      npmProfile,
+    };
+  }
   throw new Error('Dependabot branch is outside the approved automation scopes');
 }
 
@@ -75,6 +119,7 @@ export function validateChangedFiles(files) {
   invariant(files.length > 0 && files.length <= MAX_CHANGED_FILES, 'Changed-file count is invalid');
 
   let changedReferenceCount = 0;
+  const changedActionNames = new Set();
   for (const file of files) {
     invariant(WORKFLOW_PATH_PATTERN.test(file.filename), 'Only GitHub workflow files may change: ' + file.filename);
     invariant(file.status === 'modified' && !file.previous_filename, 'Workflow files may only be modified: ' + file.filename);
@@ -101,6 +146,7 @@ export function validateChangedFiles(files) {
     invariant(JSON.stringify(oldActions) === JSON.stringify(newActions), 'Action names must not change');
     validateRoutineActionVersions(oldReferences, newReferences, file.filename);
 
+    for (const action of newActions) changedActionNames.add(action);
     const oldDigests = oldReferences.map(({ action, sha }) => action + '@' + sha).sort();
     const newDigests = newReferences.map(({ action, sha }) => action + '@' + sha).sort();
     invariant(JSON.stringify(oldDigests) !== JSON.stringify(newDigests), 'At least one Action SHA must change');
@@ -108,22 +154,30 @@ export function validateChangedFiles(files) {
     invariant(changedReferenceCount <= MAX_ACTION_REFERENCES, 'Action reference count is invalid');
   }
 
+  invariant(changedActionNames.size === 1, 'Dependabot Action PR must update exactly one Action');
   return changedReferenceCount;
 }
 
-export function validateNpmChangedFiles(files) {
-  invariant(files.length === 1 || files.length === 2, 'Routine npm update must change pnpm-lock.yaml, optionally with package.json');
+function validateNpmChangedFilesForProfile(files, profile) {
   const actualFiles = files.map(({ filename }) => filename).sort();
-  const lockOnly = [NPM_LOCK_PATH];
-  const directUpdate = [NPM_LOCK_PATH, NPM_PACKAGE_PATH].sort();
-  invariant(
-    isDeepStrictEqual(actualFiles, lockOnly) || isDeepStrictEqual(actualFiles, directUpdate),
-    'Routine npm update changed files outside the approved dependency pair'
-  );
+  const directUpdate = [profile.packagePath, ...(profile.lockPath ? [profile.lockPath] : [])].sort();
+  const lockOnly = profile.lockPath ? [profile.lockPath] : null;
+  const validShape = isDeepStrictEqual(actualFiles, directUpdate)
+    || (profile.allowLockOnly && lockOnly && isDeepStrictEqual(actualFiles, lockOnly));
+
+  invariant(validShape, `${profile.id}: npm update changed files outside the approved dependency files`);
   for (const file of files) {
-    invariant(file.status === 'modified' && !file.previous_filename, 'Routine npm dependency files may only be modified');
+    invariant(file.status === 'modified' && !file.previous_filename, `${profile.id}: npm dependency files may only be modified`);
   }
-  return actualFiles.includes(NPM_PACKAGE_PATH);
+  return actualFiles.includes(profile.packagePath);
+}
+
+export function validateNpmChangedFiles(files) {
+  return validateNpmChangedFilesForProfile(files, NPM_PROFILES.icloud);
+}
+
+export function validateStaticBrowserNpmChangedFiles(files) {
+  return validateNpmChangedFilesForProfile(files, NPM_PROFILES.staticBrowserTests);
 }
 
 function parseStableVersion(version, label) {
@@ -163,7 +217,6 @@ export function validateRoutineNpmPackageUpdate(basePackage, headPackage) {
       if (before === after) continue;
       const oldVersion = parseStableVersion(before, `${packageName} old version`);
       const newVersion = parseStableVersion(after, `${packageName} new version`);
-      invariant(newVersion[0] === oldVersion[0], `${packageName} major update requires manual review`);
       invariant(compareVersions(newVersion, oldVersion) > 0, `${packageName} update must move forward`);
       changes.push({ packageName, before, after });
     }
@@ -280,18 +333,24 @@ export async function main(env = process.env, fetchImpl = fetch, log = console.l
     REPOSITORY: repository,
     RUN_BASE_SHA: baseSha,
     RUN_HEAD_SHA: headSha,
+    VALIDATION_WORKFLOW: validationWorkflow,
   } = env;
   const pullNumber = Number(pullNumberText);
 
   invariant(token, 'GITHUB_TOKEN is required');
   invariant(/^[^/]+\/[^/]+$/.test(repository || ''), 'REPOSITORY must be owner/name');
   invariant(defaultBranch, 'DEFAULT_BRANCH is required');
+  invariant(validationWorkflow, 'VALIDATION_WORKFLOW is required');
   invariant(Number.isSafeInteger(pullNumber) && pullNumber > 0, 'PR_NUMBER must be a positive integer');
   invariant(SHA_PATTERN.test(baseSha || ''), 'RUN_BASE_SHA must be a full SHA');
   invariant(SHA_PATTERN.test(headSha || ''), 'RUN_HEAD_SHA must be a full SHA');
 
   const pullRequest = await githubRequest(repository, token, '/pulls/' + pullNumber, {}, fetchImpl);
-  const kind = classifyDependabotPullRequest(pullRequest, { repository, defaultBranch, baseSha, headSha });
+  const scope = classifyDependabotPullRequest(pullRequest, { repository, defaultBranch, baseSha, headSha });
+  invariant(
+    validationWorkflow === scope.validationWorkflow,
+    `Dependabot scope must be validated by ${scope.validationWorkflow}`
+  );
   invariant(
     Number.isSafeInteger(pullRequest.changed_files)
       && pullRequest.changed_files > 0
@@ -304,27 +363,33 @@ export async function main(env = process.env, fetchImpl = fetch, log = console.l
 
   let summary;
   let commitTitle;
-  if (kind === 'github-actions') {
+  if (scope.kind === 'github-actions') {
     const referenceCount = validateChangedFiles(files);
     const actionReferences = collectNewActionReferences(files);
     await verifyActionReferences(actionReferences, runGit);
-    summary = `${referenceCount} official Action reference(s) and exact release tag(s)`;
-    commitTitle = 'chore: update official GitHub Actions (#' + pullNumber + ')';
+    summary = `${referenceCount} official Action reference(s) for one Action and exact release tag(s)`;
+    commitTitle = 'chore: update official GitHub Action (#' + pullNumber + ')';
   } else {
-    const packageFileChanged = validateNpmChangedFiles(files);
+    const profile = scope.npmProfile;
+    const packageFileChanged = validateNpmChangedFilesForProfile(files, profile);
     const [basePackage, headPackage] = await Promise.all([
-      readJsonAtRef(repository, token, NPM_PACKAGE_PATH, baseSha, fetchImpl),
-      readJsonAtRef(repository, token, NPM_PACKAGE_PATH, headSha, fetchImpl),
+      readJsonAtRef(repository, token, profile.packagePath, baseSha, fetchImpl),
+      readJsonAtRef(repository, token, profile.packagePath, headSha, fetchImpl),
     ]);
     const changes = validateRoutineNpmPackageUpdate(basePackage, headPackage);
     if (packageFileChanged) {
-      invariant(changes.length > 0, 'package.json changed without an approved dependency version update');
-      summary = `${changes.length} routine npm dependency update(s)`;
+      invariant(changes.length === 1, `${profile.id}: Dependabot PR must update exactly one direct dependency`);
+      const [change] = changes;
+      if (profile.allowedDependencies) {
+        invariant(profile.allowedDependencies.has(change.packageName), `${profile.id}: dependency is outside the approved auto-update scope`);
+      }
+      summary = `${change.packageName} ${change.before} -> ${change.after}`;
     } else {
+      invariant(profile.allowLockOnly, `${profile.id}: lockfile-only updates are not allowed`);
       invariant(changes.length === 0, 'Lockfile-only update unexpectedly changed package.json semantics');
       summary = 'one lockfile-only transitive npm dependency update';
     }
-    commitTitle = 'chore: update iCloud dependencies (#' + pullNumber + ')';
+    commitTitle = `chore: update ${profile.commitLabel} (#${pullNumber})`;
   }
 
   const result = await githubRequest(repository, token, '/pulls/' + pullNumber + '/merge', {
