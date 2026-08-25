@@ -1,24 +1,14 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import {
     assertCandidateBundleVersion,
-    evaluateBrowserBundle,
+    compareStableSemver,
+    parseStableSemver,
     preparePanguCode,
-    selectedVendors,
-    testPangu
+    selectedVendors
 } from './update-static-vendors.mjs';
-
-const PANGU_V9_STYLE_FIXTURE = `
-globalThis.pangu = {
-    spacingText(text) {
-        return text
-            .replaceAll('中文ABC123', '中文 ABC123')
-            .replaceAll('中文ABC', '中文 ABC')
-            .replaceAll('第二行123', '第二行 123');
-    }
-};
-`;
 
 test('requires an explicit vendor so one updater failure cannot couple unrelated vendors', () => {
     assert.throws(() => selectedVendors([]), /--vendor <id>/);
@@ -30,7 +20,7 @@ test('requires an explicit vendor so one updater failure cannot couple unrelated
 test('keeps Nzh bundle metadata pinned to the npm package version', () => {
     const nzh = {
         name: 'Nzh',
-        candidateVersionPatterns: [/\bnzh v([^\s*]+)/i],
+        candidateVersionPatterns: [/\bnzh v([^\s*]+)/i]
     };
     assert.doesNotThrow(() => assertCandidateBundleVersion(nzh, '/*! nzh v1.0.14 */', '1.0.14'));
     assert.throws(
@@ -43,34 +33,28 @@ test('keeps Nzh bundle metadata pinned to the npm package version', () => {
     );
 });
 
-test('allows vendors without a reliable bundle version header to use package metadata plus functional validation', () => {
-    assert.doesNotThrow(() => assertCandidateBundleVersion({ name: 'Pangu.js' }, PANGU_V9_STYLE_FIXTURE, '9.1.0'));
+test('allows vendors without a reliable bundle version header to rely on package metadata plus browser validation', () => {
+    assert.doesNotThrow(() => assertCandidateBundleVersion({ name: 'Pangu.js' }, '/* browser bundle */', '9.1.0'));
 });
 
-test('adapts the Pangu 9 spacingText API to the existing page spacing API', () => {
-    const prepared = preparePanguCode(PANGU_V9_STYLE_FIXTURE, '9.1.0');
+test('accepts only stable semantic versions and compares them numerically', () => {
+    assert.deepEqual(parseStableSemver('9.1.0'), [9, 1, 0]);
+    assert.equal(compareStableSemver('9.1.0', '4.0.7') > 0, true);
+    assert.equal(compareStableSemver('1.0.14', '1.0.14'), 0);
+    assert.equal(compareStableSemver('1.0.13', '1.0.14') < 0, true);
+    assert.throws(() => parseStableSemver('9.2.0-beta.1'), /stable X\.Y\.Z/);
+    assert.throws(() => parseStableSemver('v9.2.0'), /stable X\.Y\.Z/);
+});
+
+test('adapts the Pangu 9 spacingText API without executing the candidate in Node', () => {
+    const prepared = preparePanguCode('/* upstream browser bundle */', '9.1.0');
     assert.match(prepared, /linchun-vendor: pangu@9\.1\.0/);
-
-    const sandbox = evaluateBrowserBundle(prepared);
-    assert.equal(typeof sandbox.pangu.spacingText, 'function');
-    assert.equal(typeof sandbox.pangu.spacing, 'function');
-    assert.equal(sandbox.pangu.spacing('中文ABC123'), '中文 ABC123');
-    assert.equal(sandbox.pangu.spacing('中文ABC\n第二行123'), '中文 ABC\n第二行 123');
+    assert.match(prepared, /typeof pangu\.spacingText === 'function'/);
+    assert.match(prepared, /pangu\.spacing = pangu\.spacingText\.bind\(pangu\)/);
 });
 
-test('keeps the minimal Pangu core behavior contract across API generations', () => {
-    const prepared = preparePanguCode(PANGU_V9_STYLE_FIXTURE, '9.1.0');
-    assert.doesNotThrow(() => testPangu(prepared));
-
-    const oldApiFixture = `
-        globalThis.pangu = {
-            spacing(text) {
-                return text
-                    .replaceAll('中文ABC123', '中文 ABC123')
-                    .replaceAll('中文ABC', '中文 ABC')
-                    .replaceAll('第二行123', '第二行 123');
-            }
-        };
-    `;
-    assert.doesNotThrow(() => testPangu(oldApiFixture));
+test('never uses node:vm to execute registry-delivered browser bundles', async () => {
+    const source = await readFile(new URL('./update-static-vendors.mjs', import.meta.url), 'utf8');
+    assert.doesNotMatch(source, /from 'node:vm'|new vm\.Script|evaluateBrowserBundle/);
+    assert.match(source, /exercised only in the real browser smoke tests/);
 });
