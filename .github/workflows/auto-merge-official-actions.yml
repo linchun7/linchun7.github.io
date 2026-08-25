@@ -35,12 +35,16 @@ jobs:
         ) ||
         (
           github.event.workflow_run.name == 'Validate static tools' &&
-          startsWith(github.event.workflow_run.head_branch, 'dependabot/npm_and_yarn/tools/browser-tests/')
+          (
+            startsWith(github.event.workflow_run.head_branch, 'dependabot/github_actions/') ||
+            startsWith(github.event.workflow_run.head_branch, 'dependabot/npm_and_yarn/tools/browser-tests/')
+          )
         )
       )
     permissions:
       contents: write
       pull-requests: write
+      actions: read
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
