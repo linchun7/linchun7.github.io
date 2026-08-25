@@ -11,8 +11,10 @@ const STABLE_SEMVER_PATTERN = /^(\d+)\.(\d+)\.(\d+)$/;
 const ACTION_BRANCH_PREFIX = 'dependabot/github_actions/';
 const ICLOUD_VALIDATION_WORKFLOW = 'Validate iCloud price comparison';
 const STATIC_VALIDATION_WORKFLOW = 'Validate static tools';
+const STATIC_VALIDATION_WORKFLOW_PATH = '.github/workflows/validate-static-tools.yml';
 const MAX_CHANGED_FILES = 20;
 const MAX_ACTION_REFERENCES = 100;
+const MAX_WORKFLOW_RUNS = 100;
 const execFileAsync = promisify(execFile);
 
 const NPM_PROFILES = Object.freeze({
@@ -24,7 +26,7 @@ const NPM_PROFILES = Object.freeze({
     validationWorkflow: ICLOUD_VALIDATION_WORKFLOW,
     commitLabel: 'iCloud dependency',
     allowLockOnly: true,
-    allowedDependencies: null,
+    allowedDependencies: new Set(['cheerio', 'lucide', 'playwright']),
   }),
   staticBrowserTests: Object.freeze({
     id: 'static-browser-tests',
@@ -42,13 +44,17 @@ function invariant(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-function validateCommonPullRequest(pr, expected) {
+function validatePullRequestIdentity(pr, expected) {
   invariant(pr.state === 'open' && !pr.draft, 'Pull request must be open and ready');
   invariant(pr.user?.login === 'dependabot[bot]', 'Pull request author must be dependabot[bot]');
   invariant(pr.base?.ref === expected.defaultBranch, 'Pull request must target the default branch');
-  invariant(pr.base?.sha === expected.baseSha, 'Base SHA changed after validation');
   invariant(pr.head?.sha === expected.headSha, 'Head SHA changed after validation');
   invariant(pr.head?.repo?.full_name === expected.repository, 'Dependabot branch must belong to this repository');
+}
+
+function validateCommonPullRequest(pr, expected) {
+  validatePullRequestIdentity(pr, expected);
+  invariant(pr.base?.sha === expected.baseSha, 'Base SHA changed after validation');
 }
 
 function npmProfileForBranch(branch) {
@@ -71,18 +77,18 @@ export function validateStaticBrowserNpmPullRequest(pr, expected) {
 }
 
 function classifyDependabotPullRequest(pr, expected) {
-  validateCommonPullRequest(pr, expected);
+  validatePullRequestIdentity(pr, expected);
   if (pr.head?.ref?.startsWith(ACTION_BRANCH_PREFIX)) {
     return {
       kind: 'github-actions',
-      validationWorkflow: ICLOUD_VALIDATION_WORKFLOW,
+      triggerWorkflows: new Set([ICLOUD_VALIDATION_WORKFLOW, STATIC_VALIDATION_WORKFLOW]),
     };
   }
   const npmProfile = npmProfileForBranch(pr.head?.ref);
   if (npmProfile) {
     return {
       kind: 'npm',
-      validationWorkflow: npmProfile.validationWorkflow,
+      triggerWorkflows: new Set([npmProfile.validationWorkflow]),
       npmProfile,
     };
   }
@@ -156,6 +162,14 @@ export function validateChangedFiles(files) {
 
   invariant(changedActionNames.size === 1, 'Dependabot Action PR must update exactly one Action');
   return changedReferenceCount;
+}
+
+export function requiredActionValidationWorkflows(files) {
+  const required = [ICLOUD_VALIDATION_WORKFLOW];
+  if (files.some(({ filename }) => filename === STATIC_VALIDATION_WORKFLOW_PATH)) {
+    required.push(STATIC_VALIDATION_WORKFLOW);
+  }
+  return required;
 }
 
 function validateNpmChangedFilesForProfile(files, profile) {
@@ -325,6 +339,40 @@ async function readJsonAtRef(repository, token, path, ref, fetchImpl) {
   }
 }
 
+async function updatePullRequestBranch(repository, token, pullNumber, headSha, fetchImpl) {
+  return githubRequest(repository, token, '/pulls/' + pullNumber + '/update-branch', {
+    method: 'PUT',
+    body: JSON.stringify({ expected_head_sha: headSha }),
+  }, fetchImpl);
+}
+
+async function readPullRequestWorkflowRuns(repository, token, pullNumber, headBranch, headSha, fetchImpl) {
+  const payload = await githubRequest(
+    repository,
+    token,
+    `/actions/runs?head_sha=${encodeURIComponent(headSha)}&event=pull_request&per_page=${MAX_WORKFLOW_RUNS}`,
+    {},
+    fetchImpl
+  );
+  invariant(Array.isArray(payload?.workflow_runs), 'Workflow-run response is invalid');
+  return payload.workflow_runs.filter((run) => {
+    if (run?.head_sha !== headSha || run?.event !== 'pull_request') return false;
+    const pullRequests = Array.isArray(run.pull_requests) ? run.pull_requests : [];
+    if (pullRequests.length > 0) return pullRequests.some(({ number }) => Number(number) === pullNumber);
+    return run.head_branch === headBranch;
+  });
+}
+
+export function latestRequiredWorkflowState(runs, workflowName) {
+  const latest = runs
+    .filter(({ name }) => name === workflowName)
+    .sort((left, right) => Number(right.id || 0) - Number(left.id || 0))[0];
+  if (!latest) return { ready: false, reason: `waiting for ${workflowName}` };
+  if (latest.status !== 'completed') return { ready: false, reason: `${workflowName} is ${latest.status || 'pending'}` };
+  if (latest.conclusion !== 'success') return { ready: false, reason: `${workflowName} concluded ${latest.conclusion || 'without success'}` };
+  return { ready: true, reason: `${workflowName} passed` };
+}
+
 export async function main(env = process.env, fetchImpl = fetch, log = console.log, runGit = execFileAsync) {
   const {
     DEFAULT_BRANCH: defaultBranch,
@@ -346,11 +394,27 @@ export async function main(env = process.env, fetchImpl = fetch, log = console.l
   invariant(SHA_PATTERN.test(headSha || ''), 'RUN_HEAD_SHA must be a full SHA');
 
   const pullRequest = await githubRequest(repository, token, '/pulls/' + pullNumber, {}, fetchImpl);
-  const scope = classifyDependabotPullRequest(pullRequest, { repository, defaultBranch, baseSha, headSha });
+  if (pullRequest.state !== 'open') {
+    log(`Dependabot PR #${pullNumber} is already ${pullRequest.state || 'closed'}; nothing to do.`);
+    return;
+  }
+  if (pullRequest.head?.sha !== headSha) {
+    log(`Dependabot PR #${pullNumber} moved past tested head ${headSha}; ignoring superseded validation.`);
+    return;
+  }
+
+  const scope = classifyDependabotPullRequest(pullRequest, { repository, defaultBranch, headSha });
   invariant(
-    validationWorkflow === scope.validationWorkflow,
-    `Dependabot scope must be validated by ${scope.validationWorkflow}`
+    scope.triggerWorkflows.has(validationWorkflow),
+    'Dependabot scope cannot be handled by ' + validationWorkflow
   );
+
+  if (pullRequest.base?.sha !== baseSha) {
+    await updatePullRequestBranch(repository, token, pullNumber, headSha, fetchImpl);
+    log(`Updated Dependabot PR #${pullNumber} onto latest ${defaultBranch}; waiting for fresh validation.`);
+    return;
+  }
+
   invariant(
     Number.isSafeInteger(pullRequest.changed_files)
       && pullRequest.changed_files > 0
@@ -364,6 +428,30 @@ export async function main(env = process.env, fetchImpl = fetch, log = console.l
   let summary;
   let commitTitle;
   if (scope.kind === 'github-actions') {
+    const requiredWorkflows = requiredActionValidationWorkflows(files);
+    invariant(
+      requiredWorkflows.includes(validationWorkflow),
+      `GitHub Actions update was triggered by unrelated workflow ${validationWorkflow}`
+    );
+    const otherRequiredWorkflows = requiredWorkflows.filter((name) => name !== validationWorkflow);
+    if (otherRequiredWorkflows.length > 0) {
+      const workflowRuns = await readPullRequestWorkflowRuns(
+        repository,
+        token,
+        pullNumber,
+        pullRequest.head?.ref,
+        headSha,
+        fetchImpl
+      );
+      for (const workflowName of otherRequiredWorkflows) {
+        const state = latestRequiredWorkflowState(workflowRuns, workflowName);
+        if (!state.ready) {
+          log(`Dependabot PR #${pullNumber} not merged: ${state.reason}.`);
+          return;
+        }
+      }
+    }
+
     const referenceCount = validateChangedFiles(files);
     const actionReferences = collectNewActionReferences(files);
     await verifyActionReferences(actionReferences, runGit);
@@ -380,9 +468,7 @@ export async function main(env = process.env, fetchImpl = fetch, log = console.l
     if (packageFileChanged) {
       invariant(changes.length === 1, `${profile.id}: Dependabot PR must update exactly one direct dependency`);
       const [change] = changes;
-      if (profile.allowedDependencies) {
-        invariant(profile.allowedDependencies.has(change.packageName), `${profile.id}: dependency is outside the approved auto-update scope`);
-      }
+      invariant(profile.allowedDependencies.has(change.packageName), `${profile.id}: dependency is outside the approved auto-update scope`);
       summary = `${change.packageName} ${change.before} -> ${change.after}`;
     } else {
       invariant(profile.allowLockOnly, `${profile.id}: lockfile-only updates are not allowed`);
