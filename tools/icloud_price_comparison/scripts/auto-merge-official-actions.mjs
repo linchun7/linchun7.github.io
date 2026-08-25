@@ -169,8 +169,15 @@ export function validateChangedFiles(files) {
   return changedReferenceCount;
 }
 
+function changesArtifactTransferAction(files) {
+  return files.some(({ patch }) => typeof patch === 'string' && patch.split('\n').some((line) => (
+    /^[+-]\s*uses:\s*actions\/(?:upload-artifact|download-artifact)@/.test(line)
+  )));
+}
+
 export function requiredActionValidationWorkflows(files) {
-  const required = [ICLOUD_VALIDATION_WORKFLOW, ACTION_ARTIFACT_VALIDATION_WORKFLOW];
+  const required = [ICLOUD_VALIDATION_WORKFLOW];
+  if (changesArtifactTransferAction(files)) required.push(ACTION_ARTIFACT_VALIDATION_WORKFLOW);
   if (files.some(({ filename }) => filename === STATIC_VALIDATION_WORKFLOW_PATH)) {
     required.push(STATIC_VALIDATION_WORKFLOW);
   }
