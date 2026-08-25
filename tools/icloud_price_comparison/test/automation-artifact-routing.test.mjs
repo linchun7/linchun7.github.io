@@ -28,7 +28,7 @@ test('artifact validation routing uses the actual PR diff instead of Dependabot 
 
   assert.match(artifact, /startsWith\(github\.head_ref, 'dependabot\/github_actions\/'\)/);
   assert.match(autoMerge, /\/pulls\/\$\{PR_NUMBER\}\/files\?per_page=100/);
-  assert.match(autoMerge, /upload-artifact\|download-artifact/);
+  assert.match(autoMerge, /\['upload-artifact', 'download-artifact'\]/);
   assert.doesNotMatch(autoMerge, /contains\(github\.event\.workflow_run\.head_branch, '(?:upload-artifact|download-artifact)'\)/);
   assert.match(autoMerge, /should_run=false/);
 });
