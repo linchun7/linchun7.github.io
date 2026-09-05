@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.1.0"
   },
   "packageManager": "pnpm@10.14.0+sha512.ad27a79641b49c3e481a16a805baa71817a04bbe06a38d17e60e2eaee83f6a146c6a688125f5792e48dd5ba30e7da52a5cda4c3992b9ccf333f9ce223af84748",
   "scripts": {
@@ -20,7 +20,7 @@
     "test:data": "node --test --test-concurrency=1 test/data-contract.test.mjs test/data-integrity.test.mjs test/state-contract.test.mjs",
     "validate:snapshots": "node --test test/snapshot-deep-audit.test.mjs",
     "test:browsers": "node scripts/test-browsers.mjs",
-    "test:ui": "node --test --test-concurrency=1 --test-name-pattern=\"^(?!preserves sorting and minimum-price cues in forced-colors mode$).*\" test/ui-smoke.test.mjs test/forced-colors-smoke.test.mjs",
+    "test:ui": "node --test --test-concurrency=1 --test-skip-pattern=\"^preserves sorting and minimum-price cues in forced-colors mode$\" test/ui-smoke.test.mjs test/forced-colors-smoke.test.mjs",
     "test:firefox": "node --test scripts/test-firefox.mjs",
     "test:webkit": "node --test scripts/test-webkit.mjs",
     "test:vendor": "node scripts/verify-vendor.mjs"
