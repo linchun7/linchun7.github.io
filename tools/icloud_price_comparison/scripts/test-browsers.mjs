@@ -1,10 +1,16 @@
 import { spawn } from 'node:child_process';
 
+const LEGACY_FORCED_COLORS_TEST = 'preserves sorting and minimum-price cues in forced-colors mode';
+const TEST_NAME_PATTERN = `^(?!${LEGACY_FORCED_COLORS_TEST}$).*`;
+
 function runBrowserSuite(browser) {
   return new Promise((resolve) => {
     const child = spawn(process.execPath, [
       '--test',
+      '--test-concurrency=1',
+      '--test-name-pattern', TEST_NAME_PATTERN,
       'test/ui-smoke.test.mjs',
+      'test/forced-colors-smoke.test.mjs',
       'test/static-descending-url-state.test.mjs'
     ], {
       cwd: new URL('..', import.meta.url),
