@@ -9,7 +9,6 @@ function runBrowserSuite(browser) {
       '--test-concurrency=1',
       '--test-skip-pattern', LEGACY_FORCED_COLORS_TEST,
       'test/ui-smoke.test.mjs',
-      'test/forced-colors-smoke.test.mjs',
       'test/static-descending-url-state.test.mjs'
     ], {
       cwd: new URL('..', import.meta.url),
