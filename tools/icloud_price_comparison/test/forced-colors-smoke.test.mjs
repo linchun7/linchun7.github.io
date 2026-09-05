@@ -74,8 +74,8 @@ async function createServer() {
 
 function closeServer(server) {
   return new Promise((resolve, reject) => {
-    server.closeAllConnections?.();
     server.close((error) => (error ? reject(error) : resolve()));
+    server.closeAllConnections?.();
   });
 }
 
@@ -180,19 +180,21 @@ test('preserves forced-colors sorting and minimum-price cues with bounded browse
     primaryError = error;
     throw error;
   } finally {
+    let cleanupError = null;
     if (browser) {
       try {
         await runStep(context, 'browser cleanup', () => browser.close(), 5_000);
-      } catch (cleanupError) {
-        if (!primaryError) throw cleanupError;
-        context.diagnostic(`forced-colors cleanup after primary failure: ${cleanupError.message}`);
+      } catch (error) {
+        cleanupError = error;
+        context.diagnostic(`forced-colors browser cleanup failed: ${error.message}`);
       }
     }
     try {
       await runStep(context, 'server cleanup', () => closeServer(server), 3_000);
-    } catch (cleanupError) {
-      if (!primaryError) throw cleanupError;
-      context.diagnostic(`forced-colors server cleanup after primary failure: ${cleanupError.message}`);
+    } catch (error) {
+      cleanupError ??= error;
+      context.diagnostic(`forced-colors server cleanup failed: ${error.message}`);
     }
+    if (!primaryError && cleanupError) throw cleanupError;
   }
 });
