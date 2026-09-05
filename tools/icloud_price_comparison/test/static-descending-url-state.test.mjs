@@ -6,6 +6,8 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { chromium, firefox, webkit } from 'playwright';
 
+import './forced-colors-smoke.test.mjs';
+
 const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BROWSER = process.env.PLAYWRIGHT_BROWSER || 'chromium';
 const BROWSER_TYPE = { chromium, firefox, webkit }[BROWSER];

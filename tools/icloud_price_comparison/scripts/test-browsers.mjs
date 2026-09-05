@@ -1,9 +1,13 @@
 import { spawn } from 'node:child_process';
 
+const LEGACY_FORCED_COLORS_TEST = '^preserves sorting and minimum-price cues in forced-colors mode$';
+
 function runBrowserSuite(browser) {
   return new Promise((resolve) => {
     const child = spawn(process.execPath, [
       '--test',
+      '--test-concurrency=1',
+      '--test-skip-pattern', LEGACY_FORCED_COLORS_TEST,
       'test/ui-smoke.test.mjs',
       'test/static-descending-url-state.test.mjs'
     ], {
