@@ -36,7 +36,7 @@
 
     function isIpv6Address(value) {
         const text = normalizeText(value);
-        if (!text || !text.includes(':') || text.length > 45) return false;
+        if (!text || !text.includes(':') || text.length > 45 || !/^[0-9a-f:.]+$/i.test(text)) return false;
         try {
             new URL(`http://[${text}]/`);
             return true;

@@ -103,6 +103,7 @@ jobs:
           trap 'kill "$server_pid" 2>/dev/null || true' EXIT
           sleep 1
           node tools/browser-tests/static-tools-smoke.mjs
+          node tools/browser-tests/navigation-smoke.mjs
           node tools/browser-tests/card-number-core-test.mjs
           node tools/browser-tests/card-number-old-smoke.mjs
           node tools/browser-tests/card-number-new-smoke.mjs

@@ -1659,6 +1659,10 @@ async function initialize({ forceRefresh = false } = {}) {
 
   try {
     const networkData = await fetchJson('prices.json', { forceRefresh });
+    // A cache or delayed deployment must not roll back a snapshot already accepted by this page.
+    if (state.data && Date.parse(networkData.generatedAt) < Date.parse(state.data.generatedAt)) {
+      throw new Error('网络价格数据早于当前已加载快照');
+    }
     if (!state.data && staticDomMatchesPayload(networkData)) {
       hydrateStaticPriceData(networkData);
     } else if (!state.data && hasStaticSnapshot && Date.parse(networkData.generatedAt) < Date.parse(staticSnapshotGeneratedAt)) {

@@ -239,14 +239,24 @@ try {
     assert.match(await page.locator('#historyDialog').innerText(), /历史名称\/别名/);
     assert.match(await page.locator('#historyDialog').innerText(), /第四军医大学西京医院/);
     await page.locator('#historyDialogClose').click();
+    await page.locator('#historyDialog').waitFor({ state: 'hidden' });
+    await page.waitForFunction(() => !document.getElementById('historyDialog').open);
 
     await page.locator('#hospitalSearch').fill('复旦大学附属儿科医院');
     await page.locator('#yearSelect').selectOption('2014');
-    await page.waitForTimeout(220);
+    // A row count of one can still describe the previous hospital while a debounced search settles.
+    await page.waitForFunction(() => {
+        const matches = document.querySelectorAll('#hospitalList tr.data-row');
+        return document.getElementById('yearSelect').value === '2014'
+            && document.getElementById('hospitalSearch').value === '复旦大学附属儿科医院'
+            && matches.length === 1
+            && matches[0].querySelector('.hospital-history-button')?.textContent.includes('复旦大学附属儿科医院');
+    });
     rows = page.locator('#hospitalList tr.data-row');
     assert.equal(await rows.count(), 1, 'known 2014 source anomaly hospital should be searchable');
     await rows.first().locator('.hospital-history-button').click();
     await page.locator('#historyDialog').waitFor({ state: 'visible' });
+    assert.match(await page.locator('#historyDialogTitle').innerText(), /复旦大学附属儿科医院/);
     const anomalyText = await page.locator('#historyDialog').innerText();
     assert.match(anomalyText, /来源数据备注/);
     assert.match(anomalyText, /14\.799/);

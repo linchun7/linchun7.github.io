@@ -2,6 +2,8 @@
 const ul = document.getElementById("toolList");
 const searchInput = document.getElementById("searchInput");
 const noResults = document.getElementById("noResults");
+const MAX_SEARCH_LENGTH = 160;
+const normalizeQuery = value => String(value).slice(0, MAX_SEARCH_LENGTH * 2).normalize('NFKC').slice(0, MAX_SEARCH_LENGTH).trim();
 
 // 优化相似度算法
 function similarity(s1, s2) {
@@ -57,7 +59,7 @@ function displayToolList(tools, keyword) {
 function filterToolsByKeyword(keyword) {
     if (!keyword) return toolList;
     
-    const keywordLower = keyword.toLowerCase().trim();
+    const keywordLower = normalizeQuery(keyword).toLowerCase();
     const keywords = keywordLower.split(/\s+/).filter(k => k.length > 0);
     
     if (keywords.length === 0) return toolList;
@@ -120,14 +122,14 @@ function highlightSearchKeyword(text, keyword) {
     if (!keyword) return text;
     
     const textLower = text.toLowerCase();
-    const keywordLower = keyword.toLowerCase().trim();
+    const keywordLower = normalizeQuery(keyword).toLowerCase();
     const keywords = keywordLower.split(/\s+/).filter(k => k.length > 0);
     
     if (keywords.length === 0) return text;
     
     // 精确匹配高亮
     if (textLower.includes(keywordLower)) {
-        const regex = new RegExp(`(${escapeRegExp(keyword)})`, 'gi');
+        const regex = new RegExp(`(${escapeRegExp(keywordLower)})`, 'gi');
         return text.replace(regex, '<span class="highlight">$1</span>');
     }
     
@@ -262,7 +264,7 @@ function debounce(func, wait, immediate = false) {
 
 // 4. 优化事件监听
 searchInput.addEventListener("input", debounce(function() {
-    const keyword = this.value.trim();
+    const keyword = normalizeQuery(this.value);
     if (keyword === currentKeyword) return;
     
     currentKeyword = keyword;
