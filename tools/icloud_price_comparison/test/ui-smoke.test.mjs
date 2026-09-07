@@ -316,6 +316,43 @@ for (const ageHours of [-1, 37]) {
   });
 }
 
+test('does not replace an already loaded snapshot with an older network response', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'monotonic snapshot recovery');
+  if (!browserConfig) return;
+  const server = await startServer();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  const old = await readFixture('prices.json');
+  const current = structuredClone(old);
+  const next = structuredClone(old);
+  setPayloadGeneratedAt(current, new Date(Date.parse(old.generatedAt) + 3600000).toISOString());
+  setPayloadGeneratedAt(next, new Date(Date.parse(old.generatedAt) + 7200000).toISOString());
+  try {
+    const page = await browser.newPage();
+    page.setDefaultTimeout(10000);
+    await page.addInitScript(now => { Date.now = () => now; }, Date.parse(next.generatedAt) + 3600000);
+    let request = 0;
+    await page.route('**/data/prices.json', route => route.fulfill({ json: [current, old, next][Math.min(request++, 2)] }));
+    await page.route('**/googletagmanager.com/**', route => route.abort());
+    await page.goto(`http://127.0.0.1:${server.address().port}/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => !document.getElementById('searchInput').disabled);
+    const before = await page.locator('#updatedAt').textContent();
+    await page.locator('#retryButton').dispatchEvent('click');
+    await page.waitForFunction(() => document.querySelector('.workspace').getAttribute('aria-busy') === 'false');
+    assert.equal(request, 2);
+    assert.ok((await page.locator('#updatedAt').textContent()).includes(before), 'a stale response cannot roll back the accepted snapshot');
+    assert.equal(await page.locator('#searchInput').isDisabled(), false);
+    assert.equal(await page.locator('#minimumSummary .minimum-card').count(), old.tiers.length);
+    await page.click('#retryButton');
+    await page.waitForFunction(() => document.getElementById('loadStatus').hidden);
+    assert.equal(request, 3);
+    assert.notEqual(await page.locator('#updatedAt').textContent(), before, 'a genuinely newer snapshot still replaces the current one');
+    assert.equal(await page.locator('.cache-warning').count(), 0);
+  } finally {
+    await browser.close();
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+
 test('shows static prices immediately and refreshes them without blocking first paint', async () => {
   const [html, moduleSource, styleSource] = await Promise.all([
     readFile(path.join(PROJECT_DIR, 'index.html'), 'utf8'),
