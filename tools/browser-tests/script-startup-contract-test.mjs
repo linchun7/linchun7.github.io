@@ -8,6 +8,7 @@ const cases = [
   { tool: 'card_number', scripts: ['scripts.js?'] },
   { tool: 'card_number_new', scripts: ['core.js?', 'app.js?'] },
   { tool: 'financial_calculator', scripts: ['script.js?'] },
+  { tool: 'renovation_calculator', scripts: ['script.js?'] },
   { tool: 'space', scripts: ['dist/browser/pangu.min.js'], inline: "const textarea = document.getElementById('info')" },
   { tool: 'rmb_converter', scripts: ['dist/nzh.min.js'], inline: "const input = document.getElementById('inputmoney')" }
 ];
