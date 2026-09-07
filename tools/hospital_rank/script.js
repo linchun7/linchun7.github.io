@@ -65,10 +65,16 @@ function getHospital(recordOrId) {
 
 async function loadRankingData() {
     const dataUrl = RANKINGS_VERSION ? `./data/rankings.json?v=${encodeURIComponent(RANKINGS_VERSION)}` : './data/rankings.json';
-    const response = await fetch(dataUrl);
-    if (!response.ok) throw new Error(`数据加载失败：HTTP ${response.status}`);
-
-    const data = await response.json();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15_000);
+    let data;
+    try {
+        const response = await fetch(dataUrl, { signal: controller.signal, redirect: 'error' });
+        if (!response.ok) throw new Error(`数据加载失败：HTTP ${response.status}`);
+        data = await response.json();
+    } finally {
+        clearTimeout(timeout);
+    }
     if (data?.schemaVersion !== 1 || !Array.isArray(data.hospitals) || !Array.isArray(data.years)) {
         throw new Error('榜单 JSON 结构无效');
     }

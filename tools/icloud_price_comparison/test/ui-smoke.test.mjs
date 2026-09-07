@@ -206,6 +206,112 @@ after(async () => {
   await Promise.allSettled(cleanup);
 });
 
+for (const scenario of [
+  { name: 'stale', ageHours: 37, unusable: false },
+  { name: 'expired', ageHours: 169, unusable: true },
+  { name: 'future', ageHours: -1, unusable: true }
+]) {
+  test(`static fallback removes misleading minimum cues when ${scenario.name}`, { timeout: 30_000 }, async (context) => {
+    const browserConfig = await resolveBrowser(context, 'static fallback freshness');
+    if (!browserConfig) return;
+    const server = await startServer();
+    const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+    const data = await readFixture('prices.json');
+    try {
+      const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+      await page.addInitScript(now => { Date.now = () => now; }, Date.parse(data.generatedAt) + scenario.ageHours * 3600000);
+      await page.route('**/data/prices.json', route => route.abort());
+      await page.route('**/googletagmanager.com/**', route => route.abort());
+      await page.goto(`http://127.0.0.1:${server.address().port}/`, { waitUntil: 'domcontentloaded' });
+      await page.waitForFunction(() => document.querySelector('#loadStatus')?.classList.contains('is-error'));
+      assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), data.countries.length);
+      assert.equal(await page.locator('#minimumSummary .minimum-card').count(), 0);
+      assert.equal(await page.locator('.minimum-badge, .is-minimum, .rank-top').count(), 0);
+      if (scenario.unusable) {
+        assert.ok((await page.locator('#priceRows tr[data-market-id] > td:first-child').allTextContents()).every(text => text === '—'));
+        assert.ok((await page.locator('.mobile-rank').allTextContents()).every(text => text === '—'));
+        assert.ok((await page.locator('.mobile-rank-sr').allTextContents()).every(text => text === '排名暂不可用'));
+      } else {
+        assert.match(await page.locator('#rankingScopeNote').textContent(), /最近一次/);
+      }
+    } finally {
+      await browser.close();
+      await new Promise(resolve => server.close(resolve));
+    }
+  });
+}
+
+test('static fallback reclassifies offline pages and keeps retry warnings singular', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'offline static lifecycle');
+  if (!browserConfig) return;
+  const server = await startServer();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  const data = await readFixture('prices.json');
+  try {
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await page.addInitScript(now => {
+      window.__staticTestNow = now;
+      Date.now = () => window.__staticTestNow;
+    }, Date.parse(data.generatedAt) + 3600000);
+    await page.route('**/data/prices.json', route => route.abort());
+    await page.route('**/googletagmanager.com/**', route => route.abort());
+    await page.goto(`http://127.0.0.1:${server.address().port}/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#loadStatus')?.classList.contains('is-error'));
+    assert.equal(await page.locator('#minimumSummary .minimum-card').count(), data.tiers.length);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await page.click('#retryButton');
+      await page.waitForFunction(() => !document.getElementById('retryButton').hidden);
+    }
+    assert.equal(await page.locator('.cache-warning').count(), 1);
+    await page.evaluate(now => { window.__staticTestNow = now; window.dispatchEvent(new Event('pageshow')); }, Date.parse(data.generatedAt) + 37 * 3600000);
+    await page.waitForFunction(() => !document.querySelector('#minimumSummary .minimum-card'));
+    assert.match(await page.locator('#rankingScopeNote').textContent(), /最近一次/);
+    await page.evaluate(now => { window.__staticTestNow = now; window.dispatchEvent(new Event('pageshow')); }, Date.parse(data.generatedAt) + 169 * 3600000);
+    await page.waitForFunction(() => [...document.querySelectorAll('.mobile-rank')].every(el => el.textContent === '—'));
+    assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), data.countries.length);
+  } finally {
+    await browser.close();
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+
+for (const ageHours of [-1, 37]) {
+  test(`static fallback restores safety cues after clock correction from ${ageHours}h`, { timeout: 30_000 }, async (context) => {
+    const browserConfig = await resolveBrowser(context, 'static fallback recovery');
+    if (!browserConfig) return;
+    const server = await startServer();
+    const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+    const data = await readFixture('prices.json');
+    try {
+      const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+      page.setDefaultTimeout(10000);
+      let recovered = false;
+      await page.addInitScript(now => {
+        window.__staticTestNow = now;
+        Date.now = () => window.__staticTestNow;
+      }, Date.parse(data.generatedAt) + ageHours * 3600000);
+      await page.route('**/data/prices.json', route => recovered ? route.continue() : route.abort());
+      await page.route('**/googletagmanager.com/**', route => route.abort());
+      await page.goto(`http://127.0.0.1:${server.address().port}/`, { waitUntil: 'domcontentloaded' });
+      await page.waitForFunction(() => document.querySelector('#loadStatus')?.classList.contains('is-error'));
+      assert.equal(await page.locator('#minimumSummary .minimum-card').count(), 0);
+      recovered = true;
+      await page.evaluate(now => { window.__staticTestNow = now; }, Date.parse(data.generatedAt) + 3600000);
+      await page.click('#retryButton');
+      await page.waitForFunction(() => !document.getElementById('searchInput').disabled);
+      assert.equal(await page.locator('#minimumSummary .minimum-card').count(), data.tiers.length);
+      assert.equal(await page.locator('#priceRows tr[data-market-id] > td:first-child').first().textContent(), '1');
+      assert.equal(await page.locator('.mobile-rank').first().textContent(), '1');
+      assert.ok(await page.locator('.minimum-badge').count() > 0);
+      assert.ok(await page.locator('.is-minimum').count() > 0);
+      assert.equal(await page.locator('.data-status').evaluate(el => el.classList.contains('is-error')), false);
+    } finally {
+      await browser.close();
+      await new Promise(resolve => server.close(resolve));
+    }
+  });
+}
+
 test('shows static prices immediately and refreshes them without blocking first paint', async () => {
   const [html, moduleSource, styleSource] = await Promise.all([
     readFile(path.join(PROJECT_DIR, 'index.html'), 'utf8'),

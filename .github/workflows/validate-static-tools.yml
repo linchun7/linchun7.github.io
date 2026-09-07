@@ -108,6 +108,7 @@ jobs:
           node tools/browser-tests/card-number-new-smoke.mjs
           node tools/browser-tests/pinyin-smoke.mjs
           node tools/browser-tests/utility-tools-smoke.mjs
+          node tools/browser-tests/input-boundaries-smoke.mjs
           python3 tools/hospital_rank/scripts/validate_data.py
           node tools/browser-tests/hospital-rank-smoke.mjs
           node tools/browser-tests/bank-rank-smoke.mjs

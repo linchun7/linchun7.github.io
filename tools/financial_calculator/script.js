@@ -52,6 +52,7 @@
     function readPositiveInteger(id, label) {
         const value = readFiniteNumber(id, label);
         if (!Number.isInteger(value) || value <= 0) throw new Error(`${label}必须是大于 0 的整数`);
+        if (!Number.isSafeInteger(value)) throw new Error(`${label}过大，超出可精确计算的整数范围`);
         return value;
     }
 
@@ -68,9 +69,16 @@
         const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
         if (!match) throw new Error(`${label}格式无效`);
 
-        const timestamp = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-        if (!Number.isFinite(timestamp)) throw new Error(`${label}格式无效`);
-        return timestamp;
+        const year = Number(match[1]);
+        const month = Number(match[2]) - 1;
+        const day = Number(match[3]);
+        // Date.UTC treats years 00–99 as 1900–1999 and silently rolls invalid dates forward.
+        const date = new Date(0);
+        date.setUTCFullYear(year, month, day);
+        if (year < 1 || date.getUTCFullYear() !== year || date.getUTCMonth() !== month || date.getUTCDate() !== day) {
+            throw new Error(`${label}格式无效`);
+        }
+        return date.getTime();
     }
 
     function runCalculation(resultId, calculator) {

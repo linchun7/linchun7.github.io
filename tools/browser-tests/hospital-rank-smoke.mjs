@@ -10,8 +10,10 @@ if (!browserType) throw new Error(`Unsupported browser: ${browserName}`);
 
 const renderStaticScript = fileURLToPath(new URL('../hospital_rank/scripts/render_static.py', import.meta.url));
 const futureYearScript = fileURLToPath(new URL('../hospital_rank/scripts/test_future_year.py', import.meta.url));
-execFileSync('python3', [renderStaticScript, '--check'], { stdio: 'inherit' });
-execFileSync('python3', [futureYearScript], { stdio: 'inherit' });
+const python = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
+const pythonOptions = { stdio: 'inherit', windowsHide: true };
+execFileSync(python, [renderStaticScript, '--check'], pythonOptions);
+execFileSync(python, [futureYearScript], pythonOptions);
 
 const rankings = JSON.parse(await readFile(new URL('../hospital_rank/data/rankings.json', import.meta.url), 'utf8'));
 assert.equal(rankings.schemaVersion, 1, 'normalized ranking schema should be v1');

@@ -11,9 +11,11 @@ if (!browserType) throw new Error(`Unsupported browser: ${browserName}`);
 const validateScript = fileURLToPath(new URL('../bank_rank/scripts/validate_data.py', import.meta.url));
 const futureYearScript = fileURLToPath(new URL('../bank_rank/scripts/test_future_year.py', import.meta.url));
 const renderStaticScript = fileURLToPath(new URL('../bank_rank/scripts/render_static.py', import.meta.url));
-execFileSync('python3', [validateScript], { stdio: 'inherit' });
-execFileSync('python3', [futureYearScript], { stdio: 'inherit' });
-execFileSync('python3', [renderStaticScript, '--check'], { stdio: 'inherit' });
+const python = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
+const pythonOptions = { stdio: 'inherit', windowsHide: true };
+execFileSync(python, [validateScript], pythonOptions);
+execFileSync(python, [futureYearScript], pythonOptions);
+execFileSync(python, [renderStaticScript, '--check'], pythonOptions);
 
 const manifest = JSON.parse(await readFile(new URL('../bank_rank/data/rankings.json', import.meta.url), 'utf8'));
 assert.equal(manifest.schemaVersion, 1, 'bank ranking schema should remain v1');
