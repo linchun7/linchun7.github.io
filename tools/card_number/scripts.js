@@ -1,7 +1,9 @@
 // 存储生成的银行卡号组合
 let results = [];
 // 最大生成结果数量
-let maxResults = 50000; // 你可以根据需要设置最大数量
+let maxResults = 50000;
+const MAX_PATTERN_LENGTH = 100;
+let composing = false;
 
 // 从右向左的 Luhn 位权贡献：普通位、双倍后减 9 的位
 const luhnTable = [
@@ -15,7 +17,7 @@ const luhnTable = [
  */
 function generateCombinations(str) {
   const length = str.length;
-  if (length === 0 || results.length >= maxResults) return;
+  if (length === 0 || length > MAX_PATTERN_LENGTH || !/^[a-zA-Z0-9*]+$/.test(str) || results.length >= maxResults) return;
 
   // 变量按首次出现顺序编号；每个 * 独立，相同字母（忽略大小写）共享编号。
   const variableAtPosition = new Int32Array(length);
@@ -153,9 +155,18 @@ function materializeCardNumber(pattern, variableAtPosition, assignment) {
  * 开始生成银行卡号组合
  */
 function startGeneration() {
-  let inputStr = document.getElementById('inputField').value;
-  let processedInput = inputStr.replace(/[^a-zA-Z0-9*]/g, '');
+  if (composing) return;
+  const inputField = document.getElementById('inputField');
+  const processedInput = inputField.value.replace(/[^a-zA-Z0-9*]/g, '');
   results = [];
+  const tooLong = processedInput.length > MAX_PATTERN_LENGTH;
+  inputField.setAttribute('aria-invalid', String(tooLong));
+  if (tooLong) {
+    displayResults();
+    document.getElementById('countText').textContent = '';
+    document.getElementById('count').textContent = `规则最多支持 ${MAX_PATTERN_LENGTH} 位，请缩短后重试（未截断输入）。`;
+    return;
+  }
 
   if (processedInput.length > 0) {
     generateCombinations(processedInput);
@@ -177,14 +188,21 @@ function displayResults() {
   } else {
     countMessage = `${results.length}`;
   }
-	
+
   document.getElementById('countText').textContent = countText;
   document.getElementById('count').textContent = countMessage;
   document.getElementById('result').textContent = results.join('\n');
 }
 
 // 处理用户输入
-document.getElementById('inputField').addEventListener('input', function() {
+document.getElementById('inputField').addEventListener('compositionstart', () => { composing = true; });
+document.getElementById('inputField').addEventListener('compositionend', () => {
+  composing = false;
+  handleInput();
+  startGeneration();
+});
+document.getElementById('inputField').addEventListener('input', (event) => {
+  if (composing || event.isComposing) return;
   handleInput();
   startGeneration();
 });
@@ -212,7 +230,7 @@ function handleInput() {
   let inputStr = inputField.value;
 
   // 过滤非字母、数字、星号的字符，并将多个空格替换为一个空格
-  inputStr = inputStr.replace(/[^a-zA-Z0-9*\s]/g, '').replace(/\s+/g, ' ');
+  inputStr = inputStr.normalize('NFKC').replace(/[^a-zA-Z0-9*\s]/g, '').replace(/\s+/g, ' ');
 
   // 更新输入框内容
   inputField.value = inputStr;
@@ -228,6 +246,7 @@ function handleInput() {
  * @returns {boolean} - 验证结果，true 表示通过
  */
 function luhnCheck(str) {
+  if (typeof str !== 'string' || !/^\d+$/.test(str)) return false;
   let len = str.length;
   let sum = 0;
   for (let i = len - 1; i >= 0; i--) {

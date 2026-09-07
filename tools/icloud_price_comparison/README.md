@@ -87,6 +87,8 @@ Apple Support HTML ─┐
 
 网络数据超过 7 天或相对当前时间超前超过 5 分钟时不会覆盖已显示的静态价格。36 小时以内为正常可用窗口；36 小时至 7 天只作为旧数据参考。最低价提示只由 `cnyRank === 1` 决定，价格过期或 `fx.stale` 时隐藏最低价排名提示。
 
+JavaScript 可运行但网络 JSON 始终读取失败时，静态页面也遵守相同的时间边界：到期计时器、页面恢复和页签恢复都会重新判定。旧数据会移除最低价卡片与高亮；超过硬期限或时间异常时，桌面排名、移动端排名及读屏提示统一标为不可用，同时保留静态表供核对。重复重试只保留一条网络失败提示。系统时间纠正并恢复页签后，已清除的最低价和排名提示会在有效网络快照到达时重建，不直接复用降级后的页面。关闭 JavaScript 时仍能查看带生成时间的静态内容，但无法自动重新判定过期状态。
+
 ## 市场身份与中文名称
 
 `marketId` 是永久数据身份。身份选择只有三层：已发布 `prices.json` / `history.json` identity ledger → `scripts/market-registry.mjs` active registry → deterministic `apple-*` fallback。已发布 ledger 永远优先。active registry 只保存当前已知 Apple 英文 canonical name 与 reviewed source aliases；source alias 只能处理 Apple source wording 变化，并必须继续指向同一个永久 ID。

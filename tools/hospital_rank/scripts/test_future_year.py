@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 import json
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -29,6 +30,7 @@ with tempfile.TemporaryDirectory() as temp_dir:
     for name, payload in payloads.items():
         (target / name).write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
-    subprocess.run(["python3", str(VALIDATOR), "--data-dir", str(target)], check=True)
+    subprocess.run([sys.executable, str(VALIDATOR), "--data-dir", str(target)], check=True,
+                   creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
 
 print("future-year validator regression: ok")

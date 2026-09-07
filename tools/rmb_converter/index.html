@@ -164,7 +164,21 @@
             const root = document.documentElement;
             const visualViewport = window.visualViewport;
             const validNumber = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?$/;
+            const MAX_INPUT_LENGTH = 2000;
+            const MAX_EXPANDED_DIGITS = 1000;
+            let composing = false;
             let statusTimer;
+
+            function amountFitsLimit(value) {
+                if (value.length > MAX_INPUT_LENGTH) return false;
+                const [mantissa, exponentText = '0'] = value.toLowerCase().split('e');
+                const exponent = Number(exponentText);
+                if (!Number.isSafeInteger(exponent)) return false;
+                const [integer, fraction = ''] = mantissa.replace(/^[+-]/, '').split('.');
+                const decimalIndex = integer.length + exponent;
+                const digits = Math.max(1, decimalIndex) + Math.max(0, integer.length + fraction.length - decimalIndex);
+                return digits <= MAX_EXPANDED_DIGITS;
+            }
 
             function syncVisualViewportTop() {
                 const offsetTop = document.activeElement === input && visualViewport
@@ -180,7 +194,8 @@
             }
 
             function render() {
-                const cleaned = input.value.replace(/[^0-9eE+\-.]/g, '');
+                if (composing) return;
+                const cleaned = input.value.normalize('NFKC').replace(/[^0-9eE+\-.]/g, '');
                 if (cleaned !== input.value) input.value = cleaned;
 
                 const value = cleaned.trim();
@@ -199,6 +214,11 @@
                     return;
                 }
 
+                if (!amountFitsLimit(value)) {
+                    result.textContent = `金额过长：输入最多 ${MAX_INPUT_LENGTH} 个字符，展开后最多 ${MAX_EXPANDED_DIGITS} 位数字。`;
+                    result.classList.add('error');
+                    return;
+                }
                 const normalized = value.replace(/^([+-]?)\./, '$10.');
 
                 try {
@@ -211,20 +231,29 @@
             }
 
             async function copyText(text) {
-                if (navigator.clipboard && window.isSecureContext) {
-                    await navigator.clipboard.writeText(text);
-                    return;
+                if (navigator.clipboard?.writeText && window.isSecureContext) {
+                    try {
+                        await navigator.clipboard.writeText(text);
+                        return;
+                    } catch {
+                        // Permission denial must still allow the legacy copy path.
+                    }
                 }
+                const previousFocus = document.activeElement;
                 const textArea = document.createElement('textarea');
                 textArea.value = text;
                 textArea.setAttribute('readonly', '');
                 textArea.style.position = 'fixed';
                 textArea.style.opacity = '0';
                 document.body.appendChild(textArea);
-                textArea.select();
-                const copied = document.execCommand('copy');
-                textArea.remove();
-                if (!copied) throw new Error('copy failed');
+                try {
+                    textArea.focus({ preventScroll: true });
+                    textArea.select();
+                    if (!document.execCommand('copy')) throw new Error('copy failed');
+                } finally {
+                    textArea.remove();
+                    if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+                }
             }
 
             document.getElementById('clearBtn').addEventListener('click', () => {
@@ -246,7 +275,9 @@
                 }
             });
 
-            input.addEventListener('input', render);
+            input.addEventListener('compositionstart', () => { composing = true; });
+            input.addEventListener('compositionend', () => { composing = false; render(); });
+            input.addEventListener('input', event => { if (!event.isComposing) render(); });
             input.addEventListener('focus', syncVisualViewportTop);
             input.addEventListener('blur', syncVisualViewportTop);
             if (visualViewport) {

@@ -284,7 +284,7 @@ function resetCalculationOutput() {
 }
 
 function startCalculation() {
-    if (isRunning) return;
+    if (isRunning || composing) return;
     ui.input.classList.remove('input-error');
     ui.input.setAttribute('aria-invalid', 'false');
     const normalized = sanitizeCurrentInput(true);
@@ -384,21 +384,23 @@ ui.clearBtn.addEventListener('click', () => {
 });
 
 function fallbackCopy(text) {
+    const previousFocus = document.activeElement;
     const textArea = document.createElement('textarea');
     textArea.value = text;
+    textArea.setAttribute('readonly', '');
     textArea.style.position = 'fixed';
     textArea.style.opacity = '0';
     document.body.appendChild(textArea);
-    textArea.focus();
-    textArea.select();
-    let copied = false;
     try {
-        copied = document.execCommand('copy');
-    } catch (error) {
-        copied = false;
+        textArea.focus({ preventScroll: true });
+        textArea.select();
+        return document.execCommand('copy');
+    } catch {
+        return false;
+    } finally {
+        textArea.remove();
+        if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
     }
-    document.body.removeChild(textArea);
-    return copied;
 }
 
 async function copyText(text) {
@@ -445,15 +447,24 @@ ui.copyPageBtn.addEventListener('click', async () => {
     showToast(copied ? `成功复制本页 ${currentData.length} 条数据` : '复制失败，请重试');
 });
 
-ui.input.addEventListener('input', () => {
+let composing = false;
+function handleRuleInput() {
     ui.input.classList.remove('input-error');
     ui.input.setAttribute('aria-invalid', 'false');
     sanitizeCurrentInput(true);
     updateLengthWarning();
+}
+ui.input.addEventListener('compositionstart', () => { composing = true; });
+ui.input.addEventListener('compositionend', () => {
+    composing = false;
+    handleRuleInput();
+});
+ui.input.addEventListener('input', (event) => {
+    if (!composing && !event.isComposing) handleRuleInput();
 });
 
 ui.input.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') startCalculation();
+    if (event.key === 'Enter' && !composing && !event.isComposing && event.keyCode !== 229) startCalculation();
 });
 ui.calcBtn.addEventListener('click', startCalculation);
 

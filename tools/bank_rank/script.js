@@ -20,9 +20,15 @@ const numberFormatter = new Intl.NumberFormat('zh-CN', {
 });
 
 async function fetchJson(url) {
-  const response = await fetch(url, { cache: 'no-cache' });
-  if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
-  return response.json();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15_000);
+  try {
+    const response = await fetch(url, { cache: 'no-cache', signal: controller.signal, redirect: 'error' });
+    if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
+    return await response.json();
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function loadDataset() {

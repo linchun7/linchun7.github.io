@@ -105,6 +105,7 @@ let slowLoadingTimer = null;
 let freshnessBoundaryTimer = null;
 let freshnessRefreshPromise = null;
 let analyticsScheduled = false;
+let staticSnapshotDomDowngraded = false;
 const staticSnapshotMeta = document.querySelector('meta[name="icloud-price-snapshot"]');
 const staticSnapshotGeneratedAt = staticSnapshotMeta?.content ?? null;
 const staticSnapshotFxStale = staticSnapshotMeta?.dataset.fxStale === 'true';
@@ -370,6 +371,8 @@ function priceSnapshotsEqual(first, second) {
 
 function staticDomMatchesPayload(data) {
   if (!hasStaticSnapshot || data.generatedAt !== staticSnapshotGeneratedAt) return false;
+  // Safety downgrades remove badges/ranks from static DOM; a recovered snapshot must rebuild them.
+  if (staticSnapshotDomDowngraded || !state.minimumCuesEnabled) return false;
   const tierIds = [...document.querySelectorAll('.price-table thead th[data-tier]')].map(({ dataset }) => dataset.tier);
   if (tierIds.length !== data.tiers.length || tierIds.some((id, index) => id !== data.tiers[index].id)) return false;
   const rows = [...elements.priceRows.querySelectorAll('tr[data-market-id]')];
@@ -1314,6 +1317,41 @@ function scheduleBackToTableUpdate() {
   });
 }
 
+// Static first paint must obey the same age limits even if JSON never loads.
+function applyStaticSnapshotFreshness() {
+  if (state.data || !hasStaticSnapshot) return null;
+  const freshness = classifyPriceFreshness({
+    generatedAt: staticSnapshotGeneratedAt,
+    fx: { stale: staticSnapshotFxStale }
+  });
+  state.dataFreshness = freshness;
+  state.minimumCuesEnabled = freshness.status === 'fresh';
+  state.minimumCuesReason = freshness.reason;
+  if (freshness.status !== 'fresh') {
+    staticSnapshotDomDowngraded = true;
+    document.querySelectorAll('.minimum-badge').forEach((badge) => badge.remove());
+    document.querySelectorAll('.is-minimum, .rank-top').forEach((element) => element.classList.remove('is-minimum', 'rank-top'));
+    renderMinimumSummary();
+    updateRankingPresentation({ filtered: false });
+    elements.dataStatus.classList.add('is-stale');
+    if (elements.overviewNote) elements.overviewNote.textContent = elements.minimumSummary.textContent;
+  }
+  if (freshness.status === 'unusable') {
+    const message = freshness.reason === 'future-data'
+      ? '数据时间异常，暂不作为当前价格展示。请稍后重试。'
+      : '价格已经较久没有更新，暂不作为当前价格比较。请稍后重试。';
+    elements.dataStatus.classList.add('is-error');
+    elements.updatedAt.textContent = message;
+    elements.priceRows.querySelectorAll('tr[data-market-id] > td:first-child, .mobile-rank').forEach((element) => { element.textContent = '—'; });
+    elements.priceRows.querySelectorAll('.mobile-rank-sr').forEach((element) => { element.textContent = '排名暂不可用'; });
+    if (elements.rankHeaderLabel) elements.rankHeaderLabel.textContent = '排名暂不可用';
+    setLoadStatus(message, { error: true });
+    setFiltersDisabled(true);
+  }
+  scheduleFreshnessBoundary();
+  return freshness;
+}
+
 function clearFreshnessBoundary() {
   clearTimeout(freshnessBoundaryTimer);
   freshnessBoundaryTimer = null;
@@ -1321,8 +1359,9 @@ function clearFreshnessBoundary() {
 
 function scheduleFreshnessBoundary() {
   clearFreshnessBoundary();
-  if (!state.data || state.dataFreshness?.status === 'unusable') return;
-  const generatedAtMs = Date.parse(state.data.generatedAt);
+  const snapshot = state.data ?? (hasStaticSnapshot ? { generatedAt: staticSnapshotGeneratedAt } : null);
+  if (!snapshot || classifyPriceFreshness(snapshot).status === 'unusable') return;
+  const generatedAtMs = Date.parse(snapshot.generatedAt);
   const nowMs = Date.now();
   const boundaries = [
     generatedAtMs + PRICE_FRESH_MAX_AGE_MS + 1,
@@ -1587,7 +1626,10 @@ function showUnusableDataError(reason) {
 }
 
 async function refreshPriceFreshnessLifecycle() {
-  if (!state.data) return;
+  if (!state.data) {
+    applyStaticSnapshotFreshness();
+    return;
+  }
   const freshness = applyCurrentPriceFreshness();
   if (freshness.status !== 'unusable') return;
   showUnusableDataError(freshness.reason);
@@ -1602,6 +1644,7 @@ async function initialize({ forceRefresh = false } = {}) {
   if (state.loading) return;
   state.loading = true;
   clearTimeout(slowLoadingTimer);
+  elements.updatedAt.querySelectorAll('.cache-warning').forEach((warning) => warning.remove());
   setLoadStatus('正在检查最新价格…');
   if (!state.data) setFiltersDisabled(true);
   elements.dataStatus.classList.remove('is-error');
@@ -1648,32 +1691,8 @@ async function initialize({ forceRefresh = false } = {}) {
       setFiltersDisabled(false);
     } else if (hasStaticSnapshot) {
       console.warn(`网络价格刷新失败，继续显示静态价格：${error.message}`);
-      const staticFreshness = classifyPriceFreshness({ generatedAt: staticSnapshotGeneratedAt, fx: { stale: staticSnapshotFxStale } });
-      if (staticFreshness.status === 'unusable') {
-        const message = staticFreshness.reason === 'future-data'
-          ? '数据时间异常，暂不作为当前价格展示。请稍后重试。'
-          : '价格已经较久没有更新，暂不作为当前价格比较。请稍后重试。';
-        elements.dataStatus.classList.add('is-error');
-        elements.updatedAt.textContent = message;
-        document.querySelectorAll('.minimum-badge').forEach((badge) => badge.remove());
-        document.querySelectorAll('.is-minimum, .rank-top').forEach((element) => element.classList.remove('is-minimum', 'rank-top'));
-        document.querySelectorAll('.price-table tbody tr[data-market-id] > td:first-child').forEach((cell) => { cell.textContent = '—'; });
-        if (elements.rankHeaderLabel) elements.rankHeaderLabel.textContent = '排名暂不可用';
-        if (elements.rankingScopeNote) {
-          elements.rankingScopeNote.textContent = '排名暂不可用。';
-          elements.rankingScopeNote.hidden = false;
-        }
-        setLoadStatus(message, { error: true });
-        return;
-      }
-      if (staticFreshness.reason === 'fx-stale') {
-        document.querySelectorAll('.minimum-badge').forEach((badge) => badge.remove());
-        document.querySelectorAll('.is-minimum, .rank-top').forEach((element) => element.classList.remove('is-minimum', 'rank-top'));
-        if (elements.rankingScopeNote) {
-          elements.rankingScopeNote.textContent = '排名基于最近一次可用汇率，仅供参考。';
-          elements.rankingScopeNote.hidden = false;
-        }
-      }
+      const staticFreshness = applyStaticSnapshotFreshness();
+      if (staticFreshness.status === 'unusable') return;
       elements.dataStatus.classList.add('is-stale');
       const warning = document.createElement('span');
       warning.className = 'freshness-warning cache-warning';

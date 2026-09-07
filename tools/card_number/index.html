@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="format-detection" content="telephone=no">
     <link rel="stylesheet" href="styles.css">
     <link rel="shortcut icon" href="/images/favicon.ico">
@@ -17,7 +17,7 @@
 			🔥 <a href="https://www.linchun.com.cn/tools/card_number_new/" target="_blank" rel="noopener">使用新版算号器（支持数字过滤等）</a>
             <p id="prompt-info">根据输入的数字、字母及 * 号（同一字母表示相同数字，* 号表示任意数字），生成满足 Luhn 算法的银行卡号，用于卡号定制提前算号。<a href="https://www.linchun.com.cn/posts/50c5b27d.html">查看使用说明</a></p>
             <div class="input-wrapper">
-                <input type="text" id="inputField" placeholder="请输入卡号，如 6214 8800 0*aa bbbb" autofocus>
+                <input type="text" id="inputField" aria-label="卡号生成规则" aria-describedby="prompt-info" autocomplete="off" spellcheck="false" placeholder="请输入卡号，如 6214 8800 0*aa bbbb" autofocus>
                 <button id="generateButton">清空</button>
             </div>
 			<div class="result-info">
@@ -30,7 +30,7 @@
     <footer>
         <p>&copy; 2023 <a href="https://www.linchun.com.cn">林春写字的地方</a></p>
     </footer>
-    <script src="scripts.js"></script>
+    <script src="scripts.js?v=20260907-1"></script>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-K2S9L4CHNP"></script>
     <script>

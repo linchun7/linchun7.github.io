@@ -35,7 +35,7 @@
     }
 
     function isIpv6Address(value) {
-        const text = normalizeText(value).split('%')[0];
+        const text = normalizeText(value);
         if (!text || !text.includes(':') || text.length > 45) return false;
         try {
             new URL(`http://[${text}]/`);
@@ -63,12 +63,12 @@
     }
 
     function isPublicIpv6(value) {
-        const text = normalizeText(value).split('%')[0].toLowerCase();
-        if (!isIpv6Address(text)) return false;
+        if (!isIpv6Address(value)) return false;
+        const text = new URL(`http://[${normalizeText(value)}]/`).hostname.slice(1, -1);
         if (text === '::' || text === '::1') return false;
         if (text.startsWith('fc') || text.startsWith('fd')) return false;
         if (/^fe[89ab]/.test(text) || text.startsWith('ff')) return false;
-        if (text.startsWith('2001:db8') || text.startsWith('::ffff:')) return false;
+        if (text.startsWith('2001:db8:') || text.startsWith('::ffff:')) return false;
         return true;
     }
 
@@ -97,7 +97,7 @@
         return error;
     }
 
-    async function fetchWithTimeout(url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
+    async function fetchJson(url, timeoutMs = REQUEST_TIMEOUT_MS) {
         const controller = typeof AbortController === 'function' ? new AbortController() : null;
         let timeoutId;
         const timeoutPromise = new Promise((_, reject) => {
@@ -107,33 +107,27 @@
             }, timeoutMs);
         });
         try {
-            const response = await Promise.race([
-                fetch(url, {
+            // Include body consumption in the deadline, including browsers without AbortController.
+            const readResponse = async () => {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    mode: 'cors',
+                    headers: { Accept: 'application/json' },
                     cache: 'no-store',
                     credentials: 'omit',
                     referrerPolicy: 'no-referrer',
-                    ...options,
                     ...(controller ? { signal: controller.signal } : {})
-                }),
-                timeoutPromise
-            ]);
-            if (!response.ok) throw new HttpError(response.status);
-            return response;
+                });
+                if (!response.ok) throw new HttpError(response.status);
+                return response.json();
+            };
+            return await Promise.race([readResponse(), timeoutPromise]);
         } catch (error) {
             if (error && error.name === 'AbortError') throw createTimeoutError();
             throw error;
         } finally {
             window.clearTimeout(timeoutId);
         }
-    }
-
-    async function fetchJson(url, timeoutMs = REQUEST_TIMEOUT_MS) {
-        const response = await fetchWithTimeout(url, {
-            method: 'GET',
-            mode: 'cors',
-            headers: { Accept: 'application/json' }
-        }, timeoutMs);
-        return response.json();
     }
 
     function formatError(error) {
@@ -173,9 +167,11 @@
     }
 
     function makeObservation(ip, source, detail = '', sourceId = '') {
-        const normalized = normalizeText(ip);
-        if (!isPublicIpAddress(normalized)) throw new Error(`${source} 返回了非公网 IP，已忽略`);
-        return { ip: normalized, family: ipFamily(normalized), source, sourceId, detail: normalizeText(detail) };
+        const value = normalizeText(ip);
+        if (!isPublicIpAddress(value)) throw new Error(`${source} 返回了非公网 IP，已忽略`);
+        const family = ipFamily(value);
+        const normalized = family === 6 ? new URL(`http://[${value}]/`).hostname.slice(1, -1) : value;
+        return { ip: normalized, family, source, sourceId, detail: normalizeText(detail) };
     }
 
     function preferredObservation(route, family) {
