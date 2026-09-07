@@ -105,6 +105,7 @@ let slowLoadingTimer = null;
 let freshnessBoundaryTimer = null;
 let freshnessRefreshPromise = null;
 let analyticsScheduled = false;
+let staticSnapshotDomDowngraded = false;
 const staticSnapshotMeta = document.querySelector('meta[name="icloud-price-snapshot"]');
 const staticSnapshotGeneratedAt = staticSnapshotMeta?.content ?? null;
 const staticSnapshotFxStale = staticSnapshotMeta?.dataset.fxStale === 'true';
@@ -371,7 +372,7 @@ function priceSnapshotsEqual(first, second) {
 function staticDomMatchesPayload(data) {
   if (!hasStaticSnapshot || data.generatedAt !== staticSnapshotGeneratedAt) return false;
   // Safety downgrades remove badges/ranks from static DOM; a recovered snapshot must rebuild them.
-  if (!state.minimumCuesEnabled) return false;
+  if (staticSnapshotDomDowngraded || !state.minimumCuesEnabled) return false;
   const tierIds = [...document.querySelectorAll('.price-table thead th[data-tier]')].map(({ dataset }) => dataset.tier);
   if (tierIds.length !== data.tiers.length || tierIds.some((id, index) => id !== data.tiers[index].id)) return false;
   const rows = [...elements.priceRows.querySelectorAll('tr[data-market-id]')];
@@ -1327,6 +1328,7 @@ function applyStaticSnapshotFreshness() {
   state.minimumCuesEnabled = freshness.status === 'fresh';
   state.minimumCuesReason = freshness.reason;
   if (freshness.status !== 'fresh') {
+    staticSnapshotDomDowngraded = true;
     document.querySelectorAll('.minimum-badge').forEach((badge) => badge.remove());
     document.querySelectorAll('.is-minimum, .rank-top').forEach((element) => element.classList.remove('is-minimum', 'rank-top'));
     renderMinimumSummary();

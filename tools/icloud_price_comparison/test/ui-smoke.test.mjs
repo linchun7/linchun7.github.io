@@ -296,7 +296,11 @@ for (const ageHours of [-1, 37]) {
       await page.waitForFunction(() => document.querySelector('#loadStatus')?.classList.contains('is-error'));
       assert.equal(await page.locator('#minimumSummary .minimum-card').count(), 0);
       recovered = true;
-      await page.evaluate(now => { window.__staticTestNow = now; }, Date.parse(data.generatedAt) + 3600000);
+      await page.evaluate(now => {
+        window.__staticTestNow = now;
+        window.dispatchEvent(new Event('pageshow'));
+        document.dispatchEvent(new Event('visibilitychange'));
+      }, Date.parse(data.generatedAt) + 3600000);
       await page.click('#retryButton');
       await page.waitForFunction(() => !document.getElementById('searchInput').disabled);
       assert.equal(await page.locator('#minimumSummary .minimum-card').count(), data.tiers.length);
