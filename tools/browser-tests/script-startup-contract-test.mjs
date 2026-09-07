@@ -8,7 +8,8 @@ const cases = [
   { tool: 'card_number', scripts: ['scripts.js?'] },
   { tool: 'card_number_new', scripts: ['core.js?', 'app.js?'] },
   { tool: 'financial_calculator', scripts: ['script.js?'] },
-  { tool: 'space', scripts: ['dist/browser/pangu.min.js'], inline: true }
+  { tool: 'space', scripts: ['dist/browser/pangu.min.js'], inline: "const textarea = document.getElementById('info')" },
+  { tool: 'rmb_converter', scripts: ['dist/nzh.min.js'], inline: "const input = document.getElementById('inputmoney')" }
 ];
 for (const entry of cases) {
   test(`${entry.tool} preserves native startup ordering`, async () => {
@@ -23,7 +24,7 @@ for (const entry of cases) {
       assert.match(matching[0][1], /\bdata-cfasync="false"[\s\S]*\bsrc=/, `${source}: opt out before src`);
     }
     if (entry.inline) {
-      const application = scripts.filter(([, , body]) => body.includes("const textarea = document.getElementById('info')"));
+      const application = scripts.filter(([, , body]) => body.includes(entry.inline));
       assert.equal(application.length, 1);
       assert.match(application[0][1], /\bdata-cfasync="false"/, 'inline handler startup must not be delayed');
     }
