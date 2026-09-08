@@ -16,6 +16,7 @@ const pythonOptions = { stdio: 'inherit', windowsHide: true };
 execFileSync(python, [validateScript], pythonOptions);
 execFileSync(python, [futureYearScript], pythonOptions);
 execFileSync(python, [renderStaticScript, '--check'], pythonOptions);
+execFileSync(python, [fileURLToPath(new URL('../bank_rank/scripts/test_contract.py', import.meta.url))], pythonOptions);
 
 const manifest = JSON.parse(await readFile(new URL('../bank_rank/data/rankings.json', import.meta.url), 'utf8'));
 assert.equal(manifest.schemaVersion, 1, 'bank ranking schema should remain v1');
@@ -266,3 +267,6 @@ try {
   await context.close();
   await browser.close();
 }
+
+// Keep extended regressions in the same entry point used by the three-browser CI matrix.
+await import('./bank-rank-regression.mjs');

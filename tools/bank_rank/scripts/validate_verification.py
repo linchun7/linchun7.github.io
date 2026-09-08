@@ -30,7 +30,14 @@ def digest(records: list[dict[str, Any]]) -> str:
 
 
 def _https(value: Any) -> bool:
-    return isinstance(value, str) and value.startswith("https://") and len(value) > 8
+    if not isinstance(value, str) or any(c.isspace() or ord(c) < 32 or c == "\\" for c in value):
+        return False
+    try:
+        parsed = urlparse(value)
+        return bool(parsed.scheme == "https" and parsed.hostname and parsed.username is None
+                    and parsed.password is None and (parsed.port is None or 0 < parsed.port <= 65535))
+    except ValueError:
+        return False
 
 
 def _host(value: Any) -> str:
@@ -68,6 +75,8 @@ def _decimal(value: Any) -> Decimal | None:
         number = Decimal(text)
     except InvalidOperation:
         return None
+    if not number.is_finite():
+        return None
     return -number if negative else number
 
 
@@ -76,7 +85,8 @@ def _numeric_equal(left: Any, right: Any) -> bool:
     right_number = _decimal(right)
     if left_number is not None and right_number is not None:
         return left_number == right_number
-    return str(left).strip() == str(right).strip()
+    # Identical invalid strings are not independent numeric agreement.
+    return False
 
 
 def _valid_sha256(value: Any) -> bool:

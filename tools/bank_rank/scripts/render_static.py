@@ -17,6 +17,8 @@ ROWS_END = "                        <!-- STATIC_LATEST_ROWS_END -->"
 
 
 def replace_marker_block(text: str, start: str, end: str, content: str) -> str:
+    if text.count(start) != 1 or text.count(end) != 1 or text.index(start) >= text.index(end):
+        raise RuntimeError(f"marker block must occur exactly once in order: {start}")
     updated, count = re.subn(re.escape(start) + r".*?" + re.escape(end), lambda _: f"{start}\n{content}\n{end}", text, count=1, flags=re.S)
     if count != 1: raise RuntimeError(f"marker block not found exactly once: {start}")
     return updated
@@ -52,7 +54,8 @@ def has_earlier_record(data: dict, bank_id: str, before_year: int) -> bool:
     )
 
 
-def rank_change(record: dict, previous: dict | None, has_earlier: bool = False) -> tuple[str, str]:
+def rank_change(record: dict, previous: dict | None, has_earlier: bool = False, prior_year_missing: bool = False) -> tuple[str, str]:
+    if previous is None and prior_year_missing: return "上年未收录", "new"
     if previous is None: return ("上年未上榜" if has_earlier else "首次记录"), "new"
     delta = previous["rank"] - record["rank"]
     if delta > 0: return f"↑ {delta} 位", "up"
@@ -82,6 +85,8 @@ def render(data: dict, current_html: str) -> str:
             record,
             previous_record(data, record["bankId"], latest_year),
             has_earlier_record(data, record["bankId"], latest_year),
+            prior_year_missing=(latest_year > min(b["rankingYear"] for b in data["years"])
+                                and not any(b["rankingYear"] == latest_year - 1 for b in data["years"])),
         )
         bank_id = html.escape(record["bankId"])
         shown_name = html.escape(record["sourceName"])
@@ -119,7 +124,19 @@ def render(data: dict, current_html: str) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(); parser.add_argument("--check", action="store_true"); args = parser.parse_args()
-    data = MODULE.load_rankings(); current = HTML_PATH.read_text(encoding="utf-8"); expected = render(data, current)
+    try:
+        data = MODULE.load_rankings()
+        errors = MODULE.validate_dataset(data, MODULE.load_snapshot())
+        if errors:
+            print("static generation refused invalid data:")
+            for error in errors:
+                print(f"- {error}")
+            return 1
+        current = HTML_PATH.read_text(encoding="utf-8")
+        expected = render(data, current)
+    except (OSError, ValueError, RuntimeError) as error:
+        print(f"static generation FAILED: {error}")
+        return 1
     if args.check:
         if current != expected:
             rankings_version, style_version, script_version = content_versions()
@@ -127,7 +144,11 @@ def main() -> int:
             return 1
         print("index.html static preview is up to date")
         return 0
-    HTML_PATH.write_text(expected, encoding="utf-8"); print(f"rendered latest year {max(b['rankingYear'] for b in data['years'])}"); return 0
+    # Keep generated HTML byte-stable across Windows and Linux.
+    with HTML_PATH.open("w", encoding="utf-8", newline="\n") as output:
+        output.write(expected)
+    print(f"rendered latest year {max(b['rankingYear'] for b in data['years'])}")
+    return 0
 
 
 if __name__ == "__main__": raise SystemExit(main())
