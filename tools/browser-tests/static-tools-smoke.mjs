@@ -188,6 +188,21 @@ async function testMyIpWorkerProbe() {
     });
     assert.equal(forbiddenResponse.status, 403);
 
+    const methodNotAllowedResponse = await myIpProbeWorker.fetch({
+        ...request,
+        method: 'POST'
+    });
+    assert.equal(methodNotAllowedResponse.status, 405);
+    assert.equal(methodNotAllowedResponse.headers.get('Allow'), 'GET, HEAD, OPTIONS');
+
+    const missingHeadResponse = await myIpProbeWorker.fetch({
+        ...request,
+        method: 'HEAD',
+        url: 'https://myip.example.workers.dev/not-found'
+    });
+    assert.equal(missingHeadResponse.status, 404);
+    assert.equal(await missingHeadResponse.text(), '');
+
     const healthResponse = await myIpProbeWorker.fetch({
         ...request,
         url: 'https://myip.example.workers.dev/healthz'
@@ -235,6 +250,33 @@ async function testMyIpDomesticAndInternationalSources() {
     assert.equal(await page.locator('#source-ipw-status').count(), 0, 'IPW should be removed from the public source pool');
     assert.equal(await page.locator('details.details-card').getAttribute('open'), '');
     assert.equal(pageErrors.length, 0, `myip source-pool page errors: ${pageErrors.map(String).join('; ')}`);
+    await context.close();
+}
+
+async function testMyIpKeepsOriginalIpv6WhenCloudflareUsesPseudoIpv4() {
+    const domesticIp = '61.139.2.69';
+    const pseudoIpv4 = '240.16.0.1';
+    const originalIpv6 = '2404:c140:2005::6f:87ed';
+    const { context, page, pageErrors } = await createPage();
+
+    await routeDomesticPool(page, domesticIp);
+    await routeFirstParty(page, {
+        ...firstPartyPayload(pseudoIpv4),
+        originalIpv6
+    });
+    await page.route('**/api.ip.sb/**', (route) => route.abort());
+    await page.route('**/api.ipify.org/**', (route) => route.abort());
+    await page.route('**/api6.ipify.org/**', (route) => route.abort());
+    await page.route('**/ipwho.is/**', (route) => route.abort());
+
+    await page.goto(`${baseUrl}/tools/myip/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#international-status')?.textContent === '已获取');
+
+    assert.equal(await page.locator('#international-ipv4').textContent(), '未检测到');
+    assert.equal(await page.locator('#international-ipv6').textContent(), originalIpv6);
+    assert.equal(await page.locator('#source-firstparty-status').textContent(), '采用');
+    assert.equal(await page.locator('#summary-main').textContent(), '国内外 IP 均已获取');
+    assert.equal(pageErrors.length, 0, `myip pseudo-IPv4 page errors: ${pageErrors.map(String).join('; ')}`);
     await context.close();
 }
 
@@ -338,6 +380,27 @@ async function testMyIpAlwaysShowsSafeReferenceWhenDomesticPoolAndStunFail() {
     await context.close();
 }
 
+async function testMyIpNormalizesEquivalentIpv4Text() {
+    const canonicalIp = '8.8.8.8';
+    const nonCanonicalIp = '08.08.08.08';
+    const { context, page, pageErrors } = await createPage();
+
+    await routeDomesticPool(page, canonicalIp, {
+        province: '',
+        city: '',
+        operator: ''
+    });
+    await routeCommonInternational(page, nonCanonicalIp);
+
+    await page.goto(`${baseUrl}/tools/myip/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#summary-status')?.textContent === '同一出口');
+
+    assert.equal(await page.locator('#domestic-ipv4').textContent(), canonicalIp);
+    assert.equal(await page.locator('#international-ipv4').textContent(), canonicalIp);
+    assert.equal(pageErrors.length, 0, `myip IPv4 normalization page errors: ${pageErrors.map(String).join('; ')}`);
+    await context.close();
+}
+
 async function testMyIpSameExit() {
     const commonIp = '8.8.8.8';
     const { context, page, pageErrors } = await createPage();
@@ -364,10 +427,12 @@ async function testMyIp() {
     assert.doesNotMatch(source, /createElement\(['"]script|whois\.pconline\.com\.cn|pv\.sohu\.com|r\.inews\.qq\.com/);
 
     await testMyIpDomesticAndInternationalSources();
+    await testMyIpKeepsOriginalIpv6WhenCloudflareUsesPseudoIpv4();
     await testMyIpRejectsInvalidDomesticAndUsesLocalReference();
     await testMyIpInternationalPrimaryFallbackAndDifferentValues();
     await testMyIpUsesLocalNetworkReferenceWhenDomesticPoolFails();
     await testMyIpAlwaysShowsSafeReferenceWhenDomesticPoolAndStunFail();
+    await testMyIpNormalizesEquivalentIpv4Text();
     await testMyIpSameExit();
 }
 

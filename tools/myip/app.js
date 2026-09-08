@@ -170,7 +170,9 @@
         const value = normalizeText(ip);
         if (!isPublicIpAddress(value)) throw new Error(`${source} 返回了非公网 IP，已忽略`);
         const family = ipFamily(value);
-        const normalized = family === 6 ? new URL(`http://[${value}]/`).hostname.slice(1, -1) : value;
+        const normalized = family === 6
+            ? new URL(`http://[${value}]/`).hostname.slice(1, -1)
+            : parseIpv4(value).join('.');
         return { ip: normalized, family, source, sourceId, detail: normalizeText(detail) };
     }
 
@@ -446,8 +448,22 @@
                     const data = await fetchJson(firstPartyUrl);
                     if (!data || data.schemaVersion !== 1 || data.role !== 'international-first-party') throw new Error('返回格式不正确');
                     const detail = networkDetail(data);
-                    const results = [makeObservation(data.ip, '国际检测', detail, 'firstparty')];
-                    if (data.originalIpv6 && normalizeText(data.originalIpv6) !== normalizeText(data.ip)) results.push(makeObservation(data.originalIpv6, '国际检测 IPv6', detail, 'firstparty'));
+                    const results = [];
+                    let validationError = null;
+                    const addCandidate = (ip, source, expectedFamily = null) => {
+                        const value = normalizeText(ip);
+                        if (!value) return;
+                        try {
+                            const observation = makeObservation(value, source, detail, 'firstparty');
+                            if (expectedFamily && observation.family !== expectedFamily) throw new Error(`${source} 返回的地址类型不正确`);
+                            if (!results.some((item) => item.ip === observation.ip)) results.push(observation);
+                        } catch (error) {
+                            validationError = validationError || error;
+                        }
+                    };
+                    addCandidate(data.ip, '国际检测');
+                    addCandidate(data.originalIpv6, '国际检测 IPv6', 6);
+                    if (!results.length) throw validationError || new Error('未返回公网 IP');
                     return results;
                 }
             },
