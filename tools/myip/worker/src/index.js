@@ -26,7 +26,7 @@ function corsHeaders(request) {
 }
 
 function json(request, body, status = 200) {
-  return new Response(JSON.stringify(body), {
+  return new Response(request.method === 'HEAD' ? null : JSON.stringify(body), {
     status,
     headers: corsHeaders(request)
   });
@@ -88,15 +88,14 @@ export default {
     }
 
     if (request.method !== 'GET' && request.method !== 'HEAD') {
-      return json(request, { error: 'method_not_allowed' }, 405);
+      const response = json(request, { error: 'method_not_allowed' }, 405);
+      response.headers.set('Allow', 'GET, HEAD, OPTIONS');
+      return response;
     }
 
     const url = new URL(request.url);
     if (url.pathname === '/healthz') {
-      const response = json(request, { ok: true, service: 'linchun-myip-probe' });
-      return request.method === 'HEAD'
-        ? new Response(null, { status: response.status, headers: response.headers })
-        : response;
+      return json(request, { ok: true, service: 'linchun-myip-probe' });
     }
 
     if (url.pathname !== '/' && url.pathname !== '/v1/ip') {
@@ -108,9 +107,6 @@ export default {
       return json(request, { error: 'client_ip_unavailable' }, 503);
     }
 
-    const response = json(request, payload);
-    return request.method === 'HEAD'
-      ? new Response(null, { status: response.status, headers: response.headers })
-      : response;
+    return json(request, payload);
   }
 };
