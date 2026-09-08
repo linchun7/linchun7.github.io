@@ -6,7 +6,7 @@
 
 本工具比较 Apple iCloud+ 在不同国家和地区的月费。Apple Support 英文价格页提供当地价格、币种、容量、市场结构和 `Published Date`；人民币参考价优先使用 ExchangeRate-API 认证源生成，认证源不可用或未通过校验时可尝试开放汇率源，并只在受控 freshness 条件内沿用上一份已验证的安全派生结果。人民币金额只用于横向比较，不是 Apple 结算价。
 
-日常值守、自动更新、监控、Secret、Cloudflare、部署、回滚和事故处理见 [OPERATIONS.md](OPERATIONS.md)。Apple 规范化历史证据见 [data/apple-snapshots/README.md](data/apple-snapshots/README.md)。
+文档入口：系统设计与修改影响见 [ARCHITECTURE.md](ARCHITECTURE.md)；日常值守、自动更新、监控、Secret、Cloudflare、部署和回滚见 [OPERATIONS.md](OPERATIONS.md)；按现象排障见 [TROUBLESHOOTING.md](TROUBLESHOOTING.md)；Apple 规范化历史证据见 [data/apple-snapshots/README.md](data/apple-snapshots/README.md)。
 
 ## 产品边界
 
@@ -51,11 +51,11 @@ Apple Support HTML ─┐
 
 自动入口：
 
-- Cloudflare 主触发：每天北京时间 08:05，通过 `workflow_dispatch` 且 `trigger_source=cloudflare`。
-- GitHub cron 备用：每天北京时间 08:10。
+- 生产设计要求 Cloudflare 外部主触发在每天北京时间 08:05 调用 `workflow_dispatch`，并声明 `trigger_source=cloudflare`；该控制面不在仓库内，实时启用状态需在 Cloudflare/GitHub 侧确认。
+- 仓库内可验证的 GitHub cron 备用入口为每天北京时间 08:10。
 - `main` 上的手动触发始终允许执行。
 
-两个自动入口共用每日幂等保护。只有当天已经存在合格成功运行、汇率不是 stale、抓取日期也符合当天条件时，备用任务才跳过。
+两个自动入口共用每日幂等保护。只有当天已经存在合格成功运行、汇率不是 stale、抓取日期也符合当天条件时，备用任务才跳过；仓库测试验证幂等逻辑和 GitHub 备用入口，但不能单独证明外部 08:05 dispatch 实际发生。
 
 一次生产更新的核心顺序：
 
@@ -136,7 +136,7 @@ SEO 当前采用“稳定意图 + 动态数据”的组合：
 
 ## 验证
 
-从 `tools/icloud_price_comparison/` 执行，要求 Node.js 22+ 和项目声明的 pnpm 10.14.0：
+从 `tools/icloud_price_comparison/` 执行，要求 Node.js >=22.1.0 和项目声明的 pnpm 10.14.0：
 
 ```bash
 pnpm install --frozen-lockfile --ignore-scripts
@@ -158,7 +158,7 @@ pnpm audit --audit-level low
 
 完整 `pnpm test` 等价于 core 后执行三浏览器验收。
 
-关键架构事实源发生变化时，PR CI 会强制要求 `README.md` 与 `OPERATIONS.md` 同步修改；identity/data contract、`data-model.js` 中的搜索契约、生成器和关键 update/validate workflow 属于强制范围。`script.js` 作为宽泛 UI/render glue 不再因任意小改动触发两份长文档，但搜索核心语义已集中到受门禁保护的 `data-model.js`。文档契约测试继续校验关键规则内容。PR 还会直接检查 base→head 已发布 marketId 不被删除或原名 rekey，并对已提交差异执行 `git diff --check`。
+关键架构事实源发生变化时，PR CI 会强制要求 `README.md`、`ARCHITECTURE.md` 与 `OPERATIONS.md` 同步修改；identity/data contract、`data-model.js` 中的搜索契约、生成器和关键 update/validate workflow 属于强制范围。`script.js` 作为宽泛 UI/render glue 不再因任意小改动触发三份架构文档，但搜索核心语义已集中到受门禁保护的 `data-model.js`。`TROUBLESHOOTING.md` 按故障表现维护，仅在症状、首查步骤或禁止操作变化时更新。文档契约测试继续校验关键规则内容。PR 还会直接检查 base→head 已发布 marketId 不被删除或原名 rekey，并对已提交差异执行 `git diff --check`。
 
 本地预览从仓库根目录启动：
 

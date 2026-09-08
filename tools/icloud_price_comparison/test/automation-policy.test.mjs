@@ -10,6 +10,7 @@ const validationWorkflowUrl = new URL('../../../.github/workflows/validate-iclou
 const updateWorkflowUrl = new URL('../../../.github/workflows/update-icloud-prices.yml', import.meta.url);
 const autoMergeScriptUrl = new URL('../scripts/auto-merge-official-actions.mjs', import.meta.url);
 const manifestUrl = new URL('../vendor/manifest.json', import.meta.url);
+const vendorSubsetUrl = new URL('../vendor/lucide-subset.js', import.meta.url);
 const noticesUrl = new URL('../THIRD_PARTY_NOTICES.md', import.meta.url);
 
 const LONG_LIVED_WORKFLOWS = [
@@ -114,8 +115,9 @@ test('auto-merge is serialized, least-privileged, and routes each dependency sco
 });
 
 test('vendored Lucide metadata does not duplicate the package version pin', async () => {
-  const [manifestText, notices] = await Promise.all([
+  const [manifestText, subset, notices] = await Promise.all([
     readFile(manifestUrl, 'utf8'),
+    readFile(vendorSubsetUrl, 'utf8'),
     readFile(noticesUrl, 'utf8'),
   ]);
   const manifest = JSON.parse(manifestText);
@@ -124,6 +126,8 @@ test('vendored Lucide metadata does not duplicate the package version pin', asyn
   for (const asset of manifest.assets) {
     assert.equal(Object.hasOwn(asset, 'version'), false);
   }
+  assert.match(subset, /version is pinned in package\.json/i);
+  assert.doesNotMatch(subset, /Lucide\s+\d+\.\d+\.\d+/i);
   assert.match(notices, /^## Lucide\r?$/m);
   assert.match(notices, /exact reviewed version[\s\S]*?package\.json[\s\S]*?pnpm-lock\.yaml/i);
   assert.doesNotMatch(notices, /^## Lucide \d+\.\d+\.\d+\r?$/m);

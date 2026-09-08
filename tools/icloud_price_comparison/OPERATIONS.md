@@ -1,6 +1,6 @@
 # iCloud+ 全球价格比较运维手册
 
-本文面向项目所有者、发布操作员和事故响应人员，记录当前生产架构、自动任务、监控、Secret、Cloudflare、部署、回滚和故障处理。一次性的发布清单、审计记录和终验报告由项目所有者内部留存，不进入公开仓库。
+本文面向项目所有者、发布操作员和事故响应人员，记录生产运行、自动任务、监控、Secret、Cloudflare、部署与回滚。架构原因和修改影响见 [ARCHITECTURE.md](ARCHITECTURE.md)，按现象排障见 [TROUBLESHOOTING.md](TROUBLESHOOTING.md)。一次性的发布清单、审计记录和终验报告由项目所有者内部留存，不进入公开仓库。
 
 生产页面：<https://www.linchun.com.cn/tools/icloud_price_comparison/>
 
@@ -72,13 +72,13 @@ Apple Support HTML ─┐
 
 | 入口 | 时间（Asia/Shanghai） | 语义 |
 | --- | --- | --- |
-| Cloudflare 外部主触发 | 每日 08:05 | `workflow_dispatch` + `trigger_source=cloudflare` |
-| GitHub cron 备用 | 每日 08:10 | 主触发未形成合格成功结果时兜底 |
+| Cloudflare 外部主触发（生产目标） | 每日 08:05 | 控制面应调用 `workflow_dispatch` + `trigger_source=cloudflare`；实时启用状态需外部确认 |
+| GitHub cron 备用（仓库可验证） | 每日 08:10 | 主触发未形成合格成功结果时兜底 |
 | GitHub 手动触发 | 随时 | 人工验证或恢复；`main` 上不受每日幂等跳过 |
 
-两个自动入口使用北京时间、`run-log.json` 和当前数据状态做每日幂等判断。stale 汇率、未来时间或不完整成功记录都不能阻止备用任务重试。
+两个自动入口使用北京时间、`run-log.json` 和当前数据状态做每日幂等判断。stale 汇率、未来时间或不完整成功记录都不能阻止备用任务重试。仓库测试能证明幂等规则和 GitHub 08:10 入口，但不能单独证明 Cloudflare 08:05 dispatch 当天实际执行。
 
-注意：Cloudflare 外部触发使用的 GitHub 身份和凭据不在仓库定义。当前 `trigger_source` 是 caller 声明，不应被当作认证边界。外部凭据必须保持最小权限并独立轮换。
+注意：Cloudflare 外部触发使用的 GitHub 身份和凭据不在仓库定义。当前 `trigger_source` 是 caller 声明，不应被当作认证边界。外部凭据必须保持最小权限并独立轮换；控制面状态应按生产检查而不是按本文文字推断。
 
 ### 完整只读验证
 
@@ -94,7 +94,7 @@ Apple Support HTML ─┐
 - Chromium / Firefox / WebKit UI 验收
 - `pnpm audit --audit-level low`
 - `git diff --check`
-- 对关键架构 PR 执行文档同步门禁：identity、数据契约、`data-model.js` 搜索事实源、生成器或关键 update/validate workflow 变化时，`README.md` 与 `OPERATIONS.md` 必须同时进入 diff；宽泛 `script.js` 的普通 UI/render 小改动不再单独触发该门禁。PR 同时比较 base→head 的已发布 marketId ledger，并检查已提交 diff 格式。
+- 对关键架构 PR 执行文档同步门禁：identity、数据契约、`data-model.js` 搜索事实源、生成器或关键 update/validate workflow 变化时，`README.md`、`ARCHITECTURE.md` 与 `OPERATIONS.md` 必须同时进入 diff；宽泛 `script.js` 的普通 UI/render 小改动不再单独触发该门禁。`TROUBLESHOOTING.md` 仅在故障表现、首查步骤或禁止操作变化时更新。PR 同时比较 base→head 的已发布 marketId ledger，并检查已提交 diff 格式。
 
 每日更新由内置 `GITHUB_TOKEN` 推送的数据提交不会再触发普通 push 验证，因此每日 workflow 自身的 core/data/runner Chrome/工件验证就是自动数据发布门禁。
 
@@ -280,68 +280,18 @@ curl -fsSIL https://www.linchun.com.cn/tools/icloud_price_comparison/not-a-real-
 
 ## 13. 故障处理
 
-### Apple 抓取、解析或确认失败
+按具体症状、首查步骤和禁止操作排查时，使用 [TROUBLESHOOTING.md](TROUBLESHOOTING.md)。本手册只保留事故处理的通用生产原则，避免与排障手册维护两套细节：
 
-1. 不发布单路解析或未确认数据；上一份有效数据继续服务。
-2. 检查 `icloud-price-diagnostics-*` 中的结构化报告和规范化 snapshot，不把原始 Apple HTML 上传到公开仓库或 Actions artifact。
-3. 人工确认 Apple 页面是否可访问、是否改版或返回挑战页。
-4. 用合法测试 fixture 修复两条解析路径并运行 core、live dry-run、artifact、snapshots 和三浏览器。
-5. 若未来收到明确的上游使用限制、合规或下架通知，停止相关自动访问并按“合规或下架通知”流程处理。
-
-### 汇率失败或 stale
-
-1. 检查 Action notice、服务状态、额度和 Secret，绝不打印 Key。
-2. 认证来源失败后开放来源成功属于预期自动降级。
-3. 两个 fresh 在线来源均失败时，只允许既定 freshness 窗口内且与当前市场/币种结构兼容的 previous FX/CNY fallback。
-4. 超过窗口或 required currency 不完整时，不绕过验证；恢复服务、轮换凭据或等待后续自动任务。
-5. 若未来收到明确要求停止相关公开用途或下架的通知，停止受影响的人民币换算发布并按“合规或下架通知”流程处理。
-
-### 数据、快照或 artifact 损坏
-
-1. 暂停自动更新，保存失败 run、commit SHA 和工件 hash。
-2. 找到上一完整已知良好数据提交并运行 artifact/snapshot 验证。
-3. 使用 `git revert <bad-data-commit>` 回滚完整数据提交，不手拼单个 JSON。
-4. 生产验收后恢复 workflow，并在需要时人工触发一次正常更新。
-
-### 更新事务中断或锁残留
-
-- 生产更新和历史导入都有持久事务记录；下次正常运行优先自动恢复。
-- 不手工删除新鲜锁或事务文件；先确认没有活跃进程。
-- 只有满足实现中的 stale-lock 安全条件时才允许回收。
-
-### 远端 `main` 竞态
-
-1. 不 rebase 已生成工件，不 force push。
-2. 确认占用 `main` 的新提交。
-3. 从新 `main` 重新运行完整更新；旧工件不得复用。
-
-### 静态页面或 SEO Projection 不一致
-
-1. 先运行 `pnpm render:static:check`。`STATIC_RENDER_MISMATCH` 表示 marker 生成区与数据/生成器不一致；`SEO_PROJECTION_MISMATCH` 表示 description、OG/Twitter、图片 alt 或 `#brandDescription` 等 SEO Projection 目标与生成器不一致。
-2. 不要通过再次手改 `index.html` 去“消掉”错误。先确认真正要改的是 `scripts/static-page.mjs`、`scripts/render-static-page.mjs` 还是 `data/prices.json`，修改事实源后执行 `pnpm render:static`。
-3. 重新运行 core 和相关浏览器测试，确认下一次价格更新再次生成静态页时不会把修改覆盖回旧值。
-
-### 前端、CSP、缓存或隐私回归
-
-1. 保存 HAR/console/响应头/资源版本，用干净 profile 复现。
-2. CDN 配置漂移时恢复最后已知良好规则并定向 purge。
-3. 代码回归使用正常 revert；不要临时加入 `unsafe-inline`、`unsafe-eval` 或通配域名。
-4. 分析/查询数据泄漏按隐私事故处理，先停止相关脚本并保留审计记录。
-
-### 合规、外部规则变更或下架通知
-
-1. 保存通知原文、时间和来源，通知项目所有者及必要的合规负责人；不要在公开 Issue 粘贴保密往来。
-2. 先停止受影响的持续访问或发布范围，避免扩大影响。
-3. 明确哪些功能需要暂停：自动抓取、人民币换算、分析脚本或整个工具。
-4. 只有处置方案完成必要确认后才恢复。
-
-### 依赖、Action 或 vendor 供应链事件
-
-1. 停止受影响的自动合并和发布。
-2. 固定版本/SHA，核对上游安全公告、tag 与 commit。
-3. 重新验证 vendor 精确字节、hash、使用集和 notice。
-4. 在干净环境执行依赖漏洞、core、artifact、snapshots 和三浏览器检查。
-5. 无法证明完整性时回滚到最后已知良好版本。
+1. 先保存失败 workflow/run、commit SHA、首个失败步骤和必要的结构化证据，再修改系统。
+2. Apple 抓取、双解析、语义确认、FX authority、market identity、数据契约、snapshot/transaction 任一关键门禁失败时，不发布未经证明的新数据；上一份已知良好数据继续服务。
+3. 数据事故按完整提交回滚，优先 `git revert <bad-data-commit>`；不要手拼单个 `prices.json`、`history.json` 或 snapshot index。
+4. 远端 `main` 在生成期间前进时，旧工件作废；从新 `main` 重新生成，不 rebase 工件、不 force push。
+5. 静态页面或 SEO 不一致时改 generator/事实源后重新渲染；不要直接手改生成目标消除错误。
+6. 前端/CSP/缓存/隐私问题先保存 HAR、console、响应头和资源版本；不要临时放宽到 `unsafe-inline`、`unsafe-eval` 或通配域名。
+7. 依赖、Action 或 vendor 供应链事件先停止相关自动合并/发布，固定版本或 SHA 并重新验证；不能证明完整性时回到最后已知良好版本。
+8. 合规、上游规则或下架通知先停止受影响的持续访问/发布范围并保留通知原文；必要确认完成后再恢复。
+9. lock/transaction journal 由正式恢复逻辑处理；没有确认活跃进程与 stale 条件前，不手工删除。
+10. 外部 Cloudflare/DNS/TLS/Healthchecks 状态必须从真实控制面或生产响应验证，不能把本文描述当作实时证明。
 
 ## 14. 回滚
 
@@ -365,13 +315,14 @@ Cloudflare/DNS 回滚使用发布前保存的配置记录；TLS 最低版本不�
 - Apple 原始 HTML：不入库、不上传 Actions artifact。
 - 规范化 Apple JSON snapshots：作为历史证据长期保留，同日修订不覆盖。
 - 临时浏览器、截图、日志、下载包、本地审计工具和一次性清单放入 ignored `artifacts/`。
-- 公开仓库不保留面向特定 AI/代理的 `AGENTS.md`；长期规则写入 README/OPERATIONS。
-- 项目长期 Markdown 仅为 `README.md`、`OPERATIONS.md`、`THIRD_PARTY_NOTICES.md` 和 `data/apple-snapshots/README.md`，由 core 测试保护允许列表。
-- `README.md` 面向产品/开发事实，`OPERATIONS.md` 面向生产操作；涉及生成页面时，两份文档都应把 generator 视为源、把 `index.html` 视为产物。尤其不能只记录“markers 内生成”，遗漏 markers 外的 SEO Projection。
+- 公开仓库不保留面向特定 AI/代理的 `AGENTS.md` 或一次性交接说明；长期规则只进入项目正式文档。
+- 项目长期 Markdown 允许列表为 `README.md`、`ARCHITECTURE.md`、`OPERATIONS.md`、`TROUBLESHOOTING.md`、`THIRD_PARTY_NOTICES.md` 和 `data/apple-snapshots/README.md`，由 core 测试保护。
+- 文档职责固定：`README`=产品/开发入口；`ARCHITECTURE`=设计原因、事实源和修改影响；`OPERATIONS`=生产运行/权限/部署/回滚；`TROUBLESHOOTING`=按症状排查；snapshot README=历史证据格式；THIRD_PARTY_NOTICES=第三方许可。不要复制同一段细节到多份文档。
+- 涉及生成页面时，正式文档都应把 generator 视为源、把 `index.html` 视为产物；尤其不能只记录“markers 内生成”，遗漏 markers 外的 SEO Projection。
 - 页面底部当前只展示“本工具与 Apple Inc. 无关联，数据仅供参考。”及版权信息；不要把 GA4 / Cloudflare Web Analytics 运维说明误写成当前可见 footer 文案。
 - GA4 与 Cloudflare Web Analytics 的实际启用状态、隐私边界和检查方法记录在 README/本手册中；若未来要新增用户可见统计披露，应作为明确的产品文案变更，并同步修改页面与 UI 测试。
 - 不要在文档中重新引入已经关闭、已经决策或已经由代码契约解决的历史待办；若事实发生变化，按新的具体事件记录和处理。
-- 修改搜索、排序/排名语义、URL 规范、SEO Projection、自动任务时间、依赖策略或生成边界时，应在同一 PR 复核 README/OPERATIONS，避免代码先走、文档滞后。
+- 修改关键搜索、排序/排名语义、URL 规范、SEO Projection、数据/identity/snapshot 规则、自动任务或发布边界时，同一 PR 至少复核 README/ARCHITECTURE/OPERATIONS；故障表现或首查动作变化时同步复核 TROUBLESHOOTING。
 - 修改文档时同步清理代码、workflow、测试和页面文案中的失效引用。
 - Git 历史和 `history.json` 的增长继续由每周维护 workflow 监控；不要由自动任务重写 Git 历史。
 

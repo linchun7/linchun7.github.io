@@ -4,7 +4,7 @@ import {
   validatePayload,
   validatePriceHistoryConsistency
 } from './data-contract.js?v=70d67de9';
-import { createIcons } from './vendor/lucide-subset.js?v=1afb95ee';
+import { createIcons } from './vendor/lucide-subset.js?v=2b21b7af';
 import { marketSearchPriority, matchesMarketSearch, normalizeMarketSearchText, REGION_LABELS, VALID_REGIONS } from './data-model.js?v=4ddda83e';
 
 const REQUEST_TIMEOUT_MS = 8_000;

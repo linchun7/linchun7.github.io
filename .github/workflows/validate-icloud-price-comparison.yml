@@ -54,7 +54,7 @@ jobs:
             esac
           done <<< "$changed"
           if [ "$needs_docs" = true ]; then
-            for doc in tools/icloud_price_comparison/README.md tools/icloud_price_comparison/OPERATIONS.md; do
+            for doc in tools/icloud_price_comparison/README.md tools/icloud_price_comparison/ARCHITECTURE.md tools/icloud_price_comparison/OPERATIONS.md; do
               if ! printf '%s\n' "$changed" | grep -Fxq "$doc"; then
                 echo "Critical iCloud architecture changed without required documentation update: $doc" >&2
                 exit 1
