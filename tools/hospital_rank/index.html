@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-rankings-version="34ea741e">
+<html lang="zh-CN" data-rankings-version="8ad6a4b5">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -10,7 +10,7 @@
     <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
     <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
     <title>复旦版医院排名查询</title>
-    <link rel="stylesheet" href="style.css?v=8fa0dc9e-7f05d2d4">
+    <link rel="stylesheet" href="style.css?v=9a315a2f-cfb731a9">
 </head>
 <body>
     <a class="skip-link" href="#hospitalTable">跳到医院榜单</a>
@@ -46,7 +46,7 @@
                         <span class="filter-label">年份</span>
                         <span class="field-control">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
-                            <select id="yearSelect">
+                            <select id="yearSelect" disabled>
                             <!-- STATIC_YEAR_OPTIONS_START -->
                                 <option value="2023" selected>2023年</option>
                                 <option value="2022">2022年</option>
@@ -72,21 +72,21 @@
                         <span class="filter-label">省份</span>
                         <span class="field-control">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s7-5.2 7-12a7 7 0 1 0-14 0c0 6.8 7 12 7 12Z"/><circle cx="12" cy="9" r="2.3"/></svg>
-                            <select id="provinceSelect"><option value="">全部省份</option></select>
+                            <select id="provinceSelect" disabled><option value="">全部省份</option></select>
                         </span>
                     </label>
                     <label class="filter-field select-field city-field" for="citySelect">
                         <span class="filter-label">城市</span>
                         <span class="field-control">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 21V9l8-4 8 4v12M8 21v-5h8v5M8 11h2m4 0h2"/></svg>
-                            <select id="citySelect"><option value="">全部城市</option></select>
+                            <select id="citySelect" disabled><option value="">全部城市</option></select>
                         </span>
                     </label>
                     <label class="filter-field search-field" for="hospitalSearch">
                         <span class="filter-label">医院</span>
                         <span class="field-control">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-                            <input type="search" id="hospitalSearch" placeholder="搜索医院或历史名称" autocomplete="off">
+                            <input type="search" id="hospitalSearch" placeholder="搜索医院或历史名称" autocomplete="off" disabled>
                         </span>
                     </label>
                 </div>
@@ -98,14 +98,14 @@
                 <table id="hospitalTable" class="hospital-table single-year grade-mode">
                     <thead>
                         <tr>
-                            <th aria-sort="none"><button type="button" data-sort="年份">年份 <svg class="lucide lucide-arrow-up-down" data-sort-icon="" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg></button></th>
-                            <th aria-sort="none"><button type="button" data-sort="排名"><span id="rankColumnLabel">等级</span><svg class="lucide lucide-arrow-up-down" data-sort-icon="" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg></button></th>
-                            <th aria-sort="none"><button type="button" data-sort="医院名称">医院名称 <svg class="lucide lucide-arrow-up-down" data-sort-icon="" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg></button></th>
-                            <th aria-sort="none"><button type="button" data-sort="专科声誉">专科声誉 <svg class="lucide lucide-arrow-up-down" data-sort-icon="" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg></button></th>
-                            <th aria-sort="none"><button type="button" data-sort="科研学术">科研学术 <svg class="lucide lucide-arrow-up-down" data-sort-icon="" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg></button></th>
-                            <th aria-sort="none"><button type="button" data-sort="综合得分">综合得分 <svg class="lucide lucide-arrow-up-down" data-sort-icon="" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg></button></th>
-                            <th aria-sort="none"><button type="button" data-sort="省份">省份 <svg class="lucide lucide-arrow-up-down" data-sort-icon="" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg></button></th>
-                            <th aria-sort="none"><button type="button" data-sort="城市">城市 <svg class="lucide lucide-arrow-up-down" data-sort-icon="" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg></button></th>
+                            <th aria-sort="none"><button type="button" data-sort="年份" disabled>年份 <svg class="lucide lucide-arrow-up-down" data-sort-icon="" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg></button></th>
+                            <th aria-sort="none"><button type="button" data-sort="排名" disabled><span id="rankColumnLabel">等级</span><svg class="lucide lucide-arrow-up-down" data-sort-icon="" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg></button></th>
+                            <th aria-sort="none"><button type="button" data-sort="医院名称" disabled>医院名称 <svg class="lucide lucide-arrow-up-down" data-sort-icon="" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg></button></th>
+                            <th aria-sort="none"><button type="button" data-sort="专科声誉" disabled>专科声誉 <svg class="lucide lucide-arrow-up-down" data-sort-icon="" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg></button></th>
+                            <th aria-sort="none"><button type="button" data-sort="科研学术" disabled>科研学术 <svg class="lucide lucide-arrow-up-down" data-sort-icon="" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg></button></th>
+                            <th aria-sort="none"><button type="button" data-sort="综合得分" disabled>综合得分 <svg class="lucide lucide-arrow-up-down" data-sort-icon="" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg></button></th>
+                            <th aria-sort="none"><button type="button" data-sort="省份" disabled>省份 <svg class="lucide lucide-arrow-up-down" data-sort-icon="" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg></button></th>
+                            <th aria-sort="none"><button type="button" data-sort="城市" disabled>城市 <svg class="lucide lucide-arrow-up-down" data-sort-icon="" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4"></path><path d="M17 20V4"></path><path d="m3 8 4-4 4 4"></path><path d="M7 4v16"></path></svg></button></th>
                         </tr>
                     </thead>
                     <tbody id="hospitalList">
@@ -1328,7 +1328,7 @@
                 </div>
             </div>
             <div class="data-disclaimer">
-                <p><strong>榜单说明：</strong>有排名的年份按官方名次展示；等级年份按各医院最近一次可用的排名作同等级内参考排序。</p>
+                <p><strong>榜单说明：</strong>数字年份按官方名次展示；等级内官方不分先后。本站按最近一次数字排名作同等级参考排序，不代表当年名次。</p>
             </div>
         </section>
     </main>
@@ -1350,7 +1350,7 @@
         </div>
     </dialog>
 
-    <script src="script.js?v=8fa0dc9e-7f05d2d4"></script>
+    <script src="script.js?v=9a315a2f-cfb731a9"></script>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-K2S9L4CHNP"></script>
     <script>

@@ -1,113 +1,81 @@
 # 医院排名数据说明
 
-本目录保存 `tools/hospital_rank/` 的结构化数据。前端只读取 `rankings.json`；不再使用旧版 `data.js`。
+本工具用于查询复旦版中国医院综合排行榜的历年记录、地区分布与医院历史名称；不把综合榜单等同于具体科室或个人就诊建议。
 
-## 文件
+## 当前数据与来源
 
-- `rankings.json`：前端唯一正式数据源。包含医院实体注册表与 2009–2023 已核验历史基线，以及后续经同等来源核验后新增的正式年度榜单。
-- `source-snapshot.json`：2026-08-18 UTC 从健康界复旦排行榜逐年页面重新抓取并规范化得到的源站结构化快照。**不保存原始 HTML**。
-- `audit.json`：本次迁移审计记录，包括旧数据核对、更名归并、缺失年度恢复、历史原始名称补充、源站内部校验 warning 等。
+前端唯一正式数据源是 `rankings.json`。2009–2023 年历史基线共 **1,430 条记录、127 个医院实体**：2009 年 50 条、2010 年 80 条、2011–2023 年各 100 条。2009–2022 年为数字排名，2023 年为等级制。
 
-## 来源
-
-主来源：复旦大学医院管理研究所中国医院排行榜，经健康界排行榜页面发布：
+主来源为复旦大学医院管理研究所中国医院排行榜在健康界的年度发布页：
 
 `https://rank.cn-healthcare.com/fudan/national-general/year/{year}`
 
-本次逐年抓取范围为 2009–2023。
+`source-snapshot.json` 是 2026-08-18 UTC 抓取并规范化的来源快照，**不保存原始 HTML**。只存在年度 URL 或页面标题，不代表该年度存在完整可用榜单；禁止复制旧年度数据充当新榜单。
 
-医院名称另使用复旦大学医院管理研究所保留的 2011 原始综合榜页面进行历史名称交叉核验：
+`audit.json` 保留迁移核对、2011 年缺失数据恢复、名称来源及源站内部异常的审计证据。其 `summary` 描述生成时的迁移结果；后续实体订正见 `entityCorrections`，不得把原迁移的 128 家误作当前实体数。
+
+## 医院实体与名称
+
+`hospitals[]` 包含稳定 `id`（`h_<10位十六进制>`）、规范展示名 `name`、名称数组 `aliases`、当前地理元数据 `province` / `city`。年度记录以 `hospitalId` 关联同一医院，不以名称字符串直接拼接历史。
+
+`sourceName` 是**抓取时该年度来源页面实际显示的院名**，不保证是当年首次发布时的院名。医院更名或实体归并不得改写它；前端搜索同时覆盖规范名、别名和来源名。
+
+历史名称辅助证据来自复旦大学医院管理研究所 2011 年原始发布页：
 
 `https://www.fdygs.com/news2011-2.aspx`
 
-这一辅助来源**只用于补充医院历史名称/别名，不覆盖健康界回抓得到的排名、分数或 sourceName**。
+该辅助来源只用于别名和实体核验，不覆盖主来源的排名、分数、等级或 `sourceName`。
 
-## 数据模型
+**中山大学孙逸仙纪念医院与中山大学附属第二医院是同一医院**，统一使用 `h_9da51a15c9`；2010–2023 年的 14 条记录属于同一历史。中山大学官方名称证据：
 
-### 医院实体
+`https://rcb.sysu.edu.cn/article/754`（2026-06-23）
 
-`rankings.json > hospitals[]`：
+独立参加历史榜单的机构，不得仅因同属一个医院集团、现已改为某医学中心或名字相似而自动归并。
 
-- `id`：稳定医院实体 ID，格式 `h_<10位十六进制>`。
-- `name`：本站当前规范展示名。
-- `aliases`：历史名称、源站历年名称或已确认的常用更名，用于跨年归并和搜索。
-- `province` / `city`：本地补充的当前地理元数据。
+## 排名、等级与历史比较
 
-医院历史关系通过 `hospitalId` 连接，而不是通过每年显示名称字符串连接。因此医院改名后，其历年榜单仍属于同一个实体。
+`years[]` 每项包含整数 `year`、`rankingMode`（`numeric` / `grade`）、非空 `records[]`。每条记录都必须包含 `hospitalId`、`sourceName`、`rank`、`grade`、`specialtyReputation`、`researchAcademic`、`overallScore`。
 
-### 年度榜单
+正式数据必须显式包含上述字段；来源快照只要求相应制度实际提供的字段，不适用字段允许缺省或为 `null`，但不能出现虚构值。
 
-`rankings.json > years[]`：
+数字排名必须是正整数，三项分数为有限非负数，`grade` 为 `null`。保留官方并列名次，例如 2009 年的 `27、27、29`，不强行重新连续编号。等级榜的数字名次和三项分数必须为 `null`，等级顺序固定为 `A++++、A+++、A++、A+、A`。
 
-- `year`
-- `rankingMode`：`numeric` 或 `grade`
-- `records[]`
+2023 年官方同一等级内不分先后。JSON 保留来源顺序；页面按各医院最近一次可用的数字排名作同等级辅助排列，**不代表当年名次**。不同制度之间不计算名次升降。
 
-每条 `records[]` 包含：
+历史弹窗只显示本库收录的上榜记录。比较对象是上一条可用记录；跨越缺失年份时明确显示比较年份与“非同比”。不把缺失年度虚构成第 101 名、零分或连续年度变化。
 
-- `hospitalId`：对应医院实体。
-- `sourceName`：**本次抓取时，该年度健康界页面实际显示的医院名称**。历史页面可能已被健康界更新为后来的院名，因此它不一定等于当年原始发布名称；已确认的历史原始名称放入医院实体 `aliases` 并在 `audit.json` 记录来源。
-- `rank`：数字排名年份使用；等级制年份为 `null`。
-- `grade`：等级制年份使用；数字排名年份为 `null`。
-- `specialtyReputation`
-- `researchAcademic`
-- `overallScore`
+## 来源分数异常
 
-2009–2022 为数字排名；2023 为等级制。2023 官方同一等级内不分先后，因此 JSON 保留源站顺序，前端若为了浏览体验按最近一次数字排名进行同等级辅助排序，不改变源数据本身。
+2014 年复旦大学附属儿科医院来源显示专科声誉 `8.984`、科研学术 `5.795`、综合得分 `14.799`。前两项之和为 `14.779`，相差 `0.020`。保留来源展示值 `14.799`，不自行“算对”后覆盖；异常记录在审计文件与该院历史弹窗中。
 
-## 本次全量核验结果
+## 代码入口与失败边界
 
-- 源站结构化记录：1430 条。
-- 旧 `data.js`：1330 条。
-- 发现旧数据**完整缺少 2011 年 100 条**，本次已从源站恢复。
-- 除缺失的 2011 年外，旧库已有 1330 条记录与本次源站回抓结果在排名、等级、专科声誉、科研学术、综合得分上均无差异。
-- 2011 年 100 家医院中，99 家通过跨年份规范名/曾用名精确归并到既有实体；天津市眼科医院仅出现在旧库缺失年度，因此显式建立为新实体。
-- 本次实体恢复不依赖 fuzzy match：`entityRecoveryFuzzy = 0`。
-- 最终医院实体：128 家。
-- 未匹配源站记录：0；未匹配旧记录：0。
-- 对照复旦医院管理研究所 2011 原始发布页，又确认并补充 22 个历史名称别名，包括第四军医大学西京医院、第二军医大学长海医院、南京军区南京总医院、第三军医大学西南医院等；这些别名仅用于实体归并和搜索。
+`index.html` 保存最新已收录年度的静态榜单；`script.js` 加载并校验 JSON 后启用筛选、排序和历史查询。无 JavaScript、加载中或加载失败时，筛选与排序控件禁用，防止控件所选年份与静态榜单不一致。网络失败、坏数据、响应正文超时保留静态榜单；没有静态榜单时显示可见错误提示。加载超时覆盖响应头和完整 JSON 正文。
 
-详细记录见 `audit.json`。
+`style.css` 控制等级/数字/全部年份的可见列。隐藏列仅针对正常数据行，不得隐藏跨列的空结果或错误提示。
 
-## 已知源站原始数据 warning
+## 校验与更新
 
-2014 年复旦大学附属儿科医院源站显示：
-
-- 专科声誉：8.984
-- 科研学术：5.795
-- 综合得分：14.799
-
-前两项算术和为 14.779，与源站展示综合得分相差 0.020。本项目遵循“忠实保存来源”的原则，保留源站展示的 `14.799`，并在 `audit.json` 中记录 `score-sum` warning，不自行改写官方展示值。
-
-## 校验
-
-运行：
+从仓库根目录运行（依赖 Python 3 与浏览器测试目录的 Node.js / Playwright 环境）：
 
 ```bash
-python tools/hospital_rank/scripts/validate_data.py
+python -B tools/hospital_rank/scripts/validate_data.py
+python -B tools/hospital_rank/scripts/test_contract.py
+python -B tools/hospital_rank/scripts/test_future_year.py
+python -B tools/hospital_rank/scripts/render_static.py
+python -B tools/hospital_rank/scripts/render_static.py --check
 ```
 
-validator 会检查：
+校验器同时检查正式数据和来源快照的字段类型、数字范围、历史制度、记录顺序、逐值一致性、年份/医院引用/别名唯一性与 1,430 条历史基线完整性。来源中相同的错误值不能因为“两份文件相等”就通过校验。2023 年另外检查五档各 20 家。
 
-- 2009–2023 已核验历史基线完整性与固定记录数；
-- 允许 2024 及之后新增正式年度，但要求 `rankings.json` 与 `source-snapshot.json` 年份集合、记录数和来源值一致；
-- 医院 ID、实体引用和别名唯一性；
-- 数字排名/等级制字段互斥；
-- 2023 等级合法性与 20×5 分布；
-- `rankings.json` 与 `source-snapshot.json` 的逐条一致性；
-- 迁移审计不存在 unresolved mismatch；
-- 1430 条历史记录全部归入医院实体。
+`test_contract.py` 使用隔离临时数据检查坏值拒绝、官方并列与同院异名历史。`test_future_year.py` 动态选择当前最大年份之后的年度，测试连续新增年度的数字/等级榜及静态渲染，不修改正式数据。
 
-
-## 新增年度发布流程
-
-新增正式年度时，同时更新 `rankings.json` 与 `source-snapshot.json`，完成实体/历史名称核验后运行：
+浏览器验收先在仓库根启动仅本机可访问的静态服务器：
 
 ```bash
-python tools/hospital_rank/scripts/validate_data.py
-python tools/hospital_rank/scripts/test_future_year.py
-python tools/hospital_rank/scripts/render_static.py
-python tools/hospital_rank/scripts/render_static.py --check
+python -m http.server 4173 --bind 127.0.0.1
 ```
 
-`render_static.py` 会自动选择数据中的最大年份作为静态 HTML 默认榜单，并同步 CSS/JS 内容版本与 `rankings.json` 内容版本；因此新增 2024 后页面静态快照、默认年份和数据请求会一起切换到 2024。
+另一个终端运行 `node tools/browser-tests/hospital-rank-smoke.mjs`。通过环境变量 `PLAYWRIGHT_BROWSER=chromium|firefox|webkit` 分别检查三浏览器；`BASE_URL` 可覆盖默认的 `http://127.0.0.1:4173`，`PYTHON` 可指定解释器。该入口自动执行 `hospital-rank-regression.mjs` 和 Python 回归，已纳入现有静态工具 CI，无须另建流程。
+
+新增正式年度必须同时更新正式数据与来源快照，核验实体与来源后通过上述检查。`render_static.py` 自动同步静态行、年份选项、标题、排名制度与资源内容版本。不得只改 JSON 不重建静态页面，也不得使用测试夹具发布新年度。

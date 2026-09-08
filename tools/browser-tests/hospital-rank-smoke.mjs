@@ -13,7 +13,8 @@ const futureYearScript = fileURLToPath(new URL('../hospital_rank/scripts/test_fu
 const python = process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
 const pythonOptions = { stdio: 'inherit', windowsHide: true };
 execFileSync(python, [renderStaticScript, '--check'], pythonOptions);
-execFileSync(python, [futureYearScript], pythonOptions);
+execFileSync(python, ['-B', futureYearScript], pythonOptions);
+execFileSync(python, ['-B', fileURLToPath(new URL('../hospital_rank/scripts/test_contract.py', import.meta.url))], pythonOptions);
 
 const rankings = JSON.parse(await readFile(new URL('../hospital_rank/data/rankings.json', import.meta.url), 'utf8'));
 assert.equal(rankings.schemaVersion, 1, 'normalized ranking schema should be v1');
@@ -21,7 +22,7 @@ const recordsThrough2023 = rankings.years
     .filter(year => Number(year.year) <= 2023)
     .reduce((sum, year) => sum + year.records.length, 0);
 assert.equal(recordsThrough2023, 1430, 'the verified 2009–2023 historical baseline should remain complete');
-assert.ok(rankings.hospitals.length >= 128, 'hospital entities should retain the verified historical baseline');
+assert.ok(rankings.hospitals.length >= 127, 'hospital entities should retain the verified historical baseline');
 assert.equal(rankings.years.find(year => year.year === 2011)?.records.length, 100, '2011 missing legacy year should be recovered');
 const totalRecords = rankings.years.reduce((sum, year) => sum + year.records.length, 0);
 const totalHospitals = new Set(rankings.years.flatMap(year => year.records.map(record => record.hospitalId))).size;
@@ -69,7 +70,7 @@ try {
     await hydrationPage.goto(`${baseUrl}/tools/hospital_rank/`, { waitUntil: 'domcontentloaded' });
     assert.equal((await hydrationPage.locator('#rankColumnLabel').innerText()).trim(), latestYearBlock.rankingMode === 'grade' ? '等级' : '排名', 'rank label must not flash a generic mixed-mode placeholder while data is loading');
     assert.equal((await hydrationPage.locator('#workspaceTitle').innerText()).trim(), `${latestYear} 年医院榜单 · 共 ${latestYearBlock.records.length} 家医院`, 'title must not change during initial data hydration');
-    assert.equal((await hydrationPage.locator('.data-disclaimer').innerText()).trim(), '榜单说明：有排名的年份按官方名次展示；等级年份按各医院最近一次可用的排名作同等级内参考排序。', 'disclaimer must already be final before interactive data loads');
+    assert.equal((await hydrationPage.locator('.data-disclaimer').innerText()).trim(), '榜单说明：数字年份按官方名次展示；等级内官方不分先后。本站按最近一次数字排名作同等级参考排序，不代表当年名次。', 'disclaimer must already be final before interactive data loads');
     assert.equal(await hydrationPage.locator('#hospitalTable thead .sort-indicator').count(), 0, 'legacy sort arrows must never appear during hydration');
     assert.equal(await hydrationPage.locator('#hospitalTable thead svg.lucide-arrow-up-down[data-sort-icon]').count(), 8, 'final Lucide sort icons should exist before rankings JSON is released');
     const beforeNameBox = await hydrationPage.locator('#hospitalList tr.data-row').first().locator('.hospital-name').boundingBox();
@@ -127,7 +128,7 @@ await page.route('**/googletagmanager.com/**', route => route.abort());
 
 try {
     await page.goto(`${baseUrl}/tools/hospital_rank/`, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('#hospitalList tr.data-row');
+    await page.waitForSelector('#hospitalList .hospital-history-button');
 
     assert.equal(await page.locator('script[src*="echarts"]').count(), 0, 'ECharts should stay removed');
     assert.equal(await page.locator('script[src$="data.js"]').count(), 0, 'legacy data.js should stay removed');
@@ -277,10 +278,12 @@ try {
     assert.match(await firstMobileRow.locator('td').nth(7).innerText(), /市|州|区|县/);
 
     const bottomNotice = await page.locator('.data-disclaimer').innerText();
-    assert.equal(bottomNotice.trim(), '榜单说明：有排名的年份按官方名次展示；等级年份按各医院最近一次可用的排名作同等级内参考排序。', 'bottom explanation should stay concise and final');
+    assert.equal(bottomNotice.trim(), '榜单说明：数字年份按官方名次展示；等级内官方不分先后。本站按最近一次数字排名作同等级参考排序，不代表当年名次。', 'bottom explanation should stay concise and final');
 
     assert.deepEqual(pageErrors.map(error => error.message), [], 'page should not emit runtime errors');
 } finally {
     await context.close();
     await browser.close();
 }
+
+await import('./hospital-rank-regression.mjs');

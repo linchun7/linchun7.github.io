@@ -63,6 +63,53 @@ function getHospital(recordOrId) {
     return hospitalById.get(id);
 }
 
+function validateRankingDataset(data) {
+    const require = (condition, message) => { if (!condition) throw new Error(`榜单数据无效：${message}`); };
+    const text = value => typeof value === 'string' && value.trim().length > 0;
+    const grades = ['A++++', 'A+++', 'A++', 'A+', 'A'];
+    require(data?.schemaVersion === 1 && Array.isArray(data.hospitals) && data.hospitals.length > 0
+        && Array.isArray(data.years) && data.years.length > 0, '结构或记录为空');
+    require(JSON.stringify(data.rankingModes?.grade?.grades) === JSON.stringify(grades), '等级顺序错误');
+    const hospitals = new Map();
+    for (const hospital of data.hospitals) {
+        require(hospital && /^h_[0-9a-f]{10}$/.test(hospital.id) && !hospitals.has(hospital.id), '医院 ID 无效或重复');
+        require(['name', 'province', 'city'].every(field => text(hospital[field]))
+            && Array.isArray(hospital.aliases) && hospital.aliases.every(text), '医院名称、别名或地区无效');
+        hospitals.set(hospital.id, hospital);
+    }
+    const years = new Set();
+    const scores = ['specialtyReputation', 'researchAcademic', 'overallScore'];
+    for (const block of data.years) {
+        require(block && Number.isInteger(block.year) && block.year >= 2009 && block.year <= 9999
+            && !years.has(block.year), '年份无效或重复');
+        years.add(block.year);
+        require(['numeric', 'grade'].includes(block.rankingMode) && Array.isArray(block.records)
+            && block.records.length > 0, '年度榜单无效');
+        require(block.year > 2023 || block.rankingMode === (block.year === 2023 ? 'grade' : 'numeric'), '历史排名制度不符');
+        const ids = new Set();
+        const names = new Set();
+        let previousRank = 0;
+        for (const record of block.records) {
+            require(record && hospitals.has(record.hospitalId) && !ids.has(record.hospitalId)
+                && text(record.sourceName) && !names.has(record.sourceName), '医院引用或年度记录重复');
+            const hospital = hospitals.get(record.hospitalId);
+            require(record.sourceName === hospital.name || hospital.aliases.includes(record.sourceName), '来源院名未归入实体');
+            ids.add(record.hospitalId);
+            names.add(record.sourceName);
+            if (block.rankingMode === 'numeric') {
+                require(Number.isInteger(record.rank) && record.rank > 0 && record.rank >= previousRank
+                    && record.grade === null, '数字排名无效');
+                require(scores.every(field => typeof record[field] === 'number'
+                    && Number.isFinite(record[field]) && record[field] >= 0), '分数无效');
+                previousRank = record.rank;
+            } else {
+                require(record.rank === null && grades.includes(record.grade)
+                    && scores.every(field => record[field] === null), '等级榜含无效名次或分数');
+            }
+        }
+    }
+}
+
 async function loadRankingData() {
     const dataUrl = RANKINGS_VERSION ? `./data/rankings.json?v=${encodeURIComponent(RANKINGS_VERSION)}` : './data/rankings.json';
     const controller = new AbortController();
@@ -75,9 +122,8 @@ async function loadRankingData() {
     } finally {
         clearTimeout(timeout);
     }
-    if (data?.schemaVersion !== 1 || !Array.isArray(data.hospitals) || !Array.isArray(data.years)) {
-        throw new Error('榜单 JSON 结构无效');
-    }
+    // Validate the entire payload before replacing any static fallback or indexes.
+    validateRankingDataset(data);
 
     rankingDataset = data;
     hospitalById = new Map(data.hospitals.map(hospital => [hospital.id, hospital]));
@@ -335,7 +381,13 @@ function createHospitalCell(record) {
 }
 
 function getRankChange(current, previous) {
-    if (!previous) return { text: '首次记录', className: 'is-neutral' };
+    if (!previous) return { text: '本库首次记录', className: 'is-neutral' };
+    const change = compareRankChange(current, previous);
+    if (current.year - previous.year > 1) change.text += `（较 ${previous.year} 年，非同比）`;
+    return change;
+}
+
+function compareRankChange(current, previous) {
 
     if (isNumericRank(current) && isNumericRank(previous)) {
         const improvement = Number(previous.rank) - Number(current.rank);
@@ -540,7 +592,7 @@ function displayHospitals() {
     if (!visibleRecords.length) {
         const row = document.createElement('tr');
         const cell = document.createElement('td');
-        cell.colSpan = 8;
+        cell.colSpan = visibleColumnCount();
         cell.className = 'empty-message';
         cell.textContent = '没有找到符合条件的医院数据';
         row.appendChild(cell);
@@ -656,12 +708,24 @@ function bindEvents() {
     });
 }
 
+function setInteractiveEnabled(enabled) {
+    document.querySelectorAll('#yearSelect, #provinceSelect, #citySelect, #hospitalSearch, #hospitalTable thead button[data-sort]')
+        .forEach(control => { control.disabled = !enabled; });
+}
+
+function visibleColumnCount() {
+    const table = document.getElementById('hospitalTable');
+    return 8 - Number(table.classList.contains('single-year')) - (table.classList.contains('grade-mode') ? 3 : 0);
+}
+
 function primeStaticChrome() {
+    setInteractiveEnabled(false);
     document.getElementById('workspaceTitle')?.setAttribute('aria-live', 'polite');
     ensureSortHeaderMarkup();
 }
 
 function showInitError(error) {
+    setInteractiveEnabled(false);
     console.error('初始化失败:', error);
     const hospitalList = document.getElementById('hospitalList');
     const staticRows = hospitalList.querySelectorAll('tr[data-static-prerendered="true"]');
@@ -680,7 +744,7 @@ function showInitError(error) {
     hospitalList.replaceChildren();
     const row = document.createElement('tr');
     const cell = document.createElement('td');
-    cell.colSpan = 8;
+    cell.colSpan = visibleColumnCount();
     cell.className = 'error-message';
     cell.textContent = '榜单数据加载失败，请刷新页面重试';
     row.appendChild(cell);
@@ -701,6 +765,7 @@ async function init() {
         bindEvents();
         updateSortIndicators();
         displayHospitals();
+        setInteractiveEnabled(true);
     } catch (error) {
         showInitError(error);
     }
