@@ -13,6 +13,7 @@ def main() -> int:
         print("production evidence ledger FAILED"); [print(f"- {e}") for e in verification_errors]; return 1
     data=MODULE.load_rankings(); snapshot=MODULE.load_snapshot(); next_data=copy.deepcopy(data["years"][-1]); new_year=next_data["rankingYear"]+1
     next_data.update({"rankingYear":new_year,"dataYear":new_year-1,"publishedAt":f"{new_year}-08-01","officialUrl":"https://www.china-cba.net/","transcriptionUrl":"https://www.china-cba.net/"}); next_data.pop("officialSummary",None)
+    next_data["recordsFile"] = f"years/{new_year}.json"
     data["years"].append(next_data); data["scope"]["maxRankingYear"]=new_year
     snapshot["years"].append({"rankingYear":new_year,"dataYear":new_year-1,"publishedAt":next_data["publishedAt"],"officialUrl":next_data["officialUrl"],"transcriptionUrl":next_data["transcriptionUrl"],"recordCount":len(next_data["records"]),"normalizedRecordsSha256":MODULE.records_digest(next_data["records"]),"normalizations":[]})
     errors=MODULE.validate_dataset(data,snapshot)

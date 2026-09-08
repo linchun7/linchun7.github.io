@@ -96,21 +96,14 @@ V4 再次复核这些修正，并额外确认 2024 年瑞穗银行（中国）�
 
 ## 校验与静态渲染
 
-```bash
-python tools/bank_rank/scripts/validate_data.py
-python tools/bank_rank/scripts/validate_verification.py
-python tools/bank_rank/scripts/test_future_year.py
-python tools/bank_rank/scripts/render_static.py
-python tools/bank_rank/scripts/render_static.py --check
-PLAYWRIGHT_BROWSER=chromium node tools/browser-tests/bank-rank-smoke.mjs
-```
+命令、浏览器依赖与本地HTTP服务准备见[项目维护入口](../README.md)。
 
-`validate_data.py` 检查正式清单中的每年100条、榜单/数据年度关系、`scope` 年份范围与历史缺口声明、前端 `bankTypes` 完整性、稳定实体引用、记录原始名称、名称/别名冲突、核心一级资本非增序、竞赛排名、已记录的官方汇总值、可强校验年度的机构构成，以及来源摘要中的年度 SHA-256 和元数据。
+`validate_data.py` 检查每年100条、年度/财务年度关系、scope和缺失年声明、六类银行、稳定实体与名称归属、资本非增序、竞赛排名、官方汇总与可强校验的机构构成，以及年度SHA-256和元数据。财务字段必须是有限数值，布尔值、数值字符串、NaN和Infinity均不接受；净利润允许真实亏损。清单限定实体文件和`years/{year}.json`路径，禁止越过数据目录；沿革要求合法日期、HTTPS来源、已登记实体和名称。
 
-`validate_verification.py` 同时校验 V4 证据台账和 V5 冻结快照：除要求审计年份、正式记录 SHA-256、权威/完整表来源、汇总/异常说明一致外，还会把 `crosschecks/` 的1000行来源记录逐字段与生产数据离线比较，要求所有差异均有精确、非陈旧的 `resolvedDifferences` 解释；缺少机器字段时必须有100行补充覆盖。修改任何正式年度数据、快照或差异说明而未同步证据链，CI 都会失败。
+`validate_verification.py` 校验V4证据台账及V5冻结交叉快照。1000行外部来源记录的可机器字段逐项与生产数据比较，所有差异必须有精确且仍有效的`resolvedDifferences`解释；未覆盖字段必须保留补充证据。相同的无效数字字符串不算数值一致。该离线检查证明现有快照和证据台账的一致性，不等于本次重新访问过全部外部原文。
 
-`test_future_year.py` 先验证当前生产数据证据台账，再用合成未来年度验证新增年份只需按数据契约更新清单和 scope，无需修改结构 validator；负例会在同步摘要 SHA 后明确验证同一年重复实体仍被拒绝。合成未来年不会被要求伪造一份生产证据台账，因此证据约束与未来扩展性互不干扰。
+`test_contract.py` 使用内存副本或临时目录覆盖无效数值、实体和名称、沿革、缺失年份、重复快照、文件路径、静态模板标记及失败不覆盖等负例。`test_future_year.py`先校验现有证据，再验证符合文件路径、年份和scope契约的合成未来年可用、重复实体被拒绝；不把合成数据写入正式文件。
 
-`render_static.py` 自动选择最大年份生成页面元数据与最新年度完整100强无 JavaScript 静态榜单，并使用 CSS/JS 内容版本避免 CDN 或浏览器继续命中旧资源；`--check` 同时阻止已移除的黄色范围提示和逐年来源链接重新进入静态页。
+`render_static.py`先校验正式数据，再生成最大年份的完整静态100强与CSS/JS内容版本。模板标记必须唯一且顺序正确；无效数据或模板不会覆盖原HTML。`--check`要求已生成内容与当前数据和资源一致，并保持现有页面文案约束。
 
-`bank-rank-smoke.mjs` 接入现有 Playwright Chromium / Firefox / WebKit 矩阵，覆盖默认最新年、历史年份切换、2018 完整恢复、历史名称搜索与实体聚合、筛选、排序、来源/文案约束、缓存版本、控制台错误、完整100条静态 fallback，以及关键历史数据回归。由于 smoke 会执行 `test_future_year.py`，三浏览器 CI 同时会执行 V4 生产证据台账校验。
+`bank-rank-smoke.mjs`是既有三浏览器CI入口，调用Python契约测试和`bank-rank-regression.mjs`。除常规筛选排序及历史实体回归，还覆盖无JavaScript、分文件网络失败、无效JSON、超时、无效清单/记录/沿革、初始化中途失败后的完整100条回退、全部1000行页面字段、弹窗键盘焦点及误关闭、移动端布局和键盘横向滚动。
