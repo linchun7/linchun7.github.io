@@ -14,11 +14,14 @@ from typing import Any
 GRADE_ORDER = ["A++++", "A+++", "A++", "A+", "A"]
 BASELINE_COUNTS = {2009: 50, 2010: 80, **{year: 100 for year in range(2011, 2024)}}
 BASELINE_RECORDS = sum(BASELINE_COUNTS.values())
-BASELINE_HOSPITAL_ENTITIES = 128
+# 127 distinct hospitals after the source-backed Sun Yat-sen alias correction.
+BASELINE_HOSPITAL_ENTITIES = 127
 
 
 def load(path: Path) -> Any:
-    return json.loads(path.read_text(encoding="utf-8"))
+    def reject_constant(value: str) -> None:
+        raise ValueError(f"non-standard JSON number: {value}")
+    return json.loads(path.read_text(encoding="utf-8"), parse_constant=reject_constant)
 
 
 def norm(value: str) -> str:
@@ -39,6 +42,47 @@ def same_number(a: Any, b: Any) -> bool:
         return False
 
 
+def check_year_blocks(blocks: Any, *, snapshot: bool = False) -> None:
+    if not isinstance(blocks, list) or not blocks:
+        fail("years must be a non-empty array")
+    scores = ("specialtyReputation", "researchAcademic", "overallScore")
+    for block in blocks:
+        if not isinstance(block, dict):
+            fail("year block must be an object")
+        year = block.get("year")
+        if type(year) is not int or not 2009 <= year <= 9999:
+            fail("year must be an integer >= 2009")
+        mode = block.get("rankingMode")
+        if mode not in ("numeric", "grade"):
+            fail(f"{year}: unsupported ranking mode")
+        if year in BASELINE_COUNTS and mode != ("grade" if year == 2023 else "numeric"):
+            fail(f"{year}: historical ranking mode changed")
+        rows = block.get("records")
+        if not isinstance(rows, list) or not rows:
+            fail(f"{year}: records must be a non-empty array")
+        previous_rank = 0
+        required = {"sourceName", "rank", "grade", *scores}
+        if snapshot:
+            required = {"sourceName", "rank", *scores} if mode == "numeric" else {"sourceName", "grade"}
+        for row in rows:
+            if not isinstance(row, dict) or not required.issubset(row):
+                fail(f"{year}: missing required ranking fields")
+            if not isinstance(row["sourceName"], str) or not row["sourceName"].strip():
+                fail(f"{year}: sourceName must be a non-empty string")
+            if mode == "numeric":
+                rank = row["rank"]
+                # Preserve official ties, including 2009's 27, 27, 29.
+                if type(rank) is not int or rank <= 0 or rank < previous_rank or row.get("grade") is not None:
+                    fail(f"{year}: invalid/non-monotonic numeric rank")
+                previous_rank = rank
+                for field in scores:
+                    value = row[field]
+                    if type(value) not in (int, float) or not math.isfinite(value) or value < 0:
+                        fail(f"{year}: {field} must be finite and non-negative")
+            elif row.get("rank") is not None or row["grade"] not in GRADE_ORDER or any(row.get(f) is not None for f in scores):
+                fail(f"{year}: grade row must not invent ranks or scores")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     root = Path(__file__).resolve().parents[1] / "data"
@@ -49,8 +93,13 @@ def main() -> int:
     snapshot = load(args.data_dir / "source-snapshot.json")
     audit = load(args.data_dir / "audit.json")
 
-    if rankings.get("schemaVersion") != 1 or snapshot.get("schemaVersion") != 1 or audit.get("schemaVersion") != 1:
-        fail("schemaVersion must be 1 for all hospital data files")
+    for payload in (rankings, snapshot, audit):
+        if not isinstance(payload, dict) or type(payload.get("schemaVersion")) is not int or payload["schemaVersion"] != 1:
+            fail("schemaVersion must be integer 1 for all hospital data files")
+    if rankings.get("rankingModes", {}).get("grade", {}).get("grades") != GRADE_ORDER:
+        fail("rankingModes.grade.grades must preserve the official grade order")
+    check_year_blocks(rankings.get("years"))
+    check_year_blocks(snapshot.get("years"), snapshot=True)
     if snapshot.get("source", {}).get("rawHtmlStored") is not False:
         fail("source snapshot must explicitly declare rawHtmlStored=false")
     if audit.get("status") != "ok":
@@ -70,6 +119,14 @@ def main() -> int:
     hospital_by_id: dict[str, dict[str, Any]] = {}
     token_owner: dict[str, str] = {}
     for hospital in hospitals:
+        if not isinstance(hospital, dict):
+            fail("hospital entity must be an object")
+        for field in ("id", "name", "province", "city"):
+            if not isinstance(hospital.get(field), str) or not hospital[field].strip():
+                fail(f"hospital {field} must be a non-empty string")
+        aliases = hospital.get("aliases")
+        if not isinstance(aliases, list) or any(not isinstance(a, str) or not a.strip() for a in aliases):
+            fail("aliases must be an array of non-empty strings")
         hospital_id = hospital.get("id")
         if not isinstance(hospital_id, str) or not re.fullmatch(r"h_[0-9a-f]{10}", hospital_id):
             fail(f"invalid hospital id: {hospital_id!r}")
@@ -113,6 +170,8 @@ def main() -> int:
 
         source_rows = source_block.get("records", [])
         normalized_rows = block.get("records", [])
+        if [r["sourceName"] for r in source_rows] != [r["sourceName"] for r in normalized_rows]:
+            fail(f"{year}: source record order must be preserved")
         if year in BASELINE_COUNTS:
             expected_count = BASELINE_COUNTS[year]
             if len(source_rows) != expected_count or len(normalized_rows) != expected_count:

@@ -2,6 +2,22 @@
   "schemaVersion": 1,
   "generatedAt": "2026-08-18T16:18:45Z",
   "status": "ok",
+  "entityCorrections": [
+    {
+      "verifiedAt": "2026-09-08",
+      "canonicalId": "h_9da51a15c9",
+      "canonicalName": "中山大学孙逸仙纪念医院",
+      "mergedId": "h_4d69dda48f",
+      "alias": "中山大学附属第二医院",
+      "reason": "中山大学官方资料明确两名称属于同一医院；2010 年与 2011–2023 年记录无年度冲突。",
+      "sourceUrl": "https://rcb.sysu.edu.cn/article/754",
+      "sourcePublishedAt": "2026-06-23",
+      "relinkedYears": [2010],
+      "relinkedRecords": 1,
+      "sourceValuesChanged": 0,
+      "baselineEntitiesAfterCorrection": 127
+    }
+  ],
   "summary": {
     "years": 15,
     "sourceRecords": 1430,

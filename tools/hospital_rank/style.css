@@ -73,7 +73,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .hospital-table.grade-mode { min-width: 650px; }
 .hospital-table.single-year.grade-mode { min-width: 560px; }
 .hospital-table.single-year th:nth-child(1),
-.hospital-table.single-year td:nth-child(1) { display: none; }
+.hospital-table.single-year tr.data-row td:nth-child(1) { display: none; }
 .hospital-table.grade-mode th:nth-child(4),
 .hospital-table.grade-mode th:nth-child(5),
 .hospital-table.grade-mode th:nth-child(6),

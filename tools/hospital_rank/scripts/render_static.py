@@ -20,8 +20,8 @@ ROWS_END = "<!-- STATIC_LATEST_ROWS_END -->"
 OPTIONS_START = "<!-- STATIC_YEAR_OPTIONS_START -->"
 OPTIONS_END = "<!-- STATIC_YEAR_OPTIONS_END -->"
 DISCLAIMER_HTML = (
-    '<p><strong>榜单说明：</strong>有排名的年份按官方名次展示；'
-    '等级年份按各医院最近一次可用的排名作同等级内参考排序。</p>'
+    '<p><strong>榜单说明：</strong>数字年份按官方名次展示；等级内官方不分先后。'
+    '本站按最近一次数字排名作同等级参考排序，不代表当年名次。</p>'
 )
 
 
@@ -141,7 +141,7 @@ def replace_between(text: str, start: str, end: str, content: str) -> str:
     replacement = f"{start}\n{content}\n                        {end}" if "ROWS" in start else f"{start}\n{content}\n                            {end}"
     if not pattern.search(text):
         raise SystemExit(f"missing static marker: {start}")
-    return pattern.sub(replacement, text, count=1)
+    return pattern.sub(lambda _match: replacement, text, count=1)
 
 
 def replace_tag_text(text: str, element_id: str, value: str) -> str:
@@ -185,6 +185,9 @@ def render_index(source: str, data: dict) -> str:
     result = replace_tag_text(result, "brandSubtitle", f"中国医院综合排行榜 · {oldest}–{year}")
     result = replace_tag_text(result, "dataStatus", f"最新数据 {year} 年")
     result = replace_disclaimer(result)
+    # Static/no-JS controls must not let the selected year contradict the rows.
+    controls = re.compile(r'<(?:select|input)\b[^>]*\bid="(?:yearSelect|provinceSelect|citySelect|hospitalSearch)"[^>]*>|<button\b[^>]*\bdata-sort="[^"]+"[^>]*>')
+    result = controls.sub(lambda match: match[0] if re.search(r'\bdisabled\b', match[0]) else match[0][:-1] + ' disabled>', result)
 
     rank_label = "等级" if block.get("rankingMode") == "grade" else "排名"
     result = replace_tag_text(result, "rankColumnLabel", rank_label)
@@ -242,7 +245,7 @@ def main() -> None:
         }, ensure_ascii=False))
         return
 
-    INDEX_PATH.write_text(rendered, encoding="utf-8")
+    INDEX_PATH.write_text(rendered, encoding="utf-8", newline="\n")
     print(json.dumps({
         "status": "rendered",
         "latestYear": int(latest_block(data)["year"]),

@@ -288,7 +288,9 @@
     {
       "id": "h_9da51a15c9",
       "name": "中山大学孙逸仙纪念医院",
-      "aliases": [],
+      "aliases": [
+        "中山大学附属第二医院"
+      ],
       "province": "广东省",
       "city": "广州市"
     },
@@ -309,13 +311,6 @@
     {
       "id": "h_3bfcadea47",
       "name": "中山大学附属第三医院",
-      "aliases": [],
-      "province": "广东省",
-      "city": "广州市"
-    },
-    {
-      "id": "h_4d69dda48f",
-      "name": "中山大学附属第二医院",
       "aliases": [],
       "province": "广东省",
       "city": "广州市"
@@ -1963,7 +1958,7 @@
           "overallScore": 10.36
         },
         {
-          "hospitalId": "h_4d69dda48f",
+          "hospitalId": "h_9da51a15c9",
           "sourceName": "中山大学附属第二医院",
           "rank": 57,
           "grade": null,
