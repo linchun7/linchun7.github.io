@@ -1953,6 +1953,57 @@ async function readSnapshotStoreState(paths) {
   };
 }
 
+test('fetches and confirms complete Apple pricing without the 50GB tier', async () => {
+  const original = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const changed = structuredClone(original);
+  changed.tiers = changed.tiers.filter(({ id }) => id !== '50GB');
+  for (const country of changed.countries) delete country.plans['50GB'];
+  const html = buildAppleHtml(changed);
+  assert.doesNotMatch(html, /50\s*GB/i);
+  const rates = compatibleExchangeRates(original);
+  const fxPayload = { result: 'success', base_code: 'USD', time_last_update_unix: recentFxTimestamp(), rates, conversion_rates: rates };
+  await withMockedFetch({ html, fxPayload }, async () => {
+    assert.equal(await fetchResource(original.source.url, { attempts: 1, retryDelaysMs: [0] }), html);
+    await main({ dryRun: true, stepSummaryPath: null });
+  });
+});
+
+test('rolls back a candidate that disagrees with the active same-date snapshot', async () => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  try {
+    const original = JSON.parse(await readFile(paths.currentDataPath, 'utf8'));
+    const changed = structuredClone(original);
+    const tierId = changed.tiers[0].id;
+    const plan = changed.countries[0].plans[tierId];
+    plan.price = Number((plan.price + 0.01).toFixed(2));
+    plan.formattedPrice = String(plan.price);
+    const rates = compatibleExchangeRates(original);
+    const fxPayload = { result: 'success', base_code: 'USD', time_last_update_unix: recentFxTimestamp(), rates, conversion_rates: rates };
+    await withMockedFetch(
+      { html: buildAppleHtml(changed), fxPayload },
+      () => main({ dryRun: false, paths, stepSummaryPath: null })
+    );
+    const productionPaths = [paths.currentDataPath, paths.historyPath, paths.runLogPath];
+    const before = await Promise.all(productionPaths.map(filePath => readFile(filePath, 'utf8')));
+    const snapshotsBefore = await readSnapshotStoreState(paths);
+    const evidenceBefore = await Promise.all(snapshotsBefore.files.map(file => readFile(path.join(paths.snapshotsDir, file))));
+    await assert.rejects(
+      () => withMockedFetch(
+        { html: buildAppleHtml(original), fxPayload },
+        () => main({ dryRun: false, paths, stepSummaryPath: null })
+      ),
+      /Apple snapshot active revision does not match current prices/
+    );
+    assert.deepEqual(await Promise.all(productionPaths.map(filePath => readFile(filePath, 'utf8'))), before, 'failed candidates must not replace the last complete prices/history/run-log');
+    assert.deepEqual(await readSnapshotStoreState(paths), snapshotsBefore);
+    assert.deepEqual(await Promise.all(snapshotsBefore.files.map(file => readFile(path.join(paths.snapshotsDir, file)))), evidenceBefore, 'snapshot evidence must remain byte-identical');
+    await assert.rejects(readFile(defaultUpdateTransactionPath(paths.currentDataPath)), { code: 'ENOENT' });
+    await assert.rejects(readFile(defaultUpdateLockPath(paths.currentDataPath)), { code: 'ENOENT' });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('runs the production write path against isolated files', async () => {
   const { root, paths } = await createTemporaryProductionPaths();
   const summaryPath = path.join(root, 'unexpected-summary.md');

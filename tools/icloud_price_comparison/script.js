@@ -3,7 +3,7 @@ import {
   publicationDateKey,
   validatePayload,
   validatePriceHistoryConsistency
-} from './data-contract.js?v=6ba8e767';
+} from './data-contract.js?v=70d67de9';
 import { createIcons } from './vendor/lucide-subset.js?v=1afb95ee';
 import { marketSearchPriority, matchesMarketSearch, normalizeMarketSearchText, REGION_LABELS, VALID_REGIONS } from './data-model.js?v=4ddda83e';
 
@@ -1630,9 +1630,11 @@ async function refreshPriceFreshnessLifecycle() {
     applyStaticSnapshotFreshness();
     return;
   }
+  const wasUnusable = state.dataFreshness.status === 'unusable';
   const freshness = applyCurrentPriceFreshness();
-  if (freshness.status !== 'unusable') return;
-  showUnusableDataError(freshness.reason);
+  if (freshness.status !== 'unusable' && !wasUnusable) return;
+  if (freshness.status === 'unusable') showUnusableDataError(freshness.reason);
+  // Recovery must normalize controls and warnings through the same guarded refresh as expiry.
   if (!freshnessRefreshPromise) {
     freshnessRefreshPromise = initialize({ forceRefresh: true })
       .finally(() => { freshnessRefreshPromise = null; });

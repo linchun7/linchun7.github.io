@@ -8,7 +8,7 @@ import {
   validatePriceHistoryConsistency,
   validatePricePayload
 } from '../data-contract.js';
-import { validateExistingHistory, validateExistingPrices } from '../scripts/update-prices.mjs';
+import { attachDerivedCnyPrices, validateExistingHistory, validateExistingPrices } from '../scripts/update-prices.mjs';
 import { VALID_REGIONS } from '../data-model.js';
 
 const pricesUrl = new URL('../data/prices.json', import.meta.url);
@@ -29,6 +29,43 @@ test('shared browser and updater contracts accept the committed production paylo
   assert.equal(validatePayload('history.json', history), history);
   assert.doesNotThrow(() => validateExistingPrices(prices));
   assert.doesNotThrow(() => validateExistingHistory(history, prices));
+});
+
+test('rejects impossible tied CNY ranks at both browser and updater boundaries', async () => {
+  const { prices } = await productionFixtures();
+  for (const mode of ['collapsed-production-ranks', 'chained-cent-differences']) {
+    const invalid = structuredClone(prices);
+    invalid.countries.forEach((country, index) => {
+      for (const plan of Object.values(country.plans)) {
+        plan.cnyRank = 1;
+        if (mode === 'chained-cent-differences') plan.cnyPrice = (100 + index) / 100;
+      }
+    });
+    assert.throws(() => validatePayload('prices.json', invalid), /CNY ranks inconsistent with public prices/, mode);
+    assert.throws(() => validateExistingPrices(invalid), /CNY ranks inconsistent with public prices/, mode);
+  }
+});
+
+test('preserves producer CNY ranks across public rounding boundaries', async () => {
+  const { prices } = await productionFixtures();
+  const exactPrices = [1.0049999999, 1.0050000001, 1.009];
+  const currencies = ['EUR', 'GBP', 'JPY'];
+  prices.countries = prices.countries.slice(0, exactPrices.length).map((country, index) => ({
+    ...country,
+    currency: currencies[index],
+    plans: Object.fromEntries(prices.tiers.map(({ id }, tierIndex) => {
+      const price = tierIndex + 1;
+      return [id, { price, formattedPrice: String(price) }];
+    }))
+  }));
+  const rates = { USD: 1, CNY: 1, ...Object.fromEntries(currencies.map((currency, index) => [currency, 1 / exactPrices[index]])) };
+  prices.countries = attachDerivedCnyPrices(prices.countries, { fx: { rates } });
+  prices.run.countries = prices.countries.length;
+  prices.run.pricePoints = prices.countries.length * prices.tiers.length;
+  const firstTier = prices.tiers[0].id;
+  assert.deepEqual(prices.countries.map(country => country.plans[firstTier].cnyRank), [1, 1, 2]);
+  assert.deepEqual(prices.countries.map(country => country.plans[firstTier].cnyPrice), [1, 1.01, 1.01]);
+  assert.equal(validatePricePayload(prices), prices, 'public rounding must neither split genuine ties nor merge distinct full-precision ranks');
 });
 
 test('producer and browser contracts share the exact region allowlist', async () => {
