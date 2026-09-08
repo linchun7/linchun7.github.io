@@ -66,7 +66,7 @@ button:disabled{cursor:not-allowed;opacity:.5}
 .result-item-heading{align-items:center;margin-bottom:8px}
 .result-item-heading h3{margin:0;color:var(--ink);font-size:14px;line-height:1.3}
 .result-text{min-height:48px;max-height:180px;overflow:auto;padding:10px 11px;border:1px solid var(--line);border-radius:8px;background:var(--surface-soft);color:#334155;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:15px;line-height:1.7;overflow-wrap:anywhere;white-space:pre-wrap}
-.empty-text{color:#8a97a3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-size:12px}
+.empty-text{color:var(--muted);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-size:12px}
 
 .toast{position:fixed;top:18px;left:50%;z-index:9999;max-width:calc(100vw - 28px);padding:9px 13px;border-radius:8px;color:#fff;background:#24313d;box-shadow:0 10px 24px rgba(24,43,61,.18);font-size:12px;font-weight:650;text-align:center;opacity:0;pointer-events:none;transform:translate(-50%,-12px);transition:opacity .18s,transform .18s}
 .toast.show{opacity:1;transform:translate(-50%,0)}

@@ -78,6 +78,29 @@ try {
         assert.equal(await page.evaluate(() => window.__conversionCalls), 1);
         assert.equal(await page.locator('#result1').textContent(), 'converted');
     });
+    await check('RMB rejects silent coercion and sub-cent precision', 'rmb_converter', async page => {
+        for (const value of ['1万元', '123abc456']) {
+            await page.fill('#inputmoney', value);
+            assert.equal(await page.inputValue('#inputmoney'), value, 'invalid text must not be silently deleted');
+            assert.equal(await page.locator('#result1').evaluate(el => el.classList.contains('error')), true);
+            assert.match(await page.locator('#result1').textContent(), /有效数字/);
+        }
+
+        await page.fill('#inputmoney', '1.239');
+        assert.equal(await page.locator('#result1').evaluate(el => el.classList.contains('error')), true);
+        assert.match(await page.locator('#result1').textContent(), /两位小数/);
+
+        await page.fill('#inputmoney', '1.2300');
+        assert.equal(await page.locator('#result1').evaluate(el => el.classList.contains('error')), false);
+        assert.equal((await page.locator('#result1').textContent()).trim(), '人民币壹元贰角叁分');
+
+        await page.fill('#inputmoney', '-0');
+        assert.equal((await page.locator('#result1').textContent()).trim(), '人民币零元整');
+
+        await page.fill('#inputmoney', '１２３．４５');
+        assert.equal(await page.inputValue('#inputmoney'), '123.45');
+        assert.equal((await page.locator('#result1').textContent()).trim(), '人民币壹佰贰拾叁元肆角伍分');
+    });
     await check('RMB clipboard rejection falls back and removes its temporary textarea', 'rmb_converter', async page => {
         await page.fill('#inputmoney', '123.45');
         await page.evaluate(() => {
@@ -119,6 +142,25 @@ try {
         await page.fill('#interest1', '100');
         await page.click('#calculate1');
         assert.equal(await page.locator('#result1').evaluate(el => el.classList.contains('result-error')), true);
+    });
+    await check('financial supports total-loss CAGR and keyboard tab navigation', 'financial_calculator', async page => {
+        await page.click('#tab3');
+        await page.fill('#startDate', '2026-01-01');
+        await page.fill('#endDate', '2027-01-01');
+        await page.fill('#startNetValue', '1');
+        await page.fill('#endNetValue', '0');
+        await page.click('#calculate3');
+        assert.equal(await page.locator('#result3').evaluate(el => el.classList.contains('result-error')), false);
+        assert.match(await page.locator('#result3').textContent(), /-100\.00%/);
+
+        await page.locator('#tab3').focus();
+        await page.keyboard.press('ArrowRight');
+        assert.equal(await page.evaluate(() => document.activeElement?.id), 'tab4');
+        assert.equal(await page.locator('#tab4').getAttribute('aria-selected'), 'true');
+        assert.equal(await page.locator('#content4').getAttribute('hidden'), null);
+        await page.keyboard.press('Home');
+        assert.equal(await page.evaluate(() => document.activeElement?.id), 'tab1');
+        assert.equal(await page.locator('#tab1').getAttribute('aria-selected'), 'true');
     });
     await check('bank search treats half-width and full-width parentheses equally', 'bank_rank', async page => {
         await page.waitForFunction(() => !document.getElementById('bankSearch').disabled);
@@ -170,6 +212,12 @@ try {
             window.fetch = async () => ({ ok: true, json: () => { window.__bodyReads++; return new Promise(() => {}); } });
         }, withoutAbortController));
     }
+    await check('spacing fails closed when local Pangu is unavailable', 'space', async page => {
+        await page.fill('#info', '中文ABC');
+        await page.click('#addBtn');
+        assert.equal(await page.inputValue('#info'), '中文ABC');
+        assert.match(await page.locator('#alertText').textContent(), /组件加载失败/);
+    }, page => page.route('**/tools/space/dist/browser/pangu.min.js', route => route.abort()));
     await check('spacing clipboard denial falls back without losing input or focus', 'space', async page => {
         await page.fill('#info', '中文 ABC');
         await page.evaluate(() => {

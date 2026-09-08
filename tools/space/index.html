@@ -181,7 +181,12 @@
                     textarea.focus();
                     return;
                 }
-                textarea.value = pangu.spacing(textarea.value);
+                if (typeof window.pangu?.spacing !== 'function') {
+                    setStatus('排版组件加载失败');
+                    textarea.focus();
+                    return;
+                }
+                textarea.value = window.pangu.spacing(textarea.value);
                 updateCount();
                 setStatus('已处理');
                 textarea.focus();
