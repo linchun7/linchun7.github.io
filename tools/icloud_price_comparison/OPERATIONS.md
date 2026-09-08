@@ -114,11 +114,11 @@ Apple Support HTML ─┐
 
 1. 固定远端 `main` 生成基线，使用 Node.js 22、项目锁定的 pnpm 与 frozen lockfile 安装依赖，生命周期脚本禁用。
 2. 运行 core 测试。
-3. 在共享网络预算内抓取 Apple 页面；同一份 HTML 必须由 `document-order` 和 `apple-markers` 两条解析路径逐字段一致后才得到 `cross-checked`。
+3. 在共享网络预算内抓取 Apple 页面；同一份 HTML 必须由 `document-order` 和 `apple-markers` 两条解析路径逐字段一致后才得到 `cross-checked`。入口容量文本检查不能固定要求 50GB；容量增删继续由完整解析和独立语义确认校验，不放宽响应大小、编码或网络安全边界。
 4. Apple 业务语义发生变化时，执行独立 no-store 完整确认抓取。正常情况是 initial + confirmation；只有 mismatch 或确认解析退化时追加第三样本。
 5. 只有稳定、完整的 Apple 语义证据才能继续。A/B/B 或 A/degraded/A 可自动恢复；A/B/A、A/B/C、无法形成稳定证据或确认始终不可用时保留上一份生产数据，等待后续自动重试。
 6. 获取并校验汇率。认证候选不可用或 sanity 不通过时尝试开放候选；所有 fresh 在线候选均不可用时，仅允许在既定 freshness 条件内沿用上一份安全 FX/CNY 结果。
-7. 事务式生成 prices/history/run-log/Apple snapshots，并执行数据、时间、价格异常、market identity 和跨文件校验。
+7. 事务式生成 prices/history/run-log/Apple snapshots，并执行数据、时间、价格异常、market identity 和跨文件校验。快照保存或去重完成后、提交前再次核对 active revision 与候选 prices/history；不一致时在同一事务中回滚。不得为了接纳旧修订重现而擅自改写历史快照或 active revision 规则。
 8. 从已验证 `prices.json` 生成 `index.html`：`static-page.mjs` 更新静态价格/状态 fragments，`render-static-page.mjs` 更新 SEO Projection。容量列表继续由 payload 动态驱动；description 中的美国、日本、中国大陆、俄罗斯、土耳其、尼日利亚、台湾等常见及低价市场词是稳定搜索意图，不按每日最低价自动替换。
 9. 深验完整 `data/`，将数据与静态首页作为同一受控发布工件上传。
 10. 独立发布 job 解包后再次验证工件、静态 fragments、SEO Projection、首页生成边界和远端基线；只有远端 `main` 未前进时才提交并推送。
@@ -145,6 +145,8 @@ Apple Support HTML ─┐
 - 已加载的网络快照也有生成时间单调性保护：更早的网络响应不能覆盖当前快照；按刷新失败保留现有数据并提示，不重置其历史状态。真正更新的快照仍走完整契约校验与替换流程。
 - 36 小时以内为正常可用窗口；36 小时至 7 天标记旧数据并只作历史参考。
 - `fx.stale` 或价格过期时隐藏最低价排名提示。
+- 已加载网络快照从不可用恢复时，也必须走一次受并发保护的刷新，统一恢复筛选、排序、历史入口及提示。刷新失败但内存快照仍有效时可恢复操作，但保留失败提示；同一快照不清空已验证历史。
+- 公共排名保留生成器的全精度顺序；同名次公开金额允许由舍入形成相邻一分，但不允许更大跨度，也不允许不同排名与公开金额反序。
 - JavaScript 可用而首次 JSON 读取失败时，静态 fallback 也必须经过同一有效期判定，并通过到期计时器、`pageshow` 与 `visibilitychange` 重新检查；不能只在已加载 `state.data` 时检查。
 - 静态 fallback 降级必须同时清除最低价卡片、徽标与高亮；硬过期或未来时间异常时同步禁用桌面排名、移动端排名和读屏排名，保留原表作为参考。重复重试不得累积 `.cache-warning`。关闭 JavaScript 的静态内容只保留生成时间，不保证自动过期重判。
 - 静态 DOM 一旦清除了最低价或排名提示，就不能因时钟校正、`pageshow` 或 `visibilitychange` 恢复为 fresh 而直接复用；读取到有效网络快照后须重建已降级的 DOM。该标记只描述 DOM 是否被修改，不增加价格事实源。

@@ -201,7 +201,7 @@ export async function fetchResource(url, {
       });
       if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
       const body = await readBoundedResponseText(response, maxResponseBytes, resourceName);
-      if (!json && (body.length < 20_000 || !/50\s*GB/i.test(body))) {
+      if (!json && (body.length < 20_000 || !/\b[1-9]\d*\s*(?:GB|TB)\b/i.test(body))) {
         throw new Error(`Unexpected Apple response (${body.length} bytes)`);
       }
       return json ? JSON.parse(body) : body;
@@ -2697,6 +2697,9 @@ export async function main({
         snapshotsDir,
         indexPath: snapshotIndexPath
       });
+      // A successful snapshot save (including deduplication) must agree with the whole candidate.
+      // Keep this check inside the transaction so a mismatched active revision is rolled back.
+      await validateAppleSnapshotStore({ snapshotsDir, snapshotIndexPath, history, currentData: data });
       await writeJson(currentDataPath, data);
       if (historyChanged) await writeJson(historyPath, history);
       await writeJson(runLogPath, runLog);

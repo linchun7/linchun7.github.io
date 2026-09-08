@@ -396,10 +396,16 @@ export function validatePricePayload(payload, { minCountries = 1 } = {}) {
       if (ranks[0] !== 1 || ranks.some((rank, index) => rank !== index + 1)) {
         throw new Error(`prices.json has non-dense CNY ranks for ${tierId}`);
       }
+      let rankStart = ordered[0];
       for (let index = 1; index < ordered.length; index += 1) {
-        if (ordered[index].rank > ordered[index - 1].rank && ordered[index].price < ordered[index - 1].price) {
+        const current = ordered[index];
+        // Full-precision epsilon ties can round to adjacent cents, but not span a wider public-price range.
+        // Compare the whole group against its first price, not just adjacent rows.
+        if ((current.rank === rankStart.rank && current.price - rankStart.price > 0.01 + 1e-9)
+          || (current.rank > ordered[index - 1].rank && current.price < ordered[index - 1].price)) {
           throw new Error(`prices.json has CNY ranks inconsistent with public prices for ${tierId}`);
         }
+        if (current.rank !== rankStart.rank) rankStart = current;
       }
     }
   }
