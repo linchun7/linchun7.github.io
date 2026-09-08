@@ -30,7 +30,7 @@ test('keeps the shared 404 page local, private, and CSP-safe', async () => {
 });
 
 test('keeps only long-lived public Markdown in the project', () => {
-  const trackedMarkdown = execFileSync('git', ['ls-files'], {
+  const trackedMarkdown = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], {
     cwd: repositoryRoot,
     encoding: 'utf8'
   })
@@ -40,9 +40,11 @@ test('keeps only long-lived public Markdown in the project', () => {
       && existsSync(path.join(repositoryRoot, file)))
     .sort();
   assert.deepEqual(trackedMarkdown, [
+    'tools/icloud_price_comparison/ARCHITECTURE.md',
     'tools/icloud_price_comparison/OPERATIONS.md',
     'tools/icloud_price_comparison/README.md',
     'tools/icloud_price_comparison/THIRD_PARTY_NOTICES.md',
+    'tools/icloud_price_comparison/TROUBLESHOOTING.md',
     'tools/icloud_price_comparison/data/apple-snapshots/README.md'
   ]);
 });
