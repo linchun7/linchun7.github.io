@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="format-detection" content="telephone=no">
-    <meta name="description" content="数字转人民币大写金额工具，支持整数、小数、负数和科学计数法输入，一键复制转换结果。">
+    <meta name="description" content="数字转人民币大写金额工具，支持整数、最多两位小数、负数和科学计数法输入，一键复制转换结果。">
     <title>数字转人民币大写金额</title>
     <link rel="shortcut icon" href="/images/favicon.ico">
     <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
@@ -136,7 +136,7 @@
             <div class="section-heading">
                 <div>
                     <h1 id="input-title">输入金额</h1>
-                    <p>支持整数、小数、负数及科学计数法。</p>
+                    <p>支持整数、最多两位小数、负数及科学计数法；超出分位精度会提示。</p>
                 </div>
                 <a class="help-link" href="https://www.linchun.com.cn/posts/f6f9d33e.html">查看说明</a>
             </div>
@@ -180,6 +180,36 @@
                 return digits <= MAX_EXPANDED_DIGITS;
             }
 
+            function normalizeMoneyValue(value) {
+                const expandedLeading = value.replace(/^([+-]?)\./, '$10.').toLowerCase();
+                const [mantissa, exponentText = '0'] = expandedLeading.split('e');
+                const exponent = Number(exponentText);
+                const negative = mantissa.startsWith('-');
+                const [integer, fraction = ''] = mantissa.replace(/^[+-]/, '').split('.');
+                const rawDigits = integer + fraction;
+                const decimalIndex = integer.length + exponent;
+
+                let whole;
+                let decimals;
+                if (decimalIndex <= 0) {
+                    whole = '0';
+                    decimals = `${'0'.repeat(-decimalIndex)}${rawDigits}`;
+                } else if (decimalIndex >= rawDigits.length) {
+                    whole = `${rawDigits}${'0'.repeat(decimalIndex - rawDigits.length)}`;
+                    decimals = '';
+                } else {
+                    whole = rawDigits.slice(0, decimalIndex);
+                    decimals = rawDigits.slice(decimalIndex);
+                }
+
+                if (decimals.length > 2 && /[1-9]/.test(decimals.slice(2))) return null;
+
+                whole = whole.replace(/^0+(?=\d)/, '') || '0';
+                decimals = decimals.slice(0, 2).replace(/0+$/, '');
+                const isZero = whole === '0' && decimals === '';
+                return `${negative && !isZero ? '-' : ''}${whole}${decimals ? `.${decimals}` : ''}`;
+            }
+
             function syncVisualViewportTop() {
                 const offsetTop = document.activeElement === input && visualViewport
                     ? Math.max(0, Number(visualViewport.offsetTop) || 0)
@@ -195,10 +225,10 @@
 
             function render() {
                 if (composing) return;
-                const cleaned = input.value.normalize('NFKC').replace(/[^0-9eE+\-.]/g, '');
-                if (cleaned !== input.value) input.value = cleaned;
+                const normalizedInput = input.value.normalize('NFKC');
+                if (normalizedInput !== input.value) input.value = normalizedInput;
 
-                const value = cleaned.trim();
+                const value = normalizedInput.trim();
                 result.classList.remove('error');
 
                 if (!value) {
@@ -209,7 +239,7 @@
 
                 result.classList.remove('empty');
                 if (!validNumber.test(value)) {
-                    result.textContent = '请输入有效数字。';
+                    result.textContent = '请输入有效数字，不要包含单位、文字或其他符号。';
                     result.classList.add('error');
                     return;
                 }
@@ -219,7 +249,13 @@
                     result.classList.add('error');
                     return;
                 }
-                const normalized = value.replace(/^([+-]?)\./, '$10.');
+
+                const normalized = normalizeMoneyValue(value);
+                if (normalized === null) {
+                    result.textContent = '人民币大写金额最多支持到分（两位小数），请先调整金额精度。';
+                    result.classList.add('error');
+                    return;
+                }
 
                 try {
                     result.textContent = Nzh.cn.toMoney(normalized);

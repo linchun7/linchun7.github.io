@@ -49,6 +49,12 @@
         return value;
     }
 
+    function readNonNegativeNumber(id, label) {
+        const value = readFiniteNumber(id, label);
+        if (value < 0) throw new Error(`${label}不能小于 0`);
+        return value;
+    }
+
     function readPositiveInteger(id, label) {
         const value = readFiniteNumber(id, label);
         if (!Number.isInteger(value) || value <= 0) throw new Error(`${label}必须是大于 0 的整数`);
@@ -118,7 +124,7 @@
         const startDate = parseDateUtc('startDate', '起始日期');
         const endDate = parseDateUtc('endDate', '终止日期');
         const startValue = readPositiveNumber('startNetValue', '起始净值');
-        const endValue = readPositiveNumber('endNetValue', '终止净值');
+        const endValue = readNonNegativeNumber('endNetValue', '终止净值');
         const annualDays = readAnnualDays('rateType3');
 
         if (endDate <= startDate) throw new Error('终止日期必须晚于起始日期');
@@ -253,6 +259,7 @@
             const active = button === tab;
             button.classList.toggle('active', active);
             button.setAttribute('aria-selected', String(active));
+            button.tabIndex = active ? 0 : -1;
         });
 
         document.querySelectorAll('#contents .tab-pane').forEach((panel) => {
@@ -269,9 +276,24 @@
     }
 
     function init() {
-        document.querySelectorAll('#myTabs .nav-link').forEach((tab) => {
+        const tabs = [...document.querySelectorAll('#myTabs .nav-link')];
+        tabs.forEach((tab, index) => {
             tab.addEventListener('click', () => activateTab(tab));
+            tab.addEventListener('keydown', (event) => {
+                let nextIndex = null;
+                if (event.key === 'ArrowRight') nextIndex = (index + 1) % tabs.length;
+                if (event.key === 'ArrowLeft') nextIndex = (index - 1 + tabs.length) % tabs.length;
+                if (event.key === 'Home') nextIndex = 0;
+                if (event.key === 'End') nextIndex = tabs.length - 1;
+                if (nextIndex === null) return;
+
+                event.preventDefault();
+                const nextTab = tabs[nextIndex];
+                activateTab(nextTab);
+                nextTab.focus();
+            });
         });
+        activateTab(tabs.find((tab) => tab.classList.contains('active')) || tabs[0]);
 
         $('calculate1').addEventListener('click', () => runCalculation('result1', calculateAnnualizedReturn));
         $('calculate2').addEventListener('click', () => runCalculation('result2', calculateInterest));

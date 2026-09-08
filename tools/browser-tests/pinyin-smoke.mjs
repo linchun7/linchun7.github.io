@@ -16,6 +16,20 @@ async function resultText(page, id) {
     return (await page.locator(id).textContent()).trim();
 }
 
+function contrastRatio(foreground, background) {
+    const parse = (value) => value.match(/[\d.]+/g).slice(0, 3).map(Number);
+    const luminance = (value) => {
+        const [r, g, b] = parse(value).map(channel => {
+            const normalized = channel / 255;
+            return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+        });
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const left = luminance(foreground);
+    const right = luminance(background);
+    return (Math.max(left, right) + 0.05) / (Math.min(left, right) + 0.05);
+}
+
 try {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const page = await context.newPage();
@@ -25,6 +39,15 @@ try {
 
     await page.goto(`${baseUrl}/tools/pinyin/`, { waitUntil: 'domcontentloaded' });
     await waitForPinyin(page);
+
+    const emptyColors = await page.locator('#result1 .empty-text').evaluate((element) => ({
+        foreground: getComputedStyle(element).color,
+        background: getComputedStyle(element.parentElement).backgroundColor
+    }));
+    assert.ok(
+        contrastRatio(emptyColors.foreground, emptyColors.background) >= 4.5,
+        `empty-result text contrast must meet WCAG AA: ${JSON.stringify(emptyColors)}`
+    );
 
     await page.fill('#inputInfo', '汉语拼音');
     assert.equal(await resultText(page, '#result1'), 'han yu pin yin');
