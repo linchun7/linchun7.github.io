@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import {
     assertCandidateBundleVersion,
+    assertDistIntegrity,
     compareStableSemver,
     parseStableSemver,
     preparePanguCode,
@@ -44,6 +46,19 @@ test('accepts only stable semantic versions and compares them numerically', () =
     assert.equal(compareStableSemver('1.0.13', '1.0.14') < 0, true);
     assert.throws(() => parseStableSemver('9.2.0-beta.1'), /stable X\.Y\.Z/);
     assert.throws(() => parseStableSemver('v9.2.0'), /stable X\.Y\.Z/);
+});
+
+test('verifies npm tarballs against the strongest supported dist.integrity digest', () => {
+    const bytes = Buffer.from('trusted npm tarball bytes');
+    const sha256 = createHash('sha256').update(bytes).digest('base64');
+    const sha512 = createHash('sha512').update(bytes).digest('base64');
+    assert.doesNotThrow(() => assertDistIntegrity(bytes, `sha256-${sha256} sha512-${sha512}`, 'fixture'));
+    assert.throws(
+        () => assertDistIntegrity(Buffer.from('tampered npm tarball bytes'), `sha512-${sha512}`, 'fixture'),
+        /tarball integrity does not match npm metadata/
+    );
+    assert.throws(() => assertDistIntegrity(bytes, '', 'fixture'), /dist\.integrity missing/);
+    assert.throws(() => assertDistIntegrity(bytes, 'md5-deadbeef', 'fixture'), /unsupported npm dist\.integrity token/);
 });
 
 test('adapts both Pangu 9 spacingText and Pangu 10 spaceText without executing the candidate in Node', () => {
