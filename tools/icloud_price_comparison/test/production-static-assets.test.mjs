@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
   CORE_STATIC_ASSETS,
   PRODUCTION_ASSET_BASE_URL,
@@ -11,7 +12,7 @@ import {
   verifyProductionDeployment
 } from '../scripts/verify-production-deployment.mjs';
 
-const projectDirectory = new URL('../', import.meta.url);
+const projectDirectory = fileURLToPath(new URL('../', import.meta.url));
 const dataDirectory = new URL('../data/', import.meta.url);
 const expectedData = await loadVerificationArtifact(dataDirectory, 'committed fixture');
 const expectedStatic = await loadStaticAssetManifest(projectDirectory, 'committed static fixture');
