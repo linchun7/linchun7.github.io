@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
@@ -58,4 +59,14 @@ test('never uses node:vm to execute registry-delivered browser bundles', async (
     const source = await readFile(new URL('./update-static-vendors.mjs', import.meta.url), 'utf8');
     assert.doesNotMatch(source, /from 'node:vm'|new vm\.Script|evaluateBrowserBundle/);
     assert.match(source, /exercised only in the real browser smoke tests/);
+});
+
+test('probe current pinyin-pro CDN sha384', async () => {
+    const url = 'https://cdn.jsdelivr.net/npm/pinyin-pro@3.29.3/dist/index.js';
+    const response = await fetch(url, { signal: AbortSignal.timeout(20_000) });
+    assert.equal(response.ok, true, `probe failed: HTTP ${response.status}`);
+    const bytes = Buffer.from(await response.arrayBuffer());
+    assert.ok(bytes.length > 1000, `probe bundle too small: ${bytes.length}`);
+    const integrity = `sha384-${createHash('sha384').update(bytes).digest('base64')}`;
+    console.log(`PINYIN_SRI=${integrity}`);
 });
