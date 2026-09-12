@@ -9,7 +9,16 @@ const baseUrl = (process.env.BASE_URL || 'http://127.0.0.1:4173').replace(/\/$/,
 const browser = await browserType.launch({ headless: true });
 
 async function waitForPinyin(page) {
-    await page.waitForFunction(() => Boolean(window.pinyinPro?.pinyin));
+    const colors = await page.waitForFunction(() => {
+        const result = document.querySelector('#result1');
+        const placeholder = result?.querySelector('.empty-text');
+        if (!window.pinyinPro?.pinyin || !result || !placeholder || placeholder.parentElement !== result) return null;
+        const foreground = getComputedStyle(placeholder).color;
+        const background = getComputedStyle(result).backgroundColor;
+        if (!/\d/.test(foreground) || !/\d/.test(background)) return null;
+        return { foreground, background };
+    });
+    return colors.jsonValue();
 }
 
 async function resultText(page, id) {
@@ -17,7 +26,11 @@ async function resultText(page, id) {
 }
 
 function contrastRatio(foreground, background) {
-    const parse = (value) => value.match(/[\d.]+/g).slice(0, 3).map(Number);
+    const parse = (value) => {
+        const channels = value.match(/[\d.]+/g);
+        assert.ok(channels?.length >= 3, `unsupported computed color: ${value}`);
+        return channels.slice(0, 3).map(Number);
+    };
     const luminance = (value) => {
         const [r, g, b] = parse(value).map(channel => {
             const normalized = channel / 255;
@@ -38,12 +51,7 @@ try {
     await page.route('**/googletagmanager.com/**', (route) => route.abort());
 
     await page.goto(`${baseUrl}/tools/pinyin/`, { waitUntil: 'domcontentloaded' });
-    await waitForPinyin(page);
-
-    const emptyColors = await page.locator('#result1 .empty-text').evaluate((element) => ({
-        foreground: getComputedStyle(element).color,
-        background: getComputedStyle(element.parentElement).backgroundColor
-    }));
+    const emptyColors = await waitForPinyin(page);
     assert.ok(
         contrastRatio(emptyColors.foreground, emptyColors.background) >= 4.5,
         `empty-result text contrast must meet WCAG AA: ${JSON.stringify(emptyColors)}`

@@ -46,11 +46,12 @@ test('accepts only stable semantic versions and compares them numerically', () =
     assert.throws(() => parseStableSemver('v9.2.0'), /stable X\.Y\.Z/);
 });
 
-test('adapts the Pangu 9 spacingText API without executing the candidate in Node', () => {
-    const prepared = preparePanguCode('/* upstream browser bundle */', '9.1.0');
-    assert.match(prepared, /linchun-vendor: pangu@9\.1\.0/);
-    assert.match(prepared, /typeof pangu\.spacingText === 'function'/);
-    assert.match(prepared, /pangu\.spacing = pangu\.spacingText\.bind\(pangu\)/);
+test('adapts both Pangu 9 spacingText and Pangu 10 spaceText without executing the candidate in Node', () => {
+    const prepared = preparePanguCode('/* upstream browser bundle */', '10.0.0');
+    assert.match(prepared, /linchun-vendor: pangu@10\.0\.0/);
+    assert.match(prepared, /typeof pangu\.spaceText === 'function'/);
+    assert.match(prepared, /pangu\.spaceText : pangu\.spacingText/);
+    assert.match(prepared, /pangu\.spacing = spacingText\.bind\(pangu\)/);
 });
 
 test('never uses node:vm to execute registry-delivered browser bundles', async () => {
