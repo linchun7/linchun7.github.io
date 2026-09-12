@@ -147,7 +147,7 @@ jobs:
         with:
           node-version: 22
 
-      - name: 检查最新稳定版本
+      - name: 检查最新稳定版本与完整性
         id: version
         shell: bash
         run: |
@@ -178,19 +178,40 @@ jobs:
           if (direction < 0) throw new Error(`拒绝 pinyin-pro 降级：${current} -> ${latest}`);
           NODE
 
+          pack_json="$(npm pack "pinyin-pro@${latest}" --ignore-scripts --json --pack-destination "$RUNNER_TEMP")"
+          tarball="$(node -e 'const value = JSON.parse(process.argv[1]); if (!Array.isArray(value) || value.length !== 1 || !value[0].filename) process.exit(2); process.stdout.write(value[0].filename);' "$pack_json")"
+          candidate="$RUNNER_TEMP/pinyin-pro-${latest}.js"
+          tar -xOf "$RUNNER_TEMP/$tarball" package/dist/index.js > "$candidate"
+          if [[ "$(wc -c < "$candidate")" -le 1000 ]]; then
+            echo 'pinyin-pro 候选浏览器包异常过小' >&2
+            exit 1
+          fi
+          integrity="sha384-$(openssl dgst -sha384 -binary "$candidate" | base64 -w0)"
+
+          node --input-type=module - "$latest" "$integrity" <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const [version, integrity] = process.argv.slice(2);
+          const file = 'tools/pinyin/index.html';
+          const html = readFileSync(file, 'utf8');
+          const pattern = /<script\b[^>]*\bsrc="https:\/\/cdn\.jsdelivr\.net\/npm\/pinyin-pro@[^"]+\/dist\/index\.js"[^>]*><\/script>/gi;
+          const matches = html.match(pattern) ?? [];
+          if (matches.length !== 1) throw new Error(`必须且只能存在一个 pinyin-pro CDN script，实际 ${matches.length}`);
+          const replacement = `<script data-cfasync="false" src="https://cdn.jsdelivr.net/npm/pinyin-pro@${version}/dist/index.js" integrity="${integrity}" crossorigin="anonymous" defer></script>`;
+          writeFileSync(file, html.replace(pattern, replacement));
+          NODE
+
           echo "当前版本: $current"
           echo "最新版本: $latest"
+          echo "候选 SRI: $integrity"
           echo "current=$current" >> "$GITHUB_OUTPUT"
           echo "latest=$latest" >> "$GITHUB_OUTPUT"
+          echo "integrity=$integrity" >> "$GITHUB_OUTPUT"
 
-          if [[ "$current" == "$latest" ]]; then
+          if git diff --quiet -- tools/pinyin/index.html; then
             echo 'changed=false' >> "$GITHUB_OUTPUT"
-            exit 0
+          else
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
           fi
-
-          sed -i "s#pinyin-pro@${current}/dist/index.js#pinyin-pro@${latest}/dist/index.js#" tools/pinyin/index.html
-          grep -F "pinyin-pro@${latest}/dist/index.js" tools/pinyin/index.html >/dev/null
-          echo 'changed=true' >> "$GITHUB_OUTPUT"
 
       - name: 安装浏览器测试依赖
         if: steps.version.outputs.changed == 'true'
@@ -219,6 +240,7 @@ jobs:
             PLAYWRIGHT_BROWSER="$browser" node tools/browser-tests/pinyin-smoke.mjs
           done
 
+          node --test tools/browser-tests/script-startup-contract-test.mjs
           git diff --check
 
       - name: 提交通过验证的版本
@@ -387,7 +409,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          pinyin_version="$(sed -n 's#.*pinyin-pro@\([^/"[:space:]]*\)/dist/index\.js.*#\1#p' tools/pinyin/index.html | head -n 1)"
+          mapfile -t pinyin_meta < <(node --input-type=module - <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const html = readFileSync('tools/pinyin/index.html', 'utf8');
+          const tag = html.match(/<script\b[^>]*\bsrc="https:\/\/cdn\.jsdelivr\.net\/npm\/pinyin-pro@([^"]+)\/dist\/index\.js"[^>]*><\/script>/i);
+          if (!tag) throw new Error('无法解析 pinyin-pro script');
+          const version = tag[1];
+          const integrity = /\bintegrity="([^"]+)"/i.exec(tag[0])?.[1];
+          if (!/^\d+\.\d+\.\d+$/.test(version) || !/^sha384-[A-Za-z0-9+/]+={0,2}$/.test(integrity ?? '')) {
+            throw new Error('pinyin-pro 版本或 SRI 非法');
+          }
+          console.log(version);
+          console.log(integrity);
+          NODE
+          )
+          pinyin_version="${pinyin_meta[0]}"
+          pinyin_integrity="${pinyin_meta[1]}"
           expected_nzh="$(sha256sum tools/rmb_converter/dist/nzh.min.js | cut -d' ' -f1)"
           expected_pangu="$(sha256sum tools/space/dist/browser/pangu.min.js | cut -d' ' -f1)"
 
@@ -407,8 +444,20 @@ jobs:
 
             [[ "$(sha256sum nzh.min.js | cut -d' ' -f1)" == "$expected_nzh" ]] || return 1
             [[ "$(sha256sum pangu.min.js | cut -d' ' -f1)" == "$expected_pangu" ]] || return 1
-            grep -F "pinyin-pro@${pinyin_version}/dist/index.js" pinyin.html >/dev/null || return 1
             [[ "$(wc -c < pinyin-pro.js)" -gt 1000 ]] || return 1
+            actual_pinyin_integrity="sha384-$(openssl dgst -sha384 -binary pinyin-pro.js | base64 -w0)"
+            [[ "$actual_pinyin_integrity" == "$pinyin_integrity" ]] || return 1
+
+            PINYIN_VERSION="$pinyin_version" PINYIN_INTEGRITY="$pinyin_integrity" node --input-type=module - <<'NODE' || return 1
+            import { readFileSync } from 'node:fs';
+            const html = readFileSync('pinyin.html', 'utf8');
+            const tag = html.match(/<script\b[^>]*\bsrc="https:\/\/cdn\.jsdelivr\.net\/npm\/pinyin-pro@([^"]+)\/dist\/index\.js"[^>]*><\/script>/i)?.[0];
+            if (!tag) process.exit(1);
+            if (!tag.includes(`pinyin-pro@${process.env.PINYIN_VERSION}/dist/index.js`)) process.exit(1);
+            if (!tag.includes(`integrity="${process.env.PINYIN_INTEGRITY}"`)) process.exit(1);
+            if (!/\bcrossorigin="anonymous"/.test(tag)) process.exit(1);
+            if (!/\bdata-cfasync="false"[\s\S]*\bsrc=/.test(tag)) process.exit(1);
+            NODE
           }
 
           for attempt in $(seq 1 30); do
@@ -416,9 +465,9 @@ jobs:
               echo "生产契约已验证（第 ${attempt} 次）。"
               exit 0
             fi
-            echo "生产静态资源尚未同步或外部 CDN 暂不可用（第 ${attempt}/30 次），10 秒后重试。"
+            echo "生产静态资源尚未同步、SRI 不一致或外部 CDN 暂不可用（第 ${attempt}/30 次），10 秒后重试。"
             sleep 10
           done
 
-          echo "::error title=生产契约验证失败::GitHub Pages 静态资源或 pinyin-pro CDN 与当前 main 不一致。"
+          echo "::error title=生产契约验证失败::GitHub Pages 静态资源或 pinyin-pro CDN 与当前 main 的 SRI/版本不一致。"
           exit 1
