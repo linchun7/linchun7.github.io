@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile as execFileCallback } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -10,6 +11,11 @@ const execFile = promisify(execFileCallback);
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, '../..');
 const STABLE_SEMVER_PATTERN = /^(\d+)\.(\d+)\.(\d+)$/;
+const INTEGRITY_STRENGTH = new Map([
+    ['sha256', 1],
+    ['sha384', 2],
+    ['sha512', 3]
+]);
 
 const vendors = [
     {
@@ -77,6 +83,21 @@ export function assertCandidateBundleVersion(vendor, code, expectedVersion) {
     assert.equal(candidateVersion, expectedVersion, `${vendor.name}: bundle version does not match npm metadata`);
 }
 
+export function assertDistIntegrity(bytes, integrity, label = 'package') {
+    assert.ok(Buffer.isBuffer(bytes) || bytes instanceof Uint8Array, `${label}: downloaded bytes are required`);
+    assert.equal(typeof integrity, 'string', `${label}: npm dist.integrity missing`);
+    const tokens = integrity.trim().split(/\s+/).filter(Boolean).map((token) => {
+        const match = token.match(/^(sha256|sha384|sha512)-([A-Za-z0-9+/]+={0,2})$/);
+        assert.ok(match, `${label}: unsupported npm dist.integrity token`);
+        return { algorithm: match[1], digest: match[2] };
+    });
+    assert.ok(tokens.length > 0, `${label}: npm dist.integrity missing`);
+    tokens.sort((left, right) => INTEGRITY_STRENGTH.get(right.algorithm) - INTEGRITY_STRENGTH.get(left.algorithm));
+    const expected = tokens[0];
+    const actual = createHash(expected.algorithm).update(bytes).digest('base64');
+    assert.equal(actual, expected.digest, `${label}: tarball integrity does not match npm metadata`);
+}
+
 export function selectedVendors(argv = process.argv.slice(2)) {
     assert.equal(argv.length, 2, 'Usage: node update-static-vendors.mjs --vendor <id>');
     assert.equal(argv[0], '--vendor', 'Usage: node update-static-vendors.mjs --vendor <id>');
@@ -88,19 +109,21 @@ export function selectedVendors(argv = process.argv.slice(2)) {
 async function readPackageMetadata(packageName) {
     const { stdout } = await execFile(
         'npm',
-        ['view', `${packageName}@latest`, 'version', 'dist.tarball', '--json'],
+        ['view', `${packageName}@latest`, 'version', 'dist.tarball', 'dist.integrity', '--json'],
         { cwd: repoRoot, encoding: 'utf8', timeout: 30000 }
     );
     const metadata = JSON.parse(stdout);
     const version = metadata.version;
     const tarball = metadata['dist.tarball'];
+    const integrity = metadata['dist.integrity'];
     assert.equal(typeof version, 'string', `${packageName}: latest version missing`);
     parseStableSemver(version, `${packageName} latest`);
     assert.equal(typeof tarball, 'string', `${packageName}: tarball URL missing`);
+    assert.equal(typeof integrity, 'string', `${packageName}: npm dist.integrity missing`);
     const url = new URL(tarball);
     assert.equal(url.protocol, 'https:', `${packageName}: tarball must use HTTPS`);
     assert.equal(url.hostname, 'registry.npmjs.org', `${packageName}: unexpected tarball host`);
-    return { version, tarball };
+    return { version, tarball, integrity };
 }
 
 async function download(url, destination) {
@@ -109,6 +132,7 @@ async function download(url, destination) {
     const bytes = Buffer.from(await response.arrayBuffer());
     if (bytes.length < 1024) throw new Error(`Downloaded file is unexpectedly small: ${bytes.length} bytes`);
     await writeFile(destination, bytes);
+    return bytes;
 }
 
 async function readFirstExistingFile(root, candidates, vendorName) {
@@ -142,7 +166,8 @@ async function loadCandidate(vendor, tempRoot) {
     const archive = path.join(vendorDir, `${vendor.packageName}.tgz`);
     const extracted = path.join(vendorDir, 'extracted');
     await mkdir(extracted, { recursive: true });
-    await download(metadata.tarball, archive);
+    const archiveBytes = await download(metadata.tarball, archive);
+    assertDistIntegrity(archiveBytes, metadata.integrity, `${vendor.name} tarball`);
     await execFile('tar', ['-xzf', archive, '-C', extracted], { timeout: 30000 });
 
     const packageJson = JSON.parse(await readFile(path.join(extracted, 'package/package.json'), 'utf8'));
@@ -158,7 +183,7 @@ async function loadCandidate(vendor, tempRoot) {
     // Do not execute registry-delivered JavaScript in Node. The candidate is
     // exercised only in the real browser smoke tests before publication.
     const code = vendor.prepareCode ? vendor.prepareCode(rawCode, metadata.version) : rawCode;
-    console.log(`validated ${vendor.name}@${metadata.version} metadata and browser bundle from ${relativePath}`);
+    console.log(`validated ${vendor.name}@${metadata.version} metadata, integrity and browser bundle from ${relativePath}`);
     return { vendor, version: metadata.version, code };
 }
 
