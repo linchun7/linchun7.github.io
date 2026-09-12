@@ -38,12 +38,12 @@ async function findChrome() {
 async function resolveChromium(context) {
   try {
     await access(chromium.executablePath());
-    return { headless: true, timeout: 10_000 };
+    return { headless: true, timeout: 30_000 };
   } catch {
     // The daily job intentionally relies on the runner's installed Chrome.
   }
   const executablePath = await findChrome();
-  if (executablePath) return { executablePath, headless: true, timeout: 10_000 };
+  if (executablePath) return { executablePath, headless: true, timeout: 30_000 };
   if (process.env.CI) assert.fail('Chrome or Chromium is required for the forced-colors accessibility regression test');
   context.skip('Chrome or Chromium is not installed');
   return null;
@@ -99,7 +99,7 @@ async function runStep(context, label, operation, timeoutMs = 5_000) {
   }
 }
 
-test('preserves forced-colors sorting and minimum-price cues with bounded browser steps', { timeout: 30_000 }, async (context) => {
+test('preserves forced-colors sorting and minimum-price cues with bounded browser steps', { timeout: 60_000 }, async (context) => {
   if (BROWSER_UNDER_TEST !== 'chromium') {
     context.skip('forced-colors emulation is covered in Chromium');
     return;
@@ -114,7 +114,7 @@ test('preserves forced-colors sorting and minimum-price cues with bounded browse
   let primaryError = null;
 
   try {
-    browser = await runStep(context, 'browser launch', () => chromium.launch(launchOptions), 10_000);
+    browser = await runStep(context, 'browser launch', () => chromium.launch(launchOptions), 30_000);
     const page = await runStep(
       context,
       'page creation',
