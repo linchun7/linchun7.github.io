@@ -9,7 +9,14 @@ const baseUrl = (process.env.BASE_URL || 'http://127.0.0.1:4173').replace(/\/$/,
 const browser = await browserType.launch({ headless: true });
 
 async function waitForPinyin(page) {
-    await page.waitForFunction(() => Boolean(window.pinyinPro?.pinyin));
+    await page.waitForFunction(() => {
+        const result = document.querySelector('#result1');
+        const placeholder = result?.querySelector('.empty-text');
+        if (!window.pinyinPro?.pinyin || !result || !placeholder || placeholder.parentElement !== result) return false;
+        const foreground = getComputedStyle(placeholder).color;
+        const background = getComputedStyle(result).backgroundColor;
+        return /\d/.test(foreground) && /\d/.test(background);
+    });
 }
 
 async function resultText(page, id) {
@@ -17,7 +24,11 @@ async function resultText(page, id) {
 }
 
 function contrastRatio(foreground, background) {
-    const parse = (value) => value.match(/[\d.]+/g).slice(0, 3).map(Number);
+    const parse = (value) => {
+        const channels = value.match(/[\d.]+/g);
+        assert.ok(channels?.length >= 3, `unsupported computed color: ${value}`);
+        return channels.slice(0, 3).map(Number);
+    };
     const luminance = (value) => {
         const [r, g, b] = parse(value).map(channel => {
             const normalized = channel / 255;
