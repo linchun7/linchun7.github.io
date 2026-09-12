@@ -1,7 +1,9 @@
+import { execFile as execFileCallback } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { appendFile, readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { promisify } from 'node:util';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { validatePricePayload } from '../data-contract.js';
 import { parseJsonStrictBytes, validateCoreDataArtifact } from './validate-data-artifact.mjs';
 import { assertStaticPageMatches, publicPayloadFingerprint } from './static-page.mjs';
@@ -10,14 +12,28 @@ export const PRODUCTION_PRICES_URL = 'https://www.linchun.com.cn/tools/icloud_pr
 export const PRODUCTION_HISTORY_URL = 'https://www.linchun.com.cn/tools/icloud_price_comparison/data/history.json';
 export const PRODUCTION_RUN_LOG_URL = 'https://www.linchun.com.cn/tools/icloud_price_comparison/data/run-log.json';
 export const PRODUCTION_INDEX_URL = 'https://www.linchun.com.cn/tools/icloud_price_comparison/';
+export const PRODUCTION_ASSET_BASE_URL = 'https://www.linchun.com.cn/tools/icloud_price_comparison/';
 export const DEFAULT_MAX_WAIT_MS = 5 * 60 * 1_000;
 export const DEFAULT_INTERVAL_MS = 15 * 1_000;
 export const DEFAULT_REQUEST_TIMEOUT_MS = 10 * 1_000;
 export const MAX_PRICES_RESPONSE_BYTES = 1024 * 1024;
 export const MAX_HISTORY_RESPONSE_BYTES = 8 * 1024 * 1024;
 export const MAX_RUN_LOG_RESPONSE_BYTES = 8 * 1024 * 1024;
+export const MAX_STATIC_ASSET_RESPONSE_BYTES = 1024 * 1024;
 const MAX_HTML_RESPONSE_BYTES = 512 * 1024;
 const JSON_FILES = [['prices', 'prices.json'], ['history', 'history.json'], ['runLog', 'run-log.json']];
+const PROJECT_DIRECTORY = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const REPOSITORY_ROOT = path.resolve(PROJECT_DIRECTORY, '../..');
+const PROJECT_REPOSITORY_PATH = 'tools/icloud_price_comparison';
+const execFileAsync = promisify(execFileCallback);
+
+export const CORE_STATIC_ASSETS = Object.freeze([
+  Object.freeze({ path: 'style.css', contentTypePattern: /text\/css\b/i }),
+  Object.freeze({ path: 'script.js', contentTypePattern: /(?:application|text)\/(?:javascript|ecmascript)\b/i }),
+  Object.freeze({ path: 'data-contract.js', contentTypePattern: /(?:application|text)\/(?:javascript|ecmascript)\b/i }),
+  Object.freeze({ path: 'data-model.js', contentTypePattern: /(?:application|text)\/(?:javascript|ecmascript)\b/i }),
+  Object.freeze({ path: 'vendor/lucide-subset.js', contentTypePattern: /(?:application|text)\/(?:javascript|ecmascript)\b/i })
+]);
 export { publicPayloadFingerprint };
 
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
@@ -66,12 +82,89 @@ function normalizeArtifact(artifact, label) {
   return createVerificationArtifact(artifact, label);
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function assetVersionFromHtml(html, assetPath, label) {
+  const matches = [...html.matchAll(new RegExp(`${escapeRegExp(assetPath)}\\?v=([a-f0-9]{8})`, 'g'))].map((match) => match[1]);
+  if (!matches.length) throw new Error(`${label}: missing cache-busted reference for ${assetPath}`);
+  const versions = [...new Set(matches)];
+  if (versions.length !== 1) throw new Error(`${label}: inconsistent cache-busting versions for ${assetPath}`);
+  return versions[0];
+}
+
+function normalizeAssetBytes(value, label) {
+  if (Buffer.isBuffer(value)) return value;
+  if (value instanceof Uint8Array) return Buffer.from(value);
+  if (typeof value === 'string') return Buffer.from(value, 'utf8');
+  throw new Error(`${label}: static asset bytes are invalid`);
+}
+
+export function createStaticAssetManifest(indexHtml, assetContents, label = 'static asset manifest') {
+  if (typeof indexHtml !== 'string') throw new Error(`${label}: index.html must be text`);
+  const assets = {};
+  for (const definition of CORE_STATIC_ASSETS) {
+    const bytes = normalizeAssetBytes(assetContents?.[definition.path], `${label} ${definition.path}`);
+    if (bytes.byteLength === 0 || bytes.byteLength > MAX_STATIC_ASSET_RESPONSE_BYTES) {
+      throw new Error(`${label}: ${definition.path} has an invalid size`);
+    }
+    const hash = sha256(bytes);
+    const version = assetVersionFromHtml(indexHtml, definition.path, label);
+    if (version !== hash.slice(0, 8)) {
+      throw new Error(`${label}: ${definition.path} cache-busting version does not match its SHA-256`);
+    }
+    assets[definition.path] = { bytes, hash, version };
+  }
+  return { indexHtml, assets };
+}
+
+export async function loadStaticAssetManifest(projectDirectory = PROJECT_DIRECTORY, label = 'static asset manifest') {
+  const indexHtml = await readFile(path.join(projectDirectory, 'index.html'), 'utf8');
+  const assetContents = Object.fromEntries(await Promise.all(CORE_STATIC_ASSETS.map(async ({ path: assetPath }) => [
+    assetPath,
+    await readFile(path.join(projectDirectory, assetPath))
+  ])));
+  return createStaticAssetManifest(indexHtml, assetContents, label);
+}
+
+async function readTextFromGitRef(ref, relativePath) {
+  const object = `${ref}:${PROJECT_REPOSITORY_PATH}/${relativePath}`;
+  const { stdout } = await execFileAsync('git', ['show', object], {
+    cwd: REPOSITORY_ROOT,
+    encoding: 'utf8',
+    maxBuffer: 2 * 1024 * 1024,
+    timeout: 15_000,
+    windowsHide: true
+  });
+  return stdout;
+}
+
+export async function loadStaticAssetManifestFromGitRef(ref = 'origin/main', label = 'git static asset manifest') {
+  const [indexHtml, ...assetTexts] = await Promise.all([
+    readTextFromGitRef(ref, 'index.html'),
+    ...CORE_STATIC_ASSETS.map(({ path: assetPath }) => readTextFromGitRef(ref, assetPath))
+  ]);
+  return createStaticAssetManifest(
+    indexHtml,
+    Object.fromEntries(CORE_STATIC_ASSETS.map(({ path: assetPath }, index) => [assetPath, assetTexts[index]])),
+    label
+  );
+}
+
 function requestOptions(signal) {
   return { cache: 'no-store', headers: { 'cache-control': 'no-cache', pragma: 'no-cache' }, redirect: 'error', signal };
 }
 
 function verificationUrl(baseUrl, runId, attempt) {
   const url = new URL(baseUrl);
+  url.searchParams.set('verify', `${runId}-${attempt}`);
+  return url;
+}
+
+function assetVerificationUrl(baseUrl, assetPath, version, runId, attempt) {
+  const url = new URL(assetPath, baseUrl);
+  url.searchParams.set('v', version);
   url.searchParams.set('verify', `${runId}-${attempt}`);
   return url;
 }
@@ -124,6 +217,65 @@ async function fetchHtmlResource(fetchImpl, url, signal) {
   }
 }
 
+async function fetchStaticAsset(fetchImpl, baseUrl, definition, expected, signal, runId, attempt) {
+  try {
+    const response = await fetchImpl(
+      assetVerificationUrl(baseUrl, definition.path, expected.version, runId, attempt),
+      requestOptions(signal)
+    );
+    return await readBoundedResponse(response, {
+      label: definition.path,
+      maxBytes: MAX_STATIC_ASSET_RESPONSE_BYTES,
+      contentTypePattern: definition.contentTypePattern
+    });
+  } catch (error) {
+    if (error?.name === 'AbortError') throw error;
+    error.reason = error.reason?.startsWith('HTTP_')
+      ? `asset:${definition.path}:${error.reason}`
+      : error.reason ?? `asset-invalid:${definition.path}:${String(error.message).slice(0, 140).replace(/[\r\n]+/g, ' ')}`;
+    throw error;
+  }
+}
+
+async function verifyStaticAssets(manifest, productionHtml, {
+  fetchImpl, productionAssetBaseUrl, signal, runId, attempt
+}) {
+  for (const definition of CORE_STATIC_ASSETS) {
+    const expected = manifest.assets?.[definition.path];
+    if (!expected) {
+      const error = new Error(`Missing expected static asset: ${definition.path}`);
+      error.reason = `expected-asset-missing:${definition.path}`;
+      throw error;
+    }
+    let productionVersion;
+    try {
+      productionVersion = assetVersionFromHtml(productionHtml, definition.path, 'production index.html');
+    } catch (error) {
+      error.reason = `asset-index-invalid:${definition.path}:${String(error.message).slice(0, 120).replace(/[\r\n]+/g, ' ')}`;
+      throw error;
+    }
+    if (productionVersion !== expected.version) {
+      const error = new Error(`${definition.path} production version ${productionVersion} != expected ${expected.version}`);
+      error.reason = `asset-index-version:${definition.path}`;
+      throw error;
+    }
+    const bytes = await fetchStaticAsset(
+      fetchImpl,
+      productionAssetBaseUrl,
+      definition,
+      expected,
+      signal,
+      runId,
+      attempt
+    );
+    if (sha256(bytes) !== expected.hash) {
+      const error = new Error(`${definition.path} production bytes do not match the committed asset`);
+      error.reason = `asset-not-deployed:${definition.path}`;
+      throw error;
+    }
+  }
+}
+
 function classifyArtifactValidationError(error) {
   const message = String(error?.message ?? error).slice(0, 160).replace(/[\r\n]+/g, ' ');
   if (/run-log\.json/i.test(message)) return `run-log-invalid:${message}`;
@@ -133,11 +285,14 @@ function classifyArtifactValidationError(error) {
 
 const artifactHashesMatch = (left, right) => JSON_FILES.every(([key]) => left.hashes[key] === right.hashes[key]);
 const safeObservedTimestamp = (value) => (typeof value === 'string' && value.length <= 40 ? value : null);
-const resultResources = () => ({
+const resultResources = (staticManifest) => ({
   'prices.json': 'verified',
   'history.json': 'verified',
   'run-log.json': 'verified',
-  'index.html': 'verified against prices.json'
+  'index.html': 'verified against prices.json',
+  ...(staticManifest
+    ? Object.fromEntries(CORE_STATIC_ASSETS.map(({ path: assetPath }) => [assetPath, 'verified byte-for-byte']))
+    : {})
 });
 
 export async function verifyProductionDeployment(expectedArtifact, {
@@ -145,10 +300,14 @@ export async function verifyProductionDeployment(expectedArtifact, {
   productionHistoryUrl = PRODUCTION_HISTORY_URL,
   productionRunLogUrl = PRODUCTION_RUN_LOG_URL,
   productionIndexUrl = PRODUCTION_INDEX_URL,
+  productionAssetBaseUrl = PRODUCTION_ASSET_BASE_URL,
+  expectedStaticAssets = null,
   runId = 'local', maxWaitMs = DEFAULT_MAX_WAIT_MS, intervalMs = DEFAULT_INTERVAL_MS,
   requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS, fetchImpl = globalThis.fetch,
   sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)), now = () => Date.now(),
-  getCurrentMainArtifact = async () => null, log = console.log
+  getCurrentMainArtifact = async () => null,
+  getCurrentMainStaticAssets = async () => null,
+  log = console.log
 } = {}) {
   const expected = normalizeArtifact(expectedArtifact, 'expected artifact');
   const expectedFingerprint = publicPayloadFingerprint(expected.prices);
@@ -192,7 +351,16 @@ export async function verifyProductionDeployment(expectedArtifact, {
         && observed.prices.generatedAt === expected.prices.generatedAt
         && observed.prices.run.finishedAtUtc === expected.prices.run.finishedAtUtc;
       if (pricesMatch && observed.hashes.history === expected.hashes.history && observed.hashes.runLog === expected.hashes.runLog) {
-        const result = { status: 'deployed', attempts, elapsedMs: now() - startedAt, expectedGeneratedAt: expected.prices.generatedAt, observedGeneratedAt: observed.prices.generatedAt, resources: resultResources() };
+        if (expectedStaticAssets) {
+          await verifyStaticAssets(expectedStaticAssets, productionHtml, {
+            fetchImpl,
+            productionAssetBaseUrl,
+            signal: controller.signal,
+            runId,
+            attempt: attempts
+          });
+        }
+        const result = { status: 'deployed', attempts, elapsedMs: now() - startedAt, expectedGeneratedAt: expected.prices.generatedAt, observedGeneratedAt: observed.prices.generatedAt, resources: resultResources(expectedStaticAssets) };
         log(`Production verification passed on attempt ${attempts}: ${observed.prices.generatedAt}`);
         return result;
       }
@@ -209,7 +377,23 @@ export async function verifyProductionDeployment(expectedArtifact, {
           }
           if (artifactHashesMatch(observed, currentMain)
             && publicPayloadFingerprint(observed.prices) === publicPayloadFingerprint(currentMain.prices)) {
-            const result = { status: 'superseded', attempts, elapsedMs: now() - startedAt, expectedGeneratedAt: expected.prices.generatedAt, observedGeneratedAt: observed.prices.generatedAt, resources: resultResources() };
+            let currentMainStaticAssets = null;
+            if (expectedStaticAssets) {
+              currentMainStaticAssets = await getCurrentMainStaticAssets();
+              if (!currentMainStaticAssets) {
+                const error = new Error('Current main static assets are required to prove a superseding deployment');
+                error.reason = 'current-main-assets-unavailable';
+                throw error;
+              }
+              await verifyStaticAssets(currentMainStaticAssets, productionHtml, {
+                fetchImpl,
+                productionAssetBaseUrl,
+                signal: controller.signal,
+                runId,
+                attempt: attempts
+              });
+            }
+            const result = { status: 'superseded', attempts, elapsedMs: now() - startedAt, expectedGeneratedAt: expected.prices.generatedAt, observedGeneratedAt: observed.prices.generatedAt, resources: resultResources(currentMainStaticAssets ?? expectedStaticAssets) };
             log(`Production verification passed with a newer committed deployment on attempt ${attempts}: ${observed.prices.generatedAt}`);
             return result;
           }
@@ -266,17 +450,36 @@ function parseCliArguments(argv) {
 }
 
 function summaryLines(result) {
-  return ['## Production verification', '', '- prices.json: verified', '- history.json: verified', '- run-log.json: verified', '- index.html: verified against prices.json', `- Status: ${result.status}`, `- Expected generatedAt: ${result.expectedGeneratedAt}`, `- Observed generatedAt: ${result.observedGeneratedAt}`, `- Attempts: ${result.attempts}`, `- Elapsed: ${(result.elapsedMs / 1_000).toFixed(1)}s`, ''];
+  return [
+    '## Production verification',
+    '',
+    ...Object.entries(result.resources).map(([resource, status]) => `- ${resource}: ${status}`),
+    `- Status: ${result.status}`,
+    `- Expected generatedAt: ${result.expectedGeneratedAt}`,
+    `- Observed generatedAt: ${result.observedGeneratedAt}`,
+    `- Attempts: ${result.attempts}`,
+    `- Elapsed: ${(result.elapsedMs / 1_000).toFixed(1)}s`,
+    ''
+  ];
 }
 
 async function runCli() {
   const options = parseCliArguments(process.argv.slice(2));
   const expected = await loadVerificationArtifact(options.expectedDataDir, 'expected artifact');
+  const expectedStaticAssets = await loadStaticAssetManifest(PROJECT_DIRECTORY, 'expected static assets');
   const getCurrentMainArtifact = options.currentMainDataDir
     ? async () => loadVerificationArtifact(options.currentMainDataDir, 'current main artifact')
     : async () => null;
+  const getCurrentMainStaticAssets = options.currentMainDataDir
+    ? async () => loadStaticAssetManifestFromGitRef('origin/main', 'current main static assets')
+    : async () => null;
   try {
-    const result = await verifyProductionDeployment(expected, { ...options, getCurrentMainArtifact });
+    const result = await verifyProductionDeployment(expected, {
+      ...options,
+      expectedStaticAssets,
+      getCurrentMainArtifact,
+      getCurrentMainStaticAssets
+    });
     if (options.summaryFile) await appendFile(options.summaryFile, summaryLines(result).join('\n'), 'utf8');
   } catch (error) {
     if (options.summaryFile) {
