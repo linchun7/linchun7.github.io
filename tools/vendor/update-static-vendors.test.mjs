@@ -5,6 +5,7 @@ import test from 'node:test';
 
 import {
     assertCandidateBundleVersion,
+    assertDistIntegrity,
     compareStableSemver,
     parseStableSemver,
     preparePanguCode,
@@ -47,6 +48,19 @@ test('accepts only stable semantic versions and compares them numerically', () =
     assert.throws(() => parseStableSemver('v9.2.0'), /stable X\.Y\.Z/);
 });
 
+test('verifies npm tarballs against the strongest supported dist.integrity digest', () => {
+    const bytes = Buffer.from('trusted npm tarball bytes');
+    const sha256 = createHash('sha256').update(bytes).digest('base64');
+    const sha512 = createHash('sha512').update(bytes).digest('base64');
+    assert.doesNotThrow(() => assertDistIntegrity(bytes, `sha256-${sha256} sha512-${sha512}`, 'fixture'));
+    assert.throws(
+        () => assertDistIntegrity(Buffer.from('tampered npm tarball bytes'), `sha512-${sha512}`, 'fixture'),
+        /tarball integrity does not match npm metadata/
+    );
+    assert.throws(() => assertDistIntegrity(bytes, '', 'fixture'), /dist\.integrity missing/);
+    assert.throws(() => assertDistIntegrity(bytes, 'md5-deadbeef', 'fixture'), /unsupported npm dist\.integrity token/);
+});
+
 test('adapts both Pangu 9 spacingText and Pangu 10 spaceText without executing the candidate in Node', () => {
     const prepared = preparePanguCode('/* upstream browser bundle */', '10.0.0');
     assert.match(prepared, /linchun-vendor: pangu@10\.0\.0/);
@@ -59,14 +73,4 @@ test('never uses node:vm to execute registry-delivered browser bundles', async (
     const source = await readFile(new URL('./update-static-vendors.mjs', import.meta.url), 'utf8');
     assert.doesNotMatch(source, /from 'node:vm'|new vm\.Script|evaluateBrowserBundle/);
     assert.match(source, /exercised only in the real browser smoke tests/);
-});
-
-test('probe current pinyin-pro CDN sha384', async () => {
-    const url = 'https://cdn.jsdelivr.net/npm/pinyin-pro@3.29.3/dist/index.js';
-    const response = await fetch(url, { signal: AbortSignal.timeout(20_000) });
-    assert.equal(response.ok, true, `probe failed: HTTP ${response.status}`);
-    const bytes = Buffer.from(await response.arrayBuffer());
-    assert.ok(bytes.length > 1000, `probe bundle too small: ${bytes.length}`);
-    const integrity = `sha384-${createHash('sha384').update(bytes).digest('base64')}`;
-    console.log(`PINYIN_SRI=${integrity}`);
 });
