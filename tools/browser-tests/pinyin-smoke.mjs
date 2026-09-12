@@ -9,14 +9,16 @@ const baseUrl = (process.env.BASE_URL || 'http://127.0.0.1:4173').replace(/\/$/,
 const browser = await browserType.launch({ headless: true });
 
 async function waitForPinyin(page) {
-    await page.waitForFunction(() => {
+    const colors = await page.waitForFunction(() => {
         const result = document.querySelector('#result1');
         const placeholder = result?.querySelector('.empty-text');
-        if (!window.pinyinPro?.pinyin || !result || !placeholder || placeholder.parentElement !== result) return false;
+        if (!window.pinyinPro?.pinyin || !result || !placeholder || placeholder.parentElement !== result) return null;
         const foreground = getComputedStyle(placeholder).color;
         const background = getComputedStyle(result).backgroundColor;
-        return /\d/.test(foreground) && /\d/.test(background);
+        if (!/\d/.test(foreground) || !/\d/.test(background)) return null;
+        return { foreground, background };
     });
+    return colors.jsonValue();
 }
 
 async function resultText(page, id) {
@@ -49,12 +51,7 @@ try {
     await page.route('**/googletagmanager.com/**', (route) => route.abort());
 
     await page.goto(`${baseUrl}/tools/pinyin/`, { waitUntil: 'domcontentloaded' });
-    await waitForPinyin(page);
-
-    const emptyColors = {
-        foreground: await page.locator('#result1 .empty-text').evaluate((element) => getComputedStyle(element).color),
-        background: await page.locator('#result1').evaluate((element) => getComputedStyle(element).backgroundColor)
-    };
+    const emptyColors = await waitForPinyin(page);
     assert.ok(
         contrastRatio(emptyColors.foreground, emptyColors.background) >= 4.5,
         `empty-result text contrast must meet WCAG AA: ${JSON.stringify(emptyColors)}`
