@@ -9,6 +9,7 @@ const cases = [
   { tool: 'card_number_new', scripts: ['core.js?', 'app.js?'] },
   { tool: 'financial_calculator', scripts: ['script.js?'] },
   { tool: 'renovation_calculator', scripts: ['script.js?'] },
+  { tool: 'pinyin', scripts: ['https://cdn.jsdelivr.net/npm/pinyin-pro@', 'app.js?'] },
   { tool: 'space', scripts: ['dist/browser/pangu.min.js'], inline: "const textarea = document.getElementById('info')" },
   { tool: 'rmb_converter', scripts: ['dist/nzh.min.js'], inline: "const input = document.getElementById('inputmoney')" }
 ];
@@ -31,3 +32,15 @@ for (const entry of cases) {
     }
   });
 }
+
+test('pinyin-pro is version-pinned and protected by SRI', async () => {
+  const html = await readFile(new URL('../pinyin/index.html', import.meta.url), 'utf8');
+  const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
+  const dependency = scripts.filter(([, attrs]) => /\bsrc="https:\/\/cdn\.jsdelivr\.net\/npm\/pinyin-pro@/.test(attrs));
+  assert.equal(dependency.length, 1, 'pinyin-pro: exactly one CDN dependency');
+  const attrs = dependency[0][1];
+  assert.match(attrs, /\bsrc="https:\/\/cdn\.jsdelivr\.net\/npm\/pinyin-pro@\d+\.\d+\.\d+\/dist\/index\.js"/);
+  assert.match(attrs, /\bintegrity="sha384-[A-Za-z0-9+/]+={0,2}"/);
+  assert.match(attrs, /\bcrossorigin="anonymous"/);
+  assert.match(attrs, /\bdata-cfasync="false"[\s\S]*\bsrc=/);
+});
