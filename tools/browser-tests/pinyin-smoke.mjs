@@ -40,10 +40,10 @@ try {
     await page.goto(`${baseUrl}/tools/pinyin/`, { waitUntil: 'domcontentloaded' });
     await waitForPinyin(page);
 
-    const emptyColors = await page.locator('#result1 .empty-text').evaluate((element) => ({
-        foreground: getComputedStyle(element).color,
-        background: getComputedStyle(element.parentElement).backgroundColor
-    }));
+    const emptyColors = {
+        foreground: await page.locator('#result1 .empty-text').evaluate((element) => getComputedStyle(element).color),
+        background: await page.locator('#result1').evaluate((element) => getComputedStyle(element).backgroundColor)
+    };
     assert.ok(
         contrastRatio(emptyColors.foreground, emptyColors.background) >= 4.5,
         `empty-result text contrast must meet WCAG AA: ${JSON.stringify(emptyColors)}`
