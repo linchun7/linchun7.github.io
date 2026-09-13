@@ -457,7 +457,7 @@ jobs:
             if (!tag.includes(`integrity="${process.env.PINYIN_INTEGRITY}"`)) process.exit(1);
             if (!/\bcrossorigin="anonymous"/.test(tag)) process.exit(1);
             if (!/\bdata-cfasync="false"[\s\S]*\bsrc=/.test(tag)) process.exit(1);
-            NODE
+          NODE
           }
 
           for attempt in $(seq 1 30); do
