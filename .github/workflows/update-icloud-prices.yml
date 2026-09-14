@@ -259,11 +259,14 @@ jobs:
     if: needs.prepare.outputs.should_run == 'true' && needs.update.result == 'success'
     permissions:
       contents: write
+      pages: write
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 12
     outputs:
       severe_failure: ${{ steps.classify_publish.outputs.severe_failure }}
       publish_outcome: ${{ steps.classify_publish.outputs.publish_outcome }}
+      pushed_sha: ${{ steps.push_data.outputs.pushed_sha }}
+      pages_built_sha: ${{ steps.wait_pages_build.outputs.built_sha }}
     steps:
       - name: 检出精确生成基线
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -356,6 +359,71 @@ jobs:
           auth_header=$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)
           git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" push origin HEAD:main
           echo "pushed=true" >> "$GITHUB_OUTPUT"
+          echo "pushed_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: 请求本次数据变更的 Pages 构建
+        id: request_pages_build
+        if: steps.push_data.outputs.pushed == 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --method POST \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2026-03-10' \
+            "repos/$GITHUB_REPOSITORY/pages/builds"
+          echo "requested=true" >> "$GITHUB_OUTPUT"
+
+      - name: 等待 Pages 构建完成
+        id: wait_pages_build
+        if: steps.push_data.outputs.pushed == 'true' && steps.request_pages_build.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ steps.push_data.outputs.pushed_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "pages_built=false" >> "$GITHUB_OUTPUT"
+          for attempt in $(seq 1 60); do
+            read -r built_sha build_status build_error < <(
+              gh api \
+                -H 'Accept: application/vnd.github+json' \
+                -H 'X-GitHub-Api-Version: 2026-03-10' \
+                "repos/$GITHUB_REPOSITORY/pages/builds/latest" \
+                --jq '[.commit, .status, (.error.message // "")] | @tsv'
+            )
+            relation=unrelated
+            if [[ "$built_sha" == "$TARGET_SHA" ]]; then
+              relation=identical
+            elif [[ "$built_sha" =~ ^[0-9a-f]{40}$ ]]; then
+              compare_status=$(gh api \
+                -H 'Accept: application/vnd.github+json' \
+                -H 'X-GitHub-Api-Version: 2026-03-10' \
+                "repos/$GITHUB_REPOSITORY/compare/$TARGET_SHA...$built_sha" \
+                --jq '.status' 2>/dev/null || true)
+              if [[ "$compare_status" == "ahead" ]]; then
+                relation=successor
+              fi
+            fi
+            if [[ "$relation" == "identical" || "$relation" == "successor" ]]; then
+              if [[ "$build_status" == "built" ]]; then
+                echo "pages_built=true" >> "$GITHUB_OUTPUT"
+                echo "built_sha=$built_sha" >> "$GITHUB_OUTPUT"
+                echo "build_relation=$relation" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              if [[ "$build_status" == "errored" || -n "$build_error" ]]; then
+                echo "::error title=PAGES_BUILD_FAILED::Pages build for $built_sha failed: ${build_error:-$build_status}"
+                exit 1
+              fi
+            fi
+            sleep 5
+          done
+          echo "::error title=PAGES_BUILD_TIMEOUT::Pages did not build $TARGET_SHA or a verified successor within the bounded wait."
+          exit 1
 
       - name: 分类发布故障
         id: classify_publish
@@ -375,8 +443,15 @@ jobs:
           elif [[ "${{ steps.push_data.outcome }}" == "failure" ]]; then
             severe_failure=true
             publish_outcome=push_failed
-          elif [[ "${{ steps.push_data.outputs.pushed }}" == "true" ]]; then
-            publish_outcome=published
+          elif [[ "${{ steps.request_pages_build.outcome }}" == "failure" ]]; then
+            severe_failure=true
+            publish_outcome=pages_request_failed
+          elif [[ "${{ steps.wait_pages_build.outcome }}" == "failure" ]]; then
+            severe_failure=true
+            publish_outcome=pages_build_failed
+          elif [[ "${{ steps.push_data.outputs.pushed }}" == "true" ]] \
+            && [[ "${{ steps.wait_pages_build.outputs.pages_built }}" == "true" ]]; then
+            publish_outcome=pages_built
           else
             severe_failure=true
             publish_outcome=push_failed
@@ -390,6 +465,10 @@ jobs:
           if [[ "$severe_failure" == "true" ]]; then
             if [[ "$publish_outcome" == "artifact_invalid" ]]; then
               echo "::error title=PUBLISH_ARTIFACT_INVALID::已测试的数据工件未通过发布边界校验。"
+            elif [[ "$publish_outcome" == "pages_request_failed" ]]; then
+              echo "::error title=PUBLISH_PAGES_REQUEST_FAILED::数据已推送，但 Pages build 请求未成功受理。"
+            elif [[ "$publish_outcome" == "pages_build_failed" ]]; then
+              echo "::error title=PUBLISH_PAGES_BUILD_FAILED::数据已推送，但 Pages 未完成对应提交或合法后继提交的构建。"
             else
               echo "::error title=PUBLISH_PUSH_FAILED::待发布提交未能推送到 main。"
             fi
@@ -401,7 +480,7 @@ jobs:
     needs:
       - update
       - publish
-    if: needs.publish.result == 'success' && (needs.publish.outputs.publish_outcome == 'published' || needs.publish.outputs.publish_outcome == 'no_data_changes')
+    if: needs.publish.result == 'success' && (needs.publish.outputs.publish_outcome == 'pages_built' || needs.publish.outputs.publish_outcome == 'no_data_changes')
     permissions:
       contents: read
     runs-on: ubuntu-latest
@@ -612,7 +691,7 @@ jobs:
                 && [[ "$UPDATE_RESULT" == success ]] \
                 && [[ "$PUBLISH_RESULT" == success ]] \
                 && [[ "$VERIFY_RESULT" == success ]] \
-                && { [[ "$PUBLISH_OUTCOME" == published ]] || [[ "$PUBLISH_OUTCOME" == no_data_changes ]]; }; }; }; then
+                && { [[ "$PUBLISH_OUTCOME" == pages_built ]] || [[ "$PUBLISH_OUTCOME" == no_data_changes ]]; }; }; }; then
             status=0
           else
             echo "本次属于单次暂时故障，不发送失败信号；由 Healthchecks 连续缺少成功心跳的宽限期处理。"

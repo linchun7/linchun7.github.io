@@ -12,6 +12,7 @@ const maintenanceWorkflowUrl = new URL('../../../.github/workflows/icloud-reposi
 const autoMergeWorkflowUrl = new URL('../../../.github/workflows/auto-merge-official-actions.yml', import.meta.url);
 const dependabotUrl = new URL('../../../.github/dependabot.yml', import.meta.url);
 const gitignoreUrl = new URL('../../../.gitignore', import.meta.url);
+const gitattributesUrl = new URL('../../../.gitattributes', import.meta.url);
 const notFoundUrl = new URL('../../../404.html', import.meta.url);
 const packageUrl = new URL('../package.json', import.meta.url);
 const browserRunnerUrl = new URL('../scripts/test-browsers.mjs', import.meta.url);
@@ -27,6 +28,20 @@ test('keeps the shared 404 page local, private, and CSP-safe', async () => {
   assert.match(html, /<meta name="referrer" content="origin">/);
   assert.match(html, /script-src 'none'/);
   assert.doesNotMatch(html, /<script\b|\sstyle=|googletagmanager|google-analytics|googleapis|gstatic|staticfile|jquery/i);
+});
+
+test('keeps blog-owned hashed and release-marker text bytes LF-stable across platforms', async () => {
+  const attributes = (await readFile(gitattributesUrl, 'utf8')).split(/\r?\n/);
+  for (const rule of [
+    'css/** text eol=lf',
+    'js/** text eol=lf',
+    'vendor/fontawesome/** text eol=lf',
+    'blog-release.json text eol=lf',
+    '.blog-managed-files.json text eol=lf',
+    'posts/** text eol=lf'
+  ]) {
+    assert.ok(attributes.includes(rule), `missing LF-stability rule: ${rule}`);
+  }
 });
 
 test('keeps only long-lived public Markdown in the project', () => {
@@ -132,7 +147,12 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /steps\.push_data\.outcome[^]*?failure[^]*?severe_failure=true[^]*?publish_outcome=push_failed/);
   assert.match(workflow, /publish_candidate=no_data_changes[\s\S]*?publish_outcome=no_data_changes/);
   assert.match(workflow, /steps\.prepare_publish\.outputs\.should_push == 'true'/, 'main advancement and no-data paths must skip the push');
-  assert.match(workflow, /verify-production:[\s\S]*?needs:[\s\S]*?- publish[\s\S]*?publish_outcome == 'published'[\s\S]*?publish_outcome == 'no_data_changes'/);
+  assert.match(workflow, /publish:[\s\S]*?permissions:[\s\S]*?contents: write[\s\S]*?pages: write/);
+  assert.match(workflow, /steps\.push_data\.outputs\.pushed == 'true'[\s\S]*?gh api --method POST[\s\S]*?repos\/\$GITHUB_REPOSITORY\/pages\/builds/);
+  assert.match(workflow, /wait_pages_build[\s\S]*?pages\/builds\/latest[\s\S]*?compare\/\$TARGET_SHA\.\.\.\$built_sha[\s\S]*?pages_built=true/);
+  assert.match(workflow, /steps\.request_pages_build\.outcome[^]*?failure[^]*?pages_request_failed/);
+  assert.match(workflow, /steps\.wait_pages_build\.outcome[^]*?failure[^]*?pages_build_failed/);
+  assert.match(workflow, /verify-production:[\s\S]*?needs:[\s\S]*?- publish[\s\S]*?publish_outcome == 'pages_built'[\s\S]*?publish_outcome == 'no_data_changes'/);
   const verifyProductionJob = workflow.slice(
     workflow.indexOf('\n  verify-production:'),
     workflow.indexOf('\n  verify-existing-production:')
@@ -145,7 +165,7 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /PREPARE_SEVERE_FAILURE:[\s\S]*?UPDATE_SEVERE_FAILURE:[\s\S]*?PUBLISH_SEVERE_FAILURE:/);
   assert.match(workflow, /VERIFY_RESULT:\s*\$\{\{ needs\.verify-production\.result \}\}/);
   assert.match(workflow, /VERIFY_SEVERE_FAILURE:\s*\$\{\{ needs\.verify-production\.outputs\.severe_failure \}\}/);
-  assert.match(workflow, /PREPARE_SEVERE_FAILURE[\s\S]*?status=1[\s\S]*?PREPARE_RESULT[\s\S]*?status=0[\s\S]*?单次暂时故障[\s\S]*?exit 0/);
+  assert.match(workflow, /PREPARE_SEVERE_FAILURE[\s\S]*?status=1[\s\S]*?PUBLISH_OUTCOME[^]*?pages_built[^]*?status=0[\s\S]*?单次暂时故障[\s\S]*?exit 0/);
   assert.doesNotMatch(
     workflow,
     /PREPARE_RESULT" != success[\s\S]*?status=1/,
@@ -243,7 +263,7 @@ test('requires production proof before an idempotent run reports success', async
   );
   assert.match(
     notifyJob,
-    /SHOULD_RUN" == true[\s\S]*?UPDATE_RESULT" == success[\s\S]*?PUBLISH_RESULT" == success[\s\S]*?VERIFY_RESULT" == success[\s\S]*?PUBLISH_OUTCOME" == published[\s\S]*?PUBLISH_OUTCOME" == no_data_changes/,
+    /SHOULD_RUN" == true[\s\S]*?UPDATE_RESULT" == success[\s\S]*?PUBLISH_RESULT" == success[\s\S]*?VERIFY_RESULT" == success[\s\S]*?PUBLISH_OUTCOME" == pages_built[\s\S]*?PUBLISH_OUTCOME" == no_data_changes/,
     'the ordinary update success path must retain its full production proof'
   );
   assert.doesNotMatch(
