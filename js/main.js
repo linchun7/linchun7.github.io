@@ -1,113 +1,168 @@
-/**
- * Sets up Justified Gallery.
- */
-if (!!$.prototype.justifiedGallery) {
-    var options = {
-        rowHeight: 140,
-        margins: 4,
-        lastRow: "justify"
+(() => {
+  'use strict';
+
+  const i18n = window.CACTUS_I18N || {};
+  const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
+
+  function setExpanded(control, target, expanded) {
+    if (!control || !target) return;
+    control.setAttribute('aria-expanded', String(expanded));
+    target.hidden = !expanded;
+  }
+
+  function toggleExpanded(control, target) {
+    const next = control.getAttribute('aria-expanded') !== 'true';
+    setExpanded(control, target, next);
+    return next;
+  }
+
+  function scrollToTop() {
+    window.scrollTo({ top: 0, behavior: reducedMotion ? 'auto' : 'smooth' });
+  }
+
+  function copyFallback(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.append(textarea);
+    textarea.select();
+    const success = document.execCommand('copy');
+    textarea.remove();
+    if (!success) throw new Error('Copy command failed');
+  }
+
+  async function copyText(text) {
+    if (navigator.clipboard?.writeText && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+    copyFallback(text);
+  }
+
+  function setupCodeCopy() {
+    document.querySelectorAll('figure.highlight').forEach((figure) => {
+      const codeCells = figure.querySelectorAll('td.code');
+      if (!codeCells.length || figure.querySelector(':scope > .btn-copy')) return;
+
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'btn-copy tooltipped tooltipped-sw';
+      button.setAttribute('aria-label', i18n.copy || 'Copy code');
+      button.innerHTML = '<i class="fa-regular fa-clone" aria-hidden="true"></i>';
+
+      button.addEventListener('click', async () => {
+        const text = [...codeCells].map((cell) => cell.innerText).join('\n').replace(/\n+$/, '');
+        try {
+          await copyText(text);
+          const original = i18n.copy || 'Copy code';
+          button.setAttribute('aria-label', i18n.copied || 'Copied');
+          window.setTimeout(() => button.setAttribute('aria-label', original), 1600);
+        } catch (error) {
+          console.warn('Copy failed:', error);
+        }
+      });
+
+      figure.prepend(button);
+    });
+  }
+
+  function setupHeaderNavigation() {
+    const toggle = document.querySelector('#header .menu-toggle');
+    const list = document.querySelector('#header #nav-list');
+    if (!toggle || !list) return;
+
+    toggle.addEventListener('click', () => {
+      const expanded = toggle.getAttribute('aria-expanded') !== 'true';
+      toggle.setAttribute('aria-expanded', String(expanded));
+      list.classList.toggle('responsive', expanded);
+    });
+  }
+
+  function setupPostActions() {
+    const menu = document.querySelector('#header-post #menu-panel');
+    const menuControls = [...document.querySelectorAll('#menu-icon, #menu-icon-tablet')];
+    const desktopNav = document.querySelector('#header-post #nav');
+
+    const setMenuVisibility = (visible) => {
+      if (!menu) return;
+      menu.hidden = !visible;
+      menuControls.forEach((control) => {
+        control.classList.toggle('active', visible);
+        control.setAttribute('aria-expanded', String(visible));
+      });
     };
-    $(".article-gallery").justifiedGallery(options);
-}
 
-$(document).ready(function () {
+    if (menu && window.matchMedia('(min-width: 1440px)').matches) setMenuVisibility(true);
 
-    /**
-     * Shows the responsive navigation menu on mobile.
-     */
-    $("#header > #nav > ul > .icon").click(function () {
-        $("#header > #nav > ul").toggleClass("responsive");
+    menuControls.forEach((control) => {
+      control.addEventListener('click', () => setMenuVisibility(menu?.hidden ?? true));
     });
 
+    document.querySelectorAll('[data-scroll-top]').forEach((control) => {
+      control.addEventListener('click', scrollToTop);
+    });
 
-    /**
-     * Controls the different versions of  the menu in blog post articles
-     * for Desktop, tablet and mobile.
-     */
-    if ($(".post").length) {
-        var menu = $("#menu");
-        var nav = $("#menu > #nav");
-        var menuIcon = $("#menu-icon, #menu-icon-tablet");
+    document.querySelectorAll('[data-toggle-target]').forEach((control) => {
+      const selector = control.getAttribute('data-toggle-target');
+      if (!selector) return;
+      const target = document.querySelector(selector);
+      if (!target) return;
+      control.addEventListener('click', () => toggleExpanded(control, target));
+    });
 
-        /**
-         * Display the menu on hi-res laptops and desktops.
-         */
-        if ($(document).width() >= 1440) {
-            menu.css("visibility", "visible");
-            menuIcon.addClass("active");
+    const footer = document.querySelector('#footer-post');
+    const tabletMenu = document.querySelector('#menu-icon-tablet');
+    const tabletTop = document.querySelector('#top-icon-tablet');
+    let previousScroll = window.scrollY;
+    let ticking = false;
+
+    const updateOnScroll = () => {
+      const current = window.scrollY;
+      const nearTop = current < 50;
+      const scrolled = current > 100;
+
+      if (menu && desktopNav) {
+        if (nearTop) desktopNav.hidden = false;
+        else if (scrolled) desktopNav.hidden = true;
+      }
+
+      if (tabletMenu && tabletTop) {
+        tabletMenu.hidden = scrolled;
+        tabletTop.hidden = !scrolled;
+      }
+
+      if (footer) {
+        footer.hidden = current > previousScroll && current > 50;
+        if (current !== previousScroll) {
+          ['#nav-footer', '#toc-footer', '#share-footer'].forEach((selector) => {
+            const panel = document.querySelector(selector);
+            if (panel) panel.hidden = true;
+          });
+          document.querySelectorAll('#actions-footer [aria-expanded]').forEach((control) => {
+            control.setAttribute('aria-expanded', 'false');
+          });
         }
+        const footerTop = document.querySelector('#actions-footer [data-scroll-top]');
+        if (footerTop) footerTop.hidden = !scrolled;
+      }
 
-        /**
-         * Display the menu if the menu icon is clicked.
-         */
-        menuIcon.click(function () {
-            if (menu.css("visibility") === "hidden") {
-                menu.css("visibility", "visible");
-                menuIcon.addClass("active");
-            } else {
-                menu.css("visibility", "hidden");
-                menuIcon.removeClass("active");
-            }
-            return false;
-        });
+      previousScroll = Math.max(current, 0);
+      ticking = false;
+    };
 
-        /**
-         * Add a scroll listener to the menu to hide/show the navigation links.
-         */
-        if (menu.length) {
-            $(window).on("scroll", function () {
-                var topDistance = menu.offset().top;
+    window.addEventListener('scroll', () => {
+      if (!ticking) {
+        window.requestAnimationFrame(updateOnScroll);
+        ticking = true;
+      }
+    }, { passive: true });
+  }
 
-                // hide only the navigation links on desktop
-                if (!nav.is(":visible") && topDistance < 50) {
-                    nav.show();
-                } else if (nav.is(":visible") && topDistance > 100) {
-                    nav.hide();
-                }
-
-                // on tablet, hide the navigation icon as well and show a "scroll to top
-                // icon" instead
-                if (!$("#menu-icon").is(":visible") && topDistance < 50) {
-                    $("#menu-icon-tablet").show();
-                    $("#top-icon-tablet").hide();
-                } else if (!$("#menu-icon").is(":visible") && topDistance > 100) {
-                    $("#menu-icon-tablet").hide();
-                    $("#top-icon-tablet").show();
-                }
-            });
-        }
-
-        /**
-         * Show mobile navigation menu after scrolling upwards,
-         * hide it again after scrolling downwards.
-         */
-        if ($("#footer-post").length) {
-            var lastScrollTop = 0;
-            $(window).on("scroll", function () {
-                var topDistance = $(window).scrollTop();
-
-                if (topDistance > lastScrollTop) {
-                    // downscroll -> show menu
-                    $("#footer-post").hide();
-                } else {
-                    // upscroll -> hide menu
-                    $("#footer-post").show();
-                }
-                lastScrollTop = topDistance;
-
-                // close all submenu"s on scroll
-                $("#nav-footer").hide();
-                $("#toc-footer").hide();
-                $("#share-footer").hide();
-
-                // show a "navigation" icon when close to the top of the page, 
-                // otherwise show a "scroll to the top" icon
-                if (topDistance < 50) {
-                    $("#actions-footer > #top").hide();
-                } else if (topDistance > 100) {
-                    $("#actions-footer > #top").show();
-                }
-            });
-        }
-    }
-});
+  document.addEventListener('DOMContentLoaded', () => {
+    setupHeaderNavigation();
+    setupPostActions();
+    setupCodeCopy();
+  });
+})();
