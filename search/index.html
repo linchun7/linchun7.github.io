@@ -62,7 +62,7 @@
 
   
   
-<meta name="generator" content="Hexo 8.1.2">  <meta name="linchun-release" content="d41bc70f992d9fa666e63106035bf238c78d6747">
+<meta name="generator" content="Hexo 8.1.2">  <meta name="linchun-release" content="b1d1fe3d4b1055dbeb68f700810634b712fca22a">
 </head>
 
 <body class="max-width mx-auto px3 ltr">
@@ -124,8 +124,9 @@
     <label class="sr-only" for="search-input">搜索...</label>
     <input type="search" class="search-input" id="search-input"
            placeholder="搜索..." autocomplete="off" spellcheck="false"
+           maxlength="200"
            aria-controls="search-result" aria-describedby="search-help">
-    <p id="search-help" class="search-help">输入文章标题或正文关键词，结果会即时显示。</p>
+    <p id="search-help" class="search-help">输入文章标题或正文关键词，结果会即时显示；最多 200 个字符、20 个空格分隔词。</p>
   </form>
   <div id="search-result" role="region" aria-live="polite" aria-atomic="false"></div>
   <p id="search-no-result" class="search-no-result" role="status" hidden>抱歉，没有符合您搜索条件的结果。请换其它关键词再试。</p>
@@ -162,7 +163,7 @@
 
 
   
-<script src="/js/search.b64fe20be4a5.js"></script>
+<script src="/js/search.5404ea7dfd13.js"></script>
 
   <script>
     (function initSearchWhenReady() {
@@ -170,7 +171,8 @@
         var searchPath = "/search.xml";
         window.searchFunc(searchPath, 'search-input', 'search-result', {
           noResultsId: 'search-no-result',
-          errorText: "搜索索引暂时无法加载，请稍后再试。"
+          errorText: "搜索索引暂时无法加载，请稍后再试。",
+          tooLongText: "搜索内容过长，请缩短后重试。"
         });
       }
       if (document.readyState === 'loading') {
