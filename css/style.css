@@ -453,7 +453,7 @@ body {
   color: #383838;
   font-weight: 400;
   font-size: 16px;
-  font-family: "Fira Code Variable", "Fira Code", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif, monospace;
+  font-family: ui-monospace, "SFMono-Regular", "Cascadia Code", Consolas, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", monospace;
   line-height: 1.725;
   font-display: swap;
   text-rendering: geometricPrecision;
@@ -589,7 +589,7 @@ input:focus-visible {
 .content article.page pre code {
   margin: 0;
   font-size: 16px;
-  font-family: "Fira Code Variable", "Fira Code", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif, monospace;
+  font-family: ui-monospace, "SFMono-Regular", "Cascadia Code", Consolas, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", monospace;
   font-display: swap;
 }
 .content article.page pre ::-webkit-scrollbar {
@@ -607,7 +607,7 @@ input:focus-visible {
   border-style: none;
   border-radius: 4px;
   font-weight: 500;
-  font-family: "Fira Code Variable", "Fira Code", "SFMono-Regular", "Cascadia Code", Consolas, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", monospace;
+  font-family: ui-monospace, "SFMono-Regular", "Cascadia Code", Consolas, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", monospace;
   -webkit-border-radius: 4px;
 }
 .content p {
@@ -1611,7 +1611,7 @@ article .content .caption {
   font-display: swap;
   font-weight: 400;
   font-size: 12.8px;
-  font-family: "Fira Code Variable", "Fira Code", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif, monospace;
+  font-family: ui-monospace, "SFMono-Regular", "Cascadia Code", Consolas, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", monospace;
   line-height: 1.725;
   text-rendering: geometricPrecision;
   text-align: center;
@@ -1793,7 +1793,7 @@ pre code {
   padding-left: 1em;
   border-radius: 4px;
   font-weight: 500;
-  font-family: "Fira Code Variable", "Fira Code", "SFMono-Regular", "Cascadia Code", Consolas, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", monospace !important;
+  font-family: ui-monospace, "SFMono-Regular", "Cascadia Code", Consolas, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", monospace !important;
   display: block;
   border: none;
 }
@@ -1812,7 +1812,7 @@ ol>li code {
   border-radius: 4px;
   background-color: rgba(200,200,200,0.3);
   font-weight: 500;
-  font-family: "Fira Code Variable", "Fira Code", "SFMono-Regular", "Cascadia Code", Consolas, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", monospace;
+  font-family: ui-monospace, "SFMono-Regular", "Cascadia Code", Consolas, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", monospace;
   -webkit-border-radius: 4px;
 }
 table tr:nth-child(2n) {
@@ -1824,13 +1824,13 @@ td code {
   border-radius: 4px;
   background-color: rgba(27,31,35,0.05);
   font-weight: 500;
-  font-family: "Fira Code Variable", "Fira Code", "SFMono-Regular", "Cascadia Code", Consolas, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", monospace;
+  font-family: ui-monospace, "SFMono-Regular", "Cascadia Code", Consolas, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", monospace;
   -webkit-border-radius: 4px;
 }
 table {
   font-weight: 400;
   font-size: 16px !important;
-  font-family: "Fira Code Variable", "Fira Code", "SFMono-Regular", "Cascadia Code", Consolas, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", monospace;
+  font-family: ui-monospace, "SFMono-Regular", "Cascadia Code", Consolas, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", monospace;
 }
 table tr td:not(.gutter):not(.code),
 table tr th:not(.gutter):not(.code) {
@@ -1853,7 +1853,7 @@ table tr .code pre .line .meta + .bash {
   border-radius: 4px;
   background: #3c3c3c;
   font-weight: 500;
-  font-family: "Fira Code Variable", "Fira Code", "SFMono-Regular", "Cascadia Code", Consolas, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", monospace;
+  font-family: ui-monospace, "SFMono-Regular", "Cascadia Code", Consolas, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", monospace;
   -webkit-border-radius: 4px;
 }
 .highlight figcaption {
