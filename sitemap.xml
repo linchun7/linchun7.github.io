@@ -43,6 +43,12 @@
     <loc>https://www.linchun.com.cn/archives/2024/03/</loc>
   </url>
   <url>
+    <loc>https://www.linchun.com.cn/archives/2026/</loc>
+  </url>
+  <url>
+    <loc>https://www.linchun.com.cn/archives/2026/09/</loc>
+  </url>
+  <url>
     <loc>https://www.linchun.com.cn/archives/page/2/</loc>
   </url>
   <url>
@@ -70,6 +76,9 @@
     <loc>https://www.linchun.com.cn/categories/%E6%A6%9C%E5%8D%95/</loc>
   </url>
   <url>
+    <loc>https://www.linchun.com.cn/categories/%E6%B5%8B%E8%AF%95/</loc>
+  </url>
+  <url>
     <loc>https://www.linchun.com.cn/categories/%E9%87%91%E8%9E%8D/</loc>
   </url>
   <url>
@@ -77,6 +86,9 @@
   </url>
   <url>
     <loc>https://www.linchun.com.cn/posts/1a0b935c.html</loc>
+  </url>
+  <url>
+    <loc>https://www.linchun.com.cn/posts/4a17b156.html</loc>
   </url>
   <url>
     <loc>https://www.linchun.com.cn/posts/4e4a96ad.html</loc>
@@ -200,6 +212,9 @@
   </url>
   <url>
     <loc>https://www.linchun.com.cn/tags/DNS%E5%9C%B0%E5%9D%80/</loc>
+  </url>
+  <url>
+    <loc>https://www.linchun.com.cn/tags/Hello-World/</loc>
   </url>
   <url>
     <loc>https://www.linchun.com.cn/tags/Luhn%E7%AE%97%E6%B3%95/</loc>
