@@ -181,16 +181,26 @@ test('production acceptance verifies all five static assets byte-for-byte', asyn
   for (const { path } of CORE_STATIC_ASSETS) {
     assert.equal(result.resources[path], 'verified byte-for-byte');
   }
-  assert.equal(server.observedRequests.length, 9);
-  for (const request of server.observedRequests) {
+  assert.equal(server.observedRequests.length, 13);
+  const diagnosticRequests = server.observedRequests.filter(({ url }) => /[?&]verify=/.test(url));
+  const acceptanceRequests = server.observedRequests.filter(({ url }) => !/[?&]verify=/.test(url));
+  assert.equal(diagnosticRequests.length, 4);
+  assert.equal(acceptanceRequests.length, 9);
+  for (const request of diagnosticRequests) {
     assert.equal(request.cacheControl, 'no-cache');
     assert.equal(request.pragma, 'no-cache');
     assert.match(request.url, /[?&]verify=asset-test-1(?:&|$)/);
+  }
+  for (const request of acceptanceRequests) {
+    assert.equal(request.cacheControl, undefined);
+    assert.equal(request.pragma, undefined);
+    assert.doesNotMatch(request.url, /[?&]verify=/);
   }
   for (const { path } of CORE_STATIC_ASSETS) {
     const request = server.observedRequests.find(({ pathName }) => pathName === `/${path}`);
     assert.ok(request, `missing production readback for ${path}`);
     assert.match(request.url, new RegExp(`[?&]v=${expectedStatic.assets[path].version}(?:&|$)`));
+    assert.doesNotMatch(request.url, /[?&]verify=/);
   }
 });
 

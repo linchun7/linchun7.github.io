@@ -152,8 +152,13 @@ export async function loadStaticAssetManifestFromGitRef(ref = 'origin/main', lab
   );
 }
 
-function requestOptions(signal) {
-  return { cache: 'no-store', headers: { 'cache-control': 'no-cache', pragma: 'no-cache' }, redirect: 'error', signal };
+function requestOptions(signal, { cacheBypass = true } = {}) {
+  const options = { redirect: 'error', signal };
+  if (cacheBypass) {
+    options.cache = 'no-store';
+    options.headers = { 'cache-control': 'no-cache', pragma: 'no-cache' };
+  }
+  return options;
 }
 
 function verificationUrl(baseUrl, runId, attempt) {
@@ -166,6 +171,12 @@ function assetVerificationUrl(baseUrl, assetPath, version, runId, attempt) {
   const url = new URL(assetPath, baseUrl);
   url.searchParams.set('v', version);
   url.searchParams.set('verify', `${runId}-${attempt}`);
+  return url;
+}
+
+function canonicalAssetUrl(baseUrl, assetPath, version) {
+  const url = new URL(assetPath, baseUrl);
+  url.searchParams.set('v', version);
   return url;
 }
 
@@ -184,9 +195,9 @@ async function readBoundedResponse(response, { label, maxBytes, contentTypePatte
   return bytes;
 }
 
-async function fetchJsonResource(fetchImpl, url, signal, resource, maxBytes) {
+async function fetchJsonResource(fetchImpl, url, signal, resource, maxBytes, { cacheBypass = true } = {}) {
   try {
-    const response = await fetchImpl(url, requestOptions(signal));
+    const response = await fetchImpl(url, requestOptions(signal, { cacheBypass }));
     const bytes = await readBoundedResponse(response, {
       label: resource, maxBytes,
       contentTypePattern: /(?:application|text)\/(?:[a-z0-9.+-]*\+)?json\b/i
@@ -201,9 +212,9 @@ async function fetchJsonResource(fetchImpl, url, signal, resource, maxBytes) {
   }
 }
 
-async function fetchHtmlResource(fetchImpl, url, signal) {
+async function fetchHtmlResource(fetchImpl, url, signal, { cacheBypass = true } = {}) {
   try {
-    const response = await fetchImpl(url, requestOptions(signal));
+    const response = await fetchImpl(url, requestOptions(signal, { cacheBypass }));
     const bytes = await readBoundedResponse(response, {
       label: 'index.html', maxBytes: MAX_HTML_RESPONSE_BYTES, contentTypePattern: /text\/html\b/i
     });
@@ -217,11 +228,14 @@ async function fetchHtmlResource(fetchImpl, url, signal) {
   }
 }
 
-async function fetchStaticAsset(fetchImpl, baseUrl, definition, expected, signal, runId, attempt) {
+async function fetchStaticAsset(fetchImpl, baseUrl, definition, expected, signal, runId, attempt, { diagnostic = true } = {}) {
   try {
+    const url = diagnostic
+      ? assetVerificationUrl(baseUrl, definition.path, expected.version, runId, attempt)
+      : canonicalAssetUrl(baseUrl, definition.path, expected.version);
     const response = await fetchImpl(
-      assetVerificationUrl(baseUrl, definition.path, expected.version, runId, attempt),
-      requestOptions(signal)
+      url,
+      requestOptions(signal, { cacheBypass: diagnostic })
     );
     return await readBoundedResponse(response, {
       label: definition.path,
@@ -238,7 +252,7 @@ async function fetchStaticAsset(fetchImpl, baseUrl, definition, expected, signal
 }
 
 async function verifyStaticAssets(manifest, productionHtml, {
-  fetchImpl, productionAssetBaseUrl, signal, runId, attempt
+  fetchImpl, productionAssetBaseUrl, signal, runId, attempt, diagnostic = true
 }) {
   for (const definition of CORE_STATIC_ASSETS) {
     const expected = manifest.assets?.[definition.path];
@@ -266,7 +280,8 @@ async function verifyStaticAssets(manifest, productionHtml, {
       expected,
       signal,
       runId,
-      attempt
+      attempt,
+      { diagnostic }
     );
     if (sha256(bytes) !== expected.hash) {
       const error = new Error(`${definition.path} production bytes do not match the committed asset`);
@@ -284,6 +299,10 @@ function classifyArtifactValidationError(error) {
 }
 
 const artifactHashesMatch = (left, right) => JSON_FILES.every(([key]) => left.hashes[key] === right.hashes[key]);
+const artifactExactlyMatches = (left, right) => artifactHashesMatch(left, right)
+  && publicPayloadFingerprint(left.prices) === publicPayloadFingerprint(right.prices)
+  && left.prices.generatedAt === right.prices.generatedAt
+  && left.prices.run.finishedAtUtc === right.prices.run.finishedAtUtc;
 const safeObservedTimestamp = (value) => (typeof value === 'string' && value.length <= 40 ? value : null);
 const resultResources = (staticManifest) => ({
   'prices.json': 'verified',
@@ -294,6 +313,97 @@ const resultResources = (staticManifest) => ({
     ? Object.fromEntries(CORE_STATIC_ASSETS.map(({ path: assetPath }) => [assetPath, 'verified byte-for-byte']))
     : {})
 });
+
+async function readProductionSnapshot({
+  fetchImpl,
+  productionPricesUrl,
+  productionHistoryUrl,
+  productionRunLogUrl,
+  productionIndexUrl,
+  signal,
+  runId,
+  attempt,
+  diagnostic
+}) {
+  const resourceUrl = (value) => diagnostic ? verificationUrl(value, runId, attempt) : new URL(value);
+  const requestMode = { cacheBypass: diagnostic };
+  const [pricesResult, historyResult, runLogResult, productionHtml] = await Promise.all([
+    fetchJsonResource(fetchImpl, resourceUrl(productionPricesUrl), signal, 'prices', MAX_PRICES_RESPONSE_BYTES, requestMode),
+    fetchJsonResource(fetchImpl, resourceUrl(productionHistoryUrl), signal, 'history', MAX_HISTORY_RESPONSE_BYTES, requestMode),
+    fetchJsonResource(fetchImpl, resourceUrl(productionRunLogUrl), signal, 'run-log', MAX_RUN_LOG_RESPONSE_BYTES, requestMode),
+    fetchHtmlResource(fetchImpl, resourceUrl(productionIndexUrl), signal, requestMode)
+  ]);
+  let observed;
+  try {
+    observed = buildArtifact(
+      { prices: pricesResult.value, history: historyResult.value, runLog: runLogResult.value },
+      { prices: pricesResult.bytes, history: historyResult.bytes, runLog: runLogResult.bytes },
+      diagnostic ? 'production diagnostic artifact' : 'production acceptance artifact'
+    );
+  } catch (error) {
+    error.reason = classifyArtifactValidationError(error);
+    throw error;
+  }
+  try {
+    assertStaticPageMatches(productionHtml, observed.prices);
+  } catch (error) {
+    error.reason = `STATIC_RENDER_MISMATCH:${String(error.message).slice(0, 120).replace(/[\r\n]+/g, ' ')}`;
+    throw error;
+  }
+  return { observed, productionHtml };
+}
+
+async function verifyCanonicalAcceptance(targetArtifact, targetStaticAssets, {
+  fetchImpl,
+  productionPricesUrl,
+  productionHistoryUrl,
+  productionRunLogUrl,
+  productionIndexUrl,
+  productionAssetBaseUrl,
+  signal,
+  runId,
+  attempt
+}) {
+  let snapshot;
+  try {
+    snapshot = await readProductionSnapshot({
+      fetchImpl,
+      productionPricesUrl,
+      productionHistoryUrl,
+      productionRunLogUrl,
+      productionIndexUrl,
+      signal,
+      runId,
+      attempt,
+      diagnostic: false
+    });
+  } catch (error) {
+    error.reason = `canonical:${error.reason ?? (error?.name === 'AbortError' ? 'request-timeout' : String(error?.message ?? error).slice(0, 140).replace(/[\r\n]+/g, ' '))}`;
+    throw error;
+  }
+  const { observed, productionHtml } = snapshot;
+  if (!artifactExactlyMatches(observed, targetArtifact)) {
+    const error = new Error('Canonical production URLs do not match the proven deployment target');
+    error.reason = 'canonical-artifact-not-deployed';
+    throw error;
+  }
+  if (targetStaticAssets) {
+    try {
+      await verifyStaticAssets(targetStaticAssets, productionHtml, {
+        fetchImpl,
+        productionAssetBaseUrl,
+        signal,
+        runId,
+        attempt,
+        diagnostic: false
+      });
+    } catch (error) {
+      error.reason = `canonical:${error.reason ?? String(error?.message ?? error).slice(0, 140).replace(/[\r\n]+/g, ' ')}`;
+      throw error;
+    }
+  }
+  return { observed, productionHtml };
+}
 
 export async function verifyProductionDeployment(expectedArtifact, {
   productionPricesUrl = PRODUCTION_PRICES_URL,
@@ -321,47 +431,37 @@ export async function verifyProductionDeployment(expectedArtifact, {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
     try {
-      const [pricesResult, historyResult, runLogResult, productionHtml] = await Promise.all([
-        fetchJsonResource(fetchImpl, verificationUrl(productionPricesUrl, runId, attempts), controller.signal, 'prices', MAX_PRICES_RESPONSE_BYTES),
-        fetchJsonResource(fetchImpl, verificationUrl(productionHistoryUrl, runId, attempts), controller.signal, 'history', MAX_HISTORY_RESPONSE_BYTES),
-        fetchJsonResource(fetchImpl, verificationUrl(productionRunLogUrl, runId, attempts), controller.signal, 'run-log', MAX_RUN_LOG_RESPONSE_BYTES),
-        fetchHtmlResource(fetchImpl, verificationUrl(productionIndexUrl, runId, attempts), controller.signal)
-      ]);
-      let observed;
-      try {
-        observed = buildArtifact(
-          { prices: pricesResult.value, history: historyResult.value, runLog: runLogResult.value },
-          { prices: pricesResult.bytes, history: historyResult.bytes, runLog: runLogResult.bytes },
-          'production artifact'
-        );
-      } catch (error) {
-        error.reason = classifyArtifactValidationError(error);
-        throw error;
-      }
+      const { observed } = await readProductionSnapshot({
+        fetchImpl,
+        productionPricesUrl,
+        productionHistoryUrl,
+        productionRunLogUrl,
+        productionIndexUrl,
+        signal: controller.signal,
+        runId,
+        attempt: attempts,
+        diagnostic: true
+      });
       lastObservedGeneratedAt = safeObservedTimestamp(observed.prices.generatedAt);
-      try {
-        assertStaticPageMatches(productionHtml, observed.prices);
-      } catch (error) {
-        error.reason = `STATIC_RENDER_MISMATCH:${String(error.message).slice(0, 120).replace(/[\r\n]+/g, ' ')}`;
-        throw error;
-      }
 
       const pricesMatch = observed.hashes.prices === expected.hashes.prices
         && publicPayloadFingerprint(observed.prices) === expectedFingerprint
         && observed.prices.generatedAt === expected.prices.generatedAt
         && observed.prices.run.finishedAtUtc === expected.prices.run.finishedAtUtc;
       if (pricesMatch && observed.hashes.history === expected.hashes.history && observed.hashes.runLog === expected.hashes.runLog) {
-        if (expectedStaticAssets) {
-          await verifyStaticAssets(expectedStaticAssets, productionHtml, {
-            fetchImpl,
-            productionAssetBaseUrl,
-            signal: controller.signal,
-            runId,
-            attempt: attempts
-          });
-        }
-        const result = { status: 'deployed', attempts, elapsedMs: now() - startedAt, expectedGeneratedAt: expected.prices.generatedAt, observedGeneratedAt: observed.prices.generatedAt, resources: resultResources(expectedStaticAssets) };
-        log(`Production verification passed on attempt ${attempts}: ${observed.prices.generatedAt}`);
+        const acceptance = await verifyCanonicalAcceptance(expected, expectedStaticAssets, {
+          fetchImpl,
+          productionPricesUrl,
+          productionHistoryUrl,
+          productionRunLogUrl,
+          productionIndexUrl,
+          productionAssetBaseUrl,
+          signal: controller.signal,
+          runId,
+          attempt: attempts
+        });
+        const result = { status: 'deployed', attempts, elapsedMs: now() - startedAt, expectedGeneratedAt: expected.prices.generatedAt, observedGeneratedAt: acceptance.observed.prices.generatedAt, resources: resultResources(expectedStaticAssets) };
+        log(`Production verification passed on canonical user URLs on attempt ${attempts}: ${acceptance.observed.prices.generatedAt}`);
         return result;
       }
 
@@ -375,8 +475,7 @@ export async function verifyProductionDeployment(expectedArtifact, {
             error.reason = `current-main-invalid:${String(error.message).slice(0, 140).replace(/[\r\n]+/g, ' ')}`;
             throw error;
           }
-          if (artifactHashesMatch(observed, currentMain)
-            && publicPayloadFingerprint(observed.prices) === publicPayloadFingerprint(currentMain.prices)) {
+          if (artifactExactlyMatches(observed, currentMain)) {
             let currentMainStaticAssets = null;
             if (expectedStaticAssets) {
               currentMainStaticAssets = await getCurrentMainStaticAssets();
@@ -385,16 +484,20 @@ export async function verifyProductionDeployment(expectedArtifact, {
                 error.reason = 'current-main-assets-unavailable';
                 throw error;
               }
-              await verifyStaticAssets(currentMainStaticAssets, productionHtml, {
-                fetchImpl,
-                productionAssetBaseUrl,
-                signal: controller.signal,
-                runId,
-                attempt: attempts
-              });
             }
-            const result = { status: 'superseded', attempts, elapsedMs: now() - startedAt, expectedGeneratedAt: expected.prices.generatedAt, observedGeneratedAt: observed.prices.generatedAt, resources: resultResources(currentMainStaticAssets ?? expectedStaticAssets) };
-            log(`Production verification passed with a newer committed deployment on attempt ${attempts}: ${observed.prices.generatedAt}`);
+            const acceptance = await verifyCanonicalAcceptance(currentMain, currentMainStaticAssets, {
+              fetchImpl,
+              productionPricesUrl,
+              productionHistoryUrl,
+              productionRunLogUrl,
+              productionIndexUrl,
+              productionAssetBaseUrl,
+              signal: controller.signal,
+              runId,
+              attempt: attempts
+            });
+            const result = { status: 'superseded', attempts, elapsedMs: now() - startedAt, expectedGeneratedAt: expected.prices.generatedAt, observedGeneratedAt: acceptance.observed.prices.generatedAt, resources: resultResources(currentMainStaticAssets ?? expectedStaticAssets) };
+            log(`Production verification passed with a newer committed deployment on canonical user URLs on attempt ${attempts}: ${acceptance.observed.prices.generatedAt}`);
             return result;
           }
           if (observed.hashes.prices === currentMain.hashes.prices) {
@@ -409,9 +512,9 @@ export async function verifyProductionDeployment(expectedArtifact, {
       else if (observed.hashes.history !== expected.hashes.history) lastReason = 'history-not-deployed';
       else lastReason = 'run-log-not-deployed';
     } catch (error) {
-      lastReason = error?.name === 'AbortError'
+      lastReason = error.reason ?? (error?.name === 'AbortError'
         ? 'request-timeout'
-        : error.reason ?? `retryable-response:${String(error?.message ?? error).slice(0, 160).replace(/[\r\n]+/g, ' ')}`;
+        : `retryable-response:${String(error?.message ?? error).slice(0, 160).replace(/[\r\n]+/g, ' ')}`);
     } finally {
       controller.abort();
       clearTimeout(timeout);

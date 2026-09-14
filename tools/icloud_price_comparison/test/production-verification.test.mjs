@@ -74,13 +74,16 @@ function attemptFromUrl(requestUrl) {
 async function startSequenceServer(sequence) {
   const indexTemplate = await readFile(indexUrl, 'utf8');
   const observedRequests = [];
+  let latestDiagnosticAttempt = 0;
   const server = createServer(async (request, response) => {
     const url = new URL(request.url, 'http://localhost');
     const resource = Object.entries(RESOURCE_PATHS).find(([, pathname]) => pathname === url.pathname)?.[0];
-    const attempt = attemptFromUrl(request.url);
+    const diagnostic = url.search.includes('verify=');
+    const attempt = diagnostic ? attemptFromUrl(request.url) : latestDiagnosticAttempt;
+    if (diagnostic) latestDiagnosticAttempt = attempt;
     const item = sequence[Math.min(attempt, sequence.length - 1)];
     const override = item.responses?.[resource] ?? {};
-    observedRequests.push({ resource, attempt: attempt + 1, url: request.url, cacheControl: request.headers['cache-control'], pragma: request.headers.pragma });
+    observedRequests.push({ resource, attempt: attempt + 1, diagnostic, url: request.url, cacheControl: request.headers['cache-control'], pragma: request.headers.pragma });
     if (override.delayMs) await new Promise((resolve) => setTimeout(resolve, override.delayMs));
     if (response.destroyed) return;
     if (override.redirect) {
@@ -364,18 +367,44 @@ test('supersession fixtures never synthesize a future deployment', () => {
   );
 });
 
-test('applies cache bypass headers and a unique query to every resource and attempt', async (t) => {
+test('uses cache-bypassed diagnostic reads but requires ordinary canonical acceptance requests', async (t) => {
   const old = shiftedArtifact(expected, -1);
   const server = await startSequenceServer([{ artifact: old }, { artifact: expected }]);
   t.after(() => server.close());
   await verifyProductionDeployment(expected, fastOptions(server));
-  assert.equal(server.observedRequests.length, 8);
-  for (const request of server.observedRequests) {
+  assert.equal(server.observedRequests.length, 12);
+  const diagnosticRequests = server.observedRequests.filter(({ diagnostic }) => diagnostic);
+  const acceptanceRequests = server.observedRequests.filter(({ diagnostic }) => !diagnostic);
+  assert.equal(diagnosticRequests.length, 8);
+  assert.equal(acceptanceRequests.length, 4);
+  for (const request of diagnosticRequests) {
     assert.equal(request.cacheControl, 'no-cache');
     assert.equal(request.pragma, 'no-cache');
     assert.match(request.url, new RegExp(`\\?verify=test-run-${request.attempt}$`));
   }
+  for (const request of acceptanceRequests) {
+    assert.equal(request.cacheControl, undefined);
+    assert.equal(request.pragma, undefined);
+    assert.doesNotMatch(request.url, /[?&]verify=/);
+  }
   assert.deepEqual(new Set(server.observedRequests.map(({ resource }) => resource)), new Set(['prices', 'history', 'runLog', 'index']));
+});
+
+test('does not accept cache-bypassed diagnostics when ordinary canonical user URLs are broken', async (t) => {
+  const server = await startSequenceServer([{ artifact: expected }]);
+  t.after(() => server.close());
+  const fetchImpl = async (url, options = {}) => {
+    const parsedUrl = new URL(url, 'http://localhost');
+    if (!parsedUrl.search.includes('verify=')) {
+      return new Response('unavailable', { status: 503, headers: { 'content-type': 'text/plain' } });
+    }
+    return globalThis.fetch(url, options);
+  };
+  await assert.rejects(
+    () => verifyProductionDeployment(expected, fastOptions(server, { fetchImpl, maxWaitMs: 1 })),
+    (error) => error.code === 'PUBLISH_PRODUCTION_NOT_UPDATED'
+      && /canonical:.*HTTP_503/.test(error.details.lastReason)
+  );
 });
 
 test('retries HTTP failure, timeout, malformed prices, and stale static HTML without weakening the contract', async () => {
@@ -404,10 +433,10 @@ test('aborts pending sibling requests when one resource fails fast before retry'
     const parsedUrl = new URL(url, 'http://localhost');
     const token = parsedUrl.searchParams.get('verify') ?? '';
     const attempt = Number(token.match(/-(\d+)$/)?.[1] ?? 1);
-    if (attempt === 1 && parsedUrl.pathname === new URL(server.urls.productionPricesUrl).pathname) {
+    if (parsedUrl.search.includes('verify=') && attempt === 1 && parsedUrl.pathname === new URL(server.urls.productionPricesUrl).pathname) {
       return new Response('{}', { status: 503, headers: { 'content-type': 'application/json' } });
     }
-    if (attempt === 1) {
+    if (parsedUrl.search.includes('verify=') && attempt === 1) {
       pendingSignals.push(options.signal);
       return new Promise((resolve, reject) => {
         const abort = () => reject(new DOMException('Aborted', 'AbortError'));
@@ -446,5 +475,5 @@ test('the existing-production idempotent path uses the same complete verifier co
   const second = await verifyProductionDeployment(expected, fastOptions(server, { runId: 'existing-2' }));
   assert.equal(first.status, 'deployed');
   assert.equal(second.status, 'deployed');
-  assert.equal(server.observedRequests.length, 8);
+  assert.equal(server.observedRequests.length, 16);
 });

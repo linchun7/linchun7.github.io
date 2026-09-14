@@ -191,7 +191,9 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(verifier, /DEFAULT_MAX_WAIT_MS = 5 \* 60 \* 1_000/);
   assert.match(verifier, /DEFAULT_INTERVAL_MS = 15 \* 1_000/);
   assert.match(verifier, /DEFAULT_REQUEST_TIMEOUT_MS = 10 \* 1_000/);
-  assert.match(verifier, /cache: 'no-store'[\s\S]*?'cache-control': 'no-cache'[\s\S]*?pragma: 'no-cache'/);
+  assert.match(verifier, /if \(cacheBypass\)[\s\S]*?options\.cache = 'no-store'[\s\S]*?'cache-control': 'no-cache'[\s\S]*?pragma: 'no-cache'/);
+  assert.match(verifier, /diagnostic \? verificationUrl\(value, runId, attempt\) : new URL\(value\)/);
+  assert.match(verifier, /canonicalAssetUrl[\s\S]*?requestOptions\(signal, \{ cacheBypass: diagnostic \}\)/);
   assert.match(verifier, /schemaVersion !== 4[\s\S]*?parser !== 'cross-checked'/);
   assert.match(verifier, /observed\.prices\.generatedAt === expected\.prices\.generatedAt[\s\S]*?observed\.prices\.run\.finishedAtUtc === expected\.prices\.run\.finishedAtUtc/);
   assert.match(verifier, /observed\.hashes\.history === expected\.hashes\.history[\s\S]*?observed\.hashes\.runLog === expected\.hashes\.runLog/);
