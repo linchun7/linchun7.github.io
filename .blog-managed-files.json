@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "generatedBy": "linchun-blog-source",
   "files": [
     "404.html",
@@ -18,6 +18,7 @@
     "archives/2024/index.html",
     "archives/index.html",
     "archives/page/2/index.html",
+    "blog-release.json",
     "categories/index.html",
     "categories/互联网/index.html",
     "categories/工具/index.html",
@@ -27,7 +28,6 @@
     "categories/技术/网络/index.html",
     "categories/榜单/index.html",
     "categories/金融/index.html",
-    "css/style.44a8ac5847e4.css",
     "css/style.css",
     "images/Photo_0411_1a.jpg",
     "images/apple-touch-icon.png",
@@ -36,9 +36,7 @@
     "images/upyun.png",
     "images/upyun.svg",
     "index.html",
-    "js/main.ecccbd5bfc3b.js",
     "js/main.js",
-    "js/search.7f3cf5106527.js",
     "js/search.js",
     "page/2/index.html",
     "pictures/TOP100_Basic_Information.png",
@@ -98,7 +96,32 @@
     "tags/银行网点/index.html",
     "tags/银行股东/index.html",
     "vendor/fontawesome/LICENSE.txt",
-    "vendor/fontawesome/icons.0f8d2dd5bd48.svg",
     "vendor/fontawesome/icons.svg"
+  ],
+  "immutableAssets": [
+    {
+      "path": "css/style.44a8ac5847e4.css",
+      "sha256": "44a8ac5847e498801abfded22d98724ddd6f8941269be11b4c82d676624e559d"
+    },
+    {
+      "path": "css/style.ea845346be1b.css",
+      "sha256": "ea845346be1beaa82aeb414f11a2e93af478e5175beae79871f5beea2923f935"
+    },
+    {
+      "path": "js/main.ecccbd5bfc3b.js",
+      "sha256": "ecccbd5bfc3b2d18a9ff57b72aae38694b53f51b290bdfe16eef32855359db73"
+    },
+    {
+      "path": "js/search.7f3cf5106527.js",
+      "sha256": "7f3cf5106527aa63b4ef267aa39f5dcd4ae8b68da27a73a6db7b05614295884f"
+    },
+    {
+      "path": "js/search.b64fe20be4a5.js",
+      "sha256": "b64fe20be4a53529128f07a4ae647f326607fa491134403157e0304afd9903f4"
+    },
+    {
+      "path": "vendor/fontawesome/icons.0f8d2dd5bd48.svg",
+      "sha256": "0f8d2dd5bd4801cef20d14b651b37b4a706a41fd7f54ea963b919956242a1026"
+    }
   ]
 }
