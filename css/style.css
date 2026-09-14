@@ -513,6 +513,22 @@ body h4 {
   font: inherit;
   cursor: pointer;
 }
+.icon-svg {
+  display: inline-block;
+  width: 1.25em;
+  height: 1em;
+  overflow: visible;
+  fill: currentColor;
+  vertical-align: -0.125em;
+  flex: none;
+}
+.icon-lg {
+  font-size: 1.25em;
+  vertical-align: -0.0714em;
+}
+.icon-2x {
+  font-size: 2em;
+}
 button:focus-visible,
 a:focus-visible,
 input:focus-visible {

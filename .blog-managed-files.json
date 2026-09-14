@@ -100,10 +100,6 @@
     "vendor/fira-code/files/fira-code-symbols2-wght-normal.woff2",
     "vendor/fira-code/wght.css",
     "vendor/fontawesome/LICENSE.txt",
-    "vendor/fontawesome/css/all.min.css",
-    "vendor/fontawesome/webfonts/fa-brands-400.woff2",
-    "vendor/fontawesome/webfonts/fa-regular-400.woff2",
-    "vendor/fontawesome/webfonts/fa-solid-900.woff2",
-    "vendor/fontawesome/webfonts/fa-v4compatibility.woff2"
+    "vendor/fontawesome/icons.svg"
   ]
 }

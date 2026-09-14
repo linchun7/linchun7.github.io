@@ -50,7 +50,7 @@
       button.type = 'button';
       button.className = 'btn-copy tooltipped tooltipped-sw';
       button.setAttribute('aria-label', i18n.copy || 'Copy code');
-      button.innerHTML = '<i class="fa-regular fa-clone" aria-hidden="true"></i>';
+      button.innerHTML = '<svg class="icon-svg" aria-hidden="true" focusable="false"><use href="/vendor/fontawesome/icons.svg#fa-regular-clone"></use></svg>';
 
       button.addEventListener('click', async () => {
         const text = [...codeCells].map((cell) => cell.innerText).join('\n').replace(/\n+$/, '');
