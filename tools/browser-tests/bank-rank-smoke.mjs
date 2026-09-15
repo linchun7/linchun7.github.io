@@ -77,9 +77,9 @@ try {
 
   assert.equal(await page.locator('#yearSelect').inputValue(), String(latestYear), 'latest year should be selected by default');
   assert.equal(await page.locator('#bankList tr.data-row').count(), 100, 'default view should render the full latest-year top 100');
-  assert.equal((await page.locator('.brand-copy strong').innerText()).trim(), '中国银行业100强榜单');
+  assert.equal((await page.locator('.brand-copy strong').innerText()).trim(), '中国银行业 100 强榜单');
   assert.equal(await page.locator('#brandSubtitle').count(), 0, 'old capital-ranking/year-range brand subtitle should stay removed');
-  assert.equal((await page.locator('#workspaceTitle').innerText()).trim(), `${latestYear} 年中国银行业100强榜单`);
+  assert.equal((await page.locator('#workspaceTitle').innerText()).trim(), `${latestYear} 年中国银行业 100 强榜单`);
   assert.equal((await page.locator('#resultSummary').innerText()).trim(), `100 家银行 · 榜单基于 ${latestBlock.dataYear} 年末财务数据`);
   assert.equal((await page.locator('#dataStatus').innerText()).trim(), `最新榜单 ${latestYear} 年`);
   assert.equal(await page.locator('meta[name="theme-color"]').getAttribute('content'), '#eef2f6', 'theme color should match the shared iCloud page chrome');
@@ -122,7 +122,7 @@ try {
 
   if (oldestYear !== latestYear) {
     await page.locator('#yearSelect').selectOption(String(oldestYear));
-    await page.waitForFunction(year => document.querySelector('#workspaceTitle')?.textContent.includes(`${year} 年中国银行业100强榜单`), oldestYear);
+    await page.waitForFunction(year => document.querySelector('#workspaceTitle')?.textContent.includes(`${year} 年中国银行业 100 强榜单`), oldestYear);
     assert.equal(await page.locator('#bankList tr.data-row').count(), 100, `${oldestYear} should render 100 banks`);
     const oldestBlock = loadedYears.find(block => Number(block.rankingYear) === oldestYear);
     assert.match(await page.locator('#resultSummary').innerText(), new RegExp(`100 家银行 · 榜单基于 ${oldestBlock.dataYear} 年末财务数据`));
@@ -133,7 +133,7 @@ try {
   }
 
   await page.locator('#yearSelect').selectOption('2018');
-  await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2018 年中国银行业100强榜单'));
+  await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2018 年中国银行业 100 强榜单'));
   assert.equal(await page.locator('#bankList tr.data-row').count(), 100, '2018 recovered ranking should render all 100 banks');
   assert.match(await page.locator('#bankList tr.data-row').first().innerText(), /中国工商银行/, '2018 recovered ranking should retain ICBC at the top');
 
@@ -160,7 +160,7 @@ try {
   await page.locator('#bankSearch').fill('');
 
   await page.locator('#yearSelect').selectOption('2021');
-  await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2021 年中国银行业100强榜单'));
+  await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2021 年中国银行业 100 强榜单'));
   await page.locator('#bankSearch').fill('中国建设银行');
   let row = page.locator('#bankList tr.data-row').first();
   assert.equal((await row.locator('td').nth(4).innerText()).trim(), '281,322.54', 'reverified CCB assets should render in the UI');
@@ -182,14 +182,14 @@ try {
   await page.locator('#bankSearch').fill('');
 
   await page.locator('#yearSelect').selectOption('2023');
-  await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2023 年中国银行业100强榜单'));
+  await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2023 年中国银行业 100 强榜单'));
   await page.locator('#bankSearch').fill('华融湘江银行');
   assert.equal(await page.locator('#bankList tr.data-row').count(), 1, 'historical-name search should resolve the renamed bank entity');
   assert.match(await page.locator('#bankList tr.data-row').first().innerText(), /湖南银行/, 'post-rename yearly ranking should display the newer published name');
   await page.locator('#bankSearch').fill('');
 
   await page.locator('#yearSelect').selectOption('2022');
-  await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2022 年中国银行业100强榜单'));
+  await page.waitForFunction(() => document.querySelector('#workspaceTitle')?.textContent.includes('2022 年中国银行业 100 强榜单'));
   await page.locator('#bankSearch').fill('苏州银行');
   row = page.locator('#bankList tr.data-row').first();
   assert.equal((await row.locator('td').nth(3).innerText()).trim(), '331.86', 'corrected Suzhou Bank value should render in the UI');

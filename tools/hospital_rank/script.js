@@ -266,7 +266,7 @@ function initYearSelect() {
     const yearSelect = document.getElementById('yearSelect');
     const years = rankingDataset.years.map(block => Number(block.year)).sort((a, b) => b - a);
     yearSelect.replaceChildren();
-    years.forEach(year => yearSelect.add(new Option(`${year}年`, String(year))));
+    years.forEach(year => yearSelect.add(new Option(`${year} 年`, String(year))));
     yearSelect.add(new Option('全部年份', ''));
 
     const latestYear = years[0];
@@ -442,7 +442,7 @@ function openHistoryDialog(hospitalId, trigger) {
 
         const year = document.createElement('span');
         year.className = 'dialog-history-year';
-        year.textContent = `${record.year}年`;
+        year.textContent = `${record.year} 年`;
 
         const rank = document.createElement('span');
         rank.className = 'dialog-history-rank';

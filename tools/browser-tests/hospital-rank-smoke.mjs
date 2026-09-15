@@ -189,8 +189,8 @@ try {
 
     const historyText = await page.locator('#historyDialog').innerText();
     assert.match(historyText, /历年榜单/);
-    assert.match(historyText, /2023年/);
-    assert.match(historyText, /2022年/);
+    assert.match(historyText, /2023 年/);
+    assert.match(historyText, /2022 年/);
     assert.doesNotMatch(historyText, /同等级内/, 'hospital detail should not repeat global grade-ordering methodology');
 
     await page.locator('#historyDialogClose').click();

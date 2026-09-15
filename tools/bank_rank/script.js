@@ -350,7 +350,7 @@ function render() {
   const filters = [type ? `类型：${type}` : '', query ? `搜索：${query}` : ''].filter(Boolean).join(' · ');
   // Build the entire table off-DOM before replacing the last complete view.
   document.getElementById('bankList').replaceChildren(rows);
-  document.getElementById('workspaceTitle').textContent = `${selectedYear} 年中国银行业100强榜单`;
+  document.getElementById('workspaceTitle').textContent = `${selectedYear} 年中国银行业 100 强榜单`;
   document.getElementById('resultSummary').textContent = `${records.length} 家银行 · 榜单基于 ${block.dataYear} 年末财务数据${filters ? ` · ${filters}` : ''}`;
   updateSortHeaders();
 }
@@ -359,7 +359,7 @@ function initControls() {
   const yearSelect = document.getElementById('yearSelect');
   yearSelect.replaceChildren();
   [...dataset.years].sort((a, b) => b.rankingYear - a.rankingYear).forEach(block => {
-    yearSelect.add(new Option(`${block.rankingYear}年`, String(block.rankingYear)));
+    yearSelect.add(new Option(`${block.rankingYear} 年`, String(block.rankingYear)));
   });
   selectedYear = Math.max(...dataset.years.map(block => Number(block.rankingYear)));
   yearSelect.value = String(selectedYear);

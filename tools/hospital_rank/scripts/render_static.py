@@ -131,7 +131,7 @@ def render_options(data: dict, latest_year: int) -> str:
     lines = []
     for year in years:
         selected = " selected" if year == latest_year else ""
-        lines.append(f'                                <option value="{year}"{selected}>{year}年</option>')
+        lines.append(f'                                <option value="{year}"{selected}>{year} 年</option>')
     lines.append('                                <option value="">全部年份</option>')
     return "\n".join(lines)
 

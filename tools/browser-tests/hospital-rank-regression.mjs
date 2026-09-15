@@ -78,7 +78,7 @@ try {
         await page.locator('.hospital-history-button').first().click();
         await page.locator('#historyDialog').waitFor({ state: 'visible' });
         assert.match(await page.locator('#historyDialogTitle').innerText(), /孙逸仙纪念医院/);
-        assert.match(await page.locator('#historyDialog').innerText(), /2010年/);
+        assert.match(await page.locator('#historyDialog').innerText(), /2010 年/);
         assert.match(await page.locator('#historyDialog').innerText(), /中山大学附属第二医院/);
         await page.keyboard.press('Escape');
         await page.locator('#historyDialog').waitFor({ state: 'hidden' });
