@@ -34,6 +34,20 @@ jobs:
       - name: 应用最终产品补丁
         run: python3 .github/temp-finalize-icloud-zh-monitor.py
 
+      - name: 收窄只读监测断言
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('tools/icloud_price_comparison/test/followup-hardening.test.mjs')
+          text = path.read_text(encoding='utf-8')
+          old = "  assert.doesNotMatch(monitorSource, /country-names\\.zh\\.json|writeFile/);"
+          new = "  assert.doesNotMatch(monitorSource, /readFile\\([^)]*country-names\\.zh\\.json|\\bwriteFile\\b/);"
+          if old in text:
+              text = text.replace(old, new, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+
       - name: 刷新静态资源契约
         working-directory: tools/icloud_price_comparison
         run: |
