@@ -29,14 +29,19 @@ async function readFixture(fileName) {
   return JSON.parse(await readFile(path.join(PROJECT_DIR, 'data', fileName), 'utf8'));
 }
 
-function formatUiDate(value) {
+function parsePublicationDate(value) {
   const text = String(value).trim().replace(/^published\s+date\s*:?\s*/i, '');
   const date = /^\d{4}-\d{2}-\d{2}$/.test(text)
     ? new Date(`${text}T00:00:00Z`)
     : new Date(`${text} 00:00:00 UTC`);
+  if (Number.isNaN(date.getTime())) throw new Error(`Invalid publication date fixture: ${value}`);
+  return date;
+}
+
+function formatUiDate(value) {
   return new Intl.DateTimeFormat('zh-CN', {
     year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'UTC'
-  }).format(date);
+  }).format(parsePublicationDate(value));
 }
 
 function setPayloadGeneratedAt(data, generatedAt) {
@@ -1452,7 +1457,7 @@ test('keeps current prices usable when optional history data is unavailable or m
       {
         status: 200,
         body: JSON.stringify(staleHistory),
-        expectedPublishedDate: '2026/07/17'
+        expectedPublishedDate: formatUiDate(expectedData.source.publishedDate)
       },
       {
         status: 200,
@@ -1589,7 +1594,7 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
   const browserConfig = await resolveBrowser(context, 'the stale-data UI test');
   if (!browserConfig) return;
   const validData = await readFixture('prices.json');
-  const referenceNow = Date.now();
+  const referenceNow = Date.parse(validData.generatedAt) + (8 * 24 * 60 * 60 * 1_000);
   const scenarios = [
     {
       label: 'old snapshot',
@@ -1721,7 +1726,7 @@ test('reclassifies long-lived pages across lifecycle boundaries without replacin
   if (!browserConfig) return;
   const fixture = await readFixture('prices.json');
   const history = await readFixture('history.json');
-  const referenceNow = Date.now();
+  const referenceNow = Date.parse(fixture.generatedAt) + (8 * 24 * 60 * 60 * 1_000);
   const original = structuredClone(fixture);
   setPayloadGeneratedAt(original, new Date(referenceNow - (35 * 60 * 60 * 1_000) - (59 * 60 * 1_000)).toISOString());
   original.fx.fetchedAt = original.generatedAt;
@@ -1950,7 +1955,7 @@ test('shows an explicit expired state when lifecycle refresh fails', { timeout: 
   const browserConfig = await resolveBrowser(context, 'the expired lifecycle failure test');
   if (!browserConfig) return;
   const payload = await readFixture('prices.json');
-  const referenceNow = Date.now();
+  const referenceNow = Date.parse(payload.generatedAt) + (8 * 24 * 60 * 60 * 1_000);
   setPayloadGeneratedAt(payload, new Date(referenceNow - (7 * 24 * 60 * 60 * 1_000)).toISOString());
   payload.fx.fetchedAt = payload.generatedAt;
   payload.fx.stale = false;
@@ -2228,7 +2233,7 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
   const firstTier = data.tiers[0];
   const dayMs = 86_400_000;
   const priceEnd = Date.UTC(2026, 7, 1);
-  const publicationEnd = Date.UTC(2026, 6, 17);
+  const publicationEnd = parsePublicationDate(data.source.publishedDate).getTime();
   const priceEvents = Array.from({ length: 100 }, (_, index) => {
     const observedAt = new Date(priceEnd - (99 - index) * dayMs).toISOString().slice(0, 10);
     return {
