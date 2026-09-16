@@ -8,6 +8,7 @@ const autoMergeWorkflowUrl = new URL('../../../.github/workflows/auto-merge-offi
 const artifactValidationWorkflowUrl = new URL('../../../.github/workflows/validate-action-artifact-roundtrip.yml', import.meta.url);
 const validationWorkflowUrl = new URL('../../../.github/workflows/validate-icloud-price-comparison.yml', import.meta.url);
 const updateWorkflowUrl = new URL('../../../.github/workflows/update-icloud-prices.yml', import.meta.url);
+const monitorWorkflowUrl = new URL('../../../.github/workflows/monitor-icloud-zh-markets.yml', import.meta.url);
 const autoMergeScriptUrl = new URL('../scripts/auto-merge-official-actions.mjs', import.meta.url);
 const manifestUrl = new URL('../vendor/manifest.json', import.meta.url);
 const vendorSubsetUrl = new URL('../vendor/lucide-subset.js', import.meta.url);
@@ -16,13 +17,14 @@ const noticesUrl = new URL('../THIRD_PARTY_NOTICES.md', import.meta.url);
 const LONG_LIVED_WORKFLOWS = [
   'auto-merge-official-actions.yml',
   'icloud-repository-maintenance.yml',
+  'monitor-icloud-zh-markets.yml',
   'update-icloud-prices.yml',
   'validate-action-artifact-roundtrip.yml',
   'validate-icloud-price-comparison.yml',
   'validate-static-tools.yml',
 ];
 
-test('keeps the automation surface limited to six reviewed long-lived workflows', async () => {
+test('keeps the automation surface limited to seven reviewed long-lived workflows', async () => {
   const workflows = (await readdir(workflowsDirUrl))
     .filter((name) => /\.ya?ml$/i.test(name))
     .sort();
@@ -42,6 +44,18 @@ test('pins every long-lived GitHub Action to a full SHA with a stable release an
       );
     }
   }
+});
+
+test('keeps Chinese market monitoring read-only and isolated from the price updater', async () => {
+  const [monitorWorkflow, updateWorkflow] = await Promise.all([
+    readFile(monitorWorkflowUrl, 'utf8'),
+    readFile(updateWorkflowUrl, 'utf8'),
+  ]);
+  assert.match(monitorWorkflow, /workflow_run:[\s\S]*?Update iCloud prices[\s\S]*?completed/);
+  assert.match(monitorWorkflow, /permissions:[\s\S]*?contents: read/);
+  assert.doesNotMatch(monitorWorkflow, /contents: write/);
+  assert.match(monitorWorkflow, /node scripts\/check-apple-zh-markets\.mjs/);
+  assert.doesNotMatch(updateWorkflow, /check-apple-zh-markets\.mjs/);
 });
 
 test('stages maintenance after production and keeps every dependency update in its own PR', async () => {
