@@ -4,15 +4,15 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const APPLE_ZH_ICLOUD_URL = 'https://support.apple.com/zh-cn/108047';
-const REVIEWED_NAMES_URL = new URL('./country-names.zh.json', import.meta.url);
+const REVIEWED_MARKETS_URL = new URL('./apple-zh-reviewed-markets.json', import.meta.url);
 const REQUEST_TIMEOUT_MS = 15_000;
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const MIN_PLAUSIBLE_MARKETS = 20;
 const MAX_PLAUSIBLE_MARKETS = 400;
 
 const CAPACITY_RE = /(?:^|[^\d])(?:50|200)\s*GB\b|(?:^|[^\d])(?:2|6|12)\s*TB\b/giu;
-const MARKET_HEADER_RE = /^(?:国家(?:或地区)?|国家\s*\/\s*地区|地区|市场|country(?:\s*\/\s*region)?|region|market)(?:\s*\([^)]*\))?$/iu;
-const NON_MARKET_RE = /(?:icloud|homekit|储存空间|存储空间|价格|定价|方案|月费|国家或地区|国家\/地区|付款方式|发布日期|有帮助|北美洲|南美洲|拉丁美洲|加勒比地区|欧洲、中东和非洲|欧洲|中东|非洲|亚太地区)/iu;
+const MARKET_HEADER_RE = /^(?:国家(?:或地区)?|国家\s*\/\s*地区|地区|市场|country(?:\s*\/\s*region)?|region|market)(?:\s*[（(][^）)]*[）)])?$/iu;
+const NON_MARKET_RE = /(?:icloud|homekit|储存空间|存储空间|价格|定价|方案|月费|国家或地区|国家\s*\/\s*地区|付款方式|发布日期|有帮助|北美洲|南美洲|拉丁美洲|加勒比地区|欧洲、中东和非洲|亚太地区)/iu;
 const FOOTNOTE_SUFFIX_RE = /(?:\s*(?:\d+(?:\s*[,，]\s*\d+)*|[⁰¹²³⁴⁵⁶⁷⁸⁹]+))+$/u;
 const ZERO_WIDTH_RE = /[\u200B-\u200D\u2060\uFEFF]/gu;
 
@@ -37,14 +37,13 @@ function countCapacityMarkers(value) {
 function looksLikeMarketName(value) {
   const name = stripFootnotes(value);
   if (!name || name.length > 60 || NON_MARKET_RE.test(name)) return false;
-  if (MARKET_HEADER_RE.test(name)) return false;
-  if (/[：:$€£¥₩₽₹₱₦₸]|\b(?:GB|TB)\b/iu.test(name)) return false;
-  if (/\d/u.test(name)) return false;
+  if (/^[（(]|[）)]$/u.test(name) || MARKET_HEADER_RE.test(name)) return false;
+  if (/[：:$€£¥₩₽₹₱₦₸]|\b(?:GB|TB)\b/iu.test(name) || /\d/u.test(name)) return false;
   return /[\p{L}\p{Script=Han}]/u.test(name);
 }
 
 export function marketNameFromLabel(value, { allowPlain = false } = {}) {
-  let text = stripFootnotes(value);
+  const text = stripFootnotes(value);
   if (!text) return null;
 
   const parenthesized = text.match(/^(.{1,90}?)\s*[（(]([^（）()]{1,80})[）)]$/u);
@@ -74,12 +73,16 @@ function rootForExtraction($) {
         : $('body');
 }
 
+// Legacy Apple form: one market heading followed by a price list. We deliberately
+// do not depend on gb-* classes or one exact heading level.
 function extractHeadingCandidates($, root, target) {
   root.find('h2,h3,h4,h5,h6,dt').each((_, element) => {
     addCandidate(target, $(element).text(), { allowPlain: false });
   });
 }
 
+// Current English-style form: a table whose first column is market/country and
+// whose remaining columns are storage tiers. Header wording and column count may vary.
 function extractTableCandidates($, root, target) {
   root.find('table').each((_, table) => {
     const rows = $(table).find('tr').toArray();
@@ -103,53 +106,31 @@ function extractTableCandidates($, root, target) {
   });
 }
 
-function firstShortChildText($, element) {
-  for (const node of element.childNodes ?? []) {
-    const raw = node.type === 'text' ? node.data : $(node).text();
-    const text = normalizeVisibleText(raw);
-    if (!text || text.length > 100 || countCapacityMarkers(text) > 0) continue;
-    return text;
-  }
-  return '';
+function directNodeText($, node) {
+  if (node.type === 'text') return normalizeVisibleText(node.data);
+  return normalizeVisibleText($(node).text());
 }
 
-function extractContextCandidates($, root, target) {
-  root.find('section,article,div,li,dd,p').each((_, element) => {
-    const text = normalizeVisibleText($(element).text());
-    if (!text || text.length > 1500 || countCapacityMarkers(text) < 2) return;
+// Generic future form: a small local container whose first few direct nodes contain
+// a short market label and whose following siblings contain multiple storage tiers.
+// This keeps the fallback independent of CSS/classes while preventing article-wide
+// feature lists or footnotes from being mistaken for markets.
+function extractLocalGroupCandidates($, root, target) {
+  root.find('section,article,div,li,dd').each((_, element) => {
+    const nodes = (element.childNodes ?? []).filter((node) => directNodeText($, node));
+    if (nodes.length < 2 || nodes.length > 24) return;
+    const totalText = normalizeVisibleText($(element).text());
+    if (!totalText || totalText.length > 1200 || countCapacityMarkers(totalText) < 2) return;
 
-    const leadingLabel = text.match(/^(.{1,100}?[（(][^（）()]{1,80}[）)])/u)?.[1];
-    if (leadingLabel) addCandidate(target, leadingLabel, { allowPlain: false });
-
-    const childText = firstShortChildText($, element);
-    if (childText) addCandidate(target, childText, { allowPlain: true });
-  });
-}
-
-function collectTextNodes(rootNode) {
-  const values = [];
-  const visit = (node) => {
-    if (node.type === 'text') {
-      const text = normalizeVisibleText(node.data);
-      if (text) values.push(text);
-      return;
+    for (let index = 0; index < Math.min(nodes.length - 1, 4); index += 1) {
+      const label = directNodeText($, nodes[index]);
+      const candidate = marketNameFromLabel(label, { allowPlain: true });
+      if (!candidate) continue;
+      const following = nodes.slice(index + 1).map((node) => directNodeText($, node)).join(' ');
+      if (countCapacityMarkers(following) >= 2) target.add(candidate);
+      break;
     }
-    for (const child of node.children ?? []) visit(child);
-  };
-  visit(rootNode);
-  return values;
-}
-
-function extractTextAdjacencyCandidates(root, target) {
-  const rootNode = root[0];
-  if (!rootNode) return;
-  const tokens = collectTextNodes(rootNode);
-  for (let index = 0; index < tokens.length; index += 1) {
-    const candidate = marketNameFromLabel(tokens[index], { allowPlain: true });
-    if (!candidate) continue;
-    const nearby = tokens.slice(index + 1, index + 10).join(' ');
-    if (countCapacityMarkers(nearby) >= 2) target.add(candidate);
-  }
+  });
 }
 
 export function extractAppleZhMarketNames(html) {
@@ -158,19 +139,25 @@ export function extractAppleZhMarketNames(html) {
   const markets = new Set();
   extractHeadingCandidates($, root, markets);
   extractTableCandidates($, root, markets);
-  extractContextCandidates($, root, markets);
-  extractTextAdjacencyCandidates(root, markets);
+  extractLocalGroupCandidates($, root, markets);
   return [...markets].sort((a, b) => a.localeCompare(b, 'zh-CN'));
 }
 
-export function reviewedMarketNamesFromMapping(mapping) {
-  if (!mapping || typeof mapping !== 'object' || Array.isArray(mapping)) {
-    throw new Error('Chinese market-name authority must be an object');
+export function parseReviewedMarketBaseline(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Chinese market review baseline must be an object');
   }
-  const names = Object.values(mapping)
-    .filter((value) => typeof value === 'string' && value.trim())
-    .map(normalizeVisibleText);
-  return [...new Set(names)].sort((a, b) => a.localeCompare(b, 'zh-CN'));
+  if (value.source !== APPLE_ZH_ICLOUD_URL || !Array.isArray(value.markets)) {
+    throw new Error('Chinese market review baseline has an unsupported structure');
+  }
+  const markets = value.markets.map(normalizeVisibleText);
+  if (markets.some((name) => !looksLikeMarketName(name))) {
+    throw new Error('Chinese market review baseline contains an invalid market name');
+  }
+  if (new Set(markets).size !== markets.length) {
+    throw new Error('Chinese market review baseline contains duplicate names');
+  }
+  return markets;
 }
 
 export function compareMarketNameSets(reviewedNames, observedNames) {
@@ -229,42 +216,34 @@ async function fetchAppleHtml(fetchImpl = fetch) {
 
 export async function runAppleZhMarketMonitor({ fetchImpl = fetch } = {}) {
   try {
-    const mapping = JSON.parse(await readFile(REVIEWED_NAMES_URL, 'utf8'));
-    const reviewedNames = reviewedMarketNamesFromMapping(mapping);
-    const html = await fetchAppleHtml(fetchImpl);
-    const observedNames = extractAppleZhMarketNames(html);
+    const reviewedNames = parseReviewedMarketBaseline(JSON.parse(await readFile(REVIEWED_MARKETS_URL, 'utf8')));
+    const observedNames = extractAppleZhMarketNames(await fetchAppleHtml(fetchImpl));
     validateObservedMarketSet(reviewedNames, observedNames);
     const diff = compareMarketNameSets(reviewedNames, observedNames);
 
     if (!diff.added.length && !diff.removed.length) {
       console.log(`Apple Chinese iCloud+ market list unchanged (${observedNames.length} markets).`);
-      await appendSummary([
-        '### Apple 中文 iCloud+ 地区监测',
-        '',
-        `地区名称集合未变化（${observedNames.length} 个）。`,
-      ]);
+      await appendSummary(['### Apple 中文 iCloud+ 地区监测', '', `地区名称集合未变化（${observedNames.length} 个）。`]);
       return { status: 'unchanged', reviewedNames, observedNames, ...diff };
     }
 
     const message = `新增 ${diff.added.length}，移除 ${diff.removed.length}；仅提示人工复核，不自动修改中文名称。`;
     console.log(`::warning title=Apple 中文 iCloud+ 地区列表有变化::${escapeWorkflowCommand(message)}`);
+    console.log(`Apple Chinese market additions: ${diff.added.join('、') || '无'}`);
+    console.log(`Apple Chinese market removals: ${diff.removed.join('、') || '无'}`);
     await appendSummary([
       '### ⚠️ Apple 中文 iCloud+ 地区列表有变化',
       '',
-      `${message}`,
+      message,
       diff.added.length ? `- 页面新增：${diff.added.join('、')}` : '- 页面新增：无',
       diff.removed.length ? `- 页面不再出现：${diff.removed.join('、')}` : '- 页面不再出现：无',
-      '- 处理方式：人工核对同一 Apple 中文 iCloud+ 页面后，再更新 `scripts/country-names.zh.json`。',
+      '- 处理方式：人工核对同一 Apple 中文 iCloud+ 页面后，再更新地区名单基线；如能可靠对应英文市场，再更新 `scripts/country-names.zh.json`。',
     ]);
     return { status: 'changed', reviewedNames, observedNames, ...diff };
   } catch (error) {
     const message = `本次中文地区监测不可用：${error instanceof Error ? error.message : String(error)}；不影响价格更新。`;
     console.log(`::notice title=Apple 中文地区监测不可用::${escapeWorkflowCommand(message)}`);
-    await appendSummary([
-      '### Apple 中文 iCloud+ 地区监测',
-      '',
-      `${message}`,
-    ]);
+    await appendSummary(['### Apple 中文 iCloud+ 地区监测', '', message]);
     return { status: 'unavailable', error };
   }
 }
