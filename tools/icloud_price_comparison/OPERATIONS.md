@@ -38,7 +38,7 @@ Apple Support HTML ─┐
 - 新 Apple 市场先匹配 active registry；未命中时直接生成确定性 `apple-*` ID。真正 unknown 完成正常语义确认且无冲突后允许自动发布，一旦发布该 ID 永久不 rekey。
 - 已发布或历史出现过的市场 ID 永久 reserved，不因市场移除而重新分配。
 - 不做模糊 market rename 自动绑定；只有严格高置信 identity ambiguity 才要求维护者显式增加 alias。
-- 运维审计必须区分“稳定市场身份”和“Apple 来源证据”：价格/币种历史按永久 `marketId` 连续；发布日期事件的 `changes` 按 Apple 快照原始 `country` 名称取证。若 Apple 只改 source wording，同一 `marketId` 可以保持不变，但 publication evidence 仍应显示旧名移除与新名新增。
+- 运维审计必须区分“稳定市场身份”和“Apple 来源证据”：价格/币种历史按永久 `marketId` 连续；发布日期事件的 `changes` 按 Apple 快照原始 `country` 名称取证。若 Apple 只改 source wording，同一 `marketId` 可以保持不变，但 publication evidence 仍应显示旧名移除与新名新增；价格历史的 artifact 深验必须按解析后的稳定 `marketId` 对齐快照事件。
 - 默认 200GB 人民币参考价升序；200GB 不存在时使用当前 tier 列表首项作为默认容量。
 - 容量价格排序显示生成器提供的全球 `cnyRank`；搜索和地区筛选不重算局部排名。国家/地区排序改用当前列表序号，移动端显示为 `序N`，并提供独立读屏文本“全球价格排名第 N / 当前列表序号第 N”；视觉徽标本身不重复进入无障碍名称。
 - 搜索输入先做 Unicode NFKC 规范化；`marketId`、中英文国家/地区名做部分匹配。地区搜索同时覆盖 Apple 原始英文 region 与中文显示标签，但仅在查询至少 2 个 Unicode 字符时参与；完整 `marketId` 优先级最高，币种只按完整代码匹配。
