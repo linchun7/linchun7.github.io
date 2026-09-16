@@ -1,0 +1,44 @@
+name: Temporary iCloud seal verification
+on:
+  push:
+    branches: [review/icloud-seal-recovery-20260916]
+permissions:
+  contents: read
+concurrency:
+  group: icloud-seal-recovery-20260916
+  cancel-in-progress: false
+jobs:
+  regression:
+    if: github.repository == 'linchun7/linchun7.github.io' && github.ref == 'refs/heads/review/icloud-seal-recovery-20260916'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22
+      - name: Install pinned dependencies
+        working-directory: tools/icloud_price_comparison
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile --ignore-scripts
+      - name: Adversarial regressions before implementation
+        working-directory: tools/icloud_price_comparison
+        run: node --test test/seal-regressions.test.mjs
+      - name: Export isolated review inputs
+        if: always()
+        run: |
+          git rev-parse HEAD > "$RUNNER_TEMP/review-head.txt"
+          tar -czf "$RUNNER_TEMP/review-inputs.tgz" .github tools/icloud_price_comparison
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: icloud-seal-review-inputs
+          path: |
+            ${{ runner.temp }}/review-inputs.tgz
+            ${{ runner.temp }}/review-head.txt
+          if-no-files-found: error
+          retention-days: 1
