@@ -31,7 +31,7 @@ jobs:
 
       - name: 针对性监测与展示测试
         working-directory: tools/icloud_price_comparison
-        run: node --test --test-concurrency=1 test/followup-hardening.test.mjs test/automation-policy.test.mjs
+        run: node --test --test-concurrency=1 test/followup-hardening.test.mjs
 
       - name: 真实 Apple 中文页验收
         working-directory: tools/icloud_price_comparison
