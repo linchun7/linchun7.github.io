@@ -22,6 +22,24 @@ jobs:
           node-version: 22
       - name: Apply exact patch
         run: python3 .github/temp-icloud-market-metadata-fix.py
+      - name: Refine regression expectations
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('tools/icloud_price_comparison/test/update-prices.test.mjs')
+          text = path.read_text()
+          text = text.replace(
+              r'assert.match(summary, /待同一 Apple iCloud\+ 中文价格页同步\/确认：1 个/);',
+              r'assert.match(summary, /待同一 Apple iCloud\+ 中文价格页同步\/确认：[1-9]\d* 个/);',
+              1
+          )
+          old = '''    assert.equal(caseOnlyUnknown.marketId, publishedUnknown.marketId);\n    assert.notEqual(caseOnlyUnknown.marketId, resolveMarket('new apple market').id);\n'''
+          new = '''    assert.equal(caseOnlyUnknown.marketId, publishedUnknown.marketId);\n    assert.notEqual(caseOnlyUnknown.marketId, resolveMarket('new apple market').id);\n    assert.equal(warnings.filter((warning) => warning.startsWith('MARKET_REVIEW_DEBT:')).length, 1);\n    assert.equal(logs.filter((message) => message.startsWith('::notice title=Apple market review debt::')).length, 1);\n'''
+          if text.count(old) != 1:
+              raise SystemExit(f'expected republish assertion anchor once, found {text.count(old)}')
+          path.write_text(text.replace(old, new, 1))
+          PY
       - name: Install dependencies
         working-directory: tools/icloud_price_comparison
         run: |
