@@ -175,4 +175,5 @@ test('Chinese market monitor is an isolated read-only service triggered after th
   const monitorSource = await readFile(new URL('../scripts/check-apple-zh-markets.mjs', import.meta.url), 'utf8');
   assert.doesNotMatch(monitorSource, /readFile\([^)]*country-names\.zh\.json|\bwriteFile\b/);
   assert.match(monitorSource, /仅提示人工复核，不自动修改中文名称/);
+  assert.match(monitorSource, /process\.exitCode = monitorExitCode\(result\)/);
 });
