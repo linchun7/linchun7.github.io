@@ -231,3 +231,5 @@ Apple 108047 可能以历史逐市场列表或按地区 `Country (Currency)` 表
 `market-evidence.mjs` 统一快照证据中的首次规范化 source-name → 永久 ID 绑定及精确日期锚点。已发布的未知名称仅改大小写时，不能重新哈希；历史声称的 ID 也不能充当自己的证据。已保留的永久 ID 不再作为 removed/added rename 候选；真正冲突和未确认的一对一 rename 仍阻塞。
 
 archive importer 重放完整 snapshot ledger（包括此前 live revision），而非只拼本次输入与最新价格；保留可精确匹配证据的 live UTC 观察记录。`history.updatedAt` 是与当前价格批次一致的 as-of 水位，回填不是一次新的 Apple 观察，导入执行时间只写运维日志。在线事件与回填事件仍只能命中 revision 的 `firstConfirmedDate` 或 `publishedDate`，不使用时间范围容忍。
+
+区域完整性必须对 region 内的全部表格取证，而非只枚举已经识别的表头。合法区域表拆成“可识别部分 + 未识别部分”时，两路 parser 都必须拒绝，不能将遗漏行解释为已确认市场移除；区域外由独立标题界定的无关表格不参与价格解析。

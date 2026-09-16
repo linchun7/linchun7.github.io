@@ -329,7 +329,10 @@ function parseByDocumentOrder($, options) {
 
   for (const node of nodes) {
     if ($(node).is('table')) {
-      if (!isPotentialPricingTable($, node)) continue;
+      if (!isPotentialPricingTable($, node)) {
+        if (currentRegion) throw new Error(`Unrecognized table inside Apple pricing section #${currentSectionId}`);
+        continue;
+      }
       if (!currentRegion || !currentSectionId) throw new Error('Apple pricing table was found before a region heading');
       if (seenTables.has(currentSectionId)) throw new Error(`Multiple Apple pricing tables found for #${currentSectionId}`);
       countries.push(...parsePricingTable($, node, currentRegion, options));
@@ -356,13 +359,16 @@ function parseByAppleMarkers($, options) {
   const countries = [];
   const foundRegions = new Set();
   const seenTables = new Set();
-  const nodes = $('#nasalac, #emea, #ap, table').toArray();
+  const nodes = $('#nasalac, #emea, #ap, h2, h3, table').toArray();
   let currentRegion = null;
   let currentSectionId = null;
 
   for (const node of nodes) {
     if ($(node).is('table')) {
-      if (!isPotentialPricingTable($, node)) continue;
+      if (!isPotentialPricingTable($, node)) {
+        if (currentRegion) throw new Error(`Unrecognized table inside Apple marker pricing section #${currentSectionId}`);
+        continue;
+      }
       if (!currentRegion || !currentSectionId) throw new Error('Apple marker parser found a pricing table before a region marker');
       if (seenTables.has(currentSectionId)) throw new Error(`Multiple Apple marker pricing tables found for #${currentSectionId}`);
       countries.push(...parsePricingColumns($, node, currentRegion, options));
@@ -370,7 +376,13 @@ function parseByAppleMarkers($, options) {
       continue;
     }
     const sectionId = $(node).attr('id');
-    if (!REGIONS[sectionId]) continue;
+    if (!REGIONS[sectionId]) {
+      if ($(node).is('h2, h3')) {
+        currentRegion = null;
+        currentSectionId = null;
+      }
+      continue;
+    }
     currentRegion = REGIONS[sectionId];
     currentSectionId = sectionId;
     foundRegions.add(sectionId);
