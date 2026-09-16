@@ -6,12 +6,12 @@ on:
       - fix/icloud-zh-market-monitor-v2
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   diagnose:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -22,40 +22,17 @@ jobs:
         run: |
           corepack enable
           pnpm install --frozen-lockfile --ignore-scripts
-      - name: Apply currency-fragment hardening in diagnostic workspace
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path('tools/icloud_price_comparison/scripts/check-apple-zh-markets.mjs')
-          text = path.read_text(encoding='utf-8')
-          old = "  if (!name || name.length > 60 || NON_MARKET_RE.test(name)) return false;\n"
-          new = "  if (!name || name.length > 60 || NON_MARKET_RE.test(name)) return false;\n  if (/^[（(]|[）)]$/u.test(name)) return false;\n"
-          if old not in text:
-              raise SystemExit('looksLikeMarketName marker missing')
-          path.write_text(text.replace(old, new, 1), encoding='utf-8')
-          PY
-      - name: Print exact live market-name diff
+      - name: Inspect current Apple Chinese HTML around candidate names
         working-directory: tools/icloud_price_comparison
         run: |
           node --input-type=module <<'NODE'
-          import { readFile } from 'node:fs/promises';
-          import {
-            APPLE_ZH_ICLOUD_URL,
-            compareMarketNameSets,
-            extractAppleZhMarketNames,
-            reviewedMarketNamesFromMapping,
-          } from './scripts/check-apple-zh-markets.mjs';
-          const mapping = JSON.parse(await readFile('./scripts/country-names.zh.json', 'utf8'));
-          const reviewed = reviewedMarketNamesFromMapping(mapping);
-          const response = await fetch(APPLE_ZH_ICLOUD_URL, { cache: 'no-store', headers: { 'cache-control': 'no-cache' } });
+          const url = 'https://support.apple.com/zh-cn/108047';
+          const response = await fetch(url, { cache: 'no-store', headers: { 'cache-control': 'no-cache' } });
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          const observed = extractAppleZhMarketNames(await response.text());
-          const diff = compareMarketNameSets(reviewed, observed);
-          console.log(JSON.stringify({ reviewedCount: reviewed.length, observedCount: observed.length, added: diff.added, removed: diff.removed }, null, 2));
+          const html = await response.text();
+          for (const needle of ['刚果共和国', '毛里求斯', '莫尔多瓦', '摩尔多瓦', '隐藏邮件地址', '自定义电子邮件域']) {
+            const at = html.indexOf(needle);
+            console.log(`\n===== ${needle} @ ${at} =====`);
+            console.log(at >= 0 ? html.slice(Math.max(0, at - 500), at + 900).replace(/\s+/g, ' ') : 'NOT FOUND');
+          }
           NODE
-      - name: Run focused parser regressions
-        working-directory: tools/icloud_price_comparison
-        run: |
-          python3 ../../../.github/temp-icloud-zh-market-v2.py
-          pnpm assets:update
-          node --test --test-concurrency=1 test/followup-hardening.test.mjs test/workflow.test.mjs
