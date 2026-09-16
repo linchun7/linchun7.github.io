@@ -24,7 +24,7 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: 22
-      - name: Apply the reviewed patch and remove all temporary source scaffolding
+      - name: Apply reviewed patch and remove temporary scaffolding
         run: |
           python3 - <<'PY'
           import base64, gzip, hashlib, pathlib, subprocess
@@ -36,55 +36,64 @@ jobs:
           for p in paths: p.unlink()
           pathlib.Path('.github/workflows/icloud-seal-review-temporary.yml').unlink()
           PY
-      - name: Install pinned dependencies and generate official asset versions
+      - name: Install pinned dependencies and generate asset versions
         working-directory: tools/icloud_price_comparison
         run: |
           corepack enable
           pnpm install --frozen-lockfile --ignore-scripts
           pnpm assets:update
+      - name: Freeze the exact clean candidate before testing Git HEAD
+        run: |
+          set -euo pipefail
+          git diff --check
+          git diff --exit-code 5d1f37e1699667c7935e73a7695148fd9fa22510 -- tools/icloud_price_comparison/data tools/icloud_price_comparison/scripts/apple-zh-reviewed-markets.json tools/icloud_price_comparison/scripts/country-names.zh.json
+          git diff --name-only | while IFS= read -r file; do
+            case "$file" in
+              tools/icloud_price_comparison/*|.github/workflows/monitor-icloud-zh-markets.yml|.github/workflows/icloud-seal-review-temporary.yml|.github/icloud-seal-part[012].b64) ;;
+              *) echo "Unexpected path: $file" >&2; exit 1;;
+            esac
+          done
+          test -z "$(git ls-files --others --exclude-standard)"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -u
+          git commit -m 'fix: close iCloud source accounting and monitoring blind spots' -m 'Preserve production evidence and permanent identities; share reviewed rename projection; bound read-only monitoring input and fail visibly. Temporary review scaffolding removed. This immutable commit must pass all acceptance gates before it is pushed.'
+          git rev-parse HEAD > "$RUNNER_TEMP/review-head.txt"
+          git diff --exit-code HEAD
       - name: Focused regressions
         working-directory: tools/icloud_price_comparison
-        run: node --test test/seal-regressions.test.mjs test/followup-hardening.test.mjs test/production-loop.test.mjs
-      - name: Full core
+        run: |
+          node --test test/seal-regressions.test.mjs test/followup-hardening.test.mjs test/production-loop.test.mjs > "$RUNNER_TEMP/focused.log" 2>&1 || { grep -A35 -B3 'not ok' "$RUNNER_TEMP/focused.log" || true; tail -n15 "$RUNNER_TEMP/focused.log"; exit 1; }
+          tail -n12 "$RUNNER_TEMP/focused.log"
+      - name: Full core on immutable HEAD
         working-directory: tools/icloud_price_comparison
-        run: pnpm test:core
-      - name: Current artifact deep validation
+        run: |
+          pnpm test:core > "$RUNNER_TEMP/core.log" 2>&1 || { grep -A35 -B3 'not ok' "$RUNNER_TEMP/core.log" || true; tail -n15 "$RUNNER_TEMP/core.log"; exit 1; }
+          tail -n12 "$RUNNER_TEMP/core.log"
+      - name: Current artifact and all snapshots deep validation
         working-directory: tools/icloud_price_comparison
-        run: pnpm validate:artifact
-      - name: All Apple snapshots deep audit
-        working-directory: tools/icloud_price_comparison
-        run: pnpm validate:snapshots
+        run: |
+          pnpm validate:artifact
+          pnpm validate:snapshots
       - name: Dependency audit
         working-directory: tools/icloud_price_comparison
         run: pnpm audit --audit-level low
       - name: Install all three browsers
         working-directory: tools/icloud_price_comparison
-        run: pnpm exec playwright install --with-deps chromium firefox webkit
-      - name: Chromium
+        run: pnpm exec playwright install --with-deps chromium firefox webkit > "$RUNNER_TEMP/browser-install.log" 2>&1 || { tail -n60 "$RUNNER_TEMP/browser-install.log"; exit 1; }
+      - name: Chromium Firefox and WebKit acceptance
         working-directory: tools/icloud_price_comparison
-        env:
-          PLAYWRIGHT_BROWSER: chromium
-        run: node --test test/ui-smoke.test.mjs test/static-descending-url-state.test.mjs
-      - name: Firefox
-        working-directory: tools/icloud_price_comparison
-        env:
-          PLAYWRIGHT_BROWSER: firefox
-        run: node --test test/ui-smoke.test.mjs test/static-descending-url-state.test.mjs
-      - name: WebKit
-        working-directory: tools/icloud_price_comparison
-        env:
-          PLAYWRIGHT_BROWSER: webkit
-        run: node --test test/ui-smoke.test.mjs test/static-descending-url-state.test.mjs
+        run: |
+          set -euo pipefail
+          for browser in chromium firefox webkit; do
+            echo "Testing $browser"
+            PLAYWRIGHT_BROWSER="$browser" node --test test/ui-smoke.test.mjs test/static-descending-url-state.test.mjs > "$RUNNER_TEMP/$browser.log" 2>&1 || { grep -A40 -B3 'not ok' "$RUNNER_TEMP/$browser.log" || true; tail -n15 "$RUNNER_TEMP/$browser.log"; exit 1; }
+            tail -n12 "$RUNNER_TEMP/$browser.log"
+          done
       - name: Live Apple Chinese monitoring
         working-directory: tools/icloud_price_comparison
         run: node scripts/check-apple-zh-markets.mjs
-      - name: Confirm evidence is byte-identical and diff is clean
-        run: |
-          git diff --check
-          git diff --exit-code 5d1f37e1699667c7935e73a7695148fd9fa22510 -- tools/icloud_price_comparison/data tools/icloud_price_comparison/scripts/apple-zh-reviewed-markets.json tools/icloud_price_comparison/scripts/country-names.zh.json
-          test ! -e .github/workflows/icloud-seal-review-temporary.yml
-          test ! -e .github/icloud-seal-part0.b64
-      - name: Commit only the tested clean candidate to this review branch
+      - name: Publish only the tested immutable candidate to this review branch
         id: publish
         env:
           GH_TOKEN: ${{ github.token }}
@@ -92,26 +101,23 @@ jobs:
           set -euo pipefail
           test "$GITHUB_REF" = refs/heads/review/icloud-seal-recovery-20260916
           test "$(git ls-remote origin "$GITHUB_REF" | cut -f1)" = "$GITHUB_SHA"
-          git diff --name-only | while IFS= read -r file; do
-            case "$file" in
-              tools/icloud_price_comparison/*|.github/workflows/monitor-icloud-zh-markets.yml|.github/workflows/icloud-seal-review-temporary.yml|.github/icloud-seal-part[012].b64) ;;
-              *) echo "Unexpected path: $file" >&2; exit 1;;
-            esac
-          done
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -u
-          git commit -m 'fix: close iCloud source accounting and monitoring blind spots' -m 'Tests-first adversarial review; preserve all production evidence and permanent IDs, share reviewed rename projection, bound read-only monitor input and isolate fail-red alerting. Full candidate core/artifact/snapshots/audit and all browsers passed; temporary review files removed.'
+          test "$(git rev-parse HEAD)" = "$(cat "$RUNNER_TEMP/review-head.txt")"
+          git diff --exit-code HEAD
+          test -z "$(git ls-files --others --exclude-standard)"
+          git diff --check 5d1f37e1699667c7935e73a7695148fd9fa22510 HEAD
+          git diff --exit-code 5d1f37e1699667c7935e73a7695148fd9fa22510 HEAD -- tools/icloud_price_comparison/data tools/icloud_price_comparison/scripts/apple-zh-reviewed-markets.json tools/icloud_price_comparison/scripts/country-names.zh.json
+          test ! -e .github/workflows/icloud-seal-review-temporary.yml
+          test -z "$(find .github -name 'icloud-seal-part*.b64' -print)"
           auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
           git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push origin HEAD:refs/heads/review/icloud-seal-recovery-20260916
           echo "candidate_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          git rev-parse HEAD > "$RUNNER_TEMP/review-head.txt"
+          printf 'Candidate SHA: `%s`\nAll pre-PR gates passed; not yet merged or released.\n' "$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
           git diff --stat 5d1f37e1699667c7935e73a7695148fd9fa22510 HEAD
-      - name: Export candidate for independent readback
+      - name: Export exact candidate and complete test evidence
         if: always()
         run: |
-          git diff > "$RUNNER_TEMP/review-working.diff"
-          tar -czf "$RUNNER_TEMP/review-inputs.tgz" .github tools/icloud_price_comparison
+          git diff 5d1f37e1699667c7935e73a7695148fd9fa22510 > "$RUNNER_TEMP/review-working.diff"
+          tar --exclude=node_modules -czf "$RUNNER_TEMP/review-inputs.tgz" .github tools/icloud_price_comparison
           git rev-parse HEAD > "$RUNNER_TEMP/review-head.txt"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
@@ -121,8 +127,9 @@ jobs:
             ${{ runner.temp }}/review-inputs.tgz
             ${{ runner.temp }}/review-head.txt
             ${{ runner.temp }}/review-working.diff
+            ${{ runner.temp }}/*.log
           if-no-files-found: error
-          retention-days: 3
+          retention-days: 7
   postmerge:
     needs: seal
     if: needs.seal.result == 'success'
@@ -133,7 +140,7 @@ jobs:
       actions: read
       pull-requests: read
     steps:
-      - name: Observe the exact reviewed PR merge and its main CI plus Pages
+      - name: Verify the exact candidate PR merge and successful main CI plus Pages
         id: merged
         env:
           GH_TOKEN: ${{ github.token }}
@@ -152,6 +159,7 @@ jobs:
             if (pr) {
               const detail = await get(`/pulls/${pr.number}`);
               if (detail.merged) {
+                if (detail.head.sha !== process.env.CANDIDATE_SHA) throw new Error('PR head changed');
                 const runs = (await get(`/actions/runs?head_sha=${detail.merge_commit_sha}&per_page=100`)).workflow_runs;
                 const ci = runs.find(r => r.event === 'push' && r.name === 'Validate iCloud price comparison');
                 const pages = runs.find(r => r.name === 'pages build and deployment');
@@ -168,7 +176,7 @@ jobs:
             }
             await new Promise(resolve => setTimeout(resolve, 15000));
           }
-          if (!result) throw new Error('Bounded post-merge observation expired; no release acceptance claimed');
+          if (!result) throw new Error('Bounded observation expired; no release acceptance claimed');
           appendFileSync(process.env.GITHUB_OUTPUT, `merge_sha=${result.mergeSha}\npr_number=${result.pr}\n`);
           writeFileSync(`${process.env.RUNNER_TEMP}/postmerge.json`, JSON.stringify(result, null, 2));
           console.log(JSON.stringify(result));
@@ -180,12 +188,13 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: 22
-      - name: Validate exact merged artifact and canonical production bytes
+      - name: Validate exact merged artifact and ordinary canonical production bytes
         run: |
+          set -euo pipefail
           node tools/icloud_price_comparison/scripts/validate-data-artifact.mjs --data-dir tools/icloud_price_comparison/data
-          node tools/icloud_price_comparison/scripts/verify-production-deployment.mjs --expected-data-dir tools/icloud_price_comparison/data --run-id "seal-${{ github.run_id }}" --summary-file "$GITHUB_STEP_SUMMARY" --max-wait-ms 600000 --interval-ms 15000
+          node tools/icloud_price_comparison/scripts/verify-production-deployment.mjs --expected-data-dir tools/icloud_price_comparison/data --run-id "seal-${{ github.run_id }}" --summary-file "$GITHUB_STEP_SUMMARY" --max-wait-ms 600000 --interval-ms 15000 | tee "$RUNNER_TEMP/production.log"
           test ! -e .github/workflows/icloud-seal-review-temporary.yml
-          test ! -e .github/icloud-seal-part0.b64
+          test -z "$(find .github -name 'icloud-seal-part*.b64' -print)"
       - name: Delete only this merged exact-head review branch
         env:
           GH_TOKEN: ${{ github.token }}
@@ -198,7 +207,7 @@ jobs:
           const prResponse = await fetch(`${root}/pulls/${process.env.PR_NUMBER}`, { headers, signal: AbortSignal.timeout(15000) });
           if (!prResponse.ok) throw new Error(`PR verification ${prResponse.status}`);
           const pr = await prResponse.json();
-          if (!pr.merged || pr.head.ref !== 'review/icloud-seal-recovery-20260916' || pr.head.sha !== process.env.CANDIDATE_SHA) throw new Error('Refuse branch cleanup: PR identity changed');
+          if (!pr.merged || pr.head.ref !== 'review/icloud-seal-recovery-20260916' || pr.head.sha !== process.env.CANDIDATE_SHA) throw new Error('Refuse cleanup: PR identity changed');
           const url = `${root}/git/refs/heads/review/icloud-seal-recovery-20260916`;
           const ref = await fetch(url, { headers, signal: AbortSignal.timeout(15000) });
           if (ref.status === 404) { console.log('Review branch already deleted'); process.exit(0); }
@@ -211,6 +220,8 @@ jobs:
         if: always()
         with:
           name: icloud-seal-postmerge-evidence
-          path: ${{ runner.temp }}/postmerge.json
+          path: |
+            ${{ runner.temp }}/postmerge.json
+            ${{ runner.temp }}/production.log
           if-no-files-found: warn
-          retention-days: 3
+          retention-days: 7
