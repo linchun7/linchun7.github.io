@@ -27,6 +27,19 @@ jobs:
           corepack enable
           pnpm install --frozen-lockfile --ignore-scripts
 
+      - name: Harden plain-text fallback against currency fragments
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('tools/icloud_price_comparison/scripts/check-apple-zh-markets.mjs')
+          text = path.read_text(encoding='utf-8')
+          old = "  if (!name || name.length > 60 || NON_MARKET_RE.test(name)) return false;\n"
+          new = "  if (!name || name.length > 60 || NON_MARKET_RE.test(name)) return false;\n  if (/^[（(]|[）)]$/u.test(name)) return false;\n"
+          if old not in text:
+              raise SystemExit('looksLikeMarketName marker missing')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+
       - name: Apply final product patch
         run: python3 .github/temp-icloud-zh-market-v2.py
 
