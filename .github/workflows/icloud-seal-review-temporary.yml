@@ -15,7 +15,7 @@ jobs:
     permissions:
       contents: write
     outputs:
-      candidate_sha: ${{ steps.publish.outputs.candidate_sha }}
+      candidate_sha: ${{ steps.accept.outputs.candidate_sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -24,48 +24,72 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: 22
-      - name: Apply reviewed patch and remove temporary scaffolding
+      - name: Apply both reviewed patches and remove temporary scaffolding
+        env:
+          SUPPLEMENTAL_B64: H4sIAAAAAAAC/8VYbVMUxxb+zq/oD1R2VnZnWDUmGjUibF2plFYK8d6qAJFmpmHbzM6s07PiBqhaYxRFFrgpQAh4wRcENYIao7zqfzHbs7uf8hfu6ZnZV40vMVWp0p2XPn3O0+c85+kewuEwwoptmjpTqKqbSe10wqIqOa2a8QS2KDMNhakWTdhMgWdGwu5w2MY9OmFy/Ayra2hoQD0f5+LIERSOfL43FNmLGtzrPnTkSB1SFNRrmXGE4YL74sSwUX+MqjFkEGrHiIU0opoaXMn5hI6pQTS5DvUmDdWmpoFimJ0ysKqaScMm2tcQkxp90XNUI4ZKpPoQcgEE0UAdQkg1DWYjy+xn6BCql7whuZcamhSwrUBQts0my8IpKSjHcUKSwDKIDh0WM5qJrjPhT7zzRlV45Q4bAK+dnLfFsPsyGPyiLlwM50KzUgIaaTP7IbIAIDMzTjwfzHXi3sk6MfrsGDqMIsIBQp984g945jZEca2VzpPyrk5J+vJAR1P4m66BPUOD0aRlBjuDnWxXvSLbhNmedfBdjrQqa0DegERNmorAFTVpWZDNlMCNKENJwyLM1M8RDTEzaakEET/fcEMMqB78wJ2V8l3huPAkpsYpY1AfZFoojvVe04pDNVEbOZuklniPkUb7KBDATOrgnUI6bD2FEskenbKY7w5IwQhiNtV1IBncg+84tr4jNkOYIYvEzXNYh/teG1iDDQDci+NUp9hCMYI1CCQLV1XlafYX+SEVavibKgQ5L5HTpsQ6BiAB+Vth1Eb7tlNrELHkUBfcBb+EIPD4r6OD7UcHvz4arFfon0X0qiP4/Yam0KqaogzFDSoJJ1CSb0VgANC1q6MzMXBSHeqC6ABB6+jU5FDgVXq2k3UJOPDat4CU4PD3chcgrVeSHrTX20j493vJInbSMl5rpsFBJFWkDIpRXo5H5eqJlWV+x1w0VIcqhAYzRiz7JI0ndNIuclQlLuH3UFixSCVhmVrS9RjWTTPhrvy9BfbtHoS+7t77WSjyOWoQ1z2Nrr7WITe7AUawfuDN7YBUbBimjWLQxtCDCU9Fy3rs6nOPCbQvBy/KMguEIDcpQ4VkuqxwlRYQmep3sk3jYCETw03YAMIJyg6gjkALtkmgKwTK2X8AdL4fiRdSYHfj7n3hxr3hSGN7ZPeBxkb4900giIYq5XQAJbAdYyGkYRu3UAsNAW1xPwbV6KXnodYEcFTYU4PaFAtuwyJNg6pYb3a5QAmTPENvtpU0JDtU9N7hSdsxO65LvosQKgFs3B8IdlU8VwOuiN5DQORICSHW9aMpKIfkg680rQcr3cSa9NbIkcZA1e5iWiCYBvZ6N+DyMSC614KSV9qVaunaHXQNDx+0BQEOH1T8q91jainxWLy6VlULihW1qRi4qBRiALmbKJDXIH5wz1xWY1TXoPGkEjRZCJEUOO7qNpKKfRn0gxXhVnoH1ziRIPDseX2zpYBetqxFKUY9lD4Oz0nJzN0zID+xPYebNI0KokNuabPoRwTHD4MdVGAMOF+MW0khTyNki5whqs2kGkbVyzFR02AIFe/eQKGIR6EQUk7BNquafQb9nmiDp4zS6WcwWT7vDPqtqlAfhgdAIyQRPZvEuvQntAv5xIT4Fd7KJIknodRCEfydV2zMRCdu34u9O2lDv4KWpEpbv1u3IU9ywTOSKulyHIQCmb3Q+MmKRUESA/6BINAlRNTdTysm++cGd2J9o7x/v5hxQmkSF/E/LH7qwxH3EgEtZBV+ijWxvc2lu36gjGWoSGMF1Q/4UWA3CJB4wk4FhlwBJKy7JGwufX1x851/gBx5s7+onfkuYSqZw5GnxXSrARXwDkgMZkNNAB10hk1V//yDDBwncM/OJomFhZYzP4lMLvvzA3c0dsn+rggYAkdxDMPMQEXgv18Xa1LwbnWsmfBBGlkz9x1KWWP9kXpZTnYvkiqa4NChQ6i6CYKVnPorKlsx+S+pbcX891Td0oyh8u3Hy/BbXSH3JMp06Esp4i/HY3blzI+T8Rre/7NiXgbzj0p6TU7gu4pCQBI9b1tYBf9wbsNNlk174en1th0q3rpEgR/3JPceR+WmtuZjre3R5vZTbVE5rr3X4bh2jncc3hfaI07D+0KfuofhboExHIdW1OUzrBtl1x+i7rbov1uj/4m2nD7e1PZVtP10a0v0RHtre2v0ZDdyZtb42IIzf5U/f8JXbxa/eCEPoK25n3/kk2vZ9TS//ciZGftjezT7Yg6+OPooA1X9PX2Bj13m408K90fzaxfAGPkfzhbi4yPOb+P55St8doXfyeQmV35P/9DtOT8BIt4KFbCpnfqKpATIMWdiPvf0Vn75x/zoRT46Xfh5Mnd3C+IVLrzklzLeaHZ7BoacyQ0+PoOo7wDcNnnndT6+xsfv8jvT2e1FfmkJ1uPh8nmjeJ/LzNWwcGsLbDZaH7wA2GDkZFb/2J4rQXae3ISU5NeWvCHn+rPseiY3Ou/8ds2Zv59bWPISBMGz63fy6UveEvnEKORKpGttA36dkSm+81gsYjgDBgq//CR3/0J+80F2awfcOSMzfHwRhi3cj7CmEU1xP+3hqsaw0QfkBis+9z9+eRYCiQ+d/LXHzvQwHx/NP19D7l+hINMvLxVubjm3087CUu7aL7kH15zF4cKtGZGIrQxfv8vndvjqM4WvX8gtZ5wr03x1ozA8rhSG/1u4dcNbn8jBzRVncRvi+OsrfjkBhPzFHf7oMr96L7szm916Dmb5m6NQA+fKxKv0vHMdsv2rN/1V+obI4vVF36zoPDe/4Dy8zUcWwBVYClxQrJc7uakliCjS/GIjNzWam3zMV0edqacomRBdaKFXl39C2G+/YnOagl2Z7ItrwDF+53H+6RK/muETY/zSSuHiSm5yIbu5DFnKbj3jD6/nR6BC6fzwU2f6YX4lnX15wxm5I7LZUNdQlRhYkjP/CxSHP3oMPSEgPpzh8yuA3rmx5GxOlEniJshP8sQYGHir9eJn1zdz9zahNbrhIAftdWU6t/jUySyI3tlY8LKZv/Ugv3y7MDwCxnz9Bz6/CWTNLW8VZgW0mhQIAuz8lN15CQQTfJh44Ew9gpWJ3vTmTmTAOd94VkhPwKMzu+Z1D5iJ7M+t8p2pUieBcW75kedBcOFqRtDVy6I71xm7l5ubriLH9iYYiJz9H2dFMUZnFQAA
         run: |
           python3 - <<'PY'
-          import base64, gzip, hashlib, pathlib, subprocess
+          import base64, gzip, hashlib, os, pathlib, subprocess
           paths = [pathlib.Path(f'.github/icloud-seal-part{i}.b64') for i in range(3)]
-          patch = gzip.decompress(base64.b64decode(''.join(p.read_text() for p in paths), validate=True))
-          assert hashlib.sha256(patch).hexdigest() == 'c96ffe4e80e94a2f28b2dac3a221841811649a0c2151bcc64fe4cf6862b28fc1'
-          subprocess.run(['git', 'apply', '--check', '-'], input=patch, check=True)
-          subprocess.run(['git', 'apply', '-'], input=patch, check=True)
+          patches = [
+            (''.join(p.read_text() for p in paths), 'c96ffe4e80e94a2f28b2dac3a221841811649a0c2151bcc64fe4cf6862b28fc1'),
+            (os.environ['SUPPLEMENTAL_B64'], '49ca62e4085957bebe363d6b8eb55ac0a901a82b988d0ed7d427ef303f700088'),
+          ]
+          for encoded, expected in patches:
+              patch = gzip.decompress(base64.b64decode(encoded, validate=True))
+              assert hashlib.sha256(patch).hexdigest() == expected, 'Patch checksum mismatch'
+              subprocess.run(['git', 'apply', '--check', '-'], input=patch, check=True)
+              subprocess.run(['git', 'apply', '-'], input=patch, check=True)
           for p in paths: p.unlink()
           pathlib.Path('.github/workflows/icloud-seal-review-temporary.yml').unlink()
           PY
-      - name: Install pinned dependencies and generate asset versions
+      - name: Install pinned dependencies and generate official assets
         working-directory: tools/icloud_price_comparison
         run: |
           corepack enable
           pnpm install --frozen-lockfile --ignore-scripts
           pnpm assets:update
-      - name: Freeze the exact clean candidate before testing Git HEAD
+      - name: Stage exact Git objects without updating any remote ref
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           git diff --check
           git diff --exit-code 5d1f37e1699667c7935e73a7695148fd9fa22510 -- tools/icloud_price_comparison/data tools/icloud_price_comparison/scripts/apple-zh-reviewed-markets.json tools/icloud_price_comparison/scripts/country-names.zh.json
-          git diff --name-only | while IFS= read -r file; do
-            case "$file" in
-              tools/icloud_price_comparison/*|.github/workflows/monitor-icloud-zh-markets.yml|.github/workflows/icloud-seal-review-temporary.yml|.github/icloud-seal-part[012].b64) ;;
-              *) echo "Unexpected path: $file" >&2; exit 1;;
-            esac
-          done
           test -z "$(git ls-files --others --exclude-standard)"
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -u
-          git commit -m 'fix: close iCloud source accounting and monitoring blind spots' -m 'Preserve production evidence and permanent identities; share reviewed rename projection; bound read-only monitoring input and fail visibly. Temporary review scaffolding removed. This immutable commit must pass all acceptance gates before it is pushed.'
-          git rev-parse HEAD > "$RUNNER_TEMP/review-head.txt"
+          python3 - <<'PY'
+          import base64, json, os, pathlib, subprocess, urllib.request
+          root = 'https://api.github.com/repos/linchun7/linchun7.github.io'
+          def git(*args): return subprocess.check_output(['git', *args], text=True).strip()
+          def post(path, body):
+              request = urllib.request.Request(root+path, data=json.dumps(body).encode(), headers={'Authorization': 'Bearer '+os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json', 'Content-Type':'application/json'}, method='POST')
+              with urllib.request.urlopen(request, timeout=30) as response: return json.load(response)
+          elements = []
+          for suffix in ['scripts/parse-price-tables.mjs', 'test/production-loop.test.mjs', 'ARCHITECTURE.md']:
+              path = 'tools/icloud_price_comparison/'+suffix
+              blob = post('/git/blobs', {'content':base64.b64encode(pathlib.Path(path).read_bytes()).decode(), 'encoding':'base64'})
+              assert blob['sha'] == git('hash-object', path), 'Blob readback mismatch'
+              elements.append({'path':path,'mode':'100644','type':'blob','sha':blob['sha']})
+          tree = post('/git/trees', {'base_tree':'ec8c7c28c7bcfa47a304d72a3259c01871c78822','tree':elements})
+          assert tree['sha'] == git('write-tree'), 'Whole candidate tree differs from reviewed patch output'
+          candidate = post('/git/commits', {'message':'fix: close iCloud source-accounting and monitoring blind spots\n\nPreserve raw data and permanent identities; unify reviewed rename presentation, fail on unresolved price fragments including empty or N/A amounts, and bound isolated Chinese monitoring. Includes isolated full-updater negative regressions. Temporary scaffolding removed; candidate requires all acceptance gates before publication.', 'tree':tree['sha'], 'parents':[os.environ['GITHUB_SHA']]})
+          directory = pathlib.Path(os.environ['RUNNER_TEMP'])
+          (directory/'review-head.txt').write_text(candidate['sha']+'\n')
+          (directory/'candidate.json').write_text(json.dumps({'sha':candidate['sha'],'tree':tree['sha'],'parent':os.environ['GITHUB_SHA'],'published':False},indent=2)+'\n')
+          print('Staged candidate object: '+candidate['sha']+'; no remote ref updated')
+          PY
+          candidate="$(cat "$RUNNER_TEMP/review-head.txt")"
+          git fetch --no-tags origin "$candidate"
+          test "$(git rev-parse "$candidate^{tree}")" = "$(git write-tree)"
+          git reset --hard "$candidate"
           git diff --exit-code HEAD
-      - name: Focused regressions
+      - name: Focused source-accounting and monitoring regressions
         working-directory: tools/icloud_price_comparison
         run: |
-          node --test test/seal-regressions.test.mjs test/followup-hardening.test.mjs test/production-loop.test.mjs > "$RUNNER_TEMP/focused.log" 2>&1 || { grep -A35 -B3 'not ok' "$RUNNER_TEMP/focused.log" || true; tail -n15 "$RUNNER_TEMP/focused.log"; exit 1; }
+          node --test test/seal-regressions.test.mjs test/followup-hardening.test.mjs test/production-loop.test.mjs test/parse-price-tables.test.mjs > "$RUNNER_TEMP/focused.log" 2>&1 || { grep -A35 -B3 'not ok' "$RUNNER_TEMP/focused.log" || true; tail -n15 "$RUNNER_TEMP/focused.log"; exit 1; }
           tail -n12 "$RUNNER_TEMP/focused.log"
-      - name: Full core on immutable HEAD
+      - name: Full core on exact candidate HEAD
         working-directory: tools/icloud_price_comparison
         run: |
           pnpm test:core > "$RUNNER_TEMP/core.log" 2>&1 || { grep -A35 -B3 'not ok' "$RUNNER_TEMP/core.log" || true; tail -n15 "$RUNNER_TEMP/core.log"; exit 1; }
@@ -90,16 +114,16 @@ jobs:
             PLAYWRIGHT_BROWSER="$browser" node --test test/ui-smoke.test.mjs test/static-descending-url-state.test.mjs > "$RUNNER_TEMP/$browser.log" 2>&1 || { grep -A40 -B3 'not ok' "$RUNNER_TEMP/$browser.log" || true; tail -n15 "$RUNNER_TEMP/$browser.log"; exit 1; }
             tail -n12 "$RUNNER_TEMP/$browser.log"
           done
-      - name: Live Apple Chinese monitoring
+      - name: Live English updater dry run and Chinese monitoring
         working-directory: tools/icloud_price_comparison
-        run: node scripts/check-apple-zh-markets.mjs
-      - name: Publish only the tested immutable candidate to this review branch
-        id: publish
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          test "$GITHUB_REF" = refs/heads/review/icloud-seal-recovery-20260916
+          pnpm check:live | tee "$RUNNER_TEMP/live-english.log"
+          node scripts/check-apple-zh-markets.mjs | tee "$RUNNER_TEMP/live-chinese.log"
+      - name: Accept exact candidate for authorized connector publication
+        id: accept
+        run: |
+          set -euo pipefail
           test "$(git ls-remote origin "$GITHUB_REF" | cut -f1)" = "$GITHUB_SHA"
           test "$(git rev-parse HEAD)" = "$(cat "$RUNNER_TEMP/review-head.txt")"
           git diff --exit-code HEAD
@@ -108,17 +132,14 @@ jobs:
           git diff --exit-code 5d1f37e1699667c7935e73a7695148fd9fa22510 HEAD -- tools/icloud_price_comparison/data tools/icloud_price_comparison/scripts/apple-zh-reviewed-markets.json tools/icloud_price_comparison/scripts/country-names.zh.json
           test ! -e .github/workflows/icloud-seal-review-temporary.yml
           test -z "$(find .github -name 'icloud-seal-part*.b64' -print)"
-          auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
-          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push origin HEAD:refs/heads/review/icloud-seal-recovery-20260916
           echo "candidate_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          printf 'Candidate SHA: `%s`\nAll pre-PR gates passed; not yet merged or released.\n' "$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Candidate `%s` passed all pre-PR gates. No remote ref updated; requires authorized connector publication and PR/main/production acceptance.\n' "$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
           git diff --stat 5d1f37e1699667c7935e73a7695148fd9fa22510 HEAD
-      - name: Export exact candidate and complete test evidence
+      - name: Export candidate and complete evidence
         if: always()
         run: |
           git diff 5d1f37e1699667c7935e73a7695148fd9fa22510 > "$RUNNER_TEMP/review-working.diff"
           tar --exclude=node_modules -czf "$RUNNER_TEMP/review-inputs.tgz" .github tools/icloud_price_comparison
-          git rev-parse HEAD > "$RUNNER_TEMP/review-head.txt"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
@@ -127,6 +148,7 @@ jobs:
             ${{ runner.temp }}/review-inputs.tgz
             ${{ runner.temp }}/review-head.txt
             ${{ runner.temp }}/review-working.diff
+            ${{ runner.temp }}/candidate.json
             ${{ runner.temp }}/*.log
           if-no-files-found: error
           retention-days: 7
@@ -140,7 +162,7 @@ jobs:
       actions: read
       pull-requests: read
     steps:
-      - name: Verify the exact candidate PR merge and successful main CI plus Pages
+      - name: Verify exact candidate PR merge and main CI plus Pages
         id: merged
         env:
           GH_TOKEN: ${{ github.token }}
