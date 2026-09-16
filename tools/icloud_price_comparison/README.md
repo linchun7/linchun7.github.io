@@ -196,3 +196,7 @@ node scripts/import-apple-archives.mjs --input <包含完整历史快照的目�
 - Cloudflare HTTP CSP 与 HTML meta CSP 应保持同一最小权限边界；完整响应头、TLS、DNS、缓存和发布验收要求见 [OPERATIONS.md](OPERATIONS.md)。
 
 自有代码许可见 [LICENSE](LICENSE)。前端第三方资源许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 和 `vendor/manifest.json`。
+
+## Apple 价格页结构兼容
+
+Apple 108047 的价格区允许使用历史上的逐市场列表结构，也允许使用按地区分组的 `Country (Currency)` 表格结构。解析层会按实际 DOM 选择对应适配器，但两种结构都必须继续满足 `document-order` 与 `apple-markers` 双路径逐字段一致、独立语义确认、market identity 和数据契约门禁；页面结构切换不能成为放宽校验或过滤新增市场的理由。
