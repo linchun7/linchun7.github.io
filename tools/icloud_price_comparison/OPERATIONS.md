@@ -336,3 +336,7 @@ Cloudflare/DNS 回滚使用发布前保存的配置记录；TLS 最低版本不�
 - TLS/DNSSEC/证书/HSTS 基线。
 - 干净浏览器隐私检查、三浏览器 UI、窄屏和键盘流程。
 - 外部依赖联系人、账号恢复方式和规则变更通知渠道仍可用。
+
+## 17. Apple 价格页结构切换
+
+Apple 108047 从逐市场列表切换为地区表格时，预期修复是增加结构适配而不是降低校验。表格必须包含 `Country (Currency)` 与可解析的 GB/TB tier 表头，每个 region 只能关联一个价格表，两条解析路径仍必须形成 `cross-checked`。结构迁移可能一次暴露更多 active markets；不要用历史市场数量等固定值过滤，unknown market 按既有 deterministic `apple-*` + 独立语义确认流程处理。修复后至少运行 core、artifact/snapshot 验证和 live dry-run，再允许生产更新。
