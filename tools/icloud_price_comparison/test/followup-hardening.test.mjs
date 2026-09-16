@@ -12,6 +12,7 @@ import {
   APPLE_ZH_ICLOUD_URL,
   compareMarketNameSets,
   extractAppleZhMarketNames,
+  monitorExitCode,
   parseReviewedMarketBaseline,
   validateObservedMarketSet,
 } from '../scripts/check-apple-zh-markets.mjs';
@@ -114,6 +115,13 @@ test('Apple Chinese market monitor compares only market-name sets and ignores or
     Array.from({ length: 40 }, (_, index) => `地区${String.fromCharCode(0x4e00 + index)}`),
     Array.from({ length: 20 }, (_, index) => `完全不同${String.fromCharCode(0x5000 + index)}`),
   ), /overlap|remove/i);
+});
+
+test('Apple Chinese market monitor fails its own workflow on changes or unavailable fetches', () => {
+  assert.equal(monitorExitCode({ status: 'unchanged' }), 0);
+  assert.equal(monitorExitCode({ status: 'changed' }), 1);
+  assert.equal(monitorExitCode({ status: 'unavailable' }), 1);
+  assert.equal(monitorExitCode(null), 1);
 });
 
 test('reviewed Chinese page baseline is independent from marketId mapping and records the current human review', async () => {
