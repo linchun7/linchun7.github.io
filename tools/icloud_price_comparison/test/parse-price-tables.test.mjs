@@ -116,3 +116,31 @@ test('independent row and column decoders preserve prices under wrappers, column
   assert.equal(result.tiers.at(-1).id, '24TB');
   assert.ok(result.countries.every((c) => c.plans['24TB'].price === 999.99));
 });
+
+
+test('accounts for every table in a pricing region rather than silently dropping an unfamiliar fragment', async (t) => {
+  const { load } = await import('cheerio');
+  for (const id of ['nasalac', 'emea', 'ap']) {
+    for (const label of ['Market (Currency)', 'Country / Currency', '']) {
+      await t.test(`${id}: ${label || 'missing header'}`, () => {
+        const $ = load(CURRENT_TABLE_HTML);
+        const table = $(`#${id}`).next('table');
+        const fragment = table.clone();
+        if (label) fragment.find('thead th').first().text(label);
+        else fragment.find('thead').remove();
+        table.after(fragment);
+        assert.throws(() => parseApplePrices($.html()), /Unrecognized table inside Apple/);
+      });
+    }
+  }
+});
+
+test('ignores unrelated tables outside explicitly bounded pricing sections', async () => {
+  const { load } = await import('cheerio');
+  const $ = load(CURRENT_TABLE_HTML);
+  $('body').prepend('<h2>About iCloud+</h2><table><tr><td>Storage features</td></tr></table>');
+  $('body').append('<h2>Billing information</h2><table><tr><td>Help topics</td></tr></table>');
+  const parsed = parseApplePrices($.html());
+  assert.equal(parsed.parser, 'cross-checked');
+  assert.deepEqual(parsed.countries, parseApplePrices(CURRENT_TABLE_HTML).countries);
+});

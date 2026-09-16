@@ -131,6 +131,19 @@ test('canonical full loop binds live observations, revisions, source aliases and
   broken('table').first().remove();
   await assert.rejects(run(t, paths, [broken.html()], '2026-04-10T16:32:00Z'), /no interpretable pricing table/);
   assert.deepEqual(await allBytes(dataDir), prior, 'partial source must not modify any public file');
+  // A split regional table must not turn an unrecognized fragment into a
+  // confirmed market removal. Even identical network samples cannot prove
+  // completeness when both decoders excluded the same DOM evidence.
+  const split = load(sourceHtml(revised, '2026-04-10'));
+  const table = split('table').first();
+  const header = table.find('thead tr').clone();
+  header.children().first().text('Market (Currency)');
+  const fragment = split('<table><thead></thead><tbody></tbody></table>');
+  fragment.find('thead').append(header);
+  fragment.find('tbody').append(table.find('tbody tr').first());
+  table.after(fragment);
+  await assert.rejects(run(t, paths, [split.html(), split.html()], '2026-04-10T16:33:00Z'), /Unrecognized table inside Apple/);
+  assert.deepEqual(await allBytes(dataDir), prior, 'ignored source fragments must not publish removals or alter evidence');
   // A later archive backfill must not erase already witnessed live revisions.
   const archiveDir = path.join(root, 'archive');
   await mkdir(archiveDir);
