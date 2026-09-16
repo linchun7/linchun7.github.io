@@ -1,0 +1,46 @@
+name: Monitor Apple Chinese iCloud markets
+
+on:
+  workflow_run:
+    workflows:
+      - Update iCloud prices
+    types:
+      - completed
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: monitor-icloud-zh-markets
+  cancel-in-progress: true
+
+jobs:
+  monitor:
+    name: 检查 Apple 中文 iCloud+ 地区列表
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: 配置 Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: 启用并校验 pnpm
+        working-directory: tools/icloud_price_comparison
+        run: |
+          corepack enable
+          pnpm --version
+
+      - name: 安装项目依赖
+        working-directory: tools/icloud_price_comparison
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: 比较 Apple 中文地区名单
+        working-directory: tools/icloud_price_comparison
+        run: node scripts/check-apple-zh-markets.mjs
