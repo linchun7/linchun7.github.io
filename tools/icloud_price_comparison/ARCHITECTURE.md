@@ -235,3 +235,5 @@ Apple 108047 可能以历史逐市场列表或按地区 `Country (Currency)` 表
 archive importer 重放完整 snapshot ledger（包括此前 live revision），而非只拼本次输入与最新价格；保留可精确匹配证据的 live UTC 观察记录。`history.updatedAt` 是与当前价格批次一致的 as-of 水位，回填不是一次新的 Apple 观察，导入执行时间只写运维日志。在线事件与回填事件仍只能命中 revision 的 `firstConfirmedDate` 或 `publishedDate`，不使用时间范围容忍。
 
 区域完整性必须对 region 内的全部表格取证，而非只枚举已经识别的表头。合法区域表拆成“可识别部分 + 未识别部分”时，两路 parser 都必须拒绝，不能将遗漏行解释为已确认市场移除；区域外由独立标题界定的无关表格不参与价格解析。
+
+中文 iCloud+ 页面监测是与价格发布物理隔离的只读旁路。它在 `Update iCloud prices` workflow 完成后由独立 workflow 触发，只读取同一 Apple 简体中文 108047 页面，并把提取到的国家/地区名称集合与 `apple-zh-reviewed-markets.json` 的人工基线比较。价格、容量、发布日期、市场顺序和 DOM 样式不是监测事实；容量文本只作为识别“这是一段价格市场结构”的局部上下文。旧式标题块、表格和未来的局部分组都走同一名称集合输出，解析异常不得修改基线、中文显示名或主价格数据。

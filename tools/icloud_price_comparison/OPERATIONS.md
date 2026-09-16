@@ -350,3 +350,5 @@ Apple 108047 从逐市场列表切换为地区表格时，预期修复是增加�
 只有首次发布候选中的 `UNKNOWN_APPLE_MARKET` 与未解决的 rename suspicion 属于 identity review debt；已发布 fallback identity 不重复告警，`CHINESE_MARKET_NAME_PENDING` 仅汇总为中文页同步状态。Action 摘要可把“同一稳定 `marketId` 的旧 source name removed + 新 source name added”展示为名称变化，但 `sourcePublishedDates`、run-log 与 snapshot 中的原始 added/removed 证据必须保持不变。FX provider 的任意错误正文、HTTP statusText、JSON 片段与 transport exception 不得进入公开日志；只输出受控分类。12% dailyized sanity 仍是保守运维异常拦截值，不是对真实汇率波动的统计保证，阈值不因本轮测试而放宽。
 
 “候选生成成功”不等于发布成功：以已测试数据 commit、该 commit 的 Pages 构建以及 canonical URL 的 prices/history/run-log/static HTML 一致作为生产闭环。修复恢复必须在最新 main 新发起 workflow，不能 rerun 旧 SHA。
+
+- `Monitor Apple Chinese iCloud markets` 是独立只读服务，会在 `Update iCloud prices` 完成后运行，也可手动运行。只有 Apple 中文 iCloud+ 页的国家/地区名称集合相对 `scripts/apple-zh-reviewed-markets.json` 出现新增/移除时才提示人工复核；价格、容量、发布日期、排序或排版变化不提示。抓取/解析不可用只影响这条监测任务，不影响价格 updater。人工核实页面名单后更新该基线；只有能够人工确认到稳定 `marketId` 的中文名称才同步更新 `scripts/country-names.zh.json`。

@@ -41,3 +41,53 @@ export function marketSearchPriority(country, query) {
   if (!normalizedQuery) return 0;
   return normalizeMarketSearchText(country.marketId, 'en-US') === normalizedQuery ? 2 : 0;
 }
+
+export function foldPublicationCountryRenames(changes, currentCountries = []) {
+  const source = changes && typeof changes === 'object' ? changes : {};
+  const added = Array.isArray(source.addedCountries) ? source.addedCountries : [];
+  const removed = Array.isArray(source.removedCountries) ? source.removedCountries : [];
+  const current = Array.isArray(currentCountries) ? currentCountries : [];
+  const addedByName = new Map();
+  const removedByName = new Map();
+  const currentByName = new Map();
+  const reviewedName = (entry) => {
+    const name = typeof entry?.nameZh === 'string' ? entry.nameZh.trim() : '';
+    return /[\u3400-\u9fff]/u.test(name) ? name : '';
+  };
+  const addIndex = (map, entry, index) => {
+    const name = reviewedName(entry);
+    if (!name) return;
+    const indexes = map.get(name) ?? [];
+    indexes.push(index);
+    map.set(name, indexes);
+  };
+  added.forEach((entry, index) => addIndex(addedByName, entry, index));
+  removed.forEach((entry, index) => addIndex(removedByName, entry, index));
+  current.forEach((entry, index) => addIndex(currentByName, entry, index));
+
+  const foldedAdded = new Set();
+  const foldedRemoved = new Set();
+  const renamedCountries = [];
+  for (const [nameZh, addedIndexes] of addedByName) {
+    const removedIndexes = removedByName.get(nameZh) ?? [];
+    const currentIndexes = currentByName.get(nameZh) ?? [];
+    if (addedIndexes.length !== 1 || removedIndexes.length !== 1 || currentIndexes.length !== 1) continue;
+    const addedIndex = addedIndexes[0];
+    const removedIndex = removedIndexes[0];
+    const from = removed[removedIndex]?.country;
+    const to = added[addedIndex]?.country;
+    const currentMarket = current[currentIndexes[0]];
+    if (!from || !to || from === to || !currentMarket?.marketId || currentMarket.country !== to) continue;
+    foldedAdded.add(addedIndex);
+    foldedRemoved.add(removedIndex);
+    renamedCountries.push({ from, to, nameZh, marketId: currentMarket.marketId });
+  }
+
+  return {
+    ...source,
+    addedCountries: added.filter((_, index) => !foldedAdded.has(index)),
+    removedCountries: removed.filter((_, index) => !foldedRemoved.has(index)),
+    renamedCountries,
+  };
+}
+

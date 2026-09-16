@@ -3,9 +3,9 @@ import {
   publicationDateKey,
   validatePayload,
   validatePriceHistoryConsistency
-} from './data-contract.js?v=70d67de9';
+} from './data-contract.js?v=28c6b92b';
 import { createIcons } from './vendor/lucide-subset.js?v=2b21b7af';
-import { marketSearchPriority, matchesMarketSearch, normalizeMarketSearchText, REGION_LABELS, VALID_REGIONS } from './data-model.js?v=4ddda83e';
+import { foldPublicationCountryRenames, marketSearchPriority, matchesMarketSearch, normalizeMarketSearchText, REGION_LABELS, VALID_REGIONS } from './data-model.js?v=b12cdd59';
 
 const REQUEST_TIMEOUT_MS = 8_000;
 const ANALYTICS_ID = 'G-K2S9L4CHNP';
@@ -996,7 +996,7 @@ function changedCountryDetails(entry) {
   if (entry.fromRegion !== entry.toRegion) {
     const fromRegion = REGION_LABELS[entry.fromRegion] || entry.fromRegion;
     const toRegion = REGION_LABELS[entry.toRegion] || entry.toRegion;
-    details.push(`分区 ${fromRegion}→${toRegion}`);
+    details.push(`所属分区 ${fromRegion}→${toRegion}`);
   }
   for (const tierChange of entry.tiers || []) {
     const tier = state.data.tiers.find(({ id }) => id === tierChange.id);
@@ -1008,6 +1008,7 @@ function changedCountryDetails(entry) {
 }
 
 function createPublishedDateChangesCell(changes, isInitial = false) {
+  const displayChanges = foldPublicationCountryRenames(changes, state.data?.countries ?? []);
   const cell = document.createElement('td');
   cell.className = 'published-change-cell';
   if (isInitial || !changes) {
@@ -1025,26 +1026,36 @@ function createPublishedDateChangesCell(changes, isInitial = false) {
     cell.append(group);
   };
 
-  if (changes.addedTiers?.length) {
-    appendGroup('新增容量', changes.addedTiers.map(({ label, id }) => label || id).join('、'));
+  if (displayChanges.addedTiers?.length) {
+    appendGroup('新增容量', displayChanges.addedTiers.map(({ label, id }) => label || id).join('、'));
   }
-  if (changes.removedTiers?.length) {
-    appendGroup('移除容量', changes.removedTiers.map(({ label, id }) => label || id).join('、'));
+  if (displayChanges.removedTiers?.length) {
+    appendGroup('移除容量', displayChanges.removedTiers.map(({ label, id }) => label || id).join('、'));
   }
-  if (changes.addedCountries?.length) {
-    appendGroup('新增地区', changes.addedCountries.map(countryDisplayName).join('、'));
+  if (displayChanges.renamedCountries?.length) {
+    appendGroup('地区名称变化', displayChanges.renamedCountries
+      .map(({ from, to, nameZh }) => `${nameZh}（${from} → ${to}）`)
+      .join('、'));
   }
-  if (changes.removedCountries?.length) {
-    appendGroup('移除地区', changes.removedCountries.map(countryDisplayName).join('、'));
+  if (displayChanges.addedCountries?.length) {
+    appendGroup('新增地区', displayChanges.addedCountries.map(countryDisplayName).join('、'));
   }
-  if (changes.changedCountries?.length) {
+  if (displayChanges.removedCountries?.length) {
+    appendGroup('移除地区', displayChanges.removedCountries.map(countryDisplayName).join('、'));
+  }
+  if (displayChanges.changedCountries?.length) {
     const group = document.createElement('div');
     group.className = 'published-change-group published-change-country-group';
     const heading = document.createElement('strong');
     heading.className = 'published-change-heading';
-    heading.textContent = '地区内容变化：';
+    const onlyRegionChanges = displayChanges.changedCountries.every((entry) => (
+      entry.fromRegion !== entry.toRegion
+      && entry.fromCurrency === entry.toCurrency
+      && !(entry.tiers || []).length
+    ));
+    heading.textContent = onlyRegionChanges ? '所属分区变化：' : '地区内容变化：';
     group.append(heading);
-    for (const entry of changes.changedCountries) {
+    for (const entry of displayChanges.changedCountries) {
       const line = document.createElement('div');
       line.className = 'published-change-country';
       const country = document.createElement('strong');

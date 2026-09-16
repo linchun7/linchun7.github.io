@@ -1143,6 +1143,15 @@ test('renders current prices, sorting, and country history in a real browser', {
           (await page.locator('#publishedDateRows tr').first().locator('td').first().textContent()).trim(),
           formatUiDate(expectedHistory.sourcePublishedDates.at(-1).publishedDate)
         );
+        const septemberRenameRow = page.locator('#publishedDateRows tr').filter({ hasText: formatUiDate('2026-09-15') });
+        assert.equal(await septemberRenameRow.count(), 1, 'the September publication evidence row must remain available');
+        const septemberChangeText = await septemberRenameRow.locator('td').nth(1).innerText();
+        assert.match(septemberChangeText, /地区名称变化：/);
+        assert.match(septemberChangeText, /科特迪瓦（Ivory Coast → Cote D'Ivoire）/);
+        assert.match(septemberChangeText, /所属分区变化：/);
+        assert.match(septemberChangeText, /巴基斯坦/);
+        assert.doesNotMatch(septemberChangeText, /移除地区：[^
+]*科特迪瓦/);
         await page.keyboard.press('Escape');
         await page.waitForFunction(() => document.querySelector('#publishedDateDialog')?.open === false);
         await page.waitForFunction(() => document.activeElement?.id === 'publishedDateButton');

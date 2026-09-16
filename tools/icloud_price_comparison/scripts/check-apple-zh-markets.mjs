@@ -10,7 +10,7 @@ const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const MIN_PLAUSIBLE_MARKETS = 20;
 const MAX_PLAUSIBLE_MARKETS = 400;
 
-const CAPACITY_RE = /(?:^|[^\d])(?:50|200)\s*GB\b|(?:^|[^\d])(?:2|6|12)\s*TB\b/giu;
+const CAPACITY_RE = /\b\d+(?:[.,]\d+)?\s*(?:GB|TB|PB)\b/giu;
 const MARKET_HEADER_RE = /^(?:国家(?:或地区)?|国家\s*\/\s*地区|地区|市场|country(?:\s*\/\s*region)?|region|market)(?:\s*[（(][^）)]*[）)])?$/iu;
 const NON_MARKET_RE = /(?:icloud|homekit|储存空间|存储空间|价格|定价|方案|月费|国家或地区|国家\s*\/\s*地区|付款方式|发布日期|有帮助|北美洲|南美洲|拉丁美洲|加勒比地区|欧洲、中东和非洲|亚太地区)/iu;
 const FOOTNOTE_SUFFIX_RE = /(?:\s*(?:\d+(?:\s*[,，]\s*\d+)*|[⁰¹²³⁴⁵⁶⁷⁸⁹]+))+$/u;
@@ -77,7 +77,12 @@ function rootForExtraction($) {
 // do not depend on gb-* classes or one exact heading level.
 function extractHeadingCandidates($, root, target) {
   root.find('h2,h3,h4,h5,h6,dt').each((_, element) => {
-    addCandidate(target, $(element).text(), { allowPlain: false });
+    const candidate = marketNameFromLabel($(element).text(), { allowPlain: false });
+    if (!candidate) return;
+    const nearby = $(element).nextAll().slice(0, 3).toArray()
+      .map((node) => normalizeVisibleText($(node).text()))
+      .join(' ');
+    if (countCapacityMarkers(nearby) >= 2) target.add(candidate);
   });
 }
 
