@@ -1150,8 +1150,8 @@ test('renders current prices, sorting, and country history in a real browser', {
         assert.match(septemberChangeText, /科特迪瓦（Ivory Coast → Cote D'Ivoire）/);
         assert.match(septemberChangeText, /所属分区变化：/);
         assert.match(septemberChangeText, /巴基斯坦/);
-        assert.doesNotMatch(septemberChangeText, /移除地区：[^
-]*科特迪瓦/);
+        const removedCountryGroup = septemberChangeText.split('\n').find((line) => line.startsWith('移除地区：')) ?? '';
+        assert.equal(removedCountryGroup.includes('科特迪瓦'), false);
         await page.keyboard.press('Escape');
         await page.waitForFunction(() => document.querySelector('#publishedDateDialog')?.open === false);
         await page.waitForFunction(() => document.activeElement?.id === 'publishedDateButton');
