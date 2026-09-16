@@ -1,0 +1,53 @@
+name: iCloud isolated final review (temporary)
+on:
+  push:
+    branches: [repair/icloud-final-review-20260916]
+    paths: [.github/workflows/icloud-final-review-diagnostic.yml]
+permissions:
+  contents: read
+concurrency:
+  group: icloud-isolated-final-review
+  cancel-in-progress: false
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: d3e573d9626de11ab139da229734094c8ba800c5
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22
+      - name: Prepare isolated review evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD | tee "$RUNNER_TEMP/review-source-sha.txt"
+          git archive --format=tar HEAD | gzip > "$RUNNER_TEMP/review-source.tar.gz"
+          corepack enable
+          cd tools/icloud_price_comparison
+          pnpm install --frozen-lockfile --ignore-scripts
+          cd ../..
+          tar -czf "$RUNNER_TEMP/review-node-modules.tar.gz" tools/icloud_price_comparison/node_modules
+          curl --fail --location --max-time 60 --retry 2 https://support.apple.com/en-us/108047 -o "$RUNNER_TEMP/review-apple.html"
+      - name: Current artifact and all snapshots
+        working-directory: tools/icloud_price_comparison
+        run: |
+          pnpm validate:artifact
+          pnpm validate:snapshots
+          pnpm check:live
+          git diff --exit-code
+      - name: Export public source and test dependencies
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: icloud-final-review-baseline
+          path: |
+            ${{ runner.temp }}/review-source-sha.txt
+            ${{ runner.temp }}/review-source.tar.gz
+            ${{ runner.temp }}/review-node-modules.tar.gz
+            ${{ runner.temp }}/review-apple.html
+          if-no-files-found: error
+          retention-days: 1
