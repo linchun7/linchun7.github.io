@@ -114,15 +114,16 @@ Apple Support HTML ─┐
 一次完整生产更新应满足：
 
 1. 固定远端 `main` 生成基线，使用 Node.js 22、项目锁定的 pnpm 与 frozen lockfile 安装依赖，生命周期脚本禁用。
-2. 运行 core 测试。
-3. 在共享网络预算内抓取 Apple 页面；同一份 HTML 必须由 `document-order` 和 `apple-markers` 两条解析路径逐字段一致后才得到 `cross-checked`。入口容量文本检查不能固定要求 50GB；容量增删继续由完整解析和独立语义确认校验，不放宽响应大小、编码或网络安全边界。
-4. Apple 业务语义发生变化时，执行独立 no-store 完整确认抓取。正常情况是 initial + confirmation；只有 mismatch 或确认解析退化时追加第三样本。
-5. 只有稳定、完整的 Apple 语义证据才能继续。A/B/B 或 A/degraded/A 可自动恢复；A/B/A、A/B/C、无法形成稳定证据或确认始终不可用时保留上一份生产数据，等待后续自动重试。
-6. 获取并校验汇率。认证候选不可用或 sanity 不通过时尝试开放候选；所有 fresh 在线候选均不可用时，仅允许在既定 freshness 条件内沿用上一份安全 FX/CNY 结果。
-7. 事务式生成 prices/history/run-log/Apple snapshots，并执行数据、时间、价格异常、market identity 和跨文件校验。快照保存或去重完成后、提交前再次核对 active revision 与候选 prices/history；不一致时在同一事务中回滚。不得为了接纳旧修订重现而擅自改写历史快照或 active revision 规则。
-8. 从已验证 `prices.json` 生成 `index.html`：`static-page.mjs` 更新静态价格/状态 fragments，`render-static-page.mjs` 更新 SEO Projection。容量列表继续由 payload 动态驱动；description 中的美国、日本、中国大陆、俄罗斯、土耳其、尼日利亚、台湾等常见及低价市场词是稳定搜索意图，不按每日最低价自动替换。
-9. 深验完整 `data/`，将数据与静态首页作为同一受控发布工件上传。
-10. 独立发布 job 解包后再次验证工件、静态 fragments、SEO Projection、首页生成边界和远端基线；只有远端 `main` 未前进时才提交并推送。
+2. 在共享网络预算内抓取 Apple 页面；同一份 HTML 必须由 `document-order` 和 `apple-markers` 两条解析路径逐字段一致后才得到 `cross-checked`。入口容量文本检查不能固定要求 50GB；容量增删继续由完整解析和独立语义确认校验，不放宽响应大小、编码或网络安全边界。
+3. Apple 业务语义发生变化时，执行独立 no-store 完整确认抓取。正常情况是 initial + confirmation；只有 mismatch 或确认解析退化时追加第三样本。
+4. 只有稳定、完整的 Apple 语义证据才能继续。A/B/B 或 A/degraded/A 可自动恢复；A/B/A、A/B/C、无法形成稳定证据或确认始终不可用时保留上一份生产数据，等待后续自动重试。
+5. 获取并校验汇率。认证候选不可用或 sanity 不通过时尝试开放候选；所有 fresh 在线候选均不可用时，仅允许在既定 freshness 条件内沿用上一份安全 FX/CNY 结果。
+6. 事务式生成 prices/history/run-log/Apple snapshots，并执行数据、时间、价格异常、market identity 和跨文件校验。快照保存或去重完成后、提交前再次核对 active revision 与候选 prices/history；不一致时在同一事务中回滚。不得为了接纳旧修订重现而擅自改写历史快照或 active revision 规则。
+7. 从已验证 `prices.json` 生成 `index.html`：`static-page.mjs` 更新静态价格/状态 fragments，`render-static-page.mjs` 更新 SEO Projection。容量列表继续由 payload 动态驱动；description 中的美国、日本、中国大陆、俄罗斯、土耳其、尼日利亚、台湾等常见及低价市场词是稳定搜索意图，不按每日最低价自动替换。
+8. 在实际候选上运行唯一一次完整 core、UI 与独立 artifact 深验；将已测试数据与静态首页作为同一受控发布工件上传。
+9. 独立发布 job 解包后再次验证工件、静态 fragments、SEO Projection、首页生成边界和远端基线；只有远端 `main` 未前进时才提交并推送。
+
+10. 确认数据 commit 对应的 Pages 构建成功，再从 canonical URL 核对 prices/history/run-log/static HTML；仅生成、上传或提交成功均不代表生产发布完成。
 
 远端基线变化时必须重新生成，不 rebase 已生成工件，不 force push。
 
@@ -341,3 +342,11 @@ Cloudflare/DNS 回滚使用发布前保存的配置记录；TLS 最低版本不�
 ## 17. Apple 价格页结构切换
 
 Apple 108047 从逐市场列表切换为地区表格时，预期修复是增加结构适配而不是降低校验。表格必须包含 `Country (Currency)` 与可解析的 GB/TB tier 表头，每个 region 只能关联一个价格表，两条解析路径仍必须形成 `cross-checked`。结构迁移可能一次暴露更多 active markets；不要用历史市场数量等固定值过滤，unknown market 按既有 deterministic `apple-*` + 独立语义确认流程处理。修复后至少运行 core、artifact/snapshot 验证和 live dry-run，再允许生产更新。
+
+### 候选验收与故障信号
+
+每日 updater 先生成价格与静态页，再对实际候选运行唯一一次完整 `test:core`，随后 UI 和独立 artifact 深验；这样 bot 数据提交即使不触发 push CI，也不会留下“旧 fixture 测试绿、新数据使回归失效”的空隙。canonical production-loop 测试覆盖 list→table、A/B/B、跨北京时间午夜、同日 revision、unknown source 改写、回填与独立验收的组合路径，不引用可变生产日期或市场数。
+
+`UNKNOWN_APPLE_MARKET`、`CHINESE_MARKET_NAME_PENDING` 汇总为 review debt，完整明细保留在 summary 折叠区；未解决的 rename suspicion 单独计数、冲突仍报错。FX provider 的任意错误正文、HTTP statusText、JSON 片段与 transport exception 不得进入公开日志；只输出受控分类。12% dailyized sanity 仍是保守运维异常拦截值，不是对真实汇率波动的统计保证，阈值不因本轮测试而放宽。
+
+“候选生成成功”不等于发布成功：以已测试数据 commit、该 commit 的 Pages 构建以及 canonical URL 的 prices/history/run-log/static HTML 一致作为生产闭环。修复恢复必须在最新 main 新发起 workflow，不能 rerun 旧 SHA。

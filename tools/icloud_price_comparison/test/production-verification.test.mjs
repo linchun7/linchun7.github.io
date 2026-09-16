@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
-import test from 'node:test';
+import test, { mock } from 'node:test';
 import {
   MAX_HISTORY_RESPONSE_BYTES,
   MAX_RUN_LOG_RESPONSE_BYTES,
@@ -137,7 +137,11 @@ async function rejectsWithReason(expected, sequence, reason, options = {}) {
   }
 }
 
-const expected = await loadVerificationArtifact(dataDirectory, 'committed fixture');
+// Reserve two synthetic hours ABOVE the coherent committed observation so an
+// older deployment does not rewind new-market/history evidence into the future.
+const committed = await loadVerificationArtifact(dataDirectory, 'committed fixture');
+mock.timers.enable({ apis: ['Date'], now: new Date(Date.parse(committed.prices.generatedAt) + 3 * 60 * 60 * 1000) });
+const expected = shiftedArtifact(committed, 2);
 
 function supersessionFixtures() {
   const previous = shiftedArtifact(expected, -1);

@@ -199,15 +199,28 @@ export async function fetchResource(url, {
         redirect: 'error',
         signal: networkBudget.createTimeoutSignal(timeoutMs)
       });
-      if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const body = await readBoundedResponseText(response, maxResponseBytes, resourceName);
       if (!json && (body.length < 20_000 || !/\b[1-9]\d*\s*(?:GB|TB)\b/i.test(body))) {
         throw new Error(`Unexpected Apple response (${body.length} bytes)`);
       }
-      return json ? JSON.parse(body) : body;
+      if (!json) return body;
+      try {
+        return JSON.parse(body);
+      } catch {
+        throw new Error('Invalid JSON response');
+      }
     } catch (error) {
-      lastError = error;
-      console.warn(`Fetch attempt ${attempt}/${attempts} failed for ${resourceName}: ${logInline(error.message)}`);
+      // Remote exceptions may echo authorization or response bodies. Preserve only
+      // our finite diagnostic categories; never retain an unsafe cause for logging.
+      const detail = error.code === 'ERR_ENCODING_INVALID_ENCODED_DATA'
+        ? 'The encoded data was not valid UTF-8'
+        : /^(?:HTTP [1-5]\d{2}|Invalid JSON response)$/.test(error.message)
+        || error.message === `${resourceName} response exceeds ${maxResponseBytes} bytes`
+        || /^Unexpected Apple response \(\d+ bytes\)$/.test(error.message)
+        ? error.message : 'Transport or response decoding failed';
+      lastError = new Error(detail);
+      console.warn(`Fetch attempt ${attempt}/${attempts} failed for ${resourceName}: ${logInline(detail)}`);
       if (remainingNetworkBudget(networkBudget) <= 0) {
         lastError = networkDeadlineError(resourceName);
         break;
@@ -243,7 +256,9 @@ function fxSanityError(message) {
 }
 
 function parseExchangeRatePayload(payload, ratesField) {
-  const serviceError = typeof payload?.['error-type'] === 'string' ? payload['error-type'] : null;
+  const providerError = payload?.['error-type'];
+  const serviceError = ['invalid-key', 'inactive-account', 'quota-reached', 'unsupported-code', 'malformed-request']
+    .includes(providerError) ? providerError : null;
   if (payload?.result !== 'success') {
     throw exchangeRateError(
       serviceError ? `Exchange-rate service returned ${serviceError}` : 'Exchange-rate response is missing required fields',
@@ -1582,7 +1597,12 @@ function canonicalTierIdSet(country) {
 export function validateAppleMarketRenameReview(previousData, confirmedCountries, resolve) {
   if (!previousData?.countries?.length) return { status: 'passed', warnings: [] };
   const currentNames = new Set(confirmedCountries.map(({ country }) => country));
-  const removed = previousData.countries.filter(({ country }) => !currentNames.has(country));
+  const currentIds = new Set(confirmedCountries.map(({ country }) => resolve(country).id));
+  // A reviewed source alias is not a removed identity. Otherwise a surviving ci
+  // becomes a false rename candidate for every genuinely new EMEA/USD market.
+  const removed = previousData.countries.filter((old) => (
+    !currentNames.has(old.country) && !currentIds.has(old.marketId ?? resolve(old.country).id)
+  ));
   const candidates = [];
   for (const added of confirmedCountries) {
     const market = resolve(added.country);
@@ -2309,6 +2329,7 @@ export function buildActionSummaryLines(data, summary, trigger = resolveTriggerS
   const regionChanges = changedCountries.filter(({ fromRegion, toRegion }) => fromRegion !== toRegion);
   const changes = [];
   const warnings = [];
+  const reviewDebt = [];
 
   if (summary.publicationDateChanged) {
     const previousDate = summary.publishedDateHistory.at(-2)?.publishedDate ?? 'unknown';
@@ -2338,13 +2359,13 @@ export function buildActionSummaryLines(data, summary, trigger = resolveTriggerS
     warnings.push(`- **FX sanity**：${markdownInline(warning)}`);
   }
   for (const market of summary.unknownMarkets ?? []) {
-    warnings.push(`- **UNKNOWN_APPLE_MARKET**：${markdownInline(market.sourceName)} → ${markdownInline(market.generatedMarketId ?? market.id)}；分区 ${markdownInline(market.region ?? 'unknown')}；币种 ${markdownInline(market.currency ?? 'unknown')}`);
+    reviewDebt.push(`- **UNKNOWN_APPLE_MARKET**：${markdownInline(market.sourceName)} → ${markdownInline(market.generatedMarketId ?? market.id)}；分区 ${markdownInline(market.region ?? 'unknown')}；币种 ${markdownInline(market.currency ?? 'unknown')}`);
   }
   for (const market of summary.chineseNamePendingMarkets ?? []) {
-    warnings.push(`- **CHINESE_MARKET_NAME_PENDING**：marketId=${markdownInline(market.marketId)}；sourceName=${markdownInline(market.sourceName)}；暂用 Apple 英文名称显示`);
+    reviewDebt.push(`- **CHINESE_MARKET_NAME_PENDING**：marketId=${markdownInline(market.marketId)}；sourceName=${markdownInline(market.sourceName)}；暂用 Apple 英文名称显示`);
   }
   for (const suspicion of summary.marketIdentityRenameSuspicions ?? []) {
-    warnings.push(`- **MARKET_IDENTITY_RENAME_SUSPECTED**：newSourceName=${markdownInline(suspicion.newSourceName)}；candidate oldSourceName=${markdownInline(suspicion.oldSourceName)}；candidate oldMarketId=${markdownInline(suspicion.oldMarketId)}；分区 ${markdownInline(suspicion.region)}；币种 ${markdownInline(suspicion.currency)}；pricesMatch=${suspicion.pricesMatch === true ? 'true' : 'false'}；自动发布继续`);
+    reviewDebt.push(`- **MARKET_IDENTITY_RENAME_SUSPECTED**：newSourceName=${markdownInline(suspicion.newSourceName)}；candidate oldSourceName=${markdownInline(suspicion.oldSourceName)}；candidate oldMarketId=${markdownInline(suspicion.oldMarketId)}；分区 ${markdownInline(suspicion.region)}；币种 ${markdownInline(suspicion.currency)}；pricesMatch=${suspicion.pricesMatch === true ? 'true' : 'false'}；自动发布继续`);
   }
   for (const anomaly of summary.confirmedPriceAnomalies ?? []) {
     const authority = anomaly.code === 'PRICE_CHANGE_ANOMALY_CONFIRMED'
@@ -2359,7 +2380,8 @@ export function buildActionSummaryLines(data, summary, trigger = resolveTriggerS
     '## iCloud+ 价格更新',
     '',
     '### 结论',
-    '- **状态：成功**',
+    '- **状态：候选数据生成成功；不代表已发布**',
+    '- 发布证明：以本次 workflow 的数据提交、Pages 部署及 canonical URL 验证结果为准。',
     `- 触发方式：${describeTriggerSource(trigger)}`,
     `- 抓取完成时间（北京时间）：${formatBeijingDateTime(data.generatedAt)}`,
     '',
@@ -2380,6 +2402,11 @@ export function buildActionSummaryLines(data, summary, trigger = resolveTriggerS
     ...changes
   ];
   if (warnings.length) lines.push('', '### 警告', ...warnings);
+  if (reviewDebt.length) {
+    lines.push('', '### 市场元数据待复核（不改变永久 ID）',
+      `UNKNOWN_APPLE_MARKET=${summary.unknownMarkets?.length ?? 0}；CHINESE_MARKET_NAME_PENDING=${summary.chineseNamePendingMarkets?.length ?? 0}；MARKET_IDENTITY_RENAME_SUSPECTED=${summary.marketIdentityRenameSuspicions?.length ?? 0}`,
+      '', '<details><summary>展开完整待复核明细</summary>', '', ...reviewDebt, '', '</details>');
+  }
   lines.push('');
   return lines;
 }
@@ -2530,10 +2557,6 @@ export async function main({
   const marketIdentityRenameSuspicions = renameReview.warnings;
   for (const warning of marketIdentityRenameSuspicions) {
     console.warn(`MARKET_IDENTITY_RENAME_SUSPECTED:newSourceName=${logInline(warning.newSourceName)}:oldSourceName=${logInline(warning.oldSourceName)}:oldMarketId=${logInline(warning.oldMarketId)}:region=${logInline(warning.region)}:currency=${logInline(warning.currency)}:pricesMatch=${warning.pricesMatch === true ? 'true' : 'false'}`);
-    if (process.env.GITHUB_ACTIONS === 'true') {
-      const message = `newSourceName=${warning.newSourceName}; candidate oldSourceName=${warning.oldSourceName}; candidate oldMarketId=${warning.oldMarketId}; region=${warning.region}; currency=${warning.currency}; pricesMatch=${warning.pricesMatch === true ? 'true' : 'false'}; automatic publication continues`;
-      console.log(`::warning title=Apple market identity rename suspected::${escapeGitHubCommandMessage(message)}`);
-    }
   }
   const parsedCountries = attachMarketIdentity(parsed.countries, {
     resolve: marketResolver,
@@ -2546,22 +2569,23 @@ export async function main({
         currency: country.currency
       };
       unknownMarkets.push(warning);
-      console.warn(`UNKNOWN_APPLE_MARKET:${logInline(warning.sourceName)}:${warning.generatedMarketId}:${logInline(warning.region)}:${logInline(warning.currency)}`);
-      if (process.env.GITHUB_ACTIONS === 'true') {
-        const message = `sourceName=${warning.sourceName}; generatedMarketId=${warning.generatedMarketId}; region=${warning.region}; currency=${warning.currency}; requires registry review`;
-        console.log(`::warning title=Unknown Apple market requires registry review::${escapeGitHubCommandMessage(message)}`);
-      }
+
     },
     onChineseNamePending: (market, country) => {
       const warning = { marketId: market.id, sourceName: country.country };
       chineseNamePendingMarkets.push(warning);
-      console.warn(`CHINESE_MARKET_NAME_PENDING:marketId=${logInline(warning.marketId)}:sourceName=${logInline(warning.sourceName)}`);
-      if (process.env.GITHUB_ACTIONS === 'true') {
-        const message = `marketId=${warning.marketId}; sourceName=${warning.sourceName}; using Apple English sourceName until zh-CN wording is approved`;
-        console.log(`::warning title=Apple Chinese market name pending::${escapeGitHubCommandMessage(message)}`);
-      }
+
     }
   });
+
+  const reviewDebt = `UNKNOWN_APPLE_MARKET=${unknownMarkets.length}; CHINESE_MARKET_NAME_PENDING=${chineseNamePendingMarkets.length}; MARKET_IDENTITY_RENAME_SUSPECTED=${marketIdentityRenameSuspicions.length}`;
+  if (unknownMarkets.length || chineseNamePendingMarkets.length || marketIdentityRenameSuspicions.length) {
+    console.warn(`MARKET_REVIEW_DEBT: ${reviewDebt}; details in Action summary; published IDs remain frozen`);
+    if (process.env.GITHUB_ACTIONS === 'true') {
+      const level = marketIdentityRenameSuspicions.length ? 'warning' : 'notice';
+      console.log(`::${level} title=Apple market review debt::${escapeGitHubCommandMessage(reviewDebt)}`);
+    }
+  }
 
   const fx = await getExchangeRates(previousData, {
     requiredCurrencies: [...new Set(parsedCountries.map(({ currency }) => currency))],

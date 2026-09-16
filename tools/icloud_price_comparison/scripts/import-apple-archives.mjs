@@ -19,7 +19,9 @@ import {
   updateHistory
 } from './update-prices.mjs';
 import { formatBeijingDate } from './run-context.mjs';
-import { attachMarketIdentity, resolveMarket } from './market-registry.mjs';
+import { attachMarketIdentity, normalizedNameKey, resolveMarket, validateMarketIdentityContinuity } from './market-registry.mjs';
+import { createSnapshotMarketResolver, evidenceDateAnchors } from './market-evidence.mjs';
+import { validateHistoryPayload, validatePriceHistoryConsistency } from '../data-contract.js';
 import { getOfficialChineseMarketName } from './country-names.mjs';
 
 const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -143,7 +145,7 @@ function archiveMetadata(html) {
 
 function parseArchive(html) {
   try {
-    return parseApplePrices(html);
+    return parseApplePrices(html, { allowUnknownCountries: true });
   } catch (modernError) {
     try {
       return parseLegacyAppleArchive(html);
@@ -166,13 +168,15 @@ function withNames(parsed, names) {
 }
 
 export function assertArchiveCountriesAreKnown(parsed, names, fileName = 'archive') {
+  const reviewedNames = new Set(Object.entries(names)
+    .filter(([, value]) => typeof value === 'string' && value.trim())
+    .map(([name]) => normalizedNameKey(name)));
   const unknownCountries = parsed.countries
     .map(({ country }) => country)
     .filter((country) => {
       const market = resolveMarket(country);
       if (!market.unknown) return false;
-      const legacyDisplayName = names[country];
-      return typeof legacyDisplayName !== 'string' || !legacyDisplayName.trim();
+      return !reviewedNames.has(normalizedNameKey(country));
     });
   if (unknownCountries.length) {
     throw new Error(`${fileName} contains countries outside the reviewed Apple country list: ${unknownCountries.join(', ')}`);
@@ -184,35 +188,69 @@ function emptyChanges() {
   return { addedTiers: [], removedTiers: [], addedCountries: [], removedCountries: [], changedCountries: [] };
 }
 
-function mergeSnapshotChanges(baseChanges = emptyChanges(), additionalChanges = emptyChanges()) {
-  const unique = (items, key) => [...new Map(items.map((item) => [key(item), item])).values()];
-  const changed = new Map();
-  for (const entry of [...(baseChanges.changedCountries ?? []), ...(additionalChanges.changedCountries ?? [])]) {
-    const current = changed.get(entry.country);
-    if (!current) {
-      changed.set(entry.country, { ...entry, tiers: [...(entry.tiers ?? [])] });
-      continue;
-    }
-    const tiers = new Map((current.tiers ?? []).map((tier) => [tier.id, tier]));
-    for (const tier of entry.tiers ?? []) {
-      const previousTier = tiers.get(tier.id);
-      tiers.set(tier.id, previousTier ? { ...previousTier, to: tier.to } : tier);
-    }
-    changed.set(entry.country, {
-      ...current,
-      ...entry,
-      fromCurrency: current.fromCurrency,
-      fromRegion: current.fromRegion,
-      tiers: [...tiers.values()]
+// Rebuild from the COMPLETE evidence ledger, not just this invocation's archive
+// inputs plus today's final prices. Otherwise intermediate live revisions vanish.
+function rebuildHistoryFromEvidence(index, snapshots, archives, existingHistory, currentData, names) {
+  const resolve = createSnapshotMarketResolver(index, snapshots);
+  const imported = new Set(archives.map((archive) => `${archive.publishedDate}:${appleSnapshotContentHash(archive.parsed)}`));
+  const rebuilt = { schemaVersion: 4, markets: {}, sourcePublishedDates: [] };
+  const consumedEvents = new Map();
+  const priceKey = (plans) => JSON.stringify(Object.entries(plans).sort(([a], [b]) => a.localeCompare(b)));
+  let previousActive = null;
+  const asParsed = (snapshot) => ({ ...snapshot, countries: snapshot.countries.map((country) => ({
+    ...country, plans: Object.fromEntries(Object.entries(country.plans).map(([tier, price]) => [tier, { price }]))
+  })) });
+  for (const publication of index.snapshots) {
+    const first = asParsed(snapshots.get(publication.revisions[0].dataFile));
+    const label = archives.find((archive) => archive.publishedDate === publication.publishedDate)?.parsed.sourcePublishedDate
+      ?? existingHistory.sourcePublishedDates?.find((entry) => publicationDateKey(entry.publishedDate) === publication.publishedDate)?.publishedDate
+      ?? publication.publishedDate;
+    const priorPublication = existingHistory.sourcePublishedDates?.find((entry) => publicationDateKey(entry.publishedDate) === publication.publishedDate);
+    const observedAt = publication.revisions[0].firstConfirmedDate;
+    const retainedObservation = priorPublication?.observedAt === observedAt && priorPublication.observedAtUtc
+      ? { observedAtUtc: priorPublication.observedAtUtc, observedAtBeijing: observedAt } : {};
+    rebuilt.sourcePublishedDates.push({
+      ...retainedObservation, publishedDate: label, observedAt,
+      kind: previousActive ? 'change' : 'initial',
+      changes: previousActive ? buildSnapshotChanges(previousActive, first.countries, first.tiers) : emptyChanges()
     });
+    for (const revision of publication.revisions) {
+      const parsed = asParsed(snapshots.get(revision.dataFile));
+      const observedAt = imported.has(`${publication.publishedDate}:${revision.contentHash}`)
+        ? publication.publishedDate : revision.firstConfirmedDate;
+      for (const country of attachMarketIdentity(parsed.countries, { resolve, chineseNames: names })) {
+        const plans = Object.fromEntries(Object.entries(country.plans).map(([tier, plan]) => [tier, plan.price]));
+        const last = rebuilt.markets[country.marketId]?.events.at(-1);
+        let retained = null;
+        if (!last || last.currency !== country.currency || priceKey(last.plans) !== priceKey(plans)) {
+          const events = existingHistory.markets?.[country.marketId]?.events ?? [];
+          const anchors = evidenceDateAnchors(publication, revision);
+          const offset = consumedEvents.get(country.marketId) ?? 0;
+          const match = events.findIndex((event, i) => i >= offset
+            && event.currency === country.currency && priceKey(event.plans) === priceKey(plans)
+            && anchors.includes(event.observedAt));
+          if (match >= 0) {
+            retained = events[match];
+            consumedEvents.set(country.marketId, match + 1);
+          }
+        }
+        updateHistory(rebuilt, [country], retained?.observedAt ?? observedAt, parsed.tiers, retained?.observedAtUtc ?? null);
+      }
+    }
+    previousActive = asParsed(snapshots.get(publication.activeDataFile));
   }
-  return {
-    addedTiers: unique([...(baseChanges.addedTiers ?? []), ...(additionalChanges.addedTiers ?? [])], (item) => item.id),
-    removedTiers: unique([...(baseChanges.removedTiers ?? []), ...(additionalChanges.removedTiers ?? [])], (item) => item.id),
-    addedCountries: unique([...(baseChanges.addedCountries ?? []), ...(additionalChanges.addedCountries ?? [])], (item) => item.country),
-    removedCountries: unique([...(baseChanges.removedCountries ?? []), ...(additionalChanges.removedCountries ?? [])], (item) => item.country),
-    changedCountries: [...changed.values()]
-  };
+  // This is a historical projection AS OF the current observed price batch, not
+  // a new live observation. Actual import execution time belongs in the CLI log.
+  rebuilt.updatedAt = currentData.generatedAt;
+  if (currentData.schemaVersion === 4) {
+    validateHistoryPayload(rebuilt);
+    for (const marketId of Object.keys(existingHistory.markets ?? {})) {
+      if (!Object.hasOwn(rebuilt.markets, marketId)) throw new Error(`Published marketId missing from archive evidence: ${marketId}`);
+    }
+    validateMarketIdentityContinuity(currentData, rebuilt);
+    validatePriceHistoryConsistency(currentData, rebuilt);
+  }
+  return rebuilt;
 }
 
 function migrateSnapshotIndex(index) {
@@ -331,8 +369,7 @@ async function importAppleArchivesUnlocked(inputDir, paths = {}) {
     || a.fileName.localeCompare(b.fileName)
   ));
 
-  const rebuilt = { schemaVersion: 4, updatedAt: new Date().toISOString(), markets: {}, sourcePublishedDates: [] };
-  let previousData = null;
+  let rebuilt;
   let snapshotIndex = normalizeAppleSnapshotIndex(migratedSnapshotIndex);
   const currentPublishedDate = publicationDateKey(currentData.source.publishedDate);
   if (!archives.length) throw new Error('No validated Apple archives were found in the input directory');
@@ -357,6 +394,7 @@ async function importAppleArchivesUnlocked(inputDir, paths = {}) {
     throw error;
   });
 
+  try {
   for (const archive of archives) {
     const contentHash = appleSnapshotContentHash(archive.parsed);
     const normalizedSnapshotText = `${JSON.stringify(normalizeAppleSnapshot(archive.parsed), null, 2)}\n`;
@@ -391,50 +429,17 @@ async function importAppleArchivesUnlocked(inputDir, paths = {}) {
       }
       stagedFiles.push(entry.dataFile);
     }
-    updateHistory(rebuilt, attachMarketIdentity(archive.parsed.countries, { chineseNames: names }), archive.publishedDate, archive.parsed.tiers);
-    const changes = previousData ? buildSnapshotChanges(previousData, archive.parsed.countries, archive.parsed.tiers) : emptyChanges();
-    const sourceEntry = {
-      publishedDate: archive.parsed.sourcePublishedDate,
-      observedAt: archive.firstConfirmedDate,
-      kind: previousData ? 'change' : 'initial',
-      changes
-    };
-    const previousSourceEntry = rebuilt.sourcePublishedDates.at(-1);
-    if (publicationDateKey(previousSourceEntry?.publishedDate) === archive.publishedDate) {
-      previousSourceEntry.changes = mergeSnapshotChanges(previousSourceEntry.changes, changes);
-      previousSourceEntry.observedAt = [previousSourceEntry.observedAt, snapshotIndex.snapshots
-        .find(({ publishedDate }) => publishedDate === archive.publishedDate)
-        ?.revisions?.[0]?.firstConfirmedDate]
-        .filter(Boolean)
-        .sort()[0];
-    } else {
-      sourceEntry.observedAt = snapshotIndex.snapshots
-        .find(({ publishedDate }) => publishedDate === archive.publishedDate)
-        ?.revisions?.[0]?.firstConfirmedDate ?? sourceEntry.observedAt;
-      rebuilt.sourcePublishedDates.push(sourceEntry);
+  }
+
+  const snapshots = new Map();
+  for (const publication of snapshotIndex.snapshots) {
+    for (const revision of publication.revisions) {
+      const directory = stagedFiles.includes(revision.dataFile) ? stagingDir : snapshotsDir;
+      snapshots.set(revision.dataFile, JSON.parse(await readFile(path.join(directory, revision.dataFile), 'utf8')));
     }
-    previousData = archive.parsed;
   }
+  rebuilt = rebuildHistoryFromEvidence(snapshotIndex, snapshots, archives, existingHistory, currentData, names);
 
-  const lastArchiveDate = archives.at(-1)?.publishedDate ?? '0000-00-00';
-  const currentEventDate = currentPriceObservationDate(currentData);
-  updateHistory(rebuilt, attachMarketIdentity(currentData.countries, { chineseNames: names }), currentEventDate, currentData.tiers);
-  const currentChanges = buildSnapshotChanges(previousData, currentData.countries, currentData.tiers);
-  if (currentPublishedDate > lastArchiveDate) {
-    rebuilt.sourcePublishedDates.push({
-      publishedDate: currentData.source.publishedDate,
-      observedAt: currentEventDate,
-      kind: 'change',
-      changes: currentChanges
-    });
-  } else if (publicationDateKey(rebuilt.sourcePublishedDates.at(-1)?.publishedDate) === currentPublishedDate) {
-    rebuilt.sourcePublishedDates.at(-1).changes = mergeSnapshotChanges(
-      rebuilt.sourcePublishedDates.at(-1).changes,
-      currentChanges
-    );
-  }
-
-  try {
     const plannedSnapshotFiles = stagedFiles.map((name) => path.join(snapshotsDir, name));
     for (const filePath of plannedSnapshotFiles) {
       await access(filePath).then(
@@ -495,7 +500,7 @@ async function importAppleArchivesUnlocked(inputDir, paths = {}) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const inputIndex = process.argv.indexOf('--input');
   importAppleArchives(inputIndex >= 0 ? process.argv[inputIndex + 1] : null)
-    .then(({ archives }) => console.log(`Imported ${archives.length} validated Apple archives.`))
+    .then(({ archives }) => console.log(`Imported ${archives.length} validated Apple archives at ${new Date().toISOString()}; history remains anchored to its observed price batch.`))
     .catch((error) => {
       console.error(error);
       process.exitCode = 1;

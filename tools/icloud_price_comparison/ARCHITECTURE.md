@@ -223,3 +223,11 @@ JavaScript 可用时：
 ## 14. Apple DOM 适配边界
 
 Apple 108047 可能以历史逐市场列表或按地区 `Country (Currency)` 表格承载价格。`parse-prices.mjs` 负责结构分派，表格结构由 `parse-price-tables.mjs` 解析；两种适配器都不能改变事实源、region 语义、market identity 或价格校验规则。表格模式仍通过 `document-order` 与 exact Apple marker 两条关联路径对同一 HTML 逐字段交叉核对；未知市场、新容量和发布日期变化仍进入原有独立语义确认，而不是按旧市场数量硬过滤。
+
+### 最终候选的证据闭环
+
+表格的 `cross-checked` 由独立的逐行解码与逐列解码交叉证明；两者仅共享词法（容量、币种、价格）与明确的简单网格边界。每个 Apple region 必须有实际解析的价格表，不能仅凭标题存在判定完整；缺表、歧义跨格、异常行、中途表头漂移均拒绝。合法列重排按表头解释，不依赖固定市场数或容量数。
+
+`market-evidence.mjs` 统一快照证据中的首次规范化 source-name → 永久 ID 绑定及精确日期锚点。已发布的未知名称仅改大小写时，不能重新哈希；历史声称的 ID 也不能充当自己的证据。已保留的永久 ID 不再作为 removed/added rename 候选；真正冲突和未确认的一对一 rename 仍阻塞。
+
+archive importer 重放完整 snapshot ledger（包括此前 live revision），而非只拼本次输入与最新价格；保留可精确匹配证据的 live UTC 观察记录。`history.updatedAt` 是与当前价格批次一致的 as-of 水位，回填不是一次新的 Apple 观察，导入执行时间只写运维日志。在线事件与回填事件仍只能命中 revision 的 `firstConfirmedDate` 或 `publishedDate`，不使用时间范围容忍。
