@@ -1,4 +1,4 @@
-name: TEMP accept iCloud zh monitor
+name: TEMP diagnose iCloud publication UI
 
 on:
   push:
@@ -13,9 +13,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  accept:
+  diagnose:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -28,26 +28,11 @@ jobs:
         run: |
           corepack enable
           pnpm install --frozen-lockfile --ignore-scripts
+          pnpm exec playwright install --with-deps chromium
 
-      - name: 针对性监测与展示测试
+      - name: 仅运行主 UI smoke 并保留完整失败上下文
         working-directory: tools/icloud_price_comparison
-        run: node --test --test-concurrency=1 test/followup-hardening.test.mjs
-
-      - name: 真实 Apple 中文页验收
-        working-directory: tools/icloud_price_comparison
-        run: node scripts/check-apple-zh-markets.mjs
-
-      - name: 最终仓库形态完整 core
         shell: bash
         run: |
-          rm -f .github/workflows/temp-finalize-icloud-zh-monitor.yml .github/temp-finalize-icloud-zh-monitor.py
-          cd tools/icloud_price_comparison
-          pnpm test:core
-
-      - name: 安装 Chromium
-        working-directory: tools/icloud_price_comparison
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Chromium UI 验收
-        working-directory: tools/icloud_price_comparison
-        run: pnpm test:ui
+          set -o pipefail
+          node --test --test-concurrency=1 --test-name-pattern="renders current prices, sorting, and country history in a real browser" test/ui-smoke.test.mjs 2>&1 | tee /tmp/ui-publication.log
