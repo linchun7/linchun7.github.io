@@ -160,17 +160,27 @@ test('rejects history observations later than the artifact update date', async (
 
 test('bounds history observations by the Beijing calendar date across UTC midnight', async () => {
   const { history } = await productionFixtures();
-  const priceHistory = structuredClone(history);
+  const isolatedHistory = structuredClone(history);
+  const [marketId, sourceRecord] = Object.entries(isolatedHistory.markets)[0];
+  isolatedHistory.markets = {
+    [marketId]: {
+      ...sourceRecord,
+      events: [structuredClone(sourceRecord.events[0])]
+    }
+  };
+  isolatedHistory.sourcePublishedDates = [structuredClone(isolatedHistory.sourcePublishedDates[0])];
+
+  const priceHistory = structuredClone(isolatedHistory);
   priceHistory.updatedAt = '2026-08-14T16:02:00.000Z';
-  const event = Object.values(priceHistory.markets)[0].events.at(-1);
+  const event = Object.values(priceHistory.markets)[0].events[0];
   event.observedAt = '2026-08-15';
   event.observedAtBeijing = '2026-08-15';
   event.observedAtUtc = priceHistory.updatedAt;
   assert.doesNotThrow(() => validateHistoryPayload(priceHistory));
 
-  const publicationHistory = structuredClone(history);
+  const publicationHistory = structuredClone(isolatedHistory);
   publicationHistory.updatedAt = '2026-08-14T16:02:00.000Z';
-  const publication = publicationHistory.sourcePublishedDates.at(-1);
+  const publication = publicationHistory.sourcePublishedDates[0];
   publication.observedAt = '2026-08-15';
   publication.observedAtBeijing = '2026-08-15';
   publication.observedAtUtc = publicationHistory.updatedAt;
@@ -180,9 +190,9 @@ test('bounds history observations by the Beijing calendar date across UTC midnig
   event.observedAtBeijing = '2026-08-16';
   assert.throws(() => validateHistoryPayload(priceHistory), /invalid event/);
 
-  const beforeMidnight = structuredClone(history);
+  const beforeMidnight = structuredClone(isolatedHistory);
   beforeMidnight.updatedAt = '2026-08-14T15:59:59.000Z';
-  const premature = Object.values(beforeMidnight.markets)[0].events.at(-1);
+  const premature = Object.values(beforeMidnight.markets)[0].events[0];
   premature.observedAt = '2026-08-15';
   premature.observedAtBeijing = '2026-08-15';
   premature.observedAtUtc = beforeMidnight.updatedAt;
