@@ -132,6 +132,24 @@
         }
       ],
       "activeDataFile": "2026-07-17.json"
+    },
+    {
+      "publishedDate": "2026-09-15",
+      "activeDataFile": "2026-09-15.json",
+      "activeContentHash": "b85858deedd1c7c9c7012a9b49ad79826b0ce6486d7b1c4d3f9f3bff916f1708",
+      "revisions": [
+        {
+          "publishedDate": "2026-09-15",
+          "dataFile": "2026-09-15.json",
+          "firstConfirmedDate": "2026-09-16",
+          "sourceUrl": "https://support.apple.com/en-us/108047",
+          "parser": "cross-checked",
+          "countries": 157,
+          "pricePoints": 785,
+          "contentHash": "b85858deedd1c7c9c7012a9b49ad79826b0ce6486d7b1c4d3f9f3bff916f1708",
+          "dataSha256": "c58d12cafea1a7738c7c7c4e2ca9d809d9897af529eae27660142bcb36e94222"
+        }
+      ]
     }
   ]
 }

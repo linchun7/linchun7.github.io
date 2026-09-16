@@ -1,60 +1,8 @@
 {
   "schemaVersion": 1,
   "retention": 90,
-  "updatedAtUtc": "2026-09-15T00:06:06.096Z",
+  "updatedAtUtc": "2026-09-16T03:49:21.499Z",
   "runs": [
-    {
-      "schemaVersion": 1,
-      "id": "2026-08-01T05:05:44.884Z",
-      "status": "success",
-      "trigger": "workflow_dispatch",
-      "startedAtUtc": "2026-08-01T05:05:44.399Z",
-      "finishedAtUtc": "2026-08-01T05:05:44.884Z",
-      "durationMs": 485,
-      "observedAtBeijing": "2026-08-01",
-      "source": {
-        "appleUrl": "https://support.apple.com/en-us/108047",
-        "applePublishedDate": "July 17, 2026",
-        "appleParser": "cross-checked",
-        "appleParserStatus": "Both independent parser paths agreed",
-        "exchangeRatesFetchedAtUtc": "2026-08-01T00:02:31.000Z",
-        "exchangeRatesStale": false
-      },
-      "counts": {
-        "countries": 73,
-        "pricePoints": 365,
-        "currencies": 44,
-        "tiers": [
-          {
-            "id": "50GB",
-            "label": "50 GB"
-          },
-          {
-            "id": "200GB",
-            "label": "200 GB"
-          },
-          {
-            "id": "2TB",
-            "label": "2 TB"
-          },
-          {
-            "id": "6TB",
-            "label": "6 TB"
-          },
-          {
-            "id": "12TB",
-            "label": "12 TB"
-          }
-        ]
-      },
-      "changes": {
-        "addedTiers": [],
-        "removedTiers": [],
-        "addedCountries": [],
-        "removedCountries": [],
-        "changedCountries": []
-      }
-    },
     {
       "schemaVersion": 1,
       "id": "2026-08-01T09:22:27.222Z",
@@ -5422,6 +5370,423 @@
         "addedCountries": [],
         "removedCountries": [],
         "changedCountries": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "2026-09-16T03:49:21.499Z",
+      "status": "success",
+      "trigger": "manual",
+      "automaticRunDateBeijing": null,
+      "startedAtUtc": "2026-09-16T03:49:20.882Z",
+      "finishedAtUtc": "2026-09-16T03:49:21.499Z",
+      "durationMs": 617,
+      "observedAtBeijing": "2026-09-16",
+      "source": {
+        "appleUrl": "https://support.apple.com/en-us/108047",
+        "applePublishedDate": "September 15, 2026",
+        "appleParser": "cross-checked",
+        "appleParserStatus": "Both DOM association paths agreed",
+        "exchangeRatesFetchedAtUtc": "2026-09-16T00:00:01.000Z",
+        "exchangeRatesStale": false,
+        "exchangeRatesSourceMode": "api-key",
+        "exchangeRatesFallbackUsed": false,
+        "exchangeRatesFallbackReason": null
+      },
+      "counts": {
+        "countries": 157,
+        "pricePoints": 785,
+        "currencies": 44,
+        "tiers": [
+          {
+            "id": "50GB",
+            "label": "50 GB"
+          },
+          {
+            "id": "200GB",
+            "label": "200 GB"
+          },
+          {
+            "id": "2TB",
+            "label": "2 TB"
+          },
+          {
+            "id": "6TB",
+            "label": "6 TB"
+          },
+          {
+            "id": "12TB",
+            "label": "12 TB"
+          }
+        ]
+      },
+      "changes": {
+        "publishedDate": {
+          "changed": true,
+          "from": "July 17, 2026",
+          "to": "September 15, 2026"
+        },
+        "addedTiers": [],
+        "removedTiers": [],
+        "addedCountries": [
+          {
+            "country": "Anguilla",
+            "nameZh": "Anguilla"
+          },
+          {
+            "country": "Antigua and Barbuda",
+            "nameZh": "Antigua and Barbuda"
+          },
+          {
+            "country": "Argentina",
+            "nameZh": "Argentina"
+          },
+          {
+            "country": "Belize",
+            "nameZh": "Belize"
+          },
+          {
+            "country": "Bermuda",
+            "nameZh": "Bermuda"
+          },
+          {
+            "country": "Bolivia",
+            "nameZh": "Bolivia"
+          },
+          {
+            "country": "Cayman Islands",
+            "nameZh": "Cayman Islands"
+          },
+          {
+            "country": "Costa Rica",
+            "nameZh": "Costa Rica"
+          },
+          {
+            "country": "Dominica",
+            "nameZh": "Dominica"
+          },
+          {
+            "country": "Dominican Republic",
+            "nameZh": "Dominican Republic"
+          },
+          {
+            "country": "Ecuador",
+            "nameZh": "Ecuador"
+          },
+          {
+            "country": "El Salvador",
+            "nameZh": "El Salvador"
+          },
+          {
+            "country": "Grenada",
+            "nameZh": "Grenada"
+          },
+          {
+            "country": "Guatemala",
+            "nameZh": "Guatemala"
+          },
+          {
+            "country": "Guyana",
+            "nameZh": "Guyana"
+          },
+          {
+            "country": "Honduras",
+            "nameZh": "Honduras"
+          },
+          {
+            "country": "Jamaica",
+            "nameZh": "Jamaica"
+          },
+          {
+            "country": "Montserrat",
+            "nameZh": "Montserrat"
+          },
+          {
+            "country": "Nicaragua",
+            "nameZh": "Nicaragua"
+          },
+          {
+            "country": "Panama",
+            "nameZh": "Panama"
+          },
+          {
+            "country": "Paraguay",
+            "nameZh": "Paraguay"
+          },
+          {
+            "country": "Saint Lucia",
+            "nameZh": "Saint Lucia"
+          },
+          {
+            "country": "St. Kitts and Nevis",
+            "nameZh": "St. Kitts and Nevis"
+          },
+          {
+            "country": "St. Vincent and The Grenadines",
+            "nameZh": "St. Vincent and The Grenadines"
+          },
+          {
+            "country": "Trinidad and Tobago",
+            "nameZh": "Trinidad and Tobago"
+          },
+          {
+            "country": "Turks and Caicos",
+            "nameZh": "Turks and Caicos"
+          },
+          {
+            "country": "Uruguay",
+            "nameZh": "Uruguay"
+          },
+          {
+            "country": "Venezuela",
+            "nameZh": "Venezuela"
+          },
+          {
+            "country": "Virgin Islands, British",
+            "nameZh": "Virgin Islands, British"
+          },
+          {
+            "country": "Afghanistan",
+            "nameZh": "Afghanistan"
+          },
+          {
+            "country": "Algeria",
+            "nameZh": "Algeria"
+          },
+          {
+            "country": "Angola",
+            "nameZh": "Angola"
+          },
+          {
+            "country": "Bosnia and Herzegovina",
+            "nameZh": "Bosnia and Herzegovina"
+          },
+          {
+            "country": "Botswana",
+            "nameZh": "Botswana"
+          },
+          {
+            "country": "Burkina Faso",
+            "nameZh": "Burkina Faso"
+          },
+          {
+            "country": "Cape Verde",
+            "nameZh": "Cape Verde"
+          },
+          {
+            "country": "Chad",
+            "nameZh": "Chad"
+          },
+          {
+            "country": "Cote D'Ivoire",
+            "nameZh": "科特迪瓦"
+          },
+          {
+            "country": "Democratic Republic of the Congo",
+            "nameZh": "Democratic Republic of the Congo"
+          },
+          {
+            "country": "Eswatini",
+            "nameZh": "Eswatini"
+          },
+          {
+            "country": "Gabon",
+            "nameZh": "Gabon"
+          },
+          {
+            "country": "Gambia",
+            "nameZh": "Gambia"
+          },
+          {
+            "country": "Guinea-Bissau",
+            "nameZh": "Guinea-Bissau"
+          },
+          {
+            "country": "Iraq",
+            "nameZh": "Iraq"
+          },
+          {
+            "country": "Jordan",
+            "nameZh": "Jordan"
+          },
+          {
+            "country": "Kosovo",
+            "nameZh": "Kosovo"
+          },
+          {
+            "country": "Kuwait",
+            "nameZh": "Kuwait"
+          },
+          {
+            "country": "Lebanon",
+            "nameZh": "Lebanon"
+          },
+          {
+            "country": "Liberia",
+            "nameZh": "Liberia"
+          },
+          {
+            "country": "Libya",
+            "nameZh": "Libya"
+          },
+          {
+            "country": "Madagascar",
+            "nameZh": "Madagascar"
+          },
+          {
+            "country": "Malawi",
+            "nameZh": "Malawi"
+          },
+          {
+            "country": "Mali",
+            "nameZh": "Mali"
+          },
+          {
+            "country": "Mauritania",
+            "nameZh": "Mauritania"
+          },
+          {
+            "country": "Montenegro",
+            "nameZh": "Montenegro"
+          },
+          {
+            "country": "Morocco",
+            "nameZh": "Morocco"
+          },
+          {
+            "country": "Mozambique",
+            "nameZh": "Mozambique"
+          },
+          {
+            "country": "Namibia",
+            "nameZh": "Namibia"
+          },
+          {
+            "country": "Niger",
+            "nameZh": "Niger"
+          },
+          {
+            "country": "North Macedonia",
+            "nameZh": "North Macedonia"
+          },
+          {
+            "country": "Oman",
+            "nameZh": "Oman"
+          },
+          {
+            "country": "Rwanda",
+            "nameZh": "Rwanda"
+          },
+          {
+            "country": "São Tomé and Príncipe",
+            "nameZh": "São Tomé and Príncipe"
+          },
+          {
+            "country": "Serbia",
+            "nameZh": "Serbia"
+          },
+          {
+            "country": "Seychelles",
+            "nameZh": "Seychelles"
+          },
+          {
+            "country": "Sierra Leone",
+            "nameZh": "Sierra Leone"
+          },
+          {
+            "country": "Tunisia",
+            "nameZh": "Tunisia"
+          },
+          {
+            "country": "Ukraine",
+            "nameZh": "Ukraine"
+          },
+          {
+            "country": "Yemen",
+            "nameZh": "Yemen"
+          },
+          {
+            "country": "Bhutan",
+            "nameZh": "Bhutan"
+          },
+          {
+            "country": "Brunei Darussalam",
+            "nameZh": "Brunei Darussalam"
+          },
+          {
+            "country": "Fiji",
+            "nameZh": "Fiji"
+          },
+          {
+            "country": "Macao",
+            "nameZh": "Macao"
+          },
+          {
+            "country": "Maldives",
+            "nameZh": "Maldives"
+          },
+          {
+            "country": "Micronesia, Federated States of",
+            "nameZh": "Micronesia, Federated States of"
+          },
+          {
+            "country": "Mongolia",
+            "nameZh": "Mongolia"
+          },
+          {
+            "country": "Myanmar",
+            "nameZh": "Myanmar"
+          },
+          {
+            "country": "Nauru",
+            "nameZh": "Nauru"
+          },
+          {
+            "country": "Palau",
+            "nameZh": "Palau"
+          },
+          {
+            "country": "Papua New Guinea",
+            "nameZh": "Papua New Guinea"
+          },
+          {
+            "country": "Solomon Islands",
+            "nameZh": "Solomon Islands"
+          },
+          {
+            "country": "Sri Lanka",
+            "nameZh": "Sri Lanka"
+          },
+          {
+            "country": "Tonga",
+            "nameZh": "Tonga"
+          },
+          {
+            "country": "Turkmenistan",
+            "nameZh": "Turkmenistan"
+          },
+          {
+            "country": "Vanuatu",
+            "nameZh": "Vanuatu"
+          }
+        ],
+        "removedCountries": [
+          {
+            "country": "Ivory Coast",
+            "nameZh": "科特迪瓦"
+          }
+        ],
+        "changedCountries": [
+          {
+            "country": "Pakistan",
+            "nameZh": "巴基斯坦",
+            "fromCurrency": "PKR",
+            "toCurrency": "PKR",
+            "fromRegion": "Europe, Middle East & Africa",
+            "toRegion": "Asia Pacific",
+            "tiers": []
+          }
+        ]
       }
     }
   ]

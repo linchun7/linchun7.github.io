@@ -1,6 +1,6 @@
 {
   "schemaVersion": 4,
-  "updatedAt": "2026-08-15T04:33:18.402Z",
+  "updatedAt": "2026-09-16T03:49:21.499Z",
   "markets": {
     "bs": {
       "country": "Bahamas",
@@ -515,7 +515,7 @@
       ]
     },
     "ci": {
-      "country": "Ivory Coast",
+      "country": "Cote D'Ivoire",
       "nameZh": "科特迪瓦",
       "region": "Europe, Middle East & Africa",
       "events": [
@@ -618,7 +618,7 @@
     "pk": {
       "country": "Pakistan",
       "nameZh": "巴基斯坦",
-      "region": "Europe, Middle East & Africa",
+      "region": "Asia Pacific",
       "events": [
         {
           "observedAt": "2024-12-05",
@@ -1447,6 +1447,1686 @@
           }
         }
       ]
+    },
+    "apple-anguilla-a4a0c7e7": {
+      "country": "Anguilla",
+      "nameZh": "Anguilla",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-antigua-and-barbuda-100c4768": {
+      "country": "Antigua and Barbuda",
+      "nameZh": "Antigua and Barbuda",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-argentina-ea0b937e": {
+      "country": "Argentina",
+      "nameZh": "Argentina",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-belize-71dc81f1": {
+      "country": "Belize",
+      "nameZh": "Belize",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-bermuda-79c89fd4": {
+      "country": "Bermuda",
+      "nameZh": "Bermuda",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-bolivia-9621c073": {
+      "country": "Bolivia",
+      "nameZh": "Bolivia",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-cayman-islands-83f2b333": {
+      "country": "Cayman Islands",
+      "nameZh": "Cayman Islands",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-costa-rica-e26742d7": {
+      "country": "Costa Rica",
+      "nameZh": "Costa Rica",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-dominica-be2a7f56": {
+      "country": "Dominica",
+      "nameZh": "Dominica",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-dominican-republic-81e884cb": {
+      "country": "Dominican Republic",
+      "nameZh": "Dominican Republic",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-ecuador-2ca26c60": {
+      "country": "Ecuador",
+      "nameZh": "Ecuador",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-el-salvador-c408d26c": {
+      "country": "El Salvador",
+      "nameZh": "El Salvador",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-grenada-0593aa0c": {
+      "country": "Grenada",
+      "nameZh": "Grenada",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-guatemala-45a15a24": {
+      "country": "Guatemala",
+      "nameZh": "Guatemala",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-guyana-ea3bfc26": {
+      "country": "Guyana",
+      "nameZh": "Guyana",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-honduras-b79b5f97": {
+      "country": "Honduras",
+      "nameZh": "Honduras",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-jamaica-42c298ba": {
+      "country": "Jamaica",
+      "nameZh": "Jamaica",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-montserrat-127bcfe9": {
+      "country": "Montserrat",
+      "nameZh": "Montserrat",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-nicaragua-94e6bd57": {
+      "country": "Nicaragua",
+      "nameZh": "Nicaragua",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-panama-c3668f58": {
+      "country": "Panama",
+      "nameZh": "Panama",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-paraguay-7fb4d179": {
+      "country": "Paraguay",
+      "nameZh": "Paraguay",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-saint-lucia-abe06aae": {
+      "country": "Saint Lucia",
+      "nameZh": "Saint Lucia",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-st-kitts-and-nevis-3b3cb85d": {
+      "country": "St. Kitts and Nevis",
+      "nameZh": "St. Kitts and Nevis",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-st-vincent-and-the-grenadines-72424fd7": {
+      "country": "St. Vincent and The Grenadines",
+      "nameZh": "St. Vincent and The Grenadines",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-trinidad-and-tobago-0c0177b5": {
+      "country": "Trinidad and Tobago",
+      "nameZh": "Trinidad and Tobago",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-turks-and-caicos-a24c1d4d": {
+      "country": "Turks and Caicos",
+      "nameZh": "Turks and Caicos",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-uruguay-fe2403f2": {
+      "country": "Uruguay",
+      "nameZh": "Uruguay",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-venezuela-020e438b": {
+      "country": "Venezuela",
+      "nameZh": "Venezuela",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-virgin-islands-british-4b60323d": {
+      "country": "Virgin Islands, British",
+      "nameZh": "Virgin Islands, British",
+      "region": "Americas",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-afghanistan-5dbddf91": {
+      "country": "Afghanistan",
+      "nameZh": "Afghanistan",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-algeria-30e23022": {
+      "country": "Algeria",
+      "nameZh": "Algeria",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-angola-22b96532": {
+      "country": "Angola",
+      "nameZh": "Angola",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-bosnia-and-herzegovina-b0772b9c": {
+      "country": "Bosnia and Herzegovina",
+      "nameZh": "Bosnia and Herzegovina",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-botswana-1672f60c": {
+      "country": "Botswana",
+      "nameZh": "Botswana",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-burkina-faso-a564371a": {
+      "country": "Burkina Faso",
+      "nameZh": "Burkina Faso",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-cape-verde-9fa6f2da": {
+      "country": "Cape Verde",
+      "nameZh": "Cape Verde",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-chad-4256e512": {
+      "country": "Chad",
+      "nameZh": "Chad",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-democratic-republic-of-the-congo-098c6424": {
+      "country": "Democratic Republic of the Congo",
+      "nameZh": "Democratic Republic of the Congo",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-eswatini-e0568e4c": {
+      "country": "Eswatini",
+      "nameZh": "Eswatini",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-gabon-7e222a78": {
+      "country": "Gabon",
+      "nameZh": "Gabon",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-gambia-c6e681b1": {
+      "country": "Gambia",
+      "nameZh": "Gambia",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-guinea-bissau-75e8f462": {
+      "country": "Guinea-Bissau",
+      "nameZh": "Guinea-Bissau",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-iraq-de5008d1": {
+      "country": "Iraq",
+      "nameZh": "Iraq",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-jordan-e8bfe1ed": {
+      "country": "Jordan",
+      "nameZh": "Jordan",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-kosovo-4a867424": {
+      "country": "Kosovo",
+      "nameZh": "Kosovo",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-kuwait-10c3c2e2": {
+      "country": "Kuwait",
+      "nameZh": "Kuwait",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-lebanon-e34dd616": {
+      "country": "Lebanon",
+      "nameZh": "Lebanon",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-liberia-c9d2604d": {
+      "country": "Liberia",
+      "nameZh": "Liberia",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-libya-2aa2fcef": {
+      "country": "Libya",
+      "nameZh": "Libya",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-madagascar-d6804464": {
+      "country": "Madagascar",
+      "nameZh": "Madagascar",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-malawi-611025cd": {
+      "country": "Malawi",
+      "nameZh": "Malawi",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-mali-ee5721a5": {
+      "country": "Mali",
+      "nameZh": "Mali",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-mauritania-bfb0c8d3": {
+      "country": "Mauritania",
+      "nameZh": "Mauritania",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-montenegro-7ab597e1": {
+      "country": "Montenegro",
+      "nameZh": "Montenegro",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-morocco-b675f5df": {
+      "country": "Morocco",
+      "nameZh": "Morocco",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-mozambique-c9054826": {
+      "country": "Mozambique",
+      "nameZh": "Mozambique",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-namibia-ea5bd398": {
+      "country": "Namibia",
+      "nameZh": "Namibia",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-niger-2cbebc54": {
+      "country": "Niger",
+      "nameZh": "Niger",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-north-macedonia-cd847226": {
+      "country": "North Macedonia",
+      "nameZh": "North Macedonia",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-oman-c3ce4bf8": {
+      "country": "Oman",
+      "nameZh": "Oman",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-rwanda-12c8f8f4": {
+      "country": "Rwanda",
+      "nameZh": "Rwanda",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-sao-tome-and-principe-003c6e4d": {
+      "country": "São Tomé and Príncipe",
+      "nameZh": "São Tomé and Príncipe",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-serbia-e8739c83": {
+      "country": "Serbia",
+      "nameZh": "Serbia",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-seychelles-d1d63320": {
+      "country": "Seychelles",
+      "nameZh": "Seychelles",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-sierra-leone-f405b98d": {
+      "country": "Sierra Leone",
+      "nameZh": "Sierra Leone",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-tunisia-4609682a": {
+      "country": "Tunisia",
+      "nameZh": "Tunisia",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-ukraine-580eedc6": {
+      "country": "Ukraine",
+      "nameZh": "Ukraine",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-yemen-21c1903a": {
+      "country": "Yemen",
+      "nameZh": "Yemen",
+      "region": "Europe, Middle East & Africa",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-bhutan-d889e217": {
+      "country": "Bhutan",
+      "nameZh": "Bhutan",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-brunei-darussalam-f196e55e": {
+      "country": "Brunei Darussalam",
+      "nameZh": "Brunei Darussalam",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-fiji-679c02dc": {
+      "country": "Fiji",
+      "nameZh": "Fiji",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-macao-e10953f7": {
+      "country": "Macao",
+      "nameZh": "Macao",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-maldives-8fb54471": {
+      "country": "Maldives",
+      "nameZh": "Maldives",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-micronesia-federated-states-of-4cae1724": {
+      "country": "Micronesia, Federated States of",
+      "nameZh": "Micronesia, Federated States of",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-mongolia-99a7c065": {
+      "country": "Mongolia",
+      "nameZh": "Mongolia",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-myanmar-ba2039a4": {
+      "country": "Myanmar",
+      "nameZh": "Myanmar",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-nauru-57e90088": {
+      "country": "Nauru",
+      "nameZh": "Nauru",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-palau-7fa64773": {
+      "country": "Palau",
+      "nameZh": "Palau",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-papua-new-guinea-c65742ce": {
+      "country": "Papua New Guinea",
+      "nameZh": "Papua New Guinea",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-solomon-islands-cff4c58d": {
+      "country": "Solomon Islands",
+      "nameZh": "Solomon Islands",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-sri-lanka-07f8d114": {
+      "country": "Sri Lanka",
+      "nameZh": "Sri Lanka",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-tonga-310bc325": {
+      "country": "Tonga",
+      "nameZh": "Tonga",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-turkmenistan-b3dfc850": {
+      "country": "Turkmenistan",
+      "nameZh": "Turkmenistan",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
+    },
+    "apple-vanuatu-c5b2a6de": {
+      "country": "Vanuatu",
+      "nameZh": "Vanuatu",
+      "region": "Asia Pacific",
+      "events": [
+        {
+          "observedAt": "2026-09-16",
+          "observedAtBeijing": "2026-09-16",
+          "observedAtUtc": "2026-09-16T03:49:21.499Z",
+          "currency": "USD",
+          "plans": {
+            "50GB": 0.99,
+            "200GB": 2.99,
+            "2TB": 9.99,
+            "6TB": 29.99,
+            "12TB": 59.99
+          }
+        }
+      ]
     }
   },
   "sourcePublishedDates": [
@@ -1966,6 +3646,376 @@
                 "to": 1799000
               }
             ]
+          }
+        ]
+      }
+    },
+    {
+      "publishedDate": "September 15, 2026",
+      "observedAt": "2026-09-16",
+      "observedAtBeijing": "2026-09-16",
+      "observedAtUtc": "2026-09-16T03:49:21.499Z",
+      "kind": "change",
+      "changes": {
+        "addedTiers": [],
+        "removedTiers": [],
+        "addedCountries": [
+          {
+            "country": "Anguilla",
+            "nameZh": "Anguilla"
+          },
+          {
+            "country": "Antigua and Barbuda",
+            "nameZh": "Antigua and Barbuda"
+          },
+          {
+            "country": "Argentina",
+            "nameZh": "Argentina"
+          },
+          {
+            "country": "Belize",
+            "nameZh": "Belize"
+          },
+          {
+            "country": "Bermuda",
+            "nameZh": "Bermuda"
+          },
+          {
+            "country": "Bolivia",
+            "nameZh": "Bolivia"
+          },
+          {
+            "country": "Cayman Islands",
+            "nameZh": "Cayman Islands"
+          },
+          {
+            "country": "Costa Rica",
+            "nameZh": "Costa Rica"
+          },
+          {
+            "country": "Dominica",
+            "nameZh": "Dominica"
+          },
+          {
+            "country": "Dominican Republic",
+            "nameZh": "Dominican Republic"
+          },
+          {
+            "country": "Ecuador",
+            "nameZh": "Ecuador"
+          },
+          {
+            "country": "El Salvador",
+            "nameZh": "El Salvador"
+          },
+          {
+            "country": "Grenada",
+            "nameZh": "Grenada"
+          },
+          {
+            "country": "Guatemala",
+            "nameZh": "Guatemala"
+          },
+          {
+            "country": "Guyana",
+            "nameZh": "Guyana"
+          },
+          {
+            "country": "Honduras",
+            "nameZh": "Honduras"
+          },
+          {
+            "country": "Jamaica",
+            "nameZh": "Jamaica"
+          },
+          {
+            "country": "Montserrat",
+            "nameZh": "Montserrat"
+          },
+          {
+            "country": "Nicaragua",
+            "nameZh": "Nicaragua"
+          },
+          {
+            "country": "Panama",
+            "nameZh": "Panama"
+          },
+          {
+            "country": "Paraguay",
+            "nameZh": "Paraguay"
+          },
+          {
+            "country": "Saint Lucia",
+            "nameZh": "Saint Lucia"
+          },
+          {
+            "country": "St. Kitts and Nevis",
+            "nameZh": "St. Kitts and Nevis"
+          },
+          {
+            "country": "St. Vincent and The Grenadines",
+            "nameZh": "St. Vincent and The Grenadines"
+          },
+          {
+            "country": "Trinidad and Tobago",
+            "nameZh": "Trinidad and Tobago"
+          },
+          {
+            "country": "Turks and Caicos",
+            "nameZh": "Turks and Caicos"
+          },
+          {
+            "country": "Uruguay",
+            "nameZh": "Uruguay"
+          },
+          {
+            "country": "Venezuela",
+            "nameZh": "Venezuela"
+          },
+          {
+            "country": "Virgin Islands, British",
+            "nameZh": "Virgin Islands, British"
+          },
+          {
+            "country": "Afghanistan",
+            "nameZh": "Afghanistan"
+          },
+          {
+            "country": "Algeria",
+            "nameZh": "Algeria"
+          },
+          {
+            "country": "Angola",
+            "nameZh": "Angola"
+          },
+          {
+            "country": "Bosnia and Herzegovina",
+            "nameZh": "Bosnia and Herzegovina"
+          },
+          {
+            "country": "Botswana",
+            "nameZh": "Botswana"
+          },
+          {
+            "country": "Burkina Faso",
+            "nameZh": "Burkina Faso"
+          },
+          {
+            "country": "Cape Verde",
+            "nameZh": "Cape Verde"
+          },
+          {
+            "country": "Chad",
+            "nameZh": "Chad"
+          },
+          {
+            "country": "Cote D'Ivoire",
+            "nameZh": "科特迪瓦"
+          },
+          {
+            "country": "Democratic Republic of the Congo",
+            "nameZh": "Democratic Republic of the Congo"
+          },
+          {
+            "country": "Eswatini",
+            "nameZh": "Eswatini"
+          },
+          {
+            "country": "Gabon",
+            "nameZh": "Gabon"
+          },
+          {
+            "country": "Gambia",
+            "nameZh": "Gambia"
+          },
+          {
+            "country": "Guinea-Bissau",
+            "nameZh": "Guinea-Bissau"
+          },
+          {
+            "country": "Iraq",
+            "nameZh": "Iraq"
+          },
+          {
+            "country": "Jordan",
+            "nameZh": "Jordan"
+          },
+          {
+            "country": "Kosovo",
+            "nameZh": "Kosovo"
+          },
+          {
+            "country": "Kuwait",
+            "nameZh": "Kuwait"
+          },
+          {
+            "country": "Lebanon",
+            "nameZh": "Lebanon"
+          },
+          {
+            "country": "Liberia",
+            "nameZh": "Liberia"
+          },
+          {
+            "country": "Libya",
+            "nameZh": "Libya"
+          },
+          {
+            "country": "Madagascar",
+            "nameZh": "Madagascar"
+          },
+          {
+            "country": "Malawi",
+            "nameZh": "Malawi"
+          },
+          {
+            "country": "Mali",
+            "nameZh": "Mali"
+          },
+          {
+            "country": "Mauritania",
+            "nameZh": "Mauritania"
+          },
+          {
+            "country": "Montenegro",
+            "nameZh": "Montenegro"
+          },
+          {
+            "country": "Morocco",
+            "nameZh": "Morocco"
+          },
+          {
+            "country": "Mozambique",
+            "nameZh": "Mozambique"
+          },
+          {
+            "country": "Namibia",
+            "nameZh": "Namibia"
+          },
+          {
+            "country": "Niger",
+            "nameZh": "Niger"
+          },
+          {
+            "country": "North Macedonia",
+            "nameZh": "North Macedonia"
+          },
+          {
+            "country": "Oman",
+            "nameZh": "Oman"
+          },
+          {
+            "country": "Rwanda",
+            "nameZh": "Rwanda"
+          },
+          {
+            "country": "São Tomé and Príncipe",
+            "nameZh": "São Tomé and Príncipe"
+          },
+          {
+            "country": "Serbia",
+            "nameZh": "Serbia"
+          },
+          {
+            "country": "Seychelles",
+            "nameZh": "Seychelles"
+          },
+          {
+            "country": "Sierra Leone",
+            "nameZh": "Sierra Leone"
+          },
+          {
+            "country": "Tunisia",
+            "nameZh": "Tunisia"
+          },
+          {
+            "country": "Ukraine",
+            "nameZh": "Ukraine"
+          },
+          {
+            "country": "Yemen",
+            "nameZh": "Yemen"
+          },
+          {
+            "country": "Bhutan",
+            "nameZh": "Bhutan"
+          },
+          {
+            "country": "Brunei Darussalam",
+            "nameZh": "Brunei Darussalam"
+          },
+          {
+            "country": "Fiji",
+            "nameZh": "Fiji"
+          },
+          {
+            "country": "Macao",
+            "nameZh": "Macao"
+          },
+          {
+            "country": "Maldives",
+            "nameZh": "Maldives"
+          },
+          {
+            "country": "Micronesia, Federated States of",
+            "nameZh": "Micronesia, Federated States of"
+          },
+          {
+            "country": "Mongolia",
+            "nameZh": "Mongolia"
+          },
+          {
+            "country": "Myanmar",
+            "nameZh": "Myanmar"
+          },
+          {
+            "country": "Nauru",
+            "nameZh": "Nauru"
+          },
+          {
+            "country": "Palau",
+            "nameZh": "Palau"
+          },
+          {
+            "country": "Papua New Guinea",
+            "nameZh": "Papua New Guinea"
+          },
+          {
+            "country": "Solomon Islands",
+            "nameZh": "Solomon Islands"
+          },
+          {
+            "country": "Sri Lanka",
+            "nameZh": "Sri Lanka"
+          },
+          {
+            "country": "Tonga",
+            "nameZh": "Tonga"
+          },
+          {
+            "country": "Turkmenistan",
+            "nameZh": "Turkmenistan"
+          },
+          {
+            "country": "Vanuatu",
+            "nameZh": "Vanuatu"
+          }
+        ],
+        "removedCountries": [
+          {
+            "country": "Ivory Coast",
+            "nameZh": "科特迪瓦"
+          }
+        ],
+        "changedCountries": [
+          {
+            "country": "Pakistan",
+            "nameZh": "巴基斯坦",
+            "fromCurrency": "PKR",
+            "toCurrency": "PKR",
+            "fromRegion": "Europe, Middle East & Africa",
+            "toRegion": "Asia Pacific",
+            "tiers": []
           }
         ]
       }
