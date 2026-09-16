@@ -218,3 +218,7 @@ JavaScript 可用时：
 - 当前复杂度本身已造成维护故障。
 
 否则优先保持现有边界、减少重复说明和测试新增，而不是继续堆叠保险层。
+
+## 14. Apple DOM 适配边界
+
+Apple 108047 可能以历史逐市场列表或按地区 `Country (Currency)` 表格承载价格。`parse-prices.mjs` 负责结构分派，表格结构由 `parse-price-tables.mjs` 解析；两种适配器都不能改变事实源、region 语义、market identity 或价格校验规则。表格模式仍通过 `document-order` 与 exact Apple marker 两条关联路径对同一 HTML 逐字段交叉核对；未知市场、新容量和发布日期变化仍进入原有独立语义确认，而不是按旧市场数量硬过滤。
