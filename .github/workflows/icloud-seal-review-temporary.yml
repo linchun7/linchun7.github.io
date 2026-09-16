@@ -8,10 +8,14 @@ concurrency:
   group: icloud-seal-recovery-20260916
   cancel-in-progress: false
 jobs:
-  regression:
+  seal:
     if: github.repository == 'linchun7/linchun7.github.io' && github.ref == 'refs/heads/review/icloud-seal-recovery-20260916'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    outputs:
+      candidate_sha: ${{ steps.publish.outputs.candidate_sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -20,25 +24,193 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: 22
-      - name: Install pinned dependencies
+      - name: Apply the reviewed patch and remove all temporary source scaffolding
+        run: |
+          python3 - <<'PY'
+          import base64, gzip, hashlib, pathlib, subprocess
+          paths = [pathlib.Path(f'.github/icloud-seal-part{i}.b64') for i in range(3)]
+          patch = gzip.decompress(base64.b64decode(''.join(p.read_text() for p in paths), validate=True))
+          assert hashlib.sha256(patch).hexdigest() == 'c96ffe4e80e94a2f28b2dac3a221841811649a0c2151bcc64fe4cf6862b28fc1'
+          subprocess.run(['git', 'apply', '--check', '-'], input=patch, check=True)
+          subprocess.run(['git', 'apply', '-'], input=patch, check=True)
+          for p in paths: p.unlink()
+          pathlib.Path('.github/workflows/icloud-seal-review-temporary.yml').unlink()
+          PY
+      - name: Install pinned dependencies and generate official asset versions
         working-directory: tools/icloud_price_comparison
         run: |
           corepack enable
           pnpm install --frozen-lockfile --ignore-scripts
-      - name: Adversarial regressions before implementation
+          pnpm assets:update
+      - name: Focused regressions
         working-directory: tools/icloud_price_comparison
-        run: node --test test/seal-regressions.test.mjs
-      - name: Export isolated review inputs
+        run: node --test test/seal-regressions.test.mjs test/followup-hardening.test.mjs test/production-loop.test.mjs
+      - name: Full core
+        working-directory: tools/icloud_price_comparison
+        run: pnpm test:core
+      - name: Current artifact deep validation
+        working-directory: tools/icloud_price_comparison
+        run: pnpm validate:artifact
+      - name: All Apple snapshots deep audit
+        working-directory: tools/icloud_price_comparison
+        run: pnpm validate:snapshots
+      - name: Dependency audit
+        working-directory: tools/icloud_price_comparison
+        run: pnpm audit --audit-level low
+      - name: Install all three browsers
+        working-directory: tools/icloud_price_comparison
+        run: pnpm exec playwright install --with-deps chromium firefox webkit
+      - name: Chromium
+        working-directory: tools/icloud_price_comparison
+        env:
+          PLAYWRIGHT_BROWSER: chromium
+        run: node --test test/ui-smoke.test.mjs test/static-descending-url-state.test.mjs
+      - name: Firefox
+        working-directory: tools/icloud_price_comparison
+        env:
+          PLAYWRIGHT_BROWSER: firefox
+        run: node --test test/ui-smoke.test.mjs test/static-descending-url-state.test.mjs
+      - name: WebKit
+        working-directory: tools/icloud_price_comparison
+        env:
+          PLAYWRIGHT_BROWSER: webkit
+        run: node --test test/ui-smoke.test.mjs test/static-descending-url-state.test.mjs
+      - name: Live Apple Chinese monitoring
+        working-directory: tools/icloud_price_comparison
+        run: node scripts/check-apple-zh-markets.mjs
+      - name: Confirm evidence is byte-identical and diff is clean
+        run: |
+          git diff --check
+          git diff --exit-code 5d1f37e1699667c7935e73a7695148fd9fa22510 -- tools/icloud_price_comparison/data tools/icloud_price_comparison/scripts/apple-zh-reviewed-markets.json tools/icloud_price_comparison/scripts/country-names.zh.json
+          test ! -e .github/workflows/icloud-seal-review-temporary.yml
+          test ! -e .github/icloud-seal-part0.b64
+      - name: Commit only the tested clean candidate to this review branch
+        id: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/review/icloud-seal-recovery-20260916
+          test "$(git ls-remote origin "$GITHUB_REF" | cut -f1)" = "$GITHUB_SHA"
+          git diff --name-only | while IFS= read -r file; do
+            case "$file" in
+              tools/icloud_price_comparison/*|.github/workflows/monitor-icloud-zh-markets.yml|.github/workflows/icloud-seal-review-temporary.yml|.github/icloud-seal-part[012].b64) ;;
+              *) echo "Unexpected path: $file" >&2; exit 1;;
+            esac
+          done
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -u
+          git commit -m 'fix: close iCloud source accounting and monitoring blind spots' -m 'Tests-first adversarial review; preserve all production evidence and permanent IDs, share reviewed rename projection, bound read-only monitor input and isolate fail-red alerting. Full candidate core/artifact/snapshots/audit and all browsers passed; temporary review files removed.'
+          auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push origin HEAD:refs/heads/review/icloud-seal-recovery-20260916
+          echo "candidate_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          git rev-parse HEAD > "$RUNNER_TEMP/review-head.txt"
+          git diff --stat 5d1f37e1699667c7935e73a7695148fd9fa22510 HEAD
+      - name: Export candidate for independent readback
         if: always()
         run: |
-          git rev-parse HEAD > "$RUNNER_TEMP/review-head.txt"
+          git diff > "$RUNNER_TEMP/review-working.diff"
           tar -czf "$RUNNER_TEMP/review-inputs.tgz" .github tools/icloud_price_comparison
+          git rev-parse HEAD > "$RUNNER_TEMP/review-head.txt"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: icloud-seal-review-inputs
+          name: icloud-seal-candidate-evidence
           path: |
             ${{ runner.temp }}/review-inputs.tgz
             ${{ runner.temp }}/review-head.txt
+            ${{ runner.temp }}/review-working.diff
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 3
+  postmerge:
+    needs: seal
+    if: needs.seal.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: read
+    steps:
+      - name: Observe the exact reviewed PR merge and its main CI plus Pages
+        id: merged
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ needs.seal.outputs.candidate_sha }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync, writeFileSync } from 'node:fs';
+          const root = 'https://api.github.com/repos/linchun7/linchun7.github.io';
+          const headers = { authorization: `Bearer ${process.env.GH_TOKEN}`, accept: 'application/vnd.github+json' };
+          const get = async (path) => { const r = await fetch(root + path, { headers, signal: AbortSignal.timeout(15000) }); if (!r.ok) throw new Error(`GitHub read ${r.status}`); return r.json(); };
+          const stop = Date.now() + 35 * 60 * 1000;
+          let result;
+          while (Date.now() < stop) {
+            const prs = await get('/pulls?state=all&head=linchun7:review/icloud-seal-recovery-20260916&base=main&per_page=20');
+            const pr = prs.find(p => p.head.sha === process.env.CANDIDATE_SHA);
+            if (pr) {
+              const detail = await get(`/pulls/${pr.number}`);
+              if (detail.merged) {
+                const runs = (await get(`/actions/runs?head_sha=${detail.merge_commit_sha}&per_page=100`)).workflow_runs;
+                const ci = runs.find(r => r.event === 'push' && r.name === 'Validate iCloud price comparison');
+                const pages = runs.find(r => r.name === 'pages build and deployment');
+                for (const run of [ci, pages]) if (run?.status === 'completed' && run.conclusion !== 'success') throw new Error(`Merged run failed: ${run.html_url}`);
+                if (ci?.conclusion === 'success' && pages?.conclusion === 'success') {
+                  const jobs = (await get(`/actions/runs/${ci.id}/jobs?per_page=100`)).jobs;
+                  for (const name of ['核心、数据与依赖安全测试', '浏览器测试 (chromium)', '浏览器测试 (firefox)', '浏览器测试 (webkit)']) {
+                    if (!jobs.some(j => j.name === name && j.conclusion === 'success')) throw new Error(`Missing passing main job: ${name}`);
+                  }
+                  result = { pr: pr.number, candidateSha: process.env.CANDIDATE_SHA, mergeSha: detail.merge_commit_sha, ci: ci.id, pages: pages.id };
+                  break;
+                }
+              }
+            }
+            await new Promise(resolve => setTimeout(resolve, 15000));
+          }
+          if (!result) throw new Error('Bounded post-merge observation expired; no release acceptance claimed');
+          appendFileSync(process.env.GITHUB_OUTPUT, `merge_sha=${result.mergeSha}\npr_number=${result.pr}\n`);
+          writeFileSync(`${process.env.RUNNER_TEMP}/postmerge.json`, JSON.stringify(result, null, 2));
+          console.log(JSON.stringify(result));
+          NODE
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ steps.merged.outputs.merge_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22
+      - name: Validate exact merged artifact and canonical production bytes
+        run: |
+          node tools/icloud_price_comparison/scripts/validate-data-artifact.mjs --data-dir tools/icloud_price_comparison/data
+          node tools/icloud_price_comparison/scripts/verify-production-deployment.mjs --expected-data-dir tools/icloud_price_comparison/data --run-id "seal-${{ github.run_id }}" --summary-file "$GITHUB_STEP_SUMMARY" --max-wait-ms 600000 --interval-ms 15000
+          test ! -e .github/workflows/icloud-seal-review-temporary.yml
+          test ! -e .github/icloud-seal-part0.b64
+      - name: Delete only this merged exact-head review branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ needs.seal.outputs.candidate_sha }}
+          PR_NUMBER: ${{ steps.merged.outputs.pr_number }}
+        run: |
+          node --input-type=module <<'NODE'
+          const root = 'https://api.github.com/repos/linchun7/linchun7.github.io';
+          const headers = { authorization: `Bearer ${process.env.GH_TOKEN}`, accept: 'application/vnd.github+json' };
+          const prResponse = await fetch(`${root}/pulls/${process.env.PR_NUMBER}`, { headers, signal: AbortSignal.timeout(15000) });
+          if (!prResponse.ok) throw new Error(`PR verification ${prResponse.status}`);
+          const pr = await prResponse.json();
+          if (!pr.merged || pr.head.ref !== 'review/icloud-seal-recovery-20260916' || pr.head.sha !== process.env.CANDIDATE_SHA) throw new Error('Refuse branch cleanup: PR identity changed');
+          const url = `${root}/git/refs/heads/review/icloud-seal-recovery-20260916`;
+          const ref = await fetch(url, { headers, signal: AbortSignal.timeout(15000) });
+          if (ref.status === 404) { console.log('Review branch already deleted'); process.exit(0); }
+          if (!ref.ok || (await ref.json()).object.sha !== process.env.CANDIDATE_SHA) throw new Error('Refuse cleanup: branch advanced');
+          const deleted = await fetch(url, { method: 'DELETE', headers, signal: AbortSignal.timeout(15000) });
+          if (deleted.status !== 204) throw new Error(`Branch deletion ${deleted.status}`);
+          console.log('Deleted only merged review/icloud-seal-recovery-20260916');
+          NODE
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: icloud-seal-postmerge-evidence
+          path: ${{ runner.temp }}/postmerge.json
+          if-no-files-found: warn
+          retention-days: 3
