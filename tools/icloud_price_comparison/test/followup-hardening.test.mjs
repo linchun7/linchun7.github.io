@@ -152,6 +152,16 @@ test('publication UI projection folds only a one-to-one reviewed rename anchored
   assert.deepEqual(display.removedCountries, []);
   assert.equal(raw.addedCountries.length, 2, 'raw publication evidence remains untouched');
   assert.deepEqual(foldPublicationCountryRenames(raw, []).renamedCountries, [], 'no current stable market means no rename folding');
+
+  const unreviewedSameName = {
+    addedCountries: [{ country: 'New Name', nameZh: '同名地区' }],
+    removedCountries: [{ country: 'Old Name', nameZh: '同名地区' }],
+  };
+  assert.deepEqual(
+    foldPublicationCountryRenames(unreviewedSameName, [{ marketId: 'example', country: 'New Name', nameZh: '同名地区' }]).renamedCountries,
+    [],
+    'matching display names alone must never imply one stable identity'
+  );
 });
 
 test('Chinese market monitor is an isolated read-only service triggered after the price updater', async () => {
