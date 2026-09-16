@@ -851,9 +851,9 @@ function assertPublicationDateNotRegressed(previousPublishedDate, publishedDate)
 }
 
 export function buildSnapshotChanges(previousData, countries, tiers) {
-  const marketKey = (country) => country.marketId ?? country.country;
-  const previousByCountry = new Map((previousData?.countries ?? []).map((country) => [marketKey(country), country]));
-  const currentByCountry = new Map(countries.map((country) => [marketKey(country), country]));
+  // Publication history is Apple source evidence. Source-name changes must remain visible even when a stable marketId is preserved for price history.
+  const previousByCountry = new Map((previousData?.countries ?? []).map((country) => [country.country, country]));
+  const currentByCountry = new Map(countries.map((country) => [country.country, country]));
   const previousTiers = previousData?.tiers ?? [];
   const previousTierIds = new Set(previousTiers.map(({ id }) => id));
   const currentTierIds = new Set(tiers.map(({ id }) => id));
@@ -865,15 +865,15 @@ export function buildSnapshotChanges(previousData, countries, tiers) {
     .map(({ id, label }) => ({ id, label }));
   const comparableTiers = tiers.filter(({ id }) => previousTierIds.has(id));
   const addedCountries = countries
-    .filter((country) => !previousByCountry.has(marketKey(country)))
+    .filter((country) => !previousByCountry.has(country.country))
     .map(({ country, nameZh }) => ({ country, nameZh }));
   const removedCountries = [...previousByCountry.values()]
-    .filter((country) => !currentByCountry.has(marketKey(country)))
+    .filter((country) => !currentByCountry.has(country.country))
     .map(({ country, nameZh }) => ({ country, nameZh: nameZh || country }));
   const changedCountries = [];
 
   for (const country of countries) {
-    const previous = previousByCountry.get(marketKey(country));
+    const previous = previousByCountry.get(country.country);
     if (!previous) continue;
     const tierChanges = comparableTiers
       .filter(({ id }) => previous.plans[id]?.price !== country.plans[id]?.price)

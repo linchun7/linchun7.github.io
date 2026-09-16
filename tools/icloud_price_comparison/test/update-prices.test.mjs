@@ -4782,3 +4782,13 @@ test('truly unknown markets still participate in rename ambiguity review', () =>
   assert.equal(resolveMarket('Germany').unknown,true);
   assert.throws(()=>validateAppleMarketRenameReview({countries:[old]},[added],resolveMarket),(e)=>e.code==='MARKET_IDENTITY_RENAME_REVIEW_REQUIRED');
 });
+
+
+test('publication snapshot changes keep Apple source-name renames visible even when marketId stays stable', () => {
+  const previousData = { tiers: [{ id: '50GB', label: '50 GB' }], countries: [{ marketId: 'ci', country: 'Ivory Coast', nameZh: '科特迪瓦', region: 'Europe, Middle East & Africa', currency: 'USD', plans: { '50GB': { price: 0.99, formattedPrice: '$0.99' } } }] };
+  const currentCountries = [{ marketId: 'ci', country: "Cote D'Ivoire", nameZh: '科特迪瓦', region: 'Europe, Middle East & Africa', currency: 'USD', plans: { '50GB': { price: 0.99, formattedPrice: '$0.99' } } }];
+  const changes = buildSnapshotChanges(previousData, currentCountries, [{ id: '50GB', label: '50 GB' }]);
+  assert.deepEqual(changes.addedCountries, [{ country: "Cote D'Ivoire", nameZh: '科特迪瓦' }]);
+  assert.deepEqual(changes.removedCountries, [{ country: 'Ivory Coast', nameZh: '科特迪瓦' }]);
+  assert.deepEqual(changes.changedCountries, []);
+});

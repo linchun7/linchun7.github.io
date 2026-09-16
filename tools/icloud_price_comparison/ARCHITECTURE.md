@@ -84,6 +84,7 @@ deterministic apple-* fallback
 - 真正 unknown market 可产生稳定的 `apple-*` ID；一旦发布，这个 fallback ID 也永久冻结。
 - removed market 的历史 ID 不释放给后来者。
 - 一对一 removed/added rename 候选仍要求显式确认，不做模糊自动绑定。
+- `marketId` 只定义长期价格/历史身份，不覆盖 Apple source evidence：`sourcePublishedDates[].changes` 必须按规范化 Apple 快照中的原始 `country` 名称比较，因此 source wording 从旧名变为新名时仍记录“旧名移除 + 新名新增”；这与价格事件继续归入同一 `marketId` 并不冲突。
 
 这使 `history.json`、深链接、历史快照和未来名称修订都能围绕同一个身份累计。
 
