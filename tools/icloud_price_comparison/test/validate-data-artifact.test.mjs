@@ -590,3 +590,42 @@ test('validates snapshot-backed price history by stable marketId across Apple so
     /history events do not match snapshot evidence/
   );
 });
+
+
+test('accepts only evidence-backed publication or first-confirmation dates for price history events', () => {
+  const snapshotIndex = {
+    snapshots: [{
+      publishedDate: '2026-09-15',
+      revisions: [{ dataFile: 'new-market.json', firstConfirmedDate: '2026-09-16' }]
+    }]
+  };
+  const normalizedSnapshots = new Map([[
+    'new-market.json',
+    { countries: [{ country: 'Afghanistan', currency: 'USD', plans: { '50GB': 0.99 } }] }
+  ]]);
+  const historyAtConfirmation = {
+    markets: {
+      'apple-afghanistan-5dbddf91': {
+        country: 'Afghanistan',
+        events: [{ observedAt: '2026-09-16', currency: 'USD', plans: { '50GB': 0.99 } }]
+      }
+    }
+  };
+
+  assert.doesNotThrow(() => validateHistoryAgainstSnapshotEvidence(
+    historyAtConfirmation, snapshotIndex, normalizedSnapshots
+  ));
+
+  const backfilledAtPublication = structuredClone(historyAtConfirmation);
+  backfilledAtPublication.markets['apple-afghanistan-5dbddf91'].events[0].observedAt = '2026-09-15';
+  assert.doesNotThrow(() => validateHistoryAgainstSnapshotEvidence(
+    backfilledAtPublication, snapshotIndex, normalizedSnapshots
+  ));
+
+  const ungroundedDate = structuredClone(historyAtConfirmation);
+  ungroundedDate.markets['apple-afghanistan-5dbddf91'].events[0].observedAt = '2026-09-17';
+  assert.throws(
+    () => validateHistoryAgainstSnapshotEvidence(ungroundedDate, snapshotIndex, normalizedSnapshots),
+    /history events do not match snapshot evidence/
+  );
+});
