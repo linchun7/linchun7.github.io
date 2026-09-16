@@ -2,6 +2,7 @@ import * as cheerio from 'cheerio';
 import { canonicalTierDefinition } from '../data-contract.js';
 import { VALID_REGIONS } from '../data-model.js';
 import { MARKET_REGISTRY } from './market-registry.mjs';
+import { parseApplePriceTables } from './parse-price-tables.mjs';
 
 const OFFICIAL_COUNTRIES = new Set(Object.values(MARKET_REGISTRY).flatMap((market) => (
   [market.canonicalName, ...(market.aliases ?? [])]
@@ -443,6 +444,8 @@ function comparableParseResult(result) {
 export function parseApplePrices(html, { allowUnknownCountries = false } = {}) {
   const $ = cheerio.load(html);
   const options = { allowUnknownCountries };
+  const tableResult = parseApplePriceTables($, options);
+  if (tableResult) return tableResult;
   let documentOrderResult = null;
   let appleMarkerResult = null;
   let documentOrderError = null;
