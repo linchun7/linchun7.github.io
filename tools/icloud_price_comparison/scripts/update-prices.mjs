@@ -2299,8 +2299,50 @@ export async function savePublishedAppleSnapshot(_html, parsed, firstConfirmedDa
   return true;
 }
 
+export function buildPresentationMarketChanges(previousData, currentCountries, publicationChanges) {
+  const rawChanges = publicationChanges ?? {
+    addedTiers: [], removedTiers: [], addedCountries: [], removedCountries: [], changedCountries: []
+  };
+  const addedCountries = rawChanges.addedCountries ?? [];
+  const removedCountries = rawChanges.removedCountries ?? [];
+  const previousByMarketId = new Map((previousData?.countries ?? [])
+    .filter(({ marketId }) => typeof marketId === 'string' && marketId)
+    .map((country) => [country.marketId, country]));
+  const addedSourceNames = new Set(addedCountries.map(({ country }) => country));
+  const removedSourceNames = new Set(removedCountries.map(({ country }) => country));
+  const renamedCountries = [];
+
+  for (const current of currentCountries ?? []) {
+    if (typeof current?.marketId !== 'string' || !current.marketId) continue;
+    const previous = previousByMarketId.get(current.marketId);
+    if (!previous || previous.country === current.country) continue;
+    if (!addedSourceNames.has(current.country) || !removedSourceNames.has(previous.country)) continue;
+    renamedCountries.push({
+      marketId: current.marketId,
+      fromCountry: previous.country,
+      toCountry: current.country,
+      nameZh: current.nameZh || previous.nameZh || current.country
+    });
+  }
+  renamedCountries.sort((first, second) => first.marketId.localeCompare(second.marketId));
+  const renamedAddedNames = new Set(renamedCountries.map(({ toCountry }) => toCountry));
+  const renamedRemovedNames = new Set(renamedCountries.map(({ fromCountry }) => fromCountry));
+  return {
+    ...rawChanges,
+    addedCountries: addedCountries.filter(({ country }) => !renamedAddedNames.has(country)),
+    removedCountries: removedCountries.filter(({ country }) => !renamedRemovedNames.has(country)),
+    renamedCountries
+  };
+}
+
 function summarizeChangedCountries(entries) {
   return summarizeNames(entries.map(({ nameZh, country }) => markdownInline(nameZh || country)));
+}
+
+function summarizeRenamedCountries(entries) {
+  return summarizeNames(entries.map(({ fromCountry, toCountry }) => (
+    `${markdownInline(fromCountry)} → ${markdownInline(toCountry)}`
+  )));
 }
 
 function describeParser(data) {
@@ -2323,7 +2365,9 @@ export function buildActionSummaryLines(data, summary, trigger = resolveTriggerS
   const publicationChanges = summary.publicationChanges ?? {
     addedTiers: [], removedTiers: [], addedCountries: [], removedCountries: [], changedCountries: []
   };
-  const changedCountries = publicationChanges.changedCountries ?? [];
+  const presentationChanges = summary.presentationChanges ?? publicationChanges;
+  const changedCountries = presentationChanges.changedCountries ?? [];
+  const chineseNamePendingMarkets = summary.chineseNamePendingMarkets ?? [];
   const priceChanges = changedCountries.filter(({ tiers }) => tiers?.length);
   const currencyChanges = changedCountries.filter(({ fromCurrency, toCurrency }) => fromCurrency !== toCurrency);
   const regionChanges = changedCountries.filter(({ fromRegion, toRegion }) => fromRegion !== toRegion);
@@ -2335,17 +2379,20 @@ export function buildActionSummaryLines(data, summary, trigger = resolveTriggerS
     const previousDate = summary.publishedDateHistory.at(-2)?.publishedDate ?? 'unknown';
     changes.push(`Apple 发布日期：${markdownInline(previousDate)} → ${markdownInline(data.source.publishedDate ?? 'unknown')}`);
   }
-  if (publicationChanges.addedTiers.length) {
-    changes.push(`新增容量：${publicationChanges.addedTiers.map(({ label, id }) => markdownInline(label || id)).join('、')}`);
+  if (presentationChanges.addedTiers.length) {
+    changes.push(`新增容量：${presentationChanges.addedTiers.map(({ label, id }) => markdownInline(label || id)).join('、')}`);
   }
-  if (publicationChanges.removedTiers.length) {
-    changes.push(`移除容量：${publicationChanges.removedTiers.map(({ label, id }) => markdownInline(label || id)).join('、')}`);
+  if (presentationChanges.removedTiers.length) {
+    changes.push(`移除容量：${presentationChanges.removedTiers.map(({ label, id }) => markdownInline(label || id)).join('、')}`);
   }
-  if (publicationChanges.addedCountries.length) {
-    changes.push(`新增地区：${summarizeChangedCountries(publicationChanges.addedCountries)}`);
+  if (presentationChanges.addedCountries.length) {
+    changes.push(`新增地区：${summarizeChangedCountries(presentationChanges.addedCountries)}`);
   }
-  if (publicationChanges.removedCountries.length) {
-    changes.push(`移除地区：${summarizeChangedCountries(publicationChanges.removedCountries)}`);
+  if (presentationChanges.removedCountries.length) {
+    changes.push(`移除地区：${summarizeChangedCountries(presentationChanges.removedCountries)}`);
+  }
+  if (presentationChanges.renamedCountries?.length) {
+    changes.push(`地区名称变化：${summarizeRenamedCountries(presentationChanges.renamedCountries)}`);
   }
   if (regionChanges.length) changes.push(`所属分区变化：${summarizeChangedCountries(regionChanges)}`);
   if (currencyChanges.length) changes.push(`币种变化：${summarizeChangedCountries(currencyChanges)}`);
@@ -2360,9 +2407,6 @@ export function buildActionSummaryLines(data, summary, trigger = resolveTriggerS
   }
   for (const market of summary.unknownMarkets ?? []) {
     reviewDebt.push(`- **UNKNOWN_APPLE_MARKET**：${markdownInline(market.sourceName)} → ${markdownInline(market.generatedMarketId ?? market.id)}；分区 ${markdownInline(market.region ?? 'unknown')}；币种 ${markdownInline(market.currency ?? 'unknown')}`);
-  }
-  for (const market of summary.chineseNamePendingMarkets ?? []) {
-    reviewDebt.push(`- **CHINESE_MARKET_NAME_PENDING**：marketId=${markdownInline(market.marketId)}；sourceName=${markdownInline(market.sourceName)}；暂用 Apple 英文名称显示`);
   }
   for (const suspicion of summary.marketIdentityRenameSuspicions ?? []) {
     reviewDebt.push(`- **MARKET_IDENTITY_RENAME_SUSPECTED**：newSourceName=${markdownInline(suspicion.newSourceName)}；candidate oldSourceName=${markdownInline(suspicion.oldSourceName)}；candidate oldMarketId=${markdownInline(suspicion.oldMarketId)}；分区 ${markdownInline(suspicion.region)}；币种 ${markdownInline(suspicion.currency)}；pricesMatch=${suspicion.pricesMatch === true ? 'true' : 'false'}；自动发布继续`);
@@ -2403,9 +2447,13 @@ export function buildActionSummaryLines(data, summary, trigger = resolveTriggerS
   ];
   if (warnings.length) lines.push('', '### 警告', ...warnings);
   if (reviewDebt.length) {
-    lines.push('', '### 市场元数据待复核（不改变永久 ID）',
-      `UNKNOWN_APPLE_MARKET=${summary.unknownMarkets?.length ?? 0}；CHINESE_MARKET_NAME_PENDING=${summary.chineseNamePendingMarkets?.length ?? 0}；MARKET_IDENTITY_RENAME_SUSPECTED=${summary.marketIdentityRenameSuspicions?.length ?? 0}`,
+    lines.push('', '### 市场身份待复核（不改变永久 ID）',
+      `UNKNOWN_APPLE_MARKET=${summary.unknownMarkets?.length ?? 0}；MARKET_IDENTITY_RENAME_SUSPECTED=${summary.marketIdentityRenameSuspicions?.length ?? 0}`,
       '', '<details><summary>展开完整待复核明细</summary>', '', ...reviewDebt, '', '</details>');
+  }
+  if (chineseNamePendingMarkets.length) {
+    lines.push('', '### 中文名称同步状态',
+      `- 待同一 Apple iCloud+ 中文价格页同步/确认：${chineseNamePendingMarkets.length} 个；当前继续显示 Apple 英文名称，不作为异常或 review debt。`);
   }
   lines.push('');
   return lines;
@@ -2578,8 +2626,8 @@ export async function main({
     }
   });
 
-  const reviewDebt = `UNKNOWN_APPLE_MARKET=${unknownMarkets.length}; CHINESE_MARKET_NAME_PENDING=${chineseNamePendingMarkets.length}; MARKET_IDENTITY_RENAME_SUSPECTED=${marketIdentityRenameSuspicions.length}`;
-  if (unknownMarkets.length || chineseNamePendingMarkets.length || marketIdentityRenameSuspicions.length) {
+  const reviewDebt = `UNKNOWN_APPLE_MARKET=${unknownMarkets.length}; MARKET_IDENTITY_RENAME_SUSPECTED=${marketIdentityRenameSuspicions.length}`;
+  if (unknownMarkets.length || marketIdentityRenameSuspicions.length) {
     console.warn(`MARKET_REVIEW_DEBT: ${reviewDebt}; details in Action summary; published IDs remain frozen`);
     if (process.env.GITHUB_ACTIONS === 'true') {
       const level = marketIdentityRenameSuspicions.length ? 'warning' : 'notice';
@@ -2662,6 +2710,7 @@ export async function main({
     countries
   };
   const publicationChanges = buildSnapshotChanges(previousData, countries, parsed.tiers);
+  const presentationChanges = buildPresentationMarketChanges(previousData, countries, publicationChanges);
   const historyUpdate = updateHistory(previousHistory, countries, observedAt, parsed.tiers, generatedAt);
   const history = historyUpdate.history;
   const publishedDateUpdate = updatePublishedDateHistory(history, previousData, parsed.sourcePublishedDate, observedAt, publicationChanges, generatedAt);
@@ -2682,6 +2731,7 @@ export async function main({
     publishedDateHistory,
     publicationDateChanged: publishedDateUpdate.changed,
     publicationChanges,
+    presentationChanges,
     observedAt
   };
   const run = createRunLogEntry(data, summary, runStartedAt, finishedAt);

@@ -97,9 +97,11 @@ JavaScript 可运行但网络 JSON 始终读取失败时，静态页面也遵守
 
 `marketId` 是永久数据身份。身份选择只有三层：已发布 `prices.json` / `history.json` identity ledger → `scripts/market-registry.mjs` active registry → deterministic `apple-*` fallback。已发布 ledger 永远优先。active registry 只保存当前已知 Apple 英文 canonical name 与 reviewed source aliases；source alias 只能处理 Apple source wording 变化，并必须继续指向同一个永久 ID。
 
-首次出现且不在 active registry 的 Apple 市场直接生成可复现的 `apple-<slug>-<hash>`，记录 `UNKNOWN_APPLE_MARKET`，经正常 Apple 语义确认且无冲突后允许自动发布。一旦发布，这个 `apple-*` 永久不 rekey；以后正式识别时 active registry 也必须继续沿用该 ID，只能补 source alias 和中文名称 authority。
+首次出现且不在 active registry 的 Apple 市场直接生成可复现的 `apple-<slug>-<hash>`，仅在首次发布候选中记录 `UNKNOWN_APPLE_MARKET`，经正常 Apple 语义确认且无冲突后允许自动发布。一旦发布，identity ledger 就把这个 `apple-*` 视为永久身份，不再重复计入 unknown review debt；以后正式识别时 active registry 也必须继续沿用该 ID，只能补 reviewed source alias，不得 rekey。
 
-中文名称继续以 `scripts/country-names.zh.json` 为唯一 Apple 简体中文事实源；pending 时显示 Apple 英文 `sourceName` 并记录 `CHINESE_MARKET_NAME_PENDING`。浏览器端不维护独立的搜索别名表，只搜索当前公共 `marketId`、中英文名称、Apple 英文 region / 中文地区标签和完整币种代码；完整 `marketId` 优先。
+中文名称继续以 `scripts/country-names.zh.json` 为唯一 Apple 简体中文事实源，该文件只固化同一 iCloud+ 简体中文价格页已经确认的名称。中文价格页尚未覆盖时继续显示 Apple 英文 `sourceName`，只在 Action summary 汇总为同步状态，不作为异常或 identity review debt，也不从其他中文页面补名。浏览器端不维护独立的搜索别名表，只搜索当前公共 `marketId`、中英文名称、Apple 英文 region / 中文地区标签和完整币种代码；完整 `marketId` 优先。
+
+`sourcePublishedDates`、run-log 与 snapshot 继续保留 Apple 原始 source-name 的 added/removed 证据；Action 的人类可读摘要可以在 removed/added 已由同一稳定 `marketId` 明确证明时，仅在展示层折叠为“地区名称变化”。该折叠不得写回证据账本或参与 identity 推断。
 
 已从 Apple 页面移除的历史 marketId 仍永久占用。新 identity 若撞到 active registry 或历史 ledger，以 `MARKET_IDENTITY_RESERVED_ID_COLLISION` 失败关闭；该错误码是兼容名称，不代表存在单独的预留表。removed/added 若形成一对一结构改名候选，继续以 `MARKET_IDENTITY_RENAME_REVIEW_REQUIRED` 停止并要求显式 source alias，不做模糊自动绑定。
 
