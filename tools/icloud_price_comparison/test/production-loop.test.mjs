@@ -244,3 +244,33 @@ test('SIGKILL at each public write boundary recovers the exact prior artifact an
     });
   }
 });
+
+test('seal: an unfamiliar heading cannot hide a pricing fragment from both production decoders', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-04-10T12:00:00Z') });
+  for (const headerMode of ['unrecognized', 'missing']) {
+    for (const amount of ['$0.99', 'N/A', '', '-', '$-1', '$1oops']) {
+      await t.test(`${headerMode} header / ${amount || 'empty'} prices`, async (child) => {
+        const { paths, dataDir } = await fixture(child);
+        const initial = canonicalCountries();
+        // Do not let digits in a synthetic market name masquerade as amounts.
+        initial[0].country = 'Bahamas';
+        await run(t, paths, [sourceHtml(initial, '2026-04-09')], '2026-04-10T12:00:00Z');
+        const before = await allBytes(dataDir);
+        const $ = load(sourceHtml(initial, '2026-04-10'));
+        const original = $('table').first();
+        const fragment = $('<table><thead></thead><tbody></tbody></table>');
+        if (headerMode === 'unrecognized') {
+          const header = original.find('thead tr').clone();
+          header.children().first().text('Market (Currency)');
+          fragment.find('thead').append(header);
+        }
+        fragment.find('tbody').append(original.find('tbody tr').first());
+        fragment.find('tbody td').slice(1).text(amount);
+        original.after('<h3>Additional iCloud plans</h3>', fragment);
+        await assert.rejects(run(t, paths, [$.html(), $.html()], '2026-04-10T12:01:00Z'), /Unrecognized|Unexplained|unaccounted|pricing/i);
+        assert.deepEqual(await allBytes(dataDir), before, 'unaccounted fragment must not publish a deletion or mutate any evidence');
+        await validateExtractedDataArtifact(dataDir);
+      });
+    }
+  }
+});

@@ -179,6 +179,23 @@ function isPotentialPricingTable($, table) {
   return Boolean(findHeader($, table));
 }
 
+// A section heading can end regional association, but cannot erase a
+// price-shaped table from source accounting. Never infer a market deletion
+// from a fragment which neither decoder explained.
+function hasUnaccountedPricingEvidence($, table) {
+  const rows = $(table).find('tr').toArray().map((row) => rowCells($, row).map((cell) => nodeText($, cell)));
+  // A country/currency row is unresolved source evidence even when every
+  // amount is missing or malformed. Requiring a digit would silently publish
+  // these still-present markets as removals after an unfamiliar heading.
+  const countryCurrencyRow = rows.some((cells) => cells.length > 1
+    && cells.some((text) => /\S.*\((?:[A-Z]{3}|Euro)\)\s*$/.test(text)));
+  const tierHeader = rows.some((cells) => cells.some((text) => /^\d+(?:[.,]\d+)?\s*(?:GB|TB|PB)$/i.test(text)));
+  const amountCell = $(table).find('td').toArray().some((cell) => (
+    /^(?:[^\d]*[\p{Sc}]\s*)?\d[\d.,'’\s]*(?:\s*[\p{Sc}A-Za-z.]+)?$/u.test(nodeText($, cell))
+  ));
+  return countryCurrencyRow || (tierHeader && amountCell);
+}
+
 function assertSimpleTable($, table) {
   if ($(table).find('table').length) throw new Error('Nested Apple pricing tables are unsupported');
   for (const cell of $(table).find('th, td').toArray()) {
@@ -331,6 +348,7 @@ function parseByDocumentOrder($, options) {
     if ($(node).is('table')) {
       if (!isPotentialPricingTable($, node)) {
         if (currentRegion) throw new Error(`Unrecognized table inside Apple pricing section #${currentSectionId}`);
+        if (hasUnaccountedPricingEvidence($, node)) throw new Error('Unrecognized Apple pricing table outside a proven region');
         continue;
       }
       if (!currentRegion || !currentSectionId) throw new Error('Apple pricing table was found before a region heading');
@@ -367,6 +385,7 @@ function parseByAppleMarkers($, options) {
     if ($(node).is('table')) {
       if (!isPotentialPricingTable($, node)) {
         if (currentRegion) throw new Error(`Unrecognized table inside Apple marker pricing section #${currentSectionId}`);
+        if (hasUnaccountedPricingEvidence($, node)) throw new Error('Unrecognized Apple marker pricing table outside a proven region');
         continue;
       }
       if (!currentRegion || !currentSectionId) throw new Error('Apple marker parser found a pricing table before a region marker');

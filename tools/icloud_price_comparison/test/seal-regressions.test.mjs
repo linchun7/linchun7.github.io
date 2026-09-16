@@ -104,3 +104,44 @@ test('seal: ambiguous duplicate stable identities never fold in the Action or br
   assert.deepEqual(foldPublicationCountryRenames(raw, current).renamedCountries, []);
   assert.deepEqual(buildPresentationMarketChanges({ countries: [{ marketId: 'ci', country: 'Ivory Coast' }] }, current, raw).renamedCountries, []);
 });
+
+test('seal: monitor workflow rejects non-main dispatch and foreign upstream instead of a skipped green check', async () => {
+  const workflow = await readFile(new URL('../../../.github/workflows/monitor-icloud-zh-markets.yml', import.meta.url), 'utf8');
+  const block = workflow.match(/node --input-type=module <<'NODE'\n([\s\S]*?)\n\s+NODE/);
+  assert.ok(block, 'explicit executable trust gate must precede checkout');
+  assert.ok(workflow.indexOf(block[0]) < workflow.indexOf('uses: actions/checkout@'));
+  assert.match(workflow, /branches: \[main\]/);
+  assert.match(workflow, /cancel-in-progress: false/);
+  assert.match(workflow, /ref: main/);
+  assert.match(workflow, /if: failure\(\)[\s\S]*GITHUB_STEP_SUMMARY/);
+  assert.doesNotMatch(workflow, /continue-on-error|secrets\.|contents: write|pages: write/);
+  const base = { MONITOR_REF: 'refs/heads/main', MONITOR_EVENT: 'workflow_run', MONITOR_REPOSITORY: 'owner/site', UPSTREAM_REPOSITORY: 'owner/site', UPSTREAM_BRANCH: 'main' };
+  for (const [env, expected] of [[base, 0], [{ ...base, MONITOR_EVENT: 'workflow_dispatch' }, 0], [{ ...base, MONITOR_EVENT: 'workflow_dispatch', MONITOR_REF: 'refs/heads/review' }, 1], [{ ...base, UPSTREAM_REPOSITORY: 'attacker/site' }, 1], [{ ...base, UPSTREAM_BRANCH: 'untrusted' }, 1]]) {
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', block[1]], { env: { ...process.env, ...env }, encoding: 'utf8', timeout: 5000 });
+    assert.equal(result.status, expected, result.stderr);
+  }
+});
+
+test('seal: price, tier, order, repetition and non-target country tables do not change monitored sets', () => {
+  const original = `<main><h3>日本（日元）</h3>${prices}<h3>韩国（韩元）</h3>${prices}</main>`;
+  const expected = new Set(extractAppleZhMarketNames(original));
+  const variants = [
+    `<main><h6>韩国（别的货币）</h6><ol><li>123 PB：0.01</li></ol><h1>日本（日元）</h1><x-values>250 GB：999,999.99</x-values></main>`,
+    `<main>${table(row('韩国') + row('日本') + row('韩国'))}<time>2099-12-31</time></main>`,
+    `<main>${table(row('日本') + row('韩国'))}${table('<tr><td>功能测试岛</td><td>支持</td></tr>', '<th>国家或地区</th><th>家庭共享</th>')}</main>`,
+  ];
+  for (const html of variants) assert.deepEqual(new Set(extractAppleZhMarketNames(html)), expected);
+});
+
+test('seal: explicit conflicting IDs and equal Chinese names never establish a rename', () => {
+  const raw = { addedCountries: [{ country: "Cote D'Ivoire", marketId: 'other', nameZh: '同名' }], removedCountries: [{ country: 'Ivory Coast', marketId: 'ci', nameZh: '同名' }] };
+  const current = [{ marketId: 'ci', country: "Cote D'Ivoire", nameZh: '同名' }];
+  assert.deepEqual(foldPublicationCountryRenames(raw, current).renamedCountries, []);
+  const sameZh = { addedCountries: [{ country: 'Different', nameZh: '同名' }], removedCountries: [{ country: 'Unrelated', nameZh: '同名' }] };
+  assert.deepEqual(foldPublicationCountryRenames(sameZh, [{ marketId: 'one', country: 'Different', nameZh: '同名' }]).renamedCountries, []);
+});
+
+test('seal: colon-separated feature descriptions are not price records', () => {
+  const html = `<main><section><b>隐藏邮件地址</b><ul><li>50GB：隐藏邮件地址</li><li>200GB：自定义域名</li></ul></section><h3>日本（日元）</h3>${prices}</main>`;
+  assert.deepEqual(extractAppleZhMarketNames(html), ['日本']);
+});

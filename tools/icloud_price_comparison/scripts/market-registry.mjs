@@ -1,32 +1,10 @@
 import { createHash } from 'node:crypto';
 import { getOfficialChineseMarketName, getOfficialChineseMarketNames } from './country-names.mjs';
 
-const DEFINITIONS = [
-  ['bs', 'Bahamas'], ['bb', 'Barbados'], ['br', 'Brazil'], ['ca', 'Canada'], ['cl', 'Chile'],
-  ['co', 'Colombia'], ['mx', 'Mexico'], ['pe', 'Peru'], ['sr', 'Suriname'],
-  ['us', 'United States', ['United States of America']], ['al', 'Albania'], ['am', 'Armenia'],
-  ['az', 'Azerbaijan'], ['bh', 'Bahrain'], ['by', 'Belarus'], ['bj', 'Benin'], ['bg', 'Bulgaria'],
-  ['cm', 'Cameroon'], ['hr', 'Croatia'], ['cz', 'Czechia', ['Czech Republic']], ['dk', 'Denmark'],
-  ['eg', 'Egypt'], ['euro-zone', 'Euro Zone', ['Euro', 'Eurozone']], ['ge', 'Georgia'], ['gh', 'Ghana'],
-  ['hu', 'Hungary'], ['is', 'Iceland'], ['il', 'Israel'],
-  ['ci', 'Ivory Coast', ["Cote D'Ivoire", 'Côte d’Ivoire', "Côte d'Ivoire"]], ['ke', 'Kenya'],
-  ['mu', 'Mauritius'], ['md', 'Moldova', ['Republic of Moldova']], ['ng', 'Nigeria'], ['no', 'Norway'],
-  ['pk', 'Pakistan'], ['pl', 'Poland'], ['qa', 'Qatar'],
-  ['cg', 'Republic of Congo', ['Republic of the Congo']], ['ro', 'Romania'],
-  ['ru', 'Russia', ['Russian Federation']], ['sa', 'Saudi Arabia'], ['sn', 'Senegal'], ['za', 'South Africa'],
-  ['se', 'Sweden'], ['ch', 'Switzerland'], ['tz', 'Tanzania', ['United Republic of Tanzania']],
-  ['tr', 'Türkiye', ['Turkey']], ['ug', 'Uganda'], ['ae', 'United Arab Emirates'],
-  ['gb', 'United Kingdom', ['UK']], ['zm', 'Zambia'], ['zw', 'Zimbabwe'], ['au', 'Australia'],
-  ['kh', 'Cambodia'], ['cn', 'China mainland', ['Mainland China']], ['hk', 'Hong Kong'], ['in', 'India'],
-  ['id', 'Indonesia'], ['jp', 'Japan'], ['kz', 'Kazakhstan'], ['kg', 'Kyrgyzstan'], ['la', 'Laos'],
-  ['my', 'Malaysia'], ['np', 'Nepal'], ['nz', 'New Zealand'], ['ph', 'Philippines'],
-  ['kr', 'Republic of Korea', ['South Korea']], ['sg', 'Singapore'], ['tw', 'Taiwan'],
-  ['tj', 'Tajikistan'], ['th', 'Thailand'], ['uz', 'Uzbekistan'], ['vn', 'Vietnam', ['Viet Nam']]
-];
+import { REVIEWED_MARKET_IDENTITIES, sourceNameIdentityKey } from '../data-model.js';
 
-export const MARKET_REGISTRY = Object.freeze(Object.fromEntries(DEFINITIONS.map(([id, canonicalName, aliases = []]) => [
-  canonicalName,
-  Object.freeze({ id, canonicalName, aliases: Object.freeze(aliases), reserved: false })
+export const MARKET_REGISTRY = Object.freeze(Object.fromEntries(REVIEWED_MARKET_IDENTITIES.map((market) => [
+  market.canonicalName, Object.freeze({ ...market, reserved: false })
 ])));
 
 function normalizedName(value) {
@@ -34,7 +12,7 @@ function normalizedName(value) {
 }
 
 export function normalizedNameKey(value) {
-  return normalizedName(value).toLocaleLowerCase('en-US');
+  return sourceNameIdentityKey(value);
 }
 
 function slugify(value) {
