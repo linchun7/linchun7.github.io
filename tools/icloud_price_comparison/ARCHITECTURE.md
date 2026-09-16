@@ -86,6 +86,8 @@ deterministic apple-* fallback
 - 一对一 removed/added rename 候选仍要求显式确认，不做模糊自动绑定。
 - `marketId` 只定义长期价格/历史身份，不覆盖 Apple source evidence：`sourcePublishedDates[].changes` 必须按规范化 Apple 快照中的原始 `country` 名称比较，因此 source wording 从旧名变为新名时仍记录“旧名移除 + 新名新增”；这与价格事件继续归入同一 `marketId` 并不冲突。完整 artifact 深验核对价格事件时也必须先把快照 source name 解析回稳定 `marketId`，不能用当前 `record.country` 反向拆分历史。价格事件日期同时受证据锚点约束：历史回填可使用该 revision 的 `publishedDate`，在线首次确认可使用 `firstConfirmedDate`；其他日期不得仅凭价格相同而通过。
 
+已发布 identity ledger 同时承担 review-state 边界：deterministic `apple-*` 在首次候选里仍是 unknown，但成功发布后即是永久已知身份，不应在后续运行重复制造 unknown 告警。中文名称状态独立于 identity；只有同一 iCloud+ 简体中文价格页已经确认的名称才能进入中文事实源，尚未同步时显示英文即可。Action 摘要中的 rename folding 只是由“同一稳定 `marketId` + raw added/removed 对”派生的展示投影，不能反向修改原始 publication evidence。
+
 这使 `history.json`、深链接、历史快照和未来名称修订都能围绕同一个身份累计。
 
 ## 5. CNY、显示金额与排名

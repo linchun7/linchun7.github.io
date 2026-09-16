@@ -131,9 +131,9 @@ Apple Support HTML ─┐
 
 - 已发布 `prices.json` / `history.json` source-name identity ledger 永远优先，普通更新不得 rekey。
 - `scripts/market-registry.mjs` 只保存 active Apple 市场的稳定 ID、canonical name 和 reviewed source aliases；source alias 必须保持同一永久 ID。
-- active registry 未命中的新市场直接使用 deterministic `apple-*` fallback，记录 `UNKNOWN_APPLE_MARKET`，经正常语义确认且无冲突后可自动发布。
-- 已发布 `apple-*` 永久保持原 ID。后续正式识别或 Apple 英文 wording 改变时，只能在 active registry 中沿用该 ID并补 source alias；不得改成友好两位码。
-- `scripts/country-names.zh.json` 仍是 Apple 简体中文名称唯一事实源；pending 继续显示 Apple 英文 `sourceName`。
+- active registry 未命中的新市场直接使用 deterministic `apple-*` fallback；`UNKNOWN_APPLE_MARKET` 只表示首次发布候选中的新身份。首次成功发布后，identity ledger 即成为其永久身份依据，后续运行不得继续把同一 source identity 计为 unknown。
+- 已发布 `apple-*` 永久保持原 ID。后续正式识别或 Apple 英文 wording 改变时，只能在 active registry 中沿用该 ID并补 reviewed source alias；不得改成友好两位码。
+- `scripts/country-names.zh.json` 仍是 Apple iCloud+ 简体中文价格页名称的唯一事实源；pending 继续显示 Apple 英文 `sourceName`，只作为中文页同步状态，不从其他 Apple 中文页面补齐，也不作为 identity review debt。
 - 新 identity 撞到 active registry 或任一历史 ID 时，以 `MARKET_IDENTITY_RESERVED_ID_COLLISION` 失败关闭；该错误码是兼容名称，不表示存在单独的预留表。
 - removed/added 若形成一对一结构改名候选，以 `MARKET_IDENTITY_RENAME_REVIEW_REQUIRED` 停止并要求显式 source alias，不做模糊自动绑定。
 
@@ -347,6 +347,6 @@ Apple 108047 从逐市场列表切换为地区表格时，预期修复是增加�
 
 每日 updater 先生成价格与静态页，再对实际候选运行唯一一次完整 `test:core`，随后 UI 和独立 artifact 深验；这样 bot 数据提交即使不触发 push CI，也不会留下“旧 fixture 测试绿、新数据使回归失效”的空隙。canonical production-loop 测试覆盖 list→table、A/B/B、跨北京时间午夜、同日 revision、unknown source 改写、回填与独立验收的组合路径，不引用可变生产日期或市场数。
 
-`UNKNOWN_APPLE_MARKET`、`CHINESE_MARKET_NAME_PENDING` 汇总为 review debt，完整明细保留在 summary 折叠区；未解决的 rename suspicion 单独计数、冲突仍报错。FX provider 的任意错误正文、HTTP statusText、JSON 片段与 transport exception 不得进入公开日志；只输出受控分类。12% dailyized sanity 仍是保守运维异常拦截值，不是对真实汇率波动的统计保证，阈值不因本轮测试而放宽。
+只有首次发布候选中的 `UNKNOWN_APPLE_MARKET` 与未解决的 rename suspicion 属于 identity review debt；已发布 fallback identity 不重复告警，`CHINESE_MARKET_NAME_PENDING` 仅汇总为中文页同步状态。Action 摘要可把“同一稳定 `marketId` 的旧 source name removed + 新 source name added”展示为名称变化，但 `sourcePublishedDates`、run-log 与 snapshot 中的原始 added/removed 证据必须保持不变。FX provider 的任意错误正文、HTTP statusText、JSON 片段与 transport exception 不得进入公开日志；只输出受控分类。12% dailyized sanity 仍是保守运维异常拦截值，不是对真实汇率波动的统计保证，阈值不因本轮测试而放宽。
 
 “候选生成成功”不等于发布成功：以已测试数据 commit、该 commit 的 Pages 构建以及 canonical URL 的 prices/history/run-log/static HTML 一致作为生产闭环。修复恢复必须在最新 main 新发起 workflow，不能 rerun 旧 SHA。

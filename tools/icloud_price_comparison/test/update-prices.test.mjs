@@ -7,6 +7,7 @@ import { validateHistoryPayload, validatePriceHistoryConsistency } from '../data
 import { resolveMarket } from '../scripts/market-registry.mjs';
 import {
   buildSnapshotChanges,
+  buildPresentationMarketChanges,
   buildRunLog,
   buildActionSummaryLines,
   buildAppleSnapshotEntry,
@@ -946,7 +947,9 @@ test('publishes a confirmed unknown Apple market with a deterministic identity a
     assert.equal(logs.filter((message) => message.startsWith('::warning')).length, 0);
     const summary = await readFile(summaryPath, 'utf8');
     assert.match(summary, new RegExp(`UNKNOWN_APPLE_MARKET.*${publishedUnknown.marketId}.*${unknown.region}.*${unknown.currency}`, 's'));
-    assert.match(summary, new RegExp(`CHINESE_MARKET_NAME_PENDING.*${publishedUnknown.marketId}.*New Apple Market`, 's'));
+    assert.doesNotMatch(summary, /CHINESE_MARKET_NAME_PENDING/);
+    assert.match(summary, /### 中文名称同步状态/);
+    assert.match(summary, /待同一 Apple iCloud\+ 中文价格页同步\/确认：[1-9]\d* 个/);
     assert.ok(summary.includes('<details><summary>展开完整待复核明细</summary>'));
 
     const caseChanged = structuredClone(changed);
@@ -967,6 +970,8 @@ test('publishes a confirmed unknown Apple market with a deterministic identity a
     const caseOnlyUnknown = republished.countries.find(({ country }) => country === 'new apple market');
     assert.equal(caseOnlyUnknown.marketId, publishedUnknown.marketId);
     assert.notEqual(caseOnlyUnknown.marketId, resolveMarket('new apple market').id);
+    assert.equal(warnings.filter((warning) => warning.startsWith('MARKET_REVIEW_DEBT:')).length, 1);
+    assert.equal(logs.filter((message) => message.startsWith('::notice title=Apple market review debt::')).length, 1);
   } finally {
     globalThis.fetch = originalFetch;
     console.warn = originalWarn;
@@ -3937,7 +3942,9 @@ test('keeps successful Action summaries concise and promotes warnings', () => {
     ...summary,
     chineseNamePendingMarkets: [{ marketId: 'mu', sourceName: 'Mauritius' }]
   }, 'schedule').join('\n');
-  assert.match(pendingChineseName, /CHINESE_MARKET_NAME_PENDING.*marketId=mu.*sourceName=Mauritius/);
+  assert.doesNotMatch(pendingChineseName, /CHINESE_MARKET_NAME_PENDING/);
+  assert.match(pendingChineseName, /### 中文名称同步状态/);
+  assert.match(pendingChineseName, /待同一 Apple iCloud\+ 中文价格页同步\/确认：1 个/);
 
   const renameSuspected = buildActionSummaryLines(data, {
     ...summary,
@@ -4760,6 +4767,35 @@ test('truly unknown markets still participate in rename ambiguity review', () =>
   assert.throws(()=>validateAppleMarketRenameReview({countries:[old]},[added],resolveMarket),(e)=>e.code==='MARKET_IDENTITY_RENAME_REVIEW_REQUIRED');
 });
 
+
+test('presentation changes fold stable market source-name renames without mutating raw publication evidence', () => {
+  const previousData = { countries: [
+    { marketId: 'ci', country: 'Ivory Coast', nameZh: '科特迪瓦' },
+    { marketId: 'us', country: 'United States', nameZh: '美国' }
+  ] };
+  const currentCountries = [
+    { marketId: 'ci', country: "Cote D'Ivoire", nameZh: '科特迪瓦' },
+    { marketId: 'us', country: 'United States', nameZh: '美国' },
+    { marketId: 'apple-new-market-12345678', country: 'New Market', nameZh: 'New Market' }
+  ];
+  const raw = {
+    addedTiers: [], removedTiers: [],
+    addedCountries: [
+      { country: "Cote D'Ivoire", nameZh: '科特迪瓦' },
+      { country: 'New Market', nameZh: 'New Market' }
+    ],
+    removedCountries: [{ country: 'Ivory Coast', nameZh: '科特迪瓦' }],
+    changedCountries: []
+  };
+  const presented = buildPresentationMarketChanges(previousData, currentCountries, raw);
+  assert.deepEqual(raw.addedCountries.map(({ country }) => country), ["Cote D'Ivoire", 'New Market']);
+  assert.deepEqual(raw.removedCountries.map(({ country }) => country), ['Ivory Coast']);
+  assert.deepEqual(presented.addedCountries.map(({ country }) => country), ['New Market']);
+  assert.deepEqual(presented.removedCountries, []);
+  assert.deepEqual(presented.renamedCountries, [{
+    marketId: 'ci', fromCountry: 'Ivory Coast', toCountry: "Cote D'Ivoire", nameZh: '科特迪瓦'
+  }]);
+});
 
 test('publication snapshot changes keep Apple source-name renames visible even when marketId stays stable', () => {
   const previousData = { tiers: [{ id: '50GB', label: '50 GB' }], countries: [{ marketId: 'ci', country: 'Ivory Coast', nameZh: '科特迪瓦', region: 'Europe, Middle East & Africa', currency: 'USD', plans: { '50GB': { price: 0.99, formattedPrice: '$0.99' } } }] };

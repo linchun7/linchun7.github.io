@@ -184,3 +184,19 @@ test('published identity ledger fails closed when one normalized source name has
     (error) => error.code === 'PUBLISHED_MARKET_IDENTITY_CONFLICT'
   );
 });
+
+
+test('published fallback identities stay permanent without recurring unknown review debt', () => {
+  const unknown = [];
+  const pending = [];
+  const marketId = 'apple-published-fallback-12345678';
+  const attached = attachMarketIdentity([fixtureCountry('Published Fallback Market')], {
+    resolve: () => ({ id: marketId, sourceName: 'Published Fallback Market', unknown: true, published: true }),
+    chineseNames: {},
+    onUnknown: (market) => unknown.push(market.id),
+    onChineseNamePending: (market) => pending.push(market.id)
+  });
+  assert.equal(attached[0].marketId, marketId);
+  assert.deepEqual(unknown, []);
+  assert.deepEqual(pending, [marketId]);
+});

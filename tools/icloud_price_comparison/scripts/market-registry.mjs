@@ -250,7 +250,10 @@ export function attachMarketIdentity(countries, {
       throw new Error(`marketId collision between ${previousName} and ${country.country}: ${market.id}`);
     }
     ids.set(market.id, country.country);
-    if (market.unknown) onUnknown(market, country);
+    // A deterministic fallback is actionable only on first publication. Once it is
+    // present in the published identity ledger, the ID is permanent even if the
+    // active registry has not learned a reviewed source alias yet.
+    if (market.unknown && !market.published) onUnknown(market, country);
     const officialName = getOfficialChineseMarketName(market.id, chineseNames ?? undefined);
     if (officialName === null) onChineseNamePending(market, country);
     return {
