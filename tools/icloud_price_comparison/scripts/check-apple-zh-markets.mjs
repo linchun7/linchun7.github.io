@@ -183,6 +183,10 @@ export function validateObservedMarketSet(reviewedNames, observedNames) {
   if (removedRatio > 0.45) throw new Error(`observed Chinese market list would remove ${(removedRatio * 100).toFixed(1)}% of reviewed names`);
 }
 
+export function monitorExitCode(result) {
+  return result?.status === 'unchanged' ? 0 : 1;
+}
+
 function escapeWorkflowCommand(value) {
   return String(value).replace(/%/gu, '%25').replace(/\r/gu, '%0D').replace(/\n/gu, '%0A');
 }
@@ -249,4 +253,7 @@ export async function runAppleZhMarketMonitor({ fetchImpl = fetch } = {}) {
 }
 
 const invokedPath = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : '';
-if (invokedPath === import.meta.url) await runAppleZhMarketMonitor();
+if (invokedPath === import.meta.url) {
+  const result = await runAppleZhMarketMonitor();
+  process.exitCode = monitorExitCode(result);
+}
