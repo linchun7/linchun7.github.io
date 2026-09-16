@@ -9,25 +9,20 @@ permissions:
   contents: write
 
 jobs:
-  patch-test-commit:
+  diagnose:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
-
       - name: Install dependencies
         working-directory: tools/icloud_price_comparison
         run: |
           corepack enable
           pnpm install --frozen-lockfile --ignore-scripts
-
-      - name: Harden plain-text fallback against currency fragments
+      - name: Apply currency-fragment hardening in diagnostic workspace
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -39,45 +34,28 @@ jobs:
               raise SystemExit('looksLikeMarketName marker missing')
           path.write_text(text.replace(old, new, 1), encoding='utf-8')
           PY
-
-      - name: Apply final product patch
-        run: python3 .github/temp-icloud-zh-market-v2.py
-
-      - name: Refresh static asset contracts
+      - name: Print exact live market-name diff
         working-directory: tools/icloud_price_comparison
         run: |
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          import {
+            APPLE_ZH_ICLOUD_URL,
+            compareMarketNameSets,
+            extractAppleZhMarketNames,
+            reviewedMarketNamesFromMapping,
+          } from './scripts/check-apple-zh-markets.mjs';
+          const mapping = JSON.parse(await readFile('./scripts/country-names.zh.json', 'utf8'));
+          const reviewed = reviewedMarketNamesFromMapping(mapping);
+          const response = await fetch(APPLE_ZH_ICLOUD_URL, { cache: 'no-store', headers: { 'cache-control': 'no-cache' } });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const observed = extractAppleZhMarketNames(await response.text());
+          const diff = compareMarketNameSets(reviewed, observed);
+          console.log(JSON.stringify({ reviewedCount: reviewed.length, observedCount: observed.length, added: diff.added, removed: diff.removed }, null, 2));
+          NODE
+      - name: Run focused parser regressions
+        working-directory: tools/icloud_price_comparison
+        run: |
+          python3 ../../../.github/temp-icloud-zh-market-v2.py
           pnpm assets:update
-          pnpm render:static
-          pnpm render:static:check
-
-      - name: Run focused behavior tests
-        working-directory: tools/icloud_price_comparison
-        run: node --test --test-concurrency=1 test/followup-hardening.test.mjs test/workflow.test.mjs
-
-      - name: Exercise live Chinese market monitor
-        working-directory: tools/icloud_price_comparison
-        run: node scripts/check-apple-zh-markets.mjs
-
-      - name: Remove temporary scaffolding and commit final tree
-        run: |
-          rm .github/workflows/temp-icloud-zh-market-v2.yml
-          rm .github/temp-icloud-zh-market-v2.py
-          git status --short
-          git config user.name "linchun7"
-          git config user.email "104673731+linchun7@users.noreply.github.com"
-          git add .github/workflows/update-icloud-prices.yml tools/icloud_price_comparison
-          git add -u .github
-          git commit -m "feat: monitor Apple Chinese market list"
-          git push origin HEAD:fix/icloud-zh-market-monitor-v2
-
-      - name: Run complete core suite against committed branch head
-        working-directory: tools/icloud_price_comparison
-        run: pnpm test:core
-
-      - name: Install Chromium for UI acceptance
-        working-directory: tools/icloud_price_comparison
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Run Chromium UI acceptance
-        working-directory: tools/icloud_price_comparison
-        run: pnpm test:ui
+          node --test --test-concurrency=1 test/followup-hardening.test.mjs test/workflow.test.mjs
