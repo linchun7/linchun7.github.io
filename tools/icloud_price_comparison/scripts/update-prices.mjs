@@ -1,3 +1,4 @@
+import { foldPublicationCountryRenames } from '../data-model.js';
 import { appendFile, link, mkdir, readFile, readdir, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
@@ -2303,36 +2304,17 @@ export function buildPresentationMarketChanges(previousData, currentCountries, p
   const rawChanges = publicationChanges ?? {
     addedTiers: [], removedTiers: [], addedCountries: [], removedCountries: [], changedCountries: []
   };
-  const addedCountries = rawChanges.addedCountries ?? [];
-  const removedCountries = rawChanges.removedCountries ?? [];
-  const previousByMarketId = new Map((previousData?.countries ?? [])
-    .filter(({ marketId }) => typeof marketId === 'string' && marketId)
-    .map((country) => [country.marketId, country]));
-  const addedSourceNames = new Set(addedCountries.map(({ country }) => country));
-  const removedSourceNames = new Set(removedCountries.map(({ country }) => country));
-  const renamedCountries = [];
-
-  for (const current of currentCountries ?? []) {
-    if (typeof current?.marketId !== 'string' || !current.marketId) continue;
-    const previous = previousByMarketId.get(current.marketId);
-    if (!previous || previous.country === current.country) continue;
-    if (!addedSourceNames.has(current.country) || !removedSourceNames.has(previous.country)) continue;
-    renamedCountries.push({
-      marketId: current.marketId,
-      fromCountry: previous.country,
-      toCountry: current.country,
-      nameZh: current.nameZh || previous.nameZh || current.country
-    });
-  }
-  renamedCountries.sort((first, second) => first.marketId.localeCompare(second.marketId));
-  const renamedAddedNames = new Set(renamedCountries.map(({ toCountry }) => toCountry));
-  const renamedRemovedNames = new Set(renamedCountries.map(({ fromCountry }) => fromCountry));
-  return {
-    ...rawChanges,
-    addedCountries: addedCountries.filter(({ country }) => !renamedAddedNames.has(country)),
-    removedCountries: removedCountries.filter(({ country }) => !renamedRemovedNames.has(country)),
-    renamedCountries
-  };
+  const previous = Array.isArray(previousData?.countries) ? previousData.countries : [];
+  const current = Array.isArray(currentCountries) ? currentCountries : [];
+  const evidence = previous.flatMap((before) => {
+    if (!before?.marketId || previous.filter((entry) => entry?.marketId === before.marketId).length !== 1) return [];
+    const matches = current.filter((entry) => entry?.marketId === before.marketId);
+    return matches.length === 1 ? [{ marketId: before.marketId, from: before.country, to: matches[0].country }] : [];
+  });
+  const display = foldPublicationCountryRenames(rawChanges, current, evidence);
+  return { ...display, renamedCountries: display.renamedCountries.map(({ from, to, ...rest }) => (
+    { ...rest, fromCountry: from, toCountry: to }
+  )) };
 }
 
 function summarizeChangedCountries(entries) {
