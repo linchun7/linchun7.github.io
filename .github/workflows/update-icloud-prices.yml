@@ -124,10 +124,6 @@ jobs:
       - name: 安装项目依赖
         run: pnpm install --frozen-lockfile --ignore-scripts
 
-      - name: 运行解析与数据安全测试
-        id: core_tests
-        run: pnpm test:core
-
       - name: 抓取并校验 Apple 价格
         id: update_data
         env:
@@ -145,6 +141,11 @@ jobs:
         run: |
           pnpm render:static
           pnpm render:static:check
+
+      # 在实际候选上验证全部 core；bot 数据提交不触发 push CI，更新前的绿灯不能替代它。
+      - name: 运行解析与数据安全测试
+        id: core_tests
+        run: pnpm test:core
 
       - name: 验证更新后的页面
         id: ui_tests

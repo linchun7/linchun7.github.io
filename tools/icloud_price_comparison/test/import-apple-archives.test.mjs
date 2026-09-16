@@ -156,10 +156,11 @@ test('keeps same-date archive revisions as separate normalized JSON evidence', a
     }
     assert.equal(Object.values(result.history.markets).find(({ country }) => country === 'Alpha 1').events.length, 3);
     assert.equal(result.history.sourcePublishedDates.length, 1);
-    assert.equal(result.history.sourcePublishedDates[0].changes.changedCountries[0].country, 'Alpha 1');
-    assert.deepEqual(result.history.sourcePublishedDates[0].changes.changedCountries[0].tiers, [
-      { id: '50GB', from: 0.99, to: 2.99 }
-    ]);
+    assert.deepEqual(result.history.sourcePublishedDates[0].changes, {
+      addedTiers: [], removedTiers: [], addedCountries: [], removedCountries: [], changedCountries: []
+    }, 'initial publication evidence is not an aggregate of its later revisions');
+    assert.equal(result.history.updatedAt, currentData(parsedCurrent).generatedAt);
+    assert.deepEqual(Object.values(result.history.markets).find(({ country }) => country === 'Alpha 1').events.map((event) => event.plans['50GB']), [.99, 1.99, 2.99]);
 
     const filesBeforeRepeat = await readdir(snapshotsDir);
     const repeated = await importAppleArchives(inputDir, {

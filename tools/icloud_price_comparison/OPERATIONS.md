@@ -341,3 +341,11 @@ Cloudflare/DNS 回滚使用发布前保存的配置记录；TLS 最低版本不�
 ## 17. Apple 价格页结构切换
 
 Apple 108047 从逐市场列表切换为地区表格时，预期修复是增加结构适配而不是降低校验。表格必须包含 `Country (Currency)` 与可解析的 GB/TB tier 表头，每个 region 只能关联一个价格表，两条解析路径仍必须形成 `cross-checked`。结构迁移可能一次暴露更多 active markets；不要用历史市场数量等固定值过滤，unknown market 按既有 deterministic `apple-*` + 独立语义确认流程处理。修复后至少运行 core、artifact/snapshot 验证和 live dry-run，再允许生产更新。
+
+### 候选验收与故障信号
+
+每日 updater 先生成价格与静态页，再对实际候选运行唯一一次完整 `test:core`，随后 UI 和独立 artifact 深验；这样 bot 数据提交即使不触发 push CI，也不会留下“旧 fixture 测试绿、新数据使回归失效”的空隙。canonical production-loop 测试覆盖 list→table、A/B/B、跨北京时间午夜、同日 revision、unknown source 改写、回填与独立验收的组合路径，不引用可变生产日期或市场数。
+
+`UNKNOWN_APPLE_MARKET`、`CHINESE_MARKET_NAME_PENDING` 汇总为 review debt，完整明细保留在 summary 折叠区；未解决的 rename suspicion 单独计数、冲突仍报错。FX provider 的任意错误正文、HTTP statusText、JSON 片段与 transport exception 不得进入公开日志；只输出受控分类。12% dailyized sanity 仍是保守运维异常拦截值，不是对真实汇率波动的统计保证，阈值不因本轮测试而放宽。
+
+“候选生成成功”不等于发布成功：以已测试数据 commit、该 commit 的 Pages 构建以及 canonical URL 的 prices/history/run-log/static HTML 一致作为生产闭环。修复恢复必须在最新 main 新发起 workflow，不能 rerun 旧 SHA。

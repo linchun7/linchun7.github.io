@@ -142,8 +142,11 @@ async function writeArchive(root, dataDirectory, mutate = (entries) => entries) 
 test('accepts the committed data directory and its strict ustar package', async (t) => {
   const { root, dataDirectory } = await copiedData(t);
   const directoryResult = await validateExtractedDataArtifact(dataDirectory);
-  assert.equal(directoryResult.countries, 73);
-  assert.equal(directoryResult.snapshots, 7);
+  const prices = JSON.parse(await readFile(path.join(dataDirectory, 'prices.json'), 'utf8'));
+  const index = JSON.parse(await readFile(path.join(dataDirectory, 'apple-snapshots/index.json'), 'utf8'));
+  assert.equal(directoryResult.countries, prices.countries.length);
+  assert.equal(directoryResult.pricePoints, prices.countries.reduce((sum, country) => sum + Object.keys(country.plans).length, 0));
+  assert.equal(directoryResult.snapshots, index.snapshots.reduce((sum, snapshot) => sum + snapshot.revisions.length, 0));
   const archivePath = await writeArchive(root, dataDirectory);
   const archiveResult = await validateTarArchive(archivePath);
   assert.ok(archiveResult.entries >= 12);
@@ -424,7 +427,7 @@ test('rejects semantically invalid run-log evidence', async (t) => {
       });
     }],
     ['missing latest publication change', (run) => { delete run.changes.publishedDate; }],
-    ['publication changed flag', (run) => { run.changes.publishedDate.changed = true; }]
+    ['publication changed flag', (run) => { run.changes.publishedDate.changed = !run.changes.publishedDate.changed; }]
   ];
   for (const [label, mutate] of mutations) {
     await t.test(label, async (subtest) => {

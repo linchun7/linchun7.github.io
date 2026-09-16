@@ -197,7 +197,8 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(verifier, /schemaVersion !== 4[\s\S]*?parser !== 'cross-checked'/);
   assert.match(verifier, /observed\.prices\.generatedAt === expected\.prices\.generatedAt[\s\S]*?observed\.prices\.run\.finishedAtUtc === expected\.prices\.run\.finishedAtUtc/);
   assert.match(verifier, /observed\.hashes\.history === expected\.hashes\.history[\s\S]*?observed\.hashes\.runLog === expected\.hashes\.runLog/);
-  assert.match(updater, /::warning title=Unknown Apple market requires registry review::/);
+  assert.match(updater, /MARKET_REVIEW_DEBT/);
+  assert.doesNotMatch(updater, /::warning title=Unknown Apple market requires registry review::/);
   assert.doesNotMatch(updater, /UNKNOWN_APPLE_MARKET[^\n]*(?:throw|fail)/i);
 
   const firstCoreTest = workflow.indexOf('run: pnpm test:core');
@@ -209,8 +210,9 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   const packageData = workflow.indexOf('name: 打包已测试的数据工件');
   const productionVerification = workflow.indexOf('id: verify_production');
   const healthcheckSuccess = workflow.indexOf('status=0');
-  assert.ok(firstCoreTest >= 0 && firstCoreTest < update, 'core tests must run before the live update');
-  assert.equal(duplicateCoreTest, -1, 'the workflow must not repeat unchanged fixture and workflow tests after the update');
+  const render = workflow.indexOf('pnpm render:static:check');
+  assert.ok(update < render && render < firstCoreTest && firstCoreTest < browserTest, 'the actual rendered candidate must pass full core before UI and publication');
+  assert.equal(duplicateCoreTest, -1, 'the workflow runs full core exactly once, against the actual candidate');
   assert.ok(update < dataTest, 'the updated snapshot must pass data validation');
   assert.ok(dataTest < browserTest, 'updated data must pass before the browser tests');
   assert.equal(duplicateBrowserTest, -1, 'the workflow must run the system Chrome suite only once');

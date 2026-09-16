@@ -33,7 +33,7 @@ function normalizedName(value) {
   return String(value ?? '').normalize('NFKC').trim();
 }
 
-function normalizedNameKey(value) {
+export function normalizedNameKey(value) {
   return normalizedName(value).toLocaleLowerCase('en-US');
 }
 

@@ -16,7 +16,7 @@ import {
   validatePayload,
   validatePriceHistoryConsistency
 } from '../data-contract.js';
-import { resolveMarket } from './market-registry.mjs';
+import { createSnapshotMarketResolver, evidenceDateAnchors } from './market-evidence.mjs';
 
 const ARCHIVE_ROOT = 'tools/icloud_price_comparison/data';
 const REQUIRED_FILES = new Set([
@@ -402,6 +402,7 @@ function samePlans(first, second) {
 }
 
 export function validateHistoryAgainstSnapshotEvidence(history, snapshotIndex, normalizedSnapshots) {
+  const resolveMarket = createSnapshotMarketResolver(snapshotIndex, normalizedSnapshots);
   const expectedByMarketId = new Map();
   const sourceNamesByMarketId = new Map();
   const actualByMarketId = new Map(Object.entries(history.markets));
@@ -430,7 +431,7 @@ export function validateHistoryAgainstSnapshotEvidence(history, snapshotIndex, n
 
         const expectedEvents = expectedByMarketId.get(marketId) ?? [];
         const event = {
-          observedAtCandidates: [...new Set([snapshot.publishedDate, revision.firstConfirmedDate].filter(Boolean))],
+          observedAtCandidates: evidenceDateAnchors(snapshot, revision),
           currency: country.currency,
           plans: country.plans
         };

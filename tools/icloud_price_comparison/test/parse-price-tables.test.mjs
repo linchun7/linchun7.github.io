@@ -59,3 +59,60 @@ test('fails closed on unsupported table storage units', () => {
   const html = CURRENT_TABLE_HTML.replaceAll('<th>12 TB</th>', '<th>12 PB</th>');
   assert.throws(() => parseApplePrices(html), /Unsupported Apple table storage tier/);
 });
+
+test('rejects incomplete regions, non-rectangular cells and changing interior headers', async (t) => {
+  const { load } = await import('cheerio');
+  const mutations = {
+    'missing entire region table': ($) => $('table').first().remove(),
+    'unrecognized region header': ($) => $('table').first().find('th').first().text('Market (Currency)'),
+    'colspan changes physical meaning': ($) => $('table').first().find('td').eq(1).attr('colspan', '2'),
+    'rowspan changes physical meaning': ($) => $('table').first().find('td').first().attr('rowspan', '0'),
+    'missing price cell': ($) => $('table').first().find('td').last().remove(),
+    'extra price cell': ($) => $('table').first().find('tbody tr').append('<td>$1</td>'),
+    'duplicate country': ($) => $('table').first().find('tbody').append($('table').first().find('tbody tr').clone()),
+    'changed interior tier header': ($) => {
+      const header = $('table').first().find('thead tr').clone();
+      header.children().eq(1).text('100 GB');
+      $('table').first().find('tbody tr').after(header);
+    },
+    'reordered interior header': ($) => {
+      const header = $('table').first().find('thead tr').clone();
+      header.children().eq(1).before(header.children().eq(2));
+      $('table').first().find('tbody tr').after(header);
+    },
+    'nested table': ($) => $('table').first().find('td').eq(1).append('<table><tr><td>$0.99</td></tr></table>')
+  };
+  for (const [name, mutate] of Object.entries(mutations)) {
+    await t.test(name, () => {
+      const $ = load(CURRENT_TABLE_HTML); mutate($);
+      assert.throws(() => parseApplePrices($.html()), /table|Duplicate/);
+    });
+  }
+});
+
+test('independent row and column decoders preserve prices under wrappers, column permutations, footnotes and added tiers', async () => {
+  const { load } = await import('cheerio');
+  const baseline = parseApplePrices(CURRENT_TABLE_HTML);
+  for (const order of [[1, 0, 4, 2, 3], [4, 3, 2, 1, 0], [0, 2, 4, 3, 1]]) {
+    const $ = load(CURRENT_TABLE_HTML);
+    $('table tr').each((_, row) => {
+      const cells = $(row).children().toArray();
+      $(row).empty().append(cells[0], ...order.map((i) => cells[i + 1]));
+    });
+    $('td, th').wrapInner('<div><span></span></div>');
+    const result = parseApplePrices($.html());
+    assert.equal(result.parser, 'cross-checked');
+    for (const country of baseline.countries) {
+      assert.deepEqual(result.countries.find((c) => c.country === country.country), country);
+    }
+    assert.deepEqual(result.tiers, baseline.tiers);
+  }
+  const $ = load(CURRENT_TABLE_HTML);
+  $('table thead tr').append('<th>24 TB</th>');
+  $('table tbody tr').append('<td>999.99<sup>3</sup></td>');
+  $('table').each((_, table) => $(table).find('tbody tr').after($(table).find('thead tr').clone()));
+  const result = parseApplePrices($.html());
+  assert.equal(result.parser, 'cross-checked');
+  assert.equal(result.tiers.at(-1).id, '24TB');
+  assert.ok(result.countries.every((c) => c.plans['24TB'].price === 999.99));
+});

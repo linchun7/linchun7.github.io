@@ -179,17 +179,39 @@ function isPotentialPricingTable($, table) {
   return Boolean(findHeader($, table));
 }
 
+function assertSimpleTable($, table) {
+  if ($(table).find('table').length) throw new Error('Nested Apple pricing tables are unsupported');
+  for (const cell of $(table).find('th, td').toArray()) {
+    for (const attribute of ['rowspan', 'colspan']) {
+      const value = $(cell).attr(attribute);
+      if (value !== undefined && value !== '1') {
+        throw new Error(`Unsupported Apple pricing cell ${attribute}=${value}`);
+      }
+    }
+  }
+}
+
 function parsePricingTable($, table, region, options) {
+  assertSimpleTable($, table);
   const header = parseTableHeader($, table);
   if (!header) throw new Error('Apple pricing table header was not found');
   const rows = $(table).find('tr').toArray();
   const headerIndex = rows.indexOf(header.row);
   const countries = [];
+  if (rows.slice(0, headerIndex).some((row) => rowCells($, row).length)) {
+    throw new Error('Unexpected rows before Apple pricing table header');
+  }
 
   for (const row of rows.slice(headerIndex + 1)) {
     const cells = rowCells($, row);
     if (!cells.length) continue;
-    if (potentialPricingHeader($, row)) continue;
+    if (potentialPricingHeader($, row)) {
+      const repeatedIds = cells.slice(1).map((cell) => parseTierLabel(nodeText($, cell))?.id);
+      if (JSON.stringify(repeatedIds) !== JSON.stringify(header.tiers.map(({ id }) => id))) {
+        throw new Error('Apple pricing table changes its header inside the table');
+      }
+      continue;
+    }
     const countryText = nodeText($, cells[0]);
     if (!/\([^)]+\)\s*$/.test(countryText)) {
       throw new Error(`Unexpected row in Apple pricing table: ${countryText || '<empty>'}`);
@@ -218,6 +240,53 @@ function parsePricingTable($, table, region, options) {
   return countries;
 }
 
+
+// The marker path decodes a column-oriented rectangular grid, not the row parser's
+// header search / row skipping. Only lexical country, tier and price grammar is shared.
+function parsePricingColumns($, table, region, options) {
+  assertSimpleTable($, table);
+  const grid = $(table).find('tr').toArray()
+    .map((row) => $(row).children('th, td').toArray().map((cell) => nodeText($, cell)))
+    .filter((cells) => cells.length);
+  const labels = grid.shift();
+  if (!labels || !/^country\s*\(currency\)$/i.test(labels[0])) {
+    throw new Error('Apple marker table must start with its pricing header');
+  }
+  const tiers = labels.slice(1).map(parseTierLabel);
+  if (!tiers.length || tiers.some((tier) => !tier) || new Set(tiers.map((tier) => tier.id)).size !== tiers.length) {
+    throw new Error('Unsupported or duplicate Apple marker table storage tiers');
+  }
+  const rows = [];
+  for (const cells of grid) {
+    if (cells.length !== labels.length) throw new Error('Apple marker table is not rectangular');
+    if (/^country\s*\(currency\)$/i.test(cells[0])) {
+      if (cells.slice(1).some((label, index) => parseTierLabel(label)?.id !== tiers[index].id)) {
+        throw new Error('Apple marker table changes its header inside the table');
+      }
+    } else {
+      rows.push(cells);
+    }
+  }
+  if (!rows.length) throw new Error(`Apple marker pricing table for ${region} contains no country rows`);
+  const countries = rows.map(([label]) => ({
+    ...parseCountryText(label, options), region, plans: {}, detectedTiers: tiers
+  }));
+  for (let column = 1; column < labels.length; column += 1) {
+    const tier = tiers[column - 1];
+    for (let row = 0; row < rows.length; row += 1) {
+      const formattedPrice = rows[row][column];
+      const country = countries[row];
+      const price = parsePriceNumber(formattedPrice, country.currency);
+      if (!Number.isFinite(price)) throw new Error(`Unable to parse table price "${formattedPrice}" for ${country.country} ${tier.label}`);
+      country.plans[tier.id] = { price, formattedPrice };
+    }
+  }
+  // Keep the public field order identical to the document-order decoder.
+  return countries.map(({ country, region: area, currency, plans, detectedTiers }) => ({
+    country, region: area, currency, plans, detectedTiers
+  }));
+}
+
 function resolveRegionByDocumentOrder($, node) {
   const sectionId = $(node).attr('id');
   if (REGIONS[sectionId]) return { sectionId, region: REGIONS[sectionId] };
@@ -228,12 +297,17 @@ function resolveRegionByDocumentOrder($, node) {
   return null;
 }
 
-function finalize($, countries, foundRegions) {
+function finalize($, countries, foundRegions, seenTables) {
   for (const sectionId of Object.keys(REGIONS)) {
     if (!foundRegions.has(sectionId)) throw new Error(`Apple pricing section #${sectionId} was not found`);
+    if (!seenTables.has(sectionId)) throw new Error(`Apple pricing section #${sectionId} has no interpretable pricing table`);
   }
+  const sourceNames = new Set();
   const tierMap = new Map();
   for (const country of countries) {
+    const name = country.country.normalize('NFKC').toLocaleLowerCase('en-US');
+    if (sourceNames.has(name)) throw new Error(`Duplicate Apple table country: ${country.country}`);
+    sourceNames.add(name);
     for (const tier of country.detectedTiers) tierMap.set(tier.id, tier);
   }
   const tiers = [...tierMap.values()].sort((a, b) => a.capacityGb - b.capacityGb);
@@ -275,7 +349,7 @@ function parseByDocumentOrder($, options) {
       currentSectionId = null;
     }
   }
-  return finalize($, countries, foundRegions);
+  return finalize($, countries, foundRegions, seenTables);
 }
 
 function parseByAppleMarkers($, options) {
@@ -291,7 +365,7 @@ function parseByAppleMarkers($, options) {
       if (!isPotentialPricingTable($, node)) continue;
       if (!currentRegion || !currentSectionId) throw new Error('Apple marker parser found a pricing table before a region marker');
       if (seenTables.has(currentSectionId)) throw new Error(`Multiple Apple marker pricing tables found for #${currentSectionId}`);
-      countries.push(...parsePricingTable($, node, currentRegion, options));
+      countries.push(...parsePricingColumns($, node, currentRegion, options));
       seenTables.add(currentSectionId);
       continue;
     }
@@ -301,7 +375,7 @@ function parseByAppleMarkers($, options) {
     currentSectionId = sectionId;
     foundRegions.add(sectionId);
   }
-  return finalize($, countries, foundRegions);
+  return finalize($, countries, foundRegions, seenTables);
 }
 
 function comparable(result) {

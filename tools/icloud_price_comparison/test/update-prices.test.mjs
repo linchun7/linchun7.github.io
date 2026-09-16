@@ -454,9 +454,12 @@ test('recovers the first Apple baseline when the second and third samples match'
   }
 });
 
-test('performs a second Apple fetch when only the published date changes', async () => {
+test('performs a second Apple fetch when only the published date changes', async (t) => {
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
-  const html = buildAppleHtml(data, 'August 12, 2026');
+  const fixedNow = nextBeijingMidnightAfter(data.generatedAt);
+  t.mock.timers.enable({ apis: ['Date'], now: fixedNow });
+  const nextPublicationDate = new Date(fixedNow.getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const html = buildAppleHtml(data, nextPublicationDate);
   const result = await runAppleConfirmationScenario({ firstHtml: html, secondHtml: html });
   assert.equal(result.appleRequests, 2);
 });
@@ -502,7 +505,7 @@ test('publishes price and publication history at Beijing midnight with a previou
   };
 
   await withMockedFetch(
-    { html: buildAppleHtml(changed, 'August 12, 2026'), fxPayload },
+    { html: buildAppleHtml(changed, beijingDate), fxPayload },
     () => main({ dryRun: false, paths, stepSummaryPath: null })
   );
 
@@ -934,25 +937,17 @@ test('publishes a confirmed unknown Apple market with a deterministic identity a
     const publishedUnknown = published.countries.find(({ country }) => country === 'New Apple Market');
     assert.match(publishedUnknown.marketId, /^apple-new-apple-market-[0-9a-f]{8}$/);
     assert.equal(publishedUnknown.marketId, resolveMarket('New Apple Market').id);
-    assert.ok(warnings.some((warning) => (
-      warning.includes(`UNKNOWN_APPLE_MARKET:New Apple Market:${publishedUnknown.marketId}`)
-      && warning.includes(unknown.region)
-      && warning.includes(unknown.currency)
-    )));
-    assert.ok(logs.some((message) => (
-      message.startsWith('::warning title=Unknown Apple market requires registry review::')
-      && message.includes('sourceName=New Apple Market')
-      && message.includes(`generatedMarketId=${publishedUnknown.marketId}`)
-      && message.includes(`region=${unknown.region}`)
-      && message.includes(`currency=${unknown.currency}`)
-    )));
+    assert.equal(warnings.filter((warning) => warning.startsWith('MARKET_REVIEW_DEBT:')).length, 1);
+    const debtSummary = await readFile(summaryPath, 'utf8');
+    assert.ok(debtSummary.includes(publishedUnknown.marketId));
+    assert.ok(debtSummary.includes(unknown.region));
+    assert.ok(debtSummary.includes(unknown.currency));
+    assert.equal(logs.filter((message) => message.startsWith('::notice title=Apple market review debt::')).length, 1);
+    assert.equal(logs.filter((message) => message.startsWith('::warning')).length, 0);
     const summary = await readFile(summaryPath, 'utf8');
     assert.match(summary, new RegExp(`UNKNOWN_APPLE_MARKET.*${publishedUnknown.marketId}.*${unknown.region}.*${unknown.currency}`, 's'));
     assert.match(summary, new RegExp(`CHINESE_MARKET_NAME_PENDING.*${publishedUnknown.marketId}.*New Apple Market`, 's'));
-    assert.ok(warnings.some((warning) => warning.includes(`CHINESE_MARKET_NAME_PENDING:marketId=${publishedUnknown.marketId}:sourceName=New Apple Market`)));
-    assert.ok(logs.some((message) => message.startsWith('::warning title=Apple Chinese market name pending::')
-      && message.includes(`marketId=${publishedUnknown.marketId}`)
-      && message.includes('sourceName=New Apple Market')));
+    assert.ok(summary.includes('<details><summary>展开完整待复核明细</summary>'));
 
     const caseChanged = structuredClone(changed);
     const caseChangedUnknown = caseChanged.countries.at(-1);
@@ -2026,13 +2021,11 @@ test('runs the production write path against isolated files', async () => {
       readFile(paths.currentDataPath, 'utf8').then(JSON.parse),
       readFile(paths.snapshotIndexPath, 'utf8').then(JSON.parse)
     ]);
-    const snapshot = index.snapshots.find(({ publishedDate }) => publishedDate === '2026-07-17');
+    const currentPublication = publicationDateKey(data.source.publishedDate);
+    const snapshot = index.snapshots.find(({ publishedDate }) => publishedDate === currentPublication);
+    const before = JSON.parse(snapshotStoreBefore.index).snapshots.find(({ publishedDate }) => publishedDate === currentPublication);
     assert.ok(snapshot, 'production run must retain the current Apple snapshot');
-    assert.equal(snapshot.revisions.length, 1);
-    assert.equal(
-      snapshot.revisions[0].firstConfirmedDate,
-      JSON.parse(snapshotStoreBefore.index).snapshots.at(-1).revisions[0].firstConfirmedDate
-    );
+    assert.deepEqual(snapshot, before, 'same-content reruns cannot rewrite revision evidence');
     assert.equal(writtenData.schemaVersion, 4);
     assert.equal(writtenData.source.publishedDate, data.source.publishedDate);
     assert.equal(writtenData.countries.length, data.countries.length);
@@ -2646,7 +2639,7 @@ test('writes a failure report and normalized Apple diagnostic', async () => {
   }
 });
 
-test('captures the current Apple response for failure diagnostics', async () => {
+test('captures the current Apple response for failure diagnostics', async (t) => {
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
   const fxPayload = {
     result: 'success',
@@ -2661,26 +2654,10 @@ test('captures the current Apple response for failure diagnostics', async () => 
 
   const { root, paths } = await createTemporaryProductionPaths();
   const diagnosticsDir = path.join(root, 'diagnostics');
-  const invalidData = structuredClone(data);
-  invalidData.fx.fetchedAt = '2026-07-30T00:00:00.000Z';
-  invalidData.generatedAt = '2026-07-31T00:00:00.000Z';
-  invalidData.run.startedAtUtc = '2026-07-30T23:59:00.000Z';
-  invalidData.run.finishedAtUtc = invalidData.generatedAt;
-  invalidData.run.observedAtUtc = invalidData.generatedAt;
-  invalidData.run.observedAtBeijing = '2026-07-31';
-  const invalidRunLog = JSON.parse(await readFile(paths.runLogPath, 'utf8'));
-  const latestRun = invalidRunLog.runs.at(-1);
-  latestRun.startedAtUtc = invalidData.run.startedAtUtc;
-  latestRun.finishedAtUtc = invalidData.generatedAt;
-  invalidRunLog.runs = [latestRun];
-  invalidRunLog.updatedAtUtc = invalidData.generatedAt;
-  const invalidHistory = JSON.parse(await readFile(paths.historyPath, 'utf8'));
-  invalidHistory.updatedAt = invalidData.generatedAt;
-  await Promise.all([
-    writeFile(paths.currentDataPath, JSON.stringify(invalidData), 'utf8'),
-    writeFile(paths.historyPath, JSON.stringify(invalidHistory), 'utf8'),
-    writeFile(paths.runLogPath, JSON.stringify(invalidRunLog), 'utf8')
-  ]);
+  // Expire the FX baseline without making prices, history or snapshot evidence
+  // predate the currently committed publication. No production calendar constant.
+  const expiredNow = new Date(Date.parse(data.generatedAt) + 3 * 24 * 60 * 60 * 1000);
+  t.mock.timers.enable({ apis: ['Date'], now: expiredNow });
   try {
     await withMockedFetch(
       { html: buildAppleHtml(data), fxPayload: { result: 'error', 'error-type': 'quota-reached' } },
@@ -2692,7 +2669,7 @@ test('captures the current Apple response for failure diagnostics', async () => 
     });
     const diagnosticFile = path.join(diagnosticsDir, 'apple-snapshot.json');
     const diagnostic = JSON.parse(await readFile(diagnosticFile, 'utf8'));
-    assert.equal(diagnostic.publishedDate, '2026-07-17');
+    assert.equal(diagnostic.publishedDate, publicationDateKey(data.source.publishedDate));
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -3610,7 +3587,7 @@ test('runs the complete updater in dry-run mode without modifying committed data
   }
   const after = await Promise.all([pricesUrl, historyUrl, runLogUrl].map((url) => readFile(url, 'utf8')));
   assert.deepEqual(after, before, 'dry-run must not change prices, history, or run logs');
-  assert.ok(messages.some((message) => /Live check passed with cross-checked: 73 countries and 365 prices/.test(message)));
+  assert.ok(messages.some((message) => message.includes(`Live check passed with cross-checked: ${data.countries.length} countries and ${data.countries.length * data.tiers.length} prices`)));
 });
 
 test('accepts compact Apple 50GB labels during the fetch preflight', async () => {
