@@ -48,12 +48,13 @@ jobs:
       - name: Run focused tests
         working-directory: tools/icloud_price_comparison
         run: node --test --test-concurrency=1 test/market-registry.test.mjs test/update-prices.test.mjs test/documentation-contract.test.mjs
+      - name: Remove temporary harness before repository-wide contracts
+        run: rm .github/workflows/temp-icloud-market-metadata-fix.yml .github/temp-icloud-market-metadata-fix.py
       - name: Run full core suite
         working-directory: tools/icloud_price_comparison
         run: pnpm test:core
       - name: Commit tested changes
         run: |
-          rm .github/workflows/temp-icloud-market-metadata-fix.yml .github/temp-icloud-market-metadata-fix.py
           git diff --check
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
