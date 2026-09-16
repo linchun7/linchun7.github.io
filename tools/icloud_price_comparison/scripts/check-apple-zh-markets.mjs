@@ -38,7 +38,7 @@ function looksLikeMarketName(value) {
   const name = stripFootnotes(value);
   if (!name || name.length > 60 || NON_MARKET_RE.test(name)) return false;
   if (/^[（(]|[）)]$/u.test(name) || MARKET_HEADER_RE.test(name)) return false;
-  if (/[：:$€£¥₩₽₹₱₦₸]|\b(?:GB|TB)\b/iu.test(name) || /\d/u.test(name)) return false;
+  if (/[：:$€£¥₩₽₹₱₦₸]|\b(?:GB|TB|PB)\b/iu.test(name) || /\d/u.test(name)) return false;
   return /[\p{L}\p{Script=Han}]/u.test(name);
 }
 
@@ -73,16 +73,11 @@ function rootForExtraction($) {
         : $('body');
 }
 
-// Legacy Apple form: one market heading followed by a price list. We deliberately
-// do not depend on gb-* classes or one exact heading level.
+// Legacy Apple form: market headings encode the market name and currency in the
+// heading itself. This path deliberately ignores Apple CSS classes and heading level.
 function extractHeadingCandidates($, root, target) {
   root.find('h2,h3,h4,h5,h6,dt').each((_, element) => {
-    const candidate = marketNameFromLabel($(element).text(), { allowPlain: false });
-    if (!candidate) return;
-    const nearby = $(element).nextAll().slice(0, 3).toArray()
-      .map((node) => normalizeVisibleText($(node).text()))
-      .join(' ');
-    if (countCapacityMarkers(nearby) >= 2) target.add(candidate);
+    addCandidate(target, $(element).text(), { allowPlain: false });
   });
 }
 
@@ -116,10 +111,10 @@ function directNodeText($, node) {
   return normalizeVisibleText($(node).text());
 }
 
-// Generic future form: a small local container whose first few direct nodes contain
-// a short market label and whose following siblings contain multiple storage tiers.
-// This keeps the fallback independent of CSS/classes while preventing article-wide
-// feature lists or footnotes from being mistaken for markets.
+// Generic future form: only inspect small local containers. A short candidate label
+// is accepted only when the same local container also has multiple storage-capacity
+// markers. This intentionally avoids article-wide adjacency scans, footnotes, and
+// feature-card text while remaining independent of CSS names or exact wrappers.
 function extractLocalGroupCandidates($, root, target) {
   root.find('section,article,div,li,dd').each((_, element) => {
     const nodes = (element.childNodes ?? []).filter((node) => directNodeText($, node));
