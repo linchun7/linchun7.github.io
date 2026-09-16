@@ -430,7 +430,7 @@ export function validateHistoryAgainstSnapshotEvidence(history, snapshotIndex, n
 
         const expectedEvents = expectedByMarketId.get(marketId) ?? [];
         const event = {
-          observedAt: snapshot.publishedDate,
+          observedAtCandidates: [...new Set([snapshot.publishedDate, revision.firstConfirmedDate].filter(Boolean))],
           currency: country.currency,
           plans: country.plans
         };
@@ -452,7 +452,7 @@ export function validateHistoryAgainstSnapshotEvidence(history, snapshotIndex, n
     for (let index = 0; index < expectedEvents.length; index += 1) {
       const actual = actualEvents[index];
       const expected = expectedEvents[index];
-      if (actual.observedAt !== expected.observedAt
+      if (!expected.observedAtCandidates.includes(actual.observedAt)
         || actual.currency !== expected.currency
         || !samePlans(actual.plans, expected.plans)) {
         fail(`history events do not match snapshot evidence for marketId ${marketId}${sourceNames ? ` (${sourceNames})` : ''}`);
