@@ -16,6 +16,7 @@ import {
   validatePayload,
   validatePriceHistoryConsistency
 } from '../data-contract.js';
+import { resolveMarket } from './market-registry.mjs';
 
 const ARCHIVE_ROOT = 'tools/icloud_price_comparison/data';
 const REQUIRED_FILES = new Set([
@@ -400,14 +401,34 @@ function samePlans(first, second) {
     && firstIds.every((tierId) => Object.hasOwn(second, tierId) && first[tierId] === second[tierId]);
 }
 
-function validateHistoryAgainstSnapshotEvidence(history, snapshotIndex, normalizedSnapshots) {
-  const expectedByCountry = new Map();
-  const actualByCountry = new Map(Object.values(history.markets).map((record) => [record.country, record]));
+export function validateHistoryAgainstSnapshotEvidence(history, snapshotIndex, normalizedSnapshots) {
+  const expectedByMarketId = new Map();
+  const sourceNamesByMarketId = new Map();
+  const actualByMarketId = new Map(Object.entries(history.markets));
+
+  for (const [marketId, record] of actualByMarketId) {
+    const resolvedId = resolveMarket(record.country).id;
+    if (resolvedId !== marketId) {
+      fail(`history marketId does not match source identity for ${record.country}: ${marketId} != ${resolvedId}`);
+    }
+  }
+
   for (const snapshot of snapshotIndex.snapshots) {
     for (const revision of snapshot.revisions) {
       const pricing = normalizedSnapshots.get(revision.dataFile);
+      const seenMarketIds = new Map();
       for (const country of pricing.countries) {
-        const expectedEvents = expectedByCountry.get(country.country) ?? [];
+        const marketId = resolveMarket(country.country).id;
+        const priorSourceName = seenMarketIds.get(marketId);
+        if (priorSourceName && priorSourceName !== country.country) {
+          fail(`snapshot evidence maps multiple source names to marketId ${marketId}: ${priorSourceName}, ${country.country}`);
+        }
+        seenMarketIds.set(marketId, country.country);
+        const sourceNames = sourceNamesByMarketId.get(marketId) ?? new Set();
+        sourceNames.add(country.country);
+        sourceNamesByMarketId.set(marketId, sourceNames);
+
+        const expectedEvents = expectedByMarketId.get(marketId) ?? [];
         const event = {
           observedAt: snapshot.publishedDate,
           currency: country.currency,
@@ -417,15 +438,16 @@ function validateHistoryAgainstSnapshotEvidence(history, snapshotIndex, normaliz
         if (!previous || previous.currency !== event.currency || !samePlans(previous.plans, event.plans)) {
           expectedEvents.push(event);
         }
-        expectedByCountry.set(country.country, expectedEvents);
+        expectedByMarketId.set(marketId, expectedEvents);
       }
     }
   }
 
-  for (const [countryName, expectedEvents] of expectedByCountry) {
-    const actualEvents = actualByCountry.get(countryName)?.events;
+  for (const [marketId, expectedEvents] of expectedByMarketId) {
+    const actualEvents = actualByMarketId.get(marketId)?.events;
+    const sourceNames = [...(sourceNamesByMarketId.get(marketId) ?? [])].join(' / ');
     if (!Array.isArray(actualEvents) || actualEvents.length !== expectedEvents.length) {
-      fail(`history events do not match snapshot evidence for ${countryName}`);
+      fail(`history events do not match snapshot evidence for marketId ${marketId}${sourceNames ? ` (${sourceNames})` : ''}`);
     }
     for (let index = 0; index < expectedEvents.length; index += 1) {
       const actual = actualEvents[index];
@@ -433,14 +455,14 @@ function validateHistoryAgainstSnapshotEvidence(history, snapshotIndex, normaliz
       if (actual.observedAt !== expected.observedAt
         || actual.currency !== expected.currency
         || !samePlans(actual.plans, expected.plans)) {
-        fail(`history events do not match snapshot evidence for ${countryName}`);
+        fail(`history events do not match snapshot evidence for marketId ${marketId}${sourceNames ? ` (${sourceNames})` : ''}`);
       }
     }
   }
-  const unexpectedCountries = [...actualByCountry.keys()]
-    .filter((countryName) => !expectedByCountry.has(countryName));
-  if (unexpectedCountries.length) {
-    fail(`history contains countries without snapshot evidence: ${unexpectedCountries.join(', ')}`);
+  const unexpectedMarketIds = [...actualByMarketId.keys()]
+    .filter((marketId) => !expectedByMarketId.has(marketId));
+  if (unexpectedMarketIds.length) {
+    fail(`history contains marketIds without snapshot evidence: ${unexpectedMarketIds.join(', ')}`);
   }
 }
 

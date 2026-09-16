@@ -22,6 +22,7 @@ import {
   latestAllowedSnapshotDate,
   logInline as artifactLogInline,
   validateExtractedDataArtifact,
+  validateHistoryAgainstSnapshotEvidence,
   validateTarArchive
 } from '../scripts/validate-data-artifact.mjs';
 
@@ -557,4 +558,35 @@ test('rejects executable and special permission modes after extraction', {
       await assert.rejects(validateExtractedDataArtifact(dataDirectory), expected);
     });
   }
+});
+
+
+test('validates snapshot-backed price history by stable marketId across Apple source-name aliases', () => {
+  const history = {
+    markets: {
+      ci: {
+        country: "Cote D'Ivoire",
+        events: [{ observedAt: '2026-07-17', currency: 'USD', plans: { '50GB': 0.99 } }]
+      }
+    }
+  };
+  const snapshotIndex = {
+    snapshots: [
+      { publishedDate: '2026-07-17', revisions: [{ dataFile: 'old.json' }] },
+      { publishedDate: '2026-09-15', revisions: [{ dataFile: 'new.json' }] }
+    ]
+  };
+  const normalizedSnapshots = new Map([
+    ['old.json', { countries: [{ country: 'Ivory Coast', currency: 'USD', plans: { '50GB': 0.99 } }] }],
+    ['new.json', { countries: [{ country: "Cote D'Ivoire", currency: 'USD', plans: { '50GB': 0.99 } }] }]
+  ]);
+
+  assert.doesNotThrow(() => validateHistoryAgainstSnapshotEvidence(history, snapshotIndex, normalizedSnapshots));
+
+  const corrupted = structuredClone(history);
+  corrupted.markets.ci.events[0].plans['50GB'] = 1.99;
+  assert.throws(
+    () => validateHistoryAgainstSnapshotEvidence(corrupted, snapshotIndex, normalizedSnapshots),
+    /history events do not match snapshot evidence/
+  );
 });
