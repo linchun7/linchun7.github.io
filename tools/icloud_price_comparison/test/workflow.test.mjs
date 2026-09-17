@@ -135,7 +135,7 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.doesNotMatch(workflow, /fetch-depth: 0|git count-objects|git_kib >=/, 'daily jobs must not fetch or audit full history');
   assert.equal((workflow.match(/fetch-depth: 1/g) ?? []).length, 4, 'update, publish, and both production verification checkouts must be shallow');
   assert.match(workflow, /name: 补充未报告的失败摘要[\s\S]*if: failure\(\)/);
-  assert.match(workflow, /steps\.update_data\.outcome[\s\S]*artifacts\/run-report\.json[\s\S]*Updater already wrote a detailed failure summary/);
+  assert.match(workflow, /steps\.update_data\.outcome[\s\S]*artifacts\/run-report\.json[\s\S]*更新器已写入详细失败摘要/);
   assert.match(workflow, /::error title=iCloud\+ 价格更新失败/);
   assert.match(workflow, /上一份有效数据继续保留/);
   assert.match(workflow, /ICLOUD_HEALTHCHECK_PING_URL[\s\S]*?HEALTHCHECK_PING_URL%\/\}\/\$status/);
