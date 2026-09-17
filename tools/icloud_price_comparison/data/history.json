@@ -1,6 +1,6 @@
 {
   "schemaVersion": 4,
-  "updatedAt": "2026-09-16T03:49:21.499Z",
+  "updatedAt": "2026-09-17T05:51:45.489Z",
   "markets": {
     "bs": {
       "country": "Bahamas",
@@ -4018,6 +4018,20 @@
             "tiers": []
           }
         ]
+      }
+    },
+    {
+      "publishedDate": "September 16, 2026",
+      "observedAt": "2026-09-17",
+      "observedAtBeijing": "2026-09-17",
+      "observedAtUtc": "2026-09-17T05:51:45.489Z",
+      "kind": "change",
+      "changes": {
+        "addedTiers": [],
+        "removedTiers": [],
+        "addedCountries": [],
+        "removedCountries": [],
+        "changedCountries": []
       }
     }
   ]
