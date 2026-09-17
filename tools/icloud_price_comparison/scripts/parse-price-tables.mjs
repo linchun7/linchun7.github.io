@@ -22,7 +22,7 @@ const COUNTRY_ALIASES = {
 
 const PRICE_CURRENCY_MARKERS = {
   AED: ['AED'], AUD: ['$'], BGN: ['лв'], BRL: ['R$'], CAD: ['$'], CHF: ['CHF'],
-  CLP: ['$'], CNY: ['¥'], COP: ['$'], CZK: ['Kč'], DKK: ['kr'], EGP: ['£'],
+  CLP: ['$'], CNY: ['¥'], COP: ['$'], CZK: ['Kč'], DKK: ['kr'], EGP: ['£', 'E£'],
   EUR: ['€', 'Euro'], GBP: ['£'], HKD: ['HK$'], HUF: ['Ft'], IDR: ['Rp'], ILS: ['₪'],
   INR: ['Rs'], JPY: ['¥'], KRW: ['₩'], KZT: ['₸'], MXN: ['$'], MYR: ['RM'], NGN: ['₦'],
   NOK: ['kr'], NZD: ['$'], PEN: ['S/.'], PHP: ['₱'], PKR: ['Rs'], PLN: ['zł'], QAR: ['﷼'],
