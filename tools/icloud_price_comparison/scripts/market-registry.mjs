@@ -234,10 +234,17 @@ export function attachMarketIdentity(countries, {
     if (market.unknown && !market.published) onUnknown(market, country);
     const officialName = getOfficialChineseMarketName(market.id, chineseNames ?? undefined);
     if (officialName === null) onChineseNamePending(market, country);
+    // Reviewed Apple aliases are source spellings, not a request to rename the
+    // public market. Normalize them to the registry canonical name while keeping
+    // truly unknown or historical conflict-preservation paths fail-closed.
+    const canonicalCountry = !market.unknown && !market.preservedPublishedIdentity
+      ? market.canonicalName
+      : country.country;
     return {
       ...country,
+      country: canonicalCountry,
       marketId: market.id,
-      nameZh: officialName ?? country.country
+      nameZh: officialName ?? canonicalCountry
     };
   });
 }
