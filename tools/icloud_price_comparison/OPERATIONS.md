@@ -114,7 +114,7 @@ Apple Support HTML ─┐
 一次完整生产更新应满足：
 
 1. 固定远端 `main` 生成基线，使用 Node.js 22、项目锁定的 pnpm 与 frozen lockfile 安装依赖，生命周期脚本禁用。
-2. 在共享网络预算内抓取 Apple 页面；同一份 HTML 必须由 `document-order` 和 `apple-markers` 两条解析路径逐字段一致后才得到 `cross-checked`。入口容量文本检查不能固定要求 50GB；容量增删继续由完整解析和独立语义确认校验，不放宽响应大小、编码或网络安全边界。
+2. 在共享网络预算内抓取 Apple 页面；同一份 HTML 必须由 `document-order` 和 `apple-markers` 两条解析路径逐字段一致后才得到 `cross-checked`。逐市场列表与 `Country (Currency)` 表格两种结构必须使用同一套受约束货币标记规则：仅接受已知符号、完整 ISO 代码或与当前 ISO 前缀一致的已知符号组合（如 EGP 的 `E£ / EG£ / EGP£` 及反向形式），错误币种或任意装饰仍失败关闭。入口容量文本检查不能固定要求 50GB；容量增删继续由完整解析和独立语义确认校验，不放宽响应大小、编码或网络安全边界。
 3. Apple 业务语义发生变化时，执行独立 no-store 完整确认抓取。正常情况是 initial + confirmation；只有 mismatch 或确认解析退化时追加第三样本。
 4. 只有稳定、完整的 Apple 语义证据才能继续。A/B/B 或 A/degraded/A 可自动恢复；A/B/A、A/B/C、无法形成稳定证据或确认始终不可用时保留上一份生产数据，等待后续自动重试。
 5. 获取并校验汇率。认证候选不可用或 sanity 不通过时尝试开放候选；所有 fresh 在线候选均不可用时，仅允许在既定 freshness 条件内沿用上一份安全 FX/CNY 结果。
@@ -351,7 +351,7 @@ Apple 108047 从逐市场列表切换为地区表格时，预期修复是增加�
 
 “候选生成成功”不等于发布成功：以已测试数据 commit、该 commit 的 Pages 构建以及 canonical URL 的 prices/history/run-log/static HTML 一致作为生产闭环。修复恢复必须在最新 main 新发起 workflow，不能 rerun 旧 SHA。
 
-- `Monitor Apple Chinese iCloud markets` 是独立只读服务，会在 `Update iCloud prices` 完成后运行，也可手动运行。只有 Apple 中文 iCloud+ 页的国家/地区名称集合相对 `scripts/apple-zh-reviewed-markets.json` 出现新增/移除时才提示人工复核；价格、容量、发布日期、排序或排版变化不提示。抓取/解析不可用只影响这条监测任务，不影响价格 updater。人工核实页面名单后更新该基线；只有能够人工确认到稳定 `marketId` 的中文名称才同步更新 `scripts/country-names.zh.json`。
+- `Monitor Apple Chinese iCloud markets` 是独立只读服务，会在 `Update iCloud prices` workflow 完成后运行，也可手动运行。只有 Apple 中文 iCloud+ 页的国家/地区名称集合相对 `scripts/apple-zh-reviewed-markets.json` 出现新增/移除时才提示人工复核；价格、容量、发布日期、排序或排版变化不提示。抓取/解析不可用只影响这条监测任务，不影响价格 updater。人工核实页面名单后更新该基线；只有能够人工确认到稳定 `marketId` 的中文名称才同步更新 `scripts/country-names.zh.json`。
 
 
 ### 封板告警与回归
