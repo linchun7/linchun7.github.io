@@ -13,7 +13,7 @@ const HTML = `<!doctype html>
     <h3 id="emea">Europe, the Middle East, and Africa</h3>
     <table>
       <thead><tr><th>Country (Currency)</th><th>50 GB</th></tr></thead>
-      <tbody><tr><td>Egypt (EGP)</td><td>E£49.99</td></tr></tbody>
+      <tbody><tr><td>Egypt (EGP)</td><td>£49.99</td></tr></tbody>
     </table>
     <h3 id="ap">Asia Pacific</h3>
     <table>
@@ -23,17 +23,32 @@ const HTML = `<!doctype html>
   </body>
 </html>`;
 
-test('accepts Apple E£ decoration for EGP while preserving the formatted source price', () => {
-  const parsed = parseApplePrices(HTML);
+function egyptPrice(html) {
+  const parsed = parseApplePrices(html);
   assert.equal(parsed.parser, 'cross-checked');
   const egypt = parsed.countries.find(({ country }) => country === 'Egypt');
   assert.ok(egypt);
   assert.equal(egypt.currency, 'EGP');
-  assert.equal(egypt.plans['50GB'].price, 49.99);
-  assert.equal(egypt.plans['50GB'].formattedPrice, 'E£49.99');
+  return egypt.plans['50GB'];
+}
+
+test('keeps the current Apple EGP pound-sign format unchanged', () => {
+  const plan = egyptPrice(HTML);
+  assert.equal(plan.price, 49.99);
+  assert.equal(plan.formattedPrice, '£49.99');
 });
 
-test('does not generalize the E£ exception to unrelated currency decorations', () => {
-  const malformed = HTML.replace('E£49.99', 'EG£49.99');
-  assert.throws(() => parseApplePrices(malformed), /Unable to parse table price/);
+test('accepts ISO-qualified variants of the already-known EGP currency symbol', () => {
+  for (const marker of ['E£', 'EG£', 'EGP£', '£E', '£EG', '£EGP']) {
+    const plan = egyptPrice(HTML.replace('£49.99', `${marker}49.99`));
+    assert.equal(plan.price, 49.99);
+    assert.equal(plan.formattedPrice, `${marker}49.99`);
+  }
+});
+
+test('does not accept arbitrary or wrong-currency decorations', () => {
+  for (const marker of ['X£', 'E€', 'USD£', 'EGPX£']) {
+    const malformed = HTML.replace('£49.99', `${marker}49.99`);
+    assert.throws(() => parseApplePrices(malformed), /Unable to parse table price/);
+  }
 });
