@@ -46,7 +46,7 @@ test('seal: response size limit aborts the stream before it has been buffered', 
   let reads = 0;
   let cancelled = false;
   const stream = new ReadableStream({ pull(controller) { reads += 1; if (reads > 24) controller.close(); else controller.enqueue(new Uint8Array(256 * 1024).fill(32)); }, cancel() { cancelled = true; } });
-  const result = await runAppleZhMarketMonitor({ fetchImpl: async () => new Response(stream) });
+  const result = await runAppleZhMarketMonitor({ fetchImpl: async () => new Response(stream), report: false });
   assert.equal(result.status, 'unavailable');
   assert.ok(reads <= 11, `oversized body consumed ${reads} chunks`);
   assert.equal(cancelled, true);
