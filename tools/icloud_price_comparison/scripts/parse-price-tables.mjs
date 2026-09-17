@@ -65,14 +65,26 @@ function normalizeCurrencyMarker(value) {
   return cleanText(value).replace(/\s+/g, '');
 }
 
+function isIsoQualifiedCurrencySymbol(normalized, currency, markers) {
+  const expectedSymbols = new Set(markers.flatMap((marker) => marker.match(/\p{Sc}/gu) ?? []));
+  if (!expectedSymbols.size) return false;
+
+  const leadingCode = normalized.match(/^([A-Z]{1,3})(\p{Sc})$/u);
+  if (leadingCode && currency.startsWith(leadingCode[1]) && expectedSymbols.has(leadingCode[2])) return true;
+
+  const trailingCode = normalized.match(/^(\p{Sc})([A-Z]{1,3})$/u);
+  return Boolean(trailingCode
+    && currency.startsWith(trailingCode[2])
+    && expectedSymbols.has(trailingCode[1]));
+}
+
 function isCurrencyDecoration(value, currency) {
   const normalized = normalizeCurrencyMarker(value);
   if (!normalized) return true;
-  const allowed = new Set([
-    currency,
-    ...(PRICE_CURRENCY_MARKERS[currency] ?? [])
-  ].map(normalizeCurrencyMarker));
-  return allowed.has(normalized);
+  const markers = (PRICE_CURRENCY_MARKERS[currency] ?? []).map(normalizeCurrencyMarker);
+  const allowed = new Set([normalizeCurrencyMarker(currency), ...markers]);
+  if (allowed.has(normalized)) return true;
+  return isIsoQualifiedCurrencySymbol(normalized, currency, markers);
 }
 
 function parseNumericToken(token) {
