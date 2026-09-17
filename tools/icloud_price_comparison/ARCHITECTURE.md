@@ -240,7 +240,6 @@ archive importer 重放完整 snapshot ledger（包括此前 live revision），
 
 中文 iCloud+ 页面监测是与价格发布物理隔离的只读旁路。它在 `Update iCloud prices` workflow 完成后由独立 workflow 触发，只读取同一 Apple 简体中文 108047 页面，并把提取到的国家/地区名称集合与 `apple-zh-reviewed-markets.json` 的人工基线比较。价格、容量、发布日期、市场顺序和 DOM 样式不是监测事实；容量文本只作为识别“这是一段价格市场结构”的局部上下文。旧式标题块、表格和未来的局部分组都走同一名称集合输出，解析异常不得修改基线、中文显示名或主价格数据。
 
-
 ### 名称监测与来源身份的边界
 
 中文监测的提取不读取人工名单基线；基线验证不调用提取器的名称启发式。语义脚注、非价格功能内容不进入名称集合；国家列位置可变，未知包装可按局部 label/price 结构解释，但缺失国家单元格、无标签价格记录或不能解释的价格矩阵使监测不可用。价格/容量仅作记录上下文，绝不作为市场身份或变更事实。
@@ -250,3 +249,9 @@ archive importer 重放完整 snapshot ledger（包括此前 live revision），
 英文双路 parser 必须检查独立标题外仍带国家/币种或容量/金额证据的表格。未知 heading 不能将剩余价格行变成“无关表格”；无价格证据的真正功能表仍可忽略。该边界由完整 updater → artifact validator 反例及失败前后全部生产文件字节一致断言保护。
 
 国家/币种行本身就是仍存在的来源证据；未知标题后的价格全部为空、`N/A` 或破损，也不能被解释为市场已移除。完整 updater 回归使用不含数字的市场名，并逐场景隔离数据目录，避免名称数字或前一失败场景掩盖金额证据缺失。
+
+### 中文名称 pending 集合差异
+
+中文显示名的“待确认”不是新的事实源，也不需要新的持久化状态。更新器已经有稳定契约：尚未人工复核中文名称时，公共 `prices.json` 中该市场的 `nameZh` 暂时等于 Apple 英文 `country`。因此每日 workflow 可以在运行前复制上一份已验证 `prices.json`，在候选生成成功后由 `report-chinese-name-sync.mjs` 从前后两份工件分别投影 pending `marketId` 集合，再做集合差异。
+
+该投影只进入 Action Summary：数量变化会列出新增/退出成员；数量相同但成员替换也会同时列出两侧。它不修改 `prices.json`、`history.json`、snapshot、market registry 或 `country-names.zh.json`，也不参与发布 gate 的业务判断。独立的 Apple 中文页面名单监测仍只负责中文 108047 页面自身的名称集合变化，两者不能互相替代或直接比较数量。

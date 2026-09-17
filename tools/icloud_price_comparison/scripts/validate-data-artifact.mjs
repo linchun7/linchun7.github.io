@@ -928,7 +928,7 @@ async function main(argv = process.argv.slice(2)) {
   const result = argv[0] === '--archive'
     ? await validateTarArchive(target)
     : await validateExtractedDataArtifact(target);
-  console.log(`Validated iCloud data artifact: ${JSON.stringify(result)}`);
+  console.log(`iCloud 数据工件验证通过：${JSON.stringify(result)}`);
 }
 
 if (process.argv[1]) {
@@ -938,7 +938,7 @@ if (process.argv[1]) {
   ]);
   if (entryPath === modulePath) {
     main().catch((error) => {
-      console.error(`iCloud data artifact validation failed: ${logInline(error?.message ?? error)}`);
+      console.error(`iCloud 数据工件验证失败：${logInline(error?.message ?? error)}`);
       process.exitCode = 1;
     });
   }

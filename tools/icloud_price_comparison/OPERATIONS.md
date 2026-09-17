@@ -353,9 +353,14 @@ Apple 108047 从逐市场列表切换为地区表格时，预期修复是增加�
 
 - `Monitor Apple Chinese iCloud markets` 是独立只读服务，会在 `Update iCloud prices` workflow 完成后运行，也可手动运行。只有 Apple 中文 iCloud+ 页的国家/地区名称集合相对 `scripts/apple-zh-reviewed-markets.json` 出现新增/移除时才提示人工复核；价格、容量、发布日期、排序或排版变化不提示。抓取/解析不可用只影响这条监测任务，不影响价格 updater。人工核实页面名单后更新该基线；只有能够人工确认到稳定 `marketId` 的中文名称才同步更新 `scripts/country-names.zh.json`。
 
-
 ### 封板告警与回归
 
 中文监测仅允许可信 main 调用，checkout 明确固定 main 并在摘要记录实际代码 SHA。独立并发组不取消正在执行的监测；集合变化、抓取/解析失败以及前置安装失败均产生红灯和可读摘要。不运行或异常不是“无变化”，也不向英文 updater 反向传播失败。基线与中文映射仍须人工审查，脚本没有写入权限。
 
 排查英文源结构变动时，特别检查新标题之后的表格片段；两路 parser 都忽略同一片段并不构成完整性证明。`test/seal-regressions.test.mjs` 与 `test/production-loop.test.mjs` 在 `test:core` 生产路径执行，覆盖非法国家单元格、功能文字污染、流式响应上限、实际进程退出码、可信来源门禁、alias 展示一致性和隐藏价格片段。修复不得改动生产价格/快照，也不得把 FX 刷新当作 Apple 调价。
+
+### 中文名称待确认成员差异
+
+每日 `Update iCloud prices` 在调用 updater 前复制当时已验证的 `data/prices.json`。updater 成功后，`scripts/report-chinese-name-sync.mjs` 只读比较更新前后两份 `prices.json` 中 `nameZh === country` 的 pending `marketId` 集合，并把结果写入 Action Summary。运维人员应同时查看当前待确认数量、`新增待确认`、`退出待确认`；即使数量保持 86→86，只要成员一进一出，也会显示两侧成员。
+
+该差异只用于可观测性，不影响价格发布成败，也不引入状态文件。`退出待确认` 不能直接解读成“中文名已确认”或“市场已删除”，必须结合本次英文 active market 变化和 `country-names.zh.json` 修改判断。它与独立的 `Monitor Apple Chinese iCloud markets` 口径不同：前者基于英文价格页 active markets 的中文显示名复核状态，后者监测 Apple 中文页面自身地区名称集合。

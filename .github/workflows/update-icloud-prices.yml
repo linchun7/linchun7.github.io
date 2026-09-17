@@ -57,7 +57,8 @@ jobs:
           mkdir -p "$main_snapshot"
           git archive --format=tar "$validated_main_sha" tools/icloud_price_comparison/data | tar --extract --file=- --directory="$main_snapshot"
           node tools/icloud_price_comparison/scripts/validate-data-artifact.mjs \
-            --data-dir "$main_snapshot/tools/icloud_price_comparison/data"
+            --data-dir "$main_snapshot/tools/icloud_price_comparison/data" > /dev/null
+          echo "已验证最新 main 数据工件：$validated_main_sha"
           echo "validated_main_sha=$validated_main_sha" >> "$GITHUB_OUTPUT"
 
       - name: 检查每日幂等状态
@@ -108,6 +109,7 @@ jobs:
         run: |
           git fetch origin main --depth=1
           git checkout --detach origin/main
+          cp tools/icloud_price_comparison/data/prices.json "$RUNNER_TEMP/icloud-prices-before-update.json"
           echo "GENERATION_BASE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
@@ -131,6 +133,14 @@ jobs:
           ICLOUD_TRIGGER_SOURCE: ${{ needs.prepare.outputs.trigger_source }}
           ICLOUD_AUTOMATIC_RUN_DATE_BEIJING: ${{ needs.prepare.outputs.automatic_run_date_beijing }}
         run: pnpm update:data
+
+      - name: 比较中文名称待确认成员
+        if: steps.update_data.outcome == 'success'
+        run: |
+          node scripts/report-chinese-name-sync.mjs \
+            --previous "$RUNNER_TEMP/icloud-prices-before-update.json" \
+            --current data/prices.json \
+            --summary "$GITHUB_STEP_SUMMARY"
 
       - name: 验证更新后的价格数据
         id: data_tests
@@ -167,7 +177,8 @@ jobs:
         working-directory: .
         shell: bash
         run: |
-          node tools/icloud_price_comparison/scripts/validate-data-artifact.mjs --data-dir tools/icloud_price_comparison/data
+          node tools/icloud_price_comparison/scripts/validate-data-artifact.mjs --data-dir tools/icloud_price_comparison/data > /dev/null
+          echo "已验证待发布 iCloud 数据工件。"
           tar --format=ustar -cf "$RUNNER_TEMP/icloud-price-data.tar" tools/icloud_price_comparison/data
           cp tools/icloud_price_comparison/index.html "$RUNNER_TEMP/icloud-price-index.html"
           cd "$RUNNER_TEMP"
@@ -192,7 +203,7 @@ jobs:
         shell: bash
         run: |
           if [[ "${{ steps.update_data.outcome }}" == "failure" && -f "tools/icloud_price_comparison/artifacts/run-report.json" ]]; then
-            echo "Updater already wrote a detailed failure summary"
+            echo "更新器已写入详细失败摘要。"
             exit 0
           fi
           echo "::error title=iCloud+ 价格更新失败::自动任务未完成，请查看上方第一个标红步骤确定失败阶段。"
@@ -296,10 +307,11 @@ jobs:
           sha256sum --check icloud-price-data.tar.sha256
           sha256sum --check icloud-price-index.html.sha256
           validator="$GITHUB_WORKSPACE/tools/icloud_price_comparison/scripts/validate-data-artifact.mjs"
-          node "$validator" --archive icloud-price-data.tar
+          node "$validator" --archive icloud-price-data.tar > /dev/null
           mkdir unpacked
           tar --extract --file icloud-price-data.tar --directory unpacked --no-same-owner --no-same-permissions
-          node "$validator" --data-dir unpacked/tools/icloud_price_comparison/data
+          node "$validator" --data-dir unpacked/tools/icloud_price_comparison/data > /dev/null
+          echo "已验证待发布 iCloud 数据工件（归档与展开内容一致）。"
           node "$GITHUB_WORKSPACE/tools/icloud_price_comparison/scripts/render-static-page.mjs" --check \
             --index-file "$RUNNER_TEMP/icloud-price-data/icloud-price-index.html" \
             --prices-file "$RUNNER_TEMP/icloud-price-data/unpacked/tools/icloud_price_comparison/data/prices.json"
@@ -516,18 +528,18 @@ jobs:
           cd "$RUNNER_TEMP/icloud-price-data"
           sha256sum --check icloud-price-data.tar.sha256
           validator="$GITHUB_WORKSPACE/tools/icloud_price_comparison/scripts/validate-data-artifact.mjs"
-          node "$validator" --archive icloud-price-data.tar
+          node "$validator" --archive icloud-price-data.tar > /dev/null
           mkdir unpacked
           tar --extract --file icloud-price-data.tar --directory unpacked --no-same-owner --no-same-permissions
-          node "$validator" --data-dir unpacked/tools/icloud_price_comparison/data
+          node "$validator" --data-dir unpacked/tools/icloud_price_comparison/data > /dev/null
           git -C "$GITHUB_WORKSPACE" fetch origin main --depth=1
           CURRENT_MAIN_SHA=$(git -C "$GITHUB_WORKSPACE" rev-parse origin/main)
           current_main_root="$RUNNER_TEMP/current-main-artifact"
           mkdir -p "$current_main_root"
           git -C "$GITHUB_WORKSPACE" archive --format=tar "$CURRENT_MAIN_SHA" tools/icloud_price_comparison/data \
             | tar --extract --file=- --directory="$current_main_root"
-          node "$validator" --data-dir "$current_main_root/tools/icloud_price_comparison/data"
-          echo "Current main artifact validated from $CURRENT_MAIN_SHA"
+          node "$validator" --data-dir "$current_main_root/tools/icloud_price_comparison/data" > /dev/null
+          echo "已验证当前 main 数据工件：$CURRENT_MAIN_SHA"
 
       - name: 轮询真实生产 URL
         id: verify_production
@@ -595,7 +607,7 @@ jobs:
         run: |
           set -euo pipefail
           node tools/icloud_price_comparison/scripts/validate-data-artifact.mjs \
-            --data-dir tools/icloud_price_comparison/data
+            --data-dir tools/icloud_price_comparison/data > /dev/null
           git fetch origin main --depth=1
           CURRENT_MAIN_SHA=$(git rev-parse origin/main)
           current_main_root="$RUNNER_TEMP/current-main-artifact"
@@ -603,8 +615,8 @@ jobs:
           git archive --format=tar "$CURRENT_MAIN_SHA" tools/icloud_price_comparison/data \
             | tar --extract --file=- --directory="$current_main_root"
           node tools/icloud_price_comparison/scripts/validate-data-artifact.mjs \
-            --data-dir "$current_main_root/tools/icloud_price_comparison/data"
-          echo "Current main artifact validated from $CURRENT_MAIN_SHA"
+            --data-dir "$current_main_root/tools/icloud_price_comparison/data" > /dev/null
+          echo "已验证当前 main 数据工件：$CURRENT_MAIN_SHA"
 
       - name: 轮询真实生产 URL
         id: verify_production
