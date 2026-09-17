@@ -28,7 +28,7 @@ export const REVIEWED_MARKET_IDENTITIES = Object.freeze([
   ['se', 'Sweden'], ['ch', 'Switzerland'], ['tz', 'Tanzania', ['United Republic of Tanzania']],
   ['tr', 'Türkiye', ['Turkey']], ['ug', 'Uganda'], ['ae', 'United Arab Emirates'],
   ['gb', 'United Kingdom', ['UK']], ['zm', 'Zambia'], ['zw', 'Zimbabwe'], ['au', 'Australia'],
-  ['kh', 'Cambodia'], ['cn', 'China mainland', ['Mainland China']], ['hk', 'Hong Kong'], ['in', 'India'],
+  ['kh', 'Cambodia'], ['cn', 'China mainland', ['China', 'Mainland China']], ['hk', 'Hong Kong'], ['in', 'India'],
   ['id', 'Indonesia'], ['jp', 'Japan'], ['kz', 'Kazakhstan'], ['kg', 'Kyrgyzstan'], ['la', 'Laos'],
   ['my', 'Malaysia'], ['np', 'Nepal'], ['nz', 'New Zealand'], ['ph', 'Philippines'],
   ['kr', 'Republic of Korea', ['South Korea']], ['sg', 'Singapore'], ['tw', 'Taiwan'],
