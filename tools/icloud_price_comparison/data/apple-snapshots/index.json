@@ -59,25 +59,6 @@
       "activeDataFile": "2025-08-21.json"
     },
     {
-      "publishedDate": "2025-12-16",
-      "activeContentHash": "f7f2e7874a7c22c8e242424e04e3cda81aedb6d6af3da1af4aa6abc59971e876",
-      "revisions": [
-        {
-          "publishedDate": "2025-12-16",
-          "sourceUrl": "https://support.apple.com/en-us/108047",
-          "archiveUrl": "https://web.archive.org/web/20260330014443/https://support.apple.com/en-us/108047",
-          "parser": "cross-checked",
-          "countries": 70,
-          "pricePoints": 350,
-          "contentHash": "f7f2e7874a7c22c8e242424e04e3cda81aedb6d6af3da1af4aa6abc59971e876",
-          "dataFile": "2025-12-16.json",
-          "firstConfirmedDate": "2026-03-30",
-          "dataSha256": "86d58450b0f8c4fd0cb83d828dd74799e9513457b002497bb710b556ffa88d09"
-        }
-      ],
-      "activeDataFile": "2025-12-16.json"
-    },
-    {
       "publishedDate": "2026-04-02",
       "activeContentHash": "d7064f3625c768169e5fc6c49a36d994eb7565e9feea9f15ff4f9857a26bb51b",
       "revisions": [
@@ -148,24 +129,6 @@
           "pricePoints": 785,
           "contentHash": "b85858deedd1c7c9c7012a9b49ad79826b0ce6486d7b1c4d3f9f3bff916f1708",
           "dataSha256": "c58d12cafea1a7738c7c7c4e2ca9d809d9897af529eae27660142bcb36e94222"
-        }
-      ]
-    },
-    {
-      "publishedDate": "2026-09-16",
-      "activeDataFile": "2026-09-16.json",
-      "activeContentHash": "b85858deedd1c7c9c7012a9b49ad79826b0ce6486d7b1c4d3f9f3bff916f1708",
-      "revisions": [
-        {
-          "publishedDate": "2026-09-16",
-          "dataFile": "2026-09-16.json",
-          "firstConfirmedDate": "2026-09-17",
-          "sourceUrl": "https://support.apple.com/en-us/108047",
-          "parser": "cross-checked",
-          "countries": 157,
-          "pricePoints": 785,
-          "contentHash": "b85858deedd1c7c9c7012a9b49ad79826b0ce6486d7b1c4d3f9f3bff916f1708",
-          "dataSha256": "a608de09d3b7817e420042870fece7554211a38b4ab8a6c5513941f96cdaf8e6"
         }
       ]
     }
