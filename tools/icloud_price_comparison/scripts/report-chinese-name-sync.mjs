@@ -1,8 +1,9 @@
-import { appendFile, readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const MAX_DETAIL_ITEMS = 20;
+const LEGACY_SECTION_PATTERN = /(?:^|\n)### 中文名称同步状态\n- 待同一 Apple iCloud\+ 中文价格页同步\/确认：\d+ 个；当前继续显示 Apple 英文名称，不作为异常或 review debt。\n?/;
 
 function pendingMarkets(data, label) {
   if (data?.schemaVersion !== 4 || !Array.isArray(data.countries)) {
@@ -52,7 +53,7 @@ function summarizeMarkets(markets) {
 export function buildChineseNameSyncSummary(previousData, currentData) {
   const diff = diffChineseNamePending(previousData, currentData);
   const lines = [
-    '### 英文价格页中文名称待确认（成员差异）',
+    '### 英文价格页中文名称待确认',
     '- 口径：这里统计 Apple 英文 iCloud+ 价格页活跃市场中，中文显示名尚未复核的市场；与独立的“Apple 中文页面地区名单监测”不是同一统计。',
     `- 当前待确认：${diff.currentCount} 个。`
   ];
@@ -68,6 +69,18 @@ export function buildChineseNameSyncSummary(previousData, currentData) {
   if (diff.removed.length) lines.push(`- 退出待确认：${summarizeMarkets(diff.removed)}`);
   lines.push('- “退出待确认”只表示不再属于待确认集合：可能是中文名已复核，也可能是英文价格页活跃市场发生变化。', '');
   return lines;
+}
+
+export function mergeChineseNameSyncSummary(existingSummary, lines) {
+  const section = `${lines.join('\n')}\n`;
+  if (LEGACY_SECTION_PATTERN.test(existingSummary)) {
+    return existingSummary.replace(LEGACY_SECTION_PATTERN, (match) => {
+      const prefix = match.startsWith('\n') ? '\n' : '';
+      return `${prefix}${section}`;
+    });
+  }
+  const separator = existingSummary && !existingSummary.endsWith('\n') ? '\n' : '';
+  return `${existingSummary}${separator}${section}`;
 }
 
 function parseArgs(argv) {
@@ -94,14 +107,24 @@ async function readJson(filePath) {
   return JSON.parse(await readFile(filePath, 'utf8'));
 }
 
+async function readOptionalText(filePath) {
+  try {
+    return await readFile(filePath, 'utf8');
+  } catch (error) {
+    if (error?.code === 'ENOENT') return '';
+    throw error;
+  }
+}
+
 export async function main(argv = process.argv.slice(2)) {
   const { previousPath, currentPath, summaryPath } = parseArgs(argv);
-  const [previousData, currentData] = await Promise.all([
+  const [previousData, currentData, existingSummary] = await Promise.all([
     readJson(previousPath),
-    readJson(currentPath)
+    readJson(currentPath),
+    readOptionalText(summaryPath)
   ]);
   const lines = buildChineseNameSyncSummary(previousData, currentData);
-  await appendFile(summaryPath, lines.join('\n'), 'utf8');
+  await writeFile(summaryPath, mergeChineseNameSyncSummary(existingSummary, lines), 'utf8');
   const diff = diffChineseNamePending(previousData, currentData);
   console.log(`中文名称待确认成员差异：${diff.previousCount} → ${diff.currentCount}；新增 ${diff.added.length}，退出 ${diff.removed.length}。`);
   return diff;
