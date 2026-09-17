@@ -111,7 +111,7 @@ deterministic apple-* fallback
 
 ## 6. Snapshot revision 的语义
 
-Apple `Published Date` 与页面内容版本不是同一个概念。Apple 可能在同一发布日期下修订价格页，因此 snapshot index 允许一个 `publishedDate` 对应多个内容修订。
+Apple `Published Date` 与页面内容版本不是同一个概念。公开发布日期被视为实质内容版本的附属元数据：只有价格、地区、分区、币种或容量发生变化时才随版本更新；若页面只改日期而规范化内容不变，则继续沿用上一公开发布日期且不新增 snapshot。Apple 仍可能在同一发布日期下修订价格页，因此 snapshot index 允许一个 `publishedDate` 对应多个内容修订。
 
 每个 revision 的核心身份是规范化内容 hash；`firstConfirmedDate` 表示当前证据最早确认该修订存在的北京时间日期。活动修订按当前 index 规则确定，不覆盖旧证据。
 
@@ -224,7 +224,7 @@ JavaScript 可用时：
 
 ## 14. Apple DOM 适配边界
 
-Apple 108047 可能以历史逐市场列表或按地区 `Country (Currency)` 表格承载价格。`parse-prices.mjs` 负责结构分派，表格结构由 `parse-price-tables.mjs` 解析；两种适配器都不能改变事实源、region 语义、market identity 或价格校验规则。表格模式仍通过 `document-order` 与 exact Apple marker 两条关联路径对同一 HTML 逐字段交叉核对；未知市场、新容量和发布日期变化仍进入原有独立语义确认，而不是按旧市场数量硬过滤。
+Apple 108047 可能以历史逐市场列表或按地区 `Country (Currency)` 表格承载价格。`parse-prices.mjs` 负责结构分派，表格结构由 `parse-price-tables.mjs` 解析；两种适配器都不能改变事实源、region 语义、market identity 或价格校验规则。表格模式仍通过 `document-order` 与 exact Apple marker 两条关联路径对同一 HTML 逐字段交叉核对；未知市场、新容量以及价格/地区/币种等实质内容变化仍进入原有独立语义确认，而不是按旧市场数量硬过滤。仅发布日期变化不触发确认或公开更新。
 
 价格词法也属于跨适配器共享契约：当前币种 ISO 代码和已知货币标记仍是白名单基础；对包含 Unicode 货币符号的标记，只允许额外的 ISO-qualified 展示变体，即附加的 1～3 个大写字母必须是当前 ISO 代码的前缀，且符号本身已属于该币种。原始 `formattedPrice` 保留；任意其他前后缀、错误币种符号或混合装饰继续失败关闭。table 与 legacy list 的回归测试必须同时覆盖同一正反例，避免结构分派造成校验漂移。
 
