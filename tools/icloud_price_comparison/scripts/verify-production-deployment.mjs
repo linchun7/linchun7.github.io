@@ -461,7 +461,7 @@ export async function verifyProductionDeployment(expectedArtifact, {
           attempt: attempts
         });
         const result = { status: 'deployed', attempts, elapsedMs: now() - startedAt, expectedGeneratedAt: expected.prices.generatedAt, observedGeneratedAt: acceptance.observed.prices.generatedAt, resources: resultResources(expectedStaticAssets) };
-        log(`Production verification passed on canonical user URLs on attempt ${attempts}: ${acceptance.observed.prices.generatedAt}`);
+        log(`真实生产部署验证通过：canonical URL，第 ${attempts} 次检查；generatedAt=${acceptance.observed.prices.generatedAt}`);
         return result;
       }
 
@@ -497,7 +497,7 @@ export async function verifyProductionDeployment(expectedArtifact, {
               attempt: attempts
             });
             const result = { status: 'superseded', attempts, elapsedMs: now() - startedAt, expectedGeneratedAt: expected.prices.generatedAt, observedGeneratedAt: acceptance.observed.prices.generatedAt, resources: resultResources(currentMainStaticAssets ?? expectedStaticAssets) };
-            log(`Production verification passed with a newer committed deployment on canonical user URLs on attempt ${attempts}: ${acceptance.observed.prices.generatedAt}`);
+            log(`真实生产部署验证通过：canonical URL 已是更新提交版本，第 ${attempts} 次检查；generatedAt=${acceptance.observed.prices.generatedAt}`);
             return result;
           }
           if (observed.hashes.prices === currentMain.hashes.prices) {
@@ -519,7 +519,7 @@ export async function verifyProductionDeployment(expectedArtifact, {
       controller.abort();
       clearTimeout(timeout);
     }
-    log(`Production verification attempt ${attempts}: observed=${lastObservedGeneratedAt ?? 'unavailable'} result=${lastReason}`);
+    log(`真实生产部署验证第 ${attempts} 次：observed=${lastObservedGeneratedAt ?? 'unavailable'}；结果=${lastReason}`);
     const remainingMs = maxWaitMs - (now() - startedAt);
     if (remainingMs <= 0) break;
     await sleep(Math.min(intervalMs, remainingMs));
@@ -552,16 +552,29 @@ function parseCliArguments(argv) {
   return options;
 }
 
+function resourceStatusLabel(status) {
+  if (status === 'verified') return '已验证';
+  if (status === 'verified against prices.json') return '已与 prices.json 一致验证';
+  if (status === 'verified byte-for-byte') return '已逐字节验证';
+  return status;
+}
+
+function deploymentStatusLabel(status) {
+  if (status === 'deployed') return '已部署并验证';
+  if (status === 'superseded') return '已由更新版本覆盖并验证';
+  return status;
+}
+
 function summaryLines(result) {
   return [
-    '## Production verification',
+    '## 真实生产部署验证',
     '',
-    ...Object.entries(result.resources).map(([resource, status]) => `- ${resource}: ${status}`),
-    `- Status: ${result.status}`,
-    `- Expected generatedAt: ${result.expectedGeneratedAt}`,
-    `- Observed generatedAt: ${result.observedGeneratedAt}`,
-    `- Attempts: ${result.attempts}`,
-    `- Elapsed: ${(result.elapsedMs / 1_000).toFixed(1)}s`,
+    ...Object.entries(result.resources).map(([resource, status]) => `- ${resource}：${resourceStatusLabel(status)}`),
+    `- 状态：${deploymentStatusLabel(result.status)}`,
+    `- 预期 generatedAt：${result.expectedGeneratedAt}`,
+    `- 实际 generatedAt：${result.observedGeneratedAt}`,
+    `- 验证尝试次数：${result.attempts}`,
+    `- 耗时：${(result.elapsedMs / 1_000).toFixed(1)} 秒`,
     ''
   ];
 }
@@ -587,9 +600,19 @@ async function runCli() {
   } catch (error) {
     if (options.summaryFile) {
       const details = error.details ?? {};
-      await appendFile(options.summaryFile, ['## Production verification', '', `- Status: ${error.code ?? 'failed'}`, `- Expected generatedAt: ${details.expectedGeneratedAt ?? expected.prices.generatedAt}`, `- Last observed generatedAt: ${details.lastObservedGeneratedAt ?? 'unavailable'}`, `- Last reason: ${details.lastReason ?? 'unavailable'}`, `- Attempts: ${details.attempts ?? 0}`, `- Elapsed: ${((details.elapsedMs ?? 0) / 1_000).toFixed(1)}s`, ''].join('\n'), 'utf8');
+      await appendFile(options.summaryFile, [
+        '## 真实生产部署验证',
+        '',
+        `- 状态：失败（${error.code ?? 'failed'}）`,
+        `- 预期 generatedAt：${details.expectedGeneratedAt ?? expected.prices.generatedAt}`,
+        `- 最后观测 generatedAt：${details.lastObservedGeneratedAt ?? 'unavailable'}`,
+        `- 最后原因：${details.lastReason ?? 'unavailable'}`,
+        `- 尝试次数：${details.attempts ?? 0}`,
+        `- 耗时：${((details.elapsedMs ?? 0) / 1_000).toFixed(1)} 秒`,
+        ''
+      ].join('\n'), 'utf8');
     }
-    console.error(error.message);
+    console.error(`真实生产部署验证失败：${error.message}`);
     process.exitCode = 1;
   }
 }
