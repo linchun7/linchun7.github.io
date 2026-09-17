@@ -244,9 +244,9 @@ async function fetchAppleHtml(fetchImpl = fetch) {
     const declaredLength = Number(response.headers.get('content-length'));
     if (Number.isFinite(declaredLength) && declaredLength > MAX_RESPONSE_BYTES) {
       await response.body?.cancel();
-      throw new Error('response is too large');
+      throw new Error('响应体过大');
     }
-    if (!response.body) throw new Error('response has no body');
+    if (!response.body) throw new Error('响应体为空');
     const reader = response.body.getReader();
     const chunks = [];
     let bytes = 0;
@@ -257,7 +257,7 @@ async function fetchAppleHtml(fetchImpl = fetch) {
         bytes += value.byteLength;
         if (bytes > MAX_RESPONSE_BYTES) {
           await reader.cancel();
-          throw new Error('response is too large');
+          throw new Error('响应体过大');
         }
         chunks.push(value);
       }
@@ -265,14 +265,14 @@ async function fetchAppleHtml(fetchImpl = fetch) {
       reader.releaseLock();
     }
     const html = Buffer.concat(chunks, bytes).toString('utf8');
-    if (html.length < 1000) throw new Error('response is unexpectedly small');
+    if (html.length < 1000) throw new Error('响应内容异常偏小');
     return html;
   } finally {
     clearTimeout(timeout);
   }
 }
 
-export async function runAppleZhMarketMonitor({ fetchImpl = fetch } = {}) {
+export async function runAppleZhMarketMonitor({ fetchImpl = fetch, report = true } = {}) {
   try {
     const reviewedNames = parseReviewedMarketBaseline(JSON.parse(await readFile(REVIEWED_MARKETS_URL, 'utf8')));
     const observedNames = extractAppleZhMarketNames(await fetchAppleHtml(fetchImpl));
@@ -280,28 +280,41 @@ export async function runAppleZhMarketMonitor({ fetchImpl = fetch } = {}) {
     const diff = compareMarketNameSets(reviewedNames, observedNames);
 
     if (!diff.added.length && !diff.removed.length) {
-      console.log(`Apple Chinese iCloud+ market list unchanged (${observedNames.length} markets).`);
-      await appendSummary(['### Apple 中文 iCloud+ 地区监测', '', `地区名称集合未变化（${observedNames.length} 个）。`]);
+      if (report) {
+        console.log(`Apple 中文 iCloud+ 地区名单未变化（${observedNames.length} 个）。`);
+        await appendSummary([
+          '### Apple 中文页面 iCloud+ 地区名单监测',
+          '',
+          `地区名称集合未变化（${observedNames.length} 个）。`,
+          '- 口径说明：这里统计 Apple 中文页面的地区名称集合；与英文价格页“中文名称同步状态”的待确认数量不是同一统计。'
+        ]);
+      }
       return { status: 'unchanged', reviewedNames, observedNames, ...diff };
     }
 
-    const message = `新增 ${diff.added.length}，移除 ${diff.removed.length}；仅提示人工复核，不自动修改中文名称。`;
-    console.log(`::error title=Apple 中文 iCloud+ 地区列表有变化::${escapeWorkflowCommand(message)}`);
-    console.log(`Apple Chinese market additions: ${diff.added.join('、') || '无'}`);
-    console.log(`Apple Chinese market removals: ${diff.removed.join('、') || '无'}`);
-    await appendSummary([
-      '### ⚠️ Apple 中文 iCloud+ 地区列表有变化',
-      '',
-      message,
-      diff.added.length ? `- 页面新增：${diff.added.join('、')}` : '- 页面新增：无',
-      diff.removed.length ? `- 页面不再出现：${diff.removed.join('、')}` : '- 页面不再出现：无',
-      '- 处理方式：人工核对同一 Apple 中文 iCloud+ 页面后，再更新地区名单基线；如能可靠对应英文市场，再更新 `scripts/country-names.zh.json`。',
-    ]);
+    const message = `当前 ${observedNames.length} 个；较已复核基线新增 ${diff.added.length}，移除 ${diff.removed.length}；仅提示人工复核，不自动修改中文名称。`;
+    if (report) {
+      console.log(`::error title=Apple 中文 iCloud+ 地区列表有变化::${escapeWorkflowCommand(message)}`);
+      console.log(`页面新增地区：${diff.added.join('、') || '无'}`);
+      console.log(`页面不再出现地区：${diff.removed.join('、') || '无'}`);
+      await appendSummary([
+        '### ⚠️ Apple 中文页面 iCloud+ 地区列表有变化',
+        '',
+        message,
+        diff.added.length ? `- 页面新增：${diff.added.join('、')}` : '- 页面新增：无',
+        diff.removed.length ? `- 页面不再出现：${diff.removed.join('、')}` : '- 页面不再出现：无',
+        '- 即使总数量不变，只要成员发生替换，也会同时列出新增和移除项。',
+        '- 口径说明：这里统计 Apple 中文页面的地区名称集合；与英文价格页“中文名称同步状态”的待确认数量不是同一统计。',
+        '- 处理方式：人工核对同一 Apple 中文 iCloud+ 页面后，再更新地区名单基线；如能可靠对应英文市场，再更新 `scripts/country-names.zh.json`。',
+      ]);
+    }
     return { status: 'changed', reviewedNames, observedNames, ...diff };
   } catch (error) {
     const message = `本次中文地区监测不可用：${error instanceof Error ? error.message : String(error)}；不影响价格更新。`;
-    console.log(`::error title=Apple 中文地区监测不可用::${escapeWorkflowCommand(message)}`);
-    await appendSummary(['### Apple 中文 iCloud+ 地区监测', '', message]);
+    if (report) {
+      console.log(`::error title=Apple 中文地区监测不可用::${escapeWorkflowCommand(message)}`);
+      await appendSummary(['### Apple 中文页面 iCloud+ 地区名单监测', '', message]);
+    }
     return { status: 'unavailable', error };
   }
 }
