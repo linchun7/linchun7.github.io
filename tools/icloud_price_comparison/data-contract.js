@@ -64,6 +64,24 @@ export function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+const SUBSTANTIVE_PUBLICATION_CHANGE_KEYS = Object.freeze([
+  'addedTiers', 'removedTiers', 'addedCountries', 'removedCountries', 'changedCountries'
+]);
+
+export function hasSubstantivePublicationChanges(changes) {
+  return isPlainObject(changes) && SUBSTANTIVE_PUBLICATION_CHANGE_KEYS
+    .some((key) => Array.isArray(changes[key]) && changes[key].length > 0);
+}
+
+export function visiblePublicationEntries(entries) {
+  if (!Array.isArray(entries)) return [];
+  return entries.filter((entry, index) => index === 0 || hasSubstantivePublicationChanges(entry?.changes));
+}
+
+export function displayedPublishedDate(history, fallback = null) {
+  return visiblePublicationEntries(history?.sourcePublishedDates).at(-1)?.publishedDate ?? fallback;
+}
+
 function hasExactKeys(value, expectedKeys) {
   if (!isPlainObject(value)) return false;
   const actualKeys = Object.keys(value);
