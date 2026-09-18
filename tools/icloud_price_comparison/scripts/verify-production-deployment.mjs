@@ -345,7 +345,7 @@ async function readProductionSnapshot({
     throw error;
   }
   try {
-    assertStaticPageMatches(productionHtml, observed.prices);
+    assertStaticPageMatches(productionHtml, observed.prices, observed.history);
   } catch (error) {
     error.reason = `STATIC_RENDER_MISMATCH:${String(error.message).slice(0, 120).replace(/[\r\n]+/g, ' ')}`;
     throw error;
