@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
+import { displayedPublishedDate, visiblePublicationEntries } from '../data-contract.js';
 import {
   foldPublicationCountryRenames,
   marketSearchPriority,
@@ -22,6 +23,27 @@ import {
   validateMarketIdentityContinuity
 } from '../scripts/market-registry.mjs';
 import { renderStaticFragments } from '../scripts/static-page.mjs';
+
+test('publication presentation ignores date-only changes while preserving raw evidence', () => {
+  const empty = {
+    addedTiers: [], removedTiers: [], addedCountries: [], removedCountries: [], changedCountries: []
+  };
+  const substantive = {
+    ...empty,
+    changedCountries: [{ country: 'Example', tiers: [{ id: '50GB', from: 1, to: 2 }] }]
+  };
+  const entries = [
+    { publishedDate: 'July 17, 2026', kind: 'initial', changes: empty },
+    { publishedDate: 'September 15, 2026', kind: 'change', changes: substantive },
+    { publishedDate: 'September 16, 2026', kind: 'change', changes: empty }
+  ];
+  assert.deepEqual(
+    visiblePublicationEntries(entries).map(({ publishedDate }) => publishedDate),
+    ['July 17, 2026', 'September 15, 2026']
+  );
+  assert.equal(displayedPublishedDate({ sourcePublishedDates: entries }), 'September 15, 2026');
+  assert.equal(entries.length, 3, 'presentation filtering must not mutate raw evidence');
+});
 
 test('search normalization covers compatibility forms and both raw/localized region labels', () => {
   const us = { marketId: 'us', country: 'United States', nameZh: '美国', region: 'Americas', currency: 'USD' };

@@ -6,7 +6,7 @@ import test, { after } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { chromium, firefox, webkit } from 'playwright';
 
-import { validatePriceHistoryConsistency } from '../data-contract.js';
+import { validatePriceHistoryConsistency, visiblePublicationEntries } from '../data-contract.js';
 import { renderStaticFragments, replaceStaticFragments } from '../scripts/static-page.mjs';
 
 const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -1138,11 +1138,14 @@ test('renders current prices, sorting, and country history in a real browser', {
           const closePublishedDateBox = await page.locator('#closePublishedDate').boundingBox();
           assert.ok(closePublishedDateBox && closePublishedDateBox.width >= 44 && closePublishedDateBox.height >= 44, `${viewport.name} publication dialog close control must retain a comfortable touch target`);
         }
-        assert.equal(await page.locator('#publishedDateRows tr').count(), expectedHistory.sourcePublishedDates.length);
+        const visiblePublishedDates = visiblePublicationEntries(expectedHistory.sourcePublishedDates);
+        assert.equal(await page.locator('#publishedDateRows tr').count(), visiblePublishedDates.length);
         assert.equal(
           (await page.locator('#publishedDateRows tr').first().locator('td').first().textContent()).trim(),
-          formatUiDate(expectedHistory.sourcePublishedDates.at(-1).publishedDate)
+          formatUiDate(visiblePublishedDates.at(-1).publishedDate)
         );
+        assert.equal((await page.locator('#applePublishedDate').textContent()).trim(), formatUiDate(visiblePublishedDates.at(-1).publishedDate));
+        assert.equal(await page.locator('#publishedDateRows tr').filter({ hasText: formatUiDate('2026-09-16') }).count(), 0);
         const septemberRenameRow = page.locator('#publishedDateRows tr').filter({ hasText: formatUiDate('2026-09-15') });
         assert.equal(await septemberRenameRow.count(), 1, 'the September publication evidence row must remain available');
         const septemberChangeText = await septemberRenameRow.locator('td').nth(1).innerText();
@@ -1438,6 +1441,9 @@ test('keeps current prices usable when optional history data is unavailable or m
   if (!browserConfig) return;
   const expectedData = await readFixture('prices.json');
   const validHistory = await readFixture('history.json');
+  const expectedFrontendPublishedDate = formatUiDate(
+    visiblePublicationEntries(validHistory.sourcePublishedDates).at(-1).publishedDate
+  );
   const staleHistory = structuredClone(validHistory);
   staleHistory.sourcePublishedDates = staleHistory.sourcePublishedDates.slice(0, 1);
   const reversedHistory = structuredClone(validHistory);
@@ -1465,8 +1471,7 @@ test('keeps current prices usable when optional history data is unavailable or m
       },
       {
         status: 200,
-        body: JSON.stringify(staleHistory),
-        expectedPublishedDate: formatUiDate(expectedData.source.publishedDate)
+        body: JSON.stringify(staleHistory)
       },
       {
         status: 200,
@@ -1488,9 +1493,11 @@ test('keeps current prices usable when optional history data is unavailable or m
         assert.equal(await page.locator('#loadStatus').isVisible(), false);
         assert.equal(await page.locator('#marketCount').textContent(), `${expectedData.countries.length} 个地区`);
         assert.equal(await page.locator('#publishedDateButton').isVisible(), true);
-        if (scenario.expectedPublishedDate) {
-          assert.equal(await page.locator('#applePublishedDate').textContent(), scenario.expectedPublishedDate);
-        }
+        assert.equal(
+          await page.locator('#applePublishedDate').textContent(),
+          expectedFrontendPublishedDate,
+          'raw date-only observations must not leak into the frontend when history is unavailable or stale'
+        );
         if (scenario.unavailable) {
           await page.locator('#priceRows tr[data-market-id]').first().click();
           await page.waitForFunction(() => document.querySelector('#historySubtitle')?.textContent.includes('暂时无法读取历史记录'));

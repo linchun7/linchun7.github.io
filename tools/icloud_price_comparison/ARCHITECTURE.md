@@ -111,7 +111,7 @@ deterministic apple-* fallback
 
 ## 6. Snapshot revision 的语义
 
-Apple `Published Date` 与页面内容版本不是同一个概念。Apple 可能在同一发布日期下修订价格页，因此 snapshot index 允许一个 `publishedDate` 对应多个内容修订。
+Apple `Published Date` 与页面内容版本不是同一个概念。底层 snapshot / history 继续原样保留日期观测证据；展示层只保留首次记录和伴随价格、地区、分区、币种或容量实质变化的发布日期，单独的日期波动不进入前端时间线。Apple 可能在同一发布日期下修订价格页，因此 snapshot index 允许一个 `publishedDate` 对应多个内容修订。
 
 每个 revision 的核心身份是规范化内容 hash；`firstConfirmedDate` 表示当前证据最早确认该修订存在的北京时间日期。活动修订按当前 index 规则确定，不覆盖旧证据。
 
