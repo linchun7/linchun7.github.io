@@ -6,7 +6,7 @@ import test, { after } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { chromium, firefox, webkit } from 'playwright';
 
-import { validatePriceHistoryConsistency } from '../data-contract.js';
+import { validatePriceHistoryConsistency, visiblePublicationEntries } from '../data-contract.js';
 import { renderStaticFragments, replaceStaticFragments } from '../scripts/static-page.mjs';
 
 const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -1138,11 +1138,14 @@ test('renders current prices, sorting, and country history in a real browser', {
           const closePublishedDateBox = await page.locator('#closePublishedDate').boundingBox();
           assert.ok(closePublishedDateBox && closePublishedDateBox.width >= 44 && closePublishedDateBox.height >= 44, `${viewport.name} publication dialog close control must retain a comfortable touch target`);
         }
-        assert.equal(await page.locator('#publishedDateRows tr').count(), expectedHistory.sourcePublishedDates.length);
+        const visiblePublishedDates = visiblePublicationEntries(expectedHistory.sourcePublishedDates);
+        assert.equal(await page.locator('#publishedDateRows tr').count(), visiblePublishedDates.length);
         assert.equal(
           (await page.locator('#publishedDateRows tr').first().locator('td').first().textContent()).trim(),
-          formatUiDate(expectedHistory.sourcePublishedDates.at(-1).publishedDate)
+          formatUiDate(visiblePublishedDates.at(-1).publishedDate)
         );
+        assert.equal((await page.locator('#applePublishedDate').textContent()).trim(), formatUiDate(visiblePublishedDates.at(-1).publishedDate));
+        assert.equal(await page.locator('#publishedDateRows tr').filter({ hasText: formatUiDate('2026-09-16') }).count(), 0);
         const septemberRenameRow = page.locator('#publishedDateRows tr').filter({ hasText: formatUiDate('2026-09-15') });
         assert.equal(await septemberRenameRow.count(), 1, 'the September publication evidence row must remain available');
         const septemberChangeText = await septemberRenameRow.locator('td').nth(1).innerText();
