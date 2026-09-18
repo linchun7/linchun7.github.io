@@ -24,7 +24,7 @@ Apple Support HTML ─┐
 - `data/run-log.json` 只保留最近 90 次成功运行，不公开 API Key 配置或状态。
 - `data/apple-snapshots/` 保存规范化 Apple JSON 证据，不保存原始 Apple HTML。
 - `index.html` 是受控生成产物，不是第二套价格或 SEO 事实源。`scripts/static-page.mjs` 负责 `ICLOUD_STATIC_*` 区域；`scripts/render-static-page.mjs` 的 `seoProjection()` 还会在 markers 外生成 description、Open Graph/Twitter description、图片 alt 和 `#brandDescription`。维护这些内容必须改生成源再重新渲染，不能只手工改 `index.html`。
-- Apple 英文 108047 是 active market、价格、币种、容量和 `Published Date` 的事实源；Apple 简体中文 108047 只用于已复核的中文市场名称。
+- Apple 英文 108047 是 active market、价格、币种、容量和原始 `Published Date` 的事实源；底层继续保存全部日期观测，前端只展示首次记录及伴随价格、地区、分区、币种或容量实质变化的发布日期。Apple 简体中文 108047 只用于已复核的中文市场名称。
 - 人民币参考价优先使用 ExchangeRate-API 认证源；认证候选不可用或未通过校验时可尝试开放汇率源。公共 JSON 不发布 raw FX rates、内部全精度换算值或 API Key 状态。
 
 仓库测试可以证明代码和已提交工件的契约，但不能证明 GitHub、Cloudflare、DNS、外部触发器或第三方服务控制面的实时状态。
