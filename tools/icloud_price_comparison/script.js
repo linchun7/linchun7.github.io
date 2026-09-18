@@ -1,8 +1,10 @@
 import {
   canonicalTierDefinition,
+  displayedPublishedDate,
   publicationDateKey,
   validatePayload,
-  validatePriceHistoryConsistency
+  validatePriceHistoryConsistency,
+  visiblePublicationEntries
 } from './data-contract.js?v=71466cdf';
 import { createIcons } from './vendor/lucide-subset.js?v=2b21b7af';
 import { foldPublicationCountryRenames, marketSearchPriority, matchesMarketSearch, normalizeMarketSearchText, REGION_LABELS, VALID_REGIONS } from './data-model.js?v=27f94e24';
@@ -972,17 +974,7 @@ function ensureHistoryLoaded() {
 }
 
 function getPublishedDateHistory() {
-  const entries = state.history?.sourcePublishedDates;
-  const historyEntries = Array.isArray(entries) ? [...entries] : [];
-  if (!state.data?.source?.publishedDate) return historyEntries;
-  const currentEntry = {
-    publishedDate: state.data.source.publishedDate,
-    observedAt: state.data.run?.observedAtBeijing ?? formatBeijingDate(state.data.generatedAt)
-  };
-  if (!historyEntries.length) return [currentEntry];
-  const currentKey = publicationDateKey(currentEntry.publishedDate);
-  const latestHistoryKey = publicationDateKey(historyEntries.at(-1).publishedDate);
-  return latestHistoryKey === currentKey ? historyEntries : [...historyEntries, currentEntry];
+  return visiblePublicationEntries(state.history?.sourcePublishedDates);
 }
 
 function countryDisplayName(entry) {
@@ -1065,17 +1057,18 @@ function createPublishedDateChangesCell(changes, isInitial = false) {
     }
     cell.append(group);
   }
-  if (!cell.childElementCount) cell.textContent = '页面发布日期发生变化，未检测到价格、地区或容量变化';
+  if (!cell.childElementCount) cell.textContent = '无可展示的实质变化';
   return cell;
 }
 
 function renderPublishedDateHistory() {
   if (!state.data || !elements.applePublishedDate) return;
   const entries = getPublishedDateHistory();
-  const latest = state.data.source.publishedDate;
-  const displayedDate = formatPublishedDate(latest);
-  elements.applePublishedDate.textContent = displayedDate;
-  elements.publishedDateDialogCurrent.textContent = displayedDate;
+  if (state.historyStatus === 'ready') {
+    const latest = displayedPublishedDate(state.history);
+    if (latest) elements.applePublishedDate.textContent = formatPublishedDate(latest);
+  }
+  elements.publishedDateDialogCurrent.textContent = elements.applePublishedDate.textContent || '--';
   elements.publishedDateRows.replaceChildren();
 
   if (state.historyStatus !== 'ready') {
