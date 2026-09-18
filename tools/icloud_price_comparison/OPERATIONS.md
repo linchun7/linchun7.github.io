@@ -24,7 +24,7 @@ Apple Support HTML ─┐
 - `data/run-log.json` 只保留最近 90 次成功运行，不公开 API Key 配置或状态。
 - `data/apple-snapshots/` 保存规范化 Apple JSON 证据，不保存原始 Apple HTML。
 - `index.html` 是受控生成产物，不是第二套价格或 SEO 事实源。`scripts/static-page.mjs` 负责 `ICLOUD_STATIC_*` 区域；`scripts/render-static-page.mjs` 的 `seoProjection()` 还会在 markers 外生成 description、Open Graph/Twitter description、图片 alt 和 `#brandDescription`。维护这些内容必须改生成源再重新渲染，不能只手工改 `index.html`。
-- Apple 英文 108047 是 active market、价格、币种、容量和页面 `Published Date` 的事实源；公开发布日期只随实质内容版本更新，单独的日期变化不发布到前端或发布日期历史。Apple 简体中文 108047 只用于已复核的中文市场名称。
+- Apple 英文 108047 是 active market、价格、币种、容量和 `Published Date` 的事实源；Apple 简体中文 108047 只用于已复核的中文市场名称。
 - 人民币参考价优先使用 ExchangeRate-API 认证源；认证候选不可用或未通过校验时可尝试开放汇率源。公共 JSON 不发布 raw FX rates、内部全精度换算值或 API Key 状态。
 
 仓库测试可以证明代码和已提交工件的契约，但不能证明 GitHub、Cloudflare、DNS、外部触发器或第三方服务控制面的实时状态。
@@ -180,7 +180,7 @@ Apple Support HTML ─┐
 - 最终结论和首个失败步骤。
 - Apple parser 状态必须为 `cross-checked`。
 - 地区、容量、价格点数量是否与当前 `prices.json` 相符；合法上游变化可以改变数量，不把历史数量当永久常量。
-- Apple 页面 `Published Date` 是否未来或异常；若只有日期变化而价格、地区、币种、容量均未变，公开数据应保持上一发布日期。
+- Apple `Published Date` 是否倒退、未来或异常跳变。
 - 汇率来源、时间和 stale/fallback 状态。
 - 新增/移除地区、容量、币种和价格变化。
 - 发布 job 是否因远端 `main` 前进而安全停止。
