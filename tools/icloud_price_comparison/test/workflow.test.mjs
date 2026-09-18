@@ -187,7 +187,7 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(verifier, /https:\/\/www\.linchun\.com\.cn\/tools\/icloud_price_comparison\/data\/history\.json/);
   assert.match(verifier, /https:\/\/www\.linchun\.com\.cn\/tools\/icloud_price_comparison\/data\/run-log\.json/);
   assert.match(verifier, /https:\/\/www\.linchun\.com\.cn\/tools\/icloud_price_comparison\//);
-  assert.match(verifier, /assertStaticPageMatches\(productionHtml, observed\.prices\)/);
+  assert.match(verifier, /assertStaticPageMatches\(productionHtml, observed\.prices, observed\.history\)/);
   assert.match(verifier, /DEFAULT_MAX_WAIT_MS = 5 \* 60 \* 1_000/);
   assert.match(verifier, /DEFAULT_INTERVAL_MS = 15 \* 1_000/);
   assert.match(verifier, /DEFAULT_REQUEST_TIMEOUT_MS = 10 \* 1_000/);
