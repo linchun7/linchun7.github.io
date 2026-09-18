@@ -5785,7 +5785,7 @@
       "observedAtBeijing": "2026-09-18",
       "source": {
         "appleUrl": "https://support.apple.com/en-us/108047",
-        "applePublishedDate": "September 15, 2026",
+        "applePublishedDate": "September 16, 2026",
         "appleParser": "cross-checked",
         "appleParserStatus": "Both DOM association paths agreed",
         "exchangeRatesFetchedAtUtc": "2026-09-17T00:00:01.000Z",
@@ -5824,8 +5824,8 @@
       "changes": {
         "publishedDate": {
           "changed": false,
-          "from": "September 15, 2026",
-          "to": "September 15, 2026"
+          "from": "September 16, 2026",
+          "to": "September 16, 2026"
         },
         "addedTiers": [],
         "removedTiers": [],
