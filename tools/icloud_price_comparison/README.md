@@ -13,7 +13,7 @@
 当前长期约束如下，修改这些行为应视为产品契约变化，而不是普通 UI 调整：
 
 - 公共数据使用 schema 4；一个市场只要正式发布过一次，其 `marketId` 就永久冻结，不做常规 rekey。
-- Apple 英文支持页决定 active market、价格、币种、容量和页面发布日期；前端发布日期只在这些实质内容发生变化时随版本一起更新，单独的日期波动不进入公开历史。Apple 简体中文支持页只用于已经复核的官方中文市场名称。
+- Apple 英文支持页决定 active market、价格、币种、容量和发布日期；Apple 简体中文支持页只用于已经复核的官方中文市场名称。
 - 欧元区中文名称保持“欧盟”。中文名称尚未确认时保留 Apple 英文名称，不阻断价格更新。
 - 市场身份按“已发布 identity ledger → active registry → deterministic `apple-*` fallback”的顺序处理。已发布 ledger 永远优先；active registry 只维护 Apple 已知 source identity 与 source aliases；真正未识别的新市场首次出现时直接获得可复现的 `apple-*` ID，确认无冲突后可自动发布，并从此永久不 rekey。
 - 页面默认按 200GB 人民币参考价从低到高排序；若未来 Apple 不再提供 200GB，则使用当前 `tiers` 中的首个容量作为默认容量。
@@ -31,7 +31,7 @@
 - 支持中英文国家/地区、`marketId`、地区名称和完整币种代码搜索，以及分区筛选、容量排序、地区排序和 URL 状态恢复；精确 `marketId` 命中优先级最高，但其他名称的部分匹配仍保留。
 - 容量价格排序使用全球参考排名；国家/地区排序使用列表序号，移动端用 `序N` 区分序号与排名，并提供独立的读屏文本“全球价格排名第 N / 当前列表序号第 N”，视觉徽标本身不重复进入无障碍名称。
 - 点击地区可查看当地月费、人民币换算价、价格变更次数和完整的 Apple 当地标价历史。
-- 展示最近一次伴随价格、地区、分区、币种或容量实质变化的 Apple `Published Date`；仅发布日期变化时不更新前端日期，也不新增发布日期历史记录。
+- 展示 Apple `Published Date`，并记录发布日期变化时对应的容量、地区、分区、币种和价格差异。
 - 记录地区、容量的新增和移除；Apple 来源名称发生变化时，发布日期变化证据按 Apple 原始 `country` 名称保留“旧名称移除 + 新名称新增”，即使两者继续映射到同一个稳定 `marketId`；价格历史仍按 `marketId` 连续累计，不因来源 wording 变化而 rekey；完整工件深验同样先把快照 source name 按 registry alias / deterministic identity 解析回 `marketId` 后核对价格事件；历史回填事件只允许锚定 Apple `Published Date`，在线首次确认事件只允许锚定对应 snapshot revision 的 `firstConfirmedDate`，不接受无证据的中间或更晚日期。
 - 提供 stale/fallback 状态、错误重试、键盘操作、减弱动画、forced-colors 和窄屏适配。
 
