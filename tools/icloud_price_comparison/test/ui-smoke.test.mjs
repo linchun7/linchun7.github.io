@@ -1441,6 +1441,9 @@ test('keeps current prices usable when optional history data is unavailable or m
   if (!browserConfig) return;
   const expectedData = await readFixture('prices.json');
   const validHistory = await readFixture('history.json');
+  const expectedFrontendPublishedDate = formatUiDate(
+    visiblePublicationEntries(validHistory.sourcePublishedDates).at(-1).publishedDate
+  );
   const staleHistory = structuredClone(validHistory);
   staleHistory.sourcePublishedDates = staleHistory.sourcePublishedDates.slice(0, 1);
   const reversedHistory = structuredClone(validHistory);
@@ -1468,8 +1471,7 @@ test('keeps current prices usable when optional history data is unavailable or m
       },
       {
         status: 200,
-        body: JSON.stringify(staleHistory),
-        expectedPublishedDate: formatUiDate(expectedData.source.publishedDate)
+        body: JSON.stringify(staleHistory)
       },
       {
         status: 200,
@@ -1491,9 +1493,11 @@ test('keeps current prices usable when optional history data is unavailable or m
         assert.equal(await page.locator('#loadStatus').isVisible(), false);
         assert.equal(await page.locator('#marketCount').textContent(), `${expectedData.countries.length} 个地区`);
         assert.equal(await page.locator('#publishedDateButton').isVisible(), true);
-        if (scenario.expectedPublishedDate) {
-          assert.equal(await page.locator('#applePublishedDate').textContent(), scenario.expectedPublishedDate);
-        }
+        assert.equal(
+          await page.locator('#applePublishedDate').textContent(),
+          expectedFrontendPublishedDate,
+          'raw date-only observations must not leak into the frontend when history is unavailable or stale'
+        );
         if (scenario.unavailable) {
           await page.locator('#priceRows tr[data-market-id]').first().click();
           await page.waitForFunction(() => document.querySelector('#historySubtitle')?.textContent.includes('暂时无法读取历史记录'));
