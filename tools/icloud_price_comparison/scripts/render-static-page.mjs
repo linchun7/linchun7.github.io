@@ -60,18 +60,24 @@ export function assertSeoProjectionMatches(html, payload) {
 export async function renderStaticPage({
   write = false,
   indexPath = path.join(projectDirectory, 'index.html'),
-  pricesPath = path.join(projectDirectory, 'data/prices.json')
+  pricesPath = path.join(projectDirectory, 'data/prices.json'),
+  historyPath = path.join(projectDirectory, 'data/history.json')
 } = {}) {
-  const [html, payloadText] = await Promise.all([readFile(indexPath, 'utf8'), readFile(pricesPath, 'utf8')]);
+  const [html, payloadText, historyText] = await Promise.all([
+    readFile(indexPath, 'utf8'),
+    readFile(pricesPath, 'utf8'),
+    readFile(historyPath, 'utf8')
+  ]);
   const payload = JSON.parse(payloadText);
+  const history = JSON.parse(historyText);
   if (!write) {
-    assertStaticPageMatches(html, payload);
+    assertStaticPageMatches(html, payload, history);
     assertSeoProjectionMatches(html, payload);
     return { changed: false, bytes: Buffer.byteLength(html), countries: payload.countries.length, tiers: payload.tiers.length };
   }
-  const rendered = renderSeoProjection(replaceStaticFragments(html, renderStaticFragments(payload)), payload);
+  const rendered = renderSeoProjection(replaceStaticFragments(html, renderStaticFragments(payload, history)), payload);
   if (rendered !== html) await writeFile(indexPath, rendered, 'utf8');
-  assertStaticPageMatches(rendered, payload);
+  assertStaticPageMatches(rendered, payload, history);
   assertSeoProjectionMatches(rendered, payload);
   return { changed: rendered !== html, bytes: Buffer.byteLength(rendered), countries: payload.countries.length, tiers: payload.tiers.length };
 }
@@ -87,7 +93,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const result = await renderStaticPage({
     write: mode === '--write',
     indexPath: valueFor('--index-file') ?? path.join(projectDirectory, 'index.html'),
-    pricesPath: valueFor('--prices-file') ?? path.join(projectDirectory, 'data/prices.json')
+    pricesPath: valueFor('--prices-file') ?? path.join(projectDirectory, 'data/prices.json'),
+    historyPath: valueFor('--history-file') ?? path.join(projectDirectory, 'data/history.json')
   });
   console.log(`Static iCloud page ${mode === '--write' ? 'rendered' : 'verified'}: ${JSON.stringify(result)}`);
 }
