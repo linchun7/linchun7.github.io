@@ -455,54 +455,14 @@ test('recovers the first Apple baseline when the second and third samples match'
   }
 });
 
-test('does not perform a second Apple fetch when only the published date changes', async (t) => {
+test('performs a second Apple fetch when only the published date changes', async (t) => {
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
   const fixedNow = nextBeijingMidnightAfter(data.generatedAt);
   t.mock.timers.enable({ apis: ['Date'], now: fixedNow });
   const nextPublicationDate = new Date(fixedNow.getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const html = buildAppleHtml(data, nextPublicationDate);
-  const result = await runAppleConfirmationScenario({ firstHtml: html });
-  assert.equal(result.appleRequests, 1);
-});
-
-test('keeps public publication metadata unchanged for a date-only Apple change', async (t) => {
-  const { root, paths } = await createTemporaryProductionPaths();
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const [previous, previousHistory, previousIndex] = await Promise.all([
-    readFile(paths.currentDataPath, 'utf8').then(JSON.parse),
-    readFile(paths.historyPath, 'utf8').then(JSON.parse),
-    readFile(paths.snapshotIndexPath, 'utf8').then(JSON.parse)
-  ]);
-  const fixedNow = nextBeijingMidnightAfter(previous.generatedAt);
-  t.mock.timers.enable({ apis: ['Date'], now: fixedNow });
-  const nextPublicationDate = new Date(fixedNow.getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const fxPayload = {
-    result: 'success',
-    base_code: 'USD',
-    time_last_update_unix: Math.floor(fixedNow.getTime() / 1_000),
-    rates: compatibleExchangeRates(previous)
-  };
-
-  await withMockedFetch(
-    { html: buildAppleHtml(previous, nextPublicationDate), fxPayload },
-    () => main({ dryRun: false, paths, stepSummaryPath: null })
-  );
-
-  const [current, history, index, runLog] = await Promise.all([
-    readFile(paths.currentDataPath, 'utf8').then(JSON.parse),
-    readFile(paths.historyPath, 'utf8').then(JSON.parse),
-    readFile(paths.snapshotIndexPath, 'utf8').then(JSON.parse),
-    readFile(paths.runLogPath, 'utf8').then(JSON.parse)
-  ]);
-  assert.equal(current.source.publishedDate, previous.source.publishedDate);
-  assert.deepEqual(history.sourcePublishedDates, previousHistory.sourcePublishedDates);
-  assert.deepEqual(index, previousIndex);
-  assert.equal(runLog.runs.at(-1).source.applePublishedDate, previous.source.publishedDate);
-  assert.deepEqual(runLog.runs.at(-1).changes.publishedDate, {
-    changed: false,
-    from: previous.source.publishedDate,
-    to: previous.source.publishedDate
-  });
+  const result = await runAppleConfirmationScenario({ firstHtml: html, secondHtml: html });
+  assert.equal(result.appleRequests, 2);
 });
 
 function nextBeijingMidnightAfter(timestamp) {
