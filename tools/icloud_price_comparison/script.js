@@ -1,7 +1,6 @@
 import {
   canonicalTierDefinition,
   displayedPublishedDate,
-  publicationDateKey,
   validatePayload,
   validatePriceHistoryConsistency,
   visiblePublicationEntries
