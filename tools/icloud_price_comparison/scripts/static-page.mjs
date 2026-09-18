@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { validatePricePayload } from '../data-contract.js';
+import { displayedPublishedDate, validatePricePayload } from '../data-contract.js';
 
 export const STATIC_FRAGMENT_NAMES = Object.freeze([
   'META',
@@ -124,8 +124,9 @@ function renderCountryRow(country, tiers, options) {
   ].join('\n');
 }
 
-export function renderStaticFragments(payload) {
+export function renderStaticFragments(payload, history = null) {
   validatePricePayload(payload);
+  const publicPublishedDate = displayedPublishedDate(history, payload.source.publishedDate);
   const fingerprint = publicPayloadFingerprint(payload);
   const defaultTier = preferredDefaultTier(payload);
   const fxStale = payload.fx.stale === true;
@@ -160,7 +161,7 @@ export function renderStaticFragments(payload) {
       defaultTierId: defaultTier.id,
       minimumCuesEnabled: !fxStale
     })).join('\n'),
-    APPLE_META: `            <span>页面发布日期：<strong id="applePublishedDate">${appleDate(payload.source.publishedDate)}</strong></span>`,
+    APPLE_META: `            <span>页面发布日期：<strong id="applePublishedDate">${appleDate(publicPublishedDate)}</strong></span>`,
     FX_META: `            <span id="fxStatus">汇率更新：${beijingDateTime(payload.fx.fetchedAt)}</span>`
   };
 }
@@ -212,9 +213,9 @@ export function staticPageShell(html) {
   return shell;
 }
 
-export function assertStaticPageMatches(html, payload) {
+export function assertStaticPageMatches(html, payload, history = null) {
   const actual = extractStaticFragments(html);
-  const expected = renderStaticFragments(payload);
+  const expected = renderStaticFragments(payload, history);
   for (const name of STATIC_FRAGMENT_NAMES) {
     if (actual[name] !== expected[name]) throw new Error(`STATIC_RENDER_MISMATCH:${name}`);
   }
