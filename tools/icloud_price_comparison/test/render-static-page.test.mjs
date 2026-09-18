@@ -14,16 +14,18 @@ import {
 
 const indexUrl = new URL('../index.html', import.meta.url);
 const pricesUrl = new URL('../data/prices.json', import.meta.url);
+const historyUrl = new URL('../data/history.json', import.meta.url);
 const ogImageUrl = new URL('../og-image.png', import.meta.url);
 
 test('committed raw HTML is the deterministic projection of validated prices', async () => {
-  const [html, payload] = await Promise.all([
+  const [html, payload, history] = await Promise.all([
     readFile(indexUrl, 'utf8'),
-    readFile(pricesUrl, 'utf8').then(JSON.parse)
+    readFile(pricesUrl, 'utf8').then(JSON.parse),
+    readFile(historyUrl, 'utf8').then(JSON.parse)
   ]);
-  assert.equal(assertStaticPageMatches(html, payload), true);
+  assert.equal(assertStaticPageMatches(html, payload, history), true);
   assert.equal(assertSeoProjectionMatches(html, payload), true);
-  assert.equal(replaceStaticFragments(html, renderStaticFragments(payload)), html);
+  assert.equal(replaceStaticFragments(html, renderStaticFragments(payload, history)), html);
   assert.equal(renderSeoProjection(html, payload), html);
   const $ = load(html);
   assert.equal($('#priceRows > tr[data-market-id]').length, payload.countries.length);
@@ -37,6 +39,8 @@ test('committed raw HTML is the deterministic projection of validated prices', a
   assert.equal($('meta[name="icloud-price-snapshot"]').attr('data-fingerprint'), publicPayloadFingerprint(payload));
   assert.equal($('meta[name="icloud-price-snapshot"]').attr('data-fx-stale'), String(payload.fx.stale === true));
   assert.equal($('#resultSummary').text(), `${payload.countries.length} 个地区 · ${preferredDefaultTier(payload).label} 从低到高`);
+  assert.equal($('#applePublishedDate').text(), '2026/09/15');
+  assert.equal(payload.source.publishedDate, 'September 16, 2026', 'raw Apple observation remains preserved');
   assert.equal($('.price-table thead th[aria-sort="ascending"] i[data-lucide="arrow-up"]').length, 1);
   assert.equal($('.price-table thead th[aria-sort="ascending"]').attr('data-tier'), preferredDefaultTier(payload).id);
   assert.equal($(`.price-cell[data-tier="${preferredDefaultTier(payload).id}"].is-active-tier.is-sorted`).length, payload.countries.length);
@@ -133,13 +137,14 @@ test('static and SEO rendering use the first tier consistently when 200GB is abs
 });
 
 test('static renderer rejects missing, duplicate, and hand-edited generated regions', async () => {
-  const [html, payload] = await Promise.all([
+  const [html, payload, history] = await Promise.all([
     readFile(indexUrl, 'utf8'),
-    readFile(pricesUrl, 'utf8').then(JSON.parse)
+    readFile(pricesUrl, 'utf8').then(JSON.parse),
+    readFile(historyUrl, 'utf8').then(JSON.parse)
   ]);
   assert.throws(() => extractStaticFragments(html.replace('<!-- ICLOUD_STATIC_STATUS:END -->', '')), /STATIC_RENDER_MARKER_INVALID:STATUS/);
   assert.throws(() => extractStaticFragments(html.replace('<!-- ICLOUD_STATIC_STATUS:START -->', '<!-- ICLOUD_STATIC_STATUS:START --><!-- ICLOUD_STATIC_STATUS:START -->')), /STATIC_RENDER_MARKER_INVALID:STATUS/);
-  assert.throws(() => assertStaticPageMatches(html.replace('United States · USD', 'United States · EUR'), payload), /STATIC_RENDER_MISMATCH:TABLE_BODY/);
+  assert.throws(() => assertStaticPageMatches(html.replace('United States · USD', 'United States · EUR'), payload, history), /STATIC_RENDER_MISMATCH:TABLE_BODY/);
   assert.throws(() => assertSeoProjectionMatches(html.replace('<meta name="description"', '<meta name="description-copy"'), payload), /SEO_PROJECTION_TARGET_INVALID:description/);
 });
 
