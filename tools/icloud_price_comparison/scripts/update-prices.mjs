@@ -866,11 +866,6 @@ function assertPublicationDateNotRegressed(previousPublishedDate, publishedDate)
   }
 }
 
-export function hasPublicationContentChanges(changes) {
-  return ['addedTiers', 'removedTiers', 'addedCountries', 'removedCountries', 'changedCountries']
-    .some((key) => Array.isArray(changes?.[key]) && changes[key].length > 0);
-}
-
 export function buildSnapshotChanges(previousData, countries, tiers) {
   // Publication history is Apple source evidence. Source-name changes must remain visible even when a stable marketId is preserved for price history.
   const previousByCountry = new Map((previousData?.countries ?? []).map((country) => [country.country, country]));
@@ -2521,11 +2516,9 @@ export async function main({
     throw new Error('Apple published date was not found or has an unsupported format');
   }
   validatePrices(parsed.countries, { tiers: parsed.tiers });
-  const appleContentChanged = !previousData
-    || appleSnapshotContentHash(previousData) !== appleSnapshotContentHash(parsed);
   let confirmedRemovedCountries = [];
   let appleSemanticConfirmed = false;
-  if (appleContentChanged) {
+  if (!previousData || appleSemanticChanged(previousData, parsed)) {
     const fetchConfirmation = async (resourceName) => {
       try {
         return await fetchResource(APPLE_URL, {
@@ -2676,17 +2669,13 @@ export async function main({
   const generatedAt = finishedAt.toISOString();
   const observedAt = formatBeijingDate(generatedAt);
   assertPublicationDateNotFuture(parsed.sourcePublishedDate, observedAt);
-  const publicationChanges = buildSnapshotChanges(previousData, countries, parsed.tiers);
-  const publicPublishedDate = !previousData || hasPublicationContentChanges(publicationChanges)
-    ? parsed.sourcePublishedDate
-    : previousData.source?.publishedDate ?? parsed.sourcePublishedDate;
   const data = {
     schemaVersion: 4,
     generatedAt,
     source: {
       name: 'Apple Support',
       url: APPLE_URL,
-      publishedDate: publicPublishedDate,
+      publishedDate: parsed.sourcePublishedDate,
       parser: parsed.parser,
       parserStatus: parsed.parserStatus
     },
@@ -2702,6 +2691,7 @@ export async function main({
     tiers: parsed.tiers,
     countries
   };
+  const publicationChanges = buildSnapshotChanges(previousData, countries, parsed.tiers);
   const presentationChanges = buildPresentationMarketChanges(previousData, countries, publicationChanges);
   const historyUpdate = updateHistory(previousHistory, countries, observedAt, parsed.tiers, generatedAt);
   const history = historyUpdate.history;
@@ -2740,11 +2730,8 @@ export async function main({
   if (dryRun) {
     console.log(`Live check passed with ${parsed.parser}: ${countries.length} countries and ${countries.length * parsed.tiers.length} prices. No files were changed.`);
   } else {
-    const publishedParsed = publicPublishedDate === parsed.sourcePublishedDate
-      ? parsed
-      : { ...parsed, sourcePublishedDate: publicPublishedDate };
-    const publishedDate = publicationDateKey(publicPublishedDate);
-    const contentHash = appleSnapshotContentHash(publishedParsed);
+    const publishedDate = publicationDateKey(parsed.sourcePublishedDate);
+    const contentHash = appleSnapshotContentHash(parsed);
     const existingSnapshot = originalSnapshotIndex?.snapshots?.find((item) => item.publishedDate === publishedDate);
     const existingRevision = existingSnapshot?.revisions?.some((revision) => revision.contentHash === contentHash);
     const snapshotFile = existingSnapshot ? `${publishedDate}-${contentHash.slice(0, 12)}.json` : `${publishedDate}.json`;
@@ -2762,7 +2749,7 @@ export async function main({
     };
     await writeJsonAtomic(transactionPath, transaction);
     try {
-      await savePublishedAppleSnapshot(html, publishedParsed, observedAt, {
+      await savePublishedAppleSnapshot(html, parsed, observedAt, {
         snapshotsDir,
         indexPath: snapshotIndexPath
       });
