@@ -93,7 +93,10 @@ async function startSequenceServer(sequence) {
     }
     if (override.declaredLength) response.setHeader('content-length', override.declaredLength);
     if (resource === 'index') {
-      const html = override.body ?? replaceStaticFragments(indexTemplate, renderStaticFragments(item.htmlPrices ?? item.artifact.prices));
+      const html = override.body ?? replaceStaticFragments(
+        indexTemplate,
+        renderStaticFragments(item.htmlPrices ?? item.artifact.prices, item.htmlHistory ?? item.artifact.history)
+      );
       response.writeHead(override.status ?? 200, { 'content-type': override.contentType ?? 'text/html; charset=utf-8' });
       response.end(html);
       return;
