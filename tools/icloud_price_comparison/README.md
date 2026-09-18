@@ -31,7 +31,7 @@
 - 支持中英文国家/地区、`marketId`、地区名称和完整币种代码搜索，以及分区筛选、容量排序、地区排序和 URL 状态恢复；精确 `marketId` 命中优先级最高，但其他名称的部分匹配仍保留。
 - 容量价格排序使用全球参考排名；国家/地区排序使用列表序号，移动端用 `序N` 区分序号与排名，并提供独立的读屏文本“全球价格排名第 N / 当前列表序号第 N”，视觉徽标本身不重复进入无障碍名称。
 - 点击地区可查看当地月费、人民币换算价、价格变更次数和完整的 Apple 当地标价历史。
-- 展示 Apple `Published Date`，并记录发布日期变化时对应的容量、地区、分区、币种和价格差异。
+- 前端展示最近一次伴随价格、地区、分区、币种或容量实质变化的 Apple `Published Date`；仅日期变化仍保留在底层取证数据中，但不更新页面日期，也不显示在发布日期记录中。
 - 记录地区、容量的新增和移除；Apple 来源名称发生变化时，发布日期变化证据按 Apple 原始 `country` 名称保留“旧名称移除 + 新名称新增”，即使两者继续映射到同一个稳定 `marketId`；价格历史仍按 `marketId` 连续累计，不因来源 wording 变化而 rekey；完整工件深验同样先把快照 source name 按 registry alias / deterministic identity 解析回 `marketId` 后核对价格事件；历史回填事件只允许锚定 Apple `Published Date`，在线首次确认事件只允许锚定对应 snapshot revision 的 `firstConfirmedDate`，不接受无证据的中间或更晚日期。
 - 提供 stale/fallback 状态、错误重试、键盘操作、减弱动画、forced-colors 和窄屏适配。
 
