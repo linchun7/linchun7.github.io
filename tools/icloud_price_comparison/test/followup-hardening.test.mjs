@@ -129,14 +129,20 @@ test('Apple Chinese market monitor compares only market-name sets and ignores or
   const reviewed = ['巴哈马', '中国大陆', '日本'];
   assert.deepEqual(compareMarketNameSets(reviewed, ['日本', '巴哈马', '中国大陆']), { added: [], removed: [] });
   assert.deepEqual(compareMarketNameSets(reviewed, ['日本', '中国大陆', '新加坡']), { added: ['新加坡'], removed: ['巴哈马'] });
+  assert.deepEqual(compareMarketNameSets(reviewed, ['日本', '中国大陆']), { added: [], removed: ['巴哈马'] });
+  assert.deepEqual(compareMarketNameSets(reviewed, ['日本', '中国大陆', '巴哈马']), { added: [], removed: [] });
   assert.doesNotThrow(() => validateObservedMarketSet(
     Array.from({ length: 40 }, (_, index) => `地区${String.fromCharCode(0x4e00 + index)}`),
     Array.from({ length: 60 }, (_, index) => `地区${String.fromCharCode(0x4e00 + index)}`),
   ));
   assert.throws(() => validateObservedMarketSet(
     Array.from({ length: 40 }, (_, index) => `地区${String.fromCharCode(0x4e00 + index)}`),
+    Array.from({ length: 20 }, (_, index) => `地区${String.fromCharCode(0x4e00 + index)}`),
+  ), /coverage/i);
+  assert.throws(() => validateObservedMarketSet(
+    Array.from({ length: 40 }, (_, index) => `地区${String.fromCharCode(0x4e00 + index)}`),
     Array.from({ length: 20 }, (_, index) => `完全不同${String.fromCharCode(0x5000 + index)}`),
-  ), /overlap|remove/i);
+  ), /overlap/i);
 });
 
 test('Apple Chinese market monitor fails its own workflow on changes or unavailable fetches', () => {
@@ -146,13 +152,13 @@ test('Apple Chinese market monitor fails its own workflow on changes or unavaila
   assert.equal(monitorExitCode(null), 1);
 });
 
-test('reviewed Chinese page baseline is independent from marketId mapping and records the current human review', async () => {
+test('reviewed Chinese page baseline is a sticky history of approved names, independent from marketId mapping', async () => {
   const baseline = JSON.parse(await readFile(new URL('../scripts/apple-zh-reviewed-markets.json', import.meta.url), 'utf8'));
   const names = parseReviewedMarketBaseline(baseline);
   assert.equal(baseline.source, APPLE_ZH_ICLOUD_URL);
-  assert.equal(names.includes('刚果共和国'), false);
-  assert.equal(names.includes('老挝'), false);
-  assert.equal(names.includes('毛里求斯'), false);
+  assert.ok(names.includes('刚果共和国'));
+  assert.ok(names.includes('老挝'));
+  assert.ok(names.includes('毛里求斯'));
   assert.ok(names.includes('莫尔多瓦'));
   assert.equal(names.includes('摩尔多瓦'), false);
 });

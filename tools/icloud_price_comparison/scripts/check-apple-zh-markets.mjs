@@ -213,8 +213,10 @@ export function validateObservedMarketSet(reviewedNames, observedNames) {
   const overlap = [...observed].filter((name) => reviewed.has(name)).length;
   const minimumOverlap = Math.min(20, Math.ceil(reviewed.size * 0.5));
   if (overlap < minimumOverlap) throw new Error(`observed Chinese market overlap is implausibly low (${overlap}/${reviewed.size})`);
-  const removedRatio = [...reviewed].filter((name) => !observed.has(name)).length / reviewed.size;
-  if (removedRatio > 0.45) throw new Error(`observed Chinese market list would remove ${(removedRatio * 100).toFixed(1)}% of reviewed names`);
+  const missingRatio = (reviewed.size - overlap) / reviewed.size;
+  if (missingRatio > 0.45) {
+    throw new Error(`observed Chinese market coverage is implausibly low (${overlap}/${reviewed.size} reviewed names present)`);
+  }
 }
 
 export function monitorExitCode(result) {
@@ -279,33 +281,36 @@ export async function runAppleZhMarketMonitor({ fetchImpl = fetch, report = true
     validateObservedMarketSet(reviewedNames, observedNames);
     const diff = compareMarketNameSets(reviewedNames, observedNames);
 
-    if (!diff.added.length && !diff.removed.length) {
+    if (!diff.added.length) {
       if (report) {
-        console.log(`Apple 中文 iCloud+ 地区名单未变化（${observedNames.length} 个）。`);
+        console.log(`Apple 中文 iCloud+ 未发现新地区名称（当前页面 ${observedNames.length} 个；历史已复核 ${reviewedNames.length} 个）。`);
         await appendSummary([
-          '### Apple 中文页面 iCloud+ 地区名单监测',
+          '### Apple 中文页面 iCloud+ 地区名称监测',
           '',
-          `地区名称集合未变化（${observedNames.length} 个）。`,
-          '- 口径说明：这里统计 Apple 中文页面的地区名称集合；与英文价格页“中文名称同步状态”的待确认数量不是同一统计。'
+          `未发现新的中文地区名称（当前页面 ${observedNames.length} 个；历史已复核 ${reviewedNames.length} 个）。`,
+          diff.removed.length
+            ? `- 当前页面暂未出现 ${diff.removed.length} 个历史已复核名称；不告警，也不删除已有中文名。`
+            : '- 当前页面覆盖全部历史已复核名称。',
+          '- 口径说明：历史已复核名称集合只增不减；同名地区消失后再出现不会重复告警。'
         ]);
       }
       return { status: 'unchanged', reviewedNames, observedNames, ...diff };
     }
 
-    const message = `当前 ${observedNames.length} 个；较已复核基线新增 ${diff.added.length}，移除 ${diff.removed.length}；仅提示人工复核，不自动修改中文名称。`;
+    const message = `当前页面 ${observedNames.length} 个；发现 ${diff.added.length} 个从未复核的中文地区名称；仅提示人工复核，不自动修改中文名称。`;
     if (report) {
-      console.log(`::error title=Apple 中文 iCloud+ 地区列表有变化::${escapeWorkflowCommand(message)}`);
-      console.log(`页面新增地区：${diff.added.join('、') || '无'}`);
-      console.log(`页面不再出现地区：${diff.removed.join('、') || '无'}`);
+      console.log(`::error title=Apple 中文 iCloud+ 出现新地区名称::${escapeWorkflowCommand(message)}`);
+      console.log(`页面新增地区：${diff.added.join('、')}`);
+      if (diff.removed.length) console.log(`当前页面暂未出现的历史名称（不告警）：${diff.removed.join('、')}`);
       await appendSummary([
-        '### ⚠️ Apple 中文页面 iCloud+ 地区列表有变化',
+        '### ⚠️ Apple 中文页面 iCloud+ 出现新地区名称',
         '',
         message,
-        diff.added.length ? `- 页面新增：${diff.added.join('、')}` : '- 页面新增：无',
-        diff.removed.length ? `- 页面不再出现：${diff.removed.join('、')}` : '- 页面不再出现：无',
-        '- 即使总数量不变，只要成员发生替换，也会同时列出新增和移除项。',
-        '- 口径说明：这里统计 Apple 中文页面的地区名称集合；与英文价格页“中文名称同步状态”的待确认数量不是同一统计。',
-        '- 处理方式：人工核对同一 Apple 中文 iCloud+ 页面后，再更新地区名单基线；如能可靠对应英文市场，再更新 `scripts/country-names.zh.json`。',
+        `- 新名称：${diff.added.join('、')}`,
+        diff.removed.length ? `- 当前页面暂未出现的历史名称（不告警）：${diff.removed.join('、')}` : '- 当前页面覆盖全部历史已复核名称。',
+        '- 同名地区曾经出现、后来消失、之后再次出现：因为名称已在历史复核集合中，不重复告警。',
+        '- 若旧名称消失、出现一个从未复核的新名称，仍会红灯，供人工判断是否属于官方改名或新市场。',
+        '- 只有人工确认后才把新名称追加到历史复核集合；已有名称不因页面暂时消失而删除。',
       ]);
     }
     return { status: 'changed', reviewedNames, observedNames, ...diff };
