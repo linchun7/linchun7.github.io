@@ -137,6 +137,10 @@ test('Apple Chinese market monitor compares only market-name sets and ignores or
   ));
   assert.throws(() => validateObservedMarketSet(
     Array.from({ length: 40 }, (_, index) => `地区${String.fromCharCode(0x4e00 + index)}`),
+    Array.from({ length: 20 }, (_, index) => `地区${String.fromCharCode(0x4e00 + index)}`),
+  ), /coverage/i);
+  assert.throws(() => validateObservedMarketSet(
+    Array.from({ length: 40 }, (_, index) => `地区${String.fromCharCode(0x4e00 + index)}`),
     Array.from({ length: 20 }, (_, index) => `完全不同${String.fromCharCode(0x5000 + index)}`),
   ), /overlap/i);
 });
