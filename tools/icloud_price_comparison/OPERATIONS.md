@@ -351,7 +351,7 @@ Apple 108047 从逐市场列表切换为地区表格时，预期修复是增加�
 
 “候选生成成功”不等于发布成功：以已测试数据 commit、该 commit 的 Pages 构建以及 canonical URL 的 prices/history/run-log/static HTML 一致作为生产闭环。修复恢复必须在最新 main 新发起 workflow，不能 rerun 旧 SHA。
 
-- `Monitor Apple Chinese iCloud markets` 是独立只读服务，会在 `Update iCloud prices` workflow 完成后运行，也可手动运行。只有 Apple 中文 iCloud+ 页的国家/地区名称集合相对 `scripts/apple-zh-reviewed-markets.json` 出现新增/移除时才提示人工复核；价格、容量、发布日期、排序或排版变化不提示。抓取/解析不可用只影响这条监测任务，不影响价格 updater。人工核实页面名单后更新该基线；只有能够人工确认到稳定 `marketId` 的中文名称才同步更新 `scripts/country-names.zh.json`。
+- `Monitor Apple Chinese iCloud markets` 是独立只读服务，会在 `Update iCloud prices` workflow 完成后运行，也可手动运行。`scripts/apple-zh-reviewed-markets.json` 记录历史已复核中文名称并只增不减；当前中文页单纯少掉已知名称不告警、不删除映射，同名名称以后重新出现也不重复告警。只有出现从未复核的新中文名称时才红灯提示人工检查；价格、容量、发布日期、排序或排版变化不提示。抓取/解析不可用仍令这条监测任务红灯，但不影响价格 updater。人工确认新名称后只追加到历史复核集合；只有能够可靠对应稳定 `marketId` 时才同步更新 `scripts/country-names.zh.json`。
 
 ### 封板告警与回归
 
