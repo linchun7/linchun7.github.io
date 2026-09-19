@@ -54,7 +54,7 @@ export function buildChineseNameSyncSummary(previousData, currentData) {
   const diff = diffChineseNamePending(previousData, currentData);
   const lines = [
     '### 英文价格页中文名称待确认',
-    '- 口径：这里统计 Apple 英文 iCloud+ 价格页活跃市场中，中文显示名尚未复核的市场；与独立的“Apple 中文页面地区名单监测”不是同一统计。',
+    '- 口径：这里统计 Apple 英文 iCloud+ 价格页活跃市场中，中文显示名尚未复核的市场；与独立的“Apple 中文页面新地区名称监测”不是同一统计。',
     `- 当前待确认：${diff.currentCount} 个。`
   ];
 

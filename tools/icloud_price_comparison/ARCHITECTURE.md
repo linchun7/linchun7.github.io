@@ -238,11 +238,11 @@ archive importer 重放完整 snapshot ledger（包括此前 live revision），
 
 区域完整性必须对 region 内的全部表格取证，而非只枚举已经识别的表头。合法区域表拆成“可识别部分 + 未识别部分”时，两路 parser 都必须拒绝，不能将遗漏行解释为已确认市场移除；区域外由独立标题界定的无关表格不参与价格解析。
 
-中文 iCloud+ 页面监测是与价格发布物理隔离的只读旁路。它在 `Update iCloud prices` workflow 完成后由独立 workflow 触发，只读取同一 Apple 简体中文 108047 页面，并把提取到的国家/地区名称与 `apple-zh-reviewed-markets.json` 的历史已复核名称集合比较。这个集合是单调增加的记忆，不表达当前页面完整成员关系：已确认名称从中文页消失不会删除记录或触发红灯，同名名称以后重新出现也不会重复告警；只有从未复核的新名称才进入人工检查。价格、容量、发布日期、市场顺序和 DOM 样式不是监测事实；容量文本只作为识别“这是一段价格市场结构”的局部上下文。旧式标题块、表格和未来的局部分组都走同一名称输出，解析异常不得修改基线、中文显示名或主价格数据。
+中文 iCloud+ 页面监测是与价格发布物理隔离的只读旁路。它在 `Update iCloud prices` workflow 完成后由独立 workflow 触发，只读取同一 Apple 简体中文 108047 页面，并把提取到的国家/地区名称与 `apple-zh-reviewed-markets.json` 的历史已复核名称集合比较。这个集合是单调增加的记忆，不表达当前页面完整成员关系：已确认名称从中文页消失不会删除记录或触发红灯，同名名称以后重新出现也不会重复告警；只有从未复核的新名称才进入人工检查。进入该集合只证明 Apple 曾使用过这个中文 wording，不证明它已经与某个英文 source identity / `marketId` 建立绑定；正式中文展示仍以 `country-names.zh.json` 为唯一事实源。价格、容量、发布日期、市场顺序和 DOM 样式不是监测事实；容量文本只作为识别“这是一段价格市场结构”的局部上下文。旧式标题块、表格和未来的局部分组都走同一名称输出，解析异常不得修改历史复核集合、中文显示名或主价格数据。
 
 ### 名称监测与来源身份的边界
 
-中文监测的提取不读取人工名单基线；基线验证不调用提取器的名称启发式。语义脚注、非价格功能内容不进入名称集合；国家列位置可变，未知包装可按局部 label/price 结构解释，但缺失国家单元格、无标签价格记录或不能解释的价格矩阵使监测不可用。价格/容量仅作记录上下文，绝不作为市场身份或变更事实。
+中文页面提取器与历史已复核名称集合相互独立；历史集合的 schema 校验也不调用提取器的名称启发式。语义脚注、非价格功能内容不进入名称集合；国家列位置可变，未知包装可按局部 label/price 结构解释，但缺失国家单元格、无标签价格记录或不能解释的价格矩阵使监测不可用。价格/容量仅作记录上下文，绝不作为市场身份或变更事实。
 
 `data-model.js` 中 `REVIEWED_MARKET_IDENTITIES` 是原有已审 source alias 的唯一声明，供 registry、历史验证的 resolver 及浏览器复用。`sourceNameIdentityKey` 与搜索规范化隔离，避免搜索优化改变 identity。Action 可另外传入已验证 before/after stable-ID ledger 的证据；浏览器没有该证据时不猜测未知 alias。两者复用同一一对一投影，重复/冲突身份不折叠，raw added/removed/changed 不回写。
 
@@ -254,4 +254,4 @@ archive importer 重放完整 snapshot ledger（包括此前 live revision），
 
 中文显示名的“待确认”不是新的事实源，也不需要新的持久化状态。更新器已经有稳定契约：尚未人工复核中文名称时，公共 `prices.json` 中该市场的 `nameZh` 暂时等于 Apple 英文 `country`。因此每日 workflow 可以在运行前复制上一份已验证 `prices.json`，在候选生成成功后由 `report-chinese-name-sync.mjs` 从前后两份工件分别投影 pending `marketId` 集合，再做集合差异。
 
-该投影只进入 Action Summary：数量变化会列出新增/退出成员；数量相同但成员替换也会同时列出两侧。它不修改 `prices.json`、`history.json`、snapshot、market registry 或 `country-names.zh.json`，也不参与发布 gate 的业务判断。独立的 Apple 中文页面名单监测仍只负责中文 108047 页面自身的名称集合变化，两者不能互相替代或直接比较数量。
+该投影只进入 Action Summary：数量变化会列出新增/退出成员；数量相同但成员替换也会同时列出两侧。它不修改 `prices.json`、`history.json`、snapshot、market registry 或 `country-names.zh.json`，也不参与发布 gate 的业务判断。独立的 Apple 中文页面新地区名称监测只负责发现中文 108047 页面里历史上从未复核的新名称；已知名称的消失或重新出现不属于该监测的业务变化。两者不能互相替代或直接比较数量。

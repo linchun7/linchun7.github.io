@@ -177,19 +177,19 @@ export function extractAppleZhMarketNames(html) {
 
 export function parseReviewedMarketBaseline(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error('Chinese market review baseline must be an object');
+    throw new Error('Chinese reviewed-name history must be an object');
   }
   if (value.source !== APPLE_ZH_ICLOUD_URL || !Array.isArray(value.markets)) {
-    throw new Error('Chinese market review baseline has an unsupported structure');
+    throw new Error('Chinese reviewed-name history has an unsupported structure');
   }
   // Reviewed evidence has a schema, not the extractor's lexical heuristics.
   if (value.markets.some((name) => typeof name !== 'string' || !normalizeVisibleText(name)
     || name.length > 200 || /[\u0000-\u001F\u007F]/u.test(name))) {
-    throw new Error('Chinese market review baseline contains an invalid market name string');
+    throw new Error('Chinese reviewed-name history contains an invalid market name string');
   }
   const markets = value.markets.map(normalizeVisibleText);
   if (new Set(markets).size !== markets.length) {
-    throw new Error('Chinese market review baseline contains duplicate names');
+    throw new Error('Chinese reviewed-name history contains duplicate names');
   }
   return markets;
 }
@@ -206,7 +206,7 @@ export function compareMarketNameSets(reviewedNames, observedNames) {
 export function validateObservedMarketSet(reviewedNames, observedNames) {
   const reviewed = new Set(reviewedNames);
   const observed = new Set(observedNames);
-  if (reviewed.size < MIN_PLAUSIBLE_MARKETS) throw new Error(`reviewed market baseline is unexpectedly small (${reviewed.size})`);
+  if (reviewed.size < MIN_PLAUSIBLE_MARKETS) throw new Error(`reviewed name history is unexpectedly small (${reviewed.size})`);
   if (observed.size < MIN_PLAUSIBLE_MARKETS || observed.size > MAX_PLAUSIBLE_MARKETS) {
     throw new Error(`observed Chinese market count is implausible (${observed.size})`);
   }
@@ -285,7 +285,7 @@ export async function runAppleZhMarketMonitor({ fetchImpl = fetch, report = true
       if (report) {
         console.log(`Apple 中文 iCloud+ 未发现新地区名称（当前页面 ${observedNames.length} 个；历史已复核 ${reviewedNames.length} 个）。`);
         await appendSummary([
-          '### Apple 中文页面 iCloud+ 地区名称监测',
+          '### Apple 中文页面 iCloud+ 新地区名称监测',
           '',
           `未发现新的中文地区名称（当前页面 ${observedNames.length} 个；历史已复核 ${reviewedNames.length} 个）。`,
           diff.removed.length
@@ -315,10 +315,10 @@ export async function runAppleZhMarketMonitor({ fetchImpl = fetch, report = true
     }
     return { status: 'changed', reviewedNames, observedNames, ...diff };
   } catch (error) {
-    const message = `本次中文地区监测不可用：${error instanceof Error ? error.message : String(error)}；不影响价格更新。`;
+    const message = `本次中文名称监测不可用：${error instanceof Error ? error.message : String(error)}；不影响价格更新。`;
     if (report) {
-      console.log(`::error title=Apple 中文地区监测不可用::${escapeWorkflowCommand(message)}`);
-      await appendSummary(['### Apple 中文页面 iCloud+ 地区名单监测', '', message]);
+      console.log(`::error title=Apple 中文名称监测不可用::${escapeWorkflowCommand(message)}`);
+      await appendSummary(['### Apple 中文页面 iCloud+ 新地区名称监测', '', message]);
     }
     return { status: 'unavailable', error };
   }

@@ -152,7 +152,7 @@ test('Apple Chinese market monitor fails its own workflow on changes or unavaila
   assert.equal(monitorExitCode(null), 1);
 });
 
-test('reviewed Chinese page baseline is a sticky history of approved names, independent from marketId mapping', async () => {
+test('reviewed Chinese page names are sticky history, independent from marketId mapping', async () => {
   const baseline = JSON.parse(await readFile(new URL('../scripts/apple-zh-reviewed-markets.json', import.meta.url), 'utf8'));
   const names = parseReviewedMarketBaseline(baseline);
   assert.equal(baseline.source, APPLE_ZH_ICLOUD_URL);
