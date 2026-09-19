@@ -37,7 +37,7 @@ test('seal: table footnotes never become countries', () => {
   assert.deepEqual(extractAppleZhMarketNames(html), ['日本']);
 });
 
-test('seal: reviewed baseline schema is independent of extraction guesses and rejects coercion', () => {
+test('seal: reviewed-name history schema is independent of extraction guesses and rejects coercion', () => {
   assert.deepEqual(parseReviewedMarketBaseline({ source: APPLE_ZH_ICLOUD_URL, markets: ['示例地区（辖区）', '新地区甲'] }), ['示例地区(辖区)', '新地区甲']);
   assert.throws(() => parseReviewedMarketBaseline({ source: APPLE_ZH_ICLOUD_URL, markets: [true] }), /name|string|名称/i);
 });
