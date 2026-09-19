@@ -60,8 +60,9 @@ test('seal: real CLI exit codes and summary distinguish unchanged, changed, HTTP
   const directory = await mkdtemp(join(tmpdir(), 'icloud-seal-cli-'));
   try {
     const cases = [
-      { title: 'unchanged', names: baseline.markets, code: 0, summary: /未变化/ },
-      { title: 'changed', names: [...baseline.markets.slice(1), '新增测试岛'], code: 1, summary: /新增 1，移除 1/ },
+      { title: 'unchanged', names: baseline.markets, code: 0, summary: /未发现新的中文地区名称/ },
+      { title: 'removed-only', names: baseline.markets.slice(1), code: 0, summary: /不告警/ },
+      { title: 'changed', names: [...baseline.markets.slice(1), '新增测试岛'], code: 1, summary: /新增测试岛/ },
       { title: 'http-unavailable', http: 503, code: 1, summary: /不可用/ },
       { title: 'partial-unavailable', names: ['', ...baseline.markets.slice(1)], code: 1, summary: /不可用/ },
     ];
