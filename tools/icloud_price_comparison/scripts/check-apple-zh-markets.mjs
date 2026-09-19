@@ -213,6 +213,10 @@ export function validateObservedMarketSet(reviewedNames, observedNames) {
   const overlap = [...observed].filter((name) => reviewed.has(name)).length;
   const minimumOverlap = Math.min(20, Math.ceil(reviewed.size * 0.5));
   if (overlap < minimumOverlap) throw new Error(`observed Chinese market overlap is implausibly low (${overlap}/${reviewed.size})`);
+  const missingRatio = (reviewed.size - overlap) / reviewed.size;
+  if (missingRatio > 0.45) {
+    throw new Error(`observed Chinese market coverage is implausibly low (${overlap}/${reviewed.size} reviewed names present)`);
+  }
 }
 
 export function monitorExitCode(result) {
