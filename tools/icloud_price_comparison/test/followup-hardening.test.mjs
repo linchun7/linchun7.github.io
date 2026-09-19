@@ -150,8 +150,9 @@ test('reviewed Chinese page baseline is independent from marketId mapping and re
   const baseline = JSON.parse(await readFile(new URL('../scripts/apple-zh-reviewed-markets.json', import.meta.url), 'utf8'));
   const names = parseReviewedMarketBaseline(baseline);
   assert.equal(baseline.source, APPLE_ZH_ICLOUD_URL);
-  assert.ok(names.includes('刚果共和国'));
-  assert.ok(names.includes('毛里求斯'));
+  assert.equal(names.includes('刚果共和国'), false);
+  assert.equal(names.includes('老挝'), false);
+  assert.equal(names.includes('毛里求斯'), false);
   assert.ok(names.includes('莫尔多瓦'));
   assert.equal(names.includes('摩尔多瓦'), false);
 });
