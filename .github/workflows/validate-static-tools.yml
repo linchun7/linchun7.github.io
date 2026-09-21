@@ -427,18 +427,27 @@ jobs:
           pinyin_integrity="${pinyin_meta[1]}"
           expected_nzh="$(sha256sum tools/rmb_converter/dist/nzh.min.js | cut -d' ' -f1)"
           expected_pangu="$(sha256sum tools/space/dist/browser/pangu.min.js | cut -d' ' -f1)"
+          production_revision="$(git rev-parse HEAD)"
 
           check_once() {
+            local attempt_key="${1:?attempt key is required}"
+            local cache_key="${production_revision}-${attempt_key}"
             rm -rf "$RUNNER_TEMP/static-production-contract"
             mkdir -p "$RUNNER_TEMP/static-production-contract"
             cd "$RUNNER_TEMP/static-production-contract"
 
+            # The custom domain can briefly serve a stale CDN object after Pages has
+            # deployed. Use a per-attempt, revision-bound cache key so an early stale
+            # response cannot poison every retry and create a false production failure.
             curl --fail --silent --show-error --location --max-time 15 \
-              https://www.linchun.com.cn/tools/rmb_converter/dist/nzh.min.js -o nzh.min.js || return 1
+              --header 'Cache-Control: no-cache' --header 'Pragma: no-cache' \
+              "https://www.linchun.com.cn/tools/rmb_converter/dist/nzh.min.js?ci=${cache_key}" -o nzh.min.js || return 1
             curl --fail --silent --show-error --location --max-time 15 \
-              https://www.linchun.com.cn/tools/space/dist/browser/pangu.min.js -o pangu.min.js || return 1
+              --header 'Cache-Control: no-cache' --header 'Pragma: no-cache' \
+              "https://www.linchun.com.cn/tools/space/dist/browser/pangu.min.js?ci=${cache_key}" -o pangu.min.js || return 1
             curl --fail --silent --show-error --location --max-time 15 \
-              https://www.linchun.com.cn/tools/pinyin/ -o pinyin.html || return 1
+              --header 'Cache-Control: no-cache' --header 'Pragma: no-cache' \
+              "https://www.linchun.com.cn/tools/pinyin/?ci=${cache_key}" -o pinyin.html || return 1
             curl --fail --silent --show-error --location --max-time 15 \
               "https://cdn.jsdelivr.net/npm/pinyin-pro@${pinyin_version}/dist/index.js" -o pinyin-pro.js || return 1
 
@@ -461,7 +470,7 @@ jobs:
           }
 
           for attempt in $(seq 1 30); do
-            if check_once; then
+            if check_once "$attempt"; then
               echo "生产契约已验证（第 ${attempt} 次）。"
               exit 0
             fi
