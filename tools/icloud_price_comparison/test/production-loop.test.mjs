@@ -17,6 +17,7 @@ import { importAppleArchives } from '../scripts/import-apple-archives.mjs';
 const TIERS = [['50GB', '50 GB', .99], ['200GB', '200 GB', 2.99], ['2TB', '2 TB', 9.99], ['6TB', '6 TB', 29.99], ['12TB', '12 TB', 59.99]];
 const REGIONS = [['nasalac', 'Americas'], ['emea', 'Europe, Middle East & Africa'], ['ap', 'Asia Pacific']];
 const escape = (s) => String(s).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;');
+const AUTOMATION_ENV_KEYS = ['GITHUB_EVENT_NAME', 'ICLOUD_TRIGGER_SOURCE', 'ICLOUD_AUTOMATIC_RUN_DATE_BEIJING'];
 function canonicalCountries() {
   return REGIONS.flatMap(([, region], r) => Array.from({ length: 22 }, (_, i) => ({
     country: r === 1 && i === 0 ? 'Ivory Coast' : `Review Market ${r}-${i}`,
@@ -59,6 +60,8 @@ async function run(t, paths, htmls, now) {
   t.mock.timers.setTime(new Date(now).getTime());
   let appleRequests = 0;
   const original = globalThis.fetch;
+  const originalAutomationEnv = new Map(AUTOMATION_ENV_KEYS.map((key) => [key, process.env[key]]));
+  for (const key of AUTOMATION_ENV_KEYS) delete process.env[key];
   globalThis.fetch = async (url) => {
     if (String(url).includes('support.apple.com')) {
       const html = htmls[Math.min(appleRequests++, htmls.length - 1)];
@@ -75,8 +78,29 @@ async function run(t, paths, htmls, now) {
     const history = JSON.parse(await readFile(paths.historyPath));
     const index = JSON.parse(await readFile(paths.snapshotIndexPath));
     return { appleRequests, prices, history, index };
-  } finally { globalThis.fetch = original; }
+  } finally {
+    globalThis.fetch = original;
+    for (const [key, value] of originalAutomationEnv) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
 }
+
+test('synthetic production loop ignores ambient GitHub schedule metadata', async (t) => {
+  const originalEventName = process.env.GITHUB_EVENT_NAME;
+  process.env.GITHUB_EVENT_NAME = 'schedule';
+  t.after(() => {
+    if (originalEventName === undefined) delete process.env.GITHUB_EVENT_NAME;
+    else process.env.GITHUB_EVENT_NAME = originalEventName;
+  });
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-04-10T12:00:00Z') });
+  const { paths } = await fixture(t);
+  await run(t, paths, [sourceHtml(canonicalCountries(), '2026-04-09')], '2026-04-10T12:00:00Z');
+  const runLog = JSON.parse(await readFile(paths.runLogPath, 'utf8'));
+  assert.equal(runLog.runs.at(-1).trigger, 'local');
+  assert.equal(runLog.runs.at(-1).automaticRunDateBeijing, null);
+});
 
 test('canonical full loop binds live observations, revisions, source aliases and first-published fallback IDs', async (t) => {
   t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-04-10T15:59:58Z') });
