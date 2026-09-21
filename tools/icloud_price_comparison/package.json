@@ -29,7 +29,7 @@
     "cheerio": "1.2.0"
   },
   "devDependencies": {
-    "lucide": "1.45.0",
+    "lucide": "1.47.0",
     "playwright": "1.63.0"
   }
 }
