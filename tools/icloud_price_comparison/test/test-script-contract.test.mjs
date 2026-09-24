@@ -60,7 +60,8 @@ test('a missing browser fails promptly without leaving the test server alive', {
     });
     assert.equal(result.error, undefined, `child must exit itself, not require termination: ${result.error?.message}`);
     assert.equal(result.status, 1, 'a missing browser must fail, not skip or pass');
-    assert.match(`${result.stdout}\n${result.stderr}`, /Executable doesn't exist/);
+    // TAP may escape the apostrophe when quoting a multiline error.
+    assert.match(`${result.stdout}\n${result.stderr}`, /browserType\.launch: Executable doesn\\?'t exist/);
   } finally {
     await rm(emptyBrowsers, { recursive: true, force: true });
   }
