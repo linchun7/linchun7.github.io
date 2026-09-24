@@ -140,6 +140,39 @@ class ObservationTests(unittest.TestCase):
         self.assertEqual(new['status'], 'retained')
         self.assertEqual(new['fingerprint'], old['fingerprint'])
 
+    def test_plan_removal_and_variant_count_change_enter_pending(self):
+        old = good_market()
+        removed_plan = lambda *a, **kw: fixture(pairs=[
+            ['ChatGPT Plus', '$19.99'],
+            ['ChatGPT Plus', '$200.00'],
+            ['100 Credits', '$4.00'],
+        ])
+        pending_removed = p.observe({'code':'us','name':'美国'}, old, NOW+86400, removed_plan)
+        self.assertEqual(pending_removed['status'], 'pending')
+        self.assertEqual(pending_removed['fingerprint'], old['fingerprint'])
+
+        one_plus_variant = lambda *a, **kw: fixture(pairs=[
+            ['ChatGPT Plus', '$19.99'],
+            ['ChatGPT Go', '$8.00'],
+            ['100 Credits', '$4.00'],
+        ])
+        pending_variant = p.observe({'code':'us','name':'美国'}, old, NOW+86400, one_plus_variant)
+        self.assertEqual(pending_variant['status'], 'pending')
+        self.assertEqual(pending_variant['fingerprint'], old['fingerprint'])
+
+    def test_new_plan_addition_is_not_quarantined(self):
+        old = good_market()
+        getter = lambda *a, **kw: fixture(pairs=[
+            ['ChatGPT Plus', '$19.99'],
+            ['ChatGPT Go', '$8.00'],
+            ['ChatGPT Plus', '$200.00'],
+            ['ChatGPT New Tier', '$44.00'],
+            ['100 Credits', '$4.00'],
+        ])
+        result = p.observe({'code':'us','name':'美国'}, old, NOW+86400, getter)
+        self.assertEqual(result['status'], 'verified')
+        self.assertIn('ChatGPT New Tier', [offer['label'] for offer in result['offers']])
+
     def test_large_jump_recovers_automatically_after_18_hours(self):
         old = good_market()
         getter = lambda *a,**kw: fixture().replace('19.99','99.99')
