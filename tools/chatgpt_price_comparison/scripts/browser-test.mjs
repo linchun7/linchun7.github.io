@@ -34,18 +34,25 @@ async function evaluate(expression) {
   return result.result.value;
 }
 try {
-  // Read Chrome's readiness file instead of depending on stderr log wording.
+  // Prefer Chrome's readiness file; stderr port parsing is a fallback for
+  // runner builds that announce DevTools before DevToolsActivePort is readable.
   let port;
   const launchDeadline = Date.now() + 30000;
   while (Date.now() < launchDeadline) {
     if (launchError || browser.exitCode !== null) throw Error('Chrome exited before ready: ' + (launchError || browser.exitCode) + '\n' + diagnostics);
+    let candidate;
     try {
-      const [candidate] = (await readFile(path.join(profile, 'DevToolsActivePort'), 'utf8')).trim().split('\n');
-      if (/^[0-9]+$/.test(candidate)) {
+      [candidate] = (await readFile(path.join(profile, 'DevToolsActivePort'), 'utf8')).trim().split('\n');
+    } catch {}
+    if (!/^[0-9]+$/.test(candidate || '')) {
+      candidate = diagnostics.match(/DevTools listening on ws:\/\/127\.0\.0\.1:(\d+)\//)?.[1];
+    }
+    if (/^[0-9]+$/.test(candidate || '')) {
+      try {
         const response = await fetch(`http://127.0.0.1:${candidate}/json/version`, {signal: AbortSignal.timeout(1000)});
         if (response.ok) { port = candidate; break; }
-      }
-    } catch {}
+      } catch {}
+    }
     await delay(100);
   }
   assert.ok(port, 'Chrome readiness failed: ' + diagnostics);
