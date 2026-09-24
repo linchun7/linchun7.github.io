@@ -414,9 +414,11 @@
         const cmp = a.name.localeCompare(b.name, 'zh-CN'); return state.sortDirection === 'asc' ? cmp : -cmp;
       }
       const av = minCny(a, state.sortPlan), bv = minCny(b, state.sortPlan);
-      if (!Number.isFinite(av) && !Number.isFinite(bv)) return a.name.localeCompare(b.name, 'zh-CN');
-      if (!Number.isFinite(av)) return 1; if (!Number.isFinite(bv)) return -1;
-      const cmp = av - bv || a.name.localeCompare(b.name, 'zh-CN'); return state.sortDirection === 'asc' ? cmp : -cmp;
+      if (!Number.isFinite(av) && !Number.isFinite(bv)) return a.code.localeCompare(b.code, 'en');
+      if (!Number.isFinite(av)) return 1;
+      if (!Number.isFinite(bv)) return -1;
+      if (av === bv) return a.code.localeCompare(b.code, 'en');
+      return state.sortDirection === 'asc' ? av - bv : bv - av;
     });
     return markets;
   }
@@ -455,8 +457,11 @@
       textContent: '，查看价格历史',
     });
 
+    const hasHistory = market.offers.length > 0;
+    button.disabled = !hasHistory;
+    sr.textContent = hasHistory ? '，查看价格历史' : '，暂无价格历史';
     button.append(name, mobileRank, mobileRankSr, secondary, arrow, sr);
-    button.addEventListener('click', () => openHistory(market, button));
+    if (hasHistory) button.addEventListener('click', () => openHistory(market, button));
     td.append(button);
     return td;
   }
