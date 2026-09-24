@@ -20,12 +20,20 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("- cloudflare", self.text)
         self.assertNotIn("\n  push:\n", self.text)
 
-    def test_daily_guard_controls_expensive_jobs(self):
+    def test_daily_guard_requires_successful_production_proof(self):
         self.assertIn("daily_run_guard.py", self.text)
+        self.assertIn("production_success_today", self.text)
+        self.assertIn("actions/workflows/update-chatgpt-prices.yml/runs?status=success", self.text)
         self.assertIn("needs: prepare", self.text)
         self.assertIn("needs: [prepare, generate]", self.text)
         self.assertIn("needs: [prepare, generate, publish]", self.text)
         self.assertIn("needs.prepare.outputs.should_run == 'true'", self.text)
+
+    def test_publish_waits_for_pages_and_verifies_canonical_production(self):
+        self.assertIn("pages/builds/latest", self.text)
+        self.assertIn("verify-production:", self.text)
+        self.assertIn("verify-production.mjs --expected", self.text)
+        self.assertIn("VERIFY: ${{ needs.verify-production.result }}", self.text)
 
     def test_only_main_can_publish(self):
         self.assertIn("github.ref == 'refs/heads/main'", self.text)
