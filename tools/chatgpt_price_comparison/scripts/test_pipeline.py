@@ -1,5 +1,6 @@
 import copy
 import json
+import re
 import time
 import unittest
 from urllib.error import URLError
@@ -243,8 +244,10 @@ class ContractTests(unittest.TestCase):
         self.assertRegex(page, r'style\.css\?v=[a-f0-9]{12}')
         self.assertIn('data-lucide="arrow-up"',page)
         self.assertIn('mobile-rank-sr visually-hidden',page)
-        self.assertIn('<span class="price-local">$19.99</span>',page)
-        self.assertNotIn('<span class="price-local">$200.00</span>',page)
+        plus_cell = re.search(r'<td class="price-cell[^"]*" data-plan="ChatGPT Plus">([\s\S]*?)</td>', page)
+        self.assertIsNotNone(plus_cell)
+        self.assertIn('<span class="price-local">$19.99</span>', plus_cell.group(1))
+        self.assertNotIn('<span class="price-local">$200.00</span>', plus_cell.group(1))
         self.assertIn('"display":"$200.00"',page)
         self.assertIn('139.93',page)
         self.assertNotIn('<span class="price-amount">1,400.00</span>',page)
