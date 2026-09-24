@@ -38,6 +38,11 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("verify-production.mjs --expected", self.text)
         self.assertIn("VERIFY: ${{ needs.verify-production.result }}", self.text)
 
+    def test_publish_uses_least_privilege(self):
+        self.assertIn("contents: write", self.text)
+        self.assertIn("pages: read", self.text)
+        self.assertNotIn("pages: write", self.text)
+
     def test_only_main_can_publish(self):
         self.assertIn("github.ref == 'refs/heads/main'", self.text)
         self.assertNotIn("feat/chatgpt-price-comparison", self.text)
