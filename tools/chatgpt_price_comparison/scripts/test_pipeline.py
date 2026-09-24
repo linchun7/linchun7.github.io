@@ -257,6 +257,14 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(result['updated_at'],fx['updated_at']); self.assertTrue(result['fallback'])
         self.assertIsNone(p.collect_fx(NOW+8*86400,fx,lambda *a,**kw: '{}'))
 
+    def test_fx_fallback_keeps_known_currencies_when_new_currency_is_missing(self):
+        fx=data_fixture()['fx']
+        result=p.collect_fx(NOW+86400,fx,lambda *a,**kw: '{}', {'JPY','AAA'})
+        self.assertTrue(result['fallback'])
+        self.assertEqual(set(result['rates']), {'USD','CNY','JPY'})
+        market=copy.deepcopy(data_fixture()['markets'][0]); market['currency']='AAA'
+        self.assertIsNone(p.converted(market,'20',result,NOW+86400))
+
     def test_fx_wrong_base_and_stale_rejected(self):
         for base, updated in [('EUR',NOW),('USD',NOW+86400),('USD',NOW-3*86400)]:
             result=p.collect_fx(NOW,None,lambda *a,**kw: json.dumps({'result':'success','base_code':base,'time_last_update_unix':updated,'rates':{'USD':1,'CNY':7}}))
