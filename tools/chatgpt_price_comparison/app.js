@@ -245,7 +245,7 @@
   }
   function minCny(market, plan) {
     const offer = offerFor(market, plan);
-    if (!offer || !usable(market.last_verified_at)) return null;
+    if (!offer || !state.data?.fx || !usable(state.data.fx.updated_at) || !usable(market.last_verified_at)) return null;
     const values = offer.amounts
       .filter((amount) => amount.cny != null)
       .map((amount) => Number(amount.cny))
@@ -531,7 +531,8 @@
     const events = [];
     if (changes.length) { events.push({ at: changes[0].at, snapshot: changes[0].before }); for (const c of changes) events.push({ at: c.at, snapshot: c.after }); }
     const current = semantic(market);
-    if (!events.length || canonical(events.at(-1).snapshot) !== canonical(current)) events.push({ at: state.data.generated_at, snapshot: current });
+    const currentAt = market.last_verified_at || state.data.generated_at;
+    if (!events.length || canonical(events.at(-1).snapshot) !== canonical(current)) events.push({ at: currentAt, snapshot: current });
     return events;
   }
   function compactHistory(events, plan) {
@@ -560,7 +561,7 @@
   }
   function openHistory(market, returnFocus) {
     state.activeMarket = market; state.historyReturnFocus = returnFocus; state.historyPlan = state.activePlan;
-    el.historyTitle.textContent = market.name; el.historySubtitle.textContent = `${market.code.toUpperCase()} · ${market.currency || '—'} · 记录自本工具开始观察之日起`;
+    el.historyTitle.textContent = market.name; el.historySubtitle.textContent = `${market.code.toUpperCase()} · ${market.currency || '—'} · 近期公开标价记录`;
     renderHistoryPlans(); renderHistory(); el.historyDialog.showModal();
   }
   function closeHistory() { if (el.historyDialog.open) el.historyDialog.close(); }

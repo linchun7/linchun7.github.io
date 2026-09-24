@@ -98,7 +98,18 @@ try {
   assert.equal(await evaluate(`document.querySelector('#historyTitle').textContent`),'美国','history opens for country');
   assert.ok(await evaluate(`document.querySelector('#historyRows').children.length >= 1`),'history has at least current observation');
   if(usPlus?.amounts.length>1) assert.ok(await evaluate(`document.querySelector('#historyLocalPrice').textContent.includes('$19.99') && document.querySelector('#historyLocalPrice').textContent.includes('$200.00')`),'history current price preserves variants');
+  assert.ok(await evaluate(`document.querySelector('#historySubtitle').textContent.includes('近期公开标价记录')`),'history scope is explicit');
+  assert.equal(await evaluate(`document.querySelector('.history-current div:nth-child(3) span').textContent`),'近期变更次数','history count is scoped to retained events');
   await evaluate(`document.querySelector('#closeHistory').click()`);
+
+  const fxUpdated=Date.parse(expected.fx?.updated_at || '');
+  const newestVerified=Math.max(...expected.markets.filter(m=>m.offers.length).map(m=>Date.parse(m.last_verified_at)).filter(Number.isFinite));
+  const staleFxNow=fxUpdated + 7*86400e3 + 60e3;
+  if(Number.isFinite(fxUpdated) && Number.isFinite(newestVerified) && staleFxNow < newestVerified + 7*86400e3) {
+    await evaluate(`globalThis.__chatgptRealDateNow=Date.now;Date.now=()=>${staleFxNow};document.querySelector('button[data-sort-plan="ChatGPT Plus"]').click()`);
+    assert.equal(await evaluate(`[...document.querySelectorAll('#priceRows tr[data-market-id] td:first-child')].every(td=>td.textContent==='—')`),true,'expired FX removes CNY ranks');
+    await evaluate(`Date.now=globalThis.__chatgptRealDateNow;delete globalThis.__chatgptRealDateNow;document.querySelector('button[data-sort-plan="ChatGPT Plus"]').click()`);
+  }
 
   await evaluate(`document.querySelector('#searchInput').value='<img src=x onerror=alert(1)>';document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);
   assert.equal(await evaluate(`document.querySelector('#emptyState').hidden`),false,'empty search state');

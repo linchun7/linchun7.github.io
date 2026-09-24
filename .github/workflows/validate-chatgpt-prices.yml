@@ -32,6 +32,7 @@ jobs:
           import pipeline
           from test_pipeline import data_fixture, revise
           data = data_fixture()
+          data['fx']['updated_at'] = pipeline.stamp(pipeline.epoch(data['generated_at']) - 86400)
           missing_fx = copy.deepcopy(data['markets'][0])
           missing_fx['code'] = 'de'
           missing_fx['name'] = '缺汇率测试'
