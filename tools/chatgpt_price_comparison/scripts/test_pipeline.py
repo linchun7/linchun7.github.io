@@ -74,6 +74,13 @@ class ParsingTests(unittest.TestCase):
     def test_country_identity(self):
         with self.assertRaises(ValueError): p.parse_store(fixture('jp','JPY',[['ChatGPT Plus','¥3,000']]), 'us')
 
+    def test_canonical_slug_can_change_when_storefront_and_app_id_match(self):
+        changed = fixture().replace(
+            p.url_for('us'),
+            'https://apps.apple.com/us/app/chatgpt-ai/id6448311069'
+        )
+        self.assertEqual(p.parse_store(changed, 'us')['currency'], 'USD')
+
     def test_fake_developer(self):
         with self.assertRaises(ValueError): p.parse_store(fixture().replace('1684349733','9999999999'), 'us')
 
@@ -150,14 +157,27 @@ class ObservationTests(unittest.TestCase):
         result = p.observe({'code':'us','name':'美国'}, old, NOW+100, lambda *a,**kw: fixture())
         self.assertNotIn('pending', result)
 
-    def test_redirect_country_or_host_rejected(self):
+    def test_redirect_country_host_or_app_rejected(self):
         handler = p.RestrictedRedirect()
-        for target in [p.url_for('jp'), 'http://apps.apple.com/us/app/chatgpt/id6448311069', 'https://evil.example/us/app/chatgpt/id6448311069']:
-            with self.subTest(target=target), self.assertRaises(ValueError): handler.redirect_request(Request(p.url_for('us')), None, 302, '', {}, target)
+        for target in [
+            p.url_for('jp'),
+            'http://apps.apple.com/us/app/chatgpt/id6448311069',
+            'https://evil.example/us/app/chatgpt/id6448311069',
+            'https://apps.apple.com/us/app/other/id1234567890',
+        ]:
+            with self.subTest(target=target), self.assertRaises(ValueError):
+                handler.redirect_request(Request(p.url_for('us')), None, 302, '', {}, target)
 
-    def test_language_redirect_allowed(self):
-        request = p.RestrictedRedirect().redirect_request(Request(p.url_for('de')+'?l=en-US'), None, 302, '', {}, p.url_for('de')+'?l=en-GB')
-        self.assertIn('en-GB', request.full_url)
+    def test_language_and_slug_redirect_allowed(self):
+        handler = p.RestrictedRedirect()
+        language = handler.redirect_request(Request(p.url_for('de')+'?l=en-US'), None, 302, '', {}, p.url_for('de')+'?l=en-GB')
+        self.assertIn('en-GB', language.full_url)
+        slug = handler.redirect_request(
+            Request(p.url_for('us')),
+            None, 302, '', {},
+            'https://apps.apple.com/us/app/chatgpt-ai/id6448311069'
+        )
+        self.assertIn('/us/app/chatgpt-ai/id6448311069', slug.full_url)
 
     def test_source_allowlist(self):
         with self.assertRaises(ValueError): p.fetch('https://example.com/')
