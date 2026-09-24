@@ -298,6 +298,16 @@ class ContractTests(unittest.TestCase):
         chile_pro20 = {'label':'ChatGPT Pro 20x','amounts':[{'amount':'199990'}]}
         self.assertEqual([a['amount'] for a in p.display_amounts({'offers':[chile_like,chile_pro20]}, chile_like)], ['19990'])
 
+        # Fail open when Pro 20x belongs to the lower price layer or sits
+        # outside the two Plus observations, even if it is numerically close.
+        wide_plus = {'label':'ChatGPT Plus','amounts':[{'amount':'20'},{'amount':'100'}]}
+        lower_layer_pro20 = {'label':'ChatGPT Pro 20x','amounts':[{'amount':'30'}]}
+        upper_layer_pro20 = {'label':'ChatGPT Pro 20x','amounts':[{'amount':'90'}]}
+        above_high_pro20 = {'label':'ChatGPT Pro 20x','amounts':[{'amount':'105'}]}
+        self.assertEqual([a['amount'] for a in p.display_amounts({'offers':[wide_plus,lower_layer_pro20]}, wide_plus)], ['20','100'])
+        self.assertEqual([a['amount'] for a in p.display_amounts({'offers':[wide_plus,upper_layer_pro20]}, wide_plus)], ['20'])
+        self.assertEqual([a['amount'] for a in p.display_amounts({'offers':[wide_plus,above_high_pro20]}, wide_plus)], ['20','100'])
+
     def test_verified_coverage_ratio_rounds_up_to_contract(self):
         self.assertEqual(p.minimum_verified_required(59), 48)
         self.assertEqual(p.minimum_verified_required(10), 10)

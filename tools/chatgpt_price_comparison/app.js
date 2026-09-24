@@ -239,9 +239,12 @@
     const pro20Amount = Number(pro20.amounts[0].amount);
     if (![low, high, pro20Amount].every(Number.isFinite) || low <= 0 || high <= low) return offer.amounts;
 
-    const plusGap = high - low;
-    const distanceToPro20 = Math.abs(high - pro20Amount);
-    return distanceToPro20 < plusGap ? [sorted[0]] : offer.amounts;
+    if (pro20Amount === high) return [sorted[0]];
+    if (!(low < pro20Amount && pro20Amount < high)) return offer.amounts;
+
+    const distanceToHigh = high - pro20Amount;
+    const distanceToLow = pro20Amount - low;
+    return distanceToHigh < distanceToLow ? [sorted[0]] : offer.amounts;
   }
   function minCny(market, plan) {
     const offer = offerFor(market, plan);

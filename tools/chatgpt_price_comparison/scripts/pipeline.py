@@ -514,9 +514,14 @@ def display_amounts(market: dict, offer: dict) -> list[dict]:
     if low <= 0 or high <= low:
         return amounts
 
-    plus_gap = high - low
-    distance_to_pro20 = abs(high - pro20_amount)
-    return [ordered[0]] if distance_to_pro20 < plus_gap else amounts
+    if pro20_amount == high:
+        return [ordered[0]]
+    if not low < pro20_amount < high:
+        return amounts
+
+    distance_to_high = high - pro20_amount
+    distance_to_low = pro20_amount - low
+    return [ordered[0]] if distance_to_high < distance_to_low else amounts
 
 
 def render_price_options(market: dict, plan: str, minimum: Decimal | None) -> str:
