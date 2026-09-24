@@ -29,6 +29,13 @@ FX_URL = 'https://open.er-api.com/v6/latest/USD'
 FRESH = 36 * 3600
 EXPIRE = 7 * 86400
 LIMIT = 4_000_000
+PENDING_CONFIRMATION_SECONDS = 18 * 3600
+MIN_VERIFIED_ABSOLUTE = 10
+MIN_VERIFIED_RATIO = Decimal('0.8')
+MIN_KNOWN_COVERAGE_RATIO = Decimal('0.6')
+OFFER_COUNT_DROP_RATIO = Decimal('0.5')
+PRICE_CHANGE_RATIO_LOW = Decimal('0.5')
+PRICE_CHANGE_RATIO_HIGH = Decimal('2')
 PLAN = re.compile(r'ChatGPT [A-Za-z0-9][A-Za-z0-9 +()./-]{0,70}\Z')
 AMOUNT = re.compile(r'(?:0|[1-9][0-9]*)(?:\.[0-9]{1,3})?\Z')
 ZERO_DECIMAL = {'JPY', 'KRW', 'VND', 'CLP', 'PYG', 'UGX', 'RWF', 'XOF', 'XAF'}
@@ -275,14 +282,14 @@ def unusual(old: dict, new: dict) -> bool:
         return True
     old_offers = {x['label']: x for x in old['offers']}
     new_offers = {x['label']: x for x in new['offers']}
-    if len(new_offers) < len(old_offers) / 2:
+    if Decimal(len(new_offers)) < Decimal(len(old_offers)) * OFFER_COUNT_DROP_RATIO:
         return True
     for label in old_offers.keys() & new_offers.keys():
         before, after = old_offers[label]['amounts'], new_offers[label]['amounts']
         if len(before) == len(after):
             for a, b in zip(before, after):
                 ratio = Decimal(b['amount']) / Decimal(a['amount'])
-                if ratio < Decimal('.5') or ratio > 2:
+                if ratio < PRICE_CHANGE_RATIO_LOW or ratio > PRICE_CHANGE_RATIO_HIGH:
                     return True
     return False
 
@@ -300,7 +307,7 @@ def observe(config: dict, old: dict | None, now: float, getter=fetch) -> dict:
             candidate = second
         if changed and old and old.get('offers') and unusual(old, candidate):
             pending = old.get('pending', {})
-            if pending.get('fingerprint') != candidate['fingerprint'] or now - epoch(pending['since']) < 18 * 3600:
+            if pending.get('fingerprint') != candidate['fingerprint'] or now - epoch(pending['since']) < PENDING_CONFIRMATION_SECONDS:
                 result['pending'] = {'fingerprint': candidate['fingerprint'], 'since': pending['since'] if pending.get('fingerprint') == candidate['fingerprint'] else stamp(now)}
                 result['status'] = 'pending'
                 return result
@@ -630,7 +637,10 @@ def run(output: Path, now: float | None = None) -> dict:
             print('SOURCE_ERROR', market['code'], market['error_detail'], flush=True)
     known = sum(bool(m['offers']) for m in markets)
     verified = sum(m['status'] == 'verified' for m in markets)
-    if verified < max(10, int(sum(bool(m['offers']) for m in previous.values()) * .8)) or known < len(config) * .6:
+    previous_known = sum(bool(m['offers']) for m in previous.values())
+    minimum_verified = max(MIN_VERIFIED_ABSOLUTE, int(Decimal(previous_known) * MIN_VERIFIED_RATIO))
+    minimum_known = Decimal(len(config)) * MIN_KNOWN_COVERAGE_RATIO
+    if verified < minimum_verified or Decimal(known) < minimum_known:
         raise ValueError('insufficient fresh source coverage; existing publication left untouched')
     required_currencies = {m.get('currency') for m in markets if m.get('offers') and m.get('currency')}
     fx = collect_fx(now, old.get('fx') if old else None, getter, required_currencies)
