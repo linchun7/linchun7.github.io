@@ -112,7 +112,7 @@
       for (const offer of market.offers) {
         if (typeof offer.label !== 'string' || !offer.label.startsWith('ChatGPT ')
           || !Array.isArray(offer.amounts) || !offer.amounts.length) throw Error('套餐数据不合法');
-        for (const amount of offer.amounts) {
+        for (const amount of displayAmounts(offer)) {
           if (typeof amount.amount !== 'string' || !/^\d+(\.\d{1,3})?$/.test(amount.amount)
             || typeof amount.display !== 'string'
             || (amount.cny != null && (typeof amount.cny !== 'string' || !/^\d+\.\d{2}$/.test(amount.cny)))) throw Error('金额格式错误');
@@ -136,6 +136,13 @@
     return [...ORDER.filter((p) => labels.includes(p)), ...labels.filter((p) => !ORDER.includes(p)).sort()];
   }
   function offerFor(market, plan) { return market.offers.find((offer) => offer.label === plan) || null; }
+  function displayAmounts(offer) {
+    if (!offer) return [];
+    if (offer.label !== 'ChatGPT Plus' || offer.amounts.length <= 1) return offer.amounts;
+    return [offer.amounts.reduce((lowest, amount) => (
+      Number(amount.amount) < Number(lowest.amount) ? amount : lowest
+    ))];
+  }
   function minCny(market, plan) {
     const offer = offerFor(market, plan);
     if (!offer || !usable(market.last_verified_at)) return null;
@@ -183,7 +190,7 @@
         card.disabled = true; country.textContent = '暂无可靠最低价'; price.textContent = '—';
       } else {
         const names = info.markets.map((m) => m.name);
-        country.textContent = names.length > 3 ? `${names.slice(0, 3).join('、')}等 ${names.length} 个地区` : names.join('、');
+        country.textContent = names.length > 3 ? `${names.length} 个地区并列最低` : names.join('、');
         price.textContent = formatCny(info.value);
         card.dataset.plan = plan; card.dataset.marketId = info.markets[0].code;
         card.title = `查看 ${shortPlan(plan)} 全球最低价地区`;
