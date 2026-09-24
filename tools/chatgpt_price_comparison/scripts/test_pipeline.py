@@ -279,34 +279,20 @@ class ContractTests(unittest.TestCase):
         result = p.collect_fx(NOW, None, lambda *a, **kw: json.dumps(payload), {'JPY'})
         self.assertEqual(set(result['rates']), {'USD', 'CNY', 'JPY'})
 
-    def test_plus_display_uses_structure_and_fails_open(self):
-        annual_like = {'label':'ChatGPT Plus','amounts':[{'amount':'19.99'},{'amount':'200'}]}
+    def test_main_table_uses_plan_local_minimum_without_cross_plan_inference(self):
+        plus = {'label':'ChatGPT Plus','amounts':[{'amount':'19.99'},{'amount':'200'}]}
         close_prices = {'label':'ChatGPT Plus','amounts':[{'amount':'19.99'},{'amount':'29.99'}]}
         three_prices = {'label':'ChatGPT Plus','amounts':[{'amount':'9.99'},{'amount':'19.99'},{'amount':'200'}]}
         one_price = {'label':'ChatGPT Plus','amounts':[{'amount':'19.99'}]}
-        pro20 = {'label':'ChatGPT Pro 20x','amounts':[{'amount':'200'}]}
         other_plan = {'label':'ChatGPT Pro 5x','amounts':[{'amount':'100'},{'amount':'200'}]}
+        unsorted = {'label':'ChatGPT Future','amounts':[{'amount':'40'},{'amount':'8'},{'amount':'20'}]}
 
-        self.assertEqual([a['amount'] for a in p.display_amounts({'offers':[annual_like,pro20]}, annual_like)], ['19.99'])
-        self.assertEqual([a['amount'] for a in p.display_amounts({'offers':[annual_like]}, annual_like)], ['19.99','200'])
-        self.assertEqual([a['amount'] for a in p.display_amounts({'offers':[close_prices,pro20]}, close_prices)], ['19.99','29.99'])
-        self.assertEqual([a['amount'] for a in p.display_amounts({'offers':[three_prices,pro20]}, three_prices)], ['9.99','19.99','200'])
-        self.assertEqual([a['amount'] for a in p.display_amounts({'offers':[one_price,pro20]}, one_price)], ['19.99'])
-        self.assertEqual([a['amount'] for a in p.display_amounts({'offers':[other_plan,pro20]}, other_plan)], ['100','200'])
-
-        chile_like = {'label':'ChatGPT Plus','amounts':[{'amount':'19990'},{'amount':'229990'}]}
-        chile_pro20 = {'label':'ChatGPT Pro 20x','amounts':[{'amount':'199990'}]}
-        self.assertEqual([a['amount'] for a in p.display_amounts({'offers':[chile_like,chile_pro20]}, chile_like)], ['19990'])
-
-        # Fail open when Pro 20x belongs to the lower price layer or sits
-        # outside the two Plus observations, even if it is numerically close.
-        wide_plus = {'label':'ChatGPT Plus','amounts':[{'amount':'20'},{'amount':'100'}]}
-        lower_layer_pro20 = {'label':'ChatGPT Pro 20x','amounts':[{'amount':'30'}]}
-        upper_layer_pro20 = {'label':'ChatGPT Pro 20x','amounts':[{'amount':'90'}]}
-        above_high_pro20 = {'label':'ChatGPT Pro 20x','amounts':[{'amount':'105'}]}
-        self.assertEqual([a['amount'] for a in p.display_amounts({'offers':[wide_plus,lower_layer_pro20]}, wide_plus)], ['20','100'])
-        self.assertEqual([a['amount'] for a in p.display_amounts({'offers':[wide_plus,upper_layer_pro20]}, wide_plus)], ['20'])
-        self.assertEqual([a['amount'] for a in p.display_amounts({'offers':[wide_plus,above_high_pro20]}, wide_plus)], ['20','100'])
+        self.assertEqual([a['amount'] for a in p.display_amounts(plus)], ['19.99'])
+        self.assertEqual([a['amount'] for a in p.display_amounts(close_prices)], ['19.99'])
+        self.assertEqual([a['amount'] for a in p.display_amounts(three_prices)], ['9.99'])
+        self.assertEqual([a['amount'] for a in p.display_amounts(one_price)], ['19.99'])
+        self.assertEqual([a['amount'] for a in p.display_amounts(other_plan)], ['100'])
+        self.assertEqual([a['amount'] for a in p.display_amounts(unsorted)], ['8'])
 
     def test_verified_coverage_ratio_rounds_up_to_contract(self):
         self.assertEqual(p.minimum_verified_required(59), 48)
