@@ -666,6 +666,7 @@ def render(data: dict, template: str) -> str:
         'DEFAULT_PLAN_SHORT': html.escape(short_plan(default_plan)),
         'APP_VERSION': hashlib.sha256((ROOT / 'app.js').read_bytes()).hexdigest()[:12],
         'STYLE_VERSION': hashlib.sha256((ROOT / 'style.css').read_bytes()).hexdigest()[:12],
+        'LUCIDE_VERSION': hashlib.sha256((ROOT.parent / 'icloud_price_comparison/vendor/lucide-subset.js').read_bytes()).hexdigest()[:12],
     }
     for key, value in values.items():
         marker = '{{' + key + '}}'
