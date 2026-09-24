@@ -20,6 +20,11 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("- cloudflare", self.text)
         self.assertNotIn("\n  push:\n", self.text)
 
+    def test_prepare_and_generate_resolve_latest_main(self):
+        # Scheduled/dispatch runs can wait behind the primary. Resolve main when
+        # the jobs actually start so the backup sees a just-published primary.
+        self.assertGreaterEqual(self.text.count("ref: main"), 2)
+
     def test_daily_guard_requires_successful_production_proof(self):
         self.assertIn("daily_run_guard.py", self.text)
         self.assertIn("production_success_today", self.text)
