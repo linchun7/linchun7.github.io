@@ -340,6 +340,8 @@ class ContractTests(unittest.TestCase):
         self.assertRegex(page, r'lucide-subset\.js\?v=[a-f0-9]{12}')
         self.assertIn('data-lucide="arrow-up"',page)
         self.assertIn('mobile-rank-sr visually-hidden',page)
+        self.assertIn('已覆盖地区价格排名第 1',page)
+        self.assertNotIn('全球价格排名第',page)
         plus_cell = re.search(r'<td class="price-cell[^"]*" data-plan="ChatGPT Plus">([\s\S]*?)</td>', page)
         self.assertIsNotNone(plus_cell)
         self.assertIn('<span class="price-local">$19.99</span>', plus_cell.group(1))
@@ -368,7 +370,7 @@ class ContractTests(unittest.TestCase):
         self.assertIn('JP · — · 暂无标价',page)
         self.assertIn('<span class="mobile-rank-sr visually-hidden">排名暂不可用</span>',page)
         self.assertIn('，暂无价格历史',page)
-        self.assertNotIn('全球价格排名第 —',page)
+        self.assertNotIn('全球价格排名第',page)
         self.assertNotIn('JP · — · unavailable',page)
 
     def test_static_price_ties_use_stable_market_code_order(self):
