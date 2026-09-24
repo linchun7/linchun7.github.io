@@ -364,8 +364,8 @@ def collect_fx(now: float, old: dict | None, getter=fetch, required_currencies=(
     except (ValueError, KeyError, TypeError, urllib.error.URLError, TimeoutError, OSError):
         if old and -300 <= now - epoch(old['updated_at']) <= EXPIRE:
             old_rates = old.get('rates', {})
-            if all(code in old_rates for code in required):
-                selected = {code: str(old_rates[code]) for code in required}
+            selected = {code: str(old_rates[code]) for code in required if code in old_rates}
+            if 'USD' in selected and 'CNY' in selected:
                 return dict(old, rates=selected, fallback=True)
         return None
 
