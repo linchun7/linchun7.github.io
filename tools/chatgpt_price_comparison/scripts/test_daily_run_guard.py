@@ -31,11 +31,30 @@ class DailyRunGuardTests(unittest.TestCase):
 
     def test_previous_beijing_day_runs(self):
         data = data_fixture()
-        data["generated_at"] = p.stamp(NOW - 86400)
+        previous = NOW - 86400
+        data["generated_at"] = p.stamp(previous)
+        data["fx"]["updated_at"] = p.stamp(previous)
+        for market in data["markets"]:
+            market["last_checked_at"] = p.stamp(previous)
+            if market.get("offers"):
+                market["last_verified_at"] = p.stamp(previous)
         revise(data)
         result = guard.decide("schedule", None, data, NOW)
         self.assertTrue(result["should_run"])
         self.assertFalse(result["clean_today"])
+
+    def test_unavailable_market_is_not_treated_as_degraded(self):
+        data = data_fixture()
+        market = data["markets"][0]
+        market["offers"] = []
+        market["status"] = "unavailable"
+        market.pop("currency", None)
+        market.pop("unclassified_labels", None)
+        market.pop("source_sha256", None)
+        market.pop("fingerprint", None)
+        market.pop("last_verified_at", None)
+        revise(data)
+        self.assertFalse(guard.decide("schedule", None, data, NOW)["should_run"])
 
     def test_retained_or_pending_market_keeps_backup_active(self):
         for status in ("retained", "pending"):
