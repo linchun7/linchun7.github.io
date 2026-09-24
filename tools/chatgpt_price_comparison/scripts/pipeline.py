@@ -616,7 +616,7 @@ def render(data: dict, template: str) -> str:
 
     def sort_key(market: dict):
         value = offer_min_cny(market, default_plan)
-        return (value is None, value if value is not None else Decimal('Infinity'), market['name'])
+        return (value is None, value if value is not None else Decimal('Infinity'), market['code'])
 
     rows = []
     for market in sorted(data['markets'], key=sort_key):
