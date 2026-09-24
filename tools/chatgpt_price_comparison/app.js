@@ -97,6 +97,34 @@
     existing.replaceWith(icon);
   }
 
+  function validateHistorySnapshot(snapshot) {
+    if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)
+      || Object.keys(snapshot).sort().join(',') !== 'currency,offers'
+      || !/^[A-Z]{3}$/.test(snapshot.currency || '')
+      || !Array.isArray(snapshot.offers) || snapshot.offers.length < 1 || snapshot.offers.length > 40) {
+      throw Error('历史快照格式错误');
+    }
+    const labels = new Set();
+    for (const offer of snapshot.offers) {
+      if (!offer || typeof offer !== 'object' || Array.isArray(offer)
+        || Object.keys(offer).sort().join(',') !== 'amounts,label'
+        || typeof offer.label !== 'string'
+        || !/^ChatGPT [^\x00-\x1f\x7f<>]{1,70}$/.test(offer.label)
+        || labels.has(offer.label)
+        || !Array.isArray(offer.amounts) || offer.amounts.length < 1 || offer.amounts.length > 20) {
+        throw Error('历史套餐格式错误');
+      }
+      labels.add(offer.label);
+      let previous = -Infinity;
+      for (const amount of offer.amounts) {
+        if (typeof amount !== 'string' || !/^\d+(\.\d{1,3})?$/.test(amount)) throw Error('历史金额格式错误');
+        const numeric = Number(amount);
+        if (!Number.isFinite(numeric) || numeric <= previous) throw Error('历史金额顺序错误');
+        previous = numeric;
+      }
+    }
+  }
+
   function validate(value) {
     if (value?.schema !== 1 || value.channel !== 'ios-app-store'
       || value.billing_period !== 'not_disclosed' || value.purchase_eligibility !== 'not_verified'
@@ -121,6 +149,19 @@
       }
     }
     if (!Array.isArray(value.changes) || value.changes.length > 200) throw Error('历史格式错误');
+    let previousChangeAt = -Infinity;
+    const generatedAt = Date.parse(value.generated_at);
+    for (const change of value.changes) {
+      if (!change || typeof change !== 'object' || Array.isArray(change)
+        || Object.keys(change).sort().join(',') !== 'after,at,before,code'
+        || !/^[a-z]{2}$/.test(change.code || '')) throw Error('历史记录格式错误');
+      const changedAt = Date.parse(change.at);
+      if (!Number.isFinite(changedAt) || changedAt > generatedAt || changedAt < previousChangeAt) throw Error('历史时间错误');
+      previousChangeAt = changedAt;
+      validateHistorySnapshot(change.before);
+      validateHistorySnapshot(change.after);
+      if (canonical(change.before) === canonical(change.after)) throw Error('历史记录无变化');
+    }
     return value;
   }
 
