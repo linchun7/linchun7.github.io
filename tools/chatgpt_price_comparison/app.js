@@ -202,11 +202,14 @@
   function minCny(market, plan) {
     const offer = offerFor(market, plan);
     if (!offer || !usable(market.last_verified_at)) return null;
-    const values = offer.amounts.map((a) => Number(a.cny)).filter(Number.isFinite);
+    const values = offer.amounts
+      .filter((amount) => amount.cny != null)
+      .map((amount) => Number(amount.cny))
+      .filter(Number.isFinite);
     return values.length ? Math.min(...values) : null;
   }
   function cnyText(market, amount) {
-    if (!state.data.fx || !usable(state.data.fx.updated_at) || !usable(market.last_verified_at)) return '—';
+    if (!state.data.fx || !usable(state.data.fx.updated_at) || !usable(market.last_verified_at) || amount.cny == null) return '—';
     const value = Number(amount.cny);
     return Number.isFinite(value) ? `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—';
   }
@@ -329,7 +332,7 @@
 
   function isMinimum(plan, market, amount) {
     const info = state.minimums.get(plan);
-    return !!info && Number.isFinite(info.value) && info.markets.some((m) => m.code === market.code)
+    return !!info && amount.cny != null && Number.isFinite(info.value) && info.markets.some((m) => m.code === market.code)
       && Number.isFinite(Number(amount.cny)) && Math.abs(Number(amount.cny) - info.value) <= .005;
   }
 
