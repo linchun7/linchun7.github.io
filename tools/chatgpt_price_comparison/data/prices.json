@@ -3,7 +3,7 @@
   "channel": "ios-app-store",
   "billing_period": "not_disclosed",
   "purchase_eligibility": "not_verified",
-  "generated_at": "2026-09-24T09:01:20Z",
+  "generated_at": "2026-09-24T09:49:05Z",
   "markets": [
     {
       "code": "us",
@@ -56,17 +56,17 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "USD",
       "unclassified_labels": [
         "100 Credits",
         "1000 Credits",
         "500 Credits"
       ],
-      "source_sha256": "2d30734b623787a97832d81c24fe4efeec8ec730f9aa018e52d6bbd1fe3ab9cd",
+      "source_sha256": "4ee36fd92d39f806526606914f8735204e1a250cc8d2f48dc77be040466192fa",
       "fingerprint": "20b3c44e183e3efdf4f7fd029714604e7c2f15918c214a3f0009fcfe92cecfa5",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "gb",
@@ -119,13 +119,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "GBP",
       "unclassified_labels": [],
-      "source_sha256": "5d6156357d648c81515ea8688b09d6c3a5a59165be7f79231d42849e142982c0",
+      "source_sha256": "8a6becab40c1e3f71fa86cf4f004e30b7f6dcade97420545fab563d6fddb7c13",
       "fingerprint": "694f4d5c9ef7ccab2b3758de227d26c790cd5e94a441eecc0225e9efd4e0a0c1",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "ca",
@@ -178,13 +178,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "CAD",
       "unclassified_labels": [],
-      "source_sha256": "b5af2d2ba42ee462da55353360b9ba5269f1b059d76ada3ba68e3504959d3494",
+      "source_sha256": "9fce46ab08189c08b8423dc9f6203bc5a8489690c6784bdba0b19703b6092ec8",
       "fingerprint": "22a4b86c896b83e428ca738f56bc883740349d850c8a0eb9c8f3a65455ee5083",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "au",
@@ -237,13 +237,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "AUD",
       "unclassified_labels": [],
-      "source_sha256": "32c59ed9c6e9b828e609e491b3a89f477f3bdfbf5fa0089b5354b0b79e69eb64",
+      "source_sha256": "e7f009431d5fc2a33601415e81e869bc50d6a23191b094ea29ee6c07d1f713d2",
       "fingerprint": "389a0a65fa4e6e31b4931f6c61be6b8c78879d76fad0ce79befff1574f01c652",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "nz",
@@ -296,13 +296,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "NZD",
       "unclassified_labels": [],
-      "source_sha256": "582714dc8962d0e418f87623825ef1bc7e7294297b3d287220437f9812ff7823",
+      "source_sha256": "2ef7a13a867d979d8303cb4ed90cd19ace5c46d10a7ae6624b82ea52925905d3",
       "fingerprint": "f98dfde29efa1948905ddbf0320dd6d419b2fe80ec3970f3a14dcb03615bafab",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "jp",
@@ -355,13 +355,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "JPY",
       "unclassified_labels": [],
-      "source_sha256": "d6176a8a69a12436544b725e498d91f9b69ec1a5570d9de1da2d426a578a0bd2",
+      "source_sha256": "b5ec7f87646bb8a1c35e509d2c388c884bc2fafe977fc3699444e02c06bb7f3e",
       "fingerprint": "a64d32dd5b2ce567bed04e47f9b9228b4a775a4d6ae7f947437b1de1265bec80",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "kr",
@@ -414,13 +414,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "KRW",
       "unclassified_labels": [],
-      "source_sha256": "c350305d00a265278e2bba35e4b3f29f67e50bbb6195be4a8dc5e27464a3468d",
+      "source_sha256": "dae913df343b36973e1edf69beff943d573e868686b656cef3932f16893fbaa5",
       "fingerprint": "8ecba181789de0b1d9ff0e044ef0e23d7afab79dccc2e8a86a801c445d5c1bfd",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "tw",
@@ -473,13 +473,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "TWD",
       "unclassified_labels": [],
-      "source_sha256": "8861450a977f5337e6ada541d8190ba302ba5f6eea7326ad4b3a307ea3768dfa",
+      "source_sha256": "414b8f155d86264fdfc2947d79508d726ec31fbc80a52bf85b9289b1774351b5",
       "fingerprint": "b1ad32661665eec20dfb213280460aa0fbdd7ce059121a29d706a5edc2c0af51",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "sg",
@@ -532,13 +532,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "SGD",
       "unclassified_labels": [],
-      "source_sha256": "f92dacd820237bdf87e70ca766a1a1c544b1a2796cf11f6b7a167ab13470817b",
+      "source_sha256": "1ab17bfc82115f9464af12bd7443c890b1d97b20f14cc6dc731743fd576327ee",
       "fingerprint": "f1c574f3c156513093c254817171751654fcef8e6833ea53e3b8163fc50ff006",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "my",
@@ -591,13 +591,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "MYR",
       "unclassified_labels": [],
-      "source_sha256": "e2e426447cb355927701346a593db1d0bbeb65c961669eca96ec22d7ca284273",
+      "source_sha256": "fe23a4acffa16cc3694adaaf6d6257d1dfee65a2ed3747f6e0caa51067a3b7ff",
       "fingerprint": "25c7125ee15a1e5f0bbe294dea84b5eab22ff659c88298db9cd140889cca8e71",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "th",
@@ -650,13 +650,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "THB",
       "unclassified_labels": [],
-      "source_sha256": "d21bae0b3885d376bb6a92b058ce3c2d88b8577d7af8f57f1e42c1985b214819",
+      "source_sha256": "6e661081f4c1ecf27b6a9e4d7d2e64bc716e8648bd60a9c84f33a86ab398b20e",
       "fingerprint": "4ad37e2b0bdd64d17919720cd689e2277b85782f65e5490438da5bd14d71b483",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "vn",
@@ -709,13 +709,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "VND",
       "unclassified_labels": [],
-      "source_sha256": "0ee2fa1d39992cdf4d82e2a6582271e9d61f584e0f4515910517fb6dc2bb0487",
+      "source_sha256": "79af74d37b394f4a3cbf0414fa6566a94c8253c23b3af99f6edcf5500b89d9d9",
       "fingerprint": "8b6f09dbec84d3484802af2392d31e7060ded9f3fa76e8dea30cac1414508e32",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "id",
@@ -768,13 +768,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "IDR",
       "unclassified_labels": [],
-      "source_sha256": "153e695c510c7c9c9199f75993a3d0ac4d33aff3ac7cb0d6501f0292db7fc6c2",
+      "source_sha256": "b3053831b176fa38175745d8c4bc7d8459c525e3fa235ca5c860301a25f4595b",
       "fingerprint": "b11b3e42e04a95157d292e7f32f14fd82e7f3c0fba974fc61dd33227e0ce1652",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "ph",
@@ -827,13 +827,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "PHP",
       "unclassified_labels": [],
-      "source_sha256": "a396ad84ce5cde74e040d2d54d3b880256f13302de7152e102a6ffd892730c62",
+      "source_sha256": "85cd5771960b066d605691d963fcb3060a0b991998767ab377c3f0d4e8839a4c",
       "fingerprint": "98271499dab6d45c1b335356e100740088adc3fc5f8ed770a81f07922248386e",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "in",
@@ -886,13 +886,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "INR",
       "unclassified_labels": [],
-      "source_sha256": "db88ce7088ac69709fb7883058e5b94c161dcaab8c0af9f6cff88460af0ff44b",
+      "source_sha256": "ecadb64a01cdaf1dea34b07bba99462bf55a085a6a80da6ca486ffa5d17bdc49",
       "fingerprint": "253c5368ba59d570ad1b92eb85d61f9ca641239cd75cd450c2a1c1497cc8bd90",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "pk",
@@ -945,23 +945,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "PKR",
       "unclassified_labels": [],
-      "source_sha256": "3f19d374afbfd732b7e207a55f7b8ecc58b9cfe1093b6f7eb0e233ff692e818e",
+      "source_sha256": "60f026d52932043f73e0979625b176b4a96c2d725b70338ec2da5dea88bf0cb0",
       "fingerprint": "aa2985e7b200fe3caec4d812f472d0d76a8fbb9bf932c599c47d7d04c0d0f5c5",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
-    },
-    {
-      "code": "bd",
-      "name": "孟加拉国",
-      "source_url": "https://apps.apple.com/bd/app/chatgpt/id6448311069",
-      "offers": [],
-      "last_checked_at": "2026-09-24T09:01:20Z",
-      "status": "unavailable",
-      "error": "source_unverified",
-      "error_detail": "ValueError: cross-origin, country or path redirect rejected"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "lk",
@@ -1014,13 +1004,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "USD",
       "unclassified_labels": [],
-      "source_sha256": "e6081c6521dd27bb4c0b5310ff1131dcc1d6a8b9a640202d3d60ddf6f64e683c",
+      "source_sha256": "61293b5300092bc75e6d74a828cfe4b992c212bf29dbcb1673c99da0d0bb990a",
       "fingerprint": "4792e2ea0c750968d58ed214af6617f36a27eefdd7243f5b7ba72dad79cee551",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "np",
@@ -1073,13 +1063,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "USD",
       "unclassified_labels": [],
-      "source_sha256": "0a3dd91159351adb91becf0bc1870b94cf68fdc9bce6f548396850c1ab56d553",
+      "source_sha256": "17651af92bfd09470efe8792983b0160272a4dd0131a405fd5cedf3740e858ad",
       "fingerprint": "95e732b314be45adc7ed0395ea9c191aacd4b4acdddee76df59e9e8a317cf5ee",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "tr",
@@ -1132,13 +1122,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "TRY",
       "unclassified_labels": [],
-      "source_sha256": "58029c712cb0f2a4ddfa841467064c288a07404eaedf535ca81210b8d9269159",
+      "source_sha256": "3418de6806803c864120383d7091a0c066f4c5ef6573a5eea1486b500d2f4192",
       "fingerprint": "9ca7247ecf01658f87021f9f754e185fd0da7e15c217ee7093b99b7c0864aeab",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "br",
@@ -1191,13 +1181,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "BRL",
       "unclassified_labels": [],
-      "source_sha256": "37ff4904ca4d84bcd718395610886b4d901e90ec993be64e3333840d65d54a3c",
+      "source_sha256": "6a316902d7ab4c7ed7e06e5f0eb0c2b3097e9d507b588e9e775999be4b41fc62",
       "fingerprint": "27da107efa8a1015f94994468df8d5f305ad5a6369fc03c62c22db76fc574a5c",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "mx",
@@ -1250,13 +1240,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "MXN",
       "unclassified_labels": [],
-      "source_sha256": "b3a7bdd3f491973790fcb53561e4b2920bc97aad722aac6ff9826759a3cffe50",
+      "source_sha256": "3f6fa331002810b0033fa35799bf993892934c7d0bb6ba1d500c77f1884a8b49",
       "fingerprint": "57fc7efbf24f930ed86fec19a017649d56e0f8a4961c07998406970a17a7eb78",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "ar",
@@ -1309,13 +1299,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "USD",
       "unclassified_labels": [],
-      "source_sha256": "30a9fdec111983ca1943deab98bdf8b33b42db9c0b0da7a51c50a9888fe8010d",
+      "source_sha256": "3e830c4e6b80991605f0f6108976e00587a8cd2720846093470de4badba3ccad",
       "fingerprint": "04253baade283db23cf17d5c4a068e127fc65d686b6daffa3115561cd127fb47",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "cl",
@@ -1368,13 +1358,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "CLP",
       "unclassified_labels": [],
-      "source_sha256": "0040c004469dfbaa8e935139d4dd4776a05c561f2e011ff9766df34b44926b9c",
+      "source_sha256": "80cf403d8a69be1de60591b6b5c07a40fad5fde7e1f763401937f30332995ca8",
       "fingerprint": "7ce4b60b5efb362cfe9d87f4e8fb6c0facae8ae6d59bae2ccba4c8eeb4e12c58",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "co",
@@ -1427,13 +1417,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "COP",
       "unclassified_labels": [],
-      "source_sha256": "461eb7c92a8ea626a67a16b91a10969aca0458c7f7d8ab1470faed16456e9c42",
+      "source_sha256": "7ab06dbed2c305f832c335fae8e4731024645958adf57a34148c337c37c4489e",
       "fingerprint": "96a2f27d191631ce6e126860eeaae2bb468e1897594652f23bc8cfd38bf19ea7",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "pe",
@@ -1486,13 +1476,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "PEN",
       "unclassified_labels": [],
-      "source_sha256": "5c8c3e89eaa42462700bf728f8a14702fd96e7171812def104da51c82584afb5",
+      "source_sha256": "126f8bd0beeeb195dc9fe3cfef4567146d11a0a2554af786fc7fcf5ee4bd4f12",
       "fingerprint": "85eb58b265a1cd6d23e0b6ee1bc7ec2f274e9caf26338e39c7db9a4403b5d8b1",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "uy",
@@ -1545,13 +1535,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "USD",
       "unclassified_labels": [],
-      "source_sha256": "f3fc5091267d9354a494448b903fbffc52cbc74bb6d3176831b2e500f7663ee0",
+      "source_sha256": "bc1e59c82d522534ee20907d9171e22616d95c17a553ac33573aed07a57d2c4a",
       "fingerprint": "5c44bee53b513759a4ce1b013fc2bd8046040eb71aaf8b5e858fe1b497f1a167",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "za",
@@ -1604,13 +1594,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "ZAR",
       "unclassified_labels": [],
-      "source_sha256": "7ef395deacceeaf24c4aed1dfe8ad949b7ea8384d202614237166ac358655b62",
+      "source_sha256": "12c074212f73716a666e50f4cb0719dab8c6298cd3c340bb12216e890d3d48da",
       "fingerprint": "81b3d20d68d2e5f95b9fd08184c4a30afcf8dab572b7248586c15e07affcb62c",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "eg",
@@ -1663,13 +1653,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "EGP",
       "unclassified_labels": [],
-      "source_sha256": "237cbbaf1e252668f70435c29397d60f282282b838d23fab12d519b1ef98d837",
+      "source_sha256": "932bb4de1c61888c15b5d9284b547b2af905f73501234344be061611a86cc7fa",
       "fingerprint": "b6995ea5f50e1e011232ca2337f59f39d52b34c2b9392ef3355dcbad06694042",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "sa",
@@ -1722,13 +1712,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "SAR",
       "unclassified_labels": [],
-      "source_sha256": "e65bf725243e289b3cb7f1ee4459065e25c71c6fd1b987a77d33032550e1e426",
+      "source_sha256": "f844d76256df33dc09845a832484bf1096ce999754045dfdd718291b6bbcf920",
       "fingerprint": "6a044be91eb2e71a45af0a6470ff6e6c3c159f02d23d685a5148a7aea808ea71",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "ae",
@@ -1781,13 +1771,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "AED",
       "unclassified_labels": [],
-      "source_sha256": "d5863e0134772f91a0471ac3e78e83ea34274ea02fa6beaa362b514222c2bdb8",
+      "source_sha256": "8de0421a5d2e3b9276e65c7a1f7100049d49f3090f406e74c25f79386be6432f",
       "fingerprint": "b0d6a10a8311299dbfcd01c2a42239aa4b79a011719cdb68891fe8632f2a9854",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "il",
@@ -1840,13 +1830,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "ILS",
       "unclassified_labels": [],
-      "source_sha256": "acfc27d32246fd141bb33a8c8767b36732b33ae26361cf388745e0ba0d5dbd04",
+      "source_sha256": "fae39951a1c1d875ab73a03b4ed891dee39c8b30886e85dee4afd0911f050063",
       "fingerprint": "425093a8fb2b02081635447a85dee375e09e444f265987bd37a79c7f76638363",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "qa",
@@ -1899,13 +1889,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "QAR",
       "unclassified_labels": [],
-      "source_sha256": "a4c86e1dfea6388af75c6dbb9441157b09f4509b40b6ec04c3e0866aa37ee7ab",
+      "source_sha256": "ab78b32c9206ed9e6b3f616fbe27b98d2b89e4fbebbbe771514fe2ee25b6533c",
       "fingerprint": "c5121ba889a52f051fcd40d7b54ad86dd197860ac3c35492271767f7359d6025",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "kw",
@@ -1958,13 +1948,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "USD",
       "unclassified_labels": [],
-      "source_sha256": "99082f6fd281b4c639fe99ed8315e8b70aa982abd38a78d3e136286ec898b8a6",
+      "source_sha256": "7f94cf7ac7bc21328ca45873f84fac918a8cbc7a4ea139775a5ee378cdd7d917",
       "fingerprint": "f64efdf493f1c65c7a1c5280e3f08ef2071fad4017b16ae3af3c45f9c7372f77",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "bh",
@@ -2017,13 +2007,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "USD",
       "unclassified_labels": [],
-      "source_sha256": "7c61638173a3a617809619ba81e2bd820d8249843e6e942902333ad780bf6582",
+      "source_sha256": "c02d00b36f8c0cb8fb12763f52e4a533934f819e5bd38d890ceb23a4fdec84cc",
       "fingerprint": "2fb017986c6bd6a95774e1779ac97142f36d65b62038ae6f8e1ecdcdb0b1b3e7",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "om",
@@ -2076,13 +2066,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "USD",
       "unclassified_labels": [],
-      "source_sha256": "991dd8ca0ef9a3fd38ffa8600b6cf85b2576aa591ba514a9e5425e77754bba04",
+      "source_sha256": "fe21b19f7188d0e1ad03613467ef391637741f4b8c67ddc02de035631fe26c9d",
       "fingerprint": "5ea513cf9079121537b5562c3617f61b7b07c2152a445db1f6ed084df2ddda9b",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "de",
@@ -2135,13 +2125,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "EUR",
       "unclassified_labels": [],
-      "source_sha256": "1a2d1c93e672acf6d705c840d679b6ae4b67b38e2d64f073e1169ec6ce0f87d7",
+      "source_sha256": "23bda6e87ebad08834a1e1595cba1480d569b24681dd2f5434e9ee007959b6ae",
       "fingerprint": "1eb766856847d84d556276b14eab859f4013c17a79577e5961cbb4e0b910a2d1",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "fr",
@@ -2194,13 +2184,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "EUR",
       "unclassified_labels": [],
-      "source_sha256": "b85d3a9125c66fd1305b901915ab04d8168bba7d9c3c715aa772e2fbc728544d",
+      "source_sha256": "100911848a1d677e7dc9333718b309da05835b862a743d374320457fb560ca51",
       "fingerprint": "1eb766856847d84d556276b14eab859f4013c17a79577e5961cbb4e0b910a2d1",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "it",
@@ -2253,13 +2243,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "EUR",
       "unclassified_labels": [],
-      "source_sha256": "e313468f6dc76caee0eb75744786023fa58eeed388b44763d54f407421b7c414",
+      "source_sha256": "b7848f25f9b473428afbde6d8c55b41d211492e9c4523e62b3820940fe32ed20",
       "fingerprint": "1eb766856847d84d556276b14eab859f4013c17a79577e5961cbb4e0b910a2d1",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "es",
@@ -2312,15 +2302,15 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "EUR",
       "unclassified_labels": [
         "100 Credits"
       ],
-      "source_sha256": "67ffcb0a45431b2d167fd499f39e9ec5a3385f8c09027cf94dcd97afa79c470f",
+      "source_sha256": "1295be1a0016455ba4ed34950ee47471329e8db9abfefadc00a871aab7393f81",
       "fingerprint": "1eb766856847d84d556276b14eab859f4013c17a79577e5961cbb4e0b910a2d1",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "pt",
@@ -2373,15 +2363,15 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "EUR",
       "unclassified_labels": [
         "100 Credits"
       ],
-      "source_sha256": "ca2aa30bc730effbf2802beb46fae300498658638e2544a68f7007c90e5165bf",
+      "source_sha256": "12379946b2344229081633a2b554f62b8dca5df803e4f04cf8b7686d9e063ef4",
       "fingerprint": "1eb766856847d84d556276b14eab859f4013c17a79577e5961cbb4e0b910a2d1",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "nl",
@@ -2434,13 +2424,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "EUR",
       "unclassified_labels": [],
-      "source_sha256": "b3a7fd87d8e0cc44682133d47c458d4357318240343889a71e1823e2e7ac6f1c",
+      "source_sha256": "705433cf01ba1a39b74a86195e357510615d44208f75f2ecac42c1bba5267614",
       "fingerprint": "1eb766856847d84d556276b14eab859f4013c17a79577e5961cbb4e0b910a2d1",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "be",
@@ -2493,13 +2483,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "EUR",
       "unclassified_labels": [],
-      "source_sha256": "9c268184f88fbae16d5cbb2ad929674ff4511efdcdb8354e2a8acd0ecb670969",
+      "source_sha256": "583b5f1eb2274a6c543d7336145515ea00fe6cbad5b90f6ee499b0c07c5b40f4",
       "fingerprint": "1eb766856847d84d556276b14eab859f4013c17a79577e5961cbb4e0b910a2d1",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "at",
@@ -2552,13 +2542,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "EUR",
       "unclassified_labels": [],
-      "source_sha256": "d67ac1401925942c77954df80b6d802627ede0d78c93731a8af3a6e574c06bb5",
+      "source_sha256": "bec3940f587c35863d8909d66470ab874072f2761a8d57614b564f3308e7a7c5",
       "fingerprint": "1eb766856847d84d556276b14eab859f4013c17a79577e5961cbb4e0b910a2d1",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "ie",
@@ -2611,13 +2601,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "EUR",
       "unclassified_labels": [],
-      "source_sha256": "6106f4bb7ae64b802c59c9d42b60e57ab7f1132471256433c0b61f94c8d8fc61",
+      "source_sha256": "000b2c77d5306e4c25faf9f532910cae56c101062731dd5dde055b0936126821",
       "fingerprint": "1eb766856847d84d556276b14eab859f4013c17a79577e5961cbb4e0b910a2d1",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "fi",
@@ -2670,13 +2660,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "EUR",
       "unclassified_labels": [],
-      "source_sha256": "c310bb6a914474eb9f28b0f4b2e37202b76c77a1786aeb0bd041e95934e0605b",
+      "source_sha256": "91e4be1c5b168dc1e2878eae2c30607703a18f9ccdfd12b30a81602c318e0225",
       "fingerprint": "1eb766856847d84d556276b14eab859f4013c17a79577e5961cbb4e0b910a2d1",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "gr",
@@ -2729,13 +2719,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "EUR",
       "unclassified_labels": [],
-      "source_sha256": "0803ed331b25914190e5f61c6c2ba48fb6d917831e41e64dee00e4261163a969",
+      "source_sha256": "6b5c885d027a99269b5d640102c72cd1f41dd45e855708d63a50d98c4f6d46f9",
       "fingerprint": "1eb766856847d84d556276b14eab859f4013c17a79577e5961cbb4e0b910a2d1",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "cz",
@@ -2788,13 +2778,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "CZK",
       "unclassified_labels": [],
-      "source_sha256": "bedbe750c340c219284f5fa8d690c74aa3bfa864a13b5b3f1c37e881c83d9333",
+      "source_sha256": "795a04611a8de9f41544befde68cb25cb25d88d1d6e5314dc4c1d58dbac4160e",
       "fingerprint": "d4061762498b8d8829afe8f901f7a20e07c4bcc6c06deede33d414ea0d3b3958",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "pl",
@@ -2847,13 +2837,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "PLN",
       "unclassified_labels": [],
-      "source_sha256": "63342900fdd6da745404de82e6d4fca7b679a8ad2ee434a66ec3f98e4c37e23f",
+      "source_sha256": "90ff732cdc48fb121686badfb2420c274d836135aa927563c9aadbd74674ab01",
       "fingerprint": "589229be07def7db528df4013ca6a4ca7da677550e5e3e5fc425eb445c08d4e5",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "ro",
@@ -2906,13 +2896,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "RON",
       "unclassified_labels": [],
-      "source_sha256": "33eb34c428c07227771f61a12ee406a3a23b3986c6b8f94c653425065da6b982",
+      "source_sha256": "b628dd5d38f39d7eab9175ead083a8923cfba4e9b4e003cf112db141fd694f1f",
       "fingerprint": "bb5c7f52def3f2ae8bb125b23c80dc81cfef9ab4cd4f3f6f3ab0a9250029e927",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "hu",
@@ -2965,13 +2955,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "HUF",
       "unclassified_labels": [],
-      "source_sha256": "31d776ebd23ff99aed386511f7a7ecb645222951e68b484ab4f37abf7754f9d1",
+      "source_sha256": "960109c04135a80479a315c96963d4e0a61a804c199e20f442105d0ccd21c6e1",
       "fingerprint": "846467c62fe489a90e47ff35d7ca54b4671042bea5ed3266606f1fe086b67782",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "se",
@@ -3024,13 +3014,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "SEK",
       "unclassified_labels": [],
-      "source_sha256": "2741f24166e483e8a9381a656fe64bec405bc35f2fbc3c3694b1cfa15b3eee31",
+      "source_sha256": "3320bd409bb458fadadd0e61897dfb84fe456db523bc15c85755158739b06551",
       "fingerprint": "ed6bcd9ff66e6fca87f6021ee9c323b037abd69700af767659bc0df6f712d31f",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "no",
@@ -3083,13 +3073,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "NOK",
       "unclassified_labels": [],
-      "source_sha256": "8dc27f9cd40bc310764c4994f9adb31732fa5b9a14aec0718bb2481fe1008203",
+      "source_sha256": "b4d1c68bdbd42877ae4e9602c219c298336c0d101b5bccd82840ca69a43fdc6b",
       "fingerprint": "2ad63df4fa73daad479bd763c2f0fce3fc0cadc770327f0f89445c53e2bb0f45",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "dk",
@@ -3142,13 +3132,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "DKK",
       "unclassified_labels": [],
-      "source_sha256": "3850aa11949ef6b7f47ab36f6853c760e15ff50bffaddc213a9410661a0c1a4c",
+      "source_sha256": "23e8762f1ac9d8b6b8df1ec3a54b6c1ff3b12cc07c65de9ddd62824613546c73",
       "fingerprint": "a2212ae9dd91f49e9a44e7ba7b6d7bfba03b6fb8989bdeda90ef6205cf84645a",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "ch",
@@ -3201,13 +3191,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "CHF",
       "unclassified_labels": [],
-      "source_sha256": "327f5c44064dcf8693161d5bbcf969ebe275142c87b0f1ebd8edfdaaaa237976",
+      "source_sha256": "c4f713ad49ece28cb4854cc0c8032decd7c32ebac1578cd5344a96c6f821c22b",
       "fingerprint": "389cd3b57ef486cf024d482438bd9892aa6ba1ced7ba44225e4f3935ecb14beb",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "ua",
@@ -3260,13 +3250,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "USD",
       "unclassified_labels": [],
-      "source_sha256": "cc69920a207d47933a30e5d11dbba05d3cf5dcf54a1ec18039ea586c0d9b6503",
+      "source_sha256": "c5dc2963d850418556871a8d3ae13f772c87f25e0550f1de26f7bc6fa0de5aa1",
       "fingerprint": "085858fb8942906b27f151ee945426f49e7a7da6d417fe7e84ef05fa08984209",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "kz",
@@ -3319,13 +3309,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "KZT",
       "unclassified_labels": [],
-      "source_sha256": "7aea48922c7b002750cb7acb409b59e0bbf4f0db23b673599604878e70141638",
+      "source_sha256": "5db5107592720906e410600fd53bd9ddd70a1a4469235c66f46c5aab3a203065",
       "fingerprint": "c217bb4a31622249af7779cb779807c7b3d1ef73a688527dc8a94f05ca2229df",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "ng",
@@ -3378,13 +3368,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "NGN",
       "unclassified_labels": [],
-      "source_sha256": "8efee682c1d41404ea9f52e48e297a3bacb92fa0fc2bd587fbe572063c914605",
+      "source_sha256": "28e27c61f2f5bdfc252de709cb02f3e9f7eb6bb99fda4b5d1ada0f2c9187b67e",
       "fingerprint": "16b0e26ec0f40bb30da15a13dfe966c85235aed467df214b43ba16e6b36e0170",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "ke",
@@ -3437,13 +3427,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "USD",
       "unclassified_labels": [],
-      "source_sha256": "dff32214c62dce6c12dd92c842d31739ed18391d0a6f25fabf5e6bf05b8be126",
+      "source_sha256": "1d1394346328534b8777fb1e7f30770c1683ed993315c5fb38b7d89a67435144",
       "fingerprint": "b0dc1c294d2cf20ac7c72888902c2aab9096ba6328cfe735b32f9d1838600a65",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     },
     {
       "code": "ma",
@@ -3496,13 +3486,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-09-24T09:01:20Z",
+      "last_checked_at": "2026-09-24T09:49:05Z",
       "currency": "USD",
       "unclassified_labels": [],
-      "source_sha256": "d59a8fd2f4201c1de4dbef8e9f643d38e248ed3df113e30909f5383dfeb010e2",
+      "source_sha256": "e7f0a095ecdc2ceba4d91096b0d7830724fcb5640baef296af878c49910adaa0",
       "fingerprint": "04253baade283db23cf17d5c4a068e127fc65d686b6daffa3115561cd127fb47",
       "status": "verified",
-      "last_verified_at": "2026-09-24T09:01:20Z"
+      "last_verified_at": "2026-09-24T09:49:05Z"
     }
   ],
   "fx": {
@@ -3510,174 +3500,48 @@
     "updated_at": "2026-09-24T00:02:32Z",
     "rates": {
       "AED": "3.6725",
-      "AFN": "64.553044",
-      "ALL": "80.105312",
-      "AMD": "363.178244",
-      "ANG": "1.79",
-      "AOA": "927.07002",
-      "ARS": "1516.2964",
       "AUD": "1.419544",
-      "AWG": "1.79",
-      "AZN": "1.699189",
-      "BAM": "1.715985",
-      "BBD": "2",
-      "BDT": "122.870165",
-      "BGN": "1.715985",
-      "BHD": "0.376",
-      "BIF": "2999.263838",
-      "BMD": "1",
-      "BND": "1.279316",
-      "BOB": "11.920663",
       "BRL": "5.116931",
-      "BSD": "1",
-      "BTN": "95.808597",
-      "BWP": "13.901059",
-      "BYN": "3.023979",
-      "BZD": "2",
       "CAD": "1.409434",
-      "CDF": "2308.677466",
       "CHF": "0.82447",
-      "CLF": "0.023946",
       "CLP": "946.498502",
-      "CNH": "6.709647",
       "CNY": "6.722655",
       "COP": "3202.804058",
-      "CRC": "452.33707",
-      "CUP": "24",
-      "CVE": "96.74311",
       "CZK": "21.409798",
-      "DJF": "177.721",
       "DKK": "6.553843",
-      "DOP": "59.43658",
-      "DZD": "133.671187",
       "EGP": "51.418308",
-      "ERN": "15",
-      "ETB": "161.922061",
       "EUR": "0.877372",
-      "FJD": "2.236117",
-      "FKP": "0.754511",
-      "FOK": "6.553837",
       "GBP": "0.754513",
-      "GEL": "2.611748",
-      "GGP": "0.754511",
-      "GHS": "11.573968",
-      "GIP": "0.754511",
-      "GMD": "74.265016",
-      "GNF": "8790.48314",
-      "GTQ": "7.629869",
-      "GYD": "209.042569",
-      "HKD": "7.843563",
-      "HNL": "26.834956",
-      "HRK": "6.610538",
-      "HTG": "130.655108",
       "HUF": "319.564009",
       "IDR": "17835.8258",
       "ILS": "3.026363",
-      "IMP": "0.754511",
       "INR": "95.809144",
-      "IQD": "1308.445398",
-      "IRR": "1443238.315202",
-      "ISK": "121.141603",
-      "JEP": "0.754511",
-      "JMD": "157.820808",
-      "JOD": "0.709",
       "JPY": "158.127269",
-      "KES": "129.501843",
-      "KGS": "87.468261",
-      "KHR": "4049.662692",
-      "KID": "1.419349",
-      "KMF": "431.637332",
       "KRW": "1364.768247",
-      "KWD": "0.308559",
-      "KYD": "0.833333",
       "KZT": "444.878043",
-      "LAK": "22305.041459",
-      "LBP": "89500",
-      "LKR": "329.32014",
-      "LRD": "172.774658",
-      "LSL": "16.357387",
-      "LYD": "6.367781",
-      "MAD": "9.588228",
-      "MDL": "17.577819",
-      "MGA": "4386.489178",
-      "MKD": "53.729511",
-      "MMK": "2099.922637",
-      "MNT": "3591.609865",
-      "MOP": "8.07887",
-      "MRU": "40.241079",
-      "MUR": "47.839396",
-      "MVR": "15.445888",
-      "MWK": "1742.317948",
       "MXN": "17.469096",
       "MYR": "4.079374",
-      "MZN": "63.857176",
-      "NAD": "16.357387",
       "NGN": "1326.871066",
-      "NIO": "36.794794",
       "NOK": "9.47998",
-      "NPR": "153.293755",
       "NZD": "1.761005",
-      "OMR": "0.384497",
-      "PAB": "1",
       "PEN": "3.380895",
-      "PGK": "4.452739",
       "PHP": "62.712472",
       "PKR": "276.970859",
       "PLN": "3.83835",
-      "PYG": "5928.780042",
       "QAR": "3.64",
       "RON": "4.626811",
-      "RSD": "102.833819",
-      "RUB": "84.204929",
-      "RWF": "1476.777842",
       "SAR": "3.75",
-      "SBD": "7.917869",
-      "SCR": "14.338204",
-      "SDG": "543.543469",
       "SEK": "9.907562",
       "SGD": "1.279317",
-      "SHP": "0.754511",
-      "SLE": "24.613943",
-      "SLL": "24613.943162",
-      "SOS": "571.110168",
-      "SRD": "37.76959",
-      "SSP": "5673.070321",
-      "STN": "21.495544",
-      "SYP": "121.73648",
-      "SZL": "16.357387",
       "THB": "33.366933",
-      "TJS": "9.237055",
-      "TMT": "3.496811",
-      "TND": "2.953589",
-      "TOP": "2.378649",
       "TRY": "48.861703",
-      "TTD": "6.788093",
-      "TVD": "1.419349",
       "TWD": "31.784395",
-      "TZS": "2645.036296",
-      "UAH": "44.864484",
-      "UGX": "3838.988098",
       "USD": "1",
-      "UYU": "40.120001",
-      "UZS": "11796.095828",
-      "VES": "854.4637",
       "VND": "25961.694126",
-      "VUV": "117.928823",
-      "WST": "2.716185",
-      "XAF": "575.516442",
-      "XCD": "2.7",
-      "XCG": "1.79",
-      "XDR": "0.734596",
-      "XOF": "575.516442",
-      "XPF": "104.698217",
-      "YER": "236.417382",
-      "ZAR": "16.357456",
-      "ZMW": "19.488193",
-      "ZWG": "26.6498",
-      "ZWL": "26.6498"
+      "ZAR": "16.357456"
     },
     "fallback": false
   },
   "changes": [],
-  "revision": "6871f00738fa95ba732f478a17435b92b6225db5cbdff9494dabc813c7e03898"
+  "revision": "62164344b543e1283813aeb13457b6995903514730addfd0238ecf1436a4c732"
 }
