@@ -225,11 +225,29 @@ class ContractTests(unittest.TestCase):
         self.assertIn('class="minimum-card"',page)
         self.assertIn('data-lucide="arrow-up"',page)
         self.assertIn('mobile-rank-sr visually-hidden',page)
-        self.assertIn('$19.99',page); self.assertIn('$200.00',page)
-        self.assertIn('139.93',page); self.assertIn('1,400.00',page)
+        self.assertIn('<span class="price-local">$19.99</span>',page)
+        self.assertNotIn('<span class="price-local">$200.00</span>',page)
+        self.assertIn('"display":"$200.00"',page)
+        self.assertIn('139.93',page)
+        self.assertNotIn('<span class="price-amount">1,400.00</span>',page)
         self.assertNotIn('id="refresh"',page)
         self.assertNotIn('\\n<tr data-market-id=',page)
         self.assertEqual(page,p.render(d,template))
+
+    def test_many_tied_minimum_countries_are_compacted(self):
+        d=data_fixture()
+        base=d['markets'][0]
+        d['markets']=[]
+        for code,name in [('us','美国'),('gb','英国'),('ca','加拿大'),('au','澳大利亚')]:
+            market=copy.deepcopy(base)
+            market['code']=code
+            market['name']=name
+            market['source_url']=p.url_for(code)
+            d['markets'].append(market)
+        revise(d)
+        page=p.render(d,(p.ROOT/'index.template.html').read_text(encoding='utf-8'))
+        self.assertIn('4 个地区并列最低',page)
+        self.assertNotIn('美国、英国、加拿大等 4 个地区',page)
 
     def test_bad_template_fails(self):
         with self.assertRaises(ValueError): p.render(data_fixture(),'no markers')
