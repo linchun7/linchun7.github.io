@@ -81,7 +81,8 @@ try {
   assert.equal(await evaluate(`document.querySelector('#priceRows tr[data-market-id="us"] td:nth-child(2) a')===null`),true,'country is not an App Store link');
   const usPlus=expected.markets.find(m=>m.code==='us').offers.find(o=>o.label==='ChatGPT Plus');
   if(usPlus?.amounts.length>1) {
-    assert.ok(await evaluate(`document.querySelector('#priceRows tr[data-market-id="us"] [data-plan="ChatGPT Plus"]').textContent.includes('$19.99') && document.querySelector('#priceRows tr[data-market-id="us"] [data-plan="ChatGPT Plus"]').textContent.includes('$200.00')`),'all same-plan variants stay in one cell');
+    assert.ok(await evaluate(`document.querySelector('#priceRows tr[data-market-id="us"] [data-plan="ChatGPT Plus"]').textContent.includes('$19.99')`),'Plus main cell shows lower public price');
+    assert.equal(await evaluate(`document.querySelector('#priceRows tr[data-market-id="us"] [data-plan="ChatGPT Plus"]').textContent.includes('$200.00')`),false,'Plus higher public price is hidden from main table');
   }
 
   await evaluate(`document.querySelector('#priceRows tr[data-market-id="us"] .country-history-button').click()`);
@@ -95,6 +96,29 @@ try {
   assert.equal(await evaluate(`document.querySelector('#emptyState').hidden`),false,'empty search state');
   assert.equal(await evaluate(`document.querySelectorAll('#priceRows img').length`),0,'search never becomes HTML');
   await evaluate(`document.querySelector('#searchInput').value='';document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);
+
+  const tiedPlan=plans.find(plan=>{
+    const rows=expected.markets.map(m=>{
+      const offer=m.offers.find(o=>o.label===plan);
+      if(!offer)return null;
+      const values=offer.amounts.map(a=>Number(a.cny)).filter(Number.isFinite);
+      return values.length?{code:m.code,value:Math.min(...values)}:null;
+    }).filter(Boolean);
+    if(!rows.length)return false;
+    const minimum=Math.min(...rows.map(row=>row.value));
+    return rows.filter(row=>Math.abs(row.value-minimum)<=0.005).length>3;
+  });
+  if(tiedPlan){
+    const rows=expected.markets.map(m=>{
+      const offer=m.offers.find(o=>o.label===tiedPlan);
+      if(!offer)return null;
+      const values=offer.amounts.map(a=>Number(a.cny)).filter(Number.isFinite);
+      return values.length?{code:m.code,value:Math.min(...values)}:null;
+    }).filter(Boolean);
+    const minimum=Math.min(...rows.map(row=>row.value));
+    const count=rows.filter(row=>Math.abs(row.value-minimum)<=0.005).length;
+    assert.equal(await evaluate(`document.querySelector('.minimum-card[data-plan="${tiedPlan}"] .minimum-country').textContent`),`${count} 个地区并列最低`,'large tied minimum is compacted');
+  }
 
   const enabledMinimum=await evaluate(`document.querySelector('.minimum-card:not(:disabled)')?.dataset.marketId || ''`);
   assert.ok(enabledMinimum,'minimum card available');
