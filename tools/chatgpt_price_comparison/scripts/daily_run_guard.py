@@ -35,30 +35,28 @@ def clean_publication_today(data: dict, now: float) -> bool:
     pipeline.validate(data, now)
     if _beijing_date(pipeline.epoch(data["generated_at"])) != _beijing_date(now):
         return False
-
     markets = data.get("markets", [])
     if not markets or any(market.get("status") in ("retained", "pending") for market in markets):
         return False
     if any(market.get("status") not in ("verified", "unavailable") for market in markets):
         return False
-
     fx = data.get("fx")
     if not isinstance(fx, dict) or fx.get("fallback") is not False:
         return False
     fx_time = pipeline.epoch(fx["updated_at"])
-    if fx_time > now + 300 or now - fx_time > pipeline.FRESH:
-        return False
-    return True
+    return not (fx_time > now + 300 or now - fx_time > pipeline.FRESH)
 
 
-def decide(event_name: str, requested: str | None, data: dict, now: float) -> dict:
+def decide(event_name: str, requested: str | None, data: dict, now: float,
+           production_success_today: bool = False) -> dict:
     source, automatic = _source(event_name, requested)
     clean_today = clean_publication_today(data, now)
-    should_run = not automatic or not clean_today
+    should_run = not automatic or not (clean_today and production_success_today)
     return {
         "should_run": should_run,
         "trigger_source": source,
         "clean_today": clean_today,
+        "production_success_today": production_success_today,
         "date_beijing": str(_beijing_date(now)),
     }
 
@@ -78,6 +76,7 @@ def main() -> None:
         os.environ.get("REQUESTED_TRIGGER_SOURCE"),
         data,
         now,
+        os.environ.get("PRODUCTION_SUCCESS_TODAY", "").lower() == "true",
     )
     _append(os.environ.get("GITHUB_OUTPUT"), [
         f"should_run={str(result['should_run']).lower()}",
@@ -86,14 +85,15 @@ def main() -> None:
     if result["should_run"]:
         message = f"{result['trigger_source']} 将执行 {result['date_beijing']} 的价格核验。"
     else:
-        message = f"{result['date_beijing']} 已有非降级、已核验发布；备用触发安全跳过。"
+        message = f"{result['date_beijing']} 已有非降级数据和成功生产运行证明；备用触发安全跳过。"
     print(message)
     _append(os.environ.get("GITHUB_STEP_SUMMARY"), [
         "## ChatGPT 价格每日触发检查",
         "",
         f"- 触发来源：{result['trigger_source']}",
         f"- 北京日期：{result['date_beijing']}",
-        f"- 当日已有非降级发布：{'是' if result['clean_today'] else '否'}",
+        f"- 当日数据非降级：{'是' if result['clean_today'] else '否'}",
+        f"- 当日完整生产运行成功：{'是' if result['production_success_today'] else '否'}",
         f"- 本次执行抓取：{'是' if result['should_run'] else '否'}",
     ])
 
