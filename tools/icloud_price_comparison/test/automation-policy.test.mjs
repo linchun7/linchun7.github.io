@@ -24,11 +24,29 @@ const LONG_LIVED_WORKFLOWS = [
   'validate-static-tools.yml',
 ];
 
-test('keeps the automation surface limited to seven reviewed long-lived workflows', async () => {
+test('keeps iCloud automation limited to seven reviewed workflows without owning unrelated tools', async () => {
   const workflows = (await readdir(workflowsDirUrl))
     .filter((name) => /\.ya?ml$/i.test(name))
     .sort();
-  assert.deepEqual(workflows, LONG_LIVED_WORKFLOWS);
+
+  for (const workflowName of LONG_LIVED_WORKFLOWS) {
+    assert.ok(workflows.includes(workflowName), `Missing reviewed iCloud workflow: ${workflowName}`);
+  }
+
+  const unexpectedICloudWorkflows = [];
+  for (const workflowName of workflows) {
+    if (LONG_LIVED_WORKFLOWS.includes(workflowName)) continue;
+    const workflow = await readFile(new URL(workflowName, workflowsDirUrl), 'utf8');
+    if (/icloud/i.test(workflowName) || /icloud/i.test(workflow)) {
+      unexpectedICloudWorkflows.push(workflowName);
+    }
+  }
+
+  assert.deepEqual(
+    unexpectedICloudWorkflows,
+    [],
+    `Unreviewed workflow references iCloud automation: ${unexpectedICloudWorkflows.join(', ')}`
+  );
 });
 
 test('pins every long-lived GitHub Action to a full SHA with a stable release annotation', async () => {
