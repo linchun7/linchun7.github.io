@@ -29,7 +29,8 @@
 
 ## 文件与验收
 
-- `scripts/pipeline.py`：采集、校验、状态、汇率、静态渲染。\n- `scripts/daily_run_guard.py`：CF/GitHub 自动主备的每日幂等门禁；不增加数据库或额外状态文件。
+- `scripts/pipeline.py`：采集、校验、状态、汇率、静态渲染。
+- `scripts/daily_run_guard.py`：CF/GitHub 自动主备的每日幂等门禁；不增加数据库或额外状态文件。
 - `index.template.html`、`app.js`、`style.css`：静态页面与无框架交互。
 - `data/prices.json`、`index.html`：自动生成，不手工改价。数据包含最近 200 条标价变动，不把汇率波动记录为套餐改价；更早版本见 Git 历史。
 - `scripts/test_pipeline.py`：离线回归；`scripts/browser-test.mjs`：Chrome 实测。浏览器测试覆盖重复金额、搜索、空结果、窄屏、过期、JSON 失败回退与无 JavaScript。
