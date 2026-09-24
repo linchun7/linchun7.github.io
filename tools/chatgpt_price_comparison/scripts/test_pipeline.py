@@ -217,6 +217,7 @@ class ContractTests(unittest.TestCase):
         self.assertIn('$19.99',page); self.assertIn('$200.00',page)
         self.assertIn('139.93',page); self.assertIn('1,400.00',page)
         self.assertNotIn('id="refresh"',page)
+        self.assertNotIn('\\n<tr data-market-id=',page)
         self.assertEqual(page,p.render(d,template))
 
     def test_bad_template_fails(self):

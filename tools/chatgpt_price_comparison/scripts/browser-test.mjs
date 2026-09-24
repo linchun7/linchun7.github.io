@@ -67,7 +67,7 @@ try {
   assert.equal(await evaluate('document.querySelector("#refresh")===null && document.querySelector("#plan")===null && document.querySelector("#status")===null'),true,'legacy reload and filters removed');
   assert.ok(expected.markets.some(m=>m.code==='us'&&m.offers.length),'US source present');
 
-  await evaluate(`document.querySelector('#searchInput').value='us';document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);
+  await evaluate(`document.querySelector('#searchInput').value='美国';document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);
   await until(()=>evaluate('document.querySelectorAll("#priceRows tr[data-market-id]").length===1'),'US filter');
   assert.ok(await evaluate(`document.querySelector('#priceRows').textContent.includes('美国')`));
   assert.equal(await evaluate(`document.querySelector('#priceRows tr[data-market-id="us"] td:nth-child(2) a')===null`),true,'country is not an App Store link');

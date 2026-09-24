@@ -555,9 +555,9 @@ def render(data: dict, template: str) -> str:
     payload = canonical(data).replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
     priced_markets = [market for market in data['markets'] if market['offers']]
     values = {
-        'MINIMUMS': '\\n'.join(minimum_cards),
-        'TABLE_HEAD': '\\n'.join(head),
-        'ROWS': '\\n'.join(rows),
+        'MINIMUMS': '\n'.join(minimum_cards),
+        'TABLE_HEAD': '\n'.join(head),
+        'ROWS': '\n'.join(rows),
         'DATA': payload,
         'GENERATED_BEIJING': beijing_display(data['generated_at']),
         'REVISION': data['revision'],
