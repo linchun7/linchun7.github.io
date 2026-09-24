@@ -173,6 +173,23 @@ class ObservationTests(unittest.TestCase):
         self.assertEqual(result['status'], 'verified')
         self.assertIn('ChatGPT New Tier', [offer['label'] for offer in result['offers']])
 
+    def test_successful_pending_observation_clears_stale_source_error(self):
+        old = good_market()
+        retained = p.observe(
+            {'code':'us','name':'美国'},
+            old,
+            NOW + 3600,
+            lambda *a, **kw: (_ for _ in ()).throw(URLError('offline')),
+        )
+        self.assertEqual(retained['status'], 'retained')
+        self.assertIn('error', retained)
+
+        getter = lambda *a, **kw: fixture().replace('19.99', '99.99')
+        pending = p.observe({'code':'us','name':'美国'}, retained, NOW + 86400, getter)
+        self.assertEqual(pending['status'], 'pending')
+        self.assertNotIn('error', pending)
+        self.assertNotIn('error_detail', pending)
+
     def test_large_jump_recovers_automatically_after_18_hours(self):
         old = good_market()
         getter = lambda *a,**kw: fixture().replace('19.99','99.99')
