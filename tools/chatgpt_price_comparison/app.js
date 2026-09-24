@@ -181,23 +181,11 @@
     return [...ORDER.filter((p) => labels.includes(p)), ...labels.filter((p) => !ORDER.includes(p)).sort()];
   }
   function offerFor(market, plan) { return market.offers.find((offer) => offer.label === plan) || null; }
-  function displayAmounts(market, offer) {
+  function displayAmounts(offer) {
     if (!offer) return [];
     if (offer.label !== 'ChatGPT Plus' || offer.amounts.length !== 2) return offer.amounts;
-    const pro20 = offerFor(market, 'ChatGPT Pro 20x');
-    if (!pro20 || pro20.amounts.length !== 1) return offer.amounts;
-
     const sorted = [...offer.amounts].sort((a, b) => Number(a.amount) - Number(b.amount));
-    const low = Number(sorted[0].amount);
-    const high = Number(sorted[1].amount);
-    const pro20Amount = Number(pro20.amounts[0].amount);
-    if (![low, high, pro20Amount].every(Number.isFinite) || low <= 0 || high <= low) {
-      return offer.amounts;
-    }
-
-    const plusGap = high - low;
-    const distanceToPro20 = Math.abs(high - pro20Amount);
-    return distanceToPro20 < plusGap ? [sorted[0]] : offer.amounts;
+    return [sorted[0]];
   }
   function minCny(market, plan) {
     const offer = offerFor(market, plan);
@@ -342,7 +330,7 @@
     td.classList.toggle('is-sorted', state.sortKey === 'plan' && state.sortPlan === plan);
     const offer = offerFor(market, plan);
     if (!offer) { td.classList.add('missing-price'); td.textContent = '—'; return td; }
-    for (const amount of displayAmounts(market, offer)) {
+    for (const amount of displayAmounts(offer)) {
       const option = document.createElement('div'); option.className = 'price-option';
       const cny = document.createElement('strong'); cny.className = 'price-cny';
       if (isMinimum(plan, market, amount)) {
