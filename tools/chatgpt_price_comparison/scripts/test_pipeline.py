@@ -307,6 +307,13 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(set(previous), {'us'})
         self.assertEqual([change['code'] for change in changes], ['us'])
 
+    def test_checked_in_projection_matches_current_data(self):
+        data=json.loads((p.ROOT/'data/prices.json').read_text(encoding='utf-8'))
+        p.validate(data)
+        expected=p.render(data,(p.ROOT/'index.template.html').read_text(encoding='utf-8'))
+        actual=(p.ROOT/'index.html').read_text(encoding='utf-8')
+        self.assertEqual(actual,expected)
+
     def test_static_projection_and_escape(self):
         d=data_fixture()
         d['markets'][0]['name']='</script><script>alert(1)</script>'; revise(d)
