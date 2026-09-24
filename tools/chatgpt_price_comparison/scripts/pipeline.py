@@ -439,8 +439,11 @@ def render_price_options(market: dict, plan: str, minimum: Decimal | None) -> st
     offer = market_offer(market, plan)
     if not offer:
         return '<span class="missing-price">—</span>'
+    amounts = offer['amounts']
+    if plan == 'ChatGPT Plus' and len(amounts) > 1:
+        amounts = [min(amounts, key=lambda amount: Decimal(amount['amount']))]
     options = []
-    for amount in offer['amounts']:
+    for amount in amounts:
         cny = Decimal(amount['cny']) if amount.get('cny') is not None else None
         badge = '<span class="minimum-badge">最低</span>' if minimum is not None and cny == minimum else ''
         converted = (
@@ -499,7 +502,7 @@ def render(data: dict, template: str) -> str:
             continue
         names = [market['name'] for market in plan_winners]
         country = (
-            f'{html.escape("、".join(names[:3]))}等 {len(names)} 个地区'
+            f'{len(names)} 个地区并列最低'
             if len(names) > 3 else html.escape('、'.join(names))
         )
         minimum_cards.append(
