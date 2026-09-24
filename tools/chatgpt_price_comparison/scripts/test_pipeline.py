@@ -335,6 +335,20 @@ class ContractTests(unittest.TestCase):
         self.assertNotIn('\\n<tr data-market-id=',page)
         self.assertEqual(page,p.render(d,template))
 
+    def test_static_layout_expands_when_new_plans_appear(self):
+        d=copy.deepcopy(data_fixture())
+        market=d['markets'][0]
+        for index,label in enumerate(['ChatGPT Alpha','ChatGPT Beta','ChatGPT Gamma'], start=1):
+            market['offers'].append({'label':label,'amounts':[{'amount':str(40+index),'display':f'${40+index}.00','cny':f'{(40+index)*7:.2f}'}]})
+        market['offers']=sorted(market['offers'], key=lambda offer: offer['label'])
+        market['fingerprint']=p.digest(p.semantic(market))
+        revise(d)
+        page=p.render(d,(p.ROOT/'index.template.html').read_text(encoding='utf-8'))
+        self.assertIn('style="--plan-count: 6"',page)
+        self.assertIn('style="--table-min-width: 1408px"',page)
+        for label in ('ChatGPT Alpha','ChatGPT Beta','ChatGPT Gamma'):
+            self.assertIn(f'data-plan="{label}"',page)
+
     def test_history_contract_accepts_valid_and_rejects_malformed_entries(self):
         d=data_fixture()
         before=p.semantic(d['markets'][0])
