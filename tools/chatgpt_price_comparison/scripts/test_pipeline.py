@@ -347,6 +347,12 @@ class ContractTests(unittest.TestCase):
         self.assertIn('4 个地区并列最低',page)
         self.assertNotIn('美国、英国、加拿大等 4 个地区',page)
 
+    def test_committed_index_is_current_deterministic_projection(self):
+        data=json.loads((p.ROOT/'data/prices.json').read_text(encoding='utf-8'))
+        template=(p.ROOT/'index.template.html').read_text(encoding='utf-8')
+        committed=(p.ROOT/'index.html').read_text(encoding='utf-8')
+        self.assertEqual(committed, p.render(data, template))
+
     def test_bad_template_fails(self):
         with self.assertRaises(ValueError): p.render(data_fixture(),'no markers')
 
