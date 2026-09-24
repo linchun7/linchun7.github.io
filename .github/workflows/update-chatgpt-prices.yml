@@ -154,12 +154,6 @@ jobs:
           git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push origin "HEAD:$TARGET"
           echo "pushed=true" >> "$GITHUB_OUTPUT"
           echo "pushed_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      - name: Request Pages build for published data
-        if: steps.push_data.outputs.pushed == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh api --method POST             -H 'Accept: application/vnd.github+json'             "repos/$GITHUB_REPOSITORY/pages/builds"
       - name: Wait for Pages build of published commit or successor
         if: steps.push_data.outputs.pushed == 'true'
         env:
