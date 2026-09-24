@@ -46,6 +46,8 @@ class WorkflowContractTests(unittest.TestCase):
     def test_shared_lucide_changes_trigger_validation(self):
         validate = (ROOT / ".github" / "workflows" / "validate-chatgpt-prices.yml").read_text(encoding="utf-8")
         self.assertIn("tools/icloud_price_comparison/vendor/lucide-subset.js", validate)
+        self.assertIn("branches: [main]", validate)
+        self.assertNotIn("feat/chatgpt-price-comparison", validate)
 
     def test_only_main_can_publish(self):
         self.assertIn("github.ref == 'refs/heads/main'", self.text)
