@@ -25,6 +25,7 @@ jobs:
         run: |
           python3 -m unittest discover -s tools/chatgpt_price_comparison/scripts -p 'test_*.py' -v
           node --check tools/chatgpt_price_comparison/app.js
+          node tools/chatgpt_price_comparison/scripts/test-verify-production.mjs
           python3 - <<'PY'
           import json, sys
           sys.path.insert(0, 'tools/chatgpt_price_comparison/scripts')
