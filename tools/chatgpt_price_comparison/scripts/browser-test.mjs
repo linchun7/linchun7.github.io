@@ -4,6 +4,7 @@ import {spawn} from 'node:child_process';
 import {mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
 import {existsSync} from 'node:fs';
 import {tmpdir} from 'node:os';
+import {createServer} from 'node:net';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
@@ -12,8 +13,19 @@ const chrome = process.env.CHROME_BIN || ['/usr/bin/google-chrome','/usr/bin/chr
 assert.ok(chrome, 'A local Chrome/Chromium installation is required');
 const profile = await mkdtemp(path.join(tmpdir(), 'chatgpt-browser-'));
 const server = spawn('python3', ['-m','http.server','4177','--bind','127.0.0.1'], {cwd: root, stdio:'ignore'});
-const debugPort = Number(process.env.CHROME_DEBUG_PORT || 9222);
-const browser = spawn(chrome, ['--headless=new','--no-sandbox','--disable-dev-shm-usage','--no-first-run','--no-default-browser-check','--disable-background-networking',`--remote-debugging-port=${debugPort}`,`--user-data-dir=${profile}`], {stdio:['ignore','ignore','pipe']});
+async function freePort() {
+  const probe=createServer();
+  await new Promise((resolve,reject)=>{probe.once('error',reject);probe.listen(0,'127.0.0.1',resolve);});
+  const address=probe.address();
+  assert.ok(address && typeof address === 'object', 'Could not allocate Chrome debugging port');
+  await new Promise((resolve,reject)=>probe.close(error=>error?reject(error):resolve()));
+  return address.port;
+}
+const debugPort = process.env.CHROME_DEBUG_PORT ? Number(process.env.CHROME_DEBUG_PORT) : await freePort();
+assert.ok(Number.isInteger(debugPort) && debugPort > 0 && debugPort < 65536, 'Invalid Chrome debugging port');
+const browserEnv={...process.env};
+delete browserEnv.DBUS_SESSION_BUS_ADDRESS; delete browserEnv.DBUS_STARTER_ADDRESS; delete browserEnv.DBUS_STARTER_BUS_TYPE;
+const browser = spawn(chrome, ['--headless=new','--no-sandbox','--disable-dev-shm-usage','--disable-gpu','--no-first-run','--no-default-browser-check','--disable-background-networking','--remote-debugging-address=127.0.0.1',`--remote-debugging-port=${debugPort}`,`--user-data-dir=${profile}`], {stdio:['ignore','ignore','pipe'],env:browserEnv});
 let diagnostics = '', launchError;
 browser.stderr.on('data', chunk => { diagnostics = (diagnostics + chunk).slice(-12000); });
 browser.once('error', error => { launchError = error; });
@@ -35,8 +47,7 @@ async function evaluate(expression) {
   return result.result.value;
 }
 try {
-  // GitHub runners are isolated per job; a fixed debugging port is more
-  // reliable than Chrome's port=0 readiness file behavior across builds.
+  // Use an isolated free loopback port; this avoids collisions with runner services.
   let port;
   const launchDeadline = Date.now() + 30000;
   while (Date.now() < launchDeadline) {
