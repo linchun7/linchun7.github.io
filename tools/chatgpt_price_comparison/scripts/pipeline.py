@@ -451,7 +451,7 @@ def validate(data: dict, now: float | None = None) -> None:
     for change in changes:
         if not isinstance(change, dict) or set(change) != {'at', 'code', 'before', 'after'}:
             raise ValueError('invalid history entry')
-        if not re.fullmatch('[a-z]{2}', change.get('code', '')):
+        if not re.fullmatch('[a-z]{2}', change.get('code', '')) or change['code'] not in codes:
             raise ValueError('invalid history market')
         changed_at = epoch(change['at'])
         if changed_at > generated or changed_at < previous_at:
