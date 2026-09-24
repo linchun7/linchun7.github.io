@@ -31,7 +31,7 @@ def _beijing_date(timestamp: float):
 
 
 def clean_publication_today(data: dict, now: float) -> bool:
-    """True only when today's committed artifact is fully verified and fresh."""
+    """True only when today's committed artifact is accepted, non-degraded and fresh."""
     pipeline.validate(data, now)
     if _beijing_date(pipeline.epoch(data["generated_at"])) != _beijing_date(now):
         return False
@@ -86,7 +86,7 @@ def main() -> None:
     if result["should_run"]:
         message = f"{result['trigger_source']} 将执行 {result['date_beijing']} 的价格核验。"
     else:
-        message = f"{result['date_beijing']} 已有完整、非降级的已验证发布；备用触发安全跳过。"
+        message = f"{result['date_beijing']} 已有非降级、已核验发布；备用触发安全跳过。"
     print(message)
     _append(os.environ.get("GITHUB_STEP_SUMMARY"), [
         "## ChatGPT 价格每日触发检查",
