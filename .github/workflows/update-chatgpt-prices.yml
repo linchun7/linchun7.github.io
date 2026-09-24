@@ -210,7 +210,7 @@ jobs:
           name: chatgpt-candidate-${{ github.run_id }}
           path: ${{ runner.temp }}/chatgpt-candidate
       - name: Verify canonical production JSON and HTML
-        run: node tools/chatgpt_price_comparison/scripts/verify-production.mjs --expected "$RUNNER_TEMP/chatgpt-candidate/prices.json"
+        run: node tools/chatgpt_price_comparison/scripts/verify-production.mjs --expected "$RUNNER_TEMP/chatgpt-candidate/prices.json" --expected-index "$RUNNER_TEMP/chatgpt-candidate/index.html"
 
   notify:
     needs: [prepare, generate, publish, verify-production]
