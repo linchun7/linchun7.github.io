@@ -82,7 +82,9 @@ try {
   assert.equal(await evaluate(`document.querySelector('#priceRows .mobile-rank').textContent`),'序1','country sort uses mobile sequence label');
   assert.equal(await evaluate(`document.querySelector('#priceRows .mobile-rank-sr').textContent`),'当前列表序号第 1','country sort exposes accessible sequence label');
   await evaluate(`document.querySelector('button[data-sort-plan="ChatGPT Plus"]').click()`);
-  assert.equal(await evaluate(`document.querySelector('#rankHeaderLabel > [aria-hidden="true"]').textContent`),'排名','plan sort restores global ranking header');
+  assert.equal(await evaluate(`document.querySelector('#rankHeaderLabel > [aria-hidden="true"]').textContent`),'排名','plan sort restores ranking header');
+  assert.equal(await evaluate(`document.querySelector('#rankHeaderLabel .visually-hidden').textContent`),'已覆盖地区参考排名','ranking scope is limited to covered markets');
+  assert.ok(await evaluate(`document.querySelector('#priceRows .mobile-rank-sr').textContent.startsWith('已覆盖地区价格排名第 ')`),'row ranking scope is limited to covered markets');
   assert.ok(expected.markets.some(m=>m.code==='us'&&m.offers.length),'US source present');
 
   await evaluate(`document.querySelector('#searchInput').value='美国';document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);
