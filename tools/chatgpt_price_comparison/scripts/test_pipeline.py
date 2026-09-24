@@ -342,6 +342,7 @@ class ContractTests(unittest.TestCase):
         bad_cases=[]
         future=copy.deepcopy(d); future['changes'][0]['at']=p.stamp(NOW+1); revise(future); bad_cases.append(future)
         bad_code=copy.deepcopy(d); bad_code['changes'][0]['code']='USA'; revise(bad_code); bad_cases.append(bad_code)
+        orphan=copy.deepcopy(d); orphan['changes'][0]['code']='jp'; revise(orphan); bad_cases.append(orphan)
         same=copy.deepcopy(d); same['changes'][0]['after']=copy.deepcopy(same['changes'][0]['before']); revise(same); bad_cases.append(same)
         duplicate=copy.deepcopy(d); duplicate['changes'][0]['after']['offers'][0]['amounts']=['9','9']; revise(duplicate); bad_cases.append(duplicate)
         extra=copy.deepcopy(d); extra['changes'][0]['before']['extra']=True; revise(extra); bad_cases.append(extra)
