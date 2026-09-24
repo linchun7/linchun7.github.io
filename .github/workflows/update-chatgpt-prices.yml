@@ -168,7 +168,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for attempt in $(seq 1 60); do
+          for attempt in $(seq 1 90); do
             read -r built_sha build_status build_error < <(
               gh api -H 'Accept: application/vnd.github+json'                 "repos/$GITHUB_REPOSITORY/pages/builds/latest"                 --jq '[.commit, .status, (.error.message // "")] | @tsv'
             )
@@ -191,7 +191,7 @@ jobs:
             fi
             sleep 5
           done
-          echo "::error::Pages did not build the published commit or a verified successor within 5 minutes."
+          echo "::error::Pages did not build the published commit or a verified successor within 7.5 minutes."
           exit 1
 
   verify-production:
