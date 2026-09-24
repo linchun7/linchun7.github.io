@@ -14,7 +14,7 @@
 
 ## 自动更新与防错
 
-`Update ChatGPT prices` 在 **北京时间 08:43、14:43** 自动运行（UTC `43 0,6 * * *`），第二次提供当日再次核验机会；也支持手动运行。GitHub 定时可能延迟，不承诺准点。
+生产自动更新采用主备：**Cloudflare 每日北京时间 08:25** 外部调用 `workflow_dispatch`（`trigger_source=cloudflare`）作为主触发，**GitHub cron 08:30** 仅作兜底；也支持手动运行。两个自动入口先校验当前 `prices.json`：若北京时间当天已经发布完整、非降级且汇率仍新鲜的数据，备用触发直接跳过；若存在 `retained` / `pending`、fallback 汇率、旧数据或主触发未成功发布，则继续重试。手动运行不受每日幂等跳过。仓库只能验证这一调度契约，不能单独证明 Cloudflare 控制面的实时启用状态。
 
 1. 只读任务运行离线测试、抓取、数据校验与真实 Chrome 测试。无需 API Key、登录态、付费服务、数据库或第三方 Python/Node 包。
 2. 校验应用身份、canonical 地区和币种；可见价格必须与两种结构化表示一致。它们是**同一来源的交叉校验**，不是三个独立价格源。初次采集和改价另发一次不使用缓存的确认请求。
@@ -29,7 +29,7 @@
 
 ## 文件与验收
 
-- `scripts/pipeline.py`：采集、校验、状态、汇率、静态渲染。
+- `scripts/pipeline.py`：采集、校验、状态、汇率、静态渲染。\n- `scripts/daily_run_guard.py`：CF/GitHub 自动主备的每日幂等门禁；不增加数据库或额外状态文件。
 - `index.template.html`、`app.js`、`style.css`：静态页面与无框架交互。
 - `data/prices.json`、`index.html`：自动生成，不手工改价。数据包含最近 200 条标价变动，不把汇率波动记录为套餐改价；更早版本见 Git 历史。
 - `scripts/test_pipeline.py`：离线回归；`scripts/browser-test.mjs`：Chrome 实测。浏览器测试覆盖重复金额、搜索、空结果、窄屏、过期、JSON 失败回退与无 JavaScript。
