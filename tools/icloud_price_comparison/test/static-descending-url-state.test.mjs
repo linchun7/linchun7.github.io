@@ -6,8 +6,6 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { chromium, firefox, webkit } from 'playwright';
 
-import './forced-colors-smoke.test.mjs';
-
 const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BROWSER = process.env.PLAYWRIGHT_BROWSER || 'chromium';
 const BROWSER_TYPE = { chromium, firefox, webkit }[BROWSER];
@@ -64,18 +62,20 @@ test('reconciles descending tier URL state before hydration and during static fa
   const data = JSON.parse(await readFile(path.join(PROJECT_DIR, 'data', 'prices.json'), 'utf8'));
   const server = await startServer();
   const { port } = server.address();
-  const browser = await BROWSER_TYPE.launch({ headless: true });
+  let browser;
   try {
+    browser = await BROWSER_TYPE.launch({ headless: true });
     for (const tierId of ['200GB', '6TB']) {
       const pendingPage = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+      pendingPage.setDefaultTimeout(10_000);
       let releaseRequest;
       const requestReleased = new Promise((resolve) => { releaseRequest = resolve; });
-      await pendingPage.route('https://**/*', (route) => route.abort());
-      await pendingPage.route('**/data/prices.json*', async (route) => {
-        await requestReleased;
-        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data) });
-      });
       try {
+        await pendingPage.route('https://**/*', (route) => route.abort());
+        await pendingPage.route('**/data/prices.json*', async (route) => {
+          await requestReleased;
+          await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data) });
+        });
         await pendingPage.goto(`http://127.0.0.1:${port}/?tier=${tierId}&dir=desc`, { waitUntil: 'domcontentloaded' });
         await pendingPage.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === false);
         await assertDescendingStaticState(pendingPage, data, tierId);
@@ -83,14 +83,15 @@ test('reconciles descending tier URL state before hydration and during static fa
         await pendingPage.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
         await assertDescendingStaticState(pendingPage, data, tierId);
       } finally {
-        releaseRequest?.();
+        releaseRequest();
         await pendingPage.close();
       }
 
       const fallbackPage = await browser.newPage({ viewport: { width: 1024, height: 768 } });
-      await fallbackPage.route('https://**/*', (route) => route.abort());
-      await fallbackPage.route('**/data/prices.json*', (route) => route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }));
+      fallbackPage.setDefaultTimeout(10_000);
       try {
+        await fallbackPage.route('https://**/*', (route) => route.abort());
+        await fallbackPage.route('**/data/prices.json*', (route) => route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }));
         await fallbackPage.goto(`http://127.0.0.1:${port}/?tier=${tierId}&dir=desc`, { waitUntil: 'domcontentloaded' });
         await fallbackPage.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
         await assertDescendingStaticState(fallbackPage, data, tierId);
@@ -99,7 +100,13 @@ test('reconciles descending tier URL state before hydration and during static fa
       }
     }
   } finally {
-    await browser.close();
-    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+    try {
+      await browser?.close();
+    } finally {
+      await new Promise((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+        server.closeAllConnections();
+      });
+    }
   }
 });
