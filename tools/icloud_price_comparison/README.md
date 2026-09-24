@@ -102,6 +102,8 @@ forced-colors 只保留 UI 套件中的一个实现，Chromium 真正执行，�
 
 关键数据源、契约、生成器和 update/validate workflow 改动需同步 README、ARCHITECTURE、OPERATIONS；普通 UI 修改按影响更新相关文档，不堆积过程记录。PR 检查永久 ID、文档契约与已提交 diff 格式。价格与历史、依赖锁、供应链校验和生产验收不得因测试减重而放宽。
 
+iCloud 自动化策略只约束本项目及其明确共享的受管 workflow；同仓库其他工具可独立新增 workflow，但额外 workflow 若引用 iCloud 路径或名称会被策略测试拒绝。
+
 本地预览从仓库根运行 `python -m http.server 4173`，访问 `http://127.0.0.1:4173/tools/icloud_price_comparison/`。
 
 ## 来源与许可
