@@ -138,10 +138,14 @@
   function offerFor(market, plan) { return market.offers.find((offer) => offer.label === plan) || null; }
   function displayAmounts(offer) {
     if (!offer) return [];
-    if (offer.label !== 'ChatGPT Plus' || offer.amounts.length <= 1) return offer.amounts;
-    return [offer.amounts.reduce((lowest, amount) => (
-      Number(amount.amount) < Number(lowest.amount) ? amount : lowest
-    ))];
+    if (offer.label !== 'ChatGPT Plus' || offer.amounts.length !== 2) return offer.amounts;
+    const sorted = [...offer.amounts].sort((a, b) => Number(a.amount) - Number(b.amount));
+    const low = Number(sorted[0].amount);
+    const high = Number(sorted[1].amount);
+    if (!Number.isFinite(low) || !Number.isFinite(high) || low <= 0 || high / low < 8) {
+      return offer.amounts;
+    }
+    return [sorted[0]];
   }
   function minCny(market, plan) {
     const offer = offerFor(market, plan);
