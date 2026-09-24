@@ -315,7 +315,8 @@ def observe(config: dict, old: dict | None, now: float, getter=fetch) -> dict:
     return result
 
 
-def collect_fx(now: float, old: dict | None, getter=fetch) -> dict | None:
+def collect_fx(now: float, old: dict | None, getter=fetch, required_currencies=()) -> dict | None:
+    required = sorted({'USD', 'CNY', *(code for code in required_currencies if code)})
     try:
         data = json.loads(getter(FX_URL))
         if data.get('result') != 'success' or data.get('base_code') != 'USD':
@@ -326,14 +327,25 @@ def collect_fx(now: float, old: dict | None, getter=fetch) -> dict | None:
         rates = data['rates']
         if rates.get('USD') != 1 or not 1 < rates.get('CNY', 0) < 30:
             raise ValueError('FX units or base rate invalid')
-        if len(rates) < 30 or any(not re.fullmatch('[A-Z]{3}', k) or isinstance(v, bool) or not isinstance(v, (int, float)) or not 0 < v < 1e10 for k, v in rates.items()):
+        if len(rates) < 30 or any(
+            not re.fullmatch('[A-Z]{3}', code)
+            or isinstance(rate, bool)
+            or not isinstance(rate, (int, float))
+            or not 0 < rate < 1e10
+            for code, rate in rates.items()
+        ):
             raise ValueError('invalid FX rates')
-        return {'source_url': FX_URL, 'updated_at': stamp(updated), 'rates': {k: str(v) for k, v in sorted(rates.items())}, 'fallback': False}
+        if any(code not in rates for code in required):
+            raise ValueError('required FX rate missing')
+        selected = {code: str(rates[code]) for code in required}
+        return {'source_url': FX_URL, 'updated_at': stamp(updated), 'rates': selected, 'fallback': False}
     except (ValueError, KeyError, TypeError, urllib.error.URLError, TimeoutError, OSError):
         if old and -300 <= now - epoch(old['updated_at']) <= EXPIRE:
-            return dict(old, fallback=True)
+            old_rates = old.get('rates', {})
+            if all(code in old_rates for code in required):
+                selected = {code: str(old_rates[code]) for code in required}
+                return dict(old, rates=selected, fallback=True)
         return None
-
 
 def validate(data: dict, now: float | None = None) -> None:
     now = time.time() if now is None else now
@@ -503,12 +515,12 @@ def render(data: dict, template: str) -> str:
     for plan in plans:
         active = ' is-active-plan' if plan == default_plan else ''
         sort_value = 'ascending' if plan == default_plan else 'none'
-        arrow = '↑' if plan == default_plan else '↕'
+        icon = 'arrow-up' if plan == default_plan else 'arrow-up-down'
         head.append(
             f'<th scope="col" data-plan-header="true" data-plan="{html.escape(plan)}" '
             f'class="{active.strip()}" aria-sort="{sort_value}">'
             f'<button type="button" data-sort-plan="{html.escape(plan)}" disabled>'
-            f'{html.escape(short_plan(plan))} <span aria-hidden="true">{arrow}</span>'
+            f'{html.escape(short_plan(plan))} <i data-lucide="{icon}" aria-hidden="true"></i>'
             '</button></th>'
         )
 
@@ -544,7 +556,8 @@ def render(data: dict, template: str) -> str:
             '<td><button type="button" class="country-history-button" disabled>'
             f'<span class="country-name">{html.escape(market["name"])}</span>'
             f'<span class="mobile-rank" aria-hidden="true">{rank if rank is not None else "—"}</span>'
-            f'<span class="country-meta">{market["code"].upper()} · {html.escape(market.get("currency", "—"))}{html.escape(status)}</span>'
+            f'<span class="mobile-rank-sr visually-hidden">全球价格排名第 {rank if rank is not None else "—"}</span>'
+            f'<span class="country-name-en">{market["code"].upper()} · {html.escape(market.get("currency", "—"))}{html.escape(status)}</span>'
             '<span class="history-affordance" aria-hidden="true">›</span>'
             '<span class="visually-hidden">，启用 JavaScript 后查看价格历史</span>'
             '</button></td>'
@@ -596,7 +609,8 @@ def run(output: Path, now: float | None = None) -> dict:
     verified = sum(m['status'] == 'verified' for m in markets)
     if verified < max(10, int(sum(bool(m['offers']) for m in previous.values()) * .8)) or known < len(config) * .6:
         raise ValueError('insufficient fresh source coverage; existing publication left untouched')
-    fx = collect_fx(now, old.get('fx') if old else None, getter)
+    required_currencies = {m.get('currency') for m in markets if m.get('offers') and m.get('currency')}
+    fx = collect_fx(now, old.get('fx') if old else None, getter, required_currencies)
     for market in markets:
         for offer in market['offers']:
             for price in offer['amounts']:
