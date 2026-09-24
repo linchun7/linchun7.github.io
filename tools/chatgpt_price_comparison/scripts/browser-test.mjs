@@ -64,7 +64,15 @@ try {
   const plans=[...new Set(expected.markets.flatMap(m=>m.offers.map(o=>o.label)))];
   assert.equal(await evaluate('document.querySelectorAll("[data-plan-header]").length'),plans.length,'one column per plan');
   assert.equal(await evaluate('document.querySelectorAll(".minimum-card").length'),plans.length,'one minimum card per plan');
+  assert.equal(await evaluate('document.querySelector(".search-field svg")!==null && document.querySelector("button[data-sort=country] svg")!==null'),true,'Lucide search and sort icons render');
   assert.equal(await evaluate('document.querySelector("#refresh")===null && document.querySelector("#plan")===null && document.querySelector("#status")===null'),true,'legacy reload and filters removed');
+
+  await evaluate(`document.querySelector('button[data-sort="country"]').click()`);
+  assert.equal(await evaluate(`document.querySelector('#rankHeaderLabel > [aria-hidden="true"]').textContent`),'序号','country sort switches rank header to sequence');
+  assert.equal(await evaluate(`document.querySelector('#priceRows .mobile-rank').textContent`),'序1','country sort uses mobile sequence label');
+  assert.equal(await evaluate(`document.querySelector('#priceRows .mobile-rank-sr').textContent`),'当前列表序号第 1','country sort exposes accessible sequence label');
+  await evaluate(`document.querySelector('button[data-sort-plan="ChatGPT Plus"]').click()`);
+  assert.equal(await evaluate(`document.querySelector('#rankHeaderLabel > [aria-hidden="true"]').textContent`),'排名','plan sort restores global ranking header');
   assert.ok(expected.markets.some(m=>m.code==='us'&&m.offers.length),'US source present');
 
   await evaluate(`document.querySelector('#searchInput').value='美国';document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);
@@ -106,6 +114,7 @@ try {
   await command('Page.reload',{ignoreCache:true});
   await until(()=>evaluate(`document.querySelectorAll('#priceRows tr[data-market-id]').length>0`),'no-JS static matrix');
   assert.equal(await evaluate(`document.querySelector('.country-history-button').disabled`),true,'no-JS country history is safely disabled');
+  assert.equal(await evaluate(`document.querySelector('i[data-lucide="search"]')!==null`),true,'no-JS keeps Lucide placeholder in static HTML');
   assert.equal(await evaluate(`document.querySelector('#refresh')===null`),true,'no-JS has no reload button');
   console.log('Browser tests passed: matrix columns, minimum cards, country history, variants, search/XSS, mobile plan view, no-JS static matrix.');
 } catch(error) {
