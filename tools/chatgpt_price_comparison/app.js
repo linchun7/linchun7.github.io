@@ -4,7 +4,7 @@
   const FRESH = 36 * 3600e3, EXPIRE = 7 * 86400e3;
   let data, loading = false, failure = '', lastRequest = 0;
   const canonical = v => Array.isArray(v) ? `[${v.map(canonical).join(',')}]` : v && typeof v === 'object' ? `{${Object.keys(v).sort().map(k => `${JSON.stringify(k)}:${canonical(v[k])}`).join(',')}}` : JSON.stringify(v);
-  const date = s => new Date(s).toLocaleString('zh-CN', {hour12: false});
+  const date = s => new Date(s).toLocaleString('zh-CN', {hour12: false, timeZone: 'UTC'});
   const age = s => Date.now() - Date.parse(s);
   const usable = s => Number.isFinite(age(s)) && age(s) >= -300e3 && age(s) <= EXPIRE;
   const fresh = m => m.status === 'verified' && usable(m.last_verified_at) && age(m.last_verified_at) <= FRESH;

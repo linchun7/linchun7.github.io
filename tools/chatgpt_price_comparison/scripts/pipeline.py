@@ -126,39 +126,55 @@ def walk_json(value):
 
 def parse_amount(display: str, currency: str) -> str:
     text = clean(display).replace('\u066b', '.').replace('\u066c', ',')
-    if currency == 'PEN':
-        text = text.replace('S/', 'S')
-    if not text or len(text) > 80 or re.search(r'[-−+()%/]', text):
-        raise ValueError('invalid price text')
-    for token in re.findall(r'\b[A-Z]{3}\b', text):
-        if token != currency:
-            raise ValueError('currency code disagrees with storefront')
-    symbols = {'€': {'EUR'}, '£': {'GBP', 'EGP', 'LBP'}, '₹': {'INR'}, '₺': {'TRY'}, '₩': {'KRW'}, '¥': {'JPY', 'CNY'}, '₫': {'VND'}}
-    if any(symbol in text and currency not in allowed for symbol, allowed in symbols.items()):
-        raise ValueError('currency symbol disagrees with storefront')
-    matches = re.findall(r'[0-9][0-9.,\s\u2019\x27]*', text)
-    if len(matches) != 1:
-        raise ValueError('missing or multiple prices')
-    number = re.sub(r"[\s\u2019\x27]", '', matches[0])
-    digits = 0 if currency in ZERO_DECIMAL else 3 if currency in THREE_DECIMAL else 2
-    decimal = None
-    if digits:
-        for sep in ('.', ','):
-            if sep in number and len(number.rsplit(sep, 1)[1]) == digits:
-                if decimal is not None:
-                    raise ValueError('ambiguous decimal')
-                decimal = sep
-    integer, fraction = number.rsplit(decimal, 1) if decimal else (number, '')
-    separators = set(re.findall('[.,]', integer))
-    if len(separators) > 1 or (decimal and decimal in integer):
-        raise ValueError('inconsistent number grouping')
-    if separators:
-        group = re.escape(next(iter(separators)))
-        if not (re.fullmatch(rf'[0-9]{{1,3}}(?:{group}[0-9]{{3}})+', integer) or
-                re.fullmatch(rf'[0-9]{{1,2}}(?:{group}[0-9]{{2}})+{group}[0-9]{{3}}', integer)):
-            raise ValueError('invalid thousands grouping')
-    integer = re.sub('[.,]', '', integer)
-    value = Decimal(integer + ('.' + fraction if fraction else ''))
+    if not text or len(text) > 80 or not re.fullmatch('[A-Z]{3}', currency):
+        raise ValueError('invalid price text or currency')
+    # Apple's Indonesian compact prices use a decimal comma and named scale.
+    compact = re.fullmatch(r'(?:Rp|IDR) ?([0-9]+(?:,[0-9]{1,3})?) ?(ribu|juta)', text)
+    if compact:
+        if currency != 'IDR':
+            raise ValueError('compact currency disagrees with storefront')
+        value = Decimal(compact[1].replace(',', '.')) * (1000 if compact[2] == 'ribu' else 1000000)
+    else:
+        affixes = {
+            'USD': {'$', 'US$'}, 'CAD': {'$', 'CA$'}, 'AUD': {'$', 'A$'},
+            'NZD': {'$', 'NZ$'}, 'GBP': {'£'}, 'EUR': {'€'}, 'JPY': {'¥'},
+            'CNY': {'¥'}, 'KRW': {'₩'}, 'TWD': {'NT$', '$'}, 'SGD': {'S$', '$'},
+            'MYR': {'RM'}, 'THB': {'฿'}, 'VND': {'đ', '₫'}, 'IDR': {'Rp'},
+            'PHP': {'₱'}, 'INR': {'₹'}, 'PKR': {'Rs'}, 'TRY': {'₺'},
+            'BRL': {'R$'}, 'MXN': {'$', 'MX$'}, 'CLP': {'$'}, 'COP': {'$'},
+            'PEN': {'S/'}, 'ZAR': {'R'}, 'ILS': {'₪'}, 'CZK': {'Kč'},
+            'PLN': {'zł'}, 'RON': {'lei'}, 'SEK': {'kr'}, 'NOK': {'kr'},
+            'DKK': {'kr'}, 'KZT': {'₸'}, 'NGN': {'₦'},
+        }.get(currency, set()) | {currency}
+        match = re.fullmatch(r"([^0-9]*)([0-9](?:[0-9., '\u2019]*[0-9])?)([^0-9]*)", text)
+        if not match:
+            raise ValueError('missing or multiple prices')
+        prefix, number, suffix = (part.strip() for part in match.groups())
+        if (bool(prefix) + bool(suffix) != 1) or (prefix or suffix) not in affixes:
+            raise ValueError('unknown currency affix or amount unit')
+        number = number.replace('’', "'")
+        digits = 0 if currency in ZERO_DECIMAL else 3 if currency in THREE_DECIMAL else 2
+        decimal = None
+        if digits:
+            for sep in ('.', ','):
+                if sep in number and len(number.rsplit(sep, 1)[1]) == digits:
+                    if decimal is not None:
+                        raise ValueError('ambiguous decimal')
+                    decimal = sep
+        integer, fraction = number.rsplit(decimal, 1) if decimal else (number, '')
+        separators = set(re.findall(r"[., ']+", integer))
+        if len(separators) > 1 or (decimal and decimal in integer):
+            raise ValueError('inconsistent number grouping')
+        if separators:
+            separator = next(iter(separators))
+            if len(separator) != 1:
+                raise ValueError('invalid grouping separator')
+            group = re.escape(separator)
+            if not (re.fullmatch(rf'[0-9]{{1,3}}(?:{group}[0-9]{{3}})+', integer) or
+                    re.fullmatch(rf'[0-9]{{1,2}}(?:{group}[0-9]{{2}})+{group}[0-9]{{3}}', integer)):
+                raise ValueError('invalid thousands grouping')
+        integer = re.sub(r"[., ']", '', integer)
+        value = Decimal(integer + ('.' + fraction if fraction else ''))
     if not value.is_finite() or not Decimal('0') < value < Decimal('1000000000'):
         raise ValueError('invalid paid price')
     return format(value.normalize(), 'f')
@@ -289,9 +305,11 @@ def observe(config: dict, old: dict | None, now: float, getter=fetch) -> dict:
         result.update(candidate, status='verified', last_verified_at=stamp(now))
         result.pop('pending', None)
         result.pop('error', None)
+        result.pop('error_detail', None)
     except (ValueError, KeyError, TypeError, RecursionError, InvalidOperation, urllib.error.URLError, TimeoutError, OSError) as exc:
         result['status'] = 'retained' if result.get('offers') else 'unavailable'
         result['error'] = 'http_' + str(exc.code) if isinstance(exc, urllib.error.HTTPError) else 'source_unverified'
+        result['error_detail'] = type(exc).__name__ + ': ' + clean(str(exc))[:160]
     return result
 
 
@@ -413,6 +431,9 @@ def run(output: Path, now: float | None = None) -> dict:
     getter = lambda url, **kw: fetch(url, deadline=deadline, **kw)
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
         markets = list(executor.map(lambda c: observe(c, previous.get(c['code']), now, getter), config))
+    for market in markets:
+        if market.get('error'):
+            print('SOURCE_ERROR', market['code'], market['error_detail'], flush=True)
     known = sum(bool(m['offers']) for m in markets)
     verified = sum(m['status'] == 'verified' for m in markets)
     if verified < max(10, int(sum(bool(m['offers']) for m in previous.values()) * .8)) or known < len(config) * .6:

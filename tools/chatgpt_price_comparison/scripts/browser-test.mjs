@@ -12,7 +12,10 @@ const chrome = process.env.CHROME_BIN || ['/usr/bin/google-chrome','/usr/bin/chr
 assert.ok(chrome, 'A local Chrome/Chromium installation is required');
 const profile = await mkdtemp(path.join(tmpdir(), 'chatgpt-browser-'));
 const server = spawn('python3', ['-m','http.server','4177','--bind','127.0.0.1'], {cwd: root, stdio:'ignore'});
-const browser = spawn(chrome, ['--headless=new','--no-sandbox','--disable-dev-shm-usage','--no-first-run','--remote-debugging-port=0',`--user-data-dir=${profile}`], {stdio:['ignore','ignore','pipe']});
+const browser = spawn(chrome, ['--headless=new','--no-sandbox','--disable-dev-shm-usage','--no-first-run','--no-default-browser-check','--disable-background-networking','--remote-debugging-port=0',`--user-data-dir=${profile}`], {stdio:['ignore','ignore','pipe']});
+let diagnostics = '', launchError;
+browser.stderr.on('data', chunk => { diagnostics = (diagnostics + chunk).slice(-12000); });
+browser.once('error', error => { launchError = error; });
 const delay = ms => new Promise(r => setTimeout(r, ms));
 let socket, serial = 0; const pending = new Map();
 async function until(test, label, timeout=15000) {
@@ -31,17 +34,28 @@ async function evaluate(expression) {
   return result.result.value;
 }
 try {
-  const endpoint = await new Promise((resolve,reject) => {
-    const timer=setTimeout(()=>reject(Error('Chrome did not start')),15000); let text='';
-    browser.stderr.on('data', chunk=>{text+=chunk;const found=text.match(/DevTools listening on (ws:\/\/[^\s]+)/);if(found){clearTimeout(timer);resolve(found[1]);}});
-    browser.once('error',error=>{clearTimeout(timer);reject(error);});
-  });
-  const origin=new URL(endpoint).origin.replace('ws:', 'http:');
+  // Read Chrome's readiness file instead of depending on stderr log wording.
+  let port;
+  const launchDeadline = Date.now() + 30000;
+  while (Date.now() < launchDeadline) {
+    if (launchError || browser.exitCode !== null) throw Error('Chrome exited before ready: ' + (launchError || browser.exitCode) + '\n' + diagnostics);
+    try {
+      const [candidate] = (await readFile(path.join(profile, 'DevToolsActivePort'), 'utf8')).trim().split('\n');
+      if (/^[0-9]+$/.test(candidate)) {
+        const response = await fetch(`http://127.0.0.1:${candidate}/json/version`, {signal: AbortSignal.timeout(1000)});
+        if (response.ok) { port = candidate; break; }
+      }
+    } catch {}
+    await delay(100);
+  }
+  assert.ok(port, 'Chrome readiness failed: ' + diagnostics);
+  const origin = `http://127.0.0.1:${port}`;
   const tab=await (await fetch(origin+'/json/new?about:blank',{method:'PUT'})).json();
   socket=new WebSocket(tab.webSocketDebuggerUrl);
   await new Promise((resolve,reject)=>{socket.addEventListener('open',resolve,{once:true});socket.addEventListener('error',reject,{once:true});});
   socket.addEventListener('message', ({data}) => {const m=JSON.parse(data), p=pending.get(m.id);if(m.method === 'Runtime.exceptionThrown') console.error('PAGE ERROR',JSON.stringify(m.params));if(p){clearTimeout(p.timer);pending.delete(m.id);m.error?p.reject(Error(JSON.stringify(m.error))):p.resolve(m.result);}});
   await command('Page.enable'); await command('Runtime.enable'); await command('Network.enable');
+  await command('Emulation.setTimezoneOverride', {timezoneId: 'Asia/Tokyo'});
   const url='http://127.0.0.1:4177/tools/chatgpt_price_comparison/';
   await until(async()=> (await fetch(url)).ok,'HTTP server');
   await command('Page.navigate',{url});
@@ -49,6 +63,7 @@ try {
   await until(()=>evaluate('!document.querySelector("#refresh").disabled'),'initial JSON refresh');
   assert.equal(await evaluate('document.querySelector("#health").textContent.includes("重新加载未成功")'),false,'valid JSON hash passes');
   const expected=JSON.parse(await readFile(path.join(root,'tools/chatgpt_price_comparison/data/prices.json'),'utf8'));
+  assert.equal(await evaluate(`document.querySelector('#generated').textContent`),new Date(expected.generated_at).toLocaleString('zh-CN', {hour12:false,timeZone:'UTC'}),'UTC labels are independent of browser timezone');
   assert.ok(expected.markets.some(m=>m.code==='us'&&m.offers.length),'US source present');
   await evaluate(`document.querySelector('#search').value='us';document.querySelector('#search').dispatchEvent(new Event('input'))`);
   assert.ok(await evaluate(`document.querySelector('#price-rows').textContent.includes('美国')`));
@@ -73,7 +88,7 @@ try {
   await command('Emulation.setScriptExecutionDisabled',{value:true});
   await command('Page.reload',{ignoreCache:true});
   await until(()=>evaluate(`document.querySelector('#filters')?.hidden && document.querySelectorAll('#price-rows tr').length>0`),'no-JS static table');
-  console.log('Browser tests passed: JSON integrity, filters, duplicate prices, empty state, XSS input, mobile layout, expiry, offline fallback, no-JS.');
+  console.log('Browser tests passed: JSON integrity, UTC, filters, duplicate prices, empty state, XSS input, mobile layout, expiry, offline fallback, no-JS.');
 } catch(error) {
   if (socket?.readyState === 1) console.error('PAGE STATE',await evaluate('({url:location.href,health:document.querySelector("#health")?.textContent,filters:document.querySelector("#filters")?.hidden,body:document.body?.textContent.slice(0,1200)})'));
   throw error;
