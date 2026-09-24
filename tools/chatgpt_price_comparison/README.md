@@ -23,7 +23,7 @@
 5. 本轮新核验数量不得低于已有有价地区数的 80%（且至少 10 个）；有价覆盖不得低于配置数的 60%。严重降级直接拒绝发布，保留整份原数据。
 6. 汇率失败最多沿用 7 天并标明旧汇率；若连可用 fallback 都没有，则整轮拒绝发布并保留上一版生产页面。价格超过 36 小时标记旧价；价格或汇率超过 7 天隐藏人民币换算，且过期汇率不再参与人民币排序与排名。浏览器不持久缓存价格，拒绝校验不通过或时间倒退的更新。
 7. 独立发布任务重新校验工件，JSON 与静态 HTML 同一个 Git 提交发布。只改自身的两份生成文件；远端分支前进即拒绝推送，不强推、不重放旧数据覆盖其他会话。
-8. 数据推送后等待该提交自动触发的 Pages 构建（或已验证后继提交）完成，再用独立 Node 验证器对公开 canonical JSON 做 revision 哈希校验，并确认 HTML 引用同一 revision。只有整条生产链成功才会形成当天可供兜底跳过的成功证明。
+8. 数据推送后等待该提交自动触发的 Pages 构建（或已验证后继提交）完成，再用独立 Node 验证器校验公开 canonical JSON 的数据 revision，并核对 HTML 的页面 build revision；即使价格数据没变，只要模板或前端资产变化，旧页面也不能冒充新部署。只有整条生产链成功才会形成当天可供兜底跳过的成功证明。
 9. 故障或部分降级自动维护一条未关闭 Issue，持续失败不重复创建，恢复后自动关闭。
 
 正常变价、汇率更新、短暂网络失败与恢复无需人工处理。上游长期改版、来源撤下、GitHub 权限或调度中断仍可能需要维护；不能保证永久零人工。
@@ -32,7 +32,7 @@
 
 - `scripts/pipeline.py`：采集、校验、状态、汇率、静态渲染。
 - `scripts/daily_run_guard.py`：CF/GitHub 自动主备的每日幂等门禁；结合仓库数据与 GitHub Actions 当天成功运行，不增加数据库或额外状态文件。
-- `scripts/verify-production.mjs`：Pages 构建完成后的 canonical JSON/HTML 生产验收；限制响应大小、请求时长和总重试窗口。
+- `scripts/verify-production.mjs`：Pages 构建完成后的生产验收；同时核对数据 revision 与由数据、模板、JS、CSS、图标资产共同生成的页面 build revision，避免“价格未变但旧前端仍被误判为已部署”；并限制响应大小、请求时长和总重试窗口。
 - `index.template.html`、`app.js`、`style.css`、`vendor/lucide-subset.js`：静态页面与无框架交互；图标子集随本项目本地托管，不依赖 iCloud 工具目录。
 - `data/prices.json`、`index.html`：自动生成，不手工改价。数据包含最近 200 条标价变动，不把汇率波动记录为套餐改价；更早版本见 Git 历史。
 - `scripts/test_pipeline.py`：离线回归；`scripts/browser-test.mjs`：Chrome 实测。浏览器测试覆盖套餐矩阵、最低价卡片、国家价格历史、过期汇率排名、重复金额、搜索/XSS、窄屏单套餐视图与无 JavaScript 静态矩阵。
