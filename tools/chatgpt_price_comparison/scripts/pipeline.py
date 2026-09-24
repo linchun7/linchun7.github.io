@@ -72,6 +72,14 @@ def url_for(code: str) -> str:
     return f'https://apps.apple.com/{code}/app/chatgpt/id6448311069'
 
 
+def app_storefront(url: str) -> str | None:
+    parsed = urllib.parse.urlsplit(url)
+    if parsed.scheme != 'https' or parsed.netloc != 'apps.apple.com':
+        return None
+    match = re.fullmatch(r'/([a-z]{2})/app/[^/]+/id6448311069', parsed.path)
+    return match.group(1) if match else None
+
+
 def semantic(market: dict) -> dict:
     return {'currency': market['currency'], 'offers': [
         {'label': offer['label'], 'amounts': [x['amount'] for x in offer['amounts']]}
@@ -196,7 +204,7 @@ def parse_store(text: str, code: str) -> dict:
         if sum(n.tag == 'script' and n.attrs.get('id') == key for n in nodes) != 1:
             raise ValueError('missing or duplicate source script')
     canonical_links = [n.attrs.get('href') for n in nodes if n.tag == 'link' and n.attrs.get('rel') == 'canonical']
-    if canonical_links != [url_for(code)]:
+    if len(canonical_links) != 1 or app_storefront(canonical_links[0]) != code:
         raise ValueError('wrong canonical storefront or application')
     meta = json.loads(scripts.get('software-application', '{}'))
     if meta.get('name') != 'ChatGPT' or '/developer/' not in meta.get('author', {}).get('url', '') or not re.search(r'/id1684349733(?:\?|$)', meta['author']['url']):
@@ -245,8 +253,13 @@ def parse_store(text: str, code: str) -> dict:
 class RestrictedRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         before, after = urllib.parse.urlsplit(req.full_url), urllib.parse.urlsplit(newurl)
-        if after.scheme != 'https' or after.netloc != before.netloc or after.path != before.path:
-            raise ValueError('cross-origin, country or path redirect rejected')
+        before_storefront = app_storefront(req.full_url)
+        after_storefront = app_storefront(newurl)
+        if before_storefront is not None:
+            if after_storefront != before_storefront:
+                raise ValueError('cross-origin, storefront or application redirect rejected')
+        elif after.scheme != 'https' or after.netloc != before.netloc or after.path != before.path:
+            raise ValueError('cross-origin or path redirect rejected')
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
