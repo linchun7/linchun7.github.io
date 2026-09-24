@@ -663,6 +663,7 @@ def render(data: dict, template: str) -> str:
         'TOTAL': str(len(data['markets'])),
         'CURRENCY_COUNT': str(len({market.get('currency') for market in priced_markets if market.get('currency')})),
         'PLAN_COUNT': str(len(plans)),
+        'TABLE_MIN_WIDTH': str(max(1030, 268 + 190 * len(plans))),
         'DEFAULT_PLAN_SHORT': html.escape(short_plan(default_plan)),
         'APP_VERSION': hashlib.sha256((ROOT / 'app.js').read_bytes()).hexdigest()[:12],
         'STYLE_VERSION': hashlib.sha256((ROOT / 'style.css').read_bytes()).hexdigest()[:12],
