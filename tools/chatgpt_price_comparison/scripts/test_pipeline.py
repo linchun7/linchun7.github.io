@@ -66,8 +66,10 @@ class ParsingTests(unittest.TestCase):
         self.assertNotIn('period', json.dumps(result))
 
     def test_new_plan_label_is_preserved(self):
-        result = p.parse_store(fixture(pairs=[['ChatGPT New Tier', '$44.00']]), 'us')
-        self.assertEqual(result['offers'][0]['label'], 'ChatGPT New Tier')
+        for label in ['ChatGPT New Tier', 'ChatGPT Pro ×5', 'ChatGPT Team & Business', 'ChatGPT Pro: Max']:
+            with self.subTest(label=label):
+                result = p.parse_store(fixture(pairs=[[label, '$44.00']]), 'us')
+                self.assertEqual(result['offers'][0]['label'], label)
 
     def test_country_identity(self):
         with self.assertRaises(ValueError): p.parse_store(fixture('jp','JPY',[['ChatGPT Plus','¥3,000']]), 'us')
