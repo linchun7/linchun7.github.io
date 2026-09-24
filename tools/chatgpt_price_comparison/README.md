@@ -14,7 +14,7 @@
 
 ## 自动更新与防错
 
-生产自动更新采用主备：**Cloudflare 每日北京时间 08:25** 外部调用 `workflow_dispatch`（`trigger_source=cloudflare`）作为主触发，**GitHub cron 08:30** 仅作兜底；也支持手动运行。两个自动入口先校验当前 `prices.json`：若北京时间当天已发布按当前数据契约判定为非降级、且汇率仍新鲜的数据，备用触发直接跳过；若存在 `retained` / `pending`、fallback 汇率、旧数据或主触发未成功发布，则继续重试。手动运行不受每日幂等跳过。仓库只能验证这一调度契约，不能单独证明 Cloudflare 控制面的实时启用状态。
+生产自动更新采用主备：**Cloudflare 每日北京时间 08:25** 外部调用 `workflow_dispatch`（`trigger_source=cloudflare`）作为主触发，**GitHub cron 08:30** 仅作兜底；也支持手动运行。两个自动入口先校验当前 `prices.json` 和当天 `Update ChatGPT prices` 的成功生产运行证明：只有数据非降级、汇率仍新鲜且当天已有完整成功运行时，备用触发才跳过；若存在 `retained` / `pending`、fallback 汇率、旧数据、主触发失败，或数据虽已提交但 Pages/生产验证未完成，GitHub 备用仍继续重试。手动运行不受每日幂等跳过。仓库只能验证这一调度契约，不能单独证明 Cloudflare 控制面的实时启用状态。
 
 1. 只读任务运行离线测试、抓取、数据校验与真实 Chrome 测试。无需 API Key、登录态、付费服务、数据库或第三方 Python/Node 包。
 2. 校验应用身份、canonical 地区和币种；可见价格必须与两种结构化表示一致。它们是**同一来源的交叉校验**，不是三个独立价格源。初次采集和改价另发一次不使用缓存的确认请求。
@@ -23,14 +23,16 @@
 5. 本轮新核验数量不得低于已有有价地区数的 80%（且至少 10 个）；有价覆盖不得低于配置数的 60%。严重降级直接拒绝发布，保留整份原数据。
 6. 汇率失败最多沿用 7 天并标明旧汇率。价格超过 36 小时标记旧价；价格或汇率超过 7 天隐藏人民币换算。浏览器不持久缓存价格，拒绝校验不通过或时间倒退的更新。
 7. 独立发布任务重新校验工件，JSON 与静态 HTML 同一个 Git 提交发布。只改自身的两份生成文件；远端分支前进即拒绝推送，不强推、不重放旧数据覆盖其他会话。
-8. 主分支发布后主动请求 Pages 构建，再从公开站点核对 JSON 与 HTML 的数据版本。故障或部分降级自动创建一条未关闭 Issue，持续失败不重复创建，恢复后自动关闭。
+8. 数据推送后主动请求并等待该提交（或已验证后继提交）的 Pages 构建完成，再用独立 Node 验证器对公开 canonical JSON 做 revision 哈希校验，并确认 HTML 引用同一 revision。只有整条生产链成功才会形成当天可供兜底跳过的成功证明。
+9. 故障或部分降级自动维护一条未关闭 Issue，持续失败不重复创建，恢复后自动关闭。
 
 正常变价、汇率更新、短暂网络失败与恢复无需人工处理。上游长期改版、来源撤下、GitHub 权限或调度中断仍可能需要维护；不能保证永久零人工。
 
 ## 文件与验收
 
 - `scripts/pipeline.py`：采集、校验、状态、汇率、静态渲染。
-- `scripts/daily_run_guard.py`：CF/GitHub 自动主备的每日幂等门禁；不增加数据库或额外状态文件。
+- `scripts/daily_run_guard.py`：CF/GitHub 自动主备的每日幂等门禁；结合仓库数据与 GitHub Actions 当天成功运行，不增加数据库或额外状态文件。
+- `scripts/verify-production.mjs`：Pages 构建完成后的 canonical JSON/HTML 生产验收；限制响应大小、请求时长和总重试窗口。
 - `index.template.html`、`app.js`、`style.css`：静态页面与无框架交互。
 - `data/prices.json`、`index.html`：自动生成，不手工改价。数据包含最近 200 条标价变动，不把汇率波动记录为套餐改价；更早版本见 Git 历史。
 - `scripts/test_pipeline.py`：离线回归；`scripts/browser-test.mjs`：Chrome 实测。浏览器测试覆盖重复金额、搜索、空结果、窄屏、过期、JSON 失败回退与无 JavaScript。
