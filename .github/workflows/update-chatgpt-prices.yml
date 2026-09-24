@@ -1,22 +1,43 @@
 name: Update ChatGPT prices
 on:
   schedule:
-    - cron: '43 0,6 * * *'
+    # 北京时间 08:30，作为 Cloudflare 08:25 主触发的备用。
+    - cron: '30 0 * * *'
   workflow_dispatch:
-  push:
-    branches: [main, feat/chatgpt-price-comparison]
-    paths:
-      - 'tools/chatgpt_price_comparison/**'
-      - '!tools/chatgpt_price_comparison/data/**'
-      - '!tools/chatgpt_price_comparison/index.html'
-      - '.github/workflows/update-chatgpt-prices.yml'
+    inputs:
+      trigger_source:
+        description: 触发来源（手动运行保持 manual）
+        required: false
+        default: manual
+        type: choice
+        options:
+          - manual
+          - cloudflare
 permissions:
   contents: read
 concurrency:
-  group: update-chatgpt-prices-${{ github.ref }}
+  group: update-chatgpt-prices
   cancel-in-progress: false
 jobs:
+  prepare:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      should_run: ${{ steps.daily_guard.outputs.should_run }}
+      trigger_source: ${{ steps.daily_guard.outputs.trigger_source }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check daily idempotence
+        id: daily_guard
+        env:
+          REQUESTED_TRIGGER_SOURCE: ${{ inputs.trigger_source }}
+        run: python3 tools/chatgpt_price_comparison/scripts/daily_run_guard.py
   generate:
+    needs: prepare
+    if: needs.prepare.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 12
     outputs:
@@ -52,8 +73,8 @@ jobs:
           if-no-files-found: error
           retention-days: 7
   publish:
-    needs: generate
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feat/chatgpt-price-comparison'
+    needs: [prepare, generate]
+    if: needs.prepare.outputs.should_run == 'true' && needs.generate.result == 'success' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -72,14 +93,13 @@ jobs:
         run: python3 tools/chatgpt_price_comparison/scripts/pipeline.py --check "$RUNNER_TEMP/chatgpt-candidate"
       - name: Publish two files atomically without overwriting concurrent work
         env:
-          TARGET: ${{ github.ref_name }}
+          TARGET: main
           BASE: ${{ needs.generate.outputs.base }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          case "$TARGET" in main|feat/chatgpt-price-comparison) ;; *) exit 1 ;; esac
           git fetch origin "$TARGET" --depth=1
-          test "$(git rev-parse FETCH_HEAD)" = "$BASE" || { echo '::error::Branch advanced; discard old candidate. Next scheduled run retries.'; exit 1; }
+          test "$(git rev-parse FETCH_HEAD)" = "$BASE" || { echo '::error::Branch advanced; discard old candidate. Next automatic run retries.'; exit 1; }
           mkdir -p tools/chatgpt_price_comparison/data
           cp "$RUNNER_TEMP/chatgpt-candidate/prices.json" tools/chatgpt_price_comparison/data/prices.json
           cp "$RUNNER_TEMP/chatgpt-candidate/index.html" tools/chatgpt_price_comparison/index.html
@@ -91,13 +111,11 @@ jobs:
           auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
           git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push origin "HEAD:$TARGET"
       - name: Request Pages build even when retrying a previous deployment
-        if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh api --method POST "repos/$GITHUB_REPOSITORY/pages/builds" || echo '::warning::Pages request not accepted; production verification will determine success.'
       - name: Verify publicly deployed data and static page
-        if: github.ref == 'refs/heads/main'
         env:
           CANDIDATE: ${{ runner.temp }}/chatgpt-candidate
         run: |
@@ -125,8 +143,8 @@ jobs:
               raise SystemExit('Live deployment did not match the validated artifact; previous published page may remain cached.')
           PY
   notify:
-    needs: [generate, publish]
-    if: always() && github.ref == 'refs/heads/main'
+    needs: [prepare, generate, publish]
+    if: always() && github.ref == 'refs/heads/main' && (needs.prepare.result != 'success' || needs.prepare.outputs.should_run == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
@@ -134,6 +152,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
+      PREPARE: ${{ needs.prepare.result }}
       GENERATE: ${{ needs.generate.result }}
       PUBLISH: ${{ needs.publish.result }}
       DEGRADED: ${{ needs.generate.outputs.degraded }}
@@ -143,8 +162,8 @@ jobs:
           set -euo pipefail
           title='ChatGPT 价格自动更新需要关注'
           issue=$(gh issue list --state open --search "$title in:title" --json number,title --jq '.[] | select(.title == "ChatGPT 价格自动更新需要关注") | .number' | head -1)
-          if [[ "$GENERATE" == success && "$PUBLISH" == success && "$DEGRADED" == false ]]; then
+          if [[ "$PREPARE" == success && "$GENERATE" == success && "$PUBLISH" == success && "$DEGRADED" == false ]]; then
             if [[ -n "$issue" ]]; then gh issue close "$issue" --comment '自动更新及生产验证已恢复。'; fi
           elif [[ -z "$issue" ]]; then
-            gh issue create --title "$title" --body "自动核验、发布或生产验证失败，或部分地区/汇率正在沿用旧数据。未验证的新价格不会覆盖旧价。下次计划运行会自动重试；持续失败可能需要更新来源解析器。运行：$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            gh issue create --title "$title" --body "自动触发检查、核验、发布或生产验证失败，或部分地区/汇率正在沿用旧数据。未验证的新价格不会覆盖旧价。Cloudflare 主触发与 GitHub 备用都会在需要时自动重试；持续失败可能需要更新来源解析器。运行：$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           fi
