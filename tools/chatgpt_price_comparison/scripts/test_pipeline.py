@@ -335,6 +335,16 @@ class ContractTests(unittest.TestCase):
         self.assertNotIn('\\n<tr data-market-id=',page)
         self.assertEqual(page,p.render(d,template))
 
+    def test_static_price_ties_use_stable_market_code_order(self):
+        d=copy.deepcopy(data_fixture())
+        base=d['markets'][0]
+        first=copy.deepcopy(base); first['code']='zz'; first['name']='阿市场'; first['source_url']=p.url_for('zz')
+        second=copy.deepcopy(base); second['code']='aa'; second['name']='总市场'; second['source_url']=p.url_for('aa')
+        d['markets']=[first,second]
+        revise(d)
+        page=p.render(d,(p.ROOT/'index.template.html').read_text(encoding='utf-8'))
+        self.assertLess(page.index('data-market-id="aa"'),page.index('data-market-id="zz"'))
+
     def test_static_layout_expands_when_new_plans_appear(self):
         d=copy.deepcopy(data_fixture())
         market=d['markets'][0]
