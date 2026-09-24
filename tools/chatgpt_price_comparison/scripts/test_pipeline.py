@@ -257,6 +257,26 @@ class ContractTests(unittest.TestCase):
         self.assertNotIn('\\n<tr data-market-id=',page)
         self.assertEqual(page,p.render(d,template))
 
+    def test_history_contract_accepts_valid_and_rejects_malformed_entries(self):
+        d=data_fixture()
+        before=p.semantic(d['markets'][0])
+        after=copy.deepcopy(before)
+        after['offers'][0]['amounts'][0]='9'
+        d['changes']=[{'at':p.stamp(NOW-60),'code':'us','before':before,'after':after}]
+        revise(d)
+        p.validate(d,NOW)
+
+        bad_cases=[]
+        future=copy.deepcopy(d); future['changes'][0]['at']=p.stamp(NOW+1); revise(future); bad_cases.append(future)
+        bad_code=copy.deepcopy(d); bad_code['changes'][0]['code']='USA'; revise(bad_code); bad_cases.append(bad_code)
+        same=copy.deepcopy(d); same['changes'][0]['after']=copy.deepcopy(same['changes'][0]['before']); revise(same); bad_cases.append(same)
+        duplicate=copy.deepcopy(d); duplicate['changes'][0]['after']['offers'][0]['amounts']=['9','9']; revise(duplicate); bad_cases.append(duplicate)
+        extra=copy.deepcopy(d); extra['changes'][0]['before']['extra']=True; revise(extra); bad_cases.append(extra)
+        for candidate in bad_cases:
+            with self.subTest(candidate=candidate['changes'][0]):
+                with self.assertRaises(ValueError):
+                    p.validate(candidate,NOW)
+
     def test_many_tied_minimum_countries_are_compacted(self):
         d=data_fixture()
         base=d['markets'][0]
