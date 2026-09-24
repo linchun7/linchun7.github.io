@@ -14,9 +14,9 @@ class WorkflowContractTests(unittest.TestCase):
         cls.text = WORKFLOW.read_text(encoding="utf-8")
 
     def test_cloudflare_is_primary_and_github_is_single_backup(self):
-        self.assertIn("Cloudflare 08:25", self.text)
-        self.assertIn("cron: '30 0 * * *'", self.text)
-        self.assertNotIn("cron: '25 0 * * *'", self.text)
+        self.assertIn("Cloudflare 09:05", self.text)
+        self.assertIn("cron: '10 1 * * *'", self.text)
+        self.assertNotIn("cron: '5 1 * * *'", self.text)
         self.assertIn("- cloudflare", self.text)
         self.assertNotIn("\n  push:\n", self.text)
 

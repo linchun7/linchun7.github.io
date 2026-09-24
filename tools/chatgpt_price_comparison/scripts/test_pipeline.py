@@ -205,7 +205,7 @@ class ContractTests(unittest.TestCase):
 
     def test_static_projection_and_escape(self):
         d=data_fixture(); d['markets'][0]['name']='</script><script>alert(1)</script>'; revise(d)
-        template=(p.ROOT/'index.template.html').read_text()
+        template=(p.ROOT/'index.template.html').read_text(encoding='utf-8')
         page=p.render(d,template)
         self.assertNotIn('</script><script>alert(1)',page)
         self.assertIn('&lt;/script&gt;',page)
@@ -219,7 +219,7 @@ class ContractTests(unittest.TestCase):
     def test_all_failure_does_not_write_output(self):
         config=[{'code':c,'name':c} for c in ['us','jp','de','gb','fr','it','ca','au','kr','in']]
         with tempfile.TemporaryDirectory() as temp:
-            root=Path(temp); (root/'markets.json').write_text(json.dumps(config))
+            root=Path(temp); (root/'markets.json').write_text(json.dumps(config), encoding='utf-8')
             with patch.object(p,'ROOT',root), patch.object(p,'observe',side_effect=lambda c,old,now,getter: dict(c,offers=[],status='unavailable')):
                 with self.assertRaises(ValueError): p.run(root/'output',NOW)
             self.assertFalse((root/'output').exists())

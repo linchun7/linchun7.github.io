@@ -419,11 +419,11 @@ def render(data: dict, template: str) -> str:
 
 def run(output: Path, now: float | None = None) -> dict:
     now = time.time() if now is None else now
-    config = json.loads((ROOT / 'markets.json').read_text())
+    config = json.loads((ROOT / 'markets.json').read_text(encoding='utf-8'))
     if len({c['code'] for c in config}) != len(config):
         raise ValueError('duplicate configured storefront')
     previous_path = ROOT / 'data/prices.json'
-    old = json.loads(previous_path.read_text()) if previous_path.exists() else None
+    old = json.loads(previous_path.read_text(encoding='utf-8')) if previous_path.exists() else None
     if old:
         validate(old, now)
     previous = {m['code']: m for m in old['markets']} if old else {}
@@ -452,11 +452,11 @@ def run(output: Path, now: float | None = None) -> dict:
             'generated_at': stamp(now), 'markets': markets, 'fx': fx, 'changes': changes[-200:]}
     data['revision'] = digest(data)
     validate(data, now)
-    page = render(data, (ROOT / 'index.template.html').read_text())
+    page = render(data, (ROOT / 'index.template.html').read_text(encoding='utf-8'))
     output.mkdir(parents=True, exist_ok=True)
     # Output is staging only. Git publication atomically commits JSON and its HTML projection.
-    (output / 'prices.json').write_text(json.dumps(data, ensure_ascii=False, indent=2, allow_nan=False) + '\n')
-    (output / 'index.html').write_text(page)
+    (output / 'prices.json').write_text(json.dumps(data, ensure_ascii=False, indent=2, allow_nan=False) + '\n', encoding='utf-8')
+    (output / 'index.html').write_text(page, encoding='utf-8')
     degraded = any(m['status'] in ('retained', 'pending') for m in markets) or fx is None or fx['fallback']
     message = f'核验成功 {verified}/{len(config)} 个地区；有标价 {known}；沿用/待复核 {sum(m["status"] in ("retained", "pending") for m in markets)}；汇率 {"降级" if fx is None or fx["fallback"] else "正常"}。'
     print(message)
@@ -477,9 +477,9 @@ def main():
     parser.add_argument('--check', type=Path, help='Validate staged prices.json AND deterministic HTML, no network')
     args = parser.parse_args()
     if args.check:
-        data = json.loads((args.check / 'prices.json').read_text())
+        data = json.loads((args.check / 'prices.json').read_text(encoding='utf-8'))
         validate(data)
-        if (args.check / 'index.html').read_text() != render(data, (ROOT / 'index.template.html').read_text()):
+        if (args.check / 'index.html').read_text(encoding='utf-8') != render(data, (ROOT / 'index.template.html').read_text(encoding='utf-8')):
             raise ValueError('HTML is not the validated data projection')
         print('Data contract and static projection passed.')
     elif args.output:
