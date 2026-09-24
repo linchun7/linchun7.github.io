@@ -72,6 +72,10 @@ try {
   await until(()=>evaluate('document.querySelectorAll("#priceRows tr[data-market-id]").length > 0 && document.querySelector(".country-history-button:not(:disabled)")'),'interactive matrix');
   const expected=JSON.parse(await readFile(path.join(root,'tools/chatgpt_price_comparison/data/prices.json'),'utf8'));
   const plans=[...new Set(expected.markets.flatMap(m=>m.offers.map(o=>o.label)))];
+  const defaultPlan=plans.includes('ChatGPT Plus')?'ChatGPT Plus':plans[0];
+  const sampleMarket=expected.markets.find(m=>m.offers.some(o=>o.label===defaultPlan));
+  assert.ok(defaultPlan && sampleMarket,'at least one comparable plan and market');
+  const sampleOffer=sampleMarket.offers.find(o=>o.label===defaultPlan);
   assert.equal(await evaluate('document.querySelectorAll("[data-plan-header]").length'),plans.length,'one column per plan');
   assert.equal(await evaluate('document.querySelectorAll(".minimum-card").length'),plans.length,'one minimum card per plan');
   assert.equal(await evaluate('document.querySelector(".search-field svg")!==null && document.querySelector("button[data-sort=country] svg")!==null'),true,'Lucide search and sort icons render');
@@ -81,34 +85,33 @@ try {
   assert.equal(await evaluate(`document.querySelector('#rankHeaderLabel > [aria-hidden="true"]').textContent`),'序号','country sort switches rank header to sequence');
   assert.equal(await evaluate(`document.querySelector('#priceRows .mobile-rank').textContent`),'序1','country sort uses mobile sequence label');
   assert.equal(await evaluate(`document.querySelector('#priceRows .mobile-rank-sr').textContent`),'当前列表序号第 1','country sort exposes accessible sequence label');
-  await evaluate(`document.querySelector('button[data-sort-plan="ChatGPT Plus"]').click()`);
+  await evaluate(`document.querySelector('button[data-sort-plan="${defaultPlan}"]').click()`);
   assert.equal(await evaluate(`document.querySelector('#rankHeaderLabel > [aria-hidden="true"]').textContent`),'排名','plan sort restores ranking header');
   assert.equal(await evaluate(`document.querySelector('#rankHeaderLabel .visually-hidden').textContent`),'已覆盖地区参考排名','ranking scope is limited to covered markets');
   assert.ok(await evaluate(`document.querySelector('#priceRows .mobile-rank-sr').textContent.startsWith('已覆盖地区价格排名第 ')`),'row ranking scope is limited to covered markets');
-  assert.ok(expected.markets.some(m=>m.code==='us'&&m.offers.length),'US source present');
 
-  await evaluate(`document.querySelector('#searchInput').value='美国';document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);
-  await until(()=>evaluate('document.querySelectorAll("#priceRows tr[data-market-id]").length===1'),'US filter');
-  assert.ok(await evaluate(`document.querySelector('#priceRows').textContent.includes('美国')`));
-  assert.equal(await evaluate(`document.querySelector('#priceRows tr[data-market-id="us"] td:nth-child(2) a')===null`),true,'country is not an App Store link');
-  const usMarket=expected.markets.find(m=>m.code==='us');
-  const usPlus=usMarket.offers.find(o=>o.label==='ChatGPT Plus');
-  if(usPlus?.amounts.length>1) {
-    const plusCellText=await evaluate(`document.querySelector('#priceRows tr[data-market-id="us"] [data-plan="ChatGPT Plus"]').textContent`);
-    assert.ok(plusCellText.includes('$19.99'),'Plus main cell shows lower public price');
-    assert.equal(
-      plusCellText.includes('$200.00'),
-      false,
-      'Main table keeps only the Plus plan-local minimum; cell=' + JSON.stringify(plusCellText)
-        + ' plus=' + JSON.stringify(usPlus.amounts.map(a=>a.amount))
-    );
+  await evaluate(`document.querySelector('#searchInput').value=${JSON.stringify(sampleMarket.name)};document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);
+  await until(()=>evaluate('document.querySelectorAll("#priceRows tr[data-market-id]").length===1'),'sample market filter');
+  assert.ok(await evaluate(`document.querySelector('#priceRows').textContent.includes(${JSON.stringify(sampleMarket.name)})`));
+  assert.equal(await evaluate(`document.querySelector('#priceRows tr[data-market-id="${sampleMarket.code}"] td:nth-child(2) a')===null`),true,'country is not an App Store link');
+  if(sampleOffer?.amounts.length) {
+    const sortedAmounts=[...sampleOffer.amounts].sort((a,b)=>Number(a.amount)-Number(b.amount));
+    const comparisonDisplay=sortedAmounts[0].display;
+    const comparisonCellText=await evaluate(`document.querySelector('#priceRows tr[data-market-id="${sampleMarket.code}"] [data-plan="${defaultPlan}"]').textContent`);
+    assert.ok(comparisonCellText.includes(comparisonDisplay),'main table shows the plan-local minimum public amount');
+    for(const other of sortedAmounts.slice(1)) {
+      assert.equal(comparisonCellText.includes(other.display),false,'main table excludes non-minimum same-label amounts');
+    }
   }
 
-  await evaluate(`document.querySelector('#priceRows tr[data-market-id="us"] .country-history-button').click()`);
+  await evaluate(`document.querySelector('#priceRows tr[data-market-id="${sampleMarket.code}"] .country-history-button').click()`);
   await until(()=>evaluate('document.querySelector("#historyDialog").open'),'history dialog');
-  assert.equal(await evaluate(`document.querySelector('#historyTitle').textContent`),'美国','history opens for country');
+  assert.equal(await evaluate(`document.querySelector('#historyTitle').textContent`),sampleMarket.name,'history opens for country');
   assert.ok(await evaluate(`document.querySelector('#historyRows').children.length >= 1`),'history has at least current observation');
-  if(usPlus?.amounts.length>1) assert.ok(await evaluate(`document.querySelector('#historyLocalPrice').textContent.includes('$19.99') && document.querySelector('#historyLocalPrice').textContent.includes('$200.00')`),'history current price preserves variants');
+  if(sampleOffer?.amounts.length) {
+    const historyLocal=await evaluate(`document.querySelector('#historyLocalPrice').textContent`);
+    for(const amount of sampleOffer.amounts) assert.ok(historyLocal.includes(amount.display),'history preserves every same-label public amount');
+  }
   assert.ok(await evaluate(`document.querySelector('#historySubtitle').textContent.includes('近期公开标价记录')`),'history scope is explicit');
   assert.equal(await evaluate(`document.querySelector('.history-current div:nth-child(3) span').textContent`),'近期变更次数','history count is scoped to retained events');
   await evaluate(`document.querySelector('#closeHistory').click()`);
@@ -117,9 +120,9 @@ try {
   const newestVerified=Math.max(...expected.markets.filter(m=>m.offers.length).map(m=>Date.parse(m.last_verified_at)).filter(Number.isFinite));
   const staleFxNow=fxUpdated + 7*86400e3 + 60e3;
   if(Number.isFinite(fxUpdated) && Number.isFinite(newestVerified) && staleFxNow < newestVerified + 7*86400e3) {
-    await evaluate(`globalThis.__chatgptRealDateNow=Date.now;Date.now=()=>${staleFxNow};document.querySelector('button[data-sort-plan="ChatGPT Plus"]').click()`);
+    await evaluate(`globalThis.__chatgptRealDateNow=Date.now;Date.now=()=>${staleFxNow};document.querySelector('button[data-sort-plan="${defaultPlan}"]').click()`);
     assert.equal(await evaluate(`[...document.querySelectorAll('#priceRows tr[data-market-id] td:first-child')].every(td=>td.textContent==='—')`),true,'expired FX removes CNY ranks');
-    await evaluate(`Date.now=globalThis.__chatgptRealDateNow;delete globalThis.__chatgptRealDateNow;document.querySelector('button[data-sort-plan="ChatGPT Plus"]').click()`);
+    await evaluate(`Date.now=globalThis.__chatgptRealDateNow;delete globalThis.__chatgptRealDateNow;document.querySelector('button[data-sort-plan="${defaultPlan}"]').click()`);
   }
 
   await evaluate(`document.querySelector('#searchInput').value='<img src=x onerror=alert(1)>';document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);
