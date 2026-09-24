@@ -13,9 +13,9 @@
   <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
   <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
   <link rel="modulepreload" href="../icloud_price_comparison/vendor/lucide-subset.js?v=2b21b7af6dee">
-  <link rel="stylesheet" href="style.css?v=69047c6b1675">
+  <link rel="stylesheet" href="style.css?v=24a8e155b6a1">
   <title>ChatGPT 全球价格对比｜各地区 App Store 标价</title>
-  <script defer data-cfasync="false" src="app.js?v=5e5c1fbee4a8"></script>
+  <script defer data-cfasync="false" src="app.js?v=84659aa295e8"></script>
 </head>
 <body>
   <a class="skip-link" href="#priceWorkspace">跳到价格表</a>
@@ -47,7 +47,7 @@
           <h2 id="overviewTitle">各套餐全球最低价</h2>
           <p class="overview-note">按人民币参考价比较；同名多档标价不推断计费周期。</p>
         </div>
-        <div id="minimumSummary" class="minimum-stats overview-stat-list" role="group" aria-label="各套餐全球最低价概览">
+        <div id="minimumSummary" class="minimum-stats overview-stat-list" role="group" aria-label="各套餐全球最低价概览" style="--plan-count: 4">
 <button type="button" class="minimum-card" data-plan="ChatGPT Go" data-market-id="in" disabled><span class="minimum-plan-label">Go</span><strong class="minimum-country">印度</strong><small class="minimum-price">¥28.00</small></button>
 <button type="button" class="minimum-card" data-plan="ChatGPT Plus" data-market-id="ph" disabled><span class="minimum-plan-label">Plus</span><strong class="minimum-country">菲律宾</strong><small class="minimum-price">¥107.09</small></button>
 <button type="button" class="minimum-card" data-plan="ChatGPT Pro 5x" data-market-id="ar" disabled><span class="minimum-plan-label">Pro 5x</span><strong class="minimum-country">5 个地区并列最低</strong><small class="minimum-price">¥672.27</small></button>
@@ -82,7 +82,7 @@
       </div>
 
       <div class="table-scroll" tabindex="0" role="region" aria-label="ChatGPT 各地区价格表，可左右滚动">
-        <table class="price-table" aria-describedby="resultSummary">
+        <table class="price-table" aria-describedby="resultSummary" style="--table-min-width: 1030px">
           <thead>
             <tr>
               <th class="rank-column" scope="col"><span id="rankHeaderLabel"><span aria-hidden="true">排名</span><span class="visually-hidden">全球参考排名</span></span></th>
