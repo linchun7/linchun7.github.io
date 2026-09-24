@@ -12,7 +12,8 @@ const chrome = process.env.CHROME_BIN || ['/usr/bin/google-chrome','/usr/bin/chr
 assert.ok(chrome, 'A local Chrome/Chromium installation is required');
 const profile = await mkdtemp(path.join(tmpdir(), 'chatgpt-browser-'));
 const server = spawn('python3', ['-m','http.server','4177','--bind','127.0.0.1'], {cwd: root, stdio:'ignore'});
-const browser = spawn(chrome, ['--headless=new','--no-sandbox','--disable-dev-shm-usage','--no-first-run','--no-default-browser-check','--disable-background-networking','--remote-debugging-port=0',`--user-data-dir=${profile}`], {stdio:['ignore','ignore','pipe']});
+const debugPort = Number(process.env.CHROME_DEBUG_PORT || 9222);
+const browser = spawn(chrome, ['--headless=new','--no-sandbox','--disable-dev-shm-usage','--no-first-run','--no-default-browser-check','--disable-background-networking',`--remote-debugging-port=${debugPort}`,`--user-data-dir=${profile}`], {stdio:['ignore','ignore','pipe']});
 let diagnostics = '', launchError;
 browser.stderr.on('data', chunk => { diagnostics = (diagnostics + chunk).slice(-12000); });
 browser.once('error', error => { launchError = error; });
@@ -34,25 +35,16 @@ async function evaluate(expression) {
   return result.result.value;
 }
 try {
-  // Prefer Chrome's readiness file; stderr port parsing is a fallback for
-  // runner builds that announce DevTools before DevToolsActivePort is readable.
+  // GitHub runners are isolated per job; a fixed debugging port is more
+  // reliable than Chrome's port=0 readiness file behavior across builds.
   let port;
   const launchDeadline = Date.now() + 30000;
   while (Date.now() < launchDeadline) {
     if (launchError || browser.exitCode !== null) throw Error('Chrome exited before ready: ' + (launchError || browser.exitCode) + '\n' + diagnostics);
-    let candidate;
     try {
-      [candidate] = (await readFile(path.join(profile, 'DevToolsActivePort'), 'utf8')).trim().split('\n');
+      const response = await fetch(`http://127.0.0.1:${debugPort}/json/version`, {signal: AbortSignal.timeout(1000)});
+      if (response.ok) { port = String(debugPort); break; }
     } catch {}
-    if (!/^[0-9]+$/.test(candidate || '')) {
-      candidate = diagnostics.match(/DevTools listening on ws:\/\/127\.0\.0\.1:(\d+)\//)?.[1];
-    }
-    if (/^[0-9]+$/.test(candidate || '')) {
-      try {
-        const response = await fetch(`http://127.0.0.1:${candidate}/json/version`, {signal: AbortSignal.timeout(1000)});
-        if (response.ok) { port = candidate; break; }
-      } catch {}
-    }
     await delay(100);
   }
   assert.ok(port, 'Chrome readiness failed: ' + diagnostics);
