@@ -354,6 +354,32 @@ def collect_fx(now: float, old: dict | None, getter=fetch, required_currencies=(
                 return dict(old, rates=selected, fallback=True)
         return None
 
+def validate_history_snapshot(snapshot: dict) -> None:
+    if not isinstance(snapshot, dict) or set(snapshot) != {'currency', 'offers'}:
+        raise ValueError('invalid history snapshot')
+    if not re.fullmatch('[A-Z]{3}', snapshot.get('currency', '')):
+        raise ValueError('invalid history currency')
+    offers = snapshot.get('offers')
+    if not isinstance(offers, list) or not 1 <= len(offers) <= 40:
+        raise ValueError('invalid history offers')
+    labels = set()
+    for offer in offers:
+        if not isinstance(offer, dict) or set(offer) != {'label', 'amounts'}:
+            raise ValueError('invalid history offer')
+        label = offer.get('label')
+        amounts = offer.get('amounts')
+        if not isinstance(label, str) or not PLAN.fullmatch(label) or label in labels:
+            raise ValueError('invalid history plan')
+        labels.add(label)
+        if not isinstance(amounts, list) or not 1 <= len(amounts) <= 20:
+            raise ValueError('invalid history amounts')
+        if any(not isinstance(amount, str) or not AMOUNT.fullmatch(amount) for amount in amounts):
+            raise ValueError('invalid history amount')
+        numbers = [Decimal(amount) for amount in amounts]
+        if numbers != sorted(set(numbers)):
+            raise ValueError('duplicate or unordered history amounts')
+
+
 def validate(data: dict, now: float | None = None) -> None:
     now = time.time() if now is None else now
     if data.get('schema') != 1 or data.get('channel') != 'ios-app-store' or data.get('billing_period') != 'not_disclosed' or data.get('purchase_eligibility') != 'not_verified':
@@ -403,8 +429,23 @@ def validate(data: dict, now: float | None = None) -> None:
                 raise ValueError('invalid FX rate')
         if not 1 < Decimal(fx['rates']['CNY']) < 30:
             raise ValueError('invalid CNY rate')
-    if len(data['changes']) > 200:
+    changes = data['changes']
+    if not isinstance(changes, list) or len(changes) > 200:
         raise ValueError('history exceeds retention budget')
+    previous_at = float('-inf')
+    for change in changes:
+        if not isinstance(change, dict) or set(change) != {'at', 'code', 'before', 'after'}:
+            raise ValueError('invalid history entry')
+        if not re.fullmatch('[a-z]{2}', change.get('code', '')):
+            raise ValueError('invalid history market')
+        changed_at = epoch(change['at'])
+        if changed_at > generated or changed_at < previous_at:
+            raise ValueError('invalid history time')
+        previous_at = changed_at
+        validate_history_snapshot(change['before'])
+        validate_history_snapshot(change['after'])
+        if canonical(change['before']) == canonical(change['after']):
+            raise ValueError('history entry has no semantic change')
 
 
 def converted(market: dict, amount: str, fx: dict | None, now: float) -> str | None:
