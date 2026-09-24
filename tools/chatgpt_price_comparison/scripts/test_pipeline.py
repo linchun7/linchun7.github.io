@@ -27,6 +27,9 @@ def good_market():
 
 def data_fixture():
     m = good_market()
+    m['offers'].append({'label':'ChatGPT Pro 20x','amounts':[{'amount':'200','display':'$200.00'}]})
+    m['offers'] = sorted(m['offers'], key=lambda offer: offer['label'])
+    m['fingerprint'] = p.digest(p.semantic(m))
     rates = {'USD': '1', 'CNY': '7', 'JPY': '150'}
     fx = {'source_url': p.FX_URL, 'updated_at': p.stamp(NOW), 'rates': rates, 'fallback': False}
     for o in m['offers']:
@@ -229,7 +232,6 @@ class ContractTests(unittest.TestCase):
 
     def test_static_projection_and_escape(self):
         d=data_fixture()
-        d['markets'][0]['offers'].append({'label':'ChatGPT Pro 20x','amounts':[{'amount':'200','display':'$200.00','cny':'1400.00'}]})
         d['markets'][0]['name']='</script><script>alert(1)</script>'; revise(d)
         template=(p.ROOT/'index.template.html').read_text(encoding='utf-8')
         page=p.render(d,template)
