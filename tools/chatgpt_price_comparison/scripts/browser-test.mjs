@@ -105,11 +105,22 @@ try {
   assert.equal(await evaluate(`document.querySelectorAll('#priceRows img').length`),0,'search never becomes HTML');
   await evaluate(`document.querySelector('#searchInput').value='';document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);
 
+  const missingFxMarket=expected.markets.find(m=>m.name==='缺汇率测试');
+  if(missingFxMarket){
+    await evaluate(`document.querySelector('#searchInput').value='缺汇率测试';document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);
+    await until(()=>evaluate('document.querySelectorAll("#priceRows tr[data-market-id]").length===1'),'missing FX filter');
+    const missingRow=await evaluate(`document.querySelector('#priceRows tr[data-market-id="de"]').textContent`);
+    assert.ok(missingRow.includes('—'),'missing FX renders an unavailable CNY marker');
+    assert.equal(missingRow.includes('¥0.00'),false,'missing FX never becomes zero');
+    assert.equal(await evaluate(`document.querySelector('#priceRows tr[data-market-id="de"] td:first-child').textContent`),'—','missing FX has no price rank');
+    await evaluate(`document.querySelector('#searchInput').value='';document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);
+  }
+
   const tiedPlan=plans.find(plan=>{
     const rows=expected.markets.map(m=>{
       const offer=m.offers.find(o=>o.label===plan);
       if(!offer)return null;
-      const values=offer.amounts.map(a=>Number(a.cny)).filter(Number.isFinite);
+      const values=offer.amounts.filter(a=>a.cny!=null).map(a=>Number(a.cny)).filter(Number.isFinite);
       return values.length?{code:m.code,value:Math.min(...values)}:null;
     }).filter(Boolean);
     if(!rows.length)return false;
@@ -120,7 +131,7 @@ try {
     const rows=expected.markets.map(m=>{
       const offer=m.offers.find(o=>o.label===tiedPlan);
       if(!offer)return null;
-      const values=offer.amounts.map(a=>Number(a.cny)).filter(Number.isFinite);
+      const values=offer.amounts.filter(a=>a.cny!=null).map(a=>Number(a.cny)).filter(Number.isFinite);
       return values.length?{code:m.code,value:Math.min(...values)}:null;
     }).filter(Boolean);
     const minimum=Math.min(...rows.map(row=>row.value));
