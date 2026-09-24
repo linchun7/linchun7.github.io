@@ -45,7 +45,9 @@
 
   async function loadIcons() {
     try {
-      const module = await import('../icloud_price_comparison/vendor/lucide-subset.js?v=2b21b7af');
+      const version = document.querySelector('meta[name="chatgpt-lucide-version"]')?.content;
+      if (!/^[a-f0-9]{12}$/.test(version || '')) throw new Error('图标版本无效');
+      const module = await import(`../icloud_price_comparison/vendor/lucide-subset.js?v=${version}`);
       createIcons = module.createIcons;
       refreshIcons();
     } catch (error) {
