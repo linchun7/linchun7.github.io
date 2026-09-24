@@ -14,7 +14,7 @@
 
 ## 自动更新与防错
 
-生产自动更新采用主备：**Cloudflare 每日北京时间 08:25** 外部调用 `workflow_dispatch`（`trigger_source=cloudflare`）作为主触发，**GitHub cron 08:30** 仅作兜底；也支持手动运行。两个自动入口先校验当前 `prices.json`：若北京时间当天已经发布完整、非降级且汇率仍新鲜的数据，备用触发直接跳过；若存在 `retained` / `pending`、fallback 汇率、旧数据或主触发未成功发布，则继续重试。手动运行不受每日幂等跳过。仓库只能验证这一调度契约，不能单独证明 Cloudflare 控制面的实时启用状态。
+生产自动更新采用主备：**Cloudflare 每日北京时间 08:25** 外部调用 `workflow_dispatch`（`trigger_source=cloudflare`）作为主触发，**GitHub cron 08:30** 仅作兜底；也支持手动运行。两个自动入口先校验当前 `prices.json`：若北京时间当天已发布按当前数据契约判定为非降级、且汇率仍新鲜的数据，备用触发直接跳过；若存在 `retained` / `pending`、fallback 汇率、旧数据或主触发未成功发布，则继续重试。手动运行不受每日幂等跳过。仓库只能验证这一调度契约，不能单独证明 Cloudflare 控制面的实时启用状态。
 
 1. 只读任务运行离线测试、抓取、数据校验与真实 Chrome 测试。无需 API Key、登录态、付费服务、数据库或第三方 Python/Node 包。
 2. 校验应用身份、canonical 地区和币种；可见价格必须与两种结构化表示一致。它们是**同一来源的交叉校验**，不是三个独立价格源。初次采集和改价另发一次不使用缓存的确认请求。
