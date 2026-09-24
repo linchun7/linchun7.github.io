@@ -157,7 +157,7 @@
     for (const change of value.changes) {
       if (!change || typeof change !== 'object' || Array.isArray(change)
         || Object.keys(change).sort().join(',') !== 'after,at,before,code'
-        || !/^[a-z]{2}$/.test(change.code || '')) throw Error('历史记录格式错误');
+        || !/^[a-z]{2}$/.test(change.code || '') || !codes.has(change.code)) throw Error('历史记录格式错误');
       const changedAt = Date.parse(change.at);
       if (!Number.isFinite(changedAt) || changedAt > generatedAt || changedAt < previousChangeAt) throw Error('历史时间错误');
       previousChangeAt = changedAt;
