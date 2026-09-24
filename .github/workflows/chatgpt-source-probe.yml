@@ -13,36 +13,26 @@ jobs:
       - name: Inspect public source structure
         shell: python
         run: |
-          import urllib.request, urllib.parse, re, json, concurrent.futures
-          def get(url):
+          import urllib.request, re, json, concurrent.futures
+          def inspect(country):
+              url = 'https://apps.apple.com/' + country + '/app/chatgpt/id6448311069?l=en-US'
               try:
-                  request = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'en-US,en;q=0.9'})
-                  with urllib.request.urlopen(request, timeout=18) as response:
-                      text = response.read(4000000).decode('utf-8')
-                      print('SOURCE', url, response.status, response.url, 'bytes', len(text), flush=True)
-                      return text
-              except Exception as exc:
-                  print('ERROR', url, str(exc), flush=True)
-                  return ''
-          html = get('https://chatgpt.com/pricing/')
-          for pattern in ['country', 'currency', 'pricing', 'amount']:
-              positions = [m.start() for m in re.finditer(pattern, html, re.I)]
-              print('HTML_MATCHES', pattern, len(positions), [html[max(0,p-120):p+200] for p in positions[:5]], flush=True)
-          scripts = re.findall(r'<script[^>]+src="([^"]+)"', html)
-          print('SCRIPTS', json.dumps(scripts), flush=True)
-          def inspect_script(path):
-              text = get(urllib.parse.urljoin('https://chatgpt.com/pricing/', path))
-              for pattern in ['backend-anon', 'payments/pricing', 'pricingConfig', 'countryCode', 'currencyCode']:
-                  matches = [m.start() for m in re.finditer(re.escape(pattern), text)]
-                  if matches:
-                      print('JS_MATCHES', path, pattern, [text[max(0,p-200):p+500] for p in matches[:4]], flush=True)
-          with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
-              list(pool.map(inspect_script, scripts[:35]))
-          for url in ['https://chatgpt.com/backend-anon/payments/pricing?country=US', 'https://chatgpt.com/backend-anon/payments/pricing?country=JP', 'https://apps.apple.com/us/app/chatgpt/id6448311069', 'https://open.er-api.com/v6/latest/USD']:
-              text = get(url)
-              if url.endswith('/USD') or '/backend-anon/' in url:
-                  print('PAYLOAD', url, text[:15000], flush=True)
-              else:
-                  for pattern in ['inAppPurchases', 'in-app-purchases', 'ChatGPT Plus', 'ChatGPT Pro', 'ChatGPT Go']:
+                  with urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent':'Mozilla/5.0'}), timeout=20) as r:
+                      text = r.read(4000000).decode('utf-8')
+                      print('PAGE', country, r.url, len(text), flush=True)
+                  print('SCRIPT_TAGS', country, re.findall(r'<script[^>]*>', text), flush=True)
+                  for pattern in ['priceCurrency','currencyCode','subscriptionPeriod','com.openai','inAppPurchases', 'textPairs', 'storefront', 'canonical']:
                       positions = [m.start() for m in re.finditer(re.escape(pattern), text)]
-                      print('STORE_MATCHES', pattern, [text[max(0,p-200):p+500] for p in positions[:3]], flush=True)
+                      print('MATCH', country, pattern, len(positions), [text[max(0,p-100):p+800] for p in positions[-2:]], flush=True)
+              except Exception as exc:
+                  print('ERROR', country, str(exc), flush=True)
+          with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+              list(pool.map(inspect, ['us','jp','tr','in','de','gb']))
+          for url in ['https://help.openai.com/en/articles/6950777-what-is-chatgpt-plus', 'https://developers.openai.com/codex/pricing', 'https://openai.com/chatgpt/pricing/', 'https://chatgpt.com/pricing?country=JP']:
+              try:
+                  with urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent':'Mozilla/5.0'}), timeout=20) as r:
+                      text = r.read(4000000).decode('utf-8')
+                      print('WEB', url, r.status, r.url, len(text), flush=True)
+                      print('WEB_SCRIPTS', re.findall(r'<script[^>]+src="([^"]+)"', text), flush=True)
+              except Exception as exc:
+                  print('WEB_ERROR', url, str(exc), flush=True)
