@@ -10,7 +10,7 @@
     updatedAt: $('updatedAt'), freshnessWarning: $('freshnessWarning'),
     minimumSummary: $('minimumSummary'), marketCount: $('marketCount'),
     currencyCount: $('currencyCount'), planCount: $('planCount'),
-    resultSummary: $('resultSummary'), searchInput: $('searchInput'),
+    resultSummary: $('resultSummary'), rankHeaderLabel: $('rankHeaderLabel'), searchInput: $('searchInput'),
     mobilePlanControl: $('mobilePlanControl'), priceRows: $('priceRows'),
     emptyState: $('emptyState'), fxStatus: $('fxStatus'),
     historyDialog: $('historyDialog'), historyTitle: $('historyTitle'),
@@ -40,6 +40,62 @@
     timeZone: 'Asia/Shanghai', hour12: false, year: 'numeric', month: '2-digit',
     day: '2-digit', hour: '2-digit', minute: '2-digit',
   });
+
+  let createIcons = null;
+
+  async function loadIcons() {
+    try {
+      const module = await import('../icloud_price_comparison/vendor/lucide-subset.js?v=2b21b7af');
+      createIcons = module.createIcons;
+      refreshIcons();
+    } catch (error) {
+      console.warn(`图标加载失败：${error.message}`);
+    }
+  }
+
+  function refreshIcons() {
+    if (!createIcons) return;
+    try {
+      createIcons({ attrs: { 'stroke-width': 1.8 } });
+    } catch (error) {
+      console.warn(`图标渲染失败：${error.message}`);
+    }
+  }
+
+  function mobileRankAccessibilityText(displayedRank) {
+    if (displayedRank === '—' || displayedRank == null) return '排名暂不可用';
+    return state.sortKey === 'country'
+      ? `当前列表序号第 ${displayedRank}`
+      : `全球价格排名第 ${displayedRank}`;
+  }
+
+  function updateRankingPresentation() {
+    if (!el.rankHeaderLabel) return;
+    el.rankHeaderLabel.replaceChildren();
+    const visible = document.createElement('span');
+    visible.setAttribute('aria-hidden', 'true');
+    const accessible = document.createElement('span');
+    accessible.className = 'visually-hidden';
+    if (state.sortKey === 'country') {
+      visible.textContent = '序号';
+      accessible.textContent = '当前列表序号';
+    } else {
+      visible.textContent = '排名';
+      accessible.textContent = '全球参考排名';
+    }
+    el.rankHeaderLabel.append(visible, accessible);
+  }
+
+  function replaceSortIcon(button, active) {
+    const existing = button?.querySelector('i, svg');
+    if (!existing) return;
+    const icon = document.createElement('i');
+    icon.dataset.lucide = active
+      ? (state.sortDirection === 'asc' ? 'arrow-up' : 'arrow-down')
+      : 'arrow-up-down';
+    icon.setAttribute('aria-hidden', 'true');
+    existing.replaceWith(icon);
+  }
 
   function validate(value) {
     if (value?.schema !== 1 || value.channel !== 'ios-app-store'
@@ -171,24 +227,41 @@
   function renderHeaders() {
     const row = document.querySelector('.price-table thead tr');
     row.querySelectorAll('[data-plan-header]').forEach((n) => n.remove());
+
     for (const plan of state.plans) {
-      const th = document.createElement('th'); th.scope = 'col'; th.dataset.planHeader = 'true'; th.dataset.plan = plan;
+      const th = document.createElement('th');
+      th.scope = 'col';
+      th.dataset.planHeader = 'true';
+      th.dataset.plan = plan;
       th.classList.toggle('is-active-plan', plan === state.activePlan);
       const active = state.sortKey === 'plan' && state.sortPlan === plan;
       th.setAttribute('aria-sort', active ? (state.sortDirection === 'asc' ? 'ascending' : 'descending') : 'none');
-      const button = document.createElement('button'); button.type = 'button'; button.dataset.sortPlan = plan;
+
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.dataset.sortPlan = plan;
       button.append(document.createTextNode(shortPlan(plan) + ' '));
-      const arrow = document.createElement('span'); arrow.setAttribute('aria-hidden', 'true');
-      arrow.textContent = active ? (state.sortDirection === 'asc' ? '↑' : '↓') : '↕'; button.append(arrow);
-      button.addEventListener('click', () => setPlanSort(plan)); th.append(button); row.append(th);
+      const icon = document.createElement('i');
+      icon.dataset.lucide = active ? (state.sortDirection === 'asc' ? 'arrow-up' : 'arrow-down') : 'arrow-up-down';
+      icon.setAttribute('aria-hidden', 'true');
+      button.append(icon);
+      button.addEventListener('click', () => setPlanSort(plan));
+      th.append(button);
+      row.append(th);
     }
+
     const country = row.querySelector('button[data-sort="country"]');
-    const th = country?.closest('th');
-    if (country && th) {
-      th.setAttribute('aria-sort', state.sortKey === 'country' ? (state.sortDirection === 'asc' ? 'ascending' : 'descending') : 'none');
+    const countryHeader = country?.closest('th');
+    if (country && countryHeader) {
+      country.disabled = false;
+      const active = state.sortKey === 'country';
+      countryHeader.setAttribute('aria-sort', active ? (state.sortDirection === 'asc' ? 'ascending' : 'descending') : 'none');
       country.onclick = setCountrySort;
-      country.querySelector('span').textContent = state.sortKey === 'country' ? (state.sortDirection === 'asc' ? '↑' : '↓') : '↕';
+      replaceSortIcon(country, active);
     }
+
+    updateRankingPresentation();
+    refreshIcons();
   }
 
   function isMinimum(plan, market, amount) {
@@ -238,29 +311,74 @@
     return markets;
   }
 
-  function countryCell(market, rank) {
-    const td = document.createElement('td'), button = document.createElement('button');
-    button.type = 'button'; button.className = 'country-history-button';
-    const name = Object.assign(document.createElement('span'), { className: 'country-name', textContent: market.name });
-    const mobileRank = Object.assign(document.createElement('span'), { className: 'mobile-rank', textContent: rank ?? '—' });
+  function countryCell(market, displayedRank) {
+    const td = document.createElement('td');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'country-history-button';
+
+    const name = Object.assign(document.createElement('span'), {
+      className: 'country-name',
+      textContent: market.name,
+    });
+    const mobileRank = Object.assign(document.createElement('span'), {
+      className: 'mobile-rank',
+      textContent: state.sortKey === 'country' && displayedRank !== '—' && displayedRank != null
+        ? `序${displayedRank}`
+        : String(displayedRank ?? '—'),
+    });
     mobileRank.setAttribute('aria-hidden', 'true');
-    const meta = document.createElement('span'); meta.className = 'country-meta';
-    meta.textContent = `${market.code.toUpperCase()} · ${market.currency || '—'}${market.status === 'verified' ? '' : ' · ' + STATUS[market.status]}`;
-    const arrow = Object.assign(document.createElement('span'), { className: 'history-affordance', textContent: '›' }); arrow.setAttribute('aria-hidden', 'true');
-    const sr = Object.assign(document.createElement('span'), { className: 'visually-hidden', textContent: '，查看价格历史' });
-    button.append(name, mobileRank, meta, arrow, sr); button.addEventListener('click', () => openHistory(market, button)); td.append(button); return td;
+    const mobileRankSr = Object.assign(document.createElement('span'), {
+      className: 'mobile-rank-sr visually-hidden',
+      textContent: mobileRankAccessibilityText(displayedRank),
+    });
+    const secondary = document.createElement('span');
+    secondary.className = 'country-name-en';
+    secondary.textContent = `${market.code.toUpperCase()} · ${market.currency || '—'}${market.status === 'verified' ? '' : ' · ' + STATUS[market.status]}`;
+    const arrow = Object.assign(document.createElement('span'), {
+      className: 'history-affordance',
+      textContent: '›',
+    });
+    arrow.setAttribute('aria-hidden', 'true');
+    const sr = Object.assign(document.createElement('span'), {
+      className: 'visually-hidden',
+      textContent: '，查看价格历史',
+    });
+
+    button.append(name, mobileRank, mobileRankSr, secondary, arrow, sr);
+    button.addEventListener('click', () => openHistory(market, button));
+    td.append(button);
+    return td;
   }
 
   function renderTable() {
-    calculateRanks(); renderHeaders();
-    const markets = sortedMarkets(), frag = document.createDocumentFragment();
-    for (const market of markets) {
-      const rank = rankFor(market), tr = document.createElement('tr'); tr.dataset.marketId = market.code;
-      const rankTd = document.createElement('td'); rankTd.textContent = rank ?? '—'; if (rank && rank <= 3) rankTd.classList.add('rank-top');
-      tr.append(rankTd, countryCell(market, rank)); for (const plan of state.plans) tr.append(priceCell(market, plan)); frag.append(tr);
-    }
-    el.priceRows.replaceChildren(frag); el.emptyState.hidden = markets.length !== 0;
-    const suffix = state.sortKey === 'country' ? '按国家/地区' : `${shortPlan(state.sortPlan)} ${state.sortDirection === 'asc' ? '从低到高' : '从高到低'}`;
+    calculateRanks();
+    renderHeaders();
+    const markets = sortedMarkets();
+    const frag = document.createDocumentFragment();
+
+    markets.forEach((market, index) => {
+      const globalRank = rankFor(market);
+      const displayedRank = state.sortKey === 'country' ? index + 1 : globalRank;
+      const tr = document.createElement('tr');
+      tr.dataset.marketId = market.code;
+
+      const rankTd = document.createElement('td');
+      rankTd.textContent = displayedRank ?? '—';
+      if (state.sortKey === 'plan' && state.sortDirection === 'asc' && globalRank && globalRank <= 3) {
+        rankTd.classList.add('rank-top');
+      }
+
+      tr.append(rankTd, countryCell(market, displayedRank));
+      for (const plan of state.plans) tr.append(priceCell(market, plan));
+      frag.append(tr);
+    });
+
+    el.priceRows.replaceChildren(frag);
+    el.emptyState.hidden = markets.length !== 0;
+    const suffix = state.sortKey === 'country'
+      ? `按名称${state.sortDirection === 'asc' ? '排序' : '倒序'}`
+      : `${shortPlan(state.sortPlan)} ${state.sortDirection === 'asc' ? '从低到高' : '从高到低'}`;
     el.resultSummary.textContent = `${state.query ? markets.length + ' / ' + state.data.markets.length : markets.length} 个地区 · ${suffix}`;
   }
 
@@ -347,10 +465,25 @@
   }
 
   async function start() {
-    const raw = JSON.parse($('price-data').textContent); validate(raw); await verifyRevision(raw); state.data = raw; state.plans = orderedPlans();
+    const raw = JSON.parse($('price-data').textContent);
+    validate(raw);
+    await verifyRevision(raw);
+    state.data = raw;
+    state.plans = orderedPlans();
     const defaultPlan = state.plans.includes('ChatGPT Plus') ? 'ChatGPT Plus' : state.plans[0];
-    state.activePlan = defaultPlan; state.sortPlan = defaultPlan; state.historyPlan = defaultPlan;
-    calculateMinimums(); renderMinimums(); renderStats(); renderFreshness(); renderMobilePlans(); bind(); renderTable(); backButton();
+    state.activePlan = defaultPlan;
+    state.sortPlan = defaultPlan;
+    state.historyPlan = defaultPlan;
+    el.searchInput.disabled = false;
+    await loadIcons();
+    calculateMinimums();
+    renderMinimums();
+    renderStats();
+    renderFreshness();
+    renderMobilePlans();
+    bind();
+    renderTable();
+    backButton();
   }
   start().catch((error) => { console.error(error); el.freshnessWarning.hidden = false; el.freshnessWarning.textContent = '交互功能未能启动，当前仍显示静态价格'; });
 })();
