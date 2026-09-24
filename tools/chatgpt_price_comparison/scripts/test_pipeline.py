@@ -285,6 +285,15 @@ class ContractTests(unittest.TestCase):
         chile_pro20 = {'label':'ChatGPT Pro 20x','amounts':[{'amount':'199990'}]}
         self.assertEqual([a['amount'] for a in p.display_amounts({'offers':[chile_like, chile_pro20]}, chile_like)], ['19990'])
 
+    def test_previous_baseline_and_history_are_scoped_to_current_markets(self):
+        old = {
+            'markets': [{'code':'us','value':1}, {'code':'bd','value':2}],
+            'changes': [{'code':'us','at':'a'}, {'code':'bd','at':'b'}],
+        }
+        previous, changes = p.scope_previous(old, {'us'})
+        self.assertEqual(set(previous), {'us'})
+        self.assertEqual([change['code'] for change in changes], ['us'])
+
     def test_static_projection_and_escape(self):
         d=data_fixture()
         d['markets'][0]['name']='</script><script>alert(1)</script>'; revise(d)
