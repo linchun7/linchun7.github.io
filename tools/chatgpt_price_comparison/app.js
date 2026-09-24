@@ -45,7 +45,8 @@
 
   async function loadIcons() {
     try {
-      const version = document.querySelector('meta[name="chatgpt-lucide-version"]')?.content;
+      const preload = document.querySelector('link[rel="modulepreload"][href*="lucide-subset.js?v="]');
+      const version = preload ? new URL(preload.href, location.href).searchParams.get('v') : '';
       if (!/^[a-f0-9]{12}$/.test(version || '')) throw new Error('图标版本无效');
       const module = await import(`../icloud_price_comparison/vendor/lucide-subset.js?v=${version}`);
       createIcons = module.createIcons;
