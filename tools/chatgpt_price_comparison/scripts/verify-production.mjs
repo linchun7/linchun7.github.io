@@ -29,6 +29,12 @@ export function validateSnapshot(data) {
   return data.revision;
 }
 
+export function pageRevisionOf(html) {
+  const matches = [...String(html).matchAll(/<meta name="chatgpt-page-revision" content="([a-f0-9]{64})">/g)];
+  if (matches.length !== 1) throw new Error('production HTML page revision meta is missing or duplicated');
+  return matches[0][1];
+}
+
 async function limitedText(response, limit) {
   const declared = Number(response.headers.get('content-length') || 0);
   if (declared > limit) throw new Error('production response exceeds size limit');
@@ -75,10 +81,14 @@ async function getText(fetchImpl, base, maxBytes, signal, attempt) {
 }
 
 export async function verifyOnce(expected, {
+  expectedPageRevision,
   fetchImpl = globalThis.fetch,
   requestTimeoutMs = 12_000,
   attempt = 1
 } = {}) {
+  if (!/^[a-f0-9]{64}$/.test(expectedPageRevision || '')) {
+    throw new Error('expected page revision is invalid');
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), requestTimeoutMs);
   try {
@@ -90,7 +100,10 @@ export async function verifyOnce(expected, {
     validateSnapshot(actual);
     if (actual.revision !== expected.revision) throw new Error('production revision is not expected revision');
     const revisionMeta = `<meta name="chatgpt-data-revision" content="${expected.revision}">`;
-    if (!html.includes(revisionMeta)) throw new Error('production HTML revision meta does not match expected revision');
+    if (!html.includes(revisionMeta)) throw new Error('production HTML data revision meta does not match expected revision');
+    if (pageRevisionOf(html) !== expectedPageRevision) {
+      throw new Error('production HTML page revision does not match expected build');
+    }
     return actual.revision;
   } finally {
     clearTimeout(timer);
@@ -98,6 +111,7 @@ export async function verifyOnce(expected, {
 }
 
 export async function verifyWithRetry(expected, {
+  expectedPageRevision,
   maxWaitMs = 5 * 60_000,
   intervalMs = 10_000,
   requestTimeoutMs = 12_000,
@@ -112,7 +126,7 @@ export async function verifyWithRetry(expected, {
   while (now() - start <= maxWaitMs) {
     attempt += 1;
     try {
-      const revision = await verifyOnce(expected, { fetchImpl, requestTimeoutMs, attempt });
+      const revision = await verifyOnce(expected, { expectedPageRevision, fetchImpl, requestTimeoutMs, attempt });
       console.log('Verified live JSON and HTML revision:', revision, 'attempt:', attempt);
       return { revision, attempt };
     } catch (error) {
@@ -127,10 +141,14 @@ export async function verifyWithRetry(expected, {
 }
 
 async function main() {
-  const index = process.argv.indexOf('--expected');
-  if (index < 0 || !process.argv[index + 1]) throw new Error('usage: verify-production.mjs --expected <prices.json>');
-  const expected = JSON.parse(await readFile(process.argv[index + 1], 'utf8'));
-  await verifyWithRetry(expected);
+  const dataIndex = process.argv.indexOf('--expected');
+  const pageIndex = process.argv.indexOf('--expected-index');
+  if (dataIndex < 0 || !process.argv[dataIndex + 1] || pageIndex < 0 || !process.argv[pageIndex + 1]) {
+    throw new Error('usage: verify-production.mjs --expected <prices.json> --expected-index <index.html>');
+  }
+  const expected = JSON.parse(await readFile(process.argv[dataIndex + 1], 'utf8'));
+  const expectedHtml = await readFile(process.argv[pageIndex + 1], 'utf8');
+  await verifyWithRetry(expected, { expectedPageRevision: pageRevisionOf(expectedHtml) });
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
