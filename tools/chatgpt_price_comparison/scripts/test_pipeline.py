@@ -383,6 +383,23 @@ class ContractTests(unittest.TestCase):
     def test_bad_template_fails(self):
         with self.assertRaises(ValueError): p.render(data_fixture(),'no markers')
 
+    def test_total_fx_failure_does_not_publish_candidate(self):
+        config=[{'code':c,'name':c} for c in ['us','jp','de','gb','fr','it','ca','au','kr','in']]
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)
+            (root/'markets.json').write_text(json.dumps(config), encoding='utf-8')
+            output=root/'output'
+            original_collect=p.collect_fx
+            try:
+                with patch.object(p,'ROOT',root), patch.object(p,'observe',side_effect=lambda c,old,now,getter: dict(
+                    good_market(), code=c['code'], name=c['name'], source_url=p.url_for(c['code'])
+                )), patch.object(p,'collect_fx',return_value=None):
+                    with self.assertRaisesRegex(ValueError, 'no usable FX snapshot'):
+                        p.run(output,NOW)
+            finally:
+                p.collect_fx=original_collect
+            self.assertFalse(output.exists())
+
     def test_all_failure_does_not_write_output(self):
         config=[{'code':c,'name':c} for c in ['us','jp','de','gb','fr','it','ca','au','kr','in']]
         with tempfile.TemporaryDirectory() as temp:
