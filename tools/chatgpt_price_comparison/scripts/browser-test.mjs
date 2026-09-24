@@ -79,10 +79,19 @@ try {
   await until(()=>evaluate('document.querySelectorAll("#priceRows tr[data-market-id]").length===1'),'US filter');
   assert.ok(await evaluate(`document.querySelector('#priceRows').textContent.includes('美国')`));
   assert.equal(await evaluate(`document.querySelector('#priceRows tr[data-market-id="us"] td:nth-child(2) a')===null`),true,'country is not an App Store link');
-  const usPlus=expected.markets.find(m=>m.code==='us').offers.find(o=>o.label==='ChatGPT Plus');
+  const usMarket=expected.markets.find(m=>m.code==='us');
+  const usPlus=usMarket.offers.find(o=>o.label==='ChatGPT Plus');
+  const usPro20=usMarket.offers.find(o=>o.label==='ChatGPT Pro 20x');
   if(usPlus?.amounts.length>1) {
-    assert.ok(await evaluate(`document.querySelector('#priceRows tr[data-market-id="us"] [data-plan="ChatGPT Plus"]').textContent.includes('$19.99')`),'Plus main cell shows lower public price');
-    assert.equal(await evaluate(`document.querySelector('#priceRows tr[data-market-id="us"] [data-plan="ChatGPT Plus"]').textContent.includes('$200.00')`),false,'Plus higher public price is hidden from main table');
+    const plusCellText=await evaluate(`document.querySelector('#priceRows tr[data-market-id="us"] [data-plan="ChatGPT Plus"]').textContent`);
+    assert.ok(plusCellText.includes('$19.99'),'Plus main cell shows lower public price');
+    assert.equal(
+      plusCellText.includes('$200.00'),
+      false,
+      'Plus higher public price is hidden from main table; cell=' + JSON.stringify(plusCellText)
+        + ' plus=' + JSON.stringify(usPlus.amounts.map(a=>a.amount))
+        + ' pro20=' + JSON.stringify(usPro20?.amounts?.map(a=>a.amount) || [])
+    );
   }
 
   await evaluate(`document.querySelector('#priceRows tr[data-market-id="us"] .country-history-button').click()`);
