@@ -33,7 +33,6 @@ PENDING_CONFIRMATION_SECONDS = 18 * 3600
 MIN_VERIFIED_ABSOLUTE = 10
 MIN_VERIFIED_RATIO = Decimal('0.8')
 MIN_KNOWN_COVERAGE_RATIO = Decimal('0.6')
-OFFER_COUNT_DROP_RATIO = Decimal('0.5')
 PRICE_CHANGE_RATIO_LOW = Decimal('0.5')
 PRICE_CHANGE_RATIO_HIGH = Decimal('2')
 PLAN = re.compile(r'ChatGPT [^\x00-\x1f\x7f<>]{1,70}\Z')
@@ -295,15 +294,18 @@ def unusual(old: dict, new: dict) -> bool:
         return True
     old_offers = {x['label']: x for x in old['offers']}
     new_offers = {x['label']: x for x in new['offers']}
-    if Decimal(len(new_offers)) < Decimal(len(old_offers)) * OFFER_COUNT_DROP_RATIO:
+    # New plans can be accepted after the normal independent confirmation fetch,
+    # but disappearance of an existing plan or variant first waits in pending.
+    if not old_offers.keys() <= new_offers.keys():
         return True
     for label in old_offers.keys() & new_offers.keys():
         before, after = old_offers[label]['amounts'], new_offers[label]['amounts']
-        if len(before) == len(after):
-            for a, b in zip(before, after):
-                ratio = Decimal(b['amount']) / Decimal(a['amount'])
-                if ratio < PRICE_CHANGE_RATIO_LOW or ratio > PRICE_CHANGE_RATIO_HIGH:
-                    return True
+        if len(before) != len(after):
+            return True
+        for a, b in zip(before, after):
+            ratio = Decimal(b['amount']) / Decimal(a['amount'])
+            if ratio < PRICE_CHANGE_RATIO_LOW or ratio > PRICE_CHANGE_RATIO_HIGH:
+                return True
     return False
 
 
