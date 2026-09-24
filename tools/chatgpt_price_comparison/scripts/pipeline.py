@@ -326,6 +326,8 @@ def observe(config: dict, old: dict | None, now: float, getter=fetch) -> dict:
             if pending.get('fingerprint') != candidate['fingerprint'] or now - epoch(pending['since']) < PENDING_CONFIRMATION_SECONDS:
                 result['pending'] = {'fingerprint': candidate['fingerprint'], 'since': pending['since'] if pending.get('fingerprint') == candidate['fingerprint'] else stamp(now)}
                 result['status'] = 'pending'
+                result.pop('error', None)
+                result.pop('error_detail', None)
                 return result
         result.update(candidate, status='verified', last_verified_at=stamp(now))
         result.pop('pending', None)
