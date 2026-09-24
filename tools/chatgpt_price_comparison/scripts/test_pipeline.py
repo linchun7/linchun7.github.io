@@ -231,6 +231,7 @@ class ContractTests(unittest.TestCase):
         self.assertIn('data-plan-header="true" data-plan="ChatGPT Go"',page)
         self.assertIn('data-plan-header="true" data-plan="ChatGPT Plus"',page)
         self.assertIn('class="minimum-card"',page)
+        self.assertIn('app.js?v=4',page)
         self.assertIn('data-lucide="arrow-up"',page)
         self.assertIn('mobile-rank-sr visually-hidden',page)
         self.assertIn('<span class="price-local">$19.99</span>',page)
