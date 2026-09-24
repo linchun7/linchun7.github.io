@@ -31,6 +31,7 @@ class WorkflowContractTests(unittest.TestCase):
 
     def test_publish_waits_for_pages_and_verifies_canonical_production(self):
         self.assertIn("pages/builds/latest", self.text)
+        self.assertNotIn("Request Pages build for published data", self.text)
         self.assertIn("seq 1 90", self.text)
         self.assertIn("within 7.5 minutes", self.text)
         self.assertIn("verify-production:", self.text)
