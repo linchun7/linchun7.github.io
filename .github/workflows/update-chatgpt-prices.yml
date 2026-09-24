@@ -1,0 +1,150 @@
+name: Update ChatGPT prices
+on:
+  schedule:
+    - cron: '43 0,6 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main, feat/chatgpt-price-comparison]
+    paths:
+      - 'tools/chatgpt_price_comparison/**'
+      - '!tools/chatgpt_price_comparison/data/**'
+      - '!tools/chatgpt_price_comparison/index.html'
+      - '.github/workflows/update-chatgpt-prices.yml'
+permissions:
+  contents: read
+concurrency:
+  group: update-chatgpt-prices-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    outputs:
+      base: ${{ steps.base.outputs.sha }}
+      degraded: ${{ steps.collect.outputs.degraded }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - id: base
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Offline regression tests
+        run: |
+          python3 -m unittest discover -s tools/chatgpt_price_comparison/scripts -p 'test_*.py' -v
+          node --check tools/chatgpt_price_comparison/app.js
+      - name: Collect and confirm official storefront observations
+        id: collect
+        run: python3 tools/chatgpt_price_comparison/scripts/pipeline.py --output "$RUNNER_TEMP/chatgpt-candidate"
+      - name: Validate candidate and browser behavior
+        run: |
+          python3 tools/chatgpt_price_comparison/scripts/pipeline.py --check "$RUNNER_TEMP/chatgpt-candidate"
+          mkdir -p tools/chatgpt_price_comparison/data
+          cp "$RUNNER_TEMP/chatgpt-candidate/prices.json" tools/chatgpt_price_comparison/data/prices.json
+          cp "$RUNNER_TEMP/chatgpt-candidate/index.html" tools/chatgpt_price_comparison/index.html
+          node tools/chatgpt_price_comparison/scripts/browser-test.mjs
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: chatgpt-candidate-${{ github.run_id }}
+          path: ${{ runner.temp }}/chatgpt-candidate/
+          if-no-files-found: error
+          retention-days: 7
+  publish:
+    needs: generate
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feat/chatgpt-price-comparison'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.generate.outputs.base }}
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: chatgpt-candidate-${{ github.run_id }}
+          path: ${{ runner.temp }}/chatgpt-candidate
+      - name: Independently validate exact artifact
+        run: python3 tools/chatgpt_price_comparison/scripts/pipeline.py --check "$RUNNER_TEMP/chatgpt-candidate"
+      - name: Publish two files atomically without overwriting concurrent work
+        env:
+          TARGET: ${{ github.ref_name }}
+          BASE: ${{ needs.generate.outputs.base }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          case "$TARGET" in main|feat/chatgpt-price-comparison) ;; *) exit 1 ;; esac
+          git fetch origin "$TARGET" --depth=1
+          test "$(git rev-parse FETCH_HEAD)" = "$BASE" || { echo '::error::Branch advanced; discard old candidate. Next scheduled run retries.'; exit 1; }
+          mkdir -p tools/chatgpt_price_comparison/data
+          cp "$RUNNER_TEMP/chatgpt-candidate/prices.json" tools/chatgpt_price_comparison/data/prices.json
+          cp "$RUNNER_TEMP/chatgpt-candidate/index.html" tools/chatgpt_price_comparison/index.html
+          git add tools/chatgpt_price_comparison/data/prices.json tools/chatgpt_price_comparison/index.html
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore(chatgpt): refresh verified App Store prices'
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push origin "HEAD:$TARGET"
+      - name: Request Pages build even when retrying a previous deployment
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST "repos/$GITHUB_REPOSITORY/pages/builds" || echo '::warning::Pages request not accepted; production verification will determine success.'
+      - name: Verify publicly deployed data and static page
+        if: github.ref == 'refs/heads/main'
+        env:
+          CANDIDATE: ${{ runner.temp }}/chatgpt-candidate
+        run: |
+          python3 - <<'PY'
+          import json, os, sys, time, urllib.request
+          from pathlib import Path
+          sys.path.insert(0, 'tools/chatgpt_price_comparison/scripts')
+          import pipeline
+          expected = json.loads((Path(os.environ['CANDIDATE'])/'prices.json').read_text())
+          base = 'https://www.linchun.com.cn/tools/chatgpt_price_comparison/'
+          for attempt in range(24):
+              try:
+                  with urllib.request.urlopen(base+'data/prices.json?t='+str(time.time_ns()), timeout=12) as r:
+                      actual = json.loads(r.read(2000000))
+                  pipeline.validate(actual)
+                  with urllib.request.urlopen(base+'?t='+str(time.time_ns()), timeout=12) as r:
+                      page = r.read(4000000).decode('utf-8')
+                  if actual['revision'] == expected['revision'] and actual['revision'] in page:
+                      print('Verified live JSON and HTML revision:', actual['revision'])
+                      break
+              except Exception as exc:
+                  print('Deployment verification retry:', type(exc).__name__)
+              time.sleep(10)
+          else:
+              raise SystemExit('Live deployment did not match the validated artifact; previous published page may remain cached.')
+          PY
+  notify:
+    needs: [generate, publish]
+    if: always() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      GENERATE: ${{ needs.generate.result }}
+      PUBLISH: ${{ needs.publish.result }}
+      DEGRADED: ${{ needs.generate.outputs.degraded }}
+    steps:
+      - name: Maintain one incident issue and close it after recovery
+        run: |
+          set -euo pipefail
+          title='ChatGPT 价格自动更新需要关注'
+          issue=$(gh issue list --state open --search "$title in:title" --json number,title --jq '.[] | select(.title == "ChatGPT 价格自动更新需要关注") | .number' | head -1)
+          if [[ "$GENERATE" == success && "$PUBLISH" == success && "$DEGRADED" == false ]]; then
+            if [[ -n "$issue" ]]; then gh issue close "$issue" --comment '自动更新及生产验证已恢复。'; fi
+          elif [[ -z "$issue" ]]; then
+            gh issue create --title "$title" --body "自动核验、发布或生产验证失败，或部分地区/汇率正在沿用旧数据。未验证的新价格不会覆盖旧价。下次计划运行会自动重试；持续失败可能需要更新来源解析器。运行：$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          fi

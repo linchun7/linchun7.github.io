@@ -1,0 +1,38 @@
+name: Validate ChatGPT price comparison
+on:
+  pull_request:
+    paths: ['tools/chatgpt_price_comparison/**', '.github/workflows/*chatgpt*.yml']
+  push:
+    branches: [main, feat/chatgpt-price-comparison]
+    paths: ['tools/chatgpt_price_comparison/**', '.github/workflows/*chatgpt*.yml']
+permissions:
+  contents: read
+concurrency:
+  group: validate-chatgpt-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: Unit tests and deterministic browser fixture
+        run: |
+          python3 -m unittest discover -s tools/chatgpt_price_comparison/scripts -p 'test_*.py' -v
+          node --check tools/chatgpt_price_comparison/app.js
+          python3 - <<'PY'
+          import json, sys
+          sys.path.insert(0, 'tools/chatgpt_price_comparison/scripts')
+          import pipeline
+          from test_pipeline import data_fixture
+          data = data_fixture()
+          (pipeline.ROOT/'data').mkdir(exist_ok=True)
+          (pipeline.ROOT/'data/prices.json').write_text(json.dumps(data, ensure_ascii=False))
+          (pipeline.ROOT/'index.html').write_text(pipeline.render(data, (pipeline.ROOT/'index.template.html').read_text()))
+          PY
+          node tools/chatgpt_price_comparison/scripts/browser-test.mjs
