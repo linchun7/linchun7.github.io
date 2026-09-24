@@ -332,6 +332,16 @@ class ContractTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     p.validate(candidate,NOW)
 
+    def test_static_summary_uses_actual_default_plan_when_plus_is_absent(self):
+        d=data_fixture()
+        market=d['markets'][0]
+        market['offers']=[offer for offer in market['offers'] if offer['label'] != 'ChatGPT Plus']
+        market['fingerprint']=p.digest(p.semantic(market))
+        revise(d)
+        page=p.render(d,(p.ROOT/'index.template.html').read_text(encoding='utf-8'))
+        self.assertIn('个地区 · Go 从低到高', page)
+        self.assertNotIn('个地区 · Plus 从低到高', page)
+
     def test_many_tied_minimum_countries_are_compacted(self):
         d=data_fixture()
         base=d['markets'][0]
