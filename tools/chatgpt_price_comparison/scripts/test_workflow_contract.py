@@ -41,6 +41,7 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("within 7.5 minutes", self.text)
         self.assertIn("verify-production:", self.text)
         self.assertIn("verify-production.mjs --expected", self.text)
+        self.assertIn("--expected-index", self.text)
         self.assertIn("VERIFY: ${{ needs.verify-production.result }}", self.text)
 
     def test_publish_uses_least_privilege(self):
