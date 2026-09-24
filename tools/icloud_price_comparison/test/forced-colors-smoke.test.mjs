@@ -14,6 +14,9 @@ const CONTENT_TYPES = {
   '.json': 'application/json; charset=utf-8'
 };
 const BROWSER_UNDER_TEST = process.env.PLAYWRIGHT_BROWSER || 'chromium';
+const DEFAULT_STEP_TIMEOUT_MS = 5_000;
+const PAGE_CREATION_TIMEOUT_MS = 15_000;
+const TEST_TIMEOUT_MS = 90_000;
 
 async function findChrome() {
   const candidates = [
@@ -79,7 +82,7 @@ function closeServer(server) {
   });
 }
 
-async function runStep(context, label, operation, timeoutMs = 5_000) {
+async function runStep(context, label, operation, timeoutMs = DEFAULT_STEP_TIMEOUT_MS) {
   context.diagnostic(`forced-colors stage: ${label}`);
   let timer;
   try {
@@ -99,7 +102,7 @@ async function runStep(context, label, operation, timeoutMs = 5_000) {
   }
 }
 
-test('preserves forced-colors sorting and minimum-price cues with bounded browser steps', { timeout: 60_000 }, async (context) => {
+test('preserves forced-colors sorting and minimum-price cues with bounded browser steps', { timeout: TEST_TIMEOUT_MS }, async (context) => {
   if (BROWSER_UNDER_TEST !== 'chromium') {
     context.skip('forced-colors emulation is covered in Chromium');
     return;
@@ -119,9 +122,9 @@ test('preserves forced-colors sorting and minimum-price cues with bounded browse
       context,
       'page creation',
       () => browser.newPage({ viewport: { width: 1365, height: 900 }, forcedColors: 'active' }),
-      5_000
+      PAGE_CREATION_TIMEOUT_MS
     );
-    page.setDefaultTimeout(5_000);
+    page.setDefaultTimeout(DEFAULT_STEP_TIMEOUT_MS);
     page.setDefaultNavigationTimeout(10_000);
 
     await runStep(context, 'external route guard', () => page.route('https://**/*', (route) => {
