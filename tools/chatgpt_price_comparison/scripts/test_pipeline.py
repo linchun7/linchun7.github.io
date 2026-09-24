@@ -279,19 +279,17 @@ class ContractTests(unittest.TestCase):
         result = p.collect_fx(NOW, None, lambda *a, **kw: json.dumps(payload), {'JPY'})
         self.assertEqual(set(result['rates']), {'USD', 'CNY', 'JPY'})
 
-    def test_plus_display_heuristic_fails_open(self):
-        annual_like = {'label':'ChatGPT Plus','amounts':[{'amount':'19.99'},{'amount':'200'}]}
-        close_prices = {'label':'ChatGPT Plus','amounts':[{'amount':'19.99'},{'amount':'29.99'}]}
+    def test_plus_display_is_simple_and_fails_open(self):
+        two_prices = {'label':'ChatGPT Plus','amounts':[{'amount':'19.99'},{'amount':'200'}]}
+        reversed_prices = {'label':'ChatGPT Plus','amounts':[{'amount':'200'},{'amount':'19.99'}]}
         three_prices = {'label':'ChatGPT Plus','amounts':[{'amount':'9.99'},{'amount':'19.99'},{'amount':'200'}]}
-        pro20 = {'label':'ChatGPT Pro 20x','amounts':[{'amount':'200'}]}
-        market = {'offers':[annual_like, pro20]}
-        self.assertEqual([a['amount'] for a in p.display_amounts(market, annual_like)], ['19.99'])
-        self.assertEqual([a['amount'] for a in p.display_amounts({'offers':[annual_like]}, annual_like)], ['19.99','200'])
-        self.assertEqual([a['amount'] for a in p.display_amounts({'offers':[close_prices, pro20]}, close_prices)], ['19.99','29.99'])
-        self.assertEqual([a['amount'] for a in p.display_amounts({'offers':[three_prices, pro20]}, three_prices)], ['9.99','19.99','200'])
-        chile_like = {'label':'ChatGPT Plus','amounts':[{'amount':'19990'},{'amount':'229990'}]}
-        chile_pro20 = {'label':'ChatGPT Pro 20x','amounts':[{'amount':'199990'}]}
-        self.assertEqual([a['amount'] for a in p.display_amounts({'offers':[chile_like, chile_pro20]}, chile_like)], ['19990'])
+        one_price = {'label':'ChatGPT Plus','amounts':[{'amount':'19.99'}]}
+        other_plan = {'label':'ChatGPT Pro 20x','amounts':[{'amount':'200'},{'amount':'300'}]}
+        self.assertEqual([a['amount'] for a in p.display_amounts(two_prices)], ['19.99'])
+        self.assertEqual([a['amount'] for a in p.display_amounts(reversed_prices)], ['19.99'])
+        self.assertEqual([a['amount'] for a in p.display_amounts(three_prices)], ['9.99','19.99','200'])
+        self.assertEqual([a['amount'] for a in p.display_amounts(one_price)], ['19.99'])
+        self.assertEqual([a['amount'] for a in p.display_amounts(other_plan)], ['200','300'])
 
     def test_previous_baseline_and_history_are_scoped_to_current_markets(self):
         old = {
