@@ -1,10 +1,10 @@
 name: Validate ChatGPT price comparison
 on:
   pull_request:
-    paths: ['tools/chatgpt_price_comparison/**', '.github/workflows/*chatgpt*.yml']
+    paths: ['tools/chatgpt_price_comparison/**', 'tools/icloud_price_comparison/vendor/lucide-subset.js', '.github/workflows/*chatgpt*.yml']
   push:
     branches: [main, feat/chatgpt-price-comparison]
-    paths: ['tools/chatgpt_price_comparison/**', '.github/workflows/*chatgpt*.yml']
+    paths: ['tools/chatgpt_price_comparison/**', 'tools/icloud_price_comparison/vendor/lucide-subset.js', '.github/workflows/*chatgpt*.yml']
 permissions:
   contents: read
 concurrency:
