@@ -498,31 +498,18 @@ def beijing_display(value: str) -> str:
     return datetime.fromtimestamp(epoch(value), timezone.utc).astimezone(BEIJING).strftime('%Y/%m/%d %H:%M')
 
 
-def display_amounts(market: dict, offer: dict) -> list[dict]:
+def display_amounts(offer: dict) -> list[dict]:
     amounts = offer['amounts']
     if offer['label'] != 'ChatGPT Plus' or len(amounts) != 2:
         return amounts
-    pro20 = market_offer(market, 'ChatGPT Pro 20x')
-    if not pro20 or len(pro20['amounts']) != 1:
-        return amounts
-
-    ordered = sorted(amounts, key=lambda amount: Decimal(amount['amount']))
-    low = Decimal(ordered[0]['amount'])
-    high = Decimal(ordered[1]['amount'])
-    pro20_amount = Decimal(pro20['amounts'][0]['amount'])
-    if low <= 0 or high <= low:
-        return amounts
-
-    plus_gap = high - low
-    distance_to_pro20 = abs(high - pro20_amount)
-    return [ordered[0]] if distance_to_pro20 < plus_gap else amounts
+    return [min(amounts, key=lambda amount: Decimal(amount['amount']))]
 
 
 def render_price_options(market: dict, plan: str, minimum: Decimal | None) -> str:
     offer = market_offer(market, plan)
     if not offer:
         return '<span class="missing-price">—</span>'
-    amounts = display_amounts(market, offer)
+    amounts = display_amounts(offer)
     options = []
     for amount in amounts:
         cny = Decimal(amount['cny']) if amount.get('cny') is not None else None
