@@ -645,6 +645,17 @@ def render(data: dict, template: str) -> str:
 
     payload = canonical(data).replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
     priced_markets = [market for market in data['markets'] if market['offers']]
+    template_sha = hashlib.sha256(template.encode()).hexdigest()
+    app_sha = hashlib.sha256((ROOT / 'app.js').read_bytes()).hexdigest()
+    style_sha = hashlib.sha256((ROOT / 'style.css').read_bytes()).hexdigest()
+    lucide_sha = hashlib.sha256((ROOT / 'vendor/lucide-subset.js').read_bytes()).hexdigest()
+    page_revision = digest({
+        'data_revision': data['revision'],
+        'template_sha256': template_sha,
+        'app_sha256': app_sha,
+        'style_sha256': style_sha,
+        'lucide_sha256': lucide_sha,
+    })
     values = {
         'MINIMUMS': '\n'.join(minimum_cards),
         'TABLE_HEAD': '\n'.join(head),
@@ -652,6 +663,7 @@ def render(data: dict, template: str) -> str:
         'DATA': payload,
         'GENERATED_BEIJING': beijing_display(data['generated_at']),
         'REVISION': data['revision'],
+        'PAGE_REVISION': page_revision,
         'COUNT': str(len(priced_markets)),
         'RESULT_COUNT': str(len(priced_markets)),
         'TOTAL': str(len(data['markets'])),
@@ -660,9 +672,9 @@ def render(data: dict, template: str) -> str:
         'PLAN_COUNT_STYLE': str(len(plans)),
         'TABLE_MIN_WIDTH': str(max(1030, 268 + 190 * len(plans))),
         'DEFAULT_PLAN_SHORT': html.escape(short_plan(default_plan)),
-        'APP_VERSION': hashlib.sha256((ROOT / 'app.js').read_bytes()).hexdigest()[:12],
-        'STYLE_VERSION': hashlib.sha256((ROOT / 'style.css').read_bytes()).hexdigest()[:12],
-        'LUCIDE_VERSION': hashlib.sha256((ROOT / 'vendor/lucide-subset.js').read_bytes()).hexdigest()[:12],
+        'APP_VERSION': app_sha[:12],
+        'STYLE_VERSION': style_sha[:12],
+        'LUCIDE_VERSION': lucide_sha[:12],
     }
     for key, value in values.items():
         marker = '{{' + key + '}}'
