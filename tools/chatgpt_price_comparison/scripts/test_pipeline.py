@@ -212,6 +212,14 @@ class ContractTests(unittest.TestCase):
         result = p.collect_fx(NOW, None, lambda *a, **kw: json.dumps(payload), {'JPY'})
         self.assertEqual(set(result['rates']), {'USD', 'CNY', 'JPY'})
 
+    def test_plus_display_heuristic_fails_open(self):
+        annual_like = {'label':'ChatGPT Plus','amounts':[{'amount':'19.99'},{'amount':'200'}]}
+        close_prices = {'label':'ChatGPT Plus','amounts':[{'amount':'19.99'},{'amount':'29.99'}]}
+        three_prices = {'label':'ChatGPT Plus','amounts':[{'amount':'9.99'},{'amount':'19.99'},{'amount':'200'}]}
+        self.assertEqual([a['amount'] for a in p.display_amounts(annual_like)], ['19.99'])
+        self.assertEqual([a['amount'] for a in p.display_amounts(close_prices)], ['19.99','29.99'])
+        self.assertEqual([a['amount'] for a in p.display_amounts(three_prices)], ['9.99','19.99','200'])
+
     def test_static_projection_and_escape(self):
         d=data_fixture(); d['markets'][0]['name']='</script><script>alert(1)</script>'; revise(d)
         template=(p.ROOT/'index.template.html').read_text(encoding='utf-8')
