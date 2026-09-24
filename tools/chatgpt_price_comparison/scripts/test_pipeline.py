@@ -203,6 +203,15 @@ class ContractTests(unittest.TestCase):
             result=p.collect_fx(NOW,None,lambda *a,**kw: json.dumps({'result':'success','base_code':base,'time_last_update_unix':updated,'rates':{'USD':1,'CNY':7}}))
             self.assertIsNone(result)
 
+    def test_fx_public_payload_keeps_only_required_currencies(self):
+        rates = {'USD': 1, 'CNY': 7, 'JPY': 150}
+        for first in 'ABCDEFGHIJ':
+            for second in 'ABC':
+                rates[f'X{first}{second}'] = 2
+        payload = {'result':'success','base_code':'USD','time_last_update_unix':NOW,'rates':rates}
+        result = p.collect_fx(NOW, None, lambda *a, **kw: json.dumps(payload), {'JPY'})
+        self.assertEqual(set(result['rates']), {'USD', 'CNY', 'JPY'})
+
     def test_static_projection_and_escape(self):
         d=data_fixture(); d['markets'][0]['name']='</script><script>alert(1)</script>'; revise(d)
         template=(p.ROOT/'index.template.html').read_text(encoding='utf-8')
@@ -214,6 +223,8 @@ class ContractTests(unittest.TestCase):
         self.assertIn('data-plan-header="true" data-plan="ChatGPT Go"',page)
         self.assertIn('data-plan-header="true" data-plan="ChatGPT Plus"',page)
         self.assertIn('class="minimum-card"',page)
+        self.assertIn('data-lucide="arrow-up"',page)
+        self.assertIn('mobile-rank-sr visually-hidden',page)
         self.assertIn('$19.99',page); self.assertIn('$200.00',page)
         self.assertIn('139.93',page); self.assertIn('1,400.00',page)
         self.assertNotIn('id="refresh"',page)
