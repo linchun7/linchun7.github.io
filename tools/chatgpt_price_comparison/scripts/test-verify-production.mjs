@@ -23,10 +23,25 @@ assert.match(data.revision, /^[a-f0-9]{64}$/);
 assert.equal(validateSnapshot(data), data.revision);
 
 const goodFetch = async url => new Response(
-  String(url).includes('/data/prices.json') ? JSON.stringify(data) : '<html>' + data.revision + '</html>',
+  String(url).includes('/data/prices.json')
+    ? JSON.stringify(data)
+    : '<html><head><meta name="chatgpt-data-revision" content="' + data.revision + '"></head></html>',
   { status: 200, headers: { 'content-type': 'text/plain' } }
 );
 assert.equal(await verifyOnce(data, { fetchImpl: goodFetch, requestTimeoutMs: 1000 }), data.revision);
+
+await assert.rejects(
+  verifyOnce(data, {
+    fetchImpl: async url => new Response(
+      String(url).includes('/data/prices.json')
+        ? JSON.stringify(data)
+        : '<html><body>' + data.revision + '</body></html>',
+      { status: 200, headers: { 'content-type': 'text/plain' } }
+    ),
+    requestTimeoutMs: 1000
+  }),
+  /revision meta/
+);
 
 const bad = structuredClone(data);
 bad.generated_at = '2026-09-24T00:00:01Z';
