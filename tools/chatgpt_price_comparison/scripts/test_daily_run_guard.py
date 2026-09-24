@@ -14,19 +14,22 @@ from test_pipeline import NOW, data_fixture, revise
 
 
 class DailyRunGuardTests(unittest.TestCase):
-    def test_cloudflare_skips_clean_publication_from_same_beijing_day(self):
-        result = guard.decide("workflow_dispatch", "cloudflare", data_fixture(), NOW)
+    def test_cloudflare_skips_only_with_clean_data_and_successful_production_run(self):
+        result = guard.decide("workflow_dispatch", "cloudflare", data_fixture(), NOW, True)
         self.assertFalse(result["should_run"])
         self.assertTrue(result["clean_today"])
-        self.assertEqual(result["trigger_source"], "cloudflare")
+        self.assertTrue(result["production_success_today"])
 
-    def test_github_schedule_skips_after_clean_primary(self):
-        result = guard.decide("schedule", None, data_fixture(), NOW)
+    def test_github_backup_skips_after_successful_primary(self):
+        result = guard.decide("schedule", None, data_fixture(), NOW, True)
         self.assertFalse(result["should_run"])
-        self.assertEqual(result["trigger_source"], "github-schedule")
+
+    def test_clean_data_without_production_success_retries(self):
+        result = guard.decide("schedule", None, data_fixture(), NOW, False)
+        self.assertTrue(result["should_run"])
 
     def test_manual_run_is_never_suppressed(self):
-        result = guard.decide("workflow_dispatch", "manual", data_fixture(), NOW)
+        result = guard.decide("workflow_dispatch", "manual", data_fixture(), NOW, True)
         self.assertTrue(result["should_run"])
 
     def test_previous_beijing_day_runs(self):
@@ -39,22 +42,18 @@ class DailyRunGuardTests(unittest.TestCase):
             if market.get("offers"):
                 market["last_verified_at"] = p.stamp(previous)
         revise(data)
-        result = guard.decide("schedule", None, data, NOW)
+        result = guard.decide("schedule", None, data, NOW, True)
         self.assertTrue(result["should_run"])
-        self.assertFalse(result["clean_today"])
 
-    def test_unavailable_market_is_not_treated_as_degraded(self):
+    def test_unavailable_market_is_not_degraded(self):
         data = data_fixture()
         market = data["markets"][0]
         market["offers"] = []
         market["status"] = "unavailable"
-        market.pop("currency", None)
-        market.pop("unclassified_labels", None)
-        market.pop("source_sha256", None)
-        market.pop("fingerprint", None)
-        market.pop("last_verified_at", None)
+        for key in ("currency", "unclassified_labels", "source_sha256", "fingerprint", "last_verified_at"):
+            market.pop(key, None)
         revise(data)
-        self.assertFalse(guard.decide("schedule", None, data, NOW)["should_run"])
+        self.assertFalse(guard.decide("schedule", None, data, NOW, True)["should_run"])
 
     def test_retained_or_pending_market_keeps_backup_active(self):
         for status in ("retained", "pending"):
@@ -62,22 +61,21 @@ class DailyRunGuardTests(unittest.TestCase):
                 data = copy.deepcopy(data_fixture())
                 data["markets"][0]["status"] = status
                 revise(data)
-                self.assertTrue(guard.decide("schedule", None, data, NOW)["should_run"])
+                self.assertTrue(guard.decide("schedule", None, data, NOW, True)["should_run"])
 
     def test_fallback_or_stale_fx_keeps_backup_active(self):
         fallback = data_fixture()
         fallback["fx"]["fallback"] = True
         revise(fallback)
-        self.assertTrue(guard.decide("schedule", None, fallback, NOW)["should_run"])
-
+        self.assertTrue(guard.decide("schedule", None, fallback, NOW, True)["should_run"])
         stale = data_fixture()
         stale["fx"]["updated_at"] = p.stamp(NOW - p.FRESH - 1)
         revise(stale)
-        self.assertTrue(guard.decide("schedule", None, stale, NOW)["should_run"])
+        self.assertTrue(guard.decide("schedule", None, stale, NOW, True)["should_run"])
 
     def test_unknown_dispatch_source_fails_closed(self):
         with self.assertRaises(ValueError):
-            guard.decide("workflow_dispatch", "other", data_fixture(), NOW)
+            guard.decide("workflow_dispatch", "other", data_fixture(), NOW, True)
 
 
 if __name__ == "__main__":
