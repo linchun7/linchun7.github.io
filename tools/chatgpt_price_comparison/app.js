@@ -110,7 +110,8 @@
         || !Array.isArray(market.offers)) throw Error('地区数据不合法');
       codes.add(market.code);
       for (const offer of market.offers) {
-        if (typeof offer.label !== 'string' || !offer.label.startsWith('ChatGPT ')
+        if (typeof offer.label !== 'string'
+          || !/^ChatGPT [^\x00-\x1f\x7f<>]{1,70}$/.test(offer.label)
           || !Array.isArray(offer.amounts) || !offer.amounts.length) throw Error('套餐数据不合法');
         for (const amount of offer.amounts) {
           if (typeof amount.amount !== 'string' || !/^\d+(\.\d{1,3})?$/.test(amount.amount)
