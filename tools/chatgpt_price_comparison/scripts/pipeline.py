@@ -435,13 +435,23 @@ def beijing_display(value: str) -> str:
     return datetime.fromtimestamp(epoch(value), timezone.utc).astimezone(BEIJING).strftime('%Y/%m/%d %H:%M')
 
 
+def display_amounts(offer: dict) -> list[dict]:
+    amounts = offer['amounts']
+    if offer['label'] != 'ChatGPT Plus' or len(amounts) != 2:
+        return amounts
+    ordered = sorted(amounts, key=lambda amount: Decimal(amount['amount']))
+    low = Decimal(ordered[0]['amount'])
+    high = Decimal(ordered[1]['amount'])
+    if low <= 0 or high / low < 8:
+        return amounts
+    return [ordered[0]]
+
+
 def render_price_options(market: dict, plan: str, minimum: Decimal | None) -> str:
     offer = market_offer(market, plan)
     if not offer:
         return '<span class="missing-price">—</span>'
-    amounts = offer['amounts']
-    if plan == 'ChatGPT Plus' and len(amounts) > 1:
-        amounts = [min(amounts, key=lambda amount: Decimal(amount['amount']))]
+    amounts = display_amounts(offer)
     options = []
     for amount in amounts:
         cny = Decimal(amount['cny']) if amount.get('cny') is not None else None
