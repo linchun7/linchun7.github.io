@@ -54,6 +54,9 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertNotIn("tools/icloud_price_comparison", validate)
         self.assertIn("branches: [main]", validate)
         self.assertNotIn("feat/chatgpt-price-comparison", validate)
+        for relative in ("app.js", "index.template.html", "scripts/pipeline.py"):
+            project_file = (ROOT / "tools" / "chatgpt_price_comparison" / relative).read_text(encoding="utf-8")
+            self.assertNotIn("icloud_price_comparison", project_file)
 
     def test_only_main_can_publish(self):
         self.assertIn("github.ref == 'refs/heads/main'", self.text)
