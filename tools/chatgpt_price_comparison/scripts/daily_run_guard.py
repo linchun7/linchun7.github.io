@@ -37,7 +37,9 @@ def clean_publication_today(data: dict, now: float) -> bool:
         return False
 
     markets = data.get("markets", [])
-    if not markets or any(market.get("status") != "verified" for market in markets):
+    if not markets or any(market.get("status") in ("retained", "pending") for market in markets):
+        return False
+    if any(market.get("status") not in ("verified", "unavailable") for market in markets):
         return False
 
     fx = data.get("fx")
@@ -91,7 +93,7 @@ def main() -> None:
         "",
         f"- 触发来源：{result['trigger_source']}",
         f"- 北京日期：{result['date_beijing']}",
-        f"- 当日已有干净发布：{'是' if result['clean_today'] else '否'}",
+        f"- 当日已有非降级发布：{'是' if result['clean_today'] else '否'}",
         f"- 本次执行抓取：{'是' if result['should_run'] else '否'}",
     ])
 
