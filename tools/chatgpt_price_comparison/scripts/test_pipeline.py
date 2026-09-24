@@ -216,12 +216,20 @@ class ContractTests(unittest.TestCase):
         annual_like = {'label':'ChatGPT Plus','amounts':[{'amount':'19.99'},{'amount':'200'}]}
         close_prices = {'label':'ChatGPT Plus','amounts':[{'amount':'19.99'},{'amount':'29.99'}]}
         three_prices = {'label':'ChatGPT Plus','amounts':[{'amount':'9.99'},{'amount':'19.99'},{'amount':'200'}]}
-        self.assertEqual([a['amount'] for a in p.display_amounts(annual_like)], ['19.99'])
-        self.assertEqual([a['amount'] for a in p.display_amounts(close_prices)], ['19.99','29.99'])
-        self.assertEqual([a['amount'] for a in p.display_amounts(three_prices)], ['9.99','19.99','200'])
+        pro20 = {'label':'ChatGPT Pro 20x','amounts':[{'amount':'200'}]}
+        market = {'offers':[annual_like, pro20]}
+        self.assertEqual([a['amount'] for a in p.display_amounts(market, annual_like)], ['19.99'])
+        self.assertEqual([a['amount'] for a in p.display_amounts({'offers':[annual_like]}, annual_like)], ['19.99','200'])
+        self.assertEqual([a['amount'] for a in p.display_amounts({'offers':[close_prices, pro20]}, close_prices)], ['19.99','29.99'])
+        self.assertEqual([a['amount'] for a in p.display_amounts({'offers':[three_prices, pro20]}, three_prices)], ['9.99','19.99','200'])
+        chile_like = {'label':'ChatGPT Plus','amounts':[{'amount':'19990'},{'amount':'229990'}]}
+        chile_pro20 = {'label':'ChatGPT Pro 20x','amounts':[{'amount':'199990'}]}
+        self.assertEqual([a['amount'] for a in p.display_amounts({'offers':[chile_like, chile_pro20]}, chile_like)], ['19990'])
 
     def test_static_projection_and_escape(self):
-        d=data_fixture(); d['markets'][0]['name']='</script><script>alert(1)</script>'; revise(d)
+        d=data_fixture()
+        d['markets'][0]['offers'].append({'label':'ChatGPT Pro 20x','amounts':[{'amount':'200','display':'$200.00','cny':'1400.00'}]})
+        d['markets'][0]['name']='</script><script>alert(1)</script>'; revise(d)
         template=(p.ROOT/'index.template.html').read_text(encoding='utf-8')
         page=p.render(d,template)
         self.assertNotIn('</script><script>alert(1)',page)
