@@ -89,7 +89,8 @@ export async function verifyOnce(expected, {
     const actual = JSON.parse(jsonText);
     validateSnapshot(actual);
     if (actual.revision !== expected.revision) throw new Error('production revision is not expected revision');
-    if (!html.includes(expected.revision)) throw new Error('production HTML does not reference expected revision');
+    const revisionMeta = `<meta name="chatgpt-data-revision" content="${expected.revision}">`;
+    if (!html.includes(revisionMeta)) throw new Error('production HTML revision meta does not match expected revision');
     return actual.revision;
   } finally {
     clearTimeout(timer);
