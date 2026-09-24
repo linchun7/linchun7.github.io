@@ -22,7 +22,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation, ROUND_CEILING, ROUND_HALF_UP
 
 ROOT = Path(__file__).resolve().parents[1]
 FX_URL = 'https://open.er-api.com/v6/latest/USD'
@@ -40,6 +40,7 @@ AMOUNT = re.compile(r'(?:0|[1-9][0-9]*)(?:\.[0-9]{1,3})?\Z')
 ZERO_DECIMAL = {'JPY', 'KRW', 'VND', 'CLP', 'PYG', 'UGX', 'RWF', 'XOF', 'XAF'}
 THREE_DECIMAL = {'BHD', 'IQD', 'JOD', 'KWD', 'OMR', 'TND'}
 PLAN_ORDER = ('ChatGPT Go', 'ChatGPT Plus', 'ChatGPT Pro 5x', 'ChatGPT Pro 20x')
+STATUS_LABEL = {'verified': '已核验', 'retained': '沿用旧价', 'pending': '待复核', 'unavailable': '暂无标价'}
 BEIJING = timezone(timedelta(hours=8))
 
 
@@ -623,7 +624,9 @@ def render(data: dict, template: str) -> str:
         value = offer_min_cny(market, default_plan)
         rank = rank_map.get(value) if value is not None else None
         rank_class = ' class="rank-top"' if rank is not None and rank <= 3 else ''
-        status = '' if market['status'] == 'verified' else f' · {market["status"]}'
+        status = '' if market['status'] == 'verified' else f' · {STATUS_LABEL[market["status"]]}'
+        rank_accessibility = f'全球价格排名第 {rank}' if rank is not None else '排名暂不可用'
+        history_accessibility = '，启用 JavaScript 后查看价格历史' if market['offers'] else '，暂无价格历史'
         cells = []
         for plan in plans:
             active = ' is-active-plan is-sorted' if plan == default_plan else ''
@@ -640,10 +643,10 @@ def render(data: dict, template: str) -> str:
             '<td><button type="button" class="country-history-button" disabled>'
             f'<span class="country-name">{html.escape(market["name"])}</span>'
             f'<span class="mobile-rank" aria-hidden="true">{rank if rank is not None else "—"}</span>'
-            f'<span class="mobile-rank-sr visually-hidden">全球价格排名第 {rank if rank is not None else "—"}</span>'
+            f'<span class="mobile-rank-sr visually-hidden">{rank_accessibility}</span>'
             f'<span class="country-name-en">{market["code"].upper()} · {html.escape(market.get("currency", "—"))}{html.escape(status)}</span>'
             '<span class="history-affordance" aria-hidden="true">›</span>'
-            '<span class="visually-hidden">，启用 JavaScript 后查看价格历史</span>'
+            f'<span class="visually-hidden">{history_accessibility}</span>'
             '</button></td>'
             + ''.join(cells)
             + '</tr>'
@@ -686,6 +689,11 @@ def scope_previous(old: dict | None, configured_codes: set[str]) -> tuple[dict[s
     return previous, changes
 
 
+def minimum_verified_required(previous_known: int) -> int:
+    required = (Decimal(previous_known) * MIN_VERIFIED_RATIO).to_integral_value(rounding=ROUND_CEILING)
+    return max(MIN_VERIFIED_ABSOLUTE, int(required))
+
+
 def run(output: Path, now: float | None = None) -> dict:
     now = time.time() if now is None else now
     config = json.loads((ROOT / 'markets.json').read_text(encoding='utf-8'))
@@ -707,7 +715,7 @@ def run(output: Path, now: float | None = None) -> dict:
     known = sum(bool(m['offers']) for m in markets)
     verified = sum(m['status'] == 'verified' for m in markets)
     previous_known = sum(bool(m['offers']) for m in previous.values())
-    minimum_verified = max(MIN_VERIFIED_ABSOLUTE, int(Decimal(previous_known) * MIN_VERIFIED_RATIO))
+    minimum_verified = minimum_verified_required(previous_known)
     minimum_known = Decimal(len(config)) * MIN_KNOWN_COVERAGE_RATIO
     if verified < minimum_verified or Decimal(known) < minimum_known:
         raise ValueError('insufficient fresh source coverage; existing publication left untouched')
