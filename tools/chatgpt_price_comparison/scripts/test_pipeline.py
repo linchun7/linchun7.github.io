@@ -298,6 +298,12 @@ class ContractTests(unittest.TestCase):
         chile_pro20 = {'label':'ChatGPT Pro 20x','amounts':[{'amount':'199990'}]}
         self.assertEqual([a['amount'] for a in p.display_amounts({'offers':[chile_like,chile_pro20]}, chile_like)], ['19990'])
 
+    def test_verified_coverage_ratio_rounds_up_to_contract(self):
+        self.assertEqual(p.minimum_verified_required(59), 48)
+        self.assertEqual(p.minimum_verified_required(10), 10)
+        self.assertEqual(p.minimum_verified_required(11), 10)
+        self.assertEqual(p.minimum_verified_required(13), 11)
+
     def test_previous_baseline_and_history_are_scoped_to_current_markets(self):
         old = {
             'markets': [{'code':'us','value':1}, {'code':'bd','value':2}],
@@ -334,6 +340,26 @@ class ContractTests(unittest.TestCase):
         self.assertNotIn('id="refresh"',page)
         self.assertNotIn('\\n<tr data-market-id=',page)
         self.assertEqual(page,p.render(d,template))
+
+    def test_static_unavailable_market_uses_localized_noninteractive_labels(self):
+        d=copy.deepcopy(data_fixture())
+        available=d['markets'][0]
+        unavailable=copy.deepcopy(available)
+        unavailable['code']='jp'
+        unavailable['name']='日本'
+        unavailable['source_url']=p.url_for('jp')
+        unavailable['offers']=[]
+        unavailable['status']='unavailable'
+        for key in ('currency','unclassified_labels','source_sha256','fingerprint','last_verified_at'):
+            unavailable.pop(key,None)
+        d['markets']=[available,unavailable]
+        revise(d)
+        page=p.render(d,(p.ROOT/'index.template.html').read_text(encoding='utf-8'))
+        self.assertIn('JP · — · 暂无标价',page)
+        self.assertIn('<span class="mobile-rank-sr visually-hidden">排名暂不可用</span>',page)
+        self.assertIn('，暂无价格历史',page)
+        self.assertNotIn('全球价格排名第 —',page)
+        self.assertNotIn('JP · — · unavailable',page)
 
     def test_static_price_ties_use_stable_market_code_order(self):
         d=copy.deepcopy(data_fixture())
