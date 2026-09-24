@@ -48,10 +48,13 @@ test('a missing browser fails promptly without leaving the test server alive', {
   const emptyBrowsers = await mkdtemp(join(tmpdir(), 'icloud-missing-browser-'));
   try {
     // A deliberately empty browser directory makes launch fail without network access.
+    const env = { ...process.env, PLAYWRIGHT_BROWSER: 'firefox', PLAYWRIGHT_BROWSERS_PATH: emptyBrowsers };
+    // This standalone child must report text, not inherit the parent's binary test protocol.
+    delete env.NODE_TEST_CONTEXT;
     const result = spawnSync(process.execPath, [
       fileURLToPath(new URL('./static-descending-url-state.test.mjs', import.meta.url))
     ], {
-      env: { ...process.env, PLAYWRIGHT_BROWSER: 'firefox', PLAYWRIGHT_BROWSERS_PATH: emptyBrowsers },
+      env,
       encoding: 'utf8',
       timeout: 10_000
     });
