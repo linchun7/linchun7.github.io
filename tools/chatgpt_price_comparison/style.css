@@ -206,7 +206,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, .workspace:focus-vis
 .mobile-plan-picker { display: none; }
 
 .table-scroll { max-width: 100%; overflow-x: auto; background: var(--surface); scrollbar-gutter: stable; }
-.price-table { width: 100%; min-width: 1030px; border-collapse: collapse; table-layout: fixed; }
+.price-table { width: 100%; min-width: var(--table-min-width, 1030px); border-collapse: collapse; table-layout: fixed; }
 .price-table th, .price-table td { padding: 0; border-bottom: 1px solid var(--line); vertical-align: middle; }
 .price-table thead th {
   position: sticky;
