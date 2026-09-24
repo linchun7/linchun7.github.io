@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="description" content="English browser translation benchmark with 48 fixed samples across 16 categories.">
+  <meta name="theme-color" content="#eef2f6">
+  <title>English Translation Benchmark</title>
+  <link rel="stylesheet" href="style.css?v=2">
+  <script src="script.js?v=2" defer></script>
+  <link rel="shortcut icon" href="/images/favicon.ico">
+</head>
+<body data-language="en">
+  <header class="app-header">
+    <div class="app-header-inner">
+      <a class="app-brand" href="en.html" aria-label="English benchmark home">
+        <span class="brand-mark" aria-hidden="true">A</span>
+        <div class="brand-copy"><h1>English Translation Benchmark</h1><p>48 fixed samples designed for direct browser-translation comparison.</p></div>
+      </a>
+      <a class="header-link" href="./">All languages</a>
+    </div>
+  </header>
+  <main class="page-main">
+    <section class="overview">
+      <div class="overview-card">
+        <h2>English test page</h2>
+        <p>This page contains English source text only. Translate the entire page into your target language, then reload it before testing another engine.</p>
+        <dl class="overview-stats"><div><dt>Categories</dt><dd>16</dd></div><div><dt>Samples</dt><dd>48</dd></div><div><dt>Per category</dt><dd>3</dd></div><div><dt>Source language</dt><dd>English</dd></div></dl>
+      </div>
+    </section>
+    <section class="workspace">
+      <div class="workspace-toolbar">
+        <div class="workspace-heading"><h2>Fixed test corpus</h2><p>Use the same page state for every translation engine.</p></div>
+        <nav class="test-nav" aria-label="Language pages"><a aria-current="page" href="en.html">English</a><a href="ja.html">Japanese</a><a href="ko.html">Korean</a><a href="fr.html">French</a><a href="de.html">German</a><a href="es.html">Spanish</a></nav>
+      </div>
+      <div class="workspace-summary">Prioritize mistranslations, omissions, invented information, altered scope, broken references, names and numbers before judging fluency.</div>
+    </section>
+    <div id="categoryList" class="category-list" aria-label="English translation test samples"></div>
+  </main>
+  <footer class="page-footer"><p>Fixed samples for translation-quality testing only.</p></footer>
+</body>
+</html>

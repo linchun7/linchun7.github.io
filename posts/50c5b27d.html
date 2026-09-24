@@ -1,0 +1,428 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <!-- metadata -->
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="theme-color" content="#ffffff">
+  
+  
+  
+  
+    <link rel="canonical" href="https://www.linchun.com.cn/posts/50c5b27d.html">
+  
+  
+  
+  <meta name="description" content="直接点击链接：银行卡号生成器 即可使用。 该功能主要用于银行卡号定制时的算号，可提前找出满足 Luhn 算法的银行卡号（注意，满足 Luhn 算法不等于可以直接使用，因已使用、注销、冻结、银行保留等原因，该卡号不一定能够开出）。  如何使用？  输入数字、英文字母、* 号的任意组合，即可生成符合 Luhn 算法的卡号。如输入“6221 *aaa bbbb cccc”，会生成包括且不限于以下的卡号：">
+<meta property="og:type" content="article">
+<meta property="og:title" content="银行卡号生成器">
+<meta property="og:url" content="https://www.linchun.com.cn/posts/50c5b27d.html">
+<meta property="og:site_name" content="林春写字的地方">
+<meta property="og:description" content="直接点击链接：银行卡号生成器 即可使用。 该功能主要用于银行卡号定制时的算号，可提前找出满足 Luhn 算法的银行卡号（注意，满足 Luhn 算法不等于可以直接使用，因已使用、注销、冻结、银行保留等原因，该卡号不一定能够开出）。  如何使用？  输入数字、英文字母、* 号的任意组合，即可生成符合 Luhn 算法的卡号。如输入“6221 *aaa bbbb cccc”，会生成包括且不限于以下的卡号：">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2023-07-30T02:00:34.000Z">
+<meta property="article:author" content="linchun">
+<meta property="article:tag" content="Luhn 算法">
+<meta property="article:tag" content="算号">
+<meta property="article:tag" content="银行卡号">
+<meta name="twitter:card" content="summary">
+  
+
+  
+    
+      
+        <link rel="shortcut icon" href="/images/favicon.ico">
+      
+    
+    
+      
+        <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
+      
+    
+    
+      
+        <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+      
+    
+  
+
+  <title>银行卡号生成器</title>
+  <!-- Google Analytics -->
+
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-K2S9L4CHNP"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-K2S9L4CHNP');
+</script>
+
+
+
+  <!-- platform system fonts + site styles; no webfont dependency -->
+  
+<link rel="stylesheet" href="/css/style.ea845346be1b.css">
+
+
+  
+  
+<meta name="generator" content="Hexo 8.1.2">  <meta name="linchun-release" content="100ac8fc18c84e1abe14929c7eeb16c44811dae1">
+</head>
+
+<body class="max-width mx-auto px3 ltr">
+<a class="skip-link" href="#main-content">跳到主要内容</a>
+
+  <aside id="header-post" aria-label="文章操作">
+  <button id="menu-icon" type="button" class="icon-button" aria-expanded="false" aria-controls="menu-panel" aria-label="菜单">
+    
+
+
+<svg class="icon-svg icon-lg" aria-hidden="true" focusable="false">
+  <use href="/vendor/fontawesome/icons.0f8d2dd5bd48.svg#fa-solid-bars"></use>
+</svg>
+
+  </button>
+  <button id="menu-icon-tablet" type="button" class="icon-button" aria-expanded="false" aria-controls="menu-panel" aria-label="菜单">
+    
+
+
+<svg class="icon-svg icon-lg" aria-hidden="true" focusable="false">
+  <use href="/vendor/fontawesome/icons.0f8d2dd5bd48.svg#fa-solid-bars"></use>
+</svg>
+
+  </button>
+  <button id="top-icon-tablet" type="button" class="icon-button" data-scroll-top hidden aria-label="返回顶部">
+    
+
+
+<svg class="icon-svg icon-lg" aria-hidden="true" focusable="false">
+  <use href="/vendor/fontawesome/icons.0f8d2dd5bd48.svg#fa-solid-chevron-up"></use>
+</svg>
+
+  </button>
+
+  <div id="menu-panel" hidden>
+    <nav id="nav" aria-label="文章导航">
+      <ul>
+        
+          <li><a href="/">首页</a></li>
+        
+          <li><a href="/about/">关于</a></li>
+        
+          <li><a href="/tags/">标签</a></li>
+        
+          <li><a href="/categories/">分类</a></li>
+        
+          <li><a href="/archives/">归档</a></li>
+        
+          <li><a href="/search/">搜索</a></li>
+        
+      </ul>
+    </nav>
+
+    <div id="actions">
+      <ul>
+        
+          <li><a class="icon action-control" href="/posts/f6f9d33e.html" aria-label="上一篇">
+
+
+<svg class="icon-svg" aria-hidden="true" focusable="false">
+  <use href="/vendor/fontawesome/icons.0f8d2dd5bd48.svg#fa-solid-chevron-left"></use>
+</svg>
+</a></li>
+        
+        
+          <li><a class="icon action-control" href="/posts/8c37a2f5.html" aria-label="下一篇">
+
+
+<svg class="icon-svg" aria-hidden="true" focusable="false">
+  <use href="/vendor/fontawesome/icons.0f8d2dd5bd48.svg#fa-solid-chevron-right"></use>
+</svg>
+</a></li>
+        
+        <li><button type="button" class="icon-button action-control" data-scroll-top aria-label="返回顶部">
+
+
+<svg class="icon-svg" aria-hidden="true" focusable="false">
+  <use href="/vendor/fontawesome/icons.0f8d2dd5bd48.svg#fa-solid-chevron-up"></use>
+</svg>
+</button></li>
+        <li><button type="button" class="icon-button action-control" data-toggle-target="#share-panel-desktop" aria-expanded="false" aria-controls="share-panel-desktop" aria-label="分享文章">
+
+
+<svg class="icon-svg" aria-hidden="true" focusable="false">
+  <use href="/vendor/fontawesome/icons.0f8d2dd5bd48.svg#fa-solid-share-nodes"></use>
+</svg>
+</button></li>
+      </ul>
+    </div>
+
+    <div id="share-panel-desktop" hidden>
+      
+
+<ul class="share-links">
+  <li><a class="icon" target="_blank" rel="noopener noreferrer"
+         aria-label="分享到 QQ 空间"
+         href="https://sns.qzone.qq.com/cgi-bin/qzshare/cgi_qzshare_onekey?url=https%3A%2F%2Fwww.linchun.com.cn%2Fposts%2F50c5b27d.html&title=%E9%93%B6%E8%A1%8C%E5%8D%A1%E5%8F%B7%E7%94%9F%E6%88%90%E5%99%A8">
+
+
+<svg class="icon-svg" aria-hidden="true" focusable="false">
+  <use href="/vendor/fontawesome/icons.0f8d2dd5bd48.svg#fa-brands-qq"></use>
+</svg>
+</a></li>
+  <li><a class="icon" target="_blank" rel="noopener noreferrer"
+         aria-label="分享到微博"
+         href="https://service.weibo.com/share/share.php?url=https%3A%2F%2Fwww.linchun.com.cn%2Fposts%2F50c5b27d.html&title=%E9%93%B6%E8%A1%8C%E5%8D%A1%E5%8F%B7%E7%94%9F%E6%88%90%E5%99%A8">
+
+
+<svg class="icon-svg" aria-hidden="true" focusable="false">
+  <use href="/vendor/fontawesome/icons.0f8d2dd5bd48.svg#fa-brands-weibo"></use>
+</svg>
+</a></li>
+  <li><a class="icon" target="_blank" rel="noopener noreferrer"
+         aria-label="分享到 X"
+         href="https://twitter.com/intent/tweet?url=https%3A%2F%2Fwww.linchun.com.cn%2Fposts%2F50c5b27d.html&text=%E9%93%B6%E8%A1%8C%E5%8D%A1%E5%8F%B7%E7%94%9F%E6%88%90%E5%99%A8">
+
+
+<svg class="icon-svg" aria-hidden="true" focusable="false">
+  <use href="/vendor/fontawesome/icons.0f8d2dd5bd48.svg#fa-brands-x-twitter"></use>
+</svg>
+</a></li>
+  <li><a class="icon" aria-label="通过邮件分享"
+         href="mailto:?subject=%E9%93%B6%E8%A1%8C%E5%8D%A1%E5%8F%B7%E7%94%9F%E6%88%90%E5%99%A8&body=https%3A%2F%2Fwww.linchun.com.cn%2Fposts%2F50c5b27d.html">
+
+
+<svg class="icon-svg" aria-hidden="true" focusable="false">
+  <use href="/vendor/fontawesome/icons.0f8d2dd5bd48.svg#fa-solid-envelope"></use>
+</svg>
+</a></li>
+</ul>
+
+    </div>
+    <div id="toc">
+      
+    </div>
+  </div>
+</aside>
+
+
+<div class="content index py4 ">
+  
+  <main id="main-content" class="site-main" tabindex="-1">
+    <article class="post h-entry" itemscope itemtype="https://schema.org/BlogPosting">
+  <header>
+    
+  <h1 class="posttitle p-name" itemprop="name headline">银行卡号生成器</h1>
+
+
+    <div class="meta">
+      <span class="author p-author h-card" itemprop="author" itemscope itemtype="https://schema.org/Person">
+        <span class="p-name" itemprop="name">linchun</span>
+      </span>
+      
+  
+  <div class="postdate">
+    
+      <time class="dt-published" datetime="2023-07-30T02:00:34.000Z" itemprop="datePublished">2023-07-30</time>
+      
+    
+  </div>
+
+
+      
+  <div class="article-category p-category">
+    
+
+
+<svg class="icon-svg" aria-hidden="true" focusable="false">
+  <use href="/vendor/fontawesome/icons.0f8d2dd5bd48.svg#fa-solid-box-archive"></use>
+</svg>
+
+    <a class="category-link" href="/categories/%E5%B7%A5%E5%85%B7/">工具</a>
+  </div>
+
+
+      
+  <div class="article-tag">
+    
+
+
+<svg class="icon-svg" aria-hidden="true" focusable="false">
+  <use href="/vendor/fontawesome/icons.0f8d2dd5bd48.svg#fa-solid-tag"></use>
+</svg>
+
+    <a class="tag-link-link" href="/tags/Luhn-%E7%AE%97%E6%B3%95/" rel="tag">Luhn 算法</a>, <a class="tag-link-link" href="/tags/%E7%AE%97%E5%8F%B7/" rel="tag">算号</a>, <a class="tag-link-link" href="/tags/%E9%93%B6%E8%A1%8C%E5%8D%A1%E5%8F%B7/" rel="tag">银行卡号</a>
+  </div>
+
+
+    </div>
+  </header>
+  
+
+  <div class="content e-content" itemprop="articleBody">
+    <p>直接点击链接：<strong><a href="/tools/card_number/">银行卡号生成器</a></strong> 即可使用。</p>
+<p>该功能主要用于银行卡号定制时的算号，可提前找出满足 Luhn 算法的银行卡号（注意，满足 Luhn 算法不等于可以直接使用，因已使用、注销、冻结、银行保留等原因，该卡号不一定能够开出）。</p>
+<ul>
+<li><strong>如何使用？</strong></li>
+</ul>
+<p>输入数字、英文字母、* 号的任意组合，即可生成符合 Luhn 算法的卡号。如输入“6221 *aaa bbbb cccc”，会生成包括且不限于以下的卡号：</p>
+<blockquote>
+<p>6221 0000 0000 0000 </p>
+<p>6221 0000 0000 8888 </p>
+<p>6221 0000 1111 4444 </p>
+<p>6221 0111 2222 4444 </p>
+<p>……</p>
+</blockquote>
+<ul>
+<li><strong>字母和 * 号的区别？</strong></li>
+</ul>
+<p>字母：生成的任意一条卡号中，相同字母对应的数字<strong>必</strong>相同（如 aaa 只对应 000、111 等，不会对应 001）；不同字母对应的数字，<strong>可能</strong>相同，<strong>也可能</strong>不同（如 aaa bbbb cccc，可能对应 000 0000 0000，也可能对应 000 1111 4444 等）；</p>
+<p> * 号：生成的任意一条卡号中，多个 * 号对应的数字<strong>可能</strong>相同，<strong>也可能</strong>不同（如 **，可能对应 00，也可能对应 01 等）；</p>
+
+  </div>
+</article>
+
+
+
+  </main>
+  
+    <div id="footer-post-container">
+  <nav id="footer-post" aria-label="移动端文章操作">
+    <div id="nav-footer" hidden>
+      <ul>
+        
+          <li><a href="/">首页</a></li>
+        
+          <li><a href="/about/">关于</a></li>
+        
+          <li><a href="/tags/">标签</a></li>
+        
+          <li><a href="/categories/">分类</a></li>
+        
+          <li><a href="/archives/">归档</a></li>
+        
+          <li><a href="/search/">搜索</a></li>
+        
+      </ul>
+    </div>
+
+    <div id="toc-footer" hidden>
+      
+    </div>
+
+    <div id="share-footer" hidden>
+      
+
+<ul class="share-links">
+  <li><a class="icon" target="_blank" rel="noopener noreferrer"
+         aria-label="分享到 QQ 空间"
+         href="https://sns.qzone.qq.com/cgi-bin/qzshare/cgi_qzshare_onekey?url=https%3A%2F%2Fwww.linchun.com.cn%2Fposts%2F50c5b27d.html&title=%E9%93%B6%E8%A1%8C%E5%8D%A1%E5%8F%B7%E7%94%9F%E6%88%90%E5%99%A8">
+
+
+<svg class="icon-svg icon-lg" aria-hidden="true" focusable="false">
+  <use href="/vendor/fontawesome/icons.0f8d2dd5bd48.svg#fa-brands-qq"></use>
+</svg>
+</a></li>
+  <li><a class="icon" target="_blank" rel="noopener noreferrer"
+         aria-label="分享到微博"
+         href="https://service.weibo.com/share/share.php?url=https%3A%2F%2Fwww.linchun.com.cn%2Fposts%2F50c5b27d.html&title=%E9%93%B6%E8%A1%8C%E5%8D%A1%E5%8F%B7%E7%94%9F%E6%88%90%E5%99%A8">
+
+
+<svg class="icon-svg icon-lg" aria-hidden="true" focusable="false">
+  <use href="/vendor/fontawesome/icons.0f8d2dd5bd48.svg#fa-brands-weibo"></use>
+</svg>
+</a></li>
+  <li><a class="icon" target="_blank" rel="noopener noreferrer"
+         aria-label="分享到 X"
+         href="https://twitter.com/intent/tweet?url=https%3A%2F%2Fwww.linchun.com.cn%2Fposts%2F50c5b27d.html&text=%E9%93%B6%E8%A1%8C%E5%8D%A1%E5%8F%B7%E7%94%9F%E6%88%90%E5%99%A8">
+
+
+<svg class="icon-svg icon-lg" aria-hidden="true" focusable="false">
+  <use href="/vendor/fontawesome/icons.0f8d2dd5bd48.svg#fa-brands-x-twitter"></use>
+</svg>
+</a></li>
+  <li><a class="icon" aria-label="通过邮件分享"
+         href="mailto:?subject=%E9%93%B6%E8%A1%8C%E5%8D%A1%E5%8F%B7%E7%94%9F%E6%88%90%E5%99%A8&body=https%3A%2F%2Fwww.linchun.com.cn%2Fposts%2F50c5b27d.html">
+
+
+<svg class="icon-svg icon-lg" aria-hidden="true" focusable="false">
+  <use href="/vendor/fontawesome/icons.0f8d2dd5bd48.svg#fa-solid-envelope"></use>
+</svg>
+</a></li>
+</ul>
+
+    </div>
+
+    <div id="actions-footer">
+      <button id="menu" type="button" class="icon-button" data-toggle-target="#nav-footer" aria-expanded="false" aria-controls="nav-footer">
+        
+
+
+<svg class="icon-svg icon-lg" aria-hidden="true" focusable="false">
+  <use href="/vendor/fontawesome/icons.0f8d2dd5bd48.svg#fa-solid-bars"></use>
+</svg>
+ 菜单
+      </button>
+      <button id="toc-toggle" type="button" class="icon-button" data-toggle-target="#toc-footer" aria-expanded="false" aria-controls="toc-footer">
+        
+
+
+<svg class="icon-svg icon-lg" aria-hidden="true" focusable="false">
+  <use href="/vendor/fontawesome/icons.0f8d2dd5bd48.svg#fa-solid-list"></use>
+</svg>
+ 目录
+      </button>
+      <button id="share" type="button" class="icon-button" data-toggle-target="#share-footer" aria-expanded="false" aria-controls="share-footer">
+        
+
+
+<svg class="icon-svg icon-lg" aria-hidden="true" focusable="false">
+  <use href="/vendor/fontawesome/icons.0f8d2dd5bd48.svg#fa-solid-share-nodes"></use>
+</svg>
+ 分享
+      </button>
+      <button id="top" type="button" class="icon-button" data-scroll-top hidden>
+        
+
+
+<svg class="icon-svg icon-lg" aria-hidden="true" focusable="false">
+  <use href="/vendor/fontawesome/icons.0f8d2dd5bd48.svg#fa-solid-chevron-up"></use>
+</svg>
+ 返回顶部
+      </button>
+    </div>
+  </nav>
+</div>
+
+  
+  <footer id="footer">
+  <div class="footer-top">
+    
+    
+    &copy; 2022–2026
+    <a href="https://www.linchun.com.cn">林春写字的地方</a>
+    
+  </div>
+
+  
+</footer>
+
+</div>
+<!-- Font Awesome icons are rendered from the self-hosted SVG sprite; no icon webfont stylesheet. -->
+
+<script>
+  window.CACTUS_I18N = Object.freeze({
+    copy: "复制到粘贴板！",
+    copied: "复制成功！"
+  });
+</script>
+
+<script src="/js/main.ecccbd5bfc3b.js"></script>
+
+
+
+</body>
+</html>
+

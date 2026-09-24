@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 2,
+  "assets": [
+    {
+      "file": "lucide-subset.js",
+      "package": "lucide",
+      "license": "ISC",
+      "sha256": "2b21b7af6dee81dadcaa7a6ddfee0aec6cbdc3f7aba9157bdc6183963663783a"
+    }
+  ]
+}

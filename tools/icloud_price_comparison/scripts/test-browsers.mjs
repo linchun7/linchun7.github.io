@@ -1,0 +1,30 @@
+import { spawn } from 'node:child_process';
+
+function runBrowserSuite(browser) {
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, [
+      '--test',
+      '--test-concurrency=1',
+      'test/ui-smoke.test.mjs',
+      'test/static-descending-url-state.test.mjs'
+    ], {
+      cwd: new URL('..', import.meta.url),
+      env: { ...process.env, PLAYWRIGHT_BROWSER: browser },
+      stdio: 'inherit'
+    });
+    child.on('error', (error) => {
+      console.error(`${browser} browser suite could not start: ${error.message}`);
+      resolve(1);
+    });
+    child.on('exit', (code, signal) => {
+      if (signal) console.error(`${browser} browser suite exited after signal ${signal}`);
+      resolve(code ?? 1);
+    });
+  });
+}
+
+const results = [];
+for (const browser of ['chromium', 'firefox', 'webkit']) {
+  results.push(await runBrowserSuite(browser));
+}
+if (results.some((code) => code !== 0)) process.exitCode = 1;

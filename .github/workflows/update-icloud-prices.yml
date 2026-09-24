@@ -1,0 +1,713 @@
+name: Update iCloud prices
+
+on:
+  schedule:
+    # 北京时间 08:10，作为 Cloudflare 08:05 主触发的备用。
+    - cron: '10 0 * * *'
+  workflow_dispatch:
+    inputs:
+      trigger_source:
+        description: 触发来源（手动运行保持 manual）
+        required: false
+        default: manual
+        type: choice
+        options:
+          - manual
+          - cloudflare
+
+permissions:
+  contents: read
+
+concurrency:
+  group: update-icloud-prices
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: 检查每日自动更新
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      should_run: ${{ steps.daily_guard.outputs.should_run }}
+      trigger_source: ${{ steps.daily_guard.outputs.trigger_source }}
+      automatic_run_date_beijing: ${{ steps.daily_guard.outputs.automatic_run_date_beijing }}
+      validated_main_sha: ${{ steps.validate_main_data.outputs.validated_main_sha }}
+      severe_failure: ${{ steps.classify_prepare.outputs.severe_failure }}
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: 配置 Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: 读取并深验最新 main 的每日幂等状态
+        id: validate_main_data
+        working-directory: .
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --depth=1
+          validated_main_sha=$(git rev-parse origin/main)
+          main_snapshot="$RUNNER_TEMP/icloud-main-snapshot"
+          mkdir -p "$main_snapshot"
+          git archive --format=tar "$validated_main_sha" tools/icloud_price_comparison/data | tar --extract --file=- --directory="$main_snapshot"
+          node tools/icloud_price_comparison/scripts/validate-data-artifact.mjs \
+            --data-dir "$main_snapshot/tools/icloud_price_comparison/data" > /dev/null
+          echo "已验证最新 main 数据工件：$validated_main_sha"
+          echo "validated_main_sha=$validated_main_sha" >> "$GITHUB_OUTPUT"
+
+      - name: 检查每日幂等状态
+        id: daily_guard
+        working-directory: tools/icloud_price_comparison
+        env:
+          REQUESTED_TRIGGER_SOURCE: ${{ inputs.trigger_source }}
+          ICLOUD_RUN_LOG_PATH: ${{ runner.temp }}/icloud-main-snapshot/tools/icloud_price_comparison/data/run-log.json
+        run: node scripts/daily-run-guard.mjs
+
+      - name: 分类前置检查故障
+        id: classify_prepare
+        if: always()
+        shell: bash
+        run: |
+          severe_failure=false
+          if [[ "${{ steps.validate_main_data.outcome }}" == "failure" ]] \
+            || [[ "${{ steps.daily_guard.outcome }}" == "failure" ]]; then
+            severe_failure=true
+          fi
+          echo "severe_failure=$severe_failure" >> "$GITHUB_OUTPUT"
+
+  update:
+    name: 更新并验证 iCloud+ 价格
+    needs: prepare
+    if: needs.prepare.outputs.should_run == 'true'
+    permissions:
+      contents: read
+    outputs:
+      generation_base_sha: ${{ steps.generation_base.outputs.sha }}
+      severe_failure: ${{ steps.classify_update.outputs.severe_failure }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: tools/icloud_price_comparison
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: 固定本次生成基线
+        id: generation_base
+        working-directory: .
+        shell: bash
+        run: |
+          git fetch origin main --depth=1
+          git checkout --detach origin/main
+          cp tools/icloud_price_comparison/data/prices.json "$RUNNER_TEMP/icloud-prices-before-update.json"
+          echo "GENERATION_BASE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: 配置 Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: 启用并校验 pnpm
+        run: |
+          corepack enable
+          pnpm --version
+
+      - name: 安装项目依赖
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: 抓取并校验 Apple 价格
+        id: update_data
+        env:
+          EXCHANGE_RATE_API_KEY: ${{ secrets.EXCHANGE_RATE_API_KEY }}
+          ICLOUD_TRIGGER_SOURCE: ${{ needs.prepare.outputs.trigger_source }}
+          ICLOUD_AUTOMATIC_RUN_DATE_BEIJING: ${{ needs.prepare.outputs.automatic_run_date_beijing }}
+        run: pnpm update:data
+
+      - name: 比较中文名称待确认成员
+        if: steps.update_data.outcome == 'success'
+        run: |
+          node scripts/report-chinese-name-sync.mjs \
+            --previous "$RUNNER_TEMP/icloud-prices-before-update.json" \
+            --current data/prices.json \
+            --summary "$GITHUB_STEP_SUMMARY"
+
+      - name: 验证更新后的价格数据
+        id: data_tests
+        run: pnpm test:data
+
+      - name: 生成并校验静态价格页
+        id: render_static
+        run: |
+          pnpm render:static
+          pnpm render:static:check
+
+      # 在实际候选上验证全部 core；bot 数据提交不触发 push CI，更新前的绿灯不能替代它。
+      - name: 运行解析与数据安全测试
+        id: core_tests
+        run: pnpm test:core
+
+      - name: 验证更新后的页面
+        id: ui_tests
+        # GITHUB_TOKEN 发布提交不会再次触发 push workflow；每日门禁在本 workflow 内完成 core/data + runner Chrome，Chromium + Firefox + WebKit 由代码变更/每周独立验证补充。
+        run: pnpm test:ui
+
+      - name: 上传诊断信息和 Apple 规范化快照
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: icloud-price-diagnostics-${{ github.run_id }}
+          path: tools/icloud_price_comparison/artifacts
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: 打包已测试的数据工件
+        id: package_data
+        working-directory: .
+        shell: bash
+        run: |
+          node tools/icloud_price_comparison/scripts/validate-data-artifact.mjs --data-dir tools/icloud_price_comparison/data > /dev/null
+          echo "已验证待发布 iCloud 数据工件。"
+          tar --format=ustar -cf "$RUNNER_TEMP/icloud-price-data.tar" tools/icloud_price_comparison/data
+          cp tools/icloud_price_comparison/index.html "$RUNNER_TEMP/icloud-price-index.html"
+          cd "$RUNNER_TEMP"
+          sha256sum icloud-price-data.tar > icloud-price-data.tar.sha256
+          sha256sum icloud-price-index.html > icloud-price-index.html.sha256
+
+      - name: 上传已测试的数据工件
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: icloud-price-data-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/icloud-price-data.tar
+            ${{ runner.temp }}/icloud-price-data.tar.sha256
+            ${{ runner.temp }}/icloud-price-index.html
+            ${{ runner.temp }}/icloud-price-index.html.sha256
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: 补充未报告的失败摘要
+        if: failure()
+        working-directory: .
+        shell: bash
+        run: |
+          if [[ "${{ steps.update_data.outcome }}" == "failure" && -f "tools/icloud_price_comparison/artifacts/run-report.json" ]]; then
+            echo "更新器已写入详细失败摘要。"
+            exit 0
+          fi
+          echo "::error title=iCloud+ 价格更新失败::自动任务未完成，请查看上方第一个标红步骤确定失败阶段。"
+          if [[ "${{ steps.package_data.outcome }}" == "success" ]]; then
+            data_status="价格数据步骤已经完成；本次失败来自其他验收或收尾步骤。"
+          else
+            data_status="本次运行未确认价格数据已成功提交。上一份有效数据继续保留。"
+          fi
+          {
+            echo "## iCloud+ 价格更新失败"
+            echo ""
+            echo "> **错误：** 自动任务未完成，请查看上方第一个标红步骤确定失败阶段。"
+            echo ""
+            echo "$data_status"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 分类更新故障与严重警告
+        id: classify_update
+        if: always()
+        shell: bash
+        run: |
+          severe_failure=false
+          if [[ "${{ steps.core_tests.outcome }}" == "failure" ]] \
+            || [[ "${{ steps.data_tests.outcome }}" == "failure" ]] \
+            || [[ "${{ steps.render_static.outcome }}" == "failure" ]] \
+            || [[ "${{ steps.ui_tests.outcome }}" == "failure" ]] \
+            || [[ "${{ steps.package_data.outcome }}" == "failure" ]]; then
+            severe_failure=true
+          fi
+
+          if [[ "${{ steps.update_data.outcome }}" == "failure" ]]; then
+            report="artifacts/run-report.json"
+            update_failure_severe=true
+            if [[ -f "$report" ]] && severity=$(node -e '
+                const report = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+                process.stdout.write(report.healthcheckSeverity === "transient" ? "transient" : "severe");
+              ' "$report" 2>/dev/null); then
+              if [[ "$severity" == "severe" ]]; then
+                update_failure_severe=true
+              else
+                update_failure_severe=false
+              fi
+            fi
+            if [[ "$update_failure_severe" == "true" ]]; then
+              severe_failure=true
+            fi
+          elif [[ "${{ steps.update_data.outcome }}" == "success" ]]; then
+            if ! parser=$(node -e '
+              const data = JSON.parse(require("fs").readFileSync("data/prices.json", "utf8"));
+              process.stdout.write(data?.source?.parser || "missing");
+            ' 2>/dev/null); then
+              severe_failure=true
+            elif [[ "$parser" != "cross-checked" ]]; then
+              severe_failure=true
+            fi
+          fi
+
+          echo "severe_failure=$severe_failure" >> "$GITHUB_OUTPUT"
+
+  publish:
+    name: 发布已测试的数据
+    needs:
+      - prepare
+      - update
+    if: needs.prepare.outputs.should_run == 'true' && needs.update.result == 'success'
+    permissions:
+      contents: write
+      pages: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    outputs:
+      severe_failure: ${{ steps.classify_publish.outputs.severe_failure }}
+      publish_outcome: ${{ steps.classify_publish.outputs.publish_outcome }}
+      pushed_sha: ${{ steps.push_data.outputs.pushed_sha }}
+      pages_built_sha: ${{ steps.wait_pages_build.outputs.built_sha }}
+    steps:
+      - name: 检出精确生成基线
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.update.outputs.generation_base_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: 配置 Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: 下载已测试的数据工件
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: icloud-price-data-${{ github.run_id }}
+          path: ${{ runner.temp }}/icloud-price-data
+
+      - name: 校验并展开数据工件
+        id: validate_data_artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/icloud-price-data"
+          sha256sum --check icloud-price-data.tar.sha256
+          sha256sum --check icloud-price-index.html.sha256
+          validator="$GITHUB_WORKSPACE/tools/icloud_price_comparison/scripts/validate-data-artifact.mjs"
+          node "$validator" --archive icloud-price-data.tar > /dev/null
+          mkdir unpacked
+          tar --extract --file icloud-price-data.tar --directory unpacked --no-same-owner --no-same-permissions
+          node "$validator" --data-dir unpacked/tools/icloud_price_comparison/data > /dev/null
+          echo "已验证待发布 iCloud 数据工件（归档与展开内容一致）。"
+          node "$GITHUB_WORKSPACE/tools/icloud_price_comparison/scripts/render-static-page.mjs" --check \
+            --index-file "$RUNNER_TEMP/icloud-price-data/icloud-price-index.html" \
+            --prices-file "$RUNNER_TEMP/icloud-price-data/unpacked/tools/icloud_price_comparison/data/prices.json"
+
+      - name: 确认 main 未前进并准备提交
+        id: prepare_publish
+        shell: bash
+        env:
+          GENERATION_BASE_SHA: ${{ needs.update.outputs.generation_base_sha }}
+        run: |
+          set -euo pipefail
+          echo "main_advanced=false" >> "$GITHUB_OUTPUT"
+          echo "should_push=false" >> "$GITHUB_OUTPUT"
+          git fetch origin main --depth=1
+          if [[ "$(git rev-parse origin/main)" != "$GENERATION_BASE_SHA" ]]; then
+            echo "::error title=main 已在生成期间前进::远端 main 已变化；本次不发布，下一次运行会重新生成。"
+            echo "main_advanced=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          validated_data="$RUNNER_TEMP/icloud-price-data/unpacked/tools/icloud_price_comparison/data"
+          rm -rf tools/icloud_price_comparison/data
+          cp -a "$validated_data" tools/icloud_price_comparison/data
+          cp "$RUNNER_TEMP/icloud-price-data/icloud-price-index.html" tools/icloud_price_comparison/index.html
+          base_index="$RUNNER_TEMP/generation-base-index.html"
+          git show "$GENERATION_BASE_SHA:tools/icloud_price_comparison/index.html" > "$base_index"
+          node tools/icloud_price_comparison/scripts/validate-static-page-update.mjs \
+            "$base_index" \
+            tools/icloud_price_comparison/index.html \
+            tools/icloud_price_comparison/data/prices.json
+          if git diff --quiet -- tools/icloud_price_comparison/data tools/icloud_price_comparison/index.html; then
+            echo "publish_candidate=no_data_changes" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all tools/icloud_price_comparison/data tools/icloud_price_comparison/index.html
+          git commit -m "chore: update iCloud prices"
+          echo "publish_candidate=commit_ready" >> "$GITHUB_OUTPUT"
+          echo "should_push=true" >> "$GITHUB_OUTPUT"
+
+      - name: 仅在最终步骤推送
+        id: push_data
+        if: steps.prepare_publish.outputs.should_push == 'true'
+        continue-on-error: true
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          echo "main_advanced=false" >> "$GITHUB_OUTPUT"
+          echo "pushed=false" >> "$GITHUB_OUTPUT"
+          git fetch origin main --depth=1
+          if [[ "$(git rev-parse origin/main)" != "${{ needs.update.outputs.generation_base_sha }}" ]]; then
+            echo "::error title=main 已在提交前前进::本次不推送，下一次运行会重新生成。"
+            echo "main_advanced=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          auth_header=$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w0)
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" push origin HEAD:main
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
+          echo "pushed_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: 请求本次数据变更的 Pages 构建
+        id: request_pages_build
+        if: steps.push_data.outputs.pushed == 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --method POST \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2026-03-10' \
+            "repos/$GITHUB_REPOSITORY/pages/builds"
+          echo "requested=true" >> "$GITHUB_OUTPUT"
+
+      - name: 等待 Pages 构建完成
+        id: wait_pages_build
+        if: steps.push_data.outputs.pushed == 'true' && steps.request_pages_build.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ steps.push_data.outputs.pushed_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "pages_built=false" >> "$GITHUB_OUTPUT"
+          for attempt in $(seq 1 60); do
+            read -r built_sha build_status build_error < <(
+              gh api \
+                -H 'Accept: application/vnd.github+json' \
+                -H 'X-GitHub-Api-Version: 2026-03-10' \
+                "repos/$GITHUB_REPOSITORY/pages/builds/latest" \
+                --jq '[.commit, .status, (.error.message // "")] | @tsv'
+            )
+            relation=unrelated
+            if [[ "$built_sha" == "$TARGET_SHA" ]]; then
+              relation=identical
+            elif [[ "$built_sha" =~ ^[0-9a-f]{40}$ ]]; then
+              compare_status=$(gh api \
+                -H 'Accept: application/vnd.github+json' \
+                -H 'X-GitHub-Api-Version: 2026-03-10' \
+                "repos/$GITHUB_REPOSITORY/compare/$TARGET_SHA...$built_sha" \
+                --jq '.status' 2>/dev/null || true)
+              if [[ "$compare_status" == "ahead" ]]; then
+                relation=successor
+              fi
+            fi
+            if [[ "$relation" == "identical" || "$relation" == "successor" ]]; then
+              if [[ "$build_status" == "built" ]]; then
+                echo "pages_built=true" >> "$GITHUB_OUTPUT"
+                echo "built_sha=$built_sha" >> "$GITHUB_OUTPUT"
+                echo "build_relation=$relation" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              if [[ "$build_status" == "errored" || -n "$build_error" ]]; then
+                echo "::error title=PAGES_BUILD_FAILED::Pages build for $built_sha failed: ${build_error:-$build_status}"
+                exit 1
+              fi
+            fi
+            sleep 5
+          done
+          echo "::error title=PAGES_BUILD_TIMEOUT::Pages did not build $TARGET_SHA or a verified successor within the bounded wait."
+          exit 1
+
+      - name: 分类发布故障
+        id: classify_publish
+        if: always()
+        shell: bash
+        run: |
+          severe_failure=false
+          publish_outcome=push_failed
+          if [[ "${{ steps.validate_data_artifact.outcome }}" == "failure" ]]; then
+            severe_failure=true
+            publish_outcome=artifact_invalid
+          elif [[ "${{ steps.prepare_publish.outputs.main_advanced }}" == "true" ]] \
+            || [[ "${{ steps.push_data.outputs.main_advanced }}" == "true" ]]; then
+            publish_outcome=main_advanced
+          elif [[ "${{ steps.prepare_publish.outputs.publish_candidate }}" == "no_data_changes" ]]; then
+            publish_outcome=no_data_changes
+          elif [[ "${{ steps.push_data.outcome }}" == "failure" ]]; then
+            severe_failure=true
+            publish_outcome=push_failed
+          elif [[ "${{ steps.request_pages_build.outcome }}" == "failure" ]]; then
+            severe_failure=true
+            publish_outcome=pages_request_failed
+          elif [[ "${{ steps.wait_pages_build.outcome }}" == "failure" ]]; then
+            severe_failure=true
+            publish_outcome=pages_build_failed
+          elif [[ "${{ steps.push_data.outputs.pushed }}" == "true" ]] \
+            && [[ "${{ steps.wait_pages_build.outputs.pages_built }}" == "true" ]]; then
+            publish_outcome=pages_built
+          else
+            severe_failure=true
+            publish_outcome=push_failed
+          fi
+          echo "severe_failure=$severe_failure" >> "$GITHUB_OUTPUT"
+          echo "publish_outcome=$publish_outcome" >> "$GITHUB_OUTPUT"
+          if [[ "$publish_outcome" == "main_advanced" ]]; then
+            echo "::error title=PUBLISH_MAIN_ADVANCED::main 已前进；本次不覆盖、不发布。"
+            exit 1
+          fi
+          if [[ "$severe_failure" == "true" ]]; then
+            if [[ "$publish_outcome" == "artifact_invalid" ]]; then
+              echo "::error title=PUBLISH_ARTIFACT_INVALID::已测试的数据工件未通过发布边界校验。"
+            elif [[ "$publish_outcome" == "pages_request_failed" ]]; then
+              echo "::error title=PUBLISH_PAGES_REQUEST_FAILED::数据已推送，但 Pages build 请求未成功受理。"
+            elif [[ "$publish_outcome" == "pages_build_failed" ]]; then
+              echo "::error title=PUBLISH_PAGES_BUILD_FAILED::数据已推送，但 Pages 未完成对应提交或合法后继提交的构建。"
+            else
+              echo "::error title=PUBLISH_PUSH_FAILED::待发布提交未能推送到 main。"
+            fi
+            exit 1
+          fi
+
+  verify-production:
+    name: 验证真实生产部署
+    needs:
+      - update
+      - publish
+    if: needs.publish.result == 'success' && (needs.publish.outputs.publish_outcome == 'pages_built' || needs.publish.outputs.publish_outcome == 'no_data_changes')
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    outputs:
+      severe_failure: ${{ steps.classify_verification.outputs.severe_failure }}
+      verification_status: ${{ steps.classify_verification.outputs.verification_status }}
+    steps:
+      - name: 检出验证脚本
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.update.outputs.generation_base_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: 配置 Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: 下载已测试的数据工件
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: icloud-price-data-${{ github.run_id }}
+          path: ${{ runner.temp }}/icloud-price-data
+
+      - name: 重新校验并展开已测试工件
+        id: validate_expected_artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/icloud-price-data"
+          sha256sum --check icloud-price-data.tar.sha256
+          validator="$GITHUB_WORKSPACE/tools/icloud_price_comparison/scripts/validate-data-artifact.mjs"
+          node "$validator" --archive icloud-price-data.tar > /dev/null
+          mkdir unpacked
+          tar --extract --file icloud-price-data.tar --directory unpacked --no-same-owner --no-same-permissions
+          node "$validator" --data-dir unpacked/tools/icloud_price_comparison/data > /dev/null
+          git -C "$GITHUB_WORKSPACE" fetch origin main --depth=1
+          CURRENT_MAIN_SHA=$(git -C "$GITHUB_WORKSPACE" rev-parse origin/main)
+          current_main_root="$RUNNER_TEMP/current-main-artifact"
+          mkdir -p "$current_main_root"
+          git -C "$GITHUB_WORKSPACE" archive --format=tar "$CURRENT_MAIN_SHA" tools/icloud_price_comparison/data \
+            | tar --extract --file=- --directory="$current_main_root"
+          node "$validator" --data-dir "$current_main_root/tools/icloud_price_comparison/data" > /dev/null
+          echo "已验证当前 main 数据工件：$CURRENT_MAIN_SHA"
+
+      - name: 轮询真实生产 URL
+        id: verify_production
+        continue-on-error: true
+        shell: bash
+        run: |
+          node tools/icloud_price_comparison/scripts/verify-production-deployment.mjs \
+            --expected-data-dir "$RUNNER_TEMP/icloud-price-data/unpacked/tools/icloud_price_comparison/data" \
+            --current-main-data-dir "$RUNNER_TEMP/current-main-artifact/tools/icloud_price_comparison/data" \
+            --run-id "${{ github.run_id }}" \
+            --summary-file "$GITHUB_STEP_SUMMARY"
+
+      - name: 分类生产验证结果
+        id: classify_verification
+        if: always()
+        shell: bash
+        run: |
+          severe_failure=false
+          verification_status=passed
+          if [[ "${{ steps.validate_expected_artifact.outcome }}" == "failure" ]]; then
+            severe_failure=true
+            verification_status=artifact_invalid
+          elif [[ "${{ steps.verify_production.outcome }}" == "failure" ]]; then
+            severe_failure=true
+            verification_status=production_not_updated
+          fi
+          echo "severe_failure=$severe_failure" >> "$GITHUB_OUTPUT"
+          echo "verification_status=$verification_status" >> "$GITHUB_OUTPUT"
+          if [[ "$severe_failure" == "true" ]]; then
+            if [[ "$verification_status" == "artifact_invalid" ]]; then
+              echo "::error title=PUBLISH_ARTIFACT_INVALID::production verifier 拒绝了未通过重新校验的 expected artifact。"
+            else
+              echo "::error title=PUBLISH_PRODUCTION_NOT_UPDATED::真实生产 URL 未返回已验证的发布数据。"
+            fi
+            exit 1
+          fi
+
+  verify-existing-production:
+    name: 验证已发布的幂等生产数据
+    needs: prepare
+    if: needs.prepare.result == 'success' && needs.prepare.outputs.should_run != 'true' && needs.prepare.outputs.trigger_source != 'manual'
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    outputs:
+      severe_failure: ${{ steps.classify_verification.outputs.severe_failure }}
+      verification_status: ${{ steps.classify_verification.outputs.verification_status }}
+    steps:
+      - name: 检出已验证 main 快照
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.prepare.outputs.validated_main_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: 配置 Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: 校验已固定的 main 数据并读取实时 main 证明
+        id: validate_expected_data
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tools/icloud_price_comparison/scripts/validate-data-artifact.mjs \
+            --data-dir tools/icloud_price_comparison/data > /dev/null
+          git fetch origin main --depth=1
+          CURRENT_MAIN_SHA=$(git rev-parse origin/main)
+          current_main_root="$RUNNER_TEMP/current-main-artifact"
+          mkdir -p "$current_main_root"
+          git archive --format=tar "$CURRENT_MAIN_SHA" tools/icloud_price_comparison/data \
+            | tar --extract --file=- --directory="$current_main_root"
+          node tools/icloud_price_comparison/scripts/validate-data-artifact.mjs \
+            --data-dir "$current_main_root/tools/icloud_price_comparison/data" > /dev/null
+          echo "已验证当前 main 数据工件：$CURRENT_MAIN_SHA"
+
+      - name: 轮询真实生产 URL
+        id: verify_production
+        continue-on-error: true
+        shell: bash
+        run: |
+          node tools/icloud_price_comparison/scripts/verify-production-deployment.mjs \
+            --expected-data-dir tools/icloud_price_comparison/data \
+            --current-main-data-dir "$RUNNER_TEMP/current-main-artifact/tools/icloud_price_comparison/data" \
+            --run-id "${{ github.run_id }}-existing" \
+            --summary-file "$GITHUB_STEP_SUMMARY"
+
+      - name: 分类幂等生产验证结果
+        id: classify_verification
+        if: always()
+        shell: bash
+        run: |
+          severe_failure=false
+          verification_status=passed
+          if [[ "${{ steps.validate_expected_data.outcome }}" == "failure" ]]; then
+            severe_failure=true
+            verification_status=artifact_invalid
+          elif [[ "${{ steps.verify_production.outcome }}" == "failure" ]]; then
+            severe_failure=true
+            verification_status=production_not_updated
+          fi
+          echo "severe_failure=$severe_failure" >> "$GITHUB_OUTPUT"
+          echo "verification_status=$verification_status" >> "$GITHUB_OUTPUT"
+          if [[ "$severe_failure" == "true" ]]; then
+            if [[ "$verification_status" == "artifact_invalid" ]]; then
+              echo "::error title=PUBLISH_ARTIFACT_INVALID::幂等任务的固定 main 数据未通过重新校验。"
+            else
+              echo "::error title=PUBLISH_PRODUCTION_NOT_UPDATED::真实生产 URL 仍未返回已验证的 main 数据。"
+            fi
+            exit 1
+          fi
+
+  notify:
+    name: 外部心跳告警
+    needs:
+      - prepare
+      - update
+      - publish
+      - verify-production
+      - verify-existing-production
+    if: always() && needs.prepare.result != 'skipped'
+    permissions: {}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: 报告每日更新结果
+        continue-on-error: true
+        env:
+          HEALTHCHECK_PING_URL: ${{ secrets.ICLOUD_HEALTHCHECK_PING_URL }}
+          PREPARE_RESULT: ${{ needs.prepare.result }}
+          SHOULD_RUN: ${{ needs.prepare.outputs.should_run }}
+          TRIGGER_SOURCE: ${{ needs.prepare.outputs.trigger_source }}
+          UPDATE_RESULT: ${{ needs.update.result }}
+          PUBLISH_RESULT: ${{ needs.publish.result }}
+          PUBLISH_OUTCOME: ${{ needs.publish.outputs.publish_outcome }}
+          VERIFY_RESULT: ${{ needs.verify-production.result }}
+          PREPARE_SEVERE_FAILURE: ${{ needs.prepare.outputs.severe_failure }}
+          UPDATE_SEVERE_FAILURE: ${{ needs.update.outputs.severe_failure }}
+          PUBLISH_SEVERE_FAILURE: ${{ needs.publish.outputs.severe_failure }}
+          VERIFY_SEVERE_FAILURE: ${{ needs.verify-production.outputs.severe_failure }}
+          EXISTING_VERIFY_RESULT: ${{ needs.verify-existing-production.result }}
+          EXISTING_VERIFY_SEVERE_FAILURE: ${{ needs.verify-existing-production.outputs.severe_failure }}
+        shell: bash
+        run: |
+          if [[ -z "$HEALTHCHECK_PING_URL" ]]; then
+            echo "未配置 ICLOUD_HEALTHCHECK_PING_URL，跳过第三方心跳。"
+            exit 0
+          fi
+          if [[ "$PREPARE_SEVERE_FAILURE" == true ]] \
+            || [[ "$UPDATE_SEVERE_FAILURE" == true ]] \
+            || [[ "$PUBLISH_SEVERE_FAILURE" == true ]] \
+            || [[ "$VERIFY_SEVERE_FAILURE" == true ]] \
+            || [[ "$EXISTING_VERIFY_SEVERE_FAILURE" == true ]]; then
+            status=1
+          elif [[ "$PREPARE_RESULT" == success ]] \
+            && { { [[ "$SHOULD_RUN" != true ]] \
+                && [[ "$TRIGGER_SOURCE" != manual ]] \
+                && [[ "$EXISTING_VERIFY_RESULT" == success ]]; } \
+              || { [[ "$SHOULD_RUN" == true ]] \
+                && [[ "$UPDATE_RESULT" == success ]] \
+                && [[ "$PUBLISH_RESULT" == success ]] \
+                && [[ "$VERIFY_RESULT" == success ]] \
+                && { [[ "$PUBLISH_OUTCOME" == pages_built ]] || [[ "$PUBLISH_OUTCOME" == no_data_changes ]]; }; }; }; then
+            status=0
+          else
+            echo "本次属于单次暂时故障，不发送失败信号；由 Healthchecks 连续缺少成功心跳的宽限期处理。"
+            exit 0
+          fi
+          curl --fail --silent --show-error --max-time 10 --retry 3 -- "${HEALTHCHECK_PING_URL%/}/$status"

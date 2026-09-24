@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="description" content="数字转人民币大写金额工具，支持整数、最多两位小数、负数和科学计数法输入，一键复制转换结果。">
+    <title>数字转人民币大写金额</title>
+    <link rel="shortcut icon" href="/images/favicon.ico">
+    <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
+    <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+    <script data-cfasync="false" src="dist/nzh.min.js"></script>
+    <style>
+        :root {
+            color-scheme: light;
+            --page: #eef2f6;
+            --surface: #fff;
+            --surface-soft: #f7f9fb;
+            --line: #dce4eb;
+            --ink: #17212b;
+            --muted: #5a6875;
+            --accent: #1168d4;
+            --accent-dark: #0755b5;
+            --accent-soft: #eaf3ff;
+            --green: #087a45;
+            --danger: #b93632;
+            --danger-soft: #fff1f0;
+            --shadow: 0 8px 24px rgba(24, 43, 61, .06);
+            --mobile-viewport-top: 0px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        }
+        * { box-sizing: border-box; }
+        html { background: var(--page); scrollbar-gutter: stable; }
+        body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; color: var(--ink); background: var(--page); font-size: 14px; line-height: 1.5; }
+        button, input { font: inherit; }
+        button { cursor: pointer; }
+        a { color: var(--accent-dark); text-decoration: none; }
+        a:hover { color: var(--accent); }
+        button, a { touch-action: manipulation; -webkit-tap-highlight-color: rgba(0, 113, 227, .18); }
+        button:focus-visible, a:focus-visible, input:focus-visible, .result-text:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        .skip-link { position: fixed; top: 8px; left: 8px; z-index: 100; padding: 8px 12px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); transform: translateY(-150%); }
+        .skip-link:focus { transform: translateY(0); }
+        .app-header { background: var(--surface); border-bottom: 1px solid var(--line); }
+        .app-header-inner, .page-main, .page-footer { width: min(760px, calc(100% - 40px)); margin: 0 auto; }
+        .app-header-inner { min-height: 64px; display: flex; align-items: center; }
+        .app-brand { min-width: 0; display: flex; align-items: center; gap: 11px; color: inherit; }
+        .brand-mark { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; color: var(--accent); background: var(--accent-soft); border: 1px solid #cfe2fa; border-radius: 9px; }
+        .brand-mark svg { width: 20px; height: 20px; }
+        .brand-copy { min-width: 0; }
+        .brand-copy strong { display: block; font-size: 18px; line-height: 1.2; }
+        .brand-copy p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+        .page-main { flex: 1; display: grid; align-content: start; gap: 10px; padding: 14px 0 0; }
+        .tool-card, .result-card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
+        .tool-card { padding: 16px; }
+        .section-heading, .result-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+        .section-heading { margin-bottom: 12px; }
+        .section-heading h1, .result-heading h2 { margin: 0; font-size: 18px; line-height: 1.3; }
+        .section-heading p, .result-heading p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+        .help-link { flex: 0 0 auto; padding-top: 2px; font-size: 12px; font-weight: 700; }
+        label { display: block; margin-bottom: 6px; color: #42515e; font-size: 13px; font-weight: 700; }
+        .input-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+        input { width: 100%; min-width: 0; height: 42px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: #fff; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 16px; }
+        input:hover { border-color: #bdcad5; }
+        input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(17, 104, 212, .10); outline: none; }
+        .primary-button, .secondary-button { min-height: 42px; padding: 0 14px; border-radius: 8px; font-weight: 700; white-space: nowrap; }
+        .primary-button { border: 1px solid var(--accent); color: #fff; background: var(--accent); }
+        .primary-button:hover { border-color: var(--accent-dark); background: var(--accent-dark); }
+        .secondary-button { border: 1px solid var(--line); color: var(--ink); background: var(--surface); }
+        .secondary-button:hover { border-color: #bdcad5; background: var(--surface-soft); }
+        .primary-button:active, .secondary-button:active { transform: translateY(1px); }
+        .result-card { overflow: hidden; }
+        .result-heading { align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+        .result-actions { display: flex; align-items: center; gap: 8px; }
+        .status-text { min-width: 44px; color: var(--green); font-size: 12px; font-weight: 700; text-align: right; }
+        .result-text { min-height: 110px; max-height: 240px; display: flex; align-items: flex-start; padding: 18px; overflow-x: hidden; overflow-y: auto; overflow-wrap: anywhere; color: #263746; background: #fff; font-size: 20px; line-height: 1.8; overscroll-behavior: contain; }
+        .result-text.empty { align-items: center; color: var(--muted); font-size: 13px; justify-content: center; text-align: center; }
+        .result-text.error { color: var(--danger); background: var(--danger-soft); font-size: 14px; }
+        .calculator-note { margin: 2px 4px 0; color: var(--muted); font-size: 12px; text-align: center; }
+        .page-footer { padding: 10px 0 20px; color: var(--muted); text-align: center; font-size: 12px; }
+        .page-footer p { margin: 0; }
+        .page-footer a { color: inherit; }
+        .page-footer a:hover { color: var(--accent); text-decoration: underline; }
+        @media (max-width: 560px) {
+            .app-header-inner, .page-main, .page-footer { width: min(100% - 28px, 680px); }
+            .brand-copy strong { font-size: 16px; }
+            .brand-copy p { display: none; }
+            .page-main { gap: 8px; padding-top: 10px; }
+            .tool-card { padding: 14px; }
+            .section-heading h1, .result-heading h2 { font-size: 16px; }
+            .result-card { position: sticky; top: calc(max(16px, env(safe-area-inset-top, 0px)) + var(--mobile-viewport-top)); z-index: 20; box-shadow: 0 10px 28px rgba(24, 43, 61, .12); }
+            .result-heading { padding: 9px 11px; }
+            .result-heading p { display: none; }
+            .result-actions { margin-left: auto; }
+            .result-text { min-height: 96px; max-height: 180px; max-height: min(30dvh, 180px); padding: 12px; font-size: 17px; line-height: 1.65; }
+            .result-text.empty { font-size: 12px; }
+            .calculator-note { margin-top: 4px; }
+        }
+        @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; } }
+    </style>
+</head>
+<body>
+    <a class="skip-link" href="#main">跳到主要内容</a>
+
+    <header class="app-header">
+        <div class="app-header-inner">
+            <a class="app-brand" href="./" aria-label="数字转人民币大写金额首页">
+                <span class="brand-mark" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M6 5h12M6 9h12M8 13h8M12 5v14M7 19h10"></path>
+                    </svg>
+                </span>
+                <span class="brand-copy">
+                    <strong>数字转人民币大写金额</strong>
+                    <p>输入数字，实时转换为人民币大写金额</p>
+                </span>
+            </a>
+        </div>
+    </header>
+
+    <main id="main" class="page-main">
+        <section class="result-card" aria-labelledby="result-title">
+            <div class="result-heading">
+                <div>
+                    <h2 id="result-title">人民币大写金额</h2>
+                    <p>转换结果可直接复制；内容较长时可在结果区内滚动查看。</p>
+                </div>
+                <div class="result-actions">
+                    <span id="alertText" class="status-text" role="status" aria-live="polite"></span>
+                    <button class="primary-button" type="button" id="copyBtn">复制</button>
+                </div>
+            </div>
+            <output id="result1" class="result-text empty" aria-live="polite" tabindex="0">等待输入金额。</output>
+        </section>
+
+        <section class="tool-card" aria-labelledby="input-title">
+            <div class="section-heading">
+                <div>
+                    <h1 id="input-title">输入金额</h1>
+                    <p>支持整数、最多两位小数、负数及科学计数法；超出分位精度会提示。</p>
+                </div>
+                <a class="help-link" href="https://www.linchun.com.cn/posts/f6f9d33e.html">查看说明</a>
+            </div>
+            <label for="inputmoney">数字金额</label>
+            <div class="input-actions">
+                <input id="inputmoney" type="text" inputmode="decimal" autocomplete="off" placeholder="例如：123456.78">
+                <button class="secondary-button" type="button" id="clearBtn">清空</button>
+            </div>
+        </section>
+
+        <p class="calculator-note">转换仅用于文本书写辅助，请在票据、合同等正式场景中自行复核金额。</p>
+    </main>
+
+    <footer class="page-footer">
+        <p>&copy; 2026 <a href="https://www.linchun.com.cn">林春写字的地方</a></p>
+    </footer>
+
+    <script data-cfasync="false">
+        (() => {
+            'use strict';
+
+            const input = document.getElementById('inputmoney');
+            const result = document.getElementById('result1');
+            const alertText = document.getElementById('alertText');
+            const root = document.documentElement;
+            const visualViewport = window.visualViewport;
+            const validNumber = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?$/;
+            const MAX_INPUT_LENGTH = 2000;
+            const MAX_EXPANDED_DIGITS = 1000;
+            let composing = false;
+            let statusTimer;
+
+            function amountFitsLimit(value) {
+                if (value.length > MAX_INPUT_LENGTH) return false;
+                const [mantissa, exponentText = '0'] = value.toLowerCase().split('e');
+                const exponent = Number(exponentText);
+                if (!Number.isSafeInteger(exponent)) return false;
+                const [integer, fraction = ''] = mantissa.replace(/^[+-]/, '').split('.');
+                const decimalIndex = integer.length + exponent;
+                const digits = Math.max(1, decimalIndex) + Math.max(0, integer.length + fraction.length - decimalIndex);
+                return digits <= MAX_EXPANDED_DIGITS;
+            }
+
+            function normalizeMoneyValue(value) {
+                const expandedLeading = value.replace(/^([+-]?)\./, '$10.').toLowerCase();
+                const [mantissa, exponentText = '0'] = expandedLeading.split('e');
+                const exponent = Number(exponentText);
+                const negative = mantissa.startsWith('-');
+                const [integer, fraction = ''] = mantissa.replace(/^[+-]/, '').split('.');
+                const rawDigits = integer + fraction;
+                const decimalIndex = integer.length + exponent;
+
+                let whole;
+                let decimals;
+                if (decimalIndex <= 0) {
+                    whole = '0';
+                    decimals = `${'0'.repeat(-decimalIndex)}${rawDigits}`;
+                } else if (decimalIndex >= rawDigits.length) {
+                    whole = `${rawDigits}${'0'.repeat(decimalIndex - rawDigits.length)}`;
+                    decimals = '';
+                } else {
+                    whole = rawDigits.slice(0, decimalIndex);
+                    decimals = rawDigits.slice(decimalIndex);
+                }
+
+                if (decimals.length > 2 && /[1-9]/.test(decimals.slice(2))) return null;
+
+                whole = whole.replace(/^0+(?=\d)/, '') || '0';
+                decimals = decimals.slice(0, 2).replace(/0+$/, '');
+                const isZero = whole === '0' && decimals === '';
+                return `${negative && !isZero ? '-' : ''}${whole}${decimals ? `.${decimals}` : ''}`;
+            }
+
+            function syncVisualViewportTop() {
+                const offsetTop = document.activeElement === input && visualViewport
+                    ? Math.max(0, Number(visualViewport.offsetTop) || 0)
+                    : 0;
+                root.style.setProperty('--mobile-viewport-top', `${offsetTop}px`);
+            }
+
+            function setStatus(message) {
+                alertText.textContent = message;
+                window.clearTimeout(statusTimer);
+                statusTimer = window.setTimeout(() => { alertText.textContent = ''; }, 2200);
+            }
+
+            function render() {
+                if (composing) return;
+                const normalizedInput = input.value.normalize('NFKC');
+                if (normalizedInput !== input.value) input.value = normalizedInput;
+
+                const value = normalizedInput.trim();
+                result.classList.remove('error');
+
+                if (!value) {
+                    result.textContent = '等待输入金额。';
+                    result.classList.add('empty');
+                    return;
+                }
+
+                result.classList.remove('empty');
+                if (!validNumber.test(value)) {
+                    result.textContent = '请输入有效数字，不要包含单位、文字或其他符号。';
+                    result.classList.add('error');
+                    return;
+                }
+
+                if (!amountFitsLimit(value)) {
+                    result.textContent = `金额过长：输入最多 ${MAX_INPUT_LENGTH} 个字符，展开后最多 ${MAX_EXPANDED_DIGITS} 位数字。`;
+                    result.classList.add('error');
+                    return;
+                }
+
+                const normalized = normalizeMoneyValue(value);
+                if (normalized === null) {
+                    result.textContent = '人民币大写金额最多支持到分（两位小数），请先调整金额精度。';
+                    result.classList.add('error');
+                    return;
+                }
+
+                try {
+                    result.textContent = Nzh.cn.toMoney(normalized);
+                    result.scrollTop = 0;
+                } catch (error) {
+                    result.textContent = '金额格式暂无法转换，请检查输入。';
+                    result.classList.add('error');
+                }
+            }
+
+            async function copyText(text) {
+                if (navigator.clipboard?.writeText && window.isSecureContext) {
+                    try {
+                        await navigator.clipboard.writeText(text);
+                        return;
+                    } catch {
+                        // Permission denial must still allow the legacy copy path.
+                    }
+                }
+                const previousFocus = document.activeElement;
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                textArea.setAttribute('readonly', '');
+                textArea.style.position = 'fixed';
+                textArea.style.opacity = '0';
+                document.body.appendChild(textArea);
+                try {
+                    textArea.focus({ preventScroll: true });
+                    textArea.select();
+                    if (!document.execCommand('copy')) throw new Error('copy failed');
+                } finally {
+                    textArea.remove();
+                    if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+                }
+            }
+
+            document.getElementById('clearBtn').addEventListener('click', () => {
+                input.value = '';
+                render();
+                input.focus();
+            });
+
+            document.getElementById('copyBtn').addEventListener('click', async () => {
+                if (result.classList.contains('empty') || result.classList.contains('error')) {
+                    setStatus('无金额');
+                    return;
+                }
+                try {
+                    await copyText(result.textContent.trim());
+                    setStatus('已复制');
+                } catch (error) {
+                    setStatus('复制失败');
+                }
+            });
+
+            input.addEventListener('compositionstart', () => { composing = true; });
+            input.addEventListener('compositionend', () => { composing = false; render(); });
+            input.addEventListener('input', event => { if (!event.isComposing) render(); });
+            input.addEventListener('focus', syncVisualViewportTop);
+            input.addEventListener('blur', syncVisualViewportTop);
+            if (visualViewport) {
+                visualViewport.addEventListener('resize', syncVisualViewportTop, { passive: true });
+                visualViewport.addEventListener('scroll', syncVisualViewportTop, { passive: true });
+            }
+            syncVisualViewportTop();
+            render();
+        })();
+    </script>
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-K2S9L4CHNP"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-K2S9L4CHNP');
+    </script>
+</body>
+</html>
