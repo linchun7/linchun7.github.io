@@ -698,6 +698,8 @@ def run(output: Path, now: float | None = None) -> dict:
         raise ValueError('insufficient fresh source coverage; existing publication left untouched')
     required_currencies = {m.get('currency') for m in markets if m.get('offers') and m.get('currency')}
     fx = collect_fx(now, old.get('fx') if old else None, getter, required_currencies)
+    if fx is None:
+        raise ValueError('no usable FX snapshot; existing publication left untouched')
     for market in markets:
         for offer in market['offers']:
             for price in offer['amounts']:
@@ -715,8 +717,8 @@ def run(output: Path, now: float | None = None) -> dict:
     # Output is staging only. Git publication atomically commits JSON and its HTML projection.
     (output / 'prices.json').write_text(json.dumps(data, ensure_ascii=False, indent=2, allow_nan=False) + '\n', encoding='utf-8')
     (output / 'index.html').write_text(page, encoding='utf-8')
-    degraded = any(m['status'] in ('retained', 'pending') for m in markets) or fx is None or fx['fallback']
-    message = f'核验成功 {verified}/{len(config)} 个地区；有标价 {known}；沿用/待复核 {sum(m["status"] in ("retained", "pending") for m in markets)}；汇率 {"降级" if fx is None or fx["fallback"] else "正常"}。'
+    degraded = any(m['status'] in ('retained', 'pending') for m in markets) or fx['fallback']
+    message = f'核验成功 {verified}/{len(config)} 个地区；有标价 {known}；沿用/待复核 {sum(m["status"] in ("retained", "pending") for m in markets)}；汇率 {"降级" if fx["fallback"] else "正常"}。'
     print(message)
     for m in markets:
         print(m['code'], m['status'], m.get('currency', '—'), ', '.join(x['label'] + ': ' + '/'.join(v['amount'] for v in x['amounts']) for x in m['offers']))
