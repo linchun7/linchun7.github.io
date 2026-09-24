@@ -133,27 +133,73 @@
       || value.billing_period !== 'not_disclosed' || value.purchase_eligibility !== 'not_verified'
       || !/^[a-f0-9]{64}$/.test(value.revision || '') || !Number.isFinite(Date.parse(value.generated_at))
       || !Array.isArray(value.markets) || !value.markets.length || value.markets.length > 250) throw Error('数据格式不匹配');
+
+    const generatedAt = Date.parse(value.generated_at);
     const codes = new Set();
     for (const market of value.markets) {
+      const checkedAt = Date.parse(market.last_checked_at);
       if (!/^[a-z]{2}$/.test(market.code) || codes.has(market.code)
         || market.source_url !== `https://apps.apple.com/${market.code}/app/chatgpt/id6448311069`
         || typeof market.name !== 'string' || !market.name || !Object.hasOwn(STATUS, market.status)
-        || !Array.isArray(market.offers)) throw Error('地区数据不合法');
+        || !Array.isArray(market.offers) || !Number.isFinite(checkedAt) || checkedAt > generatedAt) {
+        throw Error('地区数据不合法');
+      }
       codes.add(market.code);
+
+      if (!market.offers.length) {
+        if (market.status !== 'unavailable') throw Error('空地区状态错误');
+        continue;
+      }
+      const verifiedAt = Date.parse(market.last_verified_at);
+      if (!/^[A-Z]{3}$/.test(market.currency || '') || !Number.isFinite(verifiedAt) || verifiedAt > checkedAt
+        || !/^[a-f0-9]{64}$/.test(market.fingerprint || '') || !/^[a-f0-9]{64}$/.test(market.source_sha256 || '')) {
+        throw Error('地区核验数据不合法');
+      }
+
+      const labels = new Set();
       for (const offer of market.offers) {
         if (typeof offer.label !== 'string'
           || !/^ChatGPT [^\x00-\x1f\x7f<>]{1,70}$/.test(offer.label)
-          || !Array.isArray(offer.amounts) || !offer.amounts.length) throw Error('套餐数据不合法');
+          || labels.has(offer.label)
+          || !Array.isArray(offer.amounts) || !offer.amounts.length || offer.amounts.length > 20) {
+          throw Error('套餐数据不合法');
+        }
+        labels.add(offer.label);
+        let previousAmount = -Infinity;
         for (const amount of offer.amounts) {
+          const numeric = Number(amount.amount);
           if (typeof amount.amount !== 'string' || !/^\d+(\.\d{1,3})?$/.test(amount.amount)
+            || !Number.isFinite(numeric) || numeric <= previousAmount
             || typeof amount.display !== 'string'
-            || (amount.cny != null && (typeof amount.cny !== 'string' || !/^\d+\.\d{2}$/.test(amount.cny)))) throw Error('金额格式错误');
+            || (amount.cny != null && (typeof amount.cny !== 'string' || !/^\d+\.\d{2}$/.test(amount.cny)))) {
+            throw Error('金额格式错误');
+          }
+          previousAmount = numeric;
         }
       }
     }
+
+    if (value.fx !== null) {
+      const fx = value.fx;
+      const updatedAt = Date.parse(fx?.updated_at);
+      if (!fx || typeof fx !== 'object' || Array.isArray(fx)
+        || fx.source_url !== 'https://open.er-api.com/v6/latest/USD'
+        || typeof fx.fallback !== 'boolean'
+        || !Number.isFinite(updatedAt) || updatedAt > generatedAt + 300_000
+        || !fx.rates || typeof fx.rates !== 'object' || Array.isArray(fx.rates)
+        || Number(fx.rates.USD) !== 1 || !(Number(fx.rates.CNY) > 1 && Number(fx.rates.CNY) < 30)) {
+        throw Error('汇率数据不合法');
+      }
+      for (const [code, rate] of Object.entries(fx.rates)) {
+        const numeric = Number(rate);
+        if (!/^[A-Z]{3}$/.test(code) || !Number.isFinite(numeric) || numeric <= 0 || numeric >= 1e10) {
+          throw Error('汇率数据不合法');
+        }
+      }
+    }
+
     if (!Array.isArray(value.changes) || value.changes.length > 200) throw Error('历史格式错误');
     let previousChangeAt = -Infinity;
-    const generatedAt = Date.parse(value.generated_at);
     for (const change of value.changes) {
       if (!change || typeof change !== 'object' || Array.isArray(change)
         || Object.keys(change).sort().join(',') !== 'after,at,before,code'
