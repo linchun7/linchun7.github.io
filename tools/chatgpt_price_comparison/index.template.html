@@ -44,10 +44,10 @@
     <section class="overview" aria-labelledby="overviewTitle">
       <div class="overview-reference">
         <div class="overview-copy">
-          <h2 id="overviewTitle">各套餐全球最低价</h2>
-          <p class="overview-note">按人民币参考价比较；同名多档标价不推断计费周期。</p>
+          <h2 id="overviewTitle">各套餐已覆盖地区最低价</h2>
+          <p class="overview-note">按人民币参考价比较已覆盖地区；同名多档标价不推断计费周期。</p>
         </div>
-        <div id="minimumSummary" class="minimum-stats overview-stat-list" role="group" aria-label="各套餐全球最低价概览" style="--plan-count: {{PLAN_COUNT_STYLE}}">
+        <div id="minimumSummary" class="minimum-stats overview-stat-list" role="group" aria-label="各套餐已覆盖地区最低价概览" style="--plan-count: {{PLAN_COUNT_STYLE}}">
 {{MINIMUMS}}
         </div>
       </div>
@@ -59,10 +59,10 @@
       </dl>
     </section>
 
-    <section id="priceWorkspace" class="workspace" aria-label="全球各地区 ChatGPT App Store 标价" tabindex="-1">
+    <section id="priceWorkspace" class="workspace" aria-label="已覆盖地区 ChatGPT App Store 标价" tabindex="-1">
       <div class="workspace-toolbar">
         <div class="workspace-heading">
-          <h2>全球 ChatGPT App Store 标价</h2>
+          <h2>已覆盖地区 ChatGPT App Store 标价</h2>
           <p id="resultSummary" aria-live="polite">{{RESULT_COUNT}} 个地区 · {{DEFAULT_PLAN_SHORT}} 从低到高</p>
         </div>
         <div class="filters">
@@ -82,7 +82,7 @@
         <table class="price-table" aria-describedby="resultSummary" style="--table-min-width: {{TABLE_MIN_WIDTH}}px">
           <thead>
             <tr>
-              <th class="rank-column" scope="col"><span id="rankHeaderLabel"><span aria-hidden="true">排名</span><span class="visually-hidden">全球参考排名</span></span></th>
+              <th class="rank-column" scope="col"><span id="rankHeaderLabel"><span aria-hidden="true">排名</span><span class="visually-hidden">已覆盖地区参考排名</span></span></th>
               <th scope="col" aria-sort="none"><button type="button" data-sort="country" disabled>国家/地区 <i data-lucide="arrow-up-down" aria-hidden="true"></i></button></th>
 {{TABLE_HEAD}}
             </tr>
