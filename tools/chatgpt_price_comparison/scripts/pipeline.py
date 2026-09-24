@@ -676,16 +676,25 @@ def render(data: dict, template: str) -> str:
     return template
 
 
+def scope_previous(old: dict | None, configured_codes: set[str]) -> tuple[dict[str, dict], list[dict]]:
+    if not old:
+        return {}, []
+    previous = {market['code']: market for market in old['markets'] if market['code'] in configured_codes}
+    changes = [change for change in old['changes'] if change['code'] in configured_codes]
+    return previous, changes
+
+
 def run(output: Path, now: float | None = None) -> dict:
     now = time.time() if now is None else now
     config = json.loads((ROOT / 'markets.json').read_text(encoding='utf-8'))
-    if len({c['code'] for c in config}) != len(config):
+    configured_codes = {item['code'] for item in config}
+    if len(configured_codes) != len(config):
         raise ValueError('duplicate configured storefront')
     previous_path = ROOT / 'data/prices.json'
     old = json.loads(previous_path.read_text(encoding='utf-8')) if previous_path.exists() else None
     if old:
         validate(old, now)
-    previous = {m['code']: m for m in old['markets']} if old else {}
+    previous, changes = scope_previous(old, configured_codes)
     deadline = time.monotonic() + 240
     getter = lambda url, **kw: fetch(url, deadline=deadline, **kw)
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
@@ -706,7 +715,6 @@ def run(output: Path, now: float | None = None) -> dict:
         for offer in market['offers']:
             for price in offer['amounts']:
                 price['cny'] = converted(market, price['amount'], fx, now)
-    changes = list(old['changes']) if old else []
     for market in markets:
         before = previous.get(market['code'])
         if market['status'] == 'verified' and before and before.get('offers') and before['fingerprint'] != market['fingerprint']:
