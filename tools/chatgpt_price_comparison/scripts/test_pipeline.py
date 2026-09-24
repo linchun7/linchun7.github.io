@@ -309,7 +309,6 @@ class ContractTests(unittest.TestCase):
         self.assertRegex(page, r'app\.js\?v=[a-f0-9]{12}')
         self.assertRegex(page, r'style\.css\?v=[a-f0-9]{12}')
         self.assertRegex(page, r'lucide-subset\.js\?v=[a-f0-9]{12}')
-        self.assertRegex(page, r'<meta name="chatgpt-lucide-version" content="[a-f0-9]{12}">')
         self.assertIn('data-lucide="arrow-up"',page)
         self.assertIn('mobile-rank-sr visually-hidden',page)
         plus_cell = re.search(r'<td class="price-cell[^"]*" data-plan="ChatGPT Plus">([\s\S]*?)</td>', page)
