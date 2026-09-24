@@ -459,6 +459,14 @@ class ContractTests(unittest.TestCase):
         committed=(p.ROOT/'index.html').read_text(encoding='utf-8')
         self.assertEqual(committed, p.render(data, template))
 
+    def test_browser_acceptance_does_not_pin_live_market_prices(self):
+        browser = (p.ROOT/'scripts/browser-test.mjs').read_text(encoding='utf-8')
+        self.assertIn('sampleMarket', browser)
+        self.assertIn('defaultPlan', browser)
+        self.assertNotIn("$19.99", browser)
+        self.assertNotIn("$200.00", browser)
+        self.assertNotIn('data-market-id="us"', browser)
+
     def test_bad_template_fails(self):
         with self.assertRaises(ValueError): p.render(data_fixture(),'no markers')
 
