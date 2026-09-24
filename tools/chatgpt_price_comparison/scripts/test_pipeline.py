@@ -209,8 +209,14 @@ class ContractTests(unittest.TestCase):
         page=p.render(d,template)
         self.assertNotIn('</script><script>alert(1)',page)
         self.assertIn('&lt;/script&gt;',page)
-        self.assertIn('$19.99<br>$200.00',page)
-        self.assertIn('¥139.93<br>¥1,400.00',page)
+        self.assertEqual(page.count('<tr data-market-id="us">'),1)
+        self.assertIn('class="country-history-button" disabled',page)
+        self.assertIn('data-plan-header="true" data-plan="ChatGPT Go"',page)
+        self.assertIn('data-plan-header="true" data-plan="ChatGPT Plus"',page)
+        self.assertIn('class="minimum-card"',page)
+        self.assertIn('$19.99',page); self.assertIn('$200.00',page)
+        self.assertIn('139.93',page); self.assertIn('1,400.00',page)
+        self.assertNotIn('id="refresh"',page)
         self.assertEqual(page,p.render(d,template))
 
     def test_bad_template_fails(self):

@@ -59,38 +59,57 @@ try {
   const url='http://127.0.0.1:4177/tools/chatgpt_price_comparison/';
   await until(async()=> (await fetch(url)).ok,'HTTP server');
   await command('Page.navigate',{url});
-  await until(()=>evaluate('document.querySelector("#filters") && !document.querySelector("#filters").hidden && document.querySelectorAll("#price-rows tr").length > 0'),'interactive table');
-  await until(()=>evaluate('!document.querySelector("#refresh").disabled'),'initial JSON refresh');
-  assert.equal(await evaluate('document.querySelector("#health").textContent.includes("重新加载未成功")'),false,'valid JSON hash passes');
+  await until(()=>evaluate('document.querySelectorAll("#priceRows tr[data-market-id]").length > 0 && document.querySelector(".country-history-button:not(:disabled)")'),'interactive matrix');
   const expected=JSON.parse(await readFile(path.join(root,'tools/chatgpt_price_comparison/data/prices.json'),'utf8'));
-  assert.equal(await evaluate(`document.querySelector('#generated').textContent`),new Date(expected.generated_at).toLocaleString('zh-CN', {hour12:false,timeZone:'UTC'}),'UTC labels are independent of browser timezone');
+  const plans=[...new Set(expected.markets.flatMap(m=>m.offers.map(o=>o.label)))];
+  assert.equal(await evaluate('document.querySelectorAll("[data-plan-header]").length'),plans.length,'one column per plan');
+  assert.equal(await evaluate('document.querySelectorAll(".minimum-card").length'),plans.length,'one minimum card per plan');
+  assert.equal(await evaluate('document.querySelector("#refresh")===null && document.querySelector("#plan")===null && document.querySelector("#status")===null'),true,'legacy reload and filters removed');
   assert.ok(expected.markets.some(m=>m.code==='us'&&m.offers.length),'US source present');
-  await evaluate(`document.querySelector('#search').value='us';document.querySelector('#search').dispatchEvent(new Event('input'))`);
-  assert.ok(await evaluate(`document.querySelector('#price-rows').textContent.includes('美国')`));
-  if(expected.markets.find(m=>m.code==='us').offers.find(o=>o.label==='ChatGPT Plus')?.amounts.length>1) assert.ok(await evaluate(`document.querySelector('#price-rows').textContent.includes('多个同名标价')`),'all duplicate-label variants visible');
-  await evaluate(`document.querySelector('#search').value='<img src=x onerror=alert(1)>';document.querySelector('#search').dispatchEvent(new Event('input'))`);
-  assert.equal(await evaluate(`document.querySelector('#empty').hidden`),false,'empty search state');
-  assert.equal(await evaluate(`document.querySelectorAll('#price-rows img').length`),0,'search never becomes HTML');
-  await evaluate(`document.querySelector('#search').value='';document.querySelector('#plan').value='';document.querySelector('#search').dispatchEvent(new Event('input'))`);
+
+  await evaluate(`document.querySelector('#searchInput').value='us';document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);
+  await until(()=>evaluate('document.querySelectorAll("#priceRows tr[data-market-id]").length===1'),'US filter');
+  assert.ok(await evaluate(`document.querySelector('#priceRows').textContent.includes('美国')`));
+  assert.equal(await evaluate(`document.querySelector('#priceRows tr[data-market-id="us"] td:nth-child(2) a')===null`),true,'country is not an App Store link');
+  const usPlus=expected.markets.find(m=>m.code==='us').offers.find(o=>o.label==='ChatGPT Plus');
+  if(usPlus?.amounts.length>1) {
+    assert.ok(await evaluate(`document.querySelector('#priceRows tr[data-market-id="us"] [data-plan="ChatGPT Plus"]').textContent.includes('$19.99') && document.querySelector('#priceRows tr[data-market-id="us"] [data-plan="ChatGPT Plus"]').textContent.includes('$200.00')`),'all same-plan variants stay in one cell');
+  }
+
+  await evaluate(`document.querySelector('#priceRows tr[data-market-id="us"] .country-history-button').click()`);
+  await until(()=>evaluate('document.querySelector("#historyDialog").open'),'history dialog');
+  assert.equal(await evaluate(`document.querySelector('#historyTitle').textContent`),'美国','history opens for country');
+  assert.ok(await evaluate(`document.querySelector('#historyRows').children.length >= 1`),'history has at least current observation');
+  if(usPlus?.amounts.length>1) assert.ok(await evaluate(`document.querySelector('#historyLocalPrice').textContent.includes('$19.99') && document.querySelector('#historyLocalPrice').textContent.includes('$200.00')`),'history current price preserves variants');
+  await evaluate(`document.querySelector('#closeHistory').click()`);
+
+  await evaluate(`document.querySelector('#searchInput').value='<img src=x onerror=alert(1)>';document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);
+  assert.equal(await evaluate(`document.querySelector('#emptyState').hidden`),false,'empty search state');
+  assert.equal(await evaluate(`document.querySelectorAll('#priceRows img').length`),0,'search never becomes HTML');
+  await evaluate(`document.querySelector('#searchInput').value='';document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);
+
+  const enabledMinimum=await evaluate(`document.querySelector('.minimum-card:not(:disabled)')?.dataset.marketId || ''`);
+  assert.ok(enabledMinimum,'minimum card available');
+  await evaluate(`document.querySelector('.minimum-card:not(:disabled)').click()`);
+  await until(()=>evaluate(`document.querySelector('#priceRows tr.is-highlighted')!==null`),'minimum card row focus');
+
   await command('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+  await delay(150);
   assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth + 1'),'no body overflow on narrow screens');
+  assert.equal(await evaluate(`[...document.querySelectorAll('#priceRows tr[data-market-id]')].every(row => [...row.querySelectorAll('td[data-plan]')].filter(td => getComputedStyle(td).display !== 'none').length === 1)`),true,'mobile shows one active plan column');
   if(process.env.SCREENSHOT) {
     const result=await command('Page.captureScreenshot',{format:'png'});
     await writeFile(process.env.SCREENSHOT,Buffer.from(result.data,'base64'));
   }
-  await evaluate(`Date.now=()=>${Date.parse(expected.generated_at)+8*86400e3};document.querySelector('#search').dispatchEvent(new Event('input'))`);
-  assert.ok(await evaluate(`document.querySelector('#health').textContent.includes('过期')`),'expired publication visibly degraded');
-  assert.equal(await evaluate(`[...document.querySelectorAll('#price-rows tr')].filter(r=>r.children.length===5).every(r=>!r.children[3].textContent.includes('¥'))`),true,'expired FX and prices do not convert');
-  await command('Network.setBlockedURLs',{urls:['*data/prices.json*']});
-  await command('Page.reload',{ignoreCache:true});
-  await until(()=>evaluate(`document.querySelector('#health')?.textContent.includes('重新加载未成功')`),'offline fallback');
-  assert.ok(await evaluate(`document.querySelectorAll('#price-rows tr').length>0`),'offline table remains readable');
+
   await command('Emulation.setScriptExecutionDisabled',{value:true});
   await command('Page.reload',{ignoreCache:true});
-  await until(()=>evaluate(`document.querySelector('#filters')?.hidden && document.querySelectorAll('#price-rows tr').length>0`),'no-JS static table');
-  console.log('Browser tests passed: JSON integrity, UTC, filters, duplicate prices, empty state, XSS input, mobile layout, expiry, offline fallback, no-JS.');
+  await until(()=>evaluate(`document.querySelectorAll('#priceRows tr[data-market-id]').length>0`),'no-JS static matrix');
+  assert.equal(await evaluate(`document.querySelector('.country-history-button').disabled`),true,'no-JS country history is safely disabled');
+  assert.equal(await evaluate(`document.querySelector('#refresh')===null`),true,'no-JS has no reload button');
+  console.log('Browser tests passed: matrix columns, minimum cards, country history, variants, search/XSS, mobile plan view, no-JS static matrix.');
 } catch(error) {
-  if (socket?.readyState === 1) console.error('PAGE STATE',await evaluate('({url:location.href,health:document.querySelector("#health")?.textContent,filters:document.querySelector("#filters")?.hidden,body:document.body?.textContent.slice(0,1200)})'));
+  if (socket?.readyState === 1) console.error('PAGE STATE',await evaluate('({url:location.href,rows:document.querySelectorAll("#priceRows tr").length,dialog:document.querySelector("#historyDialog")?.open,body:document.body?.textContent.slice(0,1200)})'));
   throw error;
 } finally {
   socket?.close(); browser.kill('SIGTERM'); server.kill('SIGTERM');

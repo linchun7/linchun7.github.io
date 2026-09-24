@@ -6,7 +6,7 @@
 
 - 只采集 Apple 托管的 OpenAI 官方应用页面，应用 ID `6448311069`、开发者 ID `1684349733`。`markets.json` 配置 60 个待核验地区，不宣称覆盖全球全部市场。
 - 国家/地区、当地币种、原始金额文本、来源链接及核验时间一并保留。新的 `ChatGPT ...` 项目名自动保留，非此类的积分等项目只记录未分类名称。
-- 同名项目的全部金额并列显示。**不根据金额大小推定月付、年付、促销或新购资格**，不计算月费排名、节省比例或推荐购买地区。
+- 页面按“国家/地区 × 套餐”矩阵展示：国家一行，Go、Plus、Pro 5x、Pro 20x 等套餐各占一列；同名项目的全部金额保留在同一单元格。顶部按人民币参考价显示各套餐当前最低价地区。**不根据金额大小推定月付、年付、促销或新购资格**。
 - 网页订阅与 Google Play 的地区价格尚未接入：目前 GitHub 运行环境无法稳定读取官网定价页；不把美国标价的汇率换算伪装成各国官网价格。
 - 人民币是参考金额：`当地金额 ÷ 每美元当地货币汇率 × 每美元人民币汇率`，使用 Decimal 计算到分，非最终结算价。汇率来源为 ExchangeRate-API，页面保留其署名。
 
@@ -35,7 +35,7 @@
 - `scripts/verify-production.mjs`：Pages 构建完成后的 canonical JSON/HTML 生产验收；限制响应大小、请求时长和总重试窗口。
 - `index.template.html`、`app.js`、`style.css`：静态页面与无框架交互。
 - `data/prices.json`、`index.html`：自动生成，不手工改价。数据包含最近 200 条标价变动，不把汇率波动记录为套餐改价；更早版本见 Git 历史。
-- `scripts/test_pipeline.py`：离线回归；`scripts/browser-test.mjs`：Chrome 实测。浏览器测试覆盖重复金额、搜索、空结果、窄屏、过期、JSON 失败回退与无 JavaScript。
+- `scripts/test_pipeline.py`：离线回归；`scripts/browser-test.mjs`：Chrome 实测。浏览器测试覆盖套餐矩阵、最低价卡片、国家价格历史、重复金额、搜索/XSS、窄屏单套餐视图与无 JavaScript 静态矩阵。
 
 ```sh
 python3 -m unittest discover -s tools/chatgpt_price_comparison/scripts -p 'test_*.py' -v

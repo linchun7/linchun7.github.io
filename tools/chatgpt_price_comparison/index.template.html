@@ -6,13 +6,15 @@
   <meta name="format-detection" content="telephone=no">
   <meta name="referrer" content="origin">
   <meta name="theme-color" content="#eef2f6">
-  <meta name="description" content="比较 ChatGPT 在各地区 App Store 公开列出的内购标价与人民币参考价。">
+  <meta name="description" content="比较 ChatGPT Go、Plus、Pro 5x、Pro 20x 在各地区 App Store 的公开标价、人民币参考价与价格历史。">
   <meta name="chatgpt-data-revision" content="{{REVISION}}">
   <link rel="canonical" href="https://www.linchun.com.cn/tools/chatgpt_price_comparison/">
-  <link rel="icon" href="/images/favicon.ico">
-  <link rel="stylesheet" href="style.css?v=2">
-  <title>ChatGPT 全球价格对比｜各地区 App Store 标价</title>
-  <script defer data-cfasync="false" src="app.js?v=1"></script>
+  <link rel="shortcut icon" href="/images/favicon.ico">
+  <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css?v=3">
+  <title>ChatGPT 全球价格对比｜Go、Plus、Pro 各地区 App Store 标价</title>
+  <script defer data-cfasync="false" src="app.js?v=2"></script>
 </head>
 <body>
   <a class="skip-link" href="#priceWorkspace">跳到价格表</a>
@@ -26,80 +28,75 @@
             <path d="M3.5 12h17M12 3.5c2.2 2.4 3.3 5.2 3.3 8.5S14.2 18.1 12 20.5M12 3.5C9.8 5.9 8.7 8.7 8.7 12s1.1 6.1 3.3 8.5"></path>
           </svg>
         </span>
-        <span class="brand-copy">
-          <strong>ChatGPT 全球价格对比</strong>
-          <span>App Store 各地区公开标价与人民币参考价</span>
-        </span>
+        <div class="brand-copy">
+          <h1>ChatGPT 全球价格对比</h1>
+          <p>比较 Go、Plus、Pro 5x、Pro 20x 在各地区 App Store 的公开标价与人民币参考价。</p>
+        </div>
       </a>
       <div class="data-status">
-        <span>更新于（UTC）</span>
-        <strong id="generated">{{GENERATED}}</strong>
+        <span id="updatedAt" title="北京时间">更新于 {{GENERATED_BEIJING}}</span>
+        <span id="freshnessWarning" class="freshness-warning" hidden></span>
       </div>
     </div>
   </header>
 
   <main class="page-main">
     <noscript>
-      <p class="noscript-notice">当前页面已显示最近一次生成的价格。启用 JavaScript 后可使用搜索、筛选和刷新。</p>
+      <p class="noscript-notice">当前页面已显示最近一次生成的价格。启用 JavaScript 后可使用搜索、排序和价格历史等功能。</p>
     </noscript>
 
     <section class="overview" aria-labelledby="overviewTitle">
       <div class="overview-reference">
         <div class="overview-copy">
-          <h1 id="overviewTitle">ChatGPT 各地区公开标价</h1>
-          <p class="overview-note">价格来自 OpenAI 官方 ChatGPT 的各地区 App Store 页面。</p>
+          <h2 id="overviewTitle">各套餐全球最低价</h2>
+          <p class="overview-note">按人民币参考价比较；同名多档标价不推断计费周期。</p>
         </div>
-        <dl class="overview-stats overview-stat-list" aria-label="价格覆盖概览">
-          <div><dt>覆盖</dt><dd id="coverage">{{COUNT}} / {{TOTAL}} 个地区</dd></div>
-          <div><dt>计费周期</dt><dd>App Store 未披露</dd></div>
-          <div><dt>参考汇率</dt><dd id="fx-status">加载中</dd></div>
-        </dl>
+        <div id="minimumSummary" class="minimum-stats overview-stat-list" role="group" aria-label="各套餐全球最低价概览">
+{{MINIMUMS}}
+        </div>
       </div>
+
+      <dl class="overview-stats overview-stat-list" aria-label="价格覆盖概览">
+        <div><dt>覆盖</dt><dd id="marketCount">{{COUNT}} / {{TOTAL}} 个地区</dd></div>
+        <div><dt>币种</dt><dd id="currencyCount">{{CURRENCY_COUNT}} 种</dd></div>
+        <div><dt>套餐</dt><dd id="planCount">{{PLAN_COUNT}} 档</dd></div>
+      </dl>
     </section>
 
     <section id="priceWorkspace" class="workspace" aria-label="全球各地区 ChatGPT App Store 标价" tabindex="-1">
       <div class="workspace-toolbar">
         <div class="workspace-heading">
           <h2>全球 ChatGPT App Store 标价</h2>
-          <p id="result-count" aria-live="polite">下表保留所有公开金额，不按月费或最低价推荐地区。</p>
+          <p id="resultSummary" aria-live="polite">{{RESULT_COUNT}} 个地区 · Plus 从低到高</p>
         </div>
-        <p id="health" role="status" aria-live="polite">正在检查价格数据…</p>
-        <form id="filters" class="filters" hidden role="search">
+        <div class="filters">
           <label class="search-field">
+            <span class="search-mark" aria-hidden="true">⌕</span>
             <span class="visually-hidden">搜索国家、地区或币种</span>
-            <input id="search" type="search" maxlength="80" placeholder="搜索国家/地区或币种" autocomplete="off">
+            <input id="searchInput" name="price-search" type="search" placeholder="搜索国家/地区或币种" autocomplete="off" maxlength="80">
           </label>
-          <label class="select-field">
-            <span class="visually-hidden">筛选套餐</span>
-            <select id="plan"><option value="">全部公开套餐</option></select>
-          </label>
-          <label class="select-field">
-            <span class="visually-hidden">筛选数据状态</span>
-            <select id="status">
-              <option value="all">全部地区</option>
-              <option value="fresh">近期已核验</option>
-              <option value="attention">待关注</option>
-            </select>
-          </label>
-          <button id="refresh" class="secondary-button" type="button">重新加载</button>
-        </form>
+        </div>
+        <div class="mobile-plan-picker">
+          <span class="control-label">套餐</span>
+          <div id="mobilePlanControl" class="segmented mobile-plan-segmented" role="group" aria-label="选择要比较的套餐"></div>
+        </div>
       </div>
 
       <div class="table-scroll" tabindex="0" role="region" aria-label="ChatGPT 各地区价格表，可左右滚动">
-        <table class="price-table">
+        <table class="price-table" aria-describedby="resultSummary">
           <thead>
             <tr>
-              <th scope="col">国家/地区</th>
-              <th scope="col">套餐</th>
-              <th scope="col">当地标价</th>
-              <th scope="col">人民币参考</th>
-              <th scope="col">核验状态</th>
+              <th class="rank-column" scope="col"><span id="rankHeaderLabel">排名</span></th>
+              <th scope="col" aria-sort="none"><button type="button" data-sort="country">国家/地区 <span aria-hidden="true">↕</span></button></th>
+{{TABLE_HEAD}}
             </tr>
           </thead>
-          <tbody id="price-rows">{{ROWS}}</tbody>
+          <tbody id="priceRows">
+{{ROWS}}
+          </tbody>
         </table>
       </div>
-      <p id="empty" class="empty-state" hidden>没有匹配结果。</p>
+      <p id="emptyState" class="empty-state" hidden>没有匹配结果。</p>
 
       <div class="workspace-footer">
         <div class="source-links" role="group" aria-label="价格与汇率来源">
@@ -109,19 +106,49 @@
           <span class="source-separator" aria-hidden="true"></span>
           <div class="source-group">
             <span>汇率来源：<a class="source-item" href="https://www.exchangerate-api.com/" target="_blank" rel="noopener noreferrer">ExchangeRate-API</a></span>
+            <span id="fxStatus"></span>
           </div>
         </div>
       </div>
       <div class="data-disclaimer">
-        <p>人民币金额按参考汇率换算，仅用于比较。实际费用、税费、计费周期和可购买套餐以对应地区 App Store 与账户结算为准。</p>
+        <p>价格来自 OpenAI 官方 ChatGPT 的各地区 App Store 页面。人民币金额按参考汇率换算，仅用于比较；实际费用、税费、计费周期和可购买套餐以对应地区 App Store 与账户结算为准。</p>
       </div>
-
-      <details class="change-panel">
-        <summary>最近观察到的标价变化</summary>
-        <div id="changes"><p>启用 JavaScript 后可查看最近的已确认变化。</p></div>
-      </details>
     </section>
   </main>
+
+  <dialog id="historyDialog" class="history-dialog" aria-labelledby="historyTitle">
+    <div class="dialog-header">
+      <div>
+        <p class="dialog-eyebrow">价格历史</p>
+        <h2 id="historyTitle">价格历史</h2>
+        <p id="historySubtitle"></p>
+      </div>
+      <button class="icon-button" id="closeHistory" type="button" aria-label="关闭价格历史" title="关闭">×</button>
+    </div>
+
+    <div class="history-current">
+      <div><span>当地公开标价</span><strong id="historyLocalPrice">--</strong></div>
+      <div><span>人民币参考</span><strong id="historyCnyPrice">--</strong></div>
+      <div><span>价格变更次数</span><strong id="historyEventCount">--</strong></div>
+    </div>
+
+    <div class="history-toolbar">
+      <span class="control-label">套餐</span>
+      <div class="segmented compact" id="historyPlanControl" role="group" aria-label="历史价格套餐"></div>
+    </div>
+
+    <section class="history-list" aria-labelledby="historyListTitle">
+      <div class="section-heading"><h3 id="historyListTitle">变更记录</h3></div>
+      <div class="history-table-scroll">
+        <table>
+          <thead><tr><th scope="col">记录时间</th><th scope="col">币种</th><th id="historyPlanHeader" scope="col">公开标价</th></tr></thead>
+          <tbody id="historyRows"></tbody>
+        </table>
+      </div>
+    </section>
+  </dialog>
+
+  <button id="backToTableButton" class="back-to-table-button" type="button" aria-label="返回价格表顶部" title="返回价格表顶部" aria-hidden="true" tabindex="-1">↑</button>
 
   <footer class="page-footer">
     <p>本工具与 OpenAI、Apple Inc. 无关联，数据仅供参考。</p>

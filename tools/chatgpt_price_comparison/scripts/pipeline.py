@@ -21,7 +21,7 @@ import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -33,6 +33,8 @@ PLAN = re.compile(r'ChatGPT [A-Za-z0-9][A-Za-z0-9 +()./-]{0,70}\Z')
 AMOUNT = re.compile(r'(?:0|[1-9][0-9]*)(?:\.[0-9]{1,3})?\Z')
 ZERO_DECIMAL = {'JPY', 'KRW', 'VND', 'CLP', 'PYG', 'UGX', 'RWF', 'XOF', 'XAF'}
 THREE_DECIMAL = {'BHD', 'IQD', 'JOD', 'KWD', 'OMR', 'TND'}
+PLAN_ORDER = ('ChatGPT Go', 'ChatGPT Plus', 'ChatGPT Pro 5x', 'ChatGPT Pro 20x')
+BEIJING = timezone(timedelta(hours=8))
 
 
 def stamp(now: float | None = None) -> str:
@@ -396,24 +398,180 @@ def converted(market: dict, amount: str, fx: dict | None, now: float) -> str | N
     return format(value.quantize(Decimal('.01'), rounding=ROUND_HALF_UP), '.2f')
 
 
+def plan_labels(data: dict) -> list[str]:
+    labels = {offer['label'] for market in data['markets'] for offer in market['offers']}
+    return [label for label in PLAN_ORDER if label in labels] + sorted(labels.difference(PLAN_ORDER))
+
+
+def short_plan(label: str) -> str:
+    return label.removeprefix('ChatGPT ')
+
+
+def market_offer(market: dict, label: str) -> dict | None:
+    return next((offer for offer in market['offers'] if offer['label'] == label), None)
+
+
+def offer_min_cny(market: dict, label: str) -> Decimal | None:
+    offer = market_offer(market, label)
+    if not offer:
+        return None
+    values = [Decimal(amount['cny']) for amount in offer['amounts'] if amount.get('cny') is not None]
+    return min(values) if values else None
+
+
+def beijing_display(value: str) -> str:
+    return datetime.fromtimestamp(epoch(value), timezone.utc).astimezone(BEIJING).strftime('%Y/%m/%d %H:%M')
+
+
+def render_price_options(market: dict, plan: str, minimum: Decimal | None) -> str:
+    offer = market_offer(market, plan)
+    if not offer:
+        return '<span class="missing-price">—</span>'
+    options = []
+    for amount in offer['amounts']:
+        cny = Decimal(amount['cny']) if amount.get('cny') is not None else None
+        badge = '<span class="minimum-badge">最低</span>' if minimum is not None and cny == minimum else ''
+        converted = (
+            f'<span class="price-symbol">¥</span><span class="price-amount">{format(cny, ",.2f")}</span>'
+            if cny is not None else '<span class="price-amount">—</span>'
+        )
+        options.append(
+            '<div class="price-option">'
+            f'<strong class="price-cny">{badge}{converted}</strong>'
+            f'<span class="price-local">{html.escape(amount["display"])}</span>'
+            '</div>'
+        )
+    return ''.join(options)
+
+
 def render(data: dict, template: str) -> str:
-    now = epoch(data['generated_at'])
+    plans = plan_labels(data)
+    if not plans:
+        raise ValueError('no plans available for static projection')
+    default_plan = 'ChatGPT Plus' if 'ChatGPT Plus' in plans else plans[0]
+    generated = epoch(data['generated_at'])
+    fx_fresh = bool(data['fx']) and -300 <= generated - epoch(data['fx']['updated_at']) <= FRESH
+
+    minimums: dict[str, Decimal | None] = {}
+    winners: dict[str, list[dict]] = {}
+    for plan in plans:
+        candidates = []
+        if fx_fresh:
+            for market in data['markets']:
+                value = offer_min_cny(market, plan)
+                if (
+                    market['status'] == 'verified'
+                    and value is not None
+                    and -300 <= generated - epoch(market['last_verified_at']) <= FRESH
+                ):
+                    candidates.append((value, market))
+        minimum = min((item[0] for item in candidates), default=None)
+        minimums[plan] = minimum
+        winners[plan] = sorted(
+            [market for value, market in candidates if minimum is not None and value == minimum],
+            key=lambda market: market['code'],
+        )
+
+    minimum_cards = []
+    for plan in plans:
+        minimum = minimums[plan]
+        plan_winners = winners[plan]
+        if minimum is None or not plan_winners:
+            minimum_cards.append(
+                '<button type="button" class="minimum-card" disabled>'
+                f'<span class="minimum-plan-label">{html.escape(short_plan(plan))}</span>'
+                '<strong class="minimum-country">暂无可靠最低价</strong>'
+                '<small class="minimum-price">—</small>'
+                '</button>'
+            )
+            continue
+        names = [market['name'] for market in plan_winners]
+        country = (
+            f'{html.escape("、".join(names[:3]))}等 {len(names)} 个地区'
+            if len(names) > 3 else html.escape('、'.join(names))
+        )
+        minimum_cards.append(
+            f'<button type="button" class="minimum-card" data-plan="{html.escape(plan)}" '
+            f'data-market-id="{plan_winners[0]["code"]}" disabled>'
+            f'<span class="minimum-plan-label">{html.escape(short_plan(plan))}</span>'
+            f'<strong class="minimum-country">{country}</strong>'
+            f'<small class="minimum-price">¥{format(minimum, ",.2f")}</small>'
+            '</button>'
+        )
+
+    head = []
+    for plan in plans:
+        active = ' is-active-plan' if plan == default_plan else ''
+        sort_value = 'ascending' if plan == default_plan else 'none'
+        arrow = '↑' if plan == default_plan else '↕'
+        head.append(
+            f'<th scope="col" data-plan-header="true" data-plan="{html.escape(plan)}" '
+            f'class="{active.strip()}" aria-sort="{sort_value}">'
+            f'<button type="button" data-sort-plan="{html.escape(plan)}" disabled>'
+            f'{html.escape(short_plan(plan))} <span aria-hidden="true">{arrow}</span>'
+            '</button></th>'
+        )
+
+    rank_values = sorted({
+        value for market in data['markets']
+        if (value := offer_min_cny(market, default_plan)) is not None
+    })
+    rank_map = {value: index + 1 for index, value in enumerate(rank_values)}
+
+    def sort_key(market: dict):
+        value = offer_min_cny(market, default_plan)
+        return (value is None, value if value is not None else Decimal('Infinity'), market['name'])
+
     rows = []
-    for market in data['markets']:
-        if not market['offers']:
-            rows.append(f'<tr><th scope="row">{html.escape(market["name"])}</th><td colspan="4">暂无可核验标价 · 不等于该地区不受支持</td></tr>')
-        for offer in market['offers']:
-            local = '<br>'.join(html.escape(x['display']) for x in offer['amounts'])
-            cny = '<br>'.join('¥' + format(Decimal(x['cny']), ',.2f') if x.get('cny') is not None else '—' for x in offer['amounts'])
-            note = '多个同名标价，周期未披露' if len(offer['amounts']) > 1 else '周期未披露'
-            rows.append(f'<tr data-code="{market["code"]}" data-plan="{html.escape(offer["label"])}"><th scope="row"><a href="{market["source_url"]}" rel="noopener noreferrer">{html.escape(market["name"])}</a><small>{market["code"].upper()} · {market["currency"]}</small></th><td>{html.escape(offer["label"])}<small>{note}</small></td><td class="number">{local}</td><td class="number">{cny}</td><td><span>{"已核验" if market["status"] == "verified" else "沿用旧价 / 待复核"}</span><small>{market["last_verified_at"]}</small></td></tr>')
+    for market in sorted(data['markets'], key=sort_key):
+        value = offer_min_cny(market, default_plan)
+        rank = rank_map.get(value) if value is not None else None
+        rank_class = ' class="rank-top"' if rank is not None and rank <= 3 else ''
+        status = '' if market['status'] == 'verified' else f' · {market["status"]}'
+        cells = []
+        for plan in plans:
+            active = ' is-active-plan is-sorted' if plan == default_plan else ''
+            minimum_class = ''
+            if minimums[plan] is not None and offer_min_cny(market, plan) == minimums[plan] and market in winners[plan]:
+                minimum_class = ' is-minimum'
+            cells.append(
+                f'<td class="price-cell{active}{minimum_class}" data-plan="{html.escape(plan)}">'
+                f'{render_price_options(market, plan, minimums[plan] if market in winners[plan] else None)}</td>'
+            )
+        rows.append(
+            f'<tr data-market-id="{market["code"]}">'
+            f'<td{rank_class}>{rank if rank is not None else "—"}</td>'
+            '<td><button type="button" class="country-history-button" disabled>'
+            f'<span class="country-name">{html.escape(market["name"])}</span>'
+            f'<span class="mobile-rank" aria-hidden="true">{rank if rank is not None else "—"}</span>'
+            f'<span class="country-meta">{market["code"].upper()} · {html.escape(market.get("currency", "—"))}{html.escape(status)}</span>'
+            '<span class="history-affordance" aria-hidden="true">›</span>'
+            '<span class="visually-hidden">，启用 JavaScript 后查看价格历史</span>'
+            '</button></td>'
+            + ''.join(cells)
+            + '</tr>'
+        )
+
     payload = canonical(data).replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
-    values = {'ROWS': '\n'.join(rows), 'DATA': payload, 'GENERATED': data['generated_at'], 'REVISION': data['revision'],
-              'COUNT': str(sum(bool(m['offers']) for m in data['markets'])), 'TOTAL': str(len(data['markets']))}
+    priced_markets = [market for market in data['markets'] if market['offers']]
+    values = {
+        'MINIMUMS': '\\n'.join(minimum_cards),
+        'TABLE_HEAD': '\\n'.join(head),
+        'ROWS': '\\n'.join(rows),
+        'DATA': payload,
+        'GENERATED_BEIJING': beijing_display(data['generated_at']),
+        'REVISION': data['revision'],
+        'COUNT': str(len(priced_markets)),
+        'RESULT_COUNT': str(len(priced_markets)),
+        'TOTAL': str(len(data['markets'])),
+        'CURRENCY_COUNT': str(len({market.get('currency') for market in priced_markets if market.get('currency')})),
+        'PLAN_COUNT': str(len(plans)),
+    }
     for key, value in values.items():
-        if template.count('{{' + key + '}}') != 1:
+        marker = '{{' + key + '}}'
+        if template.count(marker) != 1:
             raise ValueError('template marker missing or duplicated: ' + key)
-        template = template.replace('{{' + key + '}}', value)
+        template = template.replace(marker, value)
     return template
 
 
