@@ -128,7 +128,7 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /GENERATION_BASE_SHA/);
   assert.match(
     workflow,
-    /current_main_sha=\$\(git rev-parse origin\/main\)[\s\S]*?git diff --name-only "\$GENERATION_BASE_SHA" "\$current_main_sha" --[\s\S]*?tools\/icloud_price_comparison\/\*[\s\S]*?\.github\/workflows\/\*icloud\*[\s\S]*?git checkout --detach "\$current_main_sha"[\s\S]*?publish_base_sha="\$current_main_sha"/,
+    /current_main_sha=\$\(git rev-parse origin\/main\)[\s\S]*?tools\/icloud_price_comparison\/\*[\s\S]*?\.github\/workflows\/\*icloud\*[\s\S]*?git diff --name-only "\$GENERATION_BASE_SHA" "\$current_main_sha" --[\s\S]*?git checkout --detach "\$current_main_sha"[\s\S]*?publish_base_sha="\$current_main_sha"/,
     'publisher must adopt unrelated main advances but reject iCloud-sensitive advances',
   );
   assert.match(
