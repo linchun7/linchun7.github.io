@@ -59,9 +59,7 @@ def clean_publication_today(data: dict, now: float) -> bool:
     if _beijing_date(pipeline.epoch(data["generated_at"])) != _beijing_date(now):
         return False
     markets = data.get("markets", [])
-    if not markets or any(market.get("status") in ("retained", "pending") for market in markets):
-        return False
-    if any(market.get("status") not in ("verified", "unavailable") for market in markets):
+    if not markets or any(market.get("status") != "verified" for market in markets):
         return False
     fx = data.get("fx")
     if not isinstance(fx, dict) or fx.get("fallback") is not False:
