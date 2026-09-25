@@ -235,7 +235,7 @@
   }
   function minCny(market, plan) {
     const offer = offerFor(market, plan);
-    if (!offer || !state.data?.fx || !usable(state.data.fx.updated_at) || !usable(market.last_verified_at)) return null;
+    if (!offer || !state.data?.fx || !fresh(market) || !usable(state.data.fx.updated_at) || age(state.data.fx.updated_at) > FRESH) return null;
     const values = offer.amounts
       .filter((amount) => amount.cny != null)
       .map((amount) => Number(amount.cny))
