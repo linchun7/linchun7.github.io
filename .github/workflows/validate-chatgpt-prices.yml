@@ -33,6 +33,37 @@ jobs:
           from test_pipeline import data_fixture, revise
           data = data_fixture()
           data['fx']['updated_at'] = pipeline.stamp(pipeline.epoch(data['generated_at']) - 86400)
+          market = data['markets'][0]
+          for label, amount in [('ChatGPT Future Alpha', '44'), ('ChatGPT Future Beta', '66')]:
+              market['offers'].append({
+                  'label': label,
+                  'amounts': [{
+                      'amount': amount,
+                      'display': '
+          missing_fx['code'] = 'de'
+          missing_fx['name'] = '缺汇率测试'
+          missing_fx['currency'] = 'EUR'
+          missing_fx['source_url'] = pipeline.url_for('de')
+          display_by_amount = {'8':'8,00 €','19.99':'19,99 €','44':'44,00 €','66':'66,00 €','200':'200,00 €'}
+          for offer in missing_fx['offers']:
+              for amount in offer['amounts']:
+                  amount['display'] = display_by_amount[amount['amount']]
+                  amount['cny'] = None
+          missing_fx['fingerprint'] = pipeline.digest(pipeline.semantic(missing_fx))
+          data['markets'].append(missing_fx)
+          revise(data)
+          pipeline.validate(data)
+          (pipeline.ROOT/'data').mkdir(exist_ok=True)
+          (pipeline.ROOT/'data/prices.json').write_text(json.dumps(data, ensure_ascii=False))
+          (pipeline.ROOT/'index.html').write_text(pipeline.render(data, (pipeline.ROOT/'index.template.html').read_text()))
+          PY
+          node tools/chatgpt_price_comparison/scripts/browser-test.mjs
+ + amount + '.00',
+                      'cny': pipeline.converted(market, amount, data['fx'], pipeline.epoch(data['generated_at'])),
+                  }],
+              })
+          market['offers'] = sorted(market['offers'], key=lambda offer: offer['label'])
+          market['fingerprint'] = pipeline.digest(pipeline.semantic(market))
           missing_fx = copy.deepcopy(data['markets'][0])
           missing_fx['code'] = 'de'
           missing_fx['name'] = '缺汇率测试'
