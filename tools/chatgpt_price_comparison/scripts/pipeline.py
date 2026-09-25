@@ -240,6 +240,13 @@ def parse_store(text: str, code: str) -> dict:
     expected = [[clean(a), clean(b)] for a, b in pairs]
     if any(visible.count(pair) != expected.count(pair) for pair in expected):
         raise ValueError('visible and structured prices disagree')
+    # Fail closed if the visible DOM exposes an additional ChatGPT plan/price
+    # that neither structured representation contains. Otherwise a source
+    # schema drift could silently hide a newly introduced paid plan.
+    visible_plan_pairs = sorted(pair for pair in visible if PLAN.fullmatch(pair[0]))
+    expected_plan_pairs = sorted(pair for pair in expected if PLAN.fullmatch(pair[0]))
+    if visible_plan_pairs != expected_plan_pairs:
+        raise ValueError('visible and structured plan prices disagree')
     offers, ignored = {}, []
     for label, display in expected:
         if not PLAN.fullmatch(label):
