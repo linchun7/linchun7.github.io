@@ -207,10 +207,12 @@ def parse_store(text: str, code: str) -> dict:
     if len(canonical_links) != 1 or app_storefront(canonical_links[0]) != code:
         raise ValueError('wrong canonical storefront or application')
     meta = json.loads(scripts.get('software-application', '{}'))
-    if meta.get('name') != 'ChatGPT' or '/developer/' not in meta.get('author', {}).get('url', '') or not re.search(r'/id1684349733(?:\?|$)', meta['author']['url']):
+    if not isinstance(meta, dict) or not isinstance(meta.get('author'), dict) or not isinstance(meta.get('offers'), dict):
+        raise ValueError('invalid application metadata structure')
+    if meta.get('name') != 'ChatGPT' or '/developer/' not in meta['author'].get('url', '') or not re.search(r'/id1684349733(?:\\?|$)', meta['author']['url']):
         raise ValueError('not the official OpenAI application')
     # offers.price is the FREE app download. Only its currency is used here.
-    currency = meta.get('offers', {}).get('priceCurrency')
+    currency = meta['offers'].get('priceCurrency')
     if not isinstance(currency, str) or not re.fullmatch('[A-Z]{3}', currency):
         raise ValueError('missing storefront currency')
     data = json.loads(scripts.get('serialized-server-data', '{}'))
@@ -218,8 +220,14 @@ def parse_store(text: str, code: str) -> dict:
     if len(annotations) != 1:
         raise ValueError('missing or ambiguous purchase annotation')
     annotation = annotations[0]
-    pairs = [pair for item in annotation.get('items', []) for pair in item.get('textPairs', [])]
-    v3 = [[item.get('leadingText'), item.get('trailingText')] for item in annotation.get('items_V3', []) if item.get('$kind') == 'textPair']
+    items = annotation.get('items', [])
+    items_v3 = annotation.get('items_V3', [])
+    if not isinstance(items, list) or not isinstance(items_v3, list) or any(not isinstance(item, dict) for item in items + items_v3):
+        raise ValueError('invalid purchase annotation structure')
+    if any(not isinstance(item.get('textPairs', []), list) for item in items):
+        raise ValueError('invalid purchase pair structure')
+    pairs = [pair for item in items for pair in item.get('textPairs', [])]
+    v3 = [[item.get('leadingText'), item.get('trailingText')] for item in items_v3 if item.get('$kind') == 'textPair']
     if not pairs or pairs != v3:
         raise ValueError('structured representations disagree')
     # Cross-check visible price pairs, never search review/description prose for prices.
@@ -344,12 +352,16 @@ def collect_fx(now: float, old: dict | None, getter=fetch, required_currencies=(
     required = sorted({'USD', 'CNY', *(code for code in required_currencies if code)})
     try:
         data = json.loads(getter(FX_URL))
+        if not isinstance(data, dict):
+            raise ValueError('invalid FX response structure')
         if data.get('result') != 'success' or data.get('base_code') != 'USD':
             raise ValueError('wrong FX base or status')
         updated = data['time_last_update_unix']
         if isinstance(updated, bool) or not isinstance(updated, (float, int)) or not -300 <= now - updated <= FRESH:
             raise ValueError('FX source timestamp is stale or future')
         rates = data['rates']
+        if not isinstance(rates, dict):
+            raise ValueError('invalid FX rates structure')
         if rates.get('USD') != 1 or not 1 < rates.get('CNY', 0) < 30:
             raise ValueError('FX units or base rate invalid')
         if len(rates) < 30 or any(
