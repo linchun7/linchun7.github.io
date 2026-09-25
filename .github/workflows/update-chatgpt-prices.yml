@@ -49,19 +49,12 @@ jobs:
             exit 0
           fi
           PROOF_FILE="$proof_file" python3 - <<'PY' >> "$GITHUB_OUTPUT"
-          import json, os
-          from datetime import datetime, timedelta, timezone
-          beijing = timezone(timedelta(hours=8))
-          today = datetime.now(timezone.utc).astimezone(beijing).date()
+          import json, os, sys, time
+          sys.path.insert(0, "tools/chatgpt_price_comparison/scripts")
+          import daily_run_guard as guard
+          data = json.load(open("tools/chatgpt_price_comparison/data/prices.json", encoding="utf-8"))
           runs = json.load(open(os.environ["PROOF_FILE"], encoding="utf-8")).get("workflow_runs", [])
-          found = any(
-              run.get("conclusion") == "success"
-              and run.get("head_branch") == "main"
-              and run.get("event") in ("schedule", "workflow_dispatch")
-              and datetime.fromisoformat(run["created_at"].replace("Z", "+00:00")).astimezone(beijing).date() == today
-              for run in runs
-              if run.get("created_at")
-          )
+          found = guard.successful_production_proof(runs, data, time.time())
           print("production_success_today=" + ("true" if found else "false"))
           PY
       - name: Check daily idempotence
