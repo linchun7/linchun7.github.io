@@ -229,5 +229,5 @@ jobs:
           if [[ "$PREPARE" == success && "$GENERATE" == success && "$PUBLISH" == success && "$VERIFY" == success && "$DEGRADED" == false ]]; then
             if [[ -n "$issue" ]]; then gh issue close "$issue" --comment '自动更新、Pages 构建及生产验证已恢复。'; fi
           elif [[ -z "$issue" ]]; then
-            gh issue create --title "$title" --body "自动触发检查、核验、发布、Pages 构建或生产验证失败，或部分地区/汇率正在沿用旧数据。未验证的新价格不会覆盖旧价。Cloudflare 主触发失败时 GitHub 备用仍会重试；持续失败可能需要维护来源或部署链路。运行：$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            gh issue create --title "$title" --body "自动触发检查、核验、发布、Pages 构建或生产验证失败，或部分地区未完整核验/汇率处于降级状态。未验证的新价格不会覆盖旧价；无可保留旧价的地区会标记为 unavailable 并继续重试。Cloudflare 主触发失败时 GitHub 备用仍会重试；持续失败可能需要维护来源或部署链路。运行：$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           fi
