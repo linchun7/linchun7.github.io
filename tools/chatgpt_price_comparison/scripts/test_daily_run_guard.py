@@ -14,6 +14,34 @@ from test_pipeline import NOW, data_fixture, revise
 
 
 class DailyRunGuardTests(unittest.TestCase):
+    def test_production_proof_must_finish_after_current_data_generation(self):
+        data = data_fixture()
+        base = {
+            "conclusion": "success",
+            "head_branch": "main",
+            "event": "workflow_dispatch",
+            "created_at": p.stamp(NOW - 120),
+        }
+        older = dict(base, updated_at=p.stamp(NOW - 1))
+        current = dict(base, updated_at=p.stamp(NOW + 60))
+        self.assertFalse(guard.successful_production_proof([older], data, NOW + 120))
+        self.assertTrue(guard.successful_production_proof([older, current], data, NOW + 120))
+
+    def test_production_proof_rejects_wrong_branch_event_or_day(self):
+        data = data_fixture()
+        valid = {
+            "conclusion": "success",
+            "head_branch": "main",
+            "event": "schedule",
+            "created_at": p.stamp(NOW - 120),
+            "updated_at": p.stamp(NOW + 60),
+        }
+        wrong_branch = dict(valid, head_branch="other")
+        wrong_event = dict(valid, event="push")
+        previous_day = dict(valid, created_at=p.stamp(NOW - 86400))
+        self.assertFalse(guard.successful_production_proof([wrong_branch, wrong_event, previous_day], data, NOW + 120))
+        self.assertTrue(guard.successful_production_proof([valid], data, NOW + 120))
+
     def test_cloudflare_skips_only_with_clean_data_and_successful_production_run(self):
         result = guard.decide("workflow_dispatch", "cloudflare", data_fixture(), NOW, True)
         self.assertFalse(result["should_run"])
