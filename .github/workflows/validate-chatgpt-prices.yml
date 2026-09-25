@@ -77,4 +77,4 @@ jobs:
               pipeline.render(data, (pipeline.ROOT/'index.template.html').read_text())
           )
           PY
-          node tools/chatgpt_price_comparison/scripts/browser-test.mjs
+          REQUIRE_FUTURE_PLAN=1 node tools/chatgpt_price_comparison/scripts/browser-test.mjs
