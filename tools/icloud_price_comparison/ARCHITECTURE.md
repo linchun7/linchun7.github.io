@@ -171,7 +171,7 @@ JavaScript 可用时：
 - 生成时记录的 base SHA；
 - 远端 `main` 是否仍停在同一个基线。
 
-若 `main` 已前进，旧工件失败关闭并重新生成，不 rebase 旧工件，也不 force push。
+若 `main` 已前进，发布器先比较生成基线到最新 `main` 的路径变化。只要 `tools/icloud_price_comparison/**` 或 iCloud 专属 workflow 发生变化，旧候选就失败关闭并从新 `main` 重新生成；若变化完全属于同仓库其他工具，则 iCloud 已验证工件保持原字节，发布器切到最新 `main` 后重新执行静态发布边界校验，并把该提交作为最终 compare-and-swap 基线。这里不对候选做 Git rebase，也不 force push；最终推送前 `main` 再次前进仍会停止。
 
 普通代码变更走 PR 的只读 CI；合并后 GitHub Pages 自动部署。生产验收不能只看 workflow 绿色，应验证真实页面资源版本/字节与公共数据。
 

@@ -316,7 +316,7 @@ jobs:
             --index-file "$RUNNER_TEMP/icloud-price-data/icloud-price-index.html" \
             --prices-file "$RUNNER_TEMP/icloud-price-data/unpacked/tools/icloud_price_comparison/data/prices.json"
 
-      - name: 确认 main 未前进并准备提交
+      - name: 确认发布基线并准备提交
         id: prepare_publish
         shell: bash
         env:
@@ -326,17 +326,37 @@ jobs:
           echo "main_advanced=false" >> "$GITHUB_OUTPUT"
           echo "should_push=false" >> "$GITHUB_OUTPUT"
           git fetch origin main --depth=1
-          if [[ "$(git rev-parse origin/main)" != "$GENERATION_BASE_SHA" ]]; then
-            echo "::error title=main 已在生成期间前进::远端 main 已变化；本次不发布，下一次运行会重新生成。"
-            echo "main_advanced=true" >> "$GITHUB_OUTPUT"
-            exit 0
+          current_main_sha=$(git rev-parse origin/main)
+          publish_base_sha="$GENERATION_BASE_SHA"
+          if [[ "$current_main_sha" != "$GENERATION_BASE_SHA" ]]; then
+            sensitive_change=false
+            sensitive_paths=()
+            while IFS= read -r changed_path; do
+              case "$changed_path" in
+                tools/icloud_price_comparison/*|.github/workflows/*icloud*)
+                  sensitive_change=true
+                  sensitive_paths+=("$changed_path")
+                  ;;
+              esac
+            done < <(git diff --name-only "$GENERATION_BASE_SHA" "$current_main_sha" --)
+            if [[ "$sensitive_change" == "true" ]]; then
+              printf -v joined_paths '%s, ' "${sensitive_paths[@]}"
+              joined_paths="${joined_paths%, }"
+              echo "::error title=iCloud 发布基线已变化::main 包含 iCloud 相关改动（$joined_paths）；本次不发布，下一次从新 main 重新生成。"
+              echo "main_advanced=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "::notice title=仅无关路径推进::main 仅有 iCloud 无关改动；保持已验证工件字节不变，在最新 main 上重新校验发布边界。"
+            git checkout --detach "$current_main_sha"
+            publish_base_sha="$current_main_sha"
           fi
+          echo "publish_base_sha=$publish_base_sha" >> "$GITHUB_OUTPUT"
           validated_data="$RUNNER_TEMP/icloud-price-data/unpacked/tools/icloud_price_comparison/data"
           rm -rf tools/icloud_price_comparison/data
           cp -a "$validated_data" tools/icloud_price_comparison/data
           cp "$RUNNER_TEMP/icloud-price-data/icloud-price-index.html" tools/icloud_price_comparison/index.html
           base_index="$RUNNER_TEMP/generation-base-index.html"
-          git show "$GENERATION_BASE_SHA:tools/icloud_price_comparison/index.html" > "$base_index"
+          git show "$publish_base_sha:tools/icloud_price_comparison/index.html" > "$base_index"
           node tools/icloud_price_comparison/scripts/validate-static-page-update.mjs \
             "$base_index" \
             tools/icloud_price_comparison/index.html \
@@ -351,7 +371,6 @@ jobs:
           git commit -m "chore: update iCloud prices"
           echo "publish_candidate=commit_ready" >> "$GITHUB_OUTPUT"
           echo "should_push=true" >> "$GITHUB_OUTPUT"
-
       - name: 仅在最终步骤推送
         id: push_data
         if: steps.prepare_publish.outputs.should_push == 'true'
@@ -359,13 +378,14 @@ jobs:
         shell: bash
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          PUBLISH_BASE_SHA: ${{ steps.prepare_publish.outputs.publish_base_sha }}
         run: |
           set -euo pipefail
           echo "main_advanced=false" >> "$GITHUB_OUTPUT"
           echo "pushed=false" >> "$GITHUB_OUTPUT"
           git fetch origin main --depth=1
-          if [[ "$(git rev-parse origin/main)" != "${{ needs.update.outputs.generation_base_sha }}" ]]; then
-            echo "::error title=main 已在提交前前进::本次不推送，下一次运行会重新生成。"
+          if [[ "$(git rev-parse origin/main)" != "$PUBLISH_BASE_SHA" ]]; then
+            echo "::error title=main 已在提交前再次前进::本次不覆盖、不推送；下一次运行会从最新 main 重新生成。"
             echo "main_advanced=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi

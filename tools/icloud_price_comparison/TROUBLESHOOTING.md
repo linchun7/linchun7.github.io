@@ -36,13 +36,13 @@ pnpm check:live
 
 1. `Update iCloud prices` 的首个失败 job/step；
 2. 是 prepare/daily guard、Apple、FX、数据校验、静态生成、artifact 还是 publish 阶段失败；
-3. `main` 是否在生成期间被其他提交推进；
+3. `main` 是否在生成或最终提交期间被其他提交推进；若只改了其他工具，正常发布器应自动跟随最新 `main`；若仍报 `main_advanced`，检查是否包含 iCloud 敏感路径或最终推送前再次发生竞态；
 4. 上一次成功 `data/run-log.json` 是否仍完整。
 
 不要：
 
 - 为了让任务变绿直接修改 `prices.json`；
-- 复用旧生成工件 rebase 到新 `main`；
+- 人工把旧生成工件 rebase 到包含 iCloud 相关改动的新 `main`；纯无关路径前进应交给工作流内置的安全跟随逻辑；
 - force push；
 - 因单次网络失败降低 parser/data/snapshot 校验。
 

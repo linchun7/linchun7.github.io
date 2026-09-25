@@ -128,6 +128,16 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /GENERATION_BASE_SHA/);
   assert.match(
     workflow,
+    /current_main_sha=\$\(git rev-parse origin\/main\)[\s\S]*?git diff --name-only "\$GENERATION_BASE_SHA" "\$current_main_sha" --[\s\S]*?tools\/icloud_price_comparison\/\*[\s\S]*?\.github\/workflows\/\*icloud\*[\s\S]*?git checkout --detach "\$current_main_sha"[\s\S]*?publish_base_sha="\$current_main_sha"/,
+    'publisher must adopt unrelated main advances but reject iCloud-sensitive advances',
+  );
+  assert.match(
+    workflow,
+    /publish_base_sha=\$publish_base_sha[\s\S]*?PUBLISH_BASE_SHA:\s*\$\{\{ steps\.prepare_publish\.outputs\.publish_base_sha \}\}[\s\S]*?git rev-parse origin\/main\)" != "\$PUBLISH_BASE_SHA"/,
+    'final push must compare against the adopted publish base',
+  );
+  assert.match(
+    workflow,
     /git rev-parse origin\/main[\s\S]*?GENERATION_BASE_SHA[\s\S]*?push origin HEAD:main/,
   );
   assert.doesNotMatch(workflow, /git pull --rebase origin main/);
@@ -146,7 +156,7 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /publish_outcome=main_advanced[\s\S]*?PUBLISH_MAIN_ADVANCED[\s\S]*?exit 1/);
   assert.match(workflow, /steps\.push_data\.outcome[^]*?failure[^]*?severe_failure=true[^]*?publish_outcome=push_failed/);
   assert.match(workflow, /publish_candidate=no_data_changes[\s\S]*?publish_outcome=no_data_changes/);
-  assert.match(workflow, /steps\.prepare_publish\.outputs\.should_push == 'true'/, 'main advancement and no-data paths must skip the push');
+  assert.match(workflow, /steps\.prepare_publish\.outputs\.should_push == 'true'/, 'unresolved advancement and no-data paths must skip the push');
   assert.match(workflow, /publish:[\s\S]*?permissions:[\s\S]*?contents: write[\s\S]*?pages: write/);
   assert.match(workflow, /steps\.push_data\.outputs\.pushed == 'true'[\s\S]*?gh api --method POST[\s\S]*?repos\/\$GITHUB_REPOSITORY\/pages\/builds/);
   assert.match(workflow, /wait_pages_build[\s\S]*?pages\/builds\/latest[\s\S]*?compare\/\$TARGET_SHA\.\.\.\$built_sha[\s\S]*?pages_built=true/);

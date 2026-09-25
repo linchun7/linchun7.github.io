@@ -125,7 +125,7 @@ Apple Support HTML ─┐
 
 10. 确认数据 commit 对应的 Pages 构建成功，再从 canonical URL 核对 prices/history/run-log/static HTML；仅生成、上传或提交成功均不代表生产发布完成。
 
-远端基线变化时必须重新生成，不 rebase 已生成工件，不 force push。
+远端基线变化时先做路径级判断：iCloud 项目或 iCloud 专属 workflow 发生变化，必须从最新 `main` 重新生成；只有同仓库其他工具的无关路径变化时，发布器才可保持已测试 iCloud 工件字节不变，切到最新 `main` 后重跑静态发布边界校验，并以该最新提交作为最终 compare-and-swap 基线。不得 Git rebase 候选，也不得 force push；最终推送前再次发生任何前进仍安全停止。
 
 ## 6. Market identity 与中文名称
 
@@ -287,7 +287,7 @@ curl -fsSIL https://www.linchun.com.cn/tools/icloud_price_comparison/not-a-real-
 1. 先保存失败 workflow/run、commit SHA、首个失败步骤和必要的结构化证据，再修改系统。
 2. Apple 抓取、双解析、语义确认、FX authority、market identity、数据契约、snapshot/transaction 任一关键门禁失败时，不发布未经证明的新数据；上一份已知良好数据继续服务。
 3. 数据事故按完整提交回滚，优先 `git revert <bad-data-commit>`；不要手拼单个 `prices.json`、`history.json` 或 snapshot index。
-4. 远端 `main` 在生成期间前进时，旧工件作废；从新 `main` 重新生成，不 rebase 工件、不 force push。
+4. 远端 `main` 在生成期间前进时先检查变更路径：若涉及 iCloud 项目或 iCloud 专属 workflow，旧候选作废并从新 `main` 重新生成；若只涉及其他工具，则由发布器保持 iCloud 工件字节不变并在最新 `main` 上重验发布边界。人工事故处理不要 rebase 工件，也不要 force push。
 5. 静态页面或 SEO 不一致时改 generator/事实源后重新渲染；不要直接手改生成目标消除错误。
 6. 前端/CSP/缓存/隐私问题先保存 HAR、console、响应头和资源版本；不要临时放宽到 `unsafe-inline`、`unsafe-eval` 或通配域名。
 7. 依赖、Action 或 vendor 供应链事件先停止相关自动合并/发布，固定版本或 SHA 并重新验证；不能证明完整性时回到最后已知良好版本。
