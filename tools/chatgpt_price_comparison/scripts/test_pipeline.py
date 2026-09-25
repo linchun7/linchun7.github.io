@@ -383,6 +383,22 @@ class ContractTests(unittest.TestCase):
         self.assertNotIn('全球价格排名第',page)
         self.assertNotIn('JP · — · unavailable',page)
 
+    def test_static_ranks_exclude_stale_or_nonverified_prices(self):
+        d=copy.deepcopy(data_fixture())
+        stale=copy.deepcopy(d['markets'][0])
+        stale['code']='jp'
+        stale['name']='日本'
+        stale['source_url']=p.url_for('jp')
+        stale['status']='retained'
+        stale['last_verified_at']=p.stamp(NOW-p.FRESH-1)
+        d['markets'].append(stale)
+        revise(d)
+        page=p.render(d,(p.ROOT/'index.template.html').read_text(encoding='utf-8'))
+        row=re.search(r'<tr data-market-id="jp">([\s\S]*?)</tr>',page)
+        self.assertIsNotNone(row)
+        self.assertIn('<td>—</td>',row.group(1))
+        self.assertIn('排名暂不可用',row.group(1))
+
     def test_static_price_ties_use_stable_market_code_order(self):
         d=copy.deepcopy(data_fixture())
         base=d['markets'][0]
