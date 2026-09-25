@@ -54,6 +54,11 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("pages: read", self.text)
         self.assertNotIn("pages: write", self.text)
 
+    def test_future_plan_browser_requirement_is_fixture_only(self):
+        validate = (ROOT / ".github" / "workflows" / "validate-chatgpt-prices.yml").read_text(encoding="utf-8")
+        self.assertIn("REQUIRE_FUTURE_PLAN=1 node tools/chatgpt_price_comparison/scripts/browser-test.mjs", validate)
+        self.assertNotIn("REQUIRE_FUTURE_PLAN=1", self.text)
+
     def test_validation_dependencies_are_project_local(self):
         validate = (ROOT / ".github" / "workflows" / "validate-chatgpt-prices.yml").read_text(encoding="utf-8")
         self.assertIn("tools/chatgpt_price_comparison/**", validate)
