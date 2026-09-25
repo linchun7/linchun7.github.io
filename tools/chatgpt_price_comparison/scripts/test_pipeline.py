@@ -418,7 +418,7 @@ class ContractTests(unittest.TestCase):
         self.assertIn('JP · — · 暂无标价',page)
         self.assertIn('<span class="mobile-rank-sr visually-hidden">排名暂不可用</span>',page)
         self.assertIn('，暂无价格历史',page)
-        unavailable_row = re.search(r'<tr data-market-id="jp">([\\s\\S]*?)</tr>', page)
+        unavailable_row = re.search(r'<tr data-market-id="jp">(.*?)</tr>', page, re.S)
         self.assertIsNotNone(unavailable_row)
         self.assertNotIn('全球价格排名第', unavailable_row.group(1))
         self.assertNotIn('JP · — · unavailable',page)
