@@ -30,6 +30,29 @@ def _beijing_date(timestamp: float):
     return datetime.fromtimestamp(timestamp, timezone.utc).astimezone(BEIJING).date()
 
 
+def successful_production_proof(runs: list[dict], data: dict, now: float) -> bool:
+    """Require a successful automatic/manual updater proof that finished after this data was generated."""
+    generated = pipeline.epoch(data["generated_at"])
+    today = _beijing_date(now)
+    for run in runs:
+        if (
+            run.get("conclusion") != "success"
+            or run.get("head_branch") != "main"
+            or run.get("event") not in ("schedule", "workflow_dispatch")
+            or not run.get("created_at")
+            or not run.get("updated_at")
+        ):
+            continue
+        try:
+            created = pipeline.epoch(run["created_at"])
+            updated = pipeline.epoch(run["updated_at"])
+        except ValueError:
+            continue
+        if _beijing_date(created) == today and updated >= generated:
+            return True
+    return False
+
+
 def clean_publication_today(data: dict, now: float) -> bool:
     """True only when today's committed artifact is accepted, non-degraded and fresh."""
     pipeline.validate(data, now)
