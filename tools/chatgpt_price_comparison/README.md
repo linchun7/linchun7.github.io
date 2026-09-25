@@ -14,16 +14,16 @@
 
 ## 自动更新与防错
 
-生产自动更新采用主备：**Cloudflare 每日北京时间 09:05** 外部调用 `workflow_dispatch`（`trigger_source=cloudflare`）作为主触发，**GitHub cron 09:10** 仅作兜底，主备间隔 5 分钟；也支持手动运行。自动任务在真正开始执行时解析最新 `main`，避免排队中的备用任务继续使用过时事件快照。两个自动入口先校验当前 `prices.json` 和当天 `Update ChatGPT prices` 的成功生产运行证明：只有数据非降级、汇率仍新鲜且当天已有完整成功运行时，备用触发才跳过；若存在 `retained` / `pending`、fallback 汇率、旧数据、主触发失败，或数据虽已提交但 Pages/生产验证未完成，GitHub 备用仍继续重试。手动运行不受每日幂等跳过。仓库只能验证这一调度契约，不能单独证明 Cloudflare 控制面的实时启用状态。
+生产自动更新采用主备：**Cloudflare 每日北京时间 09:05** 外部调用 `workflow_dispatch`（`trigger_source=cloudflare`）作为主触发，**GitHub cron 09:10** 仅作兜底，主备间隔 5 分钟；也支持手动运行。自动任务在真正开始执行时解析最新 `main`，避免排队中的备用任务继续使用过时事件快照。两个自动入口先校验当前 `prices.json` 和当天 `Update ChatGPT prices` 的成功生产运行证明：只有数据全部 `verified`、汇率仍新鲜，且有一条在当前数据生成之后完成的完整成功运行时，备用触发才跳过；若存在 `retained` / `pending` / `unavailable`、fallback 汇率、旧数据、主触发失败，或数据虽已提交但 Pages/生产验证未完成，GitHub 备用仍继续重试。手动运行不受每日幂等跳过。仓库只能验证这一调度契约，不能单独证明 Cloudflare 控制面的实时启用状态。
 
 1. 只读任务运行离线测试、抓取、数据校验与真实 Chrome 测试。无需 API Key、登录态、付费服务、数据库或第三方 Python/Node 包。
 2. 校验应用身份、canonical 地区和币种；可见价格必须与两种结构化表示一致。它们是**同一来源的交叉校验**，不是三个独立价格源。初次采集和改价另发一次不使用缓存的确认请求。
 3. 并发上限 4，单请求超时最多 15 秒，最多 3 次尝试；请求体上限 4 MB。240 秒后不再启动来源请求，工作流另有整体超时。只允许 HTTPS 官方来源；Apple 重定向必须保持同一 storefront 与 App ID `6448311069`，可容忍语言参数或页面 slug 变化。
-4. 某地区失败保留上次金额及原核验时间，单独更新检查时间。异常大幅变价、币种变化或项目数骤减先暂存指纹，至少 18 小时后仍一致才自动接受，不要求每天人工审批。
+4. 某地区失败时，有旧价则保留上次金额及原核验时间；没有可保留旧价则标记 `unavailable`。两者都属于降级，会触发告警并让备用任务继续重试。异常大幅变价、币种变化或项目数骤减先暂存指纹，至少 18 小时后再次独立确认仍一致才自动接受。
 5. 本轮新核验数量不得低于已有有价地区数的 80%（且至少 10 个）；有价覆盖不得低于配置数的 60%。严重降级直接拒绝发布，保留整份原数据。
-6. 汇率失败最多沿用 7 天并标明旧汇率；若连可用 fallback 都没有，则整轮拒绝发布并保留上一版生产页面。价格超过 36 小时标记旧价；价格或汇率超过 7 天隐藏人民币换算，且过期汇率不再参与人民币排序与排名。浏览器不持久缓存价格，拒绝校验不通过或时间倒退的更新。
+6. 汇率失败最多沿用 7 天并标明旧汇率；若连可用 fallback 都没有，则整轮拒绝发布并保留上一版生产页面。价格或汇率超过 36 小时后仍可显示旧的人民币参考值，但不再参与最低价、排序或排名；超过 7 天则隐藏人民币换算。浏览器不持久缓存价格，拒绝校验不通过或时间倒退的更新。
 7. 独立发布任务重新校验工件，JSON 与静态 HTML 同一个 Git 提交发布。只改自身的两份生成文件；远端分支前进即拒绝推送，不强推、不重放旧数据覆盖其他会话。
-8. 数据推送后等待该提交自动触发的 Pages 构建（或已验证后继提交）完成，再用独立 Node 验证器校验公开 canonical JSON 的数据 revision，并核对 HTML 的页面 build revision；即使价格数据没变，只要模板或前端资产变化，旧页面也不能冒充新部署。只有整条生产链成功才会形成当天可供兜底跳过的成功证明。
+8. 数据推送后等待该提交自动触发的 Pages 构建（或已验证后继提交）完成，再用独立 Node 验证器校验公开 canonical JSON 的数据 revision、HTML 的页面 build revision，以及线上 `app.js`、`style.css`、图标子集的实际内容哈希。即使价格数据没变，或后继提交造成 HTML 与资产短暂错配，也不能冒充新部署。只有整条生产链成功才会形成当天可供兜底跳过的成功证明。
 9. 故障或部分降级自动维护一条未关闭 Issue，持续失败不重复创建，恢复后自动关闭。
 
 正常变价、汇率更新、短暂网络失败与恢复无需人工处理。上游长期改版、来源撤下、GitHub 权限或调度中断仍可能需要维护；不能保证永久零人工。
@@ -31,11 +31,11 @@
 ## 文件与验收
 
 - `scripts/pipeline.py`：采集、校验、状态、汇率、静态渲染。
-- `scripts/daily_run_guard.py`：CF/GitHub 自动主备的每日幂等门禁；结合仓库数据与 GitHub Actions 当天成功运行，不增加数据库或额外状态文件。
-- `scripts/verify-production.mjs`：Pages 构建完成后的生产验收；同时核对数据 revision 与由数据、模板、JS、CSS、图标资产共同生成的页面 build revision，避免“价格未变但旧前端仍被误判为已部署”；并限制响应大小、请求时长和总重试窗口。
+- `scripts/daily_run_guard.py`：CF/GitHub 自动主备的每日幂等门禁；结合当前仓库数据与 GitHub Actions 成功运行，并要求生产证明完成时间不早于当前数据生成时间，不增加数据库或额外状态文件。
+- `scripts/verify-production.mjs`：Pages 构建完成后的生产验收；同时核对数据 revision、页面 build revision 与线上 JS/CSS/图标实际内容哈希，避免旧 HTML、旧资产或 HTML/资产错配被误判为已部署；并限制响应大小、请求时长和总重试窗口。
 - `index.template.html`、`app.js`、`style.css`、`vendor/lucide-subset.js`：静态页面与无框架交互；图标子集随本项目本地托管，不依赖 iCloud 工具目录。
 - `data/prices.json`、`index.html`：自动生成，不手工改价。数据包含最近 200 条标价变动，不把汇率波动记录为套餐改价；更早版本见 Git 历史。
-- `scripts/test_pipeline.py`：离线回归；`scripts/browser-test.mjs`：Chrome 实测。浏览器测试覆盖套餐矩阵、最低价卡片、国家价格历史、过期汇率排名、重复金额、搜索/XSS、窄屏单套餐视图与无 JavaScript 静态矩阵。
+- `scripts/test_pipeline.py`：离线回归；`scripts/browser-test.mjs`：Chrome 实测。浏览器测试覆盖套餐矩阵、最低价卡片、国家价格历史、陈旧汇率退出比较排名、重复金额、搜索/XSS、窄屏单套餐视图与无 JavaScript 静态矩阵。
 
 ```sh
 python3 -m unittest discover -s tools/chatgpt_price_comparison/scripts -p 'test_*.py' -v
