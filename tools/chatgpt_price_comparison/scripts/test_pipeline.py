@@ -57,6 +57,22 @@ class AmountTests(unittest.TestCase):
 
 
 class ParsingTests(unittest.TestCase):
+    def test_source_schema_type_drift_fails_as_validation_error(self):
+        bad_author = fixture().replace(
+            '"author": {"url": "https://apps.apple.com/us/developer/openai-opco-llc/id1684349733"}',
+            '"author": []',
+        )
+        bad_offers = fixture().replace(
+            '"offers": {"price": 0, "priceCurrency": "USD"}',
+            '"offers": []',
+        )
+        bad_items = fixture().replace('"items": [', '"items": "bad", "ignored_items": [', 1)
+        bad_pairs = fixture().replace('"textPairs": [', '"textPairs": "bad", "ignored_pairs": [', 1)
+        bad_v3 = fixture().replace('"items_V3": [', '"items_V3": "bad", "ignored_v3": [', 1)
+        for source in (bad_author, bad_offers, bad_items, bad_pairs, bad_v3):
+            with self.subTest(source=source[:120]), self.assertRaises(ValueError):
+                p.parse_store(source, 'us')
+
     def test_free_app_is_not_subscription_price(self):
         result = p.parse_store(fixture(), 'us')
         self.assertEqual(result['currency'], 'USD')
@@ -267,6 +283,25 @@ class ContractTests(unittest.TestCase):
     def test_decimal_exact(self):
         d=data_fixture(); m=d['markets'][0]
         self.assertEqual(p.converted(m,'19.99',d['fx'],NOW),'139.93')
+
+    def test_fx_schema_type_drift_uses_existing_fallback(self):
+        old=data_fixture()['fx']
+        malformed_payloads=[
+            '[]',
+            json.dumps({
+                'result':'success',
+                'base_code':'USD',
+                'time_last_update_unix':NOW,
+                'rates':[],
+            }),
+        ]
+        for payload in malformed_payloads:
+            with self.subTest(payload=payload):
+                result=p.collect_fx(NOW+60,old,lambda *a,**kw: payload, {'USD'})
+                self.assertIsNotNone(result)
+                self.assertTrue(result['fallback'])
+                self.assertEqual(result['rates']['USD'],'1')
+                self.assertEqual(result['rates']['CNY'],'7')
 
     def test_fx_fallback_preserves_source_date(self):
         fx=data_fixture()['fx']
