@@ -73,7 +73,7 @@ class DailyRunGuardTests(unittest.TestCase):
         result = guard.decide("schedule", None, data, NOW, True)
         self.assertTrue(result["should_run"])
 
-    def test_unavailable_market_is_not_degraded(self):
+    def test_unavailable_market_keeps_backup_active(self):
         data = data_fixture()
         market = data["markets"][0]
         market["offers"] = []
@@ -81,7 +81,7 @@ class DailyRunGuardTests(unittest.TestCase):
         for key in ("currency", "unclassified_labels", "source_sha256", "fingerprint", "last_verified_at"):
             market.pop(key, None)
         revise(data)
-        self.assertFalse(guard.decide("schedule", None, data, NOW, True)["should_run"])
+        self.assertTrue(guard.decide("schedule", None, data, NOW, True)["should_run"])
 
     def test_retained_or_pending_market_keeps_backup_active(self):
         for status in ("retained", "pending"):
