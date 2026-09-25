@@ -497,6 +497,17 @@ def offer_min_cny(market: dict, label: str) -> Decimal | None:
     return min(values) if values else None
 
 
+def comparable_min_cny(market: dict, label: str, generated: float, fx_fresh: bool) -> Decimal | None:
+    if (
+        not fx_fresh
+        or market.get('status') != 'verified'
+        or not market.get('last_verified_at')
+        or not -300 <= generated - epoch(market['last_verified_at']) <= FRESH
+    ):
+        return None
+    return offer_min_cny(market, label)
+
+
 def beijing_display(value: str) -> str:
     return datetime.fromtimestamp(epoch(value), timezone.utc).astimezone(BEIJING).strftime('%Y/%m/%d %H:%M')
 
@@ -548,12 +559,8 @@ def render(data: dict, template: str) -> str:
         candidates = []
         if fx_fresh:
             for market in data['markets']:
-                value = offer_min_cny(market, plan)
-                if (
-                    market['status'] == 'verified'
-                    and value is not None
-                    and -300 <= generated - epoch(market['last_verified_at']) <= FRESH
-                ):
+                value = comparable_min_cny(market, plan, generated, fx_fresh)
+                if value is not None:
                     candidates.append((value, market))
         minimum = min((item[0] for item in candidates), default=None)
         minimums[plan] = minimum
@@ -604,17 +611,17 @@ def render(data: dict, template: str) -> str:
 
     rank_values = sorted({
         value for market in data['markets']
-        if (value := offer_min_cny(market, default_plan)) is not None
+        if (value := comparable_min_cny(market, default_plan, generated, fx_fresh)) is not None
     })
     rank_map = {value: index + 1 for index, value in enumerate(rank_values)}
 
     def sort_key(market: dict):
-        value = offer_min_cny(market, default_plan)
+        value = comparable_min_cny(market, default_plan, generated, fx_fresh)
         return (value is None, value if value is not None else Decimal('Infinity'), market['code'])
 
     rows = []
     for market in sorted(data['markets'], key=sort_key):
-        value = offer_min_cny(market, default_plan)
+        value = comparable_min_cny(market, default_plan, generated, fx_fresh)
         rank = rank_map.get(value) if value is not None else None
         rank_class = ' class="rank-top"' if rank is not None and rank <= 3 else ''
         status = '' if market['status'] == 'verified' else f' · {STATUS_LABEL[market["status"]]}'
