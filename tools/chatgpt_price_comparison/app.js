@@ -69,7 +69,7 @@
     if (displayedRank === '—' || displayedRank == null) return '排名暂不可用';
     return state.sortKey === 'country'
       ? `当前列表序号第 ${displayedRank}`
-      : `已覆盖地区价格排名第 ${displayedRank}`;
+      : `全球价格排名第 ${displayedRank}`;
   }
 
   function updateRankingPresentation() {
@@ -84,7 +84,7 @@
       accessible.textContent = '当前列表序号';
     } else {
       visible.textContent = '排名';
-      accessible.textContent = '已覆盖地区参考排名';
+      accessible.textContent = '全球参考排名';
     }
     el.rankHeaderLabel.append(visible, accessible);
   }
@@ -286,7 +286,7 @@
         country.textContent = names.length > 3 ? `${names.length} 个地区并列最低` : names.join('、');
         price.textContent = formatCny(info.value);
         card.dataset.plan = plan; card.dataset.marketId = info.markets[0].code;
-        card.title = `查看 ${shortPlan(plan)} 已覆盖地区最低价`;
+        card.title = `查看 ${shortPlan(plan)} 全球最低价`;
         card.addEventListener('click', () => focusMinimum(plan, info.markets[0].code));
       }
       card.append(label, country, price); frag.append(card);
@@ -296,7 +296,7 @@
 
   function renderStats() {
     const priced = state.data.markets.filter((m) => m.offers.length);
-    el.marketCount.textContent = `${priced.length} / ${state.data.markets.length} 个地区`;
+    el.marketCount.textContent = `${priced.length} 个地区`;
     el.currencyCount.textContent = `${new Set(priced.map((m) => m.currency).filter(Boolean)).size} 种`;
     el.planCount.textContent = `${state.plans.length} 档`;
   }
