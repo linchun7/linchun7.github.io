@@ -106,6 +106,15 @@ class ParsingTests(unittest.TestCase):
     def test_missing_visible(self):
         with self.assertRaises(ValueError): p.parse_store(fixture().replace('class="text-pair', 'class="changed-pair'), 'us')
 
+    def test_extra_visible_chatgpt_plan_fails_closed(self):
+        source = fixture().replace(
+            '</div><script type="application/json" id="serialized-server-data">',
+            '<div class="text-pair svelte-fixture"><span>ChatGPT Future Max</span><span>$44.00</span></div>'
+            '</div><script type="application/json" id="serialized-server-data">',
+        )
+        with self.assertRaises(ValueError):
+            p.parse_store(source, 'us')
+
     def test_structured_disagreement(self):
         with self.assertRaises(ValueError): p.parse_store(fixture().replace('"trailingText": "$19.99"', '"trailingText": "$99.99"'), 'us')
 
