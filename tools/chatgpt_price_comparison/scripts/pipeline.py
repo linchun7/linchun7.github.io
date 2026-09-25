@@ -637,7 +637,7 @@ def render(data: dict, template: str) -> str:
         rank = rank_map.get(value) if value is not None else None
         rank_class = ' class="rank-top"' if rank is not None and rank <= 3 else ''
         status = '' if market['status'] == 'verified' else f' · {STATUS_LABEL[market["status"]]}'
-        rank_accessibility = f'全球价格排名第 {rank}' if rank is not None else '排名暂不可用'
+        rank_accessibility = f'已覆盖地区价格排名第 {rank}' if rank is not None else '排名暂不可用'
         history_accessibility = '，启用 JavaScript 后查看价格历史' if market['offers'] else '，暂无价格历史'
         cells = []
         for plan in plans:
