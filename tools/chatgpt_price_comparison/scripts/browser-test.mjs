@@ -76,8 +76,10 @@ try {
   const sampleMarket=expected.markets.find(m=>m.offers.some(o=>o.label===defaultPlan));
   assert.ok(defaultPlan && sampleMarket,'at least one comparable plan and market');
   const sampleOffer=sampleMarket.offers.find(o=>o.label===defaultPlan);
+  assert.ok(plans.length>=5,'browser fixture exercises future plan expansion');
   assert.equal(await evaluate('document.querySelectorAll("[data-plan-header]").length'),plans.length,'one column per plan');
   assert.equal(await evaluate('document.querySelectorAll(".minimum-card").length'),plans.length,'one minimum card per plan');
+  assert.equal(await evaluate('document.querySelectorAll("#mobilePlanControl button").length'),plans.length,'mobile plan selector includes every plan');
   assert.equal(await evaluate('document.querySelector(".search-field svg")!==null && document.querySelector("button[data-sort=country] svg")!==null'),true,'Lucide search and sort icons render');
   assert.equal(await evaluate('document.querySelector("#refresh")===null && document.querySelector("#plan")===null && document.querySelector("#status")===null'),true,'legacy reload and filters removed');
 
