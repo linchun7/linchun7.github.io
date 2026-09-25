@@ -13,12 +13,12 @@ class WorkflowContractTests(unittest.TestCase):
     def setUpClass(cls):
         cls.text = WORKFLOW.read_text(encoding="utf-8")
 
-    def test_cloudflare_is_primary_and_github_has_one_0935_fallback(self):
+    def test_cloudflare_is_primary_and_github_has_one_0910_fallback(self):
         self.assertIn("Cloudflare 09:05", self.text)
-        self.assertIn("北京时间 09:35", self.text)
-        self.assertIn("cron: '35 1 * * *'", self.text)
+        self.assertIn("北京时间 09:10", self.text)
+        self.assertIn("cron: '10 1 * * *'", self.text)
         self.assertEqual(self.text.count("- cron:"), 1)
-        self.assertNotIn("cron: '10 1 * * *'", self.text)
+        self.assertNotIn("cron: '35 1 * * *'", self.text)
         self.assertNotIn("cron: '10 2 * * *'", self.text)
         self.assertNotIn("cron: '5 1 * * *'", self.text)
         self.assertIn("- cloudflare", self.text)
