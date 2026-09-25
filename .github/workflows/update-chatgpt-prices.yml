@@ -1,8 +1,10 @@
 name: Update ChatGPT prices
 on:
   schedule:
-    # 北京时间 09:10，作为 Cloudflare 09:05 主触发的备用。
+    # 北京时间 09:10 / 10:10，作为 Cloudflare 09:05 主触发的两次低成本兜底。
+    # GitHub cron 可能延迟或漏触发；daily guard 会在已有成功生产证明时安全跳过。
     - cron: '10 1 * * *'
+    - cron: '10 2 * * *'
   workflow_dispatch:
     inputs:
       trigger_source:
