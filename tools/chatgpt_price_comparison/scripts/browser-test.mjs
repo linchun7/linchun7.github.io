@@ -180,6 +180,13 @@ try {
   assert.equal(await evaluate(`getComputedStyle(document.querySelector('.page-main')).rowGap`),'12px','mobile vertical rhythm matches the iCloud spacing');
   assert.equal(await evaluate(`getComputedStyle(document.querySelector('#mobilePlanControl')).overflowX`),'auto','future plan selector stays internally scrollable');
   assert.equal(await evaluate(`[...document.querySelectorAll('#priceRows tr[data-market-id]')].every(row => [...row.querySelectorAll('td[data-plan]')].filter(td => getComputedStyle(td).display !== 'none').length === 1)`),true,'mobile shows one active plan column');
+
+  await command('Emulation.setDeviceMetricsOverride',{width:320,height:568,deviceScaleFactor:1,mobile:true});
+  await delay(150);
+  assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth + 1'),'no body overflow on 320px screens');
+  assert.ok(await evaluate('document.querySelector(".minimum-stats").scrollWidth <= document.querySelector(".minimum-stats").clientWidth + 1'),'minimum cards stay inside the 320px overview');
+  assert.ok(await evaluate('document.querySelector(".workspace").scrollWidth <= document.querySelector(".workspace").clientWidth + 1'),'workspace shell stays inside the 320px viewport');
+
   if(process.env.SCREENSHOT) {
     const result=await command('Page.captureScreenshot',{format:'png'});
     await writeFile(process.env.SCREENSHOT,Buffer.from(result.data,'base64'));
