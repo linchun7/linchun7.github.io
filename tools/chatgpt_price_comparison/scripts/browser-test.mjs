@@ -118,10 +118,10 @@ try {
 
   const fxUpdated=Date.parse(expected.fx?.updated_at || '');
   const newestVerified=Math.max(...expected.markets.filter(m=>m.offers.length).map(m=>Date.parse(m.last_verified_at)).filter(Number.isFinite));
-  const staleFxNow=fxUpdated + 7*86400e3 + 60e3;
-  if(Number.isFinite(fxUpdated) && Number.isFinite(newestVerified) && staleFxNow < newestVerified + 7*86400e3) {
+  const staleFxNow=fxUpdated + 36*3600e3 + 60e3;
+  if(Number.isFinite(fxUpdated) && Number.isFinite(newestVerified) && staleFxNow < newestVerified + 36*3600e3) {
     await evaluate(`globalThis.__chatgptRealDateNow=Date.now;Date.now=()=>${staleFxNow};document.querySelector('button[data-sort-plan="${defaultPlan}"]').click()`);
-    assert.equal(await evaluate(`[...document.querySelectorAll('#priceRows tr[data-market-id] td:first-child')].every(td=>td.textContent==='—')`),true,'expired FX removes CNY ranks');
+    assert.equal(await evaluate(`[...document.querySelectorAll('#priceRows tr[data-market-id] td:first-child')].every(td=>td.textContent==='—')`),true,'stale FX is excluded from comparison ranks');
     await evaluate(`Date.now=globalThis.__chatgptRealDateNow;delete globalThis.__chatgptRealDateNow;document.querySelector('button[data-sort-plan="${defaultPlan}"]').click()`);
   }
 
