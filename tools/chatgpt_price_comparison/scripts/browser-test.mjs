@@ -174,6 +174,10 @@ try {
   await command('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
   await delay(150);
   assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth + 1'),'no body overflow on narrow screens');
+  assert.equal(await evaluate(`getComputedStyle(document.querySelector('.data-status')).justifyContent`),'flex-end','mobile update status is right-aligned');
+  assert.equal(await evaluate(`getComputedStyle(document.querySelector('.data-status')).textAlign`),'right','mobile update status text is right-aligned');
+  assert.equal(await evaluate(`getComputedStyle(document.querySelector('.brand-copy h1')).fontSize`),'17px','mobile title matches the iCloud scale');
+  assert.equal(await evaluate(`getComputedStyle(document.querySelector('.page-main')).rowGap`),'12px','mobile vertical rhythm matches the iCloud spacing');
   assert.equal(await evaluate(`getComputedStyle(document.querySelector('#mobilePlanControl')).overflowX`),'auto','future plan selector stays internally scrollable');
   assert.equal(await evaluate(`[...document.querySelectorAll('#priceRows tr[data-market-id]')].every(row => [...row.querySelectorAll('td[data-plan]')].filter(td => getComputedStyle(td).display !== 'none').length === 1)`),true,'mobile shows one active plan column');
   if(process.env.SCREENSHOT) {
