@@ -28,6 +28,7 @@ class WorkflowContractTests(unittest.TestCase):
     def test_daily_guard_requires_successful_production_proof(self):
         self.assertIn("daily_run_guard.py", self.text)
         self.assertIn("production_success_today", self.text)
+        self.assertIn("successful_production_proof", self.text)
         self.assertIn("actions/workflows/update-chatgpt-prices.yml/runs?status=success", self.text)
         self.assertIn("needs: prepare", self.text)
         self.assertIn("needs: [prepare, generate]", self.text)
@@ -42,6 +43,9 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("verify-production:", self.text)
         self.assertIn("verify-production.mjs --expected", self.text)
         self.assertIn("--expected-index", self.text)
+        verifier = (ROOT / "tools" / "chatgpt_price_comparison" / "scripts" / "verify-production.mjs").read_text(encoding="utf-8")
+        self.assertIn("assetVersionsOf", verifier)
+        self.assertIn("production asset content does not match version", verifier)
         self.assertIn("VERIFY: ${{ needs.verify-production.result }}", self.text)
 
     def test_publish_uses_least_privilege(self):
