@@ -7,6 +7,12 @@ export const PRICES_URL = 'https://www.linchun.com.cn/tools/chatgpt_price_compar
 export const INDEX_URL = 'https://www.linchun.com.cn/tools/chatgpt_price_comparison/';
 const MAX_JSON = 2_000_000;
 const MAX_HTML = 4_000_000;
+const MAX_ASSET = 1_000_000;
+const ASSET_PATHS = {
+  app: 'app.js',
+  style: 'style.css',
+  lucide: 'vendor/lucide-subset.js'
+};
 
 function canonical(value) {
   if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';
@@ -33,6 +39,36 @@ export function pageRevisionOf(html) {
   const matches = [...String(html).matchAll(/<meta name="chatgpt-page-revision" content="([a-f0-9]{64})">/g)];
   if (matches.length !== 1) throw new Error('production HTML page revision meta is missing or duplicated');
   return matches[0][1];
+}
+
+export function assetVersionsOf(html) {
+  const text = String(html);
+  const patterns = {
+    app: /src="app\.js\?v=([a-f0-9]{12})"/g,
+    style: /href="style\.css\?v=([a-f0-9]{12})"/g,
+    lucide: /href="vendor\/lucide-subset\.js\?v=([a-f0-9]{12})"/g
+  };
+  const result = {};
+  for (const [name, pattern] of Object.entries(patterns)) {
+    const matches = [...text.matchAll(pattern)];
+    if (matches.length !== 1) throw new Error('production HTML asset version is missing or duplicated: ' + name);
+    result[name] = matches[0][1];
+  }
+  return result;
+}
+
+function validateAssetVersions(versions) {
+  const keys = Object.keys(ASSET_PATHS);
+  if (!versions || keys.some(key => !/^[a-f0-9]{12}$/.test(versions[key] || '')) ||
+      Object.keys(versions).length !== keys.length) {
+    throw new Error('expected asset versions are invalid');
+  }
+}
+
+function assetUrl(name, version) {
+  const url = new URL(ASSET_PATHS[name], INDEX_URL);
+  url.searchParams.set('v', version);
+  return url.href;
 }
 
 async function limitedText(response, limit) {
@@ -82,6 +118,7 @@ async function getText(fetchImpl, base, maxBytes, signal, attempt) {
 
 export async function verifyOnce(expected, {
   expectedPageRevision,
+  expectedAssets,
   fetchImpl = globalThis.fetch,
   requestTimeoutMs = 12_000,
   attempt = 1
@@ -89,6 +126,7 @@ export async function verifyOnce(expected, {
   if (!/^[a-f0-9]{64}$/.test(expectedPageRevision || '')) {
     throw new Error('expected page revision is invalid');
   }
+  validateAssetVersions(expectedAssets);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), requestTimeoutMs);
   try {
@@ -104,6 +142,21 @@ export async function verifyOnce(expected, {
     if (pageRevisionOf(html) !== expectedPageRevision) {
       throw new Error('production HTML page revision does not match expected build');
     }
+    const liveAssets = assetVersionsOf(html);
+    if (canonical(liveAssets) !== canonical(expectedAssets)) {
+      throw new Error('production HTML asset versions do not match expected build');
+    }
+    const assetEntries = Object.entries(expectedAssets);
+    const assetTexts = await Promise.all(assetEntries.map(([name, version]) =>
+      getText(fetchImpl, assetUrl(name, version), MAX_ASSET, controller.signal, attempt)
+    ));
+    for (let i = 0; i < assetEntries.length; i += 1) {
+      const [name, version] = assetEntries[i];
+      const actualVersion = createHash('sha256').update(assetTexts[i]).digest('hex').slice(0, 12);
+      if (actualVersion !== version) {
+        throw new Error('production asset content does not match version: ' + name);
+      }
+    }
     return actual.revision;
   } finally {
     clearTimeout(timer);
@@ -112,6 +165,7 @@ export async function verifyOnce(expected, {
 
 export async function verifyWithRetry(expected, {
   expectedPageRevision,
+  expectedAssets,
   maxWaitMs = 5 * 60_000,
   intervalMs = 10_000,
   requestTimeoutMs = 12_000,
@@ -126,7 +180,7 @@ export async function verifyWithRetry(expected, {
   while (now() - start <= maxWaitMs) {
     attempt += 1;
     try {
-      const revision = await verifyOnce(expected, { expectedPageRevision, fetchImpl, requestTimeoutMs, attempt });
+      const revision = await verifyOnce(expected, { expectedPageRevision, expectedAssets, fetchImpl, requestTimeoutMs, attempt });
       console.log('Verified live JSON and HTML revision:', revision, 'attempt:', attempt);
       return { revision, attempt };
     } catch (error) {
@@ -148,7 +202,10 @@ async function main() {
   }
   const expected = JSON.parse(await readFile(process.argv[dataIndex + 1], 'utf8'));
   const expectedHtml = await readFile(process.argv[pageIndex + 1], 'utf8');
-  await verifyWithRetry(expected, { expectedPageRevision: pageRevisionOf(expectedHtml) });
+  await verifyWithRetry(expected, {
+    expectedPageRevision: pageRevisionOf(expectedHtml),
+    expectedAssets: assetVersionsOf(expectedHtml)
+  });
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
