@@ -3603,6 +3603,7 @@ test('minimum history is lazy, independent of ranking navigation, keyboard acces
       const series=history.events.filter(e=>e.tier==='6TB');
       assert.equal(await page.locator('.minimum-history-event').count(),series.length);
       await page.locator('#minimumHistoryTierControl button[data-tier="50GB"]').click();
+      assert.equal(await page.locator('#minimumHistoryTierControl button[data-tier="50GB"]').evaluate(el => document.activeElement === el), true, 'switching history capacity keeps keyboard focus');
       assert.deepEqual(await page.evaluate(()=>({url:location.href,query:document.querySelector('#searchInput').value,
         region:document.querySelector('#regionSelect').value,summary:document.querySelector('#resultSummary').textContent})),before,'history selection cannot change table state');
       await page.locator('.minimum-history-event details summary').first().click();
@@ -3626,6 +3627,13 @@ test('minimum history is lazy, independent of ranking navigation, keyboard acces
       await page.waitForFunction(()=>!document.querySelector('#minimumHistoryDialog').open);
       assert.equal(new URL(page.url()).searchParams.get('tier'),'6TB');
       assert.equal(await page.locator('#searchInput').inputValue(),'','explicit navigation clears filters like the original card');
+      await page.locator('#minimumHistoryButton').click();
+      await page.evaluate(now => { Date.now = () => now; window.dispatchEvent(new Event('pageshow')); }, Date.parse(history.checkedAt) + 48 * 3600000);
+      await page.waitForFunction(() => document.querySelector('#minimumHistoryCurrent').hidden);
+      await page.locator('#minimumHistoryTierControl button').last().focus();
+      await page.keyboard.press('Tab');
+      assert.equal(await page.evaluate(() => document.activeElement.tagName), 'SUMMARY', 'historical evidence stays keyboard-reachable when current rankings expire');
+      await page.keyboard.press('Escape');
       assert.deepEqual(errors,[]);
     } finally {await browser.close();}
   }

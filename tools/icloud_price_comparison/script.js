@@ -1801,6 +1801,7 @@ function renderMinimumHistory() {
     .sort((a, b) => canonicalTierDefinition(a).capacityGb - canonicalTierDefinition(b).capacityGb);
   if (!allTiers.includes(minimumHistoryUi.tier)) minimumHistoryUi.tier = allTiers[0];
   const control = document.querySelector('#minimumHistoryTierControl');
+  const focusedTier = control.contains(document.activeElement) ? document.activeElement.dataset.tier : null;
   control.replaceChildren();
   for (const tier of allTiers) {
     const button = minimumHistoryNode('button', canonicalTierDefinition(tier).label);
@@ -1809,6 +1810,7 @@ function renderMinimumHistory() {
     button.addEventListener('click', () => { minimumHistoryUi.tier = tier; minimumHistoryUi.limit = 20; renderMinimumHistory(); });
     control.append(button);
   }
+  if (focusedTier) [...control.children].find((button) => button.dataset.tier === focusedTier)?.focus({ preventScroll: true });
   const series = h.events.filter((e) => e.tier === minimumHistoryUi.tier).reverse();
   const note = document.querySelector('#minimumHistoryNote');
   const coverage = h.firstObservedAt ? `可核验记录自 ${formatBeijingDateTime(h.firstObservedAt)}，截止 ${formatBeijingDateTime(h.checkpoint?.at)}。` : '暂无可核验排名记录。';
@@ -1822,7 +1824,9 @@ function renderMinimumHistory() {
     item.append(minimumHistoryNode('p', `${formatBeijingDateTime(event.at)} · ${MINIMUM_CAUSE_LABELS[event.cause]}`, 'minimum-history-event-meta'));
     item.append(minimumHistoryNode('strong', event.kind === 'initial' ? `起始最低价：${minimumWinnerNames(event.to)}` : `${minimumWinnerNames(event.from)} → ${minimumWinnerNames(event.to)}`));
     const details = document.createElement('details');
-    details.append(minimumHistoryNode('summary', '当时的价格与依据'));
+    const summary = minimumHistoryNode('summary', '当时的价格与依据');
+    summary.tabIndex = 0; // Include native summary controls in the existing focus trap.
+    details.append(summary);
     const explanation = event.cause === 'fx' ? '该容量比较范围及 Apple 当地价格未变，换算后的第一名发生变化。'
       : event.cause === 'apple' ? '该容量 Apple 当地价格改变，相关币种换算因子相同。'
       : event.cause === 'mixed' ? '该容量 Apple 当地价格和相关汇率均有变化；不据此宣称某一项是唯一原因。'
