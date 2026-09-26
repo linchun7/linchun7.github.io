@@ -3641,75 +3641,107 @@ async function minimumHistoryTestPage(context, { width = 390, historyRoute } = {
   return {page,browser,data};
 }
 
-test('minimum history is lazy, result-focused, independent of ranking navigation, keyboard accessible and mobile safe', {timeout:60000}, async(context) => {
+test('minimum history defaults to one dense timeline, filters optionally, and stays mobile safe', {timeout:60000}, async(context) => {
   const history = await readFixture('minimum-history.json');
+  const allChanges = [...history.events]
+    .filter((event) => event.kind === 'change')
+    .sort((first, second) => Date.parse(second.at) - Date.parse(first.at));
   for (const width of [320,390,1280]) {
     let requests=0;
     const session=await minimumHistoryTestPage(context,{width,historyRoute:route=>{
       requests++;return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(history)});
     }});
     if (!session) return;
-    const {page,browser}=session;
+    const {page,browser,data}=session;
     const errors=[];page.on('pageerror',error=>errors.push(error.message));
     try {
       assert.equal(requests,0,'no history request on initial load');
       await page.locator('.minimum-card[data-tier="6TB"]').click();
       assert.equal(new URL(page.url()).searchParams.get('tier'),'6TB','card still sorts/navigates');
-      assert.equal(await page.locator('#minimumHistoryDialog').count(),0,'card must not open a second action');
+      assert.equal(await page.locator('#minimumHistoryDialog').count(),0,'card must not open history');
+
       await page.locator('#searchInput').fill('不会命中的搜索');
       await page.waitForFunction(() => document.querySelector('#resultSummary').textContent.includes('找到 0 个地区'));
       const before=await page.evaluate(()=>({url:location.href,query:document.querySelector('#searchInput').value,
         region:document.querySelector('#regionSelect').value,summary:document.querySelector('#resultSummary').textContent}));
+
       await page.locator('#minimumHistoryButton').click();
-      await page.waitForFunction(()=>document.querySelectorAll('#minimumHistoryEvents .minimum-history-event').length>0);
+      await page.waitForFunction((count)=>document.querySelectorAll('#minimumHistoryEvents .minimum-history-event').length===count,allChanges.length);
       assert.equal(requests,1);
-      assert.equal(await page.locator('#minimumHistoryTierControl button[aria-pressed="true"]').getAttribute('data-tier'),'6TB');
+      assert.equal(await page.locator('#minimumHistoryTierFilter').inputValue(),'all','history must open on all capacities');
+      assert.deepEqual(
+        await page.locator('#minimumHistoryTierFilter option').allTextContents(),
+        ['全部容量', ...data.tiers.map(({label})=>label)],
+        'capacity is an optional filter, not a required navigation step'
+      );
+      assert.equal(await page.locator('#minimumHistoryCurrent').count(),0,'history must not duplicate current-minimum navigation');
+      assert.equal(await page.locator('#minimumHistoryTierControl').count(),0,'segmented capacity navigation must be removed');
+      assert.equal(await page.locator('.minimum-history-event').count(),allChanges.length);
+      assert.deepEqual(
+        await page.locator('.minimum-history-event').evaluateAll((items)=>items.map((item)=>item.dataset.tier)),
+        allChanges.map((event)=>event.tier),
+        'all-capacity timeline must be globally chronological'
+      );
       assert.match(await page.locator('#minimumHistoryNote').textContent(),/人民币价格按当时汇率折算/);
-      const series=history.events.filter(e=>e.tier==='6TB' && e.kind==='change');
-      assert.equal(await page.locator('.minimum-history-event').count(),series.length);
-      assert.equal(await page.locator('.minimum-history-event details').count(),0,'technical evidence must stay out of the result-focused dialog');
-      assert.equal(await page.getByText(/起始最低价|首次可核验记录/).count(),0,'baseline observations must not be presented as user-facing changes');
-      const firstChange=series.at(-1);
-      const firstText=await page.locator('.minimum-history-event').first().innerText();
-      assert.match(firstText,/¥\d/,'winner changes must include historical CNY reference prices');
-      assert.match(firstText,new RegExp(firstChange.to[0].name));
-      await page.locator('#minimumHistoryTierControl button[data-tier="50GB"]').click();
-      assert.equal(await page.locator('#minimumHistoryTierControl button[data-tier="50GB"]').evaluate(el => document.activeElement === el), true, 'switching history capacity keeps keyboard focus');
+      assert.equal(await page.locator('#minimumHistoryStatus').isHidden(),true,'normal result should not spend space on status prose');
+      assert.equal(await page.locator('.minimum-history-event details').count(),0);
+      assert.equal(await page.getByText(/起始最低价|首次可核验记录/).count(),0);
+      assert.match(await page.locator('.minimum-history-event').first().innerText(),/¥\d/);
+
+      const filter=page.locator('#minimumHistoryTierFilter');
+      await filter.focus();
+      await filter.selectOption('50GB');
+      const fiftyChanges=allChanges.filter((event)=>event.tier==='50GB');
+      await page.waitForFunction((count)=>document.querySelectorAll('.minimum-history-event').length===count,fiftyChanges.length);
+      assert.equal(await filter.evaluate((element)=>document.activeElement===element),true,'filter must retain keyboard focus');
+      assert.equal(await page.locator('.minimum-history-event').count(),fiftyChanges.length);
+      assert.deepEqual(await page.locator('.minimum-history-event').evaluateAll((items)=>items.map((item)=>item.dataset.tier)),fiftyChanges.map(()=> '50GB'));
       assert.deepEqual(await page.evaluate(()=>({url:location.href,query:document.querySelector('#searchInput').value,
-        region:document.querySelector('#regionSelect').value,summary:document.querySelector('#resultSummary').textContent})),before,'history selection cannot change table state');
-      assert.equal(await page.evaluate(()=>{
-        const d=document.querySelector('#minimumHistoryDialog');return d.scrollWidth<=d.clientWidth+1;
-      }),true,`dialog must fit ${width}px`);
-      await page.locator('#closeMinimumHistory').focus();
-      await page.keyboard.press('Shift+Tab');
-      assert.equal(await page.evaluate(()=>document.querySelector('#minimumHistoryDialog').contains(document.activeElement)),true);
-      await page.keyboard.press('Tab');
-      assert.equal(await page.locator('#closeMinimumHistory').evaluate(el=>document.activeElement===el),true);
+        region:document.querySelector('#regionSelect').value,summary:document.querySelector('#resultSummary').textContent})),before,'history filtering cannot change the price table');
+
+      await filter.selectOption('200GB');
+      await page.waitForFunction(()=>document.querySelectorAll('.minimum-history-event').length===0);
+      assert.match(await page.locator('#minimumHistoryEvents').textContent(),/暂无最低价变更记录/);
+
+      await filter.selectOption('all');
+      await page.waitForFunction((count)=>document.querySelectorAll('.minimum-history-event').length===count,allChanges.length);
+      const layout=await page.locator('#minimumHistoryDialog').evaluate((dialog)=>({scrollWidth:dialog.scrollWidth,clientWidth:dialog.clientWidth}));
+      assert.ok(layout.scrollWidth<=layout.clientWidth+1,`dialog must fit ${width}px`);
+
+      const eventLayout=await page.locator('.minimum-history-event').first().evaluate((item)=>{
+        const meta=item.querySelector('.minimum-history-event-meta').getBoundingClientRect();
+        const change=item.querySelector('.minimum-history-change').getBoundingClientRect();
+        const cause=item.querySelector('.minimum-history-cause').getBoundingClientRect();
+        return {height:item.getBoundingClientRect().height,metaTop:meta.top,changeTop:change.top,causeTop:cause.top};
+      });
+      if(width>640){
+        assert.ok(eventLayout.height<64,'desktop history should remain a compact single-row timeline');
+        assert.ok(Math.abs(eventLayout.metaTop-eventLayout.changeTop)<10 && Math.abs(eventLayout.metaTop-eventLayout.causeTop)<10);
+      }else{
+        assert.ok(eventLayout.changeTop>eventLayout.metaTop,'mobile history should put the price transition on a second line');
+        assert.ok(Math.abs(eventLayout.metaTop-eventLayout.causeTop)<10,'mobile metadata and cause should share the first line');
+      }
+
       await page.keyboard.press('Escape');
       await page.waitForFunction(()=>!document.querySelector('#minimumHistoryDialog').open);
       assert.equal(await page.locator('#minimumHistoryButton').evaluate(el=>document.activeElement===el),true);
       assert.equal(page.url(),before.url);
+
       await page.locator('#minimumHistoryButton').click();
-      assert.equal(requests,1,'reuse only memory, no persistence');
-      await page.locator('#minimumHistoryTierControl button[data-tier="6TB"]').click();
-      await page.locator('#minimumHistoryCurrent').click();
-      await page.waitForFunction(()=>!document.querySelector('#minimumHistoryDialog').open);
-      assert.equal(new URL(page.url()).searchParams.get('tier'),'6TB');
-      assert.equal(await page.locator('#searchInput').inputValue(),'','explicit navigation clears filters like the original card');
-      await page.locator('#minimumHistoryButton').click();
+      assert.equal(requests,1,'reopening should reuse in-memory history');
+      assert.equal(await page.locator('#minimumHistoryTierFilter').inputValue(),'all','each open returns to the complete timeline');
       await page.evaluate(now => { Date.now = () => now; window.dispatchEvent(new Event('pageshow')); }, Date.parse(history.checkedAt) + 48 * 3600000);
-      await page.waitForFunction(() => document.querySelector('#minimumHistoryCurrent').hidden);
-      await page.locator('#minimumHistoryTierControl button').last().focus();
-      await page.keyboard.press('Tab');
-      assert.equal(await page.evaluate(()=>document.querySelector('#minimumHistoryDialog').contains(document.activeElement)),true,'focus must remain inside the dialog when current rankings expire');
+      await page.waitForFunction((count)=>document.querySelectorAll('.minimum-history-event').length===count,allChanges.length);
+      assert.equal(await page.evaluate(()=>document.querySelector('#minimumHistoryDialog').contains(document.activeElement)),true,'history stays usable when current ranking freshness changes');
       await page.keyboard.press('Escape');
       assert.deepEqual(errors,[]);
     } finally {await browser.close();}
   }
 });
 
-test('minimum history failures are isolated, retryable and do not erase the price table', {timeout:30000}, async(context)=>{
+test('minimum history failures are isolated, retryable and restore the complete timeline', {timeout:30000}, async(context)=>{
   const h=await readFixture('minimum-history.json');let attempt=0;
+  const expectedChanges=h.events.filter((event)=>event.kind==='change').length;
   const session=await minimumHistoryTestPage(context,{historyRoute:route=>{
     attempt++;
     return route.fulfill({status:200,contentType:'application/json',body:attempt===1?'{"schemaVersion":1}':JSON.stringify(h)});
@@ -3720,28 +3752,29 @@ test('minimum history failures are isolated, retryable and do not erase the pric
     const rows=await page.locator('#priceRows tr').count();
     await page.locator('#minimumHistoryButton').click();
     await page.locator('#minimumHistoryRetry').waitFor({state:'visible'});
-    assert.match(await page.locator('#minimumHistoryNote').textContent(),/当前价格表不受影响/);
+    assert.match(await page.locator('#minimumHistoryStatus').textContent(),/当前价格表不受影响/);
+    assert.equal(await page.locator('#minimumHistoryToolbar').isHidden(),true);
+    assert.equal(await page.locator('#minimumHistoryNote').isHidden(),true);
     assert.equal(await page.locator('#priceRows tr').count(),rows);
     assert.equal(await page.locator('#searchInput').isDisabled(),false);
+
     await page.locator('#minimumHistoryRetry').click();
-    await page.waitForFunction(() => document.querySelector('#minimumHistoryEvents')?.textContent.includes('暂无最低价变更记录'));
-    assert.match(await page.locator('#minimumHistoryEvents').textContent(),/暂无最低价变更记录/);
-    await page.locator('#minimumHistoryTierControl button[data-tier="6TB"]').click();
-    await page.waitForFunction(()=>document.querySelectorAll('.minimum-history-event').length>0);
+    await page.waitForFunction((count)=>document.querySelectorAll('.minimum-history-event').length===count,expectedChanges);
+    assert.equal(await page.locator('#minimumHistoryTierFilter').inputValue(),'all');
     assert.equal(attempt,2);
     assert.equal(await page.locator('#minimumHistoryRetry').isHidden(),true);
+    assert.equal(await page.locator('#minimumHistoryToolbar').isHidden(),false);
+    assert.equal(await page.locator('#minimumHistoryNote').isHidden(),false);
     await page.keyboard.press('Escape');
   } finally {await browser.close();}
 });
 
-test('minimum history distinguishes mixed causes, handles ties and bounds long histories', {timeout:30000}, async(context)=>{
+test('minimum history keeps all-capacity pagination, cause labels and optional filtering bounded', {timeout:30000}, async(context)=>{
   const { advanceMinimumHistory, emptyMinimumHistory }=await import('../scripts/minimum-history.mjs');
   const { validateMinimumHistoryPayload }=await import('../data-contract.js');
   const source=await readFixture('prices.json');
   let h=emptyMinimumHistory();
   const base=Date.parse(source.generatedAt)-25*86400000;
-  // Use a deterministic two-market history with alternating exact ties/sole winner.
-  // The fixture is intentionally independent of whichever country is currently first.
   for(let i=0;i<25;i++){
     const d=structuredClone(source);const at=new Date(base+i*86400000).toISOString();
     setPayloadGeneratedAt(d,at);
@@ -3757,21 +3790,30 @@ test('minimum history distinguishes mixed causes, handles ties and bounds long h
     h=advanceMinimumHistory(h,d);
   }
   validateMinimumHistoryPayload(h);
+  const changes=h.events.filter((event)=>event.kind==='change');
   const session=await minimumHistoryTestPage(context,{width:320,historyRoute:route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(h)})});
   if(!session)return;
   const {page,browser}=session;
   try{
     await page.locator('#minimumHistoryButton').click();
-    await page.locator('#minimumHistoryTierControl button[data-tier="6TB"]').click();
     await page.waitForFunction(()=>document.querySelectorAll('.minimum-history-event').length===20);
-    assert.match(await page.locator('#minimumHistoryNote').textContent(),/历史记录暂未同步到当前价格/);
+    assert.equal(await page.locator('#minimumHistoryTierFilter').inputValue(),'all');
+    assert.match(await page.locator('#minimumHistoryStatus').textContent(),/历史记录暂未同步到当前价格/);
+    assert.match(await page.locator('#minimumHistoryNote').textContent(),/人民币价格按当时汇率折算/);
     assert.equal(await page.locator('.minimum-history-event[data-cause="mixed"]').count()>0,true);
-    assert.equal(await page.locator('.minimum-history-event details').count(),0);
     assert.match(await page.locator('.minimum-history-event[data-cause="mixed"]').first().innerText(),/汇率 \+ Apple 调价/);
     assert.match(await page.locator('.minimum-history-event').first().innerText(),/¥\d/);
+
     await page.locator('#minimumHistoryMore').click();
-    assert.equal(await page.locator('.minimum-history-event').count(),h.events.filter((event)=>event.kind==='change').length);
+    assert.equal(await page.locator('.minimum-history-event').count(),changes.length);
     assert.equal(await page.locator('#minimumHistoryMore').isHidden(),true);
+
+    await page.locator('#minimumHistoryTierFilter').selectOption('50GB');
+    await page.waitForFunction(()=>document.querySelectorAll('.minimum-history-event').length===0);
+    assert.match(await page.locator('#minimumHistoryEvents').textContent(),/暂无最低价变更记录/);
+    await page.locator('#minimumHistoryTierFilter').selectOption('6TB');
+    assert.equal(await page.locator('.minimum-history-event').count(),20,'changing filters resets the pagination window');
+    assert.equal(await page.locator('#minimumHistoryMore').isHidden(),false);
     assert.equal(await page.evaluate(()=>document.querySelector('#minimumHistoryDialog').scrollWidth<=document.querySelector('#minimumHistoryDialog').clientWidth+1),true);
   } finally{await browser.close();}
 });
