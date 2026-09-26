@@ -1,0 +1,38 @@
+name: iCloud minimum history upgrade audit
+on:
+  push:
+    branches: [upgrade/icloud-minimum-history]
+    paths: [.github/workflows/icloud-minimum-upgrade-audit.yml]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22
+      - name: Export repository evidence and test dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          git bundle create "$RUNNER_TEMP/icloud-history.bundle" HEAD
+          git rev-parse HEAD > "$RUNNER_TEMP/icloud-audit-head.txt"
+          corepack enable
+          cd tools/icloud_price_comparison
+          pnpm install --frozen-lockfile --ignore-scripts
+          tar -czf "$RUNNER_TEMP/icloud-test-dependencies.tar.gz" node_modules
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: icloud-history-audit
+          path: |
+            ${{ runner.temp }}/icloud-history.bundle
+            ${{ runner.temp }}/icloud-audit-head.txt
+            ${{ runner.temp }}/icloud-test-dependencies.tar.gz
+          retention-days: 1
+          if-no-files-found: error
