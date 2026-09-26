@@ -20,7 +20,7 @@ jobs:
       - name: Check out exact sealed main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: aef75165ff5d0b7cf048a692acf1a9602f84c790
+          ref: 8f1ccfd4413baa356fdbd5d6cc1172ad131794dd
           persist-credentials: false
           fetch-depth: 1
 
