@@ -1,3 +1,4 @@
+import { comparisonFxFingerprint } from './minimum-history.mjs';
 import { foldPublicationCountryRenames } from '../data-model.js';
 import { appendFile, link, mkdir, readFile, readdir, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -652,8 +653,10 @@ export function attachDerivedCnyPrices(countries, { fx, previousData = null } = 
   }));
 }
 
-export function publicExchangeRateMetadata(fx) {
+export function publicExchangeRateMetadata(fx, countries = []) {
+  const comparisonFingerprint = comparisonFxFingerprint(fx, countries);
   return {
+    ...(comparisonFingerprint ? { comparisonFingerprint } : {}),
     sourceUrl: fx.sourceUrl,
     sourceMode: fx.sourceMode,
     fallbackUsed: fx.fallbackUsed,
@@ -2687,7 +2690,7 @@ export async function main({
       countries: countries.length,
       pricePoints: countries.length * parsed.tiers.length
     },
-    fx: publicExchangeRateMetadata(fx),
+    fx: publicExchangeRateMetadata(fx, countries),
     tiers: parsed.tiers,
     countries
   };

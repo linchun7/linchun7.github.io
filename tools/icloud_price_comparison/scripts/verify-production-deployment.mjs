@@ -5,11 +5,13 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { validatePricePayload } from '../data-contract.js';
+import { assertMinimumHistoryMatches } from './minimum-history.mjs';
 import { parseJsonStrictBytes, validateCoreDataArtifact } from './validate-data-artifact.mjs';
 import { assertStaticPageMatches, publicPayloadFingerprint } from './static-page.mjs';
 
 export const PRODUCTION_PRICES_URL = 'https://www.linchun.com.cn/tools/icloud_price_comparison/data/prices.json';
 export const PRODUCTION_HISTORY_URL = 'https://www.linchun.com.cn/tools/icloud_price_comparison/data/history.json';
+export const PRODUCTION_MINIMUM_HISTORY_URL = 'https://www.linchun.com.cn/tools/icloud_price_comparison/data/minimum-history.json';
 export const PRODUCTION_RUN_LOG_URL = 'https://www.linchun.com.cn/tools/icloud_price_comparison/data/run-log.json';
 export const PRODUCTION_INDEX_URL = 'https://www.linchun.com.cn/tools/icloud_price_comparison/';
 export const PRODUCTION_ASSET_BASE_URL = 'https://www.linchun.com.cn/tools/icloud_price_comparison/';
@@ -21,7 +23,7 @@ export const MAX_HISTORY_RESPONSE_BYTES = 8 * 1024 * 1024;
 export const MAX_RUN_LOG_RESPONSE_BYTES = 8 * 1024 * 1024;
 export const MAX_STATIC_ASSET_RESPONSE_BYTES = 1024 * 1024;
 const MAX_HTML_RESPONSE_BYTES = 512 * 1024;
-const JSON_FILES = [['prices', 'prices.json'], ['history', 'history.json'], ['runLog', 'run-log.json']];
+const JSON_FILES = [['prices', 'prices.json'], ['history', 'history.json'], ['runLog', 'run-log.json'], ['minimumHistory', 'minimum-history.json']];
 const PROJECT_DIRECTORY = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REPOSITORY_ROOT = path.resolve(PROJECT_DIRECTORY, '../..');
 const PROJECT_REPOSITORY_PATH = 'tools/icloud_price_comparison';
@@ -57,11 +59,12 @@ function validateDeployablePrices(payload, label) {
 function buildArtifact(values, raw, label) {
   validateDeployablePrices(values.prices, `${label} prices.json`);
   validateCoreDataArtifact(values);
+  assertMinimumHistoryMatches(values.minimumHistory, values.prices);
   return { ...values, raw, hashes: Object.fromEntries(JSON_FILES.map(([key]) => [key, sha256(raw[key])])) };
 }
 
-export function createVerificationArtifact({ prices, history, runLog }, label = 'verification artifact') {
-  const values = { prices, history, runLog };
+export function createVerificationArtifact({ prices, history, runLog, minimumHistory }, label = 'verification artifact') {
+  const values = { prices, history, runLog, minimumHistory };
   const raw = Object.fromEntries(JSON_FILES.map(([key]) => [key, Buffer.from(JSON.stringify(values[key]))]));
   return buildArtifact(values, raw, label);
 }
@@ -77,7 +80,7 @@ export async function loadVerificationArtifact(dataDirectory, label = 'verificat
 
 function normalizeArtifact(artifact, label) {
   if (artifact?.raw && artifact?.hashes) {
-    return buildArtifact({ prices: artifact.prices, history: artifact.history, runLog: artifact.runLog }, artifact.raw, label);
+    return buildArtifact({ prices: artifact.prices, history: artifact.history, runLog: artifact.runLog, minimumHistory: artifact.minimumHistory }, artifact.raw, label);
   }
   return createVerificationArtifact(artifact, label);
 }
@@ -294,6 +297,7 @@ async function verifyStaticAssets(manifest, productionHtml, {
 function classifyArtifactValidationError(error) {
   const message = String(error?.message ?? error).slice(0, 160).replace(/[\r\n]+/g, ' ');
   if (/run-log\.json/i.test(message)) return `run-log-invalid:${message}`;
+  if (/minimum/i.test(message)) return `minimum-history-invalid:${message}`;
   if (/history|price history/i.test(message)) return `history-invalid:${message}`;
   return `prices-invalid:${message}`;
 }
@@ -308,6 +312,7 @@ const resultResources = (staticManifest) => ({
   'prices.json': 'verified',
   'history.json': 'verified',
   'run-log.json': 'verified',
+  'minimum-history.json': 'verified',
   'index.html': 'verified against prices.json',
   ...(staticManifest
     ? Object.fromEntries(CORE_STATIC_ASSETS.map(({ path: assetPath }) => [assetPath, 'verified byte-for-byte']))
@@ -319,6 +324,7 @@ async function readProductionSnapshot({
   productionPricesUrl,
   productionHistoryUrl,
   productionRunLogUrl,
+  productionMinimumHistoryUrl,
   productionIndexUrl,
   signal,
   runId,
@@ -327,17 +333,18 @@ async function readProductionSnapshot({
 }) {
   const resourceUrl = (value) => diagnostic ? verificationUrl(value, runId, attempt) : new URL(value);
   const requestMode = { cacheBypass: diagnostic };
-  const [pricesResult, historyResult, runLogResult, productionHtml] = await Promise.all([
+  const [pricesResult, historyResult, runLogResult, minimumResult, productionHtml] = await Promise.all([
     fetchJsonResource(fetchImpl, resourceUrl(productionPricesUrl), signal, 'prices', MAX_PRICES_RESPONSE_BYTES, requestMode),
     fetchJsonResource(fetchImpl, resourceUrl(productionHistoryUrl), signal, 'history', MAX_HISTORY_RESPONSE_BYTES, requestMode),
     fetchJsonResource(fetchImpl, resourceUrl(productionRunLogUrl), signal, 'run-log', MAX_RUN_LOG_RESPONSE_BYTES, requestMode),
+    fetchJsonResource(fetchImpl, resourceUrl(productionMinimumHistoryUrl), signal, 'minimum-history', MAX_HISTORY_RESPONSE_BYTES, requestMode),
     fetchHtmlResource(fetchImpl, resourceUrl(productionIndexUrl), signal, requestMode)
   ]);
   let observed;
   try {
     observed = buildArtifact(
-      { prices: pricesResult.value, history: historyResult.value, runLog: runLogResult.value },
-      { prices: pricesResult.bytes, history: historyResult.bytes, runLog: runLogResult.bytes },
+      { prices: pricesResult.value, history: historyResult.value, runLog: runLogResult.value, minimumHistory: minimumResult.value },
+      { prices: pricesResult.bytes, history: historyResult.bytes, runLog: runLogResult.bytes, minimumHistory: minimumResult.bytes },
       diagnostic ? 'production diagnostic artifact' : 'production acceptance artifact'
     );
   } catch (error) {
@@ -358,6 +365,7 @@ async function verifyCanonicalAcceptance(targetArtifact, targetStaticAssets, {
   productionPricesUrl,
   productionHistoryUrl,
   productionRunLogUrl,
+  productionMinimumHistoryUrl,
   productionIndexUrl,
   productionAssetBaseUrl,
   signal,
@@ -371,6 +379,7 @@ async function verifyCanonicalAcceptance(targetArtifact, targetStaticAssets, {
       productionPricesUrl,
       productionHistoryUrl,
       productionRunLogUrl,
+      productionMinimumHistoryUrl,
       productionIndexUrl,
       signal,
       runId,
@@ -409,6 +418,7 @@ export async function verifyProductionDeployment(expectedArtifact, {
   productionPricesUrl = PRODUCTION_PRICES_URL,
   productionHistoryUrl = PRODUCTION_HISTORY_URL,
   productionRunLogUrl = PRODUCTION_RUN_LOG_URL,
+  productionMinimumHistoryUrl = PRODUCTION_MINIMUM_HISTORY_URL,
   productionIndexUrl = PRODUCTION_INDEX_URL,
   productionAssetBaseUrl = PRODUCTION_ASSET_BASE_URL,
   expectedStaticAssets = null,
@@ -436,6 +446,7 @@ export async function verifyProductionDeployment(expectedArtifact, {
         productionPricesUrl,
         productionHistoryUrl,
         productionRunLogUrl,
+        productionMinimumHistoryUrl,
         productionIndexUrl,
         signal: controller.signal,
         runId,
@@ -448,12 +459,13 @@ export async function verifyProductionDeployment(expectedArtifact, {
         && publicPayloadFingerprint(observed.prices) === expectedFingerprint
         && observed.prices.generatedAt === expected.prices.generatedAt
         && observed.prices.run.finishedAtUtc === expected.prices.run.finishedAtUtc;
-      if (pricesMatch && observed.hashes.history === expected.hashes.history && observed.hashes.runLog === expected.hashes.runLog) {
+      if (pricesMatch && artifactHashesMatch(observed, expected)) {
         const acceptance = await verifyCanonicalAcceptance(expected, expectedStaticAssets, {
           fetchImpl,
           productionPricesUrl,
           productionHistoryUrl,
           productionRunLogUrl,
+          productionMinimumHistoryUrl,
           productionIndexUrl,
           productionAssetBaseUrl,
           signal: controller.signal,
@@ -490,6 +502,7 @@ export async function verifyProductionDeployment(expectedArtifact, {
               productionPricesUrl,
               productionHistoryUrl,
               productionRunLogUrl,
+              productionMinimumHistoryUrl,
               productionIndexUrl,
               productionAssetBaseUrl,
               signal: controller.signal,
@@ -503,6 +516,7 @@ export async function verifyProductionDeployment(expectedArtifact, {
           if (observed.hashes.prices === currentMain.hashes.prices) {
             if (observed.hashes.history !== currentMain.hashes.history) lastReason = 'history-not-deployed';
             else if (observed.hashes.runLog !== currentMain.hashes.runLog) lastReason = 'run-log-not-deployed';
+            else if (observed.hashes.minimumHistory !== currentMain.hashes.minimumHistory) lastReason = 'minimum-history-not-deployed';
             else lastReason = 'newer-version-unproven';
           } else lastReason = 'newer-version-unproven';
         } else {
@@ -510,7 +524,8 @@ export async function verifyProductionDeployment(expectedArtifact, {
         }
       } else if (!pricesMatch) lastReason = 'prices-not-deployed';
       else if (observed.hashes.history !== expected.hashes.history) lastReason = 'history-not-deployed';
-      else lastReason = 'run-log-not-deployed';
+      else if (observed.hashes.runLog !== expected.hashes.runLog) lastReason = 'run-log-not-deployed';
+      else lastReason = 'minimum-history-not-deployed';
     } catch (error) {
       lastReason = error.reason ?? (error?.name === 'AbortError'
         ? 'request-timeout'

@@ -6,6 +6,7 @@ import {
   MAX_HISTORY_RESPONSE_BYTES,
   MAX_RUN_LOG_RESPONSE_BYTES,
   PRODUCTION_HISTORY_URL,
+  PRODUCTION_MINIMUM_HISTORY_URL,
   PRODUCTION_INDEX_URL,
   PRODUCTION_PRICES_URL,
   PRODUCTION_RUN_LOG_URL,
@@ -15,10 +16,12 @@ import {
 } from '../scripts/verify-production-deployment.mjs';
 import { renderStaticFragments, replaceStaticFragments } from '../scripts/static-page.mjs';
 
+import { advanceMinimumHistory } from '../scripts/minimum-history.mjs';
+
 const dataDirectory = new URL('../data/', import.meta.url);
 const indexUrl = new URL('../index.html', import.meta.url);
 const RESOURCE_PATHS = {
-  prices: '/prices.json', history: '/history.json', runLog: '/run-log.json', index: '/index.html'
+  prices: '/prices.json', history: '/history.json', runLog: '/run-log.json', minimumHistory: '/minimum-history.json', index: '/index.html'
 };
 
 function shiftedArtifact(artifact, hours) {
@@ -43,7 +46,7 @@ function shiftedArtifact(artifact, hours) {
   if (latest.automaticRunDateBeijing) latest.automaticRunDateBeijing = prices.run.observedAtBeijing;
   latest.source.exchangeRatesFetchedAtUtc = prices.fx.fetchedAt;
   runLog.updatedAtUtc = latest.finishedAtUtc;
-  return createVerificationArtifact({ prices, history, runLog }, 'shifted fixture');
+  return createVerificationArtifact({ prices, history, runLog, minimumHistory: advanceMinimumHistory(null, prices) }, 'shifted fixture');
 }
 
 function withRawWhitespace(artifact, resource) {
@@ -56,13 +59,13 @@ function withRawWhitespace(artifact, resource) {
 function olderHistoryArtifact(artifact) {
   const history = structuredClone(artifact.history);
   history.sourcePublishedDates.shift();
-  return createVerificationArtifact({ prices: artifact.prices, history, runLog: artifact.runLog }, 'older history fixture');
+  return createVerificationArtifact({ prices: artifact.prices, history, runLog: artifact.runLog, minimumHistory: artifact.minimumHistory }, 'older history fixture');
 }
 
 function olderRunLogArtifact(artifact) {
   const runLog = structuredClone(artifact.runLog);
   runLog.runs.shift();
-  return createVerificationArtifact({ prices: artifact.prices, history: artifact.history, runLog }, 'older run-log fixture');
+  return createVerificationArtifact({ prices: artifact.prices, history: artifact.history, runLog, minimumHistory: artifact.minimumHistory }, 'older run-log fixture');
 }
 
 function attemptFromUrl(requestUrl) {
@@ -110,6 +113,7 @@ async function startSequenceServer(sequence) {
   return {
     urls: {
       productionPricesUrl: `${base}/prices.json`, productionHistoryUrl: `${base}/history.json`,
+      productionMinimumHistoryUrl: `${base}/minimum-history.json`,
       productionRunLogUrl: `${base}/run-log.json`, productionIndexUrl: `${base}/index.html`
     },
     observedRequests,
@@ -163,27 +167,29 @@ function supersessionFixtures() {
   };
 }
 
-test('uses fixed trusted production URLs for all four resources', () => {
+test('uses fixed trusted production URLs for all five resources', () => {
   assert.equal(PRODUCTION_PRICES_URL, 'https://www.linchun.com.cn/tools/icloud_price_comparison/data/prices.json');
+  assert.equal(PRODUCTION_MINIMUM_HISTORY_URL, 'https://www.linchun.com.cn/tools/icloud_price_comparison/data/minimum-history.json');
   assert.equal(PRODUCTION_HISTORY_URL, 'https://www.linchun.com.cn/tools/icloud_price_comparison/data/history.json');
   assert.equal(PRODUCTION_RUN_LOG_URL, 'https://www.linchun.com.cn/tools/icloud_price_comparison/data/run-log.json');
   assert.equal(PRODUCTION_INDEX_URL, 'https://www.linchun.com.cn/tools/icloud_price_comparison/');
 });
 
-test('passes only when prices, history, run-log, and HTML all match', async (t) => {
+test('passes only when prices, history, run-log, minimum history, and HTML all match', async (t) => {
   const server = await startSequenceServer([{ artifact: expected }]);
   t.after(() => server.close());
   const result = await verifyProductionDeployment(expected, fastOptions(server));
   assert.equal(result.status, 'deployed');
   assert.deepEqual(result.resources, {
-    'prices.json': 'verified', 'history.json': 'verified', 'run-log.json': 'verified', 'index.html': 'verified against prices.json'
+    'prices.json': 'verified', 'history.json': 'verified', 'run-log.json': 'verified', 'minimum-history.json': 'verified', 'index.html': 'verified against prices.json'
   });
 });
 
 for (const [name, firstArtifact, expectedAttempts] of [
   ['prices', shiftedArtifact(expected, -1), 2],
   ['history', olderHistoryArtifact(expected), 2],
-  ['run-log', olderRunLogArtifact(expected), 2]
+  ['run-log', olderRunLogArtifact(expected), 2],
+  ['minimum-history', withRawWhitespace(expected, 'minimumHistory'), 2]
 ]) {
   test(`retries when ${name} has not deployed`, async (t) => {
     const server = await startSequenceServer([{ artifact: firstArtifact }, { artifact: expected }]);
@@ -327,6 +333,7 @@ test('invalid current-main data cannot prove supersession', () => {
   const invalid = {
     prices: current.prices,
     history: current.history,
+    minimumHistory: current.minimumHistory,
     runLog: {
       ...current.runLog,
       untrusted: true
@@ -379,11 +386,11 @@ test('uses cache-bypassed diagnostic reads but requires ordinary canonical accep
   const server = await startSequenceServer([{ artifact: old }, { artifact: expected }]);
   t.after(() => server.close());
   await verifyProductionDeployment(expected, fastOptions(server));
-  assert.equal(server.observedRequests.length, 12);
+  assert.equal(server.observedRequests.length, 15);
   const diagnosticRequests = server.observedRequests.filter(({ diagnostic }) => diagnostic);
   const acceptanceRequests = server.observedRequests.filter(({ diagnostic }) => !diagnostic);
-  assert.equal(diagnosticRequests.length, 8);
-  assert.equal(acceptanceRequests.length, 4);
+  assert.equal(diagnosticRequests.length, 10);
+  assert.equal(acceptanceRequests.length, 5);
   for (const request of diagnosticRequests) {
     assert.equal(request.cacheControl, 'no-cache');
     assert.equal(request.pragma, 'no-cache');
@@ -394,7 +401,7 @@ test('uses cache-bypassed diagnostic reads but requires ordinary canonical accep
     assert.equal(request.pragma, undefined);
     assert.doesNotMatch(request.url, /[?&]verify=/);
   }
-  assert.deepEqual(new Set(server.observedRequests.map(({ resource }) => resource)), new Set(['prices', 'history', 'runLog', 'index']));
+  assert.deepEqual(new Set(server.observedRequests.map(({ resource }) => resource)), new Set(['prices', 'history', 'runLog', 'minimumHistory', 'index']));
 });
 
 test('does not accept cache-bypassed diagnostics when ordinary canonical user URLs are broken', async (t) => {
@@ -457,7 +464,7 @@ test('aborts pending sibling requests when one resource fails fast before retry'
   const result = await verifyProductionDeployment(expected, fastOptions(server, { fetchImpl }));
   assert.equal(result.status, 'deployed');
   assert.equal(result.attempts, 2);
-  assert.equal(pendingSignals.length, 3);
+  assert.equal(pendingSignals.length, 4);
   for (const signal of pendingSignals) assert.equal(signal.aborted, true);
 });
 
@@ -466,10 +473,10 @@ test('rejects non-cross-checked prices and mismatched finishedAt', async () => {
     (prices) => { prices.source.parser = 'document-order'; },
     (prices) => { prices.run.finishedAtUtc = prices.run.startedAtUtc; }
   ]) {
-    const values = { prices: structuredClone(expected.prices), history: structuredClone(expected.history), runLog: structuredClone(expected.runLog) };
+    const values = { prices: structuredClone(expected.prices), history: structuredClone(expected.history), runLog: structuredClone(expected.runLog), minimumHistory: expected.minimumHistory };
     mutate(values.prices);
     const raw = {
-      prices: Buffer.from(JSON.stringify(values.prices)), history: Buffer.from(JSON.stringify(values.history)), runLog: Buffer.from(JSON.stringify(values.runLog))
+      prices: Buffer.from(JSON.stringify(values.prices)), history: Buffer.from(JSON.stringify(values.history)), runLog: Buffer.from(JSON.stringify(values.runLog)), minimumHistory: expected.raw.minimumHistory
     };
     await rejectsWithReason(expected, [{ artifact: { ...values, raw }, htmlPrices: expected.prices }], 'prices-invalid|run-log-invalid');
   }
@@ -482,5 +489,40 @@ test('the existing-production idempotent path uses the same complete verifier co
   const second = await verifyProductionDeployment(expected, fastOptions(server, { runId: 'existing-2' }));
   assert.equal(first.status, 'deployed');
   assert.equal(second.status, 'deployed');
-  assert.equal(server.observedRequests.length, 16);
+  assert.equal(server.observedRequests.length, 20);
+});
+
+for (const [description, response] of [
+  ['missing', { status: 404, body: '{}' }],
+  ['malformed', { body: '{bad' }],
+  ['invalid', { body: '{"schemaVersion":1}' }],
+  ['oversized', { declaredLength: MAX_HISTORY_RESPONSE_BYTES + 1 }],
+  ['wrong content type', { contentType: 'text/html' }],
+  ['redirected', { redirect: '/other-minimum-history.json' }],
+  ['stale', { body: committed.raw.minimumHistory }]
+]) {
+  test(`rejects ${description} minimum history without accepting the rest of the site`, () =>
+    rejectsWithReason(expected, [{ artifact: expected, responses: { minimumHistory: response } }], response.status ? 'minimum-history:HTTP_404' : 'minimum-history-invalid'));
+}
+
+test('canonical minimum history must match even when cache-bypassed diagnostics succeed', async (t) => {
+  const server = await startSequenceServer([{ artifact: expected }]);
+  t.after(() => server.close());
+  const fetchImpl = async (url, options) => {
+    const u = new URL(url);
+    if (u.pathname === '/minimum-history.json' && !u.searchParams.has('verify')) {
+      return new Response(committed.raw.minimumHistory, { headers: { 'content-type': 'application/json' } });
+    }
+    return fetch(url, options);
+  };
+  await assert.rejects(() => verifyProductionDeployment(expected, fastOptions(server, { fetchImpl, maxWaitMs: 1 })),
+    error => /canonical:minimum-history-invalid/.test(error.details?.lastReason));
+});
+
+test('newer production cannot be proven with different minimum-history bytes', () => {
+  const previous = shiftedArtifact(expected, -1);
+  const current = withRawWhitespace(expected, 'minimumHistory');
+  return rejectsWithReason(previous, [{ artifact: expected }], 'minimum-history-not-deployed', {
+    getCurrentMainArtifact: async () => current
+  });
 });

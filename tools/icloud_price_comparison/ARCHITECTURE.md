@@ -255,3 +255,13 @@ archive importer 重放完整 snapshot ledger（包括此前 live revision），
 中文显示名的“待确认”不是新的事实源，也不需要新的持久化状态。更新器已经有稳定契约：尚未人工复核中文名称时，公共 `prices.json` 中该市场的 `nameZh` 暂时等于 Apple 英文 `country`。因此每日 workflow 可以在运行前复制上一份已验证 `prices.json`，在候选生成成功后由 `report-chinese-name-sync.mjs` 从前后两份工件分别投影 pending `marketId` 集合，再做集合差异。
 
 该投影只进入 Action Summary：数量变化会列出新增/退出成员；数量相同但成员替换也会同时列出两侧。它不修改 `prices.json`、`history.json`、snapshot、market registry 或 `country-names.zh.json`，也不参与发布 gate 的业务判断。独立的 Apple 中文页面新地区名称监测只负责发现中文 108047 页面里历史上从未复核的新名称；已知名称的消失或重新出现不属于该监测的业务变化。两者不能互相替代或直接比较数量。
+
+## 最低价派生账本的边界
+
+`data/minimum-history.json` 与 Apple 月费 `history.json` 分离。没有新数据库、依赖、后台服务或调度器；`scripts/minimum-history.mjs` 在已有 `render:static` CLI 中比较已验证候选与上一次检查点，写入轻量账本。`render:static:check` 只读核对，`validate-data-artifact.mjs` 把账本与当前 prices 内容指纹绑定。它不进入 Apple 抓取器的事实历史事务：更新器仍维护原有 Apple 数据，发布前的既有工件门禁保证整个 data 目录与 index.html 一起接受验证和发布。失败候选不能发布。
+
+检查点每次可靠观测都推进，事件仅在 winner set 改变时追加，避免把几个月前的事件误当上一轮快照。比较依据按稳定 marketId 排序，包括该容量所有地区的本地标价、市场/币种集合，以及实际使用的换算因子指纹。未来 fresh FX 只公开可选 `comparisonFingerprint`，不公开原始汇率表；没有指纹的旧数据仍兼容，不能据 CNY 舍入值倒推精确汇率。
+
+同一比较范围、本地价格完全不变而赢家变了可记为汇率变化；本地价格变化且相关换算因子明确相同才标 Apple 调价；两者都变化标“调价与汇率均有变化”（非唯一因果结论）。地区/容量/币种变化单列，FX 不新鲜不制造赢家事件，恢复或历史证据缺口的变动保守标原因未能确定。已有精度 cnyRank 是当前权威；历史旧版只在保存原始 FX 或金额区间能严格区分时重建。
+
+UI 复用原生 dialog、焦点约束、字体与现有历史样式。独立“最低价历史”按钮保持卡片原导航契约；每批显示 20 条，明细安全 textContent 输出，并列集合不擅自选一个国家。无浏览器持久化，历史读取有超时/大小/结构/时间边界，历史失败不使价格表失效。

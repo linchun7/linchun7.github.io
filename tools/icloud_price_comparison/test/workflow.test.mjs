@@ -206,7 +206,10 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(verifier, /canonicalAssetUrl[\s\S]*?requestOptions\(signal, \{ cacheBypass: diagnostic \}\)/);
   assert.match(verifier, /schemaVersion !== 4[\s\S]*?parser !== 'cross-checked'/);
   assert.match(verifier, /observed\.prices\.generatedAt === expected\.prices\.generatedAt[\s\S]*?observed\.prices\.run\.finishedAtUtc === expected\.prices\.run\.finishedAtUtc/);
-  assert.match(verifier, /observed\.hashes\.history === expected\.hashes\.history[\s\S]*?observed\.hashes\.runLog === expected\.hashes\.runLog/);
+  assert.match(verifier, /pricesMatch && artifactHashesMatch\(observed, expected\)/);
+  assert.match(verifier, /JSON_FILES\.every\(\(\[key\]\) => left\.hashes\[key\] === right\.hashes\[key\]\)/);
+  assert.match(verifier, /\['minimumHistory', 'minimum-history\.json'\]/);
+  assert.match(verifier, /assertMinimumHistoryMatches\(values\.minimumHistory, values\.prices\)/);
   assert.match(updater, /MARKET_REVIEW_DEBT/);
   assert.doesNotMatch(updater, /::warning title=Unknown Apple market requires registry review::/);
   assert.doesNotMatch(updater, /UNKNOWN_APPLE_MARKET[^\n]*(?:throw|fail)/i);
