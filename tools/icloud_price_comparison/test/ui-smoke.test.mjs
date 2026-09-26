@@ -3495,12 +3495,23 @@ test('keeps mobile ranking visible and UX fallbacks stable', { timeout: 60_000 }
 
         const firstHistoryButton = page.locator('#priceRows tr[data-market-id] .country-history-button').first();
         const rankBadge = firstHistoryButton.locator('.mobile-rank');
-        const rankCue = await firstHistoryButton.evaluate((button) => ({
-          paddingRight: Number.parseFloat(getComputedStyle(button).paddingRight)
-        }));
+        const rankCue = await firstHistoryButton.evaluate((button) => {
+          const name = button.querySelector('.country-name').getBoundingClientRect();
+          const subtitle = button.querySelector('.country-name-en')?.getBoundingClientRect();
+          const rank = button.querySelector('.mobile-rank').getBoundingClientRect();
+          return {
+            nameBottom: name.bottom,
+            rankTop: rank.top,
+            subtitleTop: subtitle?.top ?? null,
+            rankTopDeltaFromSubtitle: subtitle ? Math.abs(rank.top - subtitle.top) : null
+          };
+        });
         assert.equal(await rankBadge.isVisible(), true, String(viewport.width) + 'px must expose the current rank or sequence');
         assert.match((await rankBadge.textContent()).trim(), /^\d+|—$/, String(viewport.width) + 'px rank badge must contain the current rank or sequence');
-        assert.ok(rankCue.paddingRight >= 60, String(viewport.width) + 'px rank badge must reserve non-overlapping space');
+        assert.ok(rankCue.rankTop >= rankCue.nameBottom - 1, String(viewport.width) + 'px rank badge must sit below the primary country name');
+        if (rankCue.subtitleTop !== null) {
+          assert.ok(rankCue.rankTopDeltaFromSubtitle <= 4, String(viewport.width) + 'px rank badge should share the subtitle row');
+        }
 
         const minimumColumns = await page.locator('#minimumSummary').evaluate((element) => (
           getComputedStyle(element).gridTemplateColumns.trim().split(/\s+/).filter(Boolean).length
@@ -3573,6 +3584,20 @@ test('prioritizes exact market IDs without hiding partial matches and distinguis
       ['序1', '序2', '序3']
     );
     assert.equal(await page.locator('#rankHeaderLabel > span[aria-hidden="true"]').innerText(), '序号');
+    const sequenceLayout = await page.locator('#priceRows .country-history-button').evaluateAll((buttons) => (
+      buttons.slice(0, 40).map((button) => {
+        const name = button.querySelector('.country-name').getBoundingClientRect();
+        const rank = button.querySelector('.mobile-rank').getBoundingClientRect();
+        return {
+          overlap: Math.max(0, Math.min(name.right, rank.right) - Math.max(name.left, rank.left))
+            * Math.max(0, Math.min(name.bottom, rank.bottom) - Math.max(name.top, rank.top)),
+          nameBottom: name.bottom,
+          rankTop: rank.top
+        };
+      })
+    ));
+    assert.ok(sequenceLayout.every(({ overlap, nameBottom, rankTop }) => overlap === 0 && rankTop >= nameBottom - 1),
+      'mobile country sorting must keep sequence badges out of the primary country-name row');
 
     await page.locator('button[data-sort-tier="200GB"]').click();
     await page.waitForFunction(() => document.querySelector('.mobile-rank')?.textContent === '1');
@@ -3674,6 +3699,24 @@ test('minimum history defaults to one dense timeline, filters optionally, and st
         ['全部容量', ...data.tiers.map(({label})=>label)],
         'capacity is an optional filter, not a required navigation step'
       );
+      assert.equal(
+        await page.locator('#minimumHistoryToolbar').evaluate((toolbar) => toolbar.parentElement?.classList.contains('dialog-header')),
+        true,
+        'minimum-history filter belongs to the dialog header'
+      );
+      const headerLayout = await page.locator('#minimumHistoryDialog .dialog-header').evaluate((header) => {
+        const title = header.querySelector('#minimumHistoryTitle').getBoundingClientRect();
+        const toolbar = header.querySelector('#minimumHistoryToolbar').getBoundingClientRect();
+        const close = header.querySelector('#closeMinimumHistory').getBoundingClientRect();
+        return { titleTop:title.top, titleBottom:title.bottom, toolbarTop:toolbar.top, toolbarBottom:toolbar.bottom, closeTop:close.top };
+      });
+      if (width > 640) {
+        assert.ok(Math.abs(headerLayout.titleTop - headerLayout.toolbarTop) < 12,
+          'desktop history filter should share the title row');
+      } else {
+        assert.ok(headerLayout.toolbarTop >= headerLayout.titleBottom + 4,
+          'mobile history filter should move below the title row');
+      }
       assert.equal(await page.locator('#minimumHistoryCurrent').count(),0,'history must not duplicate current-minimum navigation');
       assert.equal(await page.locator('#minimumHistoryTierControl').count(),0,'segmented capacity navigation must be removed');
       assert.equal(await page.locator('.minimum-history-event').count(),allChanges.length);
