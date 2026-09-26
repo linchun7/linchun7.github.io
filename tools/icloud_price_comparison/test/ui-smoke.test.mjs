@@ -1046,7 +1046,7 @@ test('renders current prices, sorting, and country history in a real browser', {
         }
         await page.waitForFunction(() => document.querySelector('#historyDialog')?.open === true);
         if (expectedRecord) {
-          await page.waitForFunction((count) => document.querySelectorAll('#historyRows tr').length === count, expectedRecord.events.length);
+          await page.waitForFunction(() => document.querySelectorAll('#historyRows tr').length > 0);
         }
         assert.equal(await page.locator('#historyDialog thead th').count(), 3, `${viewport.name} history table must use one selected-tier column`);
         assert.equal((await page.locator('#historyDialog .dialog-eyebrow').textContent()).trim(), '价格历史');
@@ -1098,10 +1098,10 @@ test('renders current prices, sorting, and country history in a real browser', {
             assert.match(await page.locator('#historyCnyPrice').textContent(), new RegExp(uiNumberFormatter.format(expectedCountry.plans[tier.id].cnyPrice).replace('.', '\\.')));
           }
           if (expectedRecord) {
-            const expectedRows = [...expectedRecord.events].reverse().map((event) => [
+            const expectedRows = [...compactExpectedSeries(expectedRecord.events, tier.id)].reverse().map((event) => [
               formatUiDate(event.observedAt),
               event.currency,
-              Number.isFinite(event.plans[tier.id]) ? uiNumberFormatter.format(event.plans[tier.id]) : '--'
+              uiNumberFormatter.format(event.plans[tier.id])
             ]);
             assert.deepEqual(
               await page.locator('#historyRows tr').evaluateAll((rows) => rows.map((row) => (
@@ -1112,7 +1112,10 @@ test('renders current prices, sorting, and country history in a real browser', {
             );
             assert.equal(await page.locator('#historyEventCount').textContent(), `${Math.max(0, compactExpectedSeries(expectedRecord.events, tier.id).length - 1)} 次`);
           }
-          assert.equal(await page.locator('#historyRows tr td').count(), (expectedRecord?.events.length ?? 1) * 3, `${viewport.name} history rows must contain exactly three cells`);
+          const expectedHistoryRowCount = expectedRecord
+            ? compactExpectedSeries(expectedRecord.events, tier.id).length
+            : 1;
+          assert.equal(await page.locator('#historyRows tr td').count(), expectedHistoryRowCount * 3, `${viewport.name} history rows must contain exactly three cells`);
         }
         assert.equal(await page.locator('#historyDialog canvas').count(), 0, `${viewport.name} history dialog must not contain a chart canvas`);
         if (viewport.name === 'desktop') await page.keyboard.press('Escape');
@@ -1232,6 +1235,70 @@ test('keeps the simplified price table hierarchy and affordances consistent', { 
   }
 });
 
+test('shows only real selected-tier price changes and labels Apple publication price changes accurately', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the Indonesia price-history projection regression');
+  if (!browserConfig) return;
+  const expectedData = await readFixture('prices.json');
+  const expectedHistory = await readFixture('history.json');
+  const indonesia = expectedData.countries.find(({ country }) => country === 'Indonesia');
+  const record = historyRecordForCountry(expectedHistory, expectedData, 'Indonesia');
+  assert.ok(indonesia && record, 'Indonesia regression fixture must exist');
+
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await page.route('https://**/*', (route) => {
+    if (route.request().url().startsWith('https://www.googletagmanager.com/')) {
+      return route.fulfill({ status: 200, contentType: 'text/javascript', body: '' });
+    }
+    return route.abort();
+  });
+  try {
+    await page.goto(`http://127.0.0.1:${port}/?tier=50GB`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, expectedData.countries.length);
+    await page.locator('#searchInput').fill('印度尼西亚');
+    const historyButton = page.locator('#priceRows tr[data-market-id="id"] .country-history-button');
+    await historyButton.click();
+    await page.waitForFunction(() => document.querySelector('#historyDialog')?.open === true);
+    await page.waitForFunction(() => document.querySelectorAll('#historyRows tr').length > 0);
+
+    await page.locator('#historyTierControl button[data-tier="50GB"]').click();
+    assert.equal(await page.locator('#historyEventCount').textContent(), '0 次');
+    assert.deepEqual(
+      await page.locator('#historyRows tr').evaluateAll((rows) => rows.map((row) => [...row.cells].map((cell) => cell.textContent.trim()))),
+      [[formatUiDate('2024-12-05'), 'IDR', '15,000']],
+      'unchanged 50GB must not acquire a fake 2026-07-17 history row'
+    );
+
+    await page.locator('#historyTierControl button[data-tier="200GB"]').click();
+    assert.equal(await page.locator('#historyEventCount').textContent(), '1 次');
+    assert.deepEqual(
+      await page.locator('#historyRows tr').evaluateAll((rows) => rows.map((row) => [...row.cells].map((cell) => cell.textContent.trim()))),
+      [
+        [formatUiDate('2026-07-17'), 'IDR', '59,000'],
+        [formatUiDate('2024-12-05'), 'IDR', '49,000']
+      ],
+      'Indonesia 200GB must show the real 49,000 -> 59,000 price change'
+    );
+
+    await page.locator('#closeHistory').click();
+    await page.locator('#publishedDateButton').click();
+    await page.waitForFunction(() => document.querySelector('#publishedDateDialog')?.open === true);
+    const julyRow = page.locator('#publishedDateRows tr').filter({ hasText: formatUiDate('2026-07-17') });
+    assert.equal(await julyRow.count(), 1);
+    const julyText = await julyRow.locator('td').nth(1).innerText();
+    assert.match(julyText, /价格变化：/);
+    assert.doesNotMatch(julyText, /地区内容变化：/);
+    assert.match(julyText, /印度尼西亚/);
+    assert.match(julyText, /200 GB 49,000 IDR→59,000 IDR/);
+  } finally {
+    await page.close();
+    await browser.close();
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
 test('excludes history events from before a tier was introduced', { timeout: 30_000 }, async (context) => {
   const browserConfig = await resolveBrowser(context, 'the tier introduction history regression test');
   if (!browserConfig) return;
@@ -1280,11 +1347,9 @@ test('excludes history events from before a tier was introduced', { timeout: 30_
     assert.equal(await page.locator('#historyDialog canvas').count(), 0);
 
     const oldEventDate = formatUiDate(targetRecord.events[0].observedAt);
-    const oldEventTierCell = await page.locator('#historyRows tr').evaluateAll((rows, date) => {
-      const row = rows.find((candidate) => candidate.cells[0]?.textContent.trim() === date);
-      return row?.cells[2]?.textContent.trim();
-    }, oldEventDate);
-    assert.equal(oldEventTierCell, '--', 'pre-introduction events should remain visibly unavailable in the table');
+    const renderedDates = await page.locator('#historyRows tr').evaluateAll((rows) => rows.map((row) => row.cells[0]?.textContent.trim()));
+    assert.equal(renderedDates.includes(oldEventDate), false, 'pre-introduction observations must not appear as fake price-history rows');
+    assert.equal(await page.locator('#historyRows tr').count(), expectedSeries.length);
     assert.deepEqual(errors, []);
   } finally {
     await page.close();
@@ -3576,7 +3641,7 @@ async function minimumHistoryTestPage(context, { width = 390, historyRoute } = {
   return {page,browser,data};
 }
 
-test('minimum history is lazy, independent of ranking navigation, keyboard accessible and mobile safe', {timeout:60000}, async(context) => {
+test('minimum history is lazy, result-focused, independent of ranking navigation, keyboard accessible and mobile safe', {timeout:60000}, async(context) => {
   const history = await readFixture('minimum-history.json');
   for (const width of [320,390,1280]) {
     let requests=0;
@@ -3599,15 +3664,19 @@ test('minimum history is lazy, independent of ranking navigation, keyboard acces
       await page.waitForFunction(()=>document.querySelectorAll('#minimumHistoryEvents .minimum-history-event').length>0);
       assert.equal(requests,1);
       assert.equal(await page.locator('#minimumHistoryTierControl button[aria-pressed="true"]').getAttribute('data-tier'),'6TB');
-      assert.match(await page.locator('#minimumHistoryNote').textContent(),/可核验记录自/);
-      const series=history.events.filter(e=>e.tier==='6TB');
+      assert.match(await page.locator('#minimumHistoryNote').textContent(),/人民币价格按当时汇率折算/);
+      const series=history.events.filter(e=>e.tier==='6TB' && e.kind==='change');
       assert.equal(await page.locator('.minimum-history-event').count(),series.length);
+      assert.equal(await page.locator('.minimum-history-event details').count(),0,'technical evidence must stay out of the result-focused dialog');
+      assert.equal(await page.getByText(/起始最低价|首次可核验记录/).count(),0,'baseline observations must not be presented as user-facing changes');
+      const firstChange=series.at(-1);
+      const firstText=await page.locator('.minimum-history-event').first().innerText();
+      assert.match(firstText,/¥\d/,'winner changes must include historical CNY reference prices');
+      assert.match(firstText,new RegExp(firstChange.to[0].name));
       await page.locator('#minimumHistoryTierControl button[data-tier="50GB"]').click();
       assert.equal(await page.locator('#minimumHistoryTierControl button[data-tier="50GB"]').evaluate(el => document.activeElement === el), true, 'switching history capacity keeps keyboard focus');
       assert.deepEqual(await page.evaluate(()=>({url:location.href,query:document.querySelector('#searchInput').value,
         region:document.querySelector('#regionSelect').value,summary:document.querySelector('#resultSummary').textContent})),before,'history selection cannot change table state');
-      await page.locator('.minimum-history-event details summary').first().click();
-      assert.match(await page.locator('.minimum-history-event details').first().innerText(),/当时|上次快照|本次快照/);
       assert.equal(await page.evaluate(()=>{
         const d=document.querySelector('#minimumHistoryDialog');return d.scrollWidth<=d.clientWidth+1;
       }),true,`dialog must fit ${width}px`);
@@ -3632,7 +3701,7 @@ test('minimum history is lazy, independent of ranking navigation, keyboard acces
       await page.waitForFunction(() => document.querySelector('#minimumHistoryCurrent').hidden);
       await page.locator('#minimumHistoryTierControl button').last().focus();
       await page.keyboard.press('Tab');
-      assert.equal(await page.evaluate(() => document.activeElement.tagName), 'SUMMARY', 'historical evidence stays keyboard-reachable when current rankings expire');
+      assert.equal(await page.evaluate(()=>document.querySelector('#minimumHistoryDialog').contains(document.activeElement)),true,'focus must remain inside the dialog when current rankings expire');
       await page.keyboard.press('Escape');
       assert.deepEqual(errors,[]);
     } finally {await browser.close();}
@@ -3692,12 +3761,13 @@ test('minimum history distinguishes mixed causes, handles ties and bounds long h
     await page.locator('#minimumHistoryButton').click();
     await page.locator('#minimumHistoryTierControl button[data-tier="6TB"]').click();
     await page.waitForFunction(()=>document.querySelectorAll('.minimum-history-event').length===20);
-    assert.match(await page.locator('#minimumHistoryNote').textContent(),/更新时间不同/);
+    assert.match(await page.locator('#minimumHistoryNote').textContent(),/历史记录暂未同步到当前价格/);
     assert.equal(await page.locator('.minimum-history-event[data-cause="mixed"]').count()>0,true);
-    await page.locator('.minimum-history-event details summary').first().click();
-    assert.match(await page.locator('.minimum-history-event details').first().innerText(),/不据此宣称某一项是唯一原因/);
+    assert.equal(await page.locator('.minimum-history-event details').count(),0);
+    assert.match(await page.locator('.minimum-history-event[data-cause="mixed"]').first().innerText(),/汇率 \+ Apple 调价/);
+    assert.match(await page.locator('.minimum-history-event').first().innerText(),/¥\\d/);
     await page.locator('#minimumHistoryMore').click();
-    assert.equal(await page.locator('.minimum-history-event').count(),25);
+    assert.equal(await page.locator('.minimum-history-event').count(),h.events.filter((event)=>event.kind==='change').length);
     assert.equal(await page.locator('#minimumHistoryMore').isHidden(),true);
     assert.equal(await page.evaluate(()=>document.querySelector('#minimumHistoryDialog').scrollWidth<=document.querySelector('#minimumHistoryDialog').clientWidth+1),true);
   } finally{await browser.close();}
