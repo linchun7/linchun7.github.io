@@ -3478,6 +3478,7 @@ test('keeps mobile ranking visible and UX fallbacks stable', { timeout: 60_000 }
   const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
   try {
     for (const viewport of [
+      { width: 641, height: 844, minimumColumns: 5 },
       { width: 390, height: 844, minimumColumns: 3 },
       { width: 320, height: 720, minimumColumns: 2 }
     ]) {
@@ -3520,9 +3521,10 @@ test('keeps mobile ranking visible and UX fallbacks stable', { timeout: 60_000 }
           if (!countryCell) return 0;
           return countryCell.getBoundingClientRect().width / table.getBoundingClientRect().width;
         });
+        const countryColumnRange = viewport.width <= 640 ? [0.46, 0.49] : [0.45, 0.47];
         assert.ok(
-          countryColumnShare >= 0.46 && countryColumnShare <= 0.49,
-          String(viewport.width) + 'px country column should use roughly 47% of the mobile table width'
+          countryColumnShare >= countryColumnRange[0] && countryColumnShare <= countryColumnRange[1],
+          String(viewport.width) + 'px country column should follow its responsive width rule'
         );
 
         const minimumColumns = await page.locator('#minimumSummary').evaluate((element) => (
