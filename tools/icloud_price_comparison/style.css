@@ -807,7 +807,7 @@ th button:active { background: rgba(17, 104, 212, .13); }
   .minimum-card { min-height: 79px; padding: 9px; }
   .minimum-card .minimum-price { font-size: 15px; }
   .price-table th:nth-child(2),
-  .price-table td:nth-child(2) { width: 43%; padding-left: 18px; }
+  .price-table td:nth-child(2) { width: 47%; padding-left: 18px; }
   .price-table th,
   .price-table td { padding-inline: 9px; }
   .price-table th button { margin-inline: -9px; padding-inline: 9px; }
@@ -863,9 +863,11 @@ th button:active { background: rgba(17, 104, 212, .13); }
 .minimum-history-filter select { min-width: 132px; height: 38px; padding: 0 30px 0 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; }
 .minimum-history-filter select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .minimum-history-status { margin: 0 0 12px; color: var(--muted); font-size: 13px; line-height: 1.55; }
-.minimum-history-note { margin: 16px 0 0; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; line-height: 1.55; }
-#minimumHistoryEvents { border-top: 1px solid var(--line); }
-.minimum-history-event { display: grid; grid-template-columns: 190px minmax(0, 1fr) max-content; align-items: center; gap: 14px; min-width: 0; padding: 13px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.minimum-history-dialog .history-list { padding-top: 12px; }
+.minimum-history-note { margin: 14px 0 0; padding: 10px 12px; color: var(--muted); background: var(--surface-soft); border-radius: 6px; font-size: 12px; line-height: 1.55; }
+#minimumHistoryEvents { border-top: 0; }
+.minimum-history-event { display: grid; grid-template-columns: 190px minmax(0, 1fr) max-content; align-items: center; gap: 14px; min-width: 0; padding: 13px 0; overflow-wrap: anywhere; }
+.minimum-history-event + .minimum-history-event { border-top: 1px solid var(--line); }
 .minimum-history-event-meta { display: flex; align-items: center; gap: 10px; min-width: 0; margin: 0; }
 .minimum-history-date { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .minimum-history-tier { flex: 0 0 auto; padding: 2px 7px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-soft); color: var(--ink-soft); font-size: 12px; line-height: 1.45; white-space: nowrap; }
