@@ -3724,6 +3724,9 @@ test('minimum history failures are isolated, retryable and do not erase the pric
     assert.equal(await page.locator('#priceRows tr').count(),rows);
     assert.equal(await page.locator('#searchInput').isDisabled(),false);
     await page.locator('#minimumHistoryRetry').click();
+    await page.waitForFunction(()=>document.querySelector('#minimumHistoryRetry').hidden);
+    assert.match(await page.locator('#minimumHistoryEvents').textContent(),/暂无最低价变更记录/);
+    await page.locator('#minimumHistoryTierControl button[data-tier="6TB"]').click();
     await page.waitForFunction(()=>document.querySelectorAll('.minimum-history-event').length>0);
     assert.equal(attempt,2);
     assert.equal(await page.locator('#minimumHistoryRetry').isHidden(),true);
