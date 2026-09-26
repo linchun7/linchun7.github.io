@@ -3467,6 +3467,53 @@ test('minimum-card controls stay enabled after returning to default home', { tim
   }
 });
 
+test('keeps the update status inside the viewport immediately above the 640px breakpoint', { timeout: 30_000 }, async (context) => {
+  const browserConfig = await resolveBrowser(context, 'the narrow-tablet header overflow regression');
+  if (!browserConfig) return;
+  const server = await startServer();
+  const { port } = server.address();
+  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
+  try {
+    for (const width of [641, 650, 700]) {
+      const page = await browser.newPage({ viewport: { width, height: 900 } });
+      await page.route('https://**/*', (route) => {
+        if (route.request().url().startsWith('https://www.googletagmanager.com/')) {
+          return route.fulfill({ status: 200, contentType: 'text/javascript', body: '' });
+        }
+        return route.abort();
+      });
+      try {
+        await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded' });
+        await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length >= 150);
+        const layout = await page.evaluate(() => {
+          const root = document.documentElement;
+          const status = document.querySelector('.data-status');
+          const updated = document.querySelector('#updatedAt');
+          const statusRect = status.getBoundingClientRect();
+          const updatedRect = updated.getBoundingClientRect();
+          return {
+            scrollWidth: root.scrollWidth,
+            clientWidth: root.clientWidth,
+            statusRight: statusRect.right,
+            updatedRight: updatedRect.right,
+            whiteSpace: getComputedStyle(status).whiteSpace
+          };
+        });
+        assert.ok(layout.scrollWidth <= layout.clientWidth + 1, `${width}px header must not create horizontal page overflow`);
+        assert.ok(layout.statusRight <= layout.clientWidth + 1, `${width}px data-status must stay inside the viewport`);
+        assert.ok(layout.updatedRight <= layout.clientWidth + 1, `${width}px updatedAt must stay inside the viewport`);
+        assert.equal(layout.whiteSpace, 'normal', `${width}px update status must be allowed to wrap when space is tight`);
+      } finally {
+        await page.close();
+      }
+    }
+  } finally {
+    await browser.close();
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+
 test('keeps mobile ranking visible and UX fallbacks stable', { timeout: 60_000 }, async (context) => {
   const browserConfig = await resolveBrowser(context, 'the mobile ranking and UX regression test');
   if (!browserConfig) return;
