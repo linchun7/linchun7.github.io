@@ -111,3 +111,13 @@ iCloud 自动化策略只约束本项目及其明确共享的受管 workflow；�
 Apple 价格：<https://support.apple.com/en-us/108047>；官方中文名称：<https://support.apple.com/zh-cn/108047>。ExchangeRate-API 认证源使用 `https://v6.exchangerate-api.com/v6/latest/USD`，API Key 仅通过 `Authorization: Bearer` 发送；开放回退源为 <https://open.er-api.com/v6/latest/USD>。
 
 税费、可用性、付款方式、购买区域限制和最终结算以 Apple 对应地区页面及实际结算为准。本工具与 Apple Inc. 无关联。自有代码见 [LICENSE](LICENSE)，第三方资源见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 与 `vendor/manifest.json`。
+
+## 最低价历史
+
+顶部最低价卡片仍然只切换容量并定位当前价格表；标题旁的“最低价历史”是独立入口。弹窗内选容量、展开依据、翻阅历史均不改变表格排序、筛选或 URL；只有显式点击“在价格表中查看当前最低价”才执行原来的导航。Escape 关闭并归还焦点。历史按需加载，失败可单独重试，不影响当前价格。
+
+`data/minimum-history.json` 是独立的人民币参考排名派生账本，不改变 Apple 当地月费的 `history.json`，也不增加“价格变更次数”。只在第一名的完整 `marketId` 集合变化时记录（包含并列加入/退出）；首次状态标为基线，每日金额波动但赢家未变不增加事件。
+
+原因分为汇率变化、Apple 调价、调价与汇率均有变化、比较范围变化、原因未能确定。混合标签只声明两种输入都变了，并不证明唯一或主要因果；有数据缺口、口径变化或无法核验汇率时不强行二选一。事件时间是北京时间观测时间，不是实际生效时刻。
+
+回溯起点是现存 Git 历史中首个可核验排名快照（当前为 2026-07-30），不是项目创建日 2024-12-08：早期浏览器实时汇率未留存，不能用固定回退汇率或今天汇率冒充当时用户看到的排名。原始汇率完整时才重算；已有全精度排名时直接使用；仅剩两位小数且无法排除舍入并列的版本记为缺口。

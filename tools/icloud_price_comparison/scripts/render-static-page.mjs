@@ -1,3 +1,4 @@
+import { updateMinimumHistory } from './minimum-history.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -90,6 +91,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const index = args.indexOf(name);
     return index < 0 ? undefined : args[index + 1];
   };
+  const pricesPath = valueFor('--prices-file') ?? path.join(projectDirectory, 'data/prices.json');
+  await updateMinimumHistory(JSON.parse(await readFile(pricesPath, 'utf8')), path.join(path.dirname(pricesPath), 'minimum-history.json'), { check: mode === '--check' });
   const result = await renderStaticPage({
     write: mode === '--write',
     indexPath: valueFor('--index-file') ?? path.join(projectDirectory, 'index.html'),

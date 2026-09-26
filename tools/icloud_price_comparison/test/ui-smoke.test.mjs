@@ -3560,3 +3560,137 @@ test('normalizes compatibility search and exposes mobile rank semantics', { time
     await server.close(() => {});
   }
 });
+
+async function minimumHistoryTestPage(context, { width = 390, historyRoute } = {}) {
+  const config = await resolveBrowser(context, 'minimum history');
+  if (!config) return null;
+  const browser = await config.browserType.launch(config.launchOptions);
+  const page = await browser.newPage({viewport:{width,height:860}});
+  const data = await readFixture('prices.json');
+  await page.addInitScript((now) => { Date.now = () => now; }, Date.parse(data.generatedAt) + 3600000);
+  await page.route('https://**/*', route => route.fulfill({status:200,contentType:'text/javascript',body:''}));
+  if (historyRoute) await page.route('**/data/minimum-history.json*',historyRoute);
+  const server = await startServer();
+  await page.goto(`http://127.0.0.1:${server.address().port}/`, {waitUntil:'domcontentloaded'});
+  await page.waitForFunction(() => !document.querySelector('#searchInput').disabled && document.querySelector('.minimum-card:not(:disabled)'));
+  return {page,browser,data};
+}
+
+test('minimum history is lazy, independent of ranking navigation, keyboard accessible and mobile safe', {timeout:60000}, async(context) => {
+  const history = await readFixture('minimum-history.json');
+  for (const width of [320,390,1280]) {
+    let requests=0;
+    const session=await minimumHistoryTestPage(context,{width,historyRoute:route=>{
+      requests++;return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(history)});
+    }});
+    if (!session) return;
+    const {page,browser}=session;
+    const errors=[];page.on('pageerror',error=>errors.push(error.message));
+    try {
+      assert.equal(requests,0,'no history request on initial load');
+      await page.locator('.minimum-card[data-tier="6TB"]').click();
+      assert.equal(new URL(page.url()).searchParams.get('tier'),'6TB','card still sorts/navigates');
+      assert.equal(await page.locator('#minimumHistoryDialog').count(),0,'card must not open a second action');
+      await page.locator('#searchInput').fill('不会命中的搜索');
+      await page.waitForFunction(() => document.querySelector('#resultSummary').textContent.includes('找到 0 个地区'));
+      const before=await page.evaluate(()=>({url:location.href,query:document.querySelector('#searchInput').value,
+        region:document.querySelector('#regionSelect').value,summary:document.querySelector('#resultSummary').textContent}));
+      await page.locator('#minimumHistoryButton').click();
+      await page.waitForFunction(()=>document.querySelectorAll('#minimumHistoryEvents .minimum-history-event').length>0);
+      assert.equal(requests,1);
+      assert.equal(await page.locator('#minimumHistoryTierControl button[aria-pressed="true"]').getAttribute('data-tier'),'6TB');
+      assert.match(await page.locator('#minimumHistoryNote').textContent(),/可核验记录自/);
+      const series=history.events.filter(e=>e.tier==='6TB');
+      assert.equal(await page.locator('.minimum-history-event').count(),series.length);
+      await page.locator('#minimumHistoryTierControl button[data-tier="50GB"]').click();
+      assert.deepEqual(await page.evaluate(()=>({url:location.href,query:document.querySelector('#searchInput').value,
+        region:document.querySelector('#regionSelect').value,summary:document.querySelector('#resultSummary').textContent})),before,'history selection cannot change table state');
+      await page.locator('.minimum-history-event details summary').first().click();
+      assert.match(await page.locator('.minimum-history-event details').first().innerText(),/当时|上次快照|本次快照/);
+      assert.equal(await page.evaluate(()=>{
+        const d=document.querySelector('#minimumHistoryDialog');return d.scrollWidth<=d.clientWidth+1;
+      }),true,`dialog must fit ${width}px`);
+      await page.locator('#closeMinimumHistory').focus();
+      await page.keyboard.press('Shift+Tab');
+      assert.equal(await page.evaluate(()=>document.querySelector('#minimumHistoryDialog').contains(document.activeElement)),true);
+      await page.keyboard.press('Tab');
+      assert.equal(await page.locator('#closeMinimumHistory').evaluate(el=>document.activeElement===el),true);
+      await page.keyboard.press('Escape');
+      await page.waitForFunction(()=>!document.querySelector('#minimumHistoryDialog').open);
+      assert.equal(await page.locator('#minimumHistoryButton').evaluate(el=>document.activeElement===el),true);
+      assert.equal(page.url(),before.url);
+      await page.locator('#minimumHistoryButton').click();
+      assert.equal(requests,1,'reuse only memory, no persistence');
+      await page.locator('#minimumHistoryTierControl button[data-tier="6TB"]').click();
+      await page.locator('#minimumHistoryCurrent').click();
+      await page.waitForFunction(()=>!document.querySelector('#minimumHistoryDialog').open);
+      assert.equal(new URL(page.url()).searchParams.get('tier'),'6TB');
+      assert.equal(await page.locator('#searchInput').inputValue(),'','explicit navigation clears filters like the original card');
+      assert.deepEqual(errors,[]);
+    } finally {await browser.close();}
+  }
+});
+
+test('minimum history failures are isolated, retryable and do not erase the price table', {timeout:30000}, async(context)=>{
+  const h=await readFixture('minimum-history.json');let attempt=0;
+  const session=await minimumHistoryTestPage(context,{historyRoute:route=>{
+    attempt++;
+    return route.fulfill({status:200,contentType:'application/json',body:attempt===1?'{"schemaVersion":1}':JSON.stringify(h)});
+  }});
+  if(!session)return;
+  const {page,browser}=session;
+  try {
+    const rows=await page.locator('#priceRows tr').count();
+    await page.locator('#minimumHistoryButton').click();
+    await page.locator('#minimumHistoryRetry').waitFor({state:'visible'});
+    assert.match(await page.locator('#minimumHistoryNote').textContent(),/当前价格表不受影响/);
+    assert.equal(await page.locator('#priceRows tr').count(),rows);
+    assert.equal(await page.locator('#searchInput').isDisabled(),false);
+    await page.locator('#minimumHistoryRetry').click();
+    await page.waitForFunction(()=>document.querySelectorAll('.minimum-history-event').length>0);
+    assert.equal(attempt,2);
+    assert.equal(await page.locator('#minimumHistoryRetry').isHidden(),true);
+    await page.keyboard.press('Escape');
+  } finally {await browser.close();}
+});
+
+test('minimum history distinguishes mixed causes, handles ties and bounds long histories', {timeout:30000}, async(context)=>{
+  const { advanceMinimumHistory, emptyMinimumHistory }=await import('../scripts/minimum-history.mjs');
+  const { validateMinimumHistoryPayload }=await import('../data-contract.js');
+  const source=await readFixture('prices.json');
+  let h=emptyMinimumHistory();
+  const base=Date.parse(source.generatedAt)-25*86400000;
+  // Use a deterministic two-market history with alternating exact ties/sole winner.
+  // The fixture is intentionally independent of whichever country is currently first.
+  for(let i=0;i<25;i++){
+    const d=structuredClone(source);const at=new Date(base+i*86400000).toISOString();
+    setPayloadGeneratedAt(d,at);
+    d.source.publishedDate='July 17, 2026'; d.fx.fetchedAt=at;
+    d.fx.comparisonFingerprint=(i%2?'a':'b').repeat(64);
+    d.countries=d.countries.slice(0,2);
+    d.tiers=d.tiers.filter(t=>t.id==='6TB');
+    d.countries.forEach((c,j)=>{
+      const amount=j===0?100:100+i;
+      c.plans={'6TB':{price:amount,formattedPrice:String(amount),cnyPrice:j===0?10:i%2?10:20,cnyRank:j===0?1:i%2?1:2}};
+    });
+    d.run.countries=2;d.run.pricePoints=2;
+    h=advanceMinimumHistory(h,d);
+  }
+  validateMinimumHistoryPayload(h);
+  const session=await minimumHistoryTestPage(context,{width:320,historyRoute:route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(h)})});
+  if(!session)return;
+  const {page,browser}=session;
+  try{
+    await page.locator('#minimumHistoryButton').click();
+    await page.locator('#minimumHistoryTierControl button[data-tier="6TB"]').click();
+    await page.waitForFunction(()=>document.querySelectorAll('.minimum-history-event').length===20);
+    assert.match(await page.locator('#minimumHistoryNote').textContent(),/更新时间不同/);
+    assert.equal(await page.locator('.minimum-history-event[data-cause="mixed"]').count()>0,true);
+    await page.locator('.minimum-history-event details summary').first().click();
+    assert.match(await page.locator('.minimum-history-event details').first().innerText(),/不据此宣称某一项是唯一原因/);
+    await page.locator('#minimumHistoryMore').click();
+    assert.equal(await page.locator('.minimum-history-event').count(),25);
+    assert.equal(await page.locator('#minimumHistoryMore').isHidden(),true);
+    assert.equal(await page.evaluate(()=>document.querySelector('#minimumHistoryDialog').scrollWidth<=document.querySelector('#minimumHistoryDialog').clientWidth+1),true);
+  } finally{await browser.close();}
+});

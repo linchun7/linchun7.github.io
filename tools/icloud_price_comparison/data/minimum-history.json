@@ -1,0 +1,303 @@
+{
+  "schemaVersion": 1,
+  "projectSince": "2024-12-08",
+  "firstObservedAt": "2026-07-30T01:01:10.212Z",
+  "checkedAt": "2026-09-26T00:06:15.186Z",
+  "observations": 113,
+  "excludedVersions": 3,
+  "pendingGap": false,
+  "gaps": [
+    {
+      "from": "2026-08-10T00:05:56.887Z",
+      "to": "2026-08-11T00:06:34.089Z"
+    }
+  ],
+  "events": [
+    {
+      "tier": "12TB",
+      "at": "2026-07-30T01:01:10.212Z",
+      "previousAt": null,
+      "kind": "initial",
+      "cause": "initial",
+      "from": [],
+      "to": [
+        {
+          "id": "ng",
+          "name": "尼日利亚",
+          "currency": "NGN",
+          "local": 66900,
+          "cny": 331.8
+        }
+      ],
+      "evidence": {
+        "pricesChanged": false,
+        "scopeChanged": true,
+        "fxChanged": null,
+        "gap": false,
+        "basisChanged": false
+      },
+      "sourceCommit": "40ffb6a1a74e85503b3547f4ee40cd0f398ca393",
+      "basis": "saved-fx"
+    },
+    {
+      "tier": "200GB",
+      "at": "2026-07-30T01:01:10.212Z",
+      "previousAt": null,
+      "kind": "initial",
+      "cause": "initial",
+      "from": [],
+      "to": [
+        {
+          "id": "ru",
+          "name": "俄罗斯",
+          "currency": "RUB",
+          "local": 149,
+          "cny": 12.68
+        }
+      ],
+      "evidence": {
+        "pricesChanged": false,
+        "scopeChanged": true,
+        "fxChanged": null,
+        "gap": false,
+        "basisChanged": false
+      },
+      "sourceCommit": "40ffb6a1a74e85503b3547f4ee40cd0f398ca393",
+      "basis": "saved-fx"
+    },
+    {
+      "tier": "2TB",
+      "at": "2026-07-30T01:01:10.212Z",
+      "previousAt": null,
+      "kind": "initial",
+      "cause": "initial",
+      "from": [],
+      "to": [
+        {
+          "id": "ru",
+          "name": "俄罗斯",
+          "currency": "RUB",
+          "local": 599,
+          "cny": 50.97
+        }
+      ],
+      "evidence": {
+        "pricesChanged": false,
+        "scopeChanged": true,
+        "fxChanged": null,
+        "gap": false,
+        "basisChanged": false
+      },
+      "sourceCommit": "40ffb6a1a74e85503b3547f4ee40cd0f398ca393",
+      "basis": "saved-fx"
+    },
+    {
+      "tier": "50GB",
+      "at": "2026-07-30T01:01:10.212Z",
+      "previousAt": null,
+      "kind": "initial",
+      "cause": "initial",
+      "from": [],
+      "to": [
+        {
+          "id": "pk",
+          "name": "巴基斯坦",
+          "currency": "PKR",
+          "local": 200,
+          "cny": 4.87
+        }
+      ],
+      "evidence": {
+        "pricesChanged": false,
+        "scopeChanged": true,
+        "fxChanged": null,
+        "gap": false,
+        "basisChanged": false
+      },
+      "sourceCommit": "40ffb6a1a74e85503b3547f4ee40cd0f398ca393",
+      "basis": "saved-fx"
+    },
+    {
+      "tier": "6TB",
+      "at": "2026-07-30T01:01:10.212Z",
+      "previousAt": null,
+      "kind": "initial",
+      "cause": "initial",
+      "from": [],
+      "to": [
+        {
+          "id": "tw",
+          "name": "台湾",
+          "currency": "TWD",
+          "local": 900,
+          "cny": 188.25
+        }
+      ],
+      "evidence": {
+        "pricesChanged": false,
+        "scopeChanged": true,
+        "fxChanged": null,
+        "gap": false,
+        "basisChanged": false
+      },
+      "sourceCommit": "40ffb6a1a74e85503b3547f4ee40cd0f398ca393",
+      "basis": "saved-fx"
+    },
+    {
+      "tier": "50GB",
+      "at": "2026-08-10T00:05:56.887Z",
+      "previousAt": "2026-08-09T02:42:02.011Z",
+      "kind": "change",
+      "cause": "fx",
+      "from": [
+        {
+          "id": "pk",
+          "name": "巴基斯坦",
+          "currency": "PKR",
+          "local": 200,
+          "cny": 4.87
+        }
+      ],
+      "to": [
+        {
+          "id": "ru",
+          "name": "俄罗斯",
+          "currency": "RUB",
+          "local": 59,
+          "cny": 4.86
+        }
+      ],
+      "evidence": {
+        "pricesChanged": false,
+        "scopeChanged": false,
+        "fxChanged": true,
+        "gap": false,
+        "basisChanged": false
+      },
+      "sourceCommit": "01b4fb9728819ed368b605481c0906b517f109fe",
+      "basis": "saved-fx"
+    },
+    {
+      "tier": "6TB",
+      "at": "2026-09-25T04:51:35.064Z",
+      "previousAt": "2026-09-24T04:10:35.835Z",
+      "kind": "change",
+      "cause": "fx",
+      "from": [
+        {
+          "id": "tw",
+          "name": "台湾",
+          "currency": "TWD",
+          "local": 900,
+          "cny": 190.36
+        }
+      ],
+      "to": [
+        {
+          "id": "mx",
+          "name": "墨西哥",
+          "currency": "MXN",
+          "local": 499,
+          "cny": 189.67
+        }
+      ],
+      "evidence": {
+        "pricesChanged": false,
+        "scopeChanged": false,
+        "fxChanged": null,
+        "gap": false,
+        "basisChanged": false
+      },
+      "sourceCommit": "d799cd09ad57040b99ad5ebf872eaeb46445abaf",
+      "basis": "stored-ranks"
+    }
+  ],
+  "checkpoint": {
+    "at": "2026-09-26T00:06:15.186Z",
+    "fingerprint": "0f672497d409affa7303567d744fd64b346fe60e1507f5a830f34ef58d62f1db",
+    "sourceCommit": null,
+    "basis": "stored-ranks",
+    "tiers": [
+      {
+        "id": "50GB",
+        "label": "50 GB",
+        "scope": "53ebf84ac1dd1aae737b2396c5014f56f044420938994eebc8b02c5747df89fb",
+        "prices": "daa548bfd0a8b0e0e9aefbe59885573fb7b15d8f26864f73ea0fa5b6dd5da4ad",
+        "fx": null,
+        "winners": [
+          {
+            "id": "ru",
+            "name": "俄罗斯",
+            "currency": "RUB",
+            "local": 59,
+            "cny": 4.71
+          }
+        ]
+      },
+      {
+        "id": "200GB",
+        "label": "200 GB",
+        "scope": "53ebf84ac1dd1aae737b2396c5014f56f044420938994eebc8b02c5747df89fb",
+        "prices": "c02dbe4a726c539086e135f6c84923349572e730a4abf9aaa685608ee59e8134",
+        "fx": null,
+        "winners": [
+          {
+            "id": "ru",
+            "name": "俄罗斯",
+            "currency": "RUB",
+            "local": 149,
+            "cny": 11.89
+          }
+        ]
+      },
+      {
+        "id": "2TB",
+        "label": "2 TB",
+        "scope": "53ebf84ac1dd1aae737b2396c5014f56f044420938994eebc8b02c5747df89fb",
+        "prices": "aa1d3ffe890acaa983a3af6adb275a65f2d2286d9a6553e86a2b9e18b965f434",
+        "fx": null,
+        "winners": [
+          {
+            "id": "ru",
+            "name": "俄罗斯",
+            "currency": "RUB",
+            "local": 599,
+            "cny": 47.8
+          }
+        ]
+      },
+      {
+        "id": "6TB",
+        "label": "6 TB",
+        "scope": "53ebf84ac1dd1aae737b2396c5014f56f044420938994eebc8b02c5747df89fb",
+        "prices": "0d8ddb20aaf7b64c6004b4d69e4fa2e537850f3c5b22ef12bdf68a71850dbe8f",
+        "fx": null,
+        "winners": [
+          {
+            "id": "mx",
+            "name": "墨西哥",
+            "currency": "MXN",
+            "local": 499,
+            "cny": 189.89
+          }
+        ]
+      },
+      {
+        "id": "12TB",
+        "label": "12 TB",
+        "scope": "53ebf84ac1dd1aae737b2396c5014f56f044420938994eebc8b02c5747df89fb",
+        "prices": "fb6d0809fd4065ddbd10f6598e75a6ecf84e3340779cdd48344b4e249bdd4ca3",
+        "fx": null,
+        "winners": [
+          {
+            "id": "ng",
+            "name": "尼日利亚",
+            "currency": "NGN",
+            "local": 66900,
+            "cny": 338.52
+          }
+        ]
+      }
+    ]
+  }
+}

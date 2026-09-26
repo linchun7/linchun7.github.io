@@ -308,7 +308,8 @@ export function validatePricePayload(payload, { minCountries = 1 } = {}) {
       || payload.source.parser !== 'cross-checked'
       || !hasSafeText(payload.source.parserStatus, 512)
       || !hasExactKeys(payload.run, PUBLIC_PRICE_RUN_KEYS)
-      || !hasExactKeys(payload.fx, PUBLIC_PRICE_FX_KEYS)
+      || !hasExactKeys(payload.fx, new Set([...PUBLIC_PRICE_FX_KEYS, ...(Object.hasOwn(payload.fx, 'comparisonFingerprint') ? ['comparisonFingerprint'] : [])]))
+      || (Object.hasOwn(payload.fx, 'comparisonFingerprint') && (payload.fx.stale || typeof payload.fx.comparisonFingerprint !== 'string' || !/^[a-f0-9]{64}$/.test(payload.fx.comparisonFingerprint)))
       || !sourceModeMatchesUrl
       || typeof payload.fx.fallbackUsed !== 'boolean'
       || !isPublicFxFallbackReason(payload.fx.fallbackReason)
@@ -577,4 +578,104 @@ export function validatePayload(fileName, payload) {
     throw new Error('prices.json must use the current public schema');
   }
   return validatePricePayload(payload, { minCountries: 60 });
+}
+
+
+// Comparison history is deliberately separate from Apple local-price history.
+export const MINIMUM_CAUSE_LABELS = Object.freeze({
+  initial: '首次可核验记录', fx: '汇率变化', apple: 'Apple 调价',
+  mixed: '调价与汇率均有变化', scope: '比较范围变化', unknown: '原因未能确定'
+});
+export function minimumChangeCause(evidence) {
+  if (evidence.gap || evidence.basisChanged) return 'unknown';
+  if (evidence.scopeChanged) return 'scope';
+  if (!evidence.pricesChanged) return evidence.fxChanged === false ? 'unknown' : 'fx';
+  if (evidence.fxChanged === false) return 'apple';
+  return evidence.fxChanged === true ? 'mixed' : 'unknown';
+}
+
+export function validateMinimumHistoryPayload(value) {
+  const fail = () => { throw new Error('minimum-history.json has an invalid comparison history'); };
+  const keys = (o, names) => hasExactKeys(o, new Set(names.split(' ')));
+  const sha = (x) => typeof x === 'string' && /^[a-f0-9]{64}$/.test(x);
+  const commit = (x) => x === null || (typeof x === 'string' && /^[a-f0-9]{40}$/.test(x));
+  const safe = (x) => hasSafeText(x, 200);
+  const ids = (rows) => rows.map((r) => r.id).join('|');
+  const winners = (rows) => {
+    if (!Array.isArray(rows) || rows.length > MAX_PUBLIC_COUNTRIES) return false;
+    let previous = '';
+    return rows.every((r) => {
+      if (!keys(r, 'id name currency local cny') || !hasSafeText(r.id, 160) || !MARKET_ID_PATTERN.test(r.id) || UNSAFE_OBJECT_KEYS.has(r.id)
+        || r.id <= previous || !safe(r.name) || typeof r.currency !== 'string' || !/^[A-Z]{3}$/.test(r.currency)
+        || !Number.isFinite(r.local) || r.local <= 0 || r.local > Number.MAX_SAFE_INTEGER
+        || !Number.isFinite(r.cny) || r.cny <= 0 || r.cny > Number.MAX_SAFE_INTEGER
+        || Math.abs(r.cny * 100 - Math.round(r.cny * 100)) > 1e-7) return false;
+      previous = r.id;
+      return true;
+    });
+  };
+  if (!keys(value, 'schemaVersion projectSince firstObservedAt checkedAt observations excludedVersions pendingGap gaps events checkpoint')
+    || value.schemaVersion !== 1 || !isValidDateOnly(value.projectSince)
+    || !(value.firstObservedAt === null || isValidIsoTimestamp(value.firstObservedAt))
+    || !(value.checkedAt === null || isValidIsoTimestamp(value.checkedAt))
+    || !Number.isSafeInteger(value.observations) || value.observations < 0
+    || !Number.isSafeInteger(value.excludedVersions) || value.excludedVersions < 0
+    || typeof value.pendingGap !== 'boolean'
+    || !Array.isArray(value.gaps) || value.gaps.length > 20000
+    || !Array.isArray(value.events) || value.events.length > 20000) fail();
+  const limit = value.checkedAt === null ? -Infinity : Date.parse(value.checkedAt);
+  let lastGap = -Infinity;
+  for (const gap of value.gaps) {
+    if (!keys(gap, 'from to') || !isValidIsoTimestamp(gap.from) || !isValidIsoTimestamp(gap.to)
+      || Date.parse(gap.from) >= Date.parse(gap.to) || Date.parse(gap.from) < lastGap || Date.parse(gap.to) > limit) fail();
+    lastGap = Date.parse(gap.to);
+  }
+  let previousAt = -Infinity;
+  const latest = new Map(), eventKeys = new Set();
+  for (const event of value.events) {
+    if (!keys(event, 'tier at previousAt kind cause from to evidence sourceCommit basis')
+      || !canonicalTierDefinition(event.tier) || !isValidIsoTimestamp(event.at)
+      || !(event.previousAt === null || isValidIsoTimestamp(event.previousAt))
+      || Date.parse(event.at) < previousAt || Date.parse(event.at) > limit
+      || (event.previousAt !== null && Date.parse(event.previousAt) >= Date.parse(event.at))
+      || !['initial', 'change'].includes(event.kind) || !Object.hasOwn(MINIMUM_CAUSE_LABELS, event.cause)
+      || !winners(event.from) || !winners(event.to) || !commit(event.sourceCommit)
+      || !['stored-ranks', 'saved-fx', 'saved-cny'].includes(event.basis)
+      || !keys(event.evidence, 'pricesChanged scopeChanged fxChanged gap basisChanged')
+      || ['pricesChanged','scopeChanged','gap','basisChanged'].some((key) => typeof event.evidence[key] !== 'boolean')
+      || ![true, false, null].includes(event.evidence.fxChanged)) fail();
+    const eventKey = `${event.at}|${event.tier}`;
+    if (eventKeys.has(eventKey)) fail();
+    eventKeys.add(eventKey);
+    if (event.kind === 'initial') {
+      if (latest.has(event.tier) || event.from.length || !event.to.length || event.cause !== 'initial' || event.previousAt !== null) fail();
+    } else if (!latest.has(event.tier) || event.previousAt === null
+      || ids(latest.get(event.tier).to) !== ids(event.from) || ids(event.from) === ids(event.to)
+      || event.cause !== minimumChangeCause(event.evidence)) fail();
+    if (latest.has(event.tier) && Date.parse(event.previousAt) < Date.parse(latest.get(event.tier).at)) fail();
+    latest.set(event.tier, event);
+    previousAt = Date.parse(event.at);
+  }
+  const cp = value.checkpoint;
+  if (cp !== null) {
+    if (!keys(cp, 'at fingerprint sourceCommit basis tiers') || !isValidIsoTimestamp(cp.at)
+      || Date.parse(cp.at) > limit || Date.parse(cp.at) < previousAt || Date.parse(value.firstObservedAt) > Date.parse(cp.at) || !sha(cp.fingerprint) || !commit(cp.sourceCommit)
+      || !['stored-ranks','saved-fx','saved-cny'].includes(cp.basis) || !Array.isArray(cp.tiers)
+      || !cp.tiers.length || cp.tiers.length > MAX_PUBLIC_TIERS) fail();
+    const tierIds = new Set();
+    for (const tier of cp.tiers) {
+      if (!keys(tier, 'id label scope prices fx winners') || !canonicalTierDefinition(tier.id)
+        || !safe(tier.label) || !sha(tier.scope) || !sha(tier.prices)
+        || !(tier.fx === null || sha(tier.fx)) || !winners(tier.winners) || !tier.winners.length
+        || tierIds.has(tier.id) || ids(latest.get(tier.id)?.to ?? []) !== ids(tier.winners)) fail();
+      tierIds.add(tier.id);
+    }
+    for (const [id, event] of latest) if (!tierIds.has(id) && event.to.length) fail();
+  }
+  if ((value.observations === 0) !== (cp === null)
+    || (cp === null) !== (value.firstObservedAt === null)
+    || (value.events.length && value.events[0].at !== value.firstObservedAt)
+    || (cp === null && value.events.length)
+    || (cp !== null && !value.pendingGap && cp.at !== value.checkedAt)) fail();
+  return value;
 }

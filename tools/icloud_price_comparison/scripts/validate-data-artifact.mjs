@@ -1,3 +1,4 @@
+import { assertMinimumHistoryMatches } from './minimum-history.mjs';
 import { createHash } from 'node:crypto';
 import { lstat, readFile, readdir, realpath } from 'node:fs/promises';
 import path from 'node:path';
@@ -21,6 +22,7 @@ import { createSnapshotMarketResolver, evidenceDateAnchors } from './market-evid
 const ARCHIVE_ROOT = 'tools/icloud_price_comparison/data';
 const REQUIRED_FILES = new Set([
   'prices.json',
+  'minimum-history.json',
   'history.json',
   'run-log.json',
   'apple-snapshots/README.md',
@@ -844,6 +846,9 @@ export async function validateExtractedDataArtifact(dataDirectory) {
     readJsonStrict(path.join(dataDirectory, 'apple-snapshots', 'index.json'), 'apple-snapshots/index.json')
   ]);
   validateCoreDataArtifact({ prices, history, runLog });
+
+  const { value: minimumHistory } = await readJsonStrict(path.join(dataDirectory, 'minimum-history.json'), 'minimum-history.json');
+  assertMinimumHistoryMatches(minimumHistory, prices);
 
   const normalizedIndex = validateSnapshotIndex(index);
   const expectedFiles = new Set(REQUIRED_FILES);

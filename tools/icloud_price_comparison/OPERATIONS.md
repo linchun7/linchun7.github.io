@@ -364,3 +364,11 @@ Apple 108047 从逐市场列表切换为地区表格时，预期修复是增加�
 每日 `Update iCloud prices` 在调用 updater 前复制当时已验证的 `data/prices.json`。updater 成功后，`scripts/report-chinese-name-sync.mjs` 只读比较更新前后两份 `prices.json` 中 `nameZh === country` 的 pending `marketId` 集合，并把结果写入 Action Summary。运维人员应同时查看当前待确认数量、`新增待确认`、`退出待确认`；即使数量保持 86→86，只要成员一进一出，也会显示两侧成员。
 
 该差异只用于可观测性，不影响价格发布成败，也不引入状态文件。`退出待确认` 不能直接解读成“中文名已确认”或“市场已删除”，必须结合本次英文 active market 变化和 `country-names.zh.json` 修改判断。它与独立的 `Monitor Apple Chinese iCloud markets` 口径不同：前者基于英文价格页 active markets 的正式中文显示名复核状态，后者只监测 Apple 中文页面是否出现历史上从未复核的新中文名称。
+
+## 最低价历史维护
+
+日常仍用原有更新工作流：`update:data` → 数据验证 → `render:static`（同步派生账本）→ `render:static:check` → core/UI → `validate:artifact` → 同一工件发布。不增加定时任务、不访问新的价格或 FX 服务。完整 `data/` 工件现在必须包含 `minimum-history.json`；缺失、损坏或与当前价格指纹不匹配时阻断发布，不静默重建清空。不要只更新 index.html 或只拷贝价格文件。
+
+第一次引入时，使用完整 Git 历史执行 `node scripts/minimum-history.mjs --backfill --ref <审核过的提交>`；这不是日常命令，也不能在浅克隆中声称完整回溯。回溯按 payload.generatedAt 排序去重，而不是使用可能被重写的 Git 提交时间；保留来源 commit，排除不可靠或冲突观测并标记缺口，不用现今汇率补历史。更新后执行 `pnpm render:static`、`pnpm assets:update`、`pnpm test:core`、`pnpm test:ui`、`pnpm validate:artifact`，复核 Apple history.json 未受 FX 事件污染。
+
+历史中的“首次可核验记录”不计作易主；观察间隔不是连续行情，也不是 Apple 调价生效时间。调查原因时应查看完整比较范围的标价及 FX 指纹，不能仅凭新旧第一名价格或 Apple 页发布日期判断。混合变动不承诺哪种因素占主导，未知原因不能改写成已确认的 Apple 调价。

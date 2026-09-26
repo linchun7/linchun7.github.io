@@ -10,6 +10,7 @@ import { parseApplePrices } from '../scripts/parse-prices.mjs';
 import { createPublishedMarketResolver, resolveMarket } from '../scripts/market-registry.mjs';
 import { main, createNetworkBudget, validateAppleMarketRenameReview, getExchangeRates, fetchResource } from '../scripts/update-prices.mjs';
 import { validateExtractedDataArtifact } from '../scripts/validate-data-artifact.mjs';
+import { emptyMinimumHistory, writeMinimumHistory, updateMinimumHistory } from '../scripts/minimum-history.mjs';
 import { importAppleArchives } from '../scripts/import-apple-archives.mjs';
 
 // Canonical synthetic source: no dependency on production count, FX, publication
@@ -39,6 +40,7 @@ async function fixture(t) {
   const dataDir = path.join(root, 'data');
   const snapshotsDir = path.join(dataDir, 'apple-snapshots');
   await mkdir(snapshotsDir, { recursive: true });
+  await writeMinimumHistory(path.join(dataDir, 'minimum-history.json'), emptyMinimumHistory());
   await writeFile(path.join(snapshotsDir, 'README.md'), 'Synthetic evidence for production-loop tests.\n');
   const paths = {
     currentDataPath: path.join(dataDir, 'prices.json'), historyPath: path.join(dataDir, 'history.json'),
@@ -73,8 +75,10 @@ async function run(t, paths, htmls, now) {
   try {
     await main({ paths, stepSummaryPath: null, dryRun: false, networkBudget: createNetworkBudget({ sleep: async () => {} }) });
     const dataDir = path.dirname(paths.currentDataPath);
-    await validateExtractedDataArtifact(dataDir); // Different implementation, full public boundary.
     const prices = JSON.parse(await readFile(paths.currentDataPath));
+    // Mirror the existing render:static publication stage, outside the Apple transaction.
+    await updateMinimumHistory(prices, path.join(dataDir, 'minimum-history.json'));
+    await validateExtractedDataArtifact(dataDir); // Different implementation, full public boundary.
     const history = JSON.parse(await readFile(paths.historyPath));
     const index = JSON.parse(await readFile(paths.snapshotIndexPath));
     return { appleRequests, prices, history, index };
