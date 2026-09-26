@@ -14,7 +14,7 @@
 
 ## 自动更新与防错
 
-生产自动更新采用主备：**Cloudflare 每日北京时间 09:05** 外部调用 `workflow_dispatch`（`trigger_source=cloudflare`）作为主触发，**GitHub cron 09:10** 提供一次低成本兜底；也支持手动运行。GitHub cron 可能延迟，因此不把 09:10 当作严格 SLA。自动任务在真正开始执行时解析最新 `main`，避免排队中的备用任务继续使用过时事件快照。两个自动入口先校验当前 `prices.json` 和当天 `Update ChatGPT prices` 的成功生产运行证明：只有数据全部 `verified`、汇率仍新鲜，且有一条在当前数据生成之后完成的完整成功运行时，备用触发才跳过；若存在 `retained` / `pending` / `unavailable`、fallback 汇率、旧数据、主触发失败，或数据虽已提交但 Pages/生产验证未完成，GitHub 备用仍继续重试。若 Cloudflare 主触发已经形成成功生产证明，09:10 的 GitHub 备用会由 daily guard 自动跳过。手动运行不受每日幂等跳过。仓库只能验证这一调度契约，不能单独证明 Cloudflare 控制面的实时启用状态。
+生产自动更新采用主备：**Cloudflare 每日北京时间 09:05** 外部调用 `workflow_dispatch`（`trigger_source=cloudflare`）作为主触发，**GitHub cron 09:10（`Asia/Shanghai`）** 提供一次低成本兜底；也支持手动运行。GitHub cron 可能延迟，因此不把 09:10 当作严格 SLA。自动任务在真正开始执行时解析最新 `main`，避免排队中的备用任务继续使用过时事件快照。两个自动入口先校验当前 `prices.json` 和当天 `Update ChatGPT prices` 的成功生产运行证明：只有数据全部 `verified`、汇率仍新鲜，且有一条在当前数据生成之后完成的完整成功运行时，备用触发才跳过；若存在 `retained` / `pending` / `unavailable`、fallback 汇率、旧数据、主触发失败，或数据虽已提交但 Pages/生产验证未完成，GitHub 备用仍继续重试。若 Cloudflare 主触发已经形成成功生产证明，09:10 的 GitHub 备用会由 daily guard 自动跳过。手动运行不受每日幂等跳过。仓库只能验证这一调度契约，不能单独证明 Cloudflare 控制面的实时启用状态。
 
 1. 只读任务运行离线测试、抓取、数据校验与真实 Chrome 测试。无需 API Key、登录态、付费服务、数据库或第三方 Python/Node 包。
 2. 校验应用身份、canonical 地区和币种；两种结构化 IAP 表示必须一致，可见 DOM 必须完整覆盖这些价格，且不得额外出现结构化数据未列出的 `ChatGPT ...` 套餐价格。它们是**同一来源的交叉校验**，不是三个独立价格源。初次采集和改价另发一次不使用缓存的确认请求。
