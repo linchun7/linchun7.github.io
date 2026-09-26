@@ -760,6 +760,7 @@ th button:active { background: rgba(17, 104, 212, .13); }
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-rows: auto auto;
     column-gap: 8px;
+    row-gap: 2px;
     align-items: center;
   }
   .country-history-button .country-name {
@@ -772,7 +773,7 @@ th button:active { background: rgba(17, 104, 212, .13); }
     grid-column: 1;
     grid-row: 2;
     min-width: 0;
-    margin-top: 3px;
+    margin-top: 0;
     white-space: nowrap;
   }
   .mobile-rank {
