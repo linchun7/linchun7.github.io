@@ -57,7 +57,7 @@ jobs:
         env:
           BROWSER: ${{ matrix.browser }}
         run: |
-          cat > /tmp/icloud-adversarial.mjs <<'NODE'
+          cat > ./.adversarial-ui.mjs <<'NODE'
           import assert from 'node:assert/strict';
           import { chromium, firefox, webkit } from 'playwright';
 
@@ -189,7 +189,8 @@ jobs:
 
           console.log(`Adversarial UI geometry passed for ${process.env.BROWSER}: ${widths.join(', ')}px`);
           NODE
-          node /tmp/icloud-adversarial.mjs
+          node ./.adversarial-ui.mjs
+          rm -f ./.adversarial-ui.mjs
 
       - name: Stop local site
         if: always()
