@@ -3724,7 +3724,7 @@ test('minimum history failures are isolated, retryable and do not erase the pric
     assert.equal(await page.locator('#priceRows tr').count(),rows);
     assert.equal(await page.locator('#searchInput').isDisabled(),false);
     await page.locator('#minimumHistoryRetry').click();
-    await page.waitForFunction(()=>document.querySelector('#minimumHistoryRetry').hidden);
+    await page.waitForFunction(() => document.querySelector('#minimumHistoryEvents')?.textContent.includes('暂无最低价变更记录'));
     assert.match(await page.locator('#minimumHistoryEvents').textContent(),/暂无最低价变更记录/);
     await page.locator('#minimumHistoryTierControl button[data-tier="6TB"]').click();
     await page.waitForFunction(()=>document.querySelectorAll('.minimum-history-event').length>0);
@@ -3768,7 +3768,7 @@ test('minimum history distinguishes mixed causes, handles ties and bounds long h
     assert.equal(await page.locator('.minimum-history-event[data-cause="mixed"]').count()>0,true);
     assert.equal(await page.locator('.minimum-history-event details').count(),0);
     assert.match(await page.locator('.minimum-history-event[data-cause="mixed"]').first().innerText(),/汇率 \+ Apple 调价/);
-    assert.match(await page.locator('.minimum-history-event').first().innerText(),/¥\\d/);
+    assert.match(await page.locator('.minimum-history-event').first().innerText(),/¥\d/);
     await page.locator('#minimumHistoryMore').click();
     assert.equal(await page.locator('.minimum-history-event').count(),h.events.filter((event)=>event.kind==='change').length);
     assert.equal(await page.locator('#minimumHistoryMore').isHidden(),true);
