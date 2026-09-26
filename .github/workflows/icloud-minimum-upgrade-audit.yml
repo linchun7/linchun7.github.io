@@ -1,0 +1,159 @@
+name: iCloud minimum history upgrade audit
+on:
+  push:
+    branches: [upgrade/icloud-minimum-history]
+    paths: [.github/workflows/icloud-minimum-upgrade-audit.yml]
+permissions:
+  contents: read
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      candidate_sha: ${{ steps.package.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22
+      - name: Apply reviewed focus patch and remove staging workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('tools/icloud_price_comparison/script.js');s=p.read_text()
+          pairs=[("  const control = document.querySelector('#minimumHistoryTierControl');\n  control.replaceChildren();", "  const control = document.querySelector('#minimumHistoryTierControl');\n  const focusedTier = control.contains(document.activeElement) ? document.activeElement.dataset.tier : null;\n  control.replaceChildren();"), ("    control.append(button);\n  }\n  const series = h.events", "    control.append(button);\n  }\n  if (focusedTier) [...control.children].find((button) => button.dataset.tier === focusedTier)?.focus({ preventScroll: true });\n  const series = h.events"), ("    details.append(minimumHistoryNode('summary', '当时的价格与依据'));", "    const summary = minimumHistoryNode('summary', '当时的价格与依据');\n    summary.tabIndex = 0; // Include native summary controls in the existing focus trap.\n    details.append(summary);")]
+          for a,b in pairs:
+              assert s.count(a)==1,a
+              s=s.replace(a,b)
+          p.write_text(s)
+          p=Path('tools/icloud_price_comparison/test/ui-smoke.test.mjs');s=p.read_text()
+          a="      await page.locator('#minimumHistoryTierControl button[data-tier=\"50GB\"]').click();\n      assert.deepEqual"
+          b="      await page.locator('#minimumHistoryTierControl button[data-tier=\"50GB\"]').click();\n      assert.equal(await page.locator('#minimumHistoryTierControl button[data-tier=\"50GB\"]').evaluate(el => document.activeElement === el), true, 'switching history capacity keeps keyboard focus');\n      assert.deepEqual"
+          assert s.count(a)==1
+          s=s.replace(a,b)
+          a="      assert.deepEqual(errors,[]);\n    } finally {await browser.close();}"
+          b="      await page.locator('#minimumHistoryButton').click();\n      await page.evaluate(now => { Date.now = () => now; window.dispatchEvent(new Event('pageshow')); }, Date.parse(history.checkedAt) + 48 * 3600000);\n      await page.waitForFunction(() => document.querySelector('#minimumHistoryCurrent').hidden);\n      await page.locator('#minimumHistoryTierControl button').last().focus();\n      await page.keyboard.press('Tab');\n      assert.equal(await page.evaluate(() => document.activeElement.tagName), 'SUMMARY', 'historical evidence stays keyboard-reachable when current rankings expire');\n      await page.keyboard.press('Escape');\n      assert.deepEqual(errors,[]);\n    } finally {await browser.close();}"
+          assert s.count(a)==1
+          p.write_text(s.replace(a,b))
+          PY
+          node tools/icloud_price_comparison/scripts/update-asset-versions.mjs --write
+          git add tools/icloud_price_comparison/script.js tools/icloud_price_comparison/index.html tools/icloud_price_comparison/test/ui-smoke.test.mjs
+          git rm .github/workflows/icloud-minimum-upgrade-audit.yml
+          git diff --cached --check
+          git -c user.name=linchun7 -c user.email=104673731+linchun7@users.noreply.github.com commit -m 'fix(icloud): preserve keyboard access through history refresh and expired rankings'
+          test "$(git rev-parse HEAD:tools/icloud_price_comparison)" = e989329c03db99a96d2077ede08b5490f58f2303
+          corepack enable
+      - name: Install locked dependencies and CJK test fonts
+        working-directory: tools/icloud_price_comparison
+        run: |
+          pnpm install --frozen-lockfile --ignore-scripts
+          sudo apt-get update -qq
+          sudo apt-get install -y fonts-noto-cjk
+      - name: Core and deep artifact acceptance
+        working-directory: tools/icloud_price_comparison
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm test:core 2>&1 | tee "$RUNNER_TEMP/icloud-core.log"
+          pnpm validate:artifact 2>&1 | tee "$RUNNER_TEMP/icloud-artifact.log"
+          pnpm validate:snapshots 2>&1 | tee "$RUNNER_TEMP/icloud-snapshots.log"
+      - name: Real browser acceptance
+        working-directory: tools/icloud_price_comparison
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm test:ui 2>&1 | tee "$RUNNER_TEMP/icloud-browser.log"
+      - name: Capture desktop and narrow-screen dialog with CJK glyphs
+        working-directory: tools/icloud_price_comparison
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          import { chromium } from 'playwright';
+          import { readFile } from 'node:fs/promises';
+          import http from 'node:http';
+          import path from 'node:path';
+          const root=path.resolve('../..');
+          const server=http.createServer(async(req,res)=>{
+            try {
+              const pathname=decodeURIComponent(new URL(req.url,'http://localhost').pathname);
+              const file=path.resolve(root,'.'+pathname+(pathname.endsWith('/')?'index.html':''));
+              if(!file.startsWith(root+path.sep)) throw new Error('Path');
+              const type={'.js':'text/javascript','.json':'application/json','.css':'text/css','.html':'text/html'}[path.extname(file)]||'application/octet-stream';
+              res.setHeader('Content-Type',type);res.end(await readFile(file));
+            }catch{res.statusCode=404;res.end('not found');}
+          });
+          await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+          const browser=await chromium.launch({executablePath:'/usr/bin/google-chrome',headless:true});
+          try {
+            const data=JSON.parse(await readFile('data/prices.json','utf8'));
+            for(const width of [320,390,1280]){
+              const page=await browser.newPage({viewport:{width,height:900}});
+              await page.route('https://**/*',route=>route.abort());
+              await page.addInitScript(now=>{Date.now=()=>now;},Date.parse(data.generatedAt)+3600000);
+              await page.goto(`http://127.0.0.1:${server.address().port}/tools/icloud_price_comparison/`);
+              await page.evaluate(()=>document.fonts.ready);
+              await page.screenshot({path:path.join(process.env.RUNNER_TEMP,`icloud-top-${width}.png`)});
+              await page.locator('#minimumHistoryButton').click();
+              await page.locator('#minimumHistoryTierControl button[data-tier="6TB"]').click();
+              await page.waitForFunction(()=>document.querySelector('#minimumHistoryDialog')?.textContent.includes('墨西哥'));
+              await page.screenshot({path:path.join(process.env.RUNNER_TEMP,`icloud-history-${width}.png`)});
+              await page.locator('.minimum-history-event details summary').first().click();
+              await page.screenshot({path:path.join(process.env.RUNNER_TEMP,`icloud-evidence-${width}.png`)});
+              await page.close();
+            }
+          } finally {await browser.close();server.close();}
+          JS
+      - name: Package exactly tested commit
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          git bundle create "$RUNNER_TEMP/icloud-tested-candidate.bundle" HEAD
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: icloud-upgrade-acceptance
+          path: |
+            ${{ runner.temp }}/icloud-*.log
+            ${{ runner.temp }}/icloud-*.png
+            ${{ runner.temp }}/icloud-tested-candidate.bundle
+          retention-days: 1
+          if-no-files-found: warn
+  publish_candidate:
+    needs: candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: icloud-upgrade-acceptance
+          path: ${{ runner.temp }}/tested
+      - name: Publish tested candidate to feature branch only
+        env:
+          EXPECTED_SHA: ${{ needs.candidate.outputs.candidate_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch "$RUNNER_TEMP/tested/icloud-tested-candidate.bundle" HEAD
+          test "$(git rev-parse FETCH_HEAD)" = "$EXPECTED_SHA"
+          test "$(git rev-parse "$EXPECTED_SHA^")" = "$GITHUB_SHA"
+          test "$(git rev-parse "$EXPECTED_SHA:tools/icloud_price_comparison")" = e989329c03db99a96d2077ede08b5490f58f2303
+          git diff --name-only "$GITHUB_SHA" "$EXPECTED_SHA" > "$RUNNER_TEMP/changed-paths.txt"
+          python3 - <<'PY'
+          import os,pathlib
+          for p in pathlib.Path(os.environ['RUNNER_TEMP'],'changed-paths.txt').read_text().splitlines():
+              assert p.startswith('tools/icloud_price_comparison/') or p == '.github/workflows/icloud-minimum-upgrade-audit.yml', p
+          PY
+          git push origin "$EXPECTED_SHA:refs/heads/upgrade/icloud-minimum-history"
