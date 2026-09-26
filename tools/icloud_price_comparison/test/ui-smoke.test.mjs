@@ -3502,15 +3502,16 @@ test('keeps mobile ranking visible and UX fallbacks stable', { timeout: 60_000 }
           return {
             nameBottom: name.bottom,
             rankTop: rank.top,
-            subtitleTop: subtitle?.top ?? null,
-            rankTopDeltaFromSubtitle: subtitle ? Math.abs(rank.top - subtitle.top) : null
+            subtitleCenter: subtitle ? (subtitle.top + subtitle.bottom) / 2 : null,
+            rankCenter: (rank.top + rank.bottom) / 2
           };
         });
         assert.equal(await rankBadge.isVisible(), true, String(viewport.width) + 'px must expose the current rank or sequence');
         assert.match((await rankBadge.textContent()).trim(), /^\d+|—$/, String(viewport.width) + 'px rank badge must contain the current rank or sequence');
         assert.ok(rankCue.rankTop >= rankCue.nameBottom - 1, String(viewport.width) + 'px rank badge must sit below the primary country name');
-        if (rankCue.subtitleTop !== null) {
-          assert.ok(rankCue.rankTopDeltaFromSubtitle <= 4, String(viewport.width) + 'px rank badge should share the subtitle row');
+        if (rankCue.subtitleCenter !== null) {
+          assert.ok(Math.abs(rankCue.rankCenter - rankCue.subtitleCenter) <= 3,
+            String(viewport.width) + 'px rank badge should be vertically centered with the subtitle row');
         }
 
         const minimumColumns = await page.locator('#minimumSummary').evaluate((element) => (
