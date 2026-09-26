@@ -1857,13 +1857,6 @@ function renderMinimumHistory() {
   document.querySelector('#minimumHistoryRetry').hidden = true;
 }
 
-pend(details); list.append(item);
-  }
-  document.querySelector('#minimumHistoryMore').hidden = series.length <= minimumHistoryUi.limit;
-  document.querySelector('#minimumHistoryCurrent').hidden = !state.minimumCuesEnabled || !state.minimumCountries[minimumHistoryUi.tier]?.length;
-  document.querySelector('#minimumHistoryRetry').hidden = true;
-}
-
 async function loadMinimumHistory() {
   if (minimumHistoryUi.promise) return minimumHistoryUi.promise;
   document.querySelector('#minimumHistoryNote').textContent = '正在读取最低价历史…';
