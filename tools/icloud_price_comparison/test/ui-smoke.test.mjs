@@ -3514,6 +3514,17 @@ test('keeps mobile ranking visible and UX fallbacks stable', { timeout: 60_000 }
             String(viewport.width) + 'px rank badge should be vertically centered with the subtitle row');
         }
 
+        const countryColumnShare = await page.locator('.price-table').evaluate((table) => {
+          const row = table.querySelector('#priceRows tr[data-market-id]');
+          const countryCell = row?.cells?.[1];
+          if (!countryCell) return 0;
+          return countryCell.getBoundingClientRect().width / table.getBoundingClientRect().width;
+        });
+        assert.ok(
+          countryColumnShare >= 0.46 && countryColumnShare <= 0.49,
+          String(viewport.width) + 'px country column should use roughly 47% of the mobile table width'
+        );
+
         const minimumColumns = await page.locator('#minimumSummary').evaluate((element) => (
           getComputedStyle(element).gridTemplateColumns.trim().split(/\s+/).filter(Boolean).length
         ));
@@ -3730,6 +3741,30 @@ test('minimum history defaults to one dense timeline, filters optionally, and st
         'all-capacity timeline must be globally chronological'
       );
       assert.match(await page.locator('#minimumHistoryNote').textContent(),/人民币价格按当时汇率折算/);
+      const separatorLayout = await page.locator('#minimumHistoryDialog').evaluate((dialog) => {
+        const list = dialog.querySelector('#minimumHistoryEvents');
+        const events = [...dialog.querySelectorAll('.minimum-history-event')];
+        const note = dialog.querySelector('#minimumHistoryNote');
+        const content = dialog.querySelector('.history-list');
+        return {
+          listBorderTop: getComputedStyle(list).borderTopWidth,
+          eventTopBorders: events.map((event) => getComputedStyle(event).borderTopWidth),
+          eventBottomBorders: events.map((event) => getComputedStyle(event).borderBottomWidth),
+          noteBorderTop: getComputedStyle(note).borderTopWidth,
+          noteBackground: getComputedStyle(note).backgroundColor,
+          contentPaddingTop: Number.parseFloat(getComputedStyle(content).paddingTop)
+        };
+      });
+      assert.equal(separatorLayout.listBorderTop,'0px','history list must not add a redundant top divider');
+      assert.equal(separatorLayout.noteBorderTop,'0px','history note must not add another horizontal divider');
+      assert.ok(separatorLayout.eventBottomBorders.every((value)=>value==='0px'),'history rows must not each add a bottom divider');
+      assert.equal(
+        separatorLayout.eventTopBorders.filter((value)=>value!=='0px').length,
+        Math.max(0, allChanges.length - 1),
+        'only adjacent history rows should have separators'
+      );
+      assert.notEqual(separatorLayout.noteBackground,'rgba(0, 0, 0, 0)','history note should use a soft background instead of another rule');
+      assert.ok(separatorLayout.contentPaddingTop <= 12,'minimum-history content should avoid excess empty space below the header');
       assert.equal(await page.locator('#minimumHistoryStatus').isHidden(),true,'normal result should not spend space on status prose');
       assert.equal(await page.locator('.minimum-history-event details').count(),0);
       assert.equal(await page.getByText(/起始最低价|首次可核验记录/).count(),0);
