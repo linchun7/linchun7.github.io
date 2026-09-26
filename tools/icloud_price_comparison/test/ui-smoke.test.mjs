@@ -3478,6 +3478,7 @@ test('keeps mobile ranking visible and UX fallbacks stable', { timeout: 60_000 }
   const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
   try {
     for (const viewport of [
+      { width: 641, height: 844, minimumColumns: 5 },
       { width: 390, height: 844, minimumColumns: 3 },
       { width: 320, height: 720, minimumColumns: 2 }
     ]) {
