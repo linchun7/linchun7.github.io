@@ -2,8 +2,10 @@ name: Update ChatGPT prices
 on:
   schedule:
     # 北京时间 09:10，作为 Cloudflare 09:05 主触发的单次低成本兜底。
+    # 显式使用 Asia/Shanghai，既避免 UTC 心算，也通过实际 schedule 变更重新注册定时 actor。
     # GitHub cron 可能延迟或漏触发；daily guard 会在已有成功生产证明时安全跳过。
-    - cron: '10 1 * * *'
+    - cron: '10 9 * * *'
+      timezone: 'Asia/Shanghai'
   workflow_dispatch:
     inputs:
       trigger_source:
