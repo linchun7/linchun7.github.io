@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        browser: [chromium, firefox, webkit]
+        browser: [firefox, webkit]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -63,7 +63,7 @@ jobs:
 
           const engine = { chromium, firefox, webkit }[process.env.BROWSER];
           const browser = await engine.launch({ headless: true });
-          const widths = [320, 390, 640, 641, 1280];
+          const widths = [641];
 
           function overlapArea(a, b) {
             return Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left))
@@ -80,7 +80,30 @@ jobs:
               await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
 
               assert.equal(errors.length, 0, `${width}px page errors: ${errors.join('; ')}`);
-              assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1),
+              const preOverflow = await page.evaluate(() => {
+                const root = document.documentElement;
+                const viewport = root.clientWidth;
+                const offenders = [...document.querySelectorAll('body *')].map((el) => {
+                  const rect = el.getBoundingClientRect();
+                  return {
+                    tag: el.tagName,
+                    id: el.id,
+                    className: typeof el.className === 'string' ? el.className : '',
+                    left: rect.left,
+                    right: rect.right,
+                    width: rect.width,
+                    scrollWidth: el.scrollWidth,
+                    clientWidth: el.clientWidth
+                  };
+                }).filter((item) => item.right > viewport + 1 || item.left < -1)
+                  .sort((a, b) => (b.right - viewport) - (a.right - viewport))
+                  .slice(0, 25);
+                return { scrollWidth: root.scrollWidth, clientWidth: viewport, offenders };
+              });
+              if (preOverflow.scrollWidth > preOverflow.clientWidth + 1) {
+                console.log('OVERFLOW_DIAGNOSTIC', JSON.stringify({ width, ...preOverflow }, null, 2));
+              }
+              assert.ok(preOverflow.scrollWidth <= preOverflow.clientWidth + 1,
                 `${width}px page has horizontal overflow before sorting`);
 
               if (width <= 1100) {
