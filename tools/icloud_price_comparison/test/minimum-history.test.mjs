@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
-import { readFile, writeFile, mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { readFile, writeFile, mkdtemp, mkdir, rm } from 'node:fs/promises';
+import { tmpdir, devNull } from 'node:os';
+import { execFileSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import test from 'node:test';
 import { minimumChangeCause, validateMinimumHistoryPayload, validatePricePayload } from '../data-contract.js';
 import { attachDerivedCnyPrices, publicExchangeRateMetadata } from '../scripts/update-prices.mjs';
 import { advanceMinimumHistory, assertMinimumHistoryMatches, buildMinimumSnapshot, comparisonFxFingerprint,
-  emptyMinimumHistory, updateMinimumHistory, writeMinimumHistory } from '../scripts/minimum-history.mjs';
+  emptyMinimumHistory, updateMinimumHistory, writeMinimumHistory, backfillMinimumHistory } from '../scripts/minimum-history.mjs';
 const production = JSON.parse(await readFile(new URL('../data/prices.json', import.meta.url), 'utf8'));
 const existing = JSON.parse(await readFile(new URL('../data/minimum-history.json', import.meta.url), 'utf8'));
 const T = Date.parse(production.generatedAt);
@@ -154,4 +156,45 @@ test('history contract rejects malformed rows, corrupt causes, chronology, chain
     h=>h.gaps.push({from:h.checkedAt,to:h.firstObservedAt})
   ];
   for(const [i,mutate] of mutations.entries()) {const h=structuredClone(good);mutate(h);assert.throws(()=>validateMinimumHistoryPayload(h), undefined, `mutation ${i}`);}
+});
+
+// Build history within the test, rather than relying on old SHA objects being
+// present in CI's depth-one checkout or pinning future production event counts.
+test('backfill is reproducible in a self-contained Git fixture and rejects shallow evidence', async () => {
+  const tmp = await mkdtemp(path.join(tmpdir(), 'minimum-backfill-'));
+  const repo = path.join(tmp, 'repo');
+  const projectDir = path.join(repo, 'tools/icloud_price_comparison');
+  const pricePath = 'tools/icloud_price_comparison/data/prices.json';
+  const git = (args, cwd = repo) => execFileSync('git', args, {
+    cwd, encoding:'utf8', stdio:['ignore','pipe','pipe'],
+    env:{...process.env, GIT_CONFIG_NOSYSTEM:'1', GIT_CONFIG_GLOBAL:devNull}
+  }).trim();
+  try {
+    await mkdir(path.join(projectDir,'data'), {recursive:true});
+    git(['init','--initial-branch=main']);
+    await writeFile(path.join(projectDir,'data/history.json'),
+      await readFile(new URL('../data/history.json',import.meta.url)));
+    const save = async (data, message) => {
+      await writeFile(path.join(repo,pricePath),JSON.stringify(data));
+      git(['add','.']);
+      git(['-c','user.name=Fixture','-c','user.email=fixture@example.invalid',
+        '-c','commit.gpgSign=false','commit','-m',message]);
+      return git(['rev-parse','HEAD']);
+    };
+    const a=fixture(), b=fixture({day:1,rates:[2,5,2.5]});
+    const firstSha=await save(a,'initial observation');
+    const secondSha=await save(b,'FX winner change');
+    const actual=await backfillMinimumHistory({projectDir});
+    const expected=advanceMinimumHistory(advanceMinimumHistory(advanceMinimumHistory(null,a,{sourceCommit:firstSha}),b,{sourceCommit:secondSha}),b);
+    assert.equal(actual.versions,2);
+    assert.deepEqual(actual.ledger,expected);
+    assert.deepEqual(await backfillMinimumHistory({projectDir}),actual);
+    assert.deepEqual(actual.ledger.events.at(-1).from.map(r=>r.id),['mx']);
+    assert.deepEqual(actual.ledger.events.at(-1).to.map(r=>r.id),['ca']);
+    assert.equal(actual.ledger.events.at(-1).cause,'fx');
+    const shallow=path.join(tmp,'shallow');
+    git(['clone','--depth=1',pathToFileURL(repo).href,shallow]);
+    await assert.rejects(backfillMinimumHistory({projectDir:path.join(shallow,'tools/icloud_price_comparison')}),/shallow checkout/);
+    await assert.rejects(backfillMinimumHistory({projectDir,ref:'--all'}),/Invalid Git ref/);
+  } finally {await rm(tmp,{recursive:true,force:true});}
 });
