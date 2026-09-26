@@ -421,21 +421,48 @@ test('does not accept cache-bypassed diagnostics when ordinary canonical user UR
   );
 });
 
-test('retries HTTP failure, timeout, malformed prices, and stale static HTML without weakening the contract', async () => {
-  for (const [responses, requestTimeoutMs = 1_000, maxAttempts = 2] of [
-    [{ prices: { status: 503, body: '{}' } }],
-    [{ history: { delayMs: 400 } }, 150, 3],
-    [{ prices: { body: '{bad' } }],
-    [{ index: { body: '<!doctype html><title>old</title>' } }]
+test('retries HTTP failure, malformed prices, and stale static HTML without weakening the contract', async () => {
+  for (const responses of [
+    { prices: { status: 503, body: '{}' } },
+    { prices: { body: '{bad' } },
+    { index: { body: '<!doctype html><title>old</title>' } }
   ]) {
     const server = await startSequenceServer([{ artifact: expected, responses }, { artifact: expected }]);
     try {
-      const result = await verifyProductionDeployment(expected, fastOptions(server, { requestTimeoutMs }));
-      assert.ok(result.attempts >= 2 && result.attempts <= maxAttempts);
+      const result = await verifyProductionDeployment(expected, fastOptions(server));
+      assert.equal(result.attempts, 2);
     } finally {
       await server.close();
     }
   }
+});
+
+test('retries a diagnostic request-timeout deterministically without wall-clock server timing', async (t) => {
+  const server = await startSequenceServer([{ artifact: expected }, { artifact: expected }]);
+  t.after(() => server.close());
+  const logs = [];
+  let injectedTimeout = false;
+  const historyPath = new URL(server.urls.productionHistoryUrl).pathname;
+
+  const fetchImpl = async (url, options = {}) => {
+    const parsedUrl = new URL(url);
+    const token = parsedUrl.searchParams.get('verify') ?? '';
+    const attempt = Number(token.match(/-(\d+)$/)?.[1] ?? 1);
+    if (!injectedTimeout && parsedUrl.searchParams.has('verify') && attempt === 1 && parsedUrl.pathname === historyPath) {
+      injectedTimeout = true;
+      throw new DOMException('Aborted', 'AbortError');
+    }
+    return globalThis.fetch(url, options);
+  };
+
+  const result = await verifyProductionDeployment(expected, fastOptions(server, {
+    fetchImpl,
+    log: (message) => logs.push(message)
+  }));
+  assert.equal(injectedTimeout, true);
+  assert.equal(result.status, 'deployed');
+  assert.equal(result.attempts, 2);
+  assert.match(logs[0], /结果=request-timeout/);
 });
 
 test('aborts pending sibling requests when one resource fails fast before retry', async (t) => {
