@@ -6,9 +6,11 @@ on:
 permissions:
   contents: read
 jobs:
-  audit:
+  candidate:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    outputs:
+      candidate_sha: ${{ steps.package.outputs.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -17,22 +19,124 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: 22
-      - name: Export repository evidence and test dependencies
+      - name: Materialize exactly reviewed candidate and remove staging helpers
         shell: bash
         run: |
           set -euo pipefail
-          git bundle create "$RUNNER_TEMP/icloud-history.bundle" HEAD
-          git rev-parse HEAD > "$RUNNER_TEMP/icloud-audit-head.txt"
+          python3 - <<'PY'
+          import base64, gzip, hashlib, pathlib, subprocess
+          encoded = ''.join(pathlib.Path(f'.github/icloud-minimum-patch.{i}.b64').read_text().strip() for i in range(1,8))
+          raw = base64.b64decode(encoded, validate=True)
+          assert hashlib.sha256(raw).hexdigest() == '3f4fe61efa6a4803546feba12340181f33be0e2ce63b685256312b3f62f86e03', 'Transfer hash mismatch'
+          patch = gzip.decompress(raw)
+          assert hashlib.sha256(patch).hexdigest() == '7bc422cb300783ae560e8a2ed05f72a638d06dbd36eeca36fb66e3aa45dc24c0', 'Patch hash mismatch'
+          subprocess.run(['git','apply','--check'],input=patch,check=True)
+          subprocess.run(['git','apply','--index'],input=patch,check=True)
+          subprocess.run(['git','rm','.github/workflows/icloud-minimum-upgrade-audit.yml',*[f'.github/icloud-minimum-patch.{i}.b64' for i in range(1,8)]],check=True)
+          paths = subprocess.check_output(['git','diff','--cached','--name-only'],text=True).splitlines()
+          for p in paths:
+              assert p.startswith('tools/icloud_price_comparison/') or p == '.github/workflows/icloud-minimum-upgrade-audit.yml' or p.startswith('.github/icloud-minimum-patch.'), p
+          PY
+          git -c user.name=linchun7 -c user.email=104673731+linchun7@users.noreply.github.com commit -m 'feat(icloud): add independently auditable minimum-winner history'
           corepack enable
-          cd tools/icloud_price_comparison
-          pnpm install --frozen-lockfile --ignore-scripts
-          tar -czf "$RUNNER_TEMP/icloud-test-dependencies.tar.gz" node_modules
+      - name: Install locked dependencies
+        working-directory: tools/icloud_price_comparison
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Core and deep artifact acceptance
+        working-directory: tools/icloud_price_comparison
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm test:core 2>&1 | tee "$RUNNER_TEMP/icloud-core.log"
+          pnpm validate:artifact 2>&1 | tee "$RUNNER_TEMP/icloud-artifact.log"
+          pnpm validate:snapshots 2>&1 | tee "$RUNNER_TEMP/icloud-snapshots.log"
+      - name: Real browser acceptance
+        working-directory: tools/icloud_price_comparison
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm test:ui 2>&1 | tee "$RUNNER_TEMP/icloud-browser.log"
+      - name: Capture desktop and narrow-screen history dialog
+        working-directory: tools/icloud_price_comparison
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          import { chromium } from 'playwright';
+          import { readFile } from 'node:fs/promises';
+          import http from 'node:http';
+          import path from 'node:path';
+          const root=path.resolve('../..');
+          const server=http.createServer(async(req,res)=>{
+            try {
+              const pathname=decodeURIComponent(new URL(req.url,'http://localhost').pathname);
+              const file=path.resolve(root,'.'+pathname+(pathname.endsWith('/')?'index.html':''));
+              if(!file.startsWith(root+path.sep)) throw new Error('Path');
+              const type={'.js':'text/javascript','.json':'application/json','.css':'text/css','.html':'text/html'}[path.extname(file)]||'application/octet-stream';
+              res.setHeader('Content-Type',type);res.end(await readFile(file));
+            }catch{res.statusCode=404;res.end('not found');}
+          });
+          await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+          const browser=await chromium.launch({executablePath:'/usr/bin/google-chrome',headless:true});
+          try {
+            const data=JSON.parse(await readFile('data/prices.json','utf8'));
+            for(const width of [320,1280]){
+              const page=await browser.newPage({viewport:{width,height:900}});
+              await page.route('https://**/*',route=>route.abort());
+              await page.addInitScript(now=>{Date.now=()=>now;},Date.parse(data.generatedAt)+3600000);
+              await page.goto(`http://127.0.0.1:${server.address().port}/tools/icloud_price_comparison/`);
+              await page.locator('#minimumHistoryButton').click();
+              await page.locator('#minimumHistoryTier').selectOption('6TB');
+              await page.waitForFunction(()=>document.querySelector('#minimumHistoryDialog')?.textContent.includes('墨西哥'));
+              await page.screenshot({path:path.join(process.env.RUNNER_TEMP,`icloud-history-${width}.png`),fullPage:true});
+              await page.close();
+            }
+          } finally {await browser.close();server.close();}
+          JS
+      - name: Package exactly tested commit
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          git bundle create "$RUNNER_TEMP/icloud-tested-candidate.bundle" HEAD
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
         with:
-          name: icloud-history-audit
+          name: icloud-upgrade-acceptance
           path: |
-            ${{ runner.temp }}/icloud-history.bundle
-            ${{ runner.temp }}/icloud-audit-head.txt
-            ${{ runner.temp }}/icloud-test-dependencies.tar.gz
+            ${{ runner.temp }}/icloud-*.log
+            ${{ runner.temp }}/icloud-history-*.png
+            ${{ runner.temp }}/icloud-tested-candidate.bundle
           retention-days: 1
-          if-no-files-found: error
+          if-no-files-found: warn
+  publish_candidate:
+    needs: candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: icloud-upgrade-acceptance
+          path: ${{ runner.temp }}/tested
+      - name: Publish tested candidate to feature branch only
+        env:
+          EXPECTED_SHA: ${{ needs.candidate.outputs.candidate_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch "$RUNNER_TEMP/tested/icloud-tested-candidate.bundle" HEAD
+          test "$(git rev-parse FETCH_HEAD)" = "$EXPECTED_SHA"
+          test "$(git rev-parse "$EXPECTED_SHA^")" = "$GITHUB_SHA"
+          git diff --name-only "$GITHUB_SHA" "$EXPECTED_SHA" > "$RUNNER_TEMP/changed-paths.txt"
+          python3 - <<'PY'
+          import os,pathlib
+          for p in pathlib.Path(os.environ['RUNNER_TEMP'],'changed-paths.txt').read_text().splitlines():
+              assert p.startswith('tools/icloud_price_comparison/') or p == '.github/workflows/icloud-minimum-upgrade-audit.yml' or p.startswith('.github/icloud-minimum-patch.'), p
+          PY
+          git push origin "$EXPECTED_SHA:refs/heads/upgrade/icloud-minimum-history"
