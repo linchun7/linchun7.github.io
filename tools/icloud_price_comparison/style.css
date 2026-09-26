@@ -127,10 +127,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   gap: 7px;
   color: var(--muted);
   font-size: 12px;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  text-align: right;
+  white-space: normal;
 }
 
-.data-status svg { width: 16px; height: 16px; }
+.data-status > span { min-width: 0; }
+.data-status svg { width: 16px; height: 16px; flex: 0 0 auto; }
 .data-status.is-stale { color: var(--muted); }
 .data-status.is-error { color: var(--danger); }
 .freshness-warning { color: var(--amber); font-weight: 650; }
