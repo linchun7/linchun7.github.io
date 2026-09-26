@@ -13,14 +13,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        browser: [firefox, webkit]
+        browser: [chromium, firefox, webkit]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out exact sealed main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          ref: 0924b500432a6f76b710a305c07f0f1d025b1fbb
+          ref: aef75165ff5d0b7cf048a692acf1a9602f84c790
           persist-credentials: false
           fetch-depth: 1
 
@@ -63,7 +63,7 @@ jobs:
 
           const engine = { chromium, firefox, webkit }[process.env.BROWSER];
           const browser = await engine.launch({ headless: true });
-          const widths = [641];
+          const widths = [320, 390, 640, 641, 1280];
 
           function overlapArea(a, b) {
             return Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left))
