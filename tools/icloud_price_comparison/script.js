@@ -907,11 +907,11 @@ function renderLocalPriceWithTrend(plan, country, changedSeries) {
 function renderHistoryRows(record) {
   renderHistoryHeaders();
   elements.historyRows.replaceChildren();
-  [...record.events].reverse().forEach((event) => {
+  const changedSeries = compactHistorySeries(record.events, state.historyTier);
+  [...changedSeries].reverse().forEach((event) => {
     const row = document.createElement('tr');
     row.append(createCell(formatDate(event.observedAt)), createCell(event.currency, 'currency-code'));
-    const price = event.plans[state.historyTier];
-    row.append(createCell(Number.isFinite(price) ? numberFormatter.format(price) : '--'));
+    row.append(createCell(numberFormatter.format(event.plans[state.historyTier])));
     elements.historyRows.append(row);
   });
 }
@@ -1038,26 +1038,33 @@ function createPublishedDateChangesCell(changes, isInitial = false) {
     appendGroup('移除地区', displayChanges.removedCountries.map(countryDisplayName).join('、'));
   }
   if (displayChanges.changedCountries?.length) {
-    const group = document.createElement('div');
-    group.className = 'published-change-group published-change-country-group';
-    const heading = document.createElement('strong');
-    heading.className = 'published-change-heading';
-    const onlyRegionChanges = displayChanges.changedCountries.every((entry) => (
-      entry.fromRegion !== entry.toRegion
-      && entry.fromCurrency === entry.toCurrency
-      && !(entry.tiers || []).length
-    ));
-    heading.textContent = onlyRegionChanges ? '所属分区变化：' : '地区内容变化：';
-    group.append(heading);
+    const groupedChanges = new Map();
     for (const entry of displayChanges.changedCountries) {
-      const line = document.createElement('div');
-      line.className = 'published-change-country';
-      const country = document.createElement('strong');
-      country.textContent = countryDisplayName(entry);
-      line.append(document.createTextNode('• '), country, document.createTextNode(`（${changedCountryDetails(entry)}）`));
-      group.append(line);
+      const labels = [];
+      if ((entry.tiers || []).length) labels.push('价格');
+      if (entry.fromCurrency !== entry.toCurrency) labels.push('币种');
+      if (entry.fromRegion !== entry.toRegion) labels.push('所属分区');
+      const label = labels.length ? `${labels.join('、')}变化` : '其他变化';
+      if (!groupedChanges.has(label)) groupedChanges.set(label, []);
+      groupedChanges.get(label).push(entry);
     }
-    cell.append(group);
+    for (const [label, entries] of groupedChanges) {
+      const group = document.createElement('div');
+      group.className = 'published-change-group published-change-country-group';
+      const heading = document.createElement('strong');
+      heading.className = 'published-change-heading';
+      heading.textContent = `${label}：`;
+      group.append(heading);
+      for (const entry of entries) {
+        const line = document.createElement('div');
+        line.className = 'published-change-country';
+        const country = document.createElement('strong');
+        country.textContent = countryDisplayName(entry);
+        line.append(document.createTextNode('• '), country, document.createTextNode(`（${changedCountryDetails(entry)}）`));
+        group.append(line);
+      }
+      cell.append(group);
+    }
   }
   if (!cell.childElementCount) cell.textContent = '无可展示的实质变化';
   return cell;
@@ -1788,10 +1795,18 @@ function ensureMinimumHistoryDialog() {
   return dialog;
 }
 
-function minimumWinnerNames(rows) {
-  if (!rows.length) return '该容量未参与比较';
-  const names = rows.map((r) => r.name);
-  return names.length > 3 ? `${names.slice(0, 3).join('、')}等 ${names.length} 个地区并列` : names.join('、');
+function minimumWinnerSummary(rows) {
+  if (!rows.length) return '暂无';
+  const summaries = rows.map((row) => `${row.name} ¥${moneyFormatter.format(row.cny)}`);
+  return summaries.length > 3
+    ? `${summaries.slice(0, 3).join('、')}等 ${summaries.length} 个地区并列`
+    : summaries.join('、');
+}
+
+function minimumHistoryCauseLabel(cause) {
+  if (cause === 'mixed') return '汇率 + Apple 调价';
+  if (cause === 'scope') return '地区范围变化';
+  return MINIMUM_CAUSE_LABELS[cause] || '原因未确定';
 }
 
 function renderMinimumHistory() {
@@ -1811,37 +1826,31 @@ function renderMinimumHistory() {
     control.append(button);
   }
   if (focusedTier) [...control.children].find((button) => button.dataset.tier === focusedTier)?.focus({ preventScroll: true });
-  const series = h.events.filter((e) => e.tier === minimumHistoryUi.tier).reverse();
+
+  const series = h.events
+    .filter((event) => event.tier === minimumHistoryUi.tier && event.kind === 'change')
+    .reverse();
   const note = document.querySelector('#minimumHistoryNote');
-  const coverage = h.firstObservedAt ? `可核验记录自 ${formatBeijingDateTime(h.firstObservedAt)}，截止 ${formatBeijingDateTime(h.checkpoint?.at)}。` : '暂无可核验排名记录。';
-  const sync = state.data && h.checkedAt !== state.data.generatedAt ? '历史与当前表格更新时间不同，以下仅作历史参考。' : '';
-  note.textContent = `${coverage}项目早期浏览器汇率未留存，不能完整回溯。仅记录第一名归属（含并列）变化；以下均为北京时间观测记录，并非变更精确发生时刻。${h.gaps.length ? `有 ${h.gaps.length} 段快照证据缺口。` : ''}${h.pendingGap ? '最近快照不足以确认最低价，未追加变更。' : ''}${sync}`;
+  const noteParts = ['人民币价格按当时汇率折算，仅展示网站可核验到的最低价变更。'];
+  if (state.data && h.checkedAt !== state.data.generatedAt) noteParts.push('历史记录暂未同步到当前价格。');
+  if (h.pendingGap) noteParts.push('最近最低价变化暂未确认。');
+  note.textContent = noteParts.join(' ');
+
   const list = document.querySelector('#minimumHistoryEvents'); list.replaceChildren();
-  if (!series.length) list.append(minimumHistoryNode('p', '该容量暂无可核验的最低价记录。'));
+  if (!series.length) list.append(minimumHistoryNode('p', '暂无最低价变更记录。'));
   for (const event of series.slice(0, minimumHistoryUi.limit)) {
     const item = minimumHistoryNode('article', '', 'minimum-history-event');
     item.dataset.cause = event.cause;
-    item.append(minimumHistoryNode('p', `${formatBeijingDateTime(event.at)} · ${MINIMUM_CAUSE_LABELS[event.cause]}`, 'minimum-history-event-meta'));
-    item.append(minimumHistoryNode('strong', event.kind === 'initial' ? `起始最低价：${minimumWinnerNames(event.to)}` : `${minimumWinnerNames(event.from)} → ${minimumWinnerNames(event.to)}`));
-    const details = document.createElement('details');
-    const summary = minimumHistoryNode('summary', '当时的价格与依据');
-    summary.tabIndex = 0; // Include native summary controls in the existing focus trap.
-    details.append(summary);
-    const explanation = event.cause === 'fx' ? '该容量比较范围及 Apple 当地价格未变，换算后的第一名发生变化。'
-      : event.cause === 'apple' ? '该容量 Apple 当地价格改变，相关币种换算因子相同。'
-      : event.cause === 'mixed' ? '该容量 Apple 当地价格和相关汇率均有变化；不据此宣称某一项是唯一原因。'
-      : event.cause === 'scope' ? '参与比较的地区、计价币种或容量发生变化，不能仅当作汇率或 Apple 调价。'
-      : event.cause === 'unknown' ? `${event.evidence.pricesChanged ? '已确认该容量存在 Apple 当地价格变化；' : ''}前后证据不足或统计口径改变，不能可靠归于单一原因。`
-      : '这是最早可核验的起始状态，不计作第一名变化。';
-    details.append(minimumHistoryNode('p', explanation));
-    for (const [label, at, rows] of [['上次快照', event.previousAt, event.from], ['本次快照', event.at, event.to]]) {
-      if (!at) continue;
-      details.append(minimumHistoryNode('p', `${label} ${formatBeijingDateTime(at)}`));
-      for (const r of rows) details.append(minimumHistoryNode('p', `${r.name}：${r.currency} ${numberFormatter.format(r.local)} ≈ ¥${moneyFormatter.format(r.cny)}`));
-    }
-    if (event.basis === 'saved-fx') details.append(minimumHistoryNode('p', '依据当时留存的 Apple 标价及原始汇率重算，未使用今天的汇率。'));
-    if (event.basis === 'saved-cny') details.append(minimumHistoryNode('p', '依据留存金额确认；无法分辨并列或舍入边界的版本不纳入。'));
-    item.append(details); list.append(item);
+    item.append(minimumHistoryNode(
+      'p',
+      `${formatDate(formatBeijingDate(event.at))} · ${minimumHistoryCauseLabel(event.cause)}`,
+      'minimum-history-event-meta'
+    ));
+    item.append(minimumHistoryNode(
+      'strong',
+      `${minimumWinnerSummary(event.from)} → ${minimumWinnerSummary(event.to)}`
+    ));
+    list.append(item);
   }
   document.querySelector('#minimumHistoryMore').hidden = series.length <= minimumHistoryUi.limit;
   document.querySelector('#minimumHistoryCurrent').hidden = !state.minimumCuesEnabled || !state.minimumCountries[minimumHistoryUi.tier]?.length;
