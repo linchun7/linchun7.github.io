@@ -1762,19 +1762,12 @@ function ensureMinimumHistoryDialog() {
 
   const header = minimumHistoryNode('div', '', 'dialog-header');
   const title = minimumHistoryNode('h2', '最低价历史'); title.id = 'minimumHistoryTitle';
-  const close = minimumHistoryNode('button', '×', 'icon-button');
-  close.type = 'button'; close.id = 'closeMinimumHistory'; close.setAttribute('aria-label', '关闭最低价历史');
-  close.addEventListener('click', () => dialog.close());
-  header.append(title, close);
-
-  const content = minimumHistoryNode('section', '', 'history-list');
-  const status = minimumHistoryNode('p', '', 'minimum-history-status');
-  status.id = 'minimumHistoryStatus'; status.hidden = true; status.setAttribute('aria-live', 'polite');
 
   const toolbar = minimumHistoryNode('div', '', 'minimum-history-toolbar');
   toolbar.id = 'minimumHistoryToolbar'; toolbar.hidden = true;
   const filter = minimumHistoryNode('label', '', 'minimum-history-filter');
-  filter.append(minimumHistoryNode('span', '容量'));
+  const filterLabel = minimumHistoryNode('span', '筛选容量', 'visually-hidden');
+  filter.append(filterLabel);
   const select = minimumHistoryNode('select');
   select.id = 'minimumHistoryTierFilter';
   select.setAttribute('aria-label', '筛选最低价历史容量');
@@ -1784,6 +1777,15 @@ function ensureMinimumHistoryDialog() {
     renderMinimumHistory();
   });
   filter.append(select); toolbar.append(filter);
+
+  const close = minimumHistoryNode('button', '×', 'icon-button');
+  close.type = 'button'; close.id = 'closeMinimumHistory'; close.setAttribute('aria-label', '关闭最低价历史');
+  close.addEventListener('click', () => dialog.close());
+  header.append(title, toolbar, close);
+
+  const content = minimumHistoryNode('section', '', 'history-list');
+  const status = minimumHistoryNode('p', '', 'minimum-history-status');
+  status.id = 'minimumHistoryStatus'; status.hidden = true; status.setAttribute('aria-live', 'polite');
 
   const list = minimumHistoryNode('div'); list.id = 'minimumHistoryEvents';
   const more = minimumHistoryNode('button', '显示更多', 'minimum-history-button');
@@ -1797,7 +1799,7 @@ function ensureMinimumHistoryDialog() {
   retry.type = 'button'; retry.id = 'minimumHistoryRetry'; retry.hidden = true;
   retry.addEventListener('click', () => { minimumHistoryUi.data = null; void loadMinimumHistory(); });
 
-  content.append(status, toolbar, list, more, note, retry);
+  content.append(status, list, more, note, retry);
   dialog.append(header, content);
   dialog.addEventListener('keydown', (event) => trapDialogFocus(dialog, event));
   dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
