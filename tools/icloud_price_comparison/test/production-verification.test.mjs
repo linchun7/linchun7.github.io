@@ -421,20 +421,41 @@ test('does not accept cache-bypassed diagnostics when ordinary canonical user UR
   );
 });
 
-test('retries HTTP failure, timeout, malformed prices, and stale static HTML without weakening the contract', async () => {
-  for (const [responses, requestTimeoutMs = 1_000, maxAttempts = 2] of [
-    [{ prices: { status: 503, body: '{}' } }],
-    [{ history: { delayMs: 400 } }, 150, 3],
-    [{ prices: { body: '{bad' } }],
-    [{ index: { body: '<!doctype html><title>old</title>' } }]
+test('retries HTTP failure, malformed prices, and stale static HTML without weakening the contract', async () => {
+  for (const responses of [
+    { prices: { status: 503, body: '{}' } },
+    { prices: { body: '{bad' } },
+    { index: { body: '<!doctype html><title>old</title>' } }
   ]) {
     const server = await startSequenceServer([{ artifact: expected, responses }, { artifact: expected }]);
     try {
-      const result = await verifyProductionDeployment(expected, fastOptions(server, { requestTimeoutMs }));
-      assert.ok(result.attempts >= 2 && result.attempts <= maxAttempts);
+      const result = await verifyProductionDeployment(expected, fastOptions(server));
+      assert.equal(result.attempts, 2);
     } finally {
       await server.close();
     }
+  }
+});
+
+test('retries a request timeout deterministically without weakening the contract', async () => {
+  const server = await startSequenceServer([{ artifact: expected }, { artifact: expected }]);
+  let injectedTimeouts = 0;
+  const historyPath = new URL(server.urls.productionHistoryUrl).pathname;
+  const fetchImpl = async (url, options = {}) => {
+    const parsedUrl = new URL(url, 'http://localhost');
+    const diagnostic = parsedUrl.search.includes('verify=');
+    if (diagnostic && attemptFromUrl(url) === 0 && parsedUrl.pathname === historyPath) {
+      injectedTimeouts += 1;
+      throw new DOMException('Aborted', 'AbortError');
+    }
+    return globalThis.fetch(url, options);
+  };
+  try {
+    const result = await verifyProductionDeployment(expected, fastOptions(server, { fetchImpl }));
+    assert.equal(injectedTimeouts, 1);
+    assert.equal(result.attempts, 2);
+  } finally {
+    await server.close();
   }
 });
 
