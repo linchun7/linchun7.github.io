@@ -1744,7 +1744,7 @@ window.addEventListener('pageshow', () => {
 
 
 // A dedicated history button leaves the existing minimum-card navigation intact.
-const minimumHistoryUi = { data: null, promise: null, dialog: null, tier: DEFAULT_SORT_TIER, limit: 20 };
+const minimumHistoryUi = { data: null, promise: null, dialog: null, filterTier: 'all', limit: 20 };
 
 function minimumHistoryNode(tag, text = '', className = '') {
   const node = document.createElement(tag);
@@ -1759,34 +1759,46 @@ function ensureMinimumHistoryDialog() {
   dialog.id = 'minimumHistoryDialog';
   dialog.className = 'history-dialog minimum-history-dialog';
   dialog.setAttribute('aria-labelledby', 'minimumHistoryTitle');
+
   const header = minimumHistoryNode('div', '', 'dialog-header');
   const title = minimumHistoryNode('h2', '最低价历史'); title.id = 'minimumHistoryTitle';
   const close = minimumHistoryNode('button', '×', 'icon-button');
   close.type = 'button'; close.id = 'closeMinimumHistory'; close.setAttribute('aria-label', '关闭最低价历史');
   close.addEventListener('click', () => dialog.close());
   header.append(title, close);
+
   const content = minimumHistoryNode('section', '', 'history-list');
-  const note = minimumHistoryNode('p', '', 'minimum-history-note'); note.id = 'minimumHistoryNote';
-  note.setAttribute('aria-live', 'polite');
-  const control = minimumHistoryNode('div', '', 'segmented compact');
-  control.id = 'minimumHistoryTierControl'; control.setAttribute('role', 'group'); control.setAttribute('aria-label', '最低价历史容量');
+  const status = minimumHistoryNode('p', '', 'minimum-history-status');
+  status.id = 'minimumHistoryStatus'; status.hidden = true; status.setAttribute('aria-live', 'polite');
+
+  const toolbar = minimumHistoryNode('div', '', 'minimum-history-toolbar');
+  toolbar.id = 'minimumHistoryToolbar'; toolbar.hidden = true;
+  const filter = minimumHistoryNode('label', '', 'minimum-history-filter');
+  filter.append(minimumHistoryNode('span', '容量'));
+  const select = minimumHistoryNode('select');
+  select.id = 'minimumHistoryTierFilter';
+  select.setAttribute('aria-label', '筛选最低价历史容量');
+  select.addEventListener('change', () => {
+    minimumHistoryUi.filterTier = select.value;
+    minimumHistoryUi.limit = 20;
+    renderMinimumHistory();
+  });
+  filter.append(select); toolbar.append(filter);
+
   const list = minimumHistoryNode('div'); list.id = 'minimumHistoryEvents';
   const more = minimumHistoryNode('button', '显示更多', 'minimum-history-button');
   more.type = 'button'; more.id = 'minimumHistoryMore'; more.hidden = true;
   more.addEventListener('click', () => { minimumHistoryUi.limit += 20; renderMinimumHistory(); });
-  const current = minimumHistoryNode('button', '在价格表中查看当前最低价', 'minimum-history-button');
-  current.type = 'button'; current.id = 'minimumHistoryCurrent'; current.hidden = true;
-  current.addEventListener('click', () => {
-    const tier = minimumHistoryUi.tier;
-    const winner = state.minimumCountries[tier]?.[0];
-    if (!winner || !state.minimumCuesEnabled || classifyPriceFreshness(state.data).status !== 'fresh') return;
-    dialog.close();
-    focusMinimumCountry(tier, winner.marketId);
-  });
+
+  const note = minimumHistoryNode('p', '人民币价格按当时汇率折算，仅展示网站可核验到的最低价变更。', 'minimum-history-note');
+  note.id = 'minimumHistoryNote'; note.hidden = true;
+
   const retry = minimumHistoryNode('button', '重新读取历史', 'minimum-history-button');
   retry.type = 'button'; retry.id = 'minimumHistoryRetry'; retry.hidden = true;
   retry.addEventListener('click', () => { minimumHistoryUi.data = null; void loadMinimumHistory(); });
-  content.append(note, control, list, more, current, retry); dialog.append(header, content);
+
+  content.append(status, toolbar, list, more, note, retry);
+  dialog.append(header, content);
   dialog.addEventListener('keydown', (event) => trapDialogFocus(dialog, event));
   dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
   dialog.addEventListener('close', () => document.querySelector('#minimumHistoryButton')?.focus({ preventScroll: true }));
@@ -1809,57 +1821,91 @@ function minimumHistoryCauseLabel(cause) {
   return MINIMUM_CAUSE_LABELS[cause] || '原因未确定';
 }
 
+function minimumHistoryTierIds(history) {
+  return [...new Set([
+    ...history.events.map((event) => event.tier),
+    ...(state.data?.tiers ?? []).map((tier) => tier.id)
+  ])].sort((first, second) => (
+    canonicalTierDefinition(first).capacityGb - canonicalTierDefinition(second).capacityGb
+  ));
+}
+
 function renderMinimumHistory() {
   const h = minimumHistoryUi.data;
   if (!h || !minimumHistoryUi.dialog?.open) return;
-  const allTiers = [...new Set([...h.events.map((e) => e.tier), ...(state.data?.tiers ?? []).map((t) => t.id)])]
-    .sort((a, b) => canonicalTierDefinition(a).capacityGb - canonicalTierDefinition(b).capacityGb);
-  if (!allTiers.includes(minimumHistoryUi.tier)) minimumHistoryUi.tier = allTiers[0];
-  const control = document.querySelector('#minimumHistoryTierControl');
-  const focusedTier = control.contains(document.activeElement) ? document.activeElement.dataset.tier : null;
-  control.replaceChildren();
-  for (const tier of allTiers) {
-    const button = minimumHistoryNode('button', canonicalTierDefinition(tier).label);
-    button.type = 'button'; button.dataset.tier = tier;
-    button.setAttribute('aria-pressed', String(tier === minimumHistoryUi.tier));
-    button.addEventListener('click', () => { minimumHistoryUi.tier = tier; minimumHistoryUi.limit = 20; renderMinimumHistory(); });
-    control.append(button);
+
+  const allTiers = minimumHistoryTierIds(h);
+  if (minimumHistoryUi.filterTier !== 'all' && !allTiers.includes(minimumHistoryUi.filterTier)) {
+    minimumHistoryUi.filterTier = 'all';
   }
-  if (focusedTier) [...control.children].find((button) => button.dataset.tier === focusedTier)?.focus({ preventScroll: true });
+
+  const select = document.querySelector('#minimumHistoryTierFilter');
+  const keepFilterFocus = document.activeElement === select;
+  select.replaceChildren();
+  const allOption = minimumHistoryNode('option', '全部容量');
+  allOption.value = 'all'; select.append(allOption);
+  for (const tier of allTiers) {
+    const option = minimumHistoryNode('option', canonicalTierDefinition(tier).label);
+    option.value = tier; select.append(option);
+  }
+  select.value = minimumHistoryUi.filterTier;
+  document.querySelector('#minimumHistoryToolbar').hidden = false;
+  if (keepFilterFocus) select.focus({ preventScroll: true });
 
   const series = h.events
-    .filter((event) => event.tier === minimumHistoryUi.tier && event.kind === 'change')
-    .reverse();
-  const note = document.querySelector('#minimumHistoryNote');
-  const noteParts = ['人民币价格按当时汇率折算，仅展示网站可核验到的最低价变更。'];
-  if (state.data && h.checkedAt !== state.data.generatedAt) noteParts.push('历史记录暂未同步到当前价格。');
-  if (h.pendingGap) noteParts.push('最近最低价变化暂未确认。');
-  note.textContent = noteParts.join(' ');
+    .filter((event) => (
+      event.kind === 'change'
+      && (minimumHistoryUi.filterTier === 'all' || event.tier === minimumHistoryUi.filterTier)
+    ))
+    .sort((first, second) => (
+      Date.parse(second.at) - Date.parse(first.at)
+      || canonicalTierDefinition(first.tier).capacityGb - canonicalTierDefinition(second.tier).capacityGb
+    ));
 
-  const list = document.querySelector('#minimumHistoryEvents'); list.replaceChildren();
-  if (!series.length) list.append(minimumHistoryNode('p', '暂无最低价变更记录。'));
+  const status = document.querySelector('#minimumHistoryStatus');
+  const statusParts = [];
+  if (state.data && h.checkedAt !== state.data.generatedAt) statusParts.push('历史记录暂未同步到当前价格。');
+  if (h.pendingGap) statusParts.push('最近最低价变化暂未确认。');
+  status.textContent = statusParts.join(' ');
+  status.hidden = statusParts.length === 0;
+
+  const list = document.querySelector('#minimumHistoryEvents');
+  list.replaceChildren();
+  if (!series.length) list.append(minimumHistoryNode('p', '暂无最低价变更记录。', 'minimum-history-empty'));
   for (const event of series.slice(0, minimumHistoryUi.limit)) {
     const item = minimumHistoryNode('article', '', 'minimum-history-event');
     item.dataset.cause = event.cause;
-    item.append(minimumHistoryNode(
-      'p',
-      `${formatDate(formatBeijingDate(event.at))} · ${minimumHistoryCauseLabel(event.cause)}`,
-      'minimum-history-event-meta'
-    ));
-    item.append(minimumHistoryNode(
+    item.dataset.tier = event.tier;
+
+    const meta = minimumHistoryNode('div', '', 'minimum-history-event-meta');
+    meta.append(
+      minimumHistoryNode('span', formatDate(formatBeijingDate(event.at)), 'minimum-history-date'),
+      minimumHistoryNode('span', canonicalTierDefinition(event.tier).label, 'minimum-history-tier')
+    );
+    const change = minimumHistoryNode(
       'strong',
-      `${minimumWinnerSummary(event.from)} → ${minimumWinnerSummary(event.to)}`
-    ));
+      `${minimumWinnerSummary(event.from)} → ${minimumWinnerSummary(event.to)}`,
+      'minimum-history-change'
+    );
+    const cause = minimumHistoryNode('span', minimumHistoryCauseLabel(event.cause), 'minimum-history-cause');
+    item.append(meta, change, cause);
     list.append(item);
   }
+
   document.querySelector('#minimumHistoryMore').hidden = series.length <= minimumHistoryUi.limit;
-  document.querySelector('#minimumHistoryCurrent').hidden = !state.minimumCuesEnabled || !state.minimumCountries[minimumHistoryUi.tier]?.length;
+  document.querySelector('#minimumHistoryNote').hidden = false;
   document.querySelector('#minimumHistoryRetry').hidden = true;
 }
 
 async function loadMinimumHistory() {
   if (minimumHistoryUi.promise) return minimumHistoryUi.promise;
-  document.querySelector('#minimumHistoryNote').textContent = '正在读取最低价历史…';
+  const status = document.querySelector('#minimumHistoryStatus');
+  status.textContent = '正在读取最低价历史…';
+  status.hidden = false;
+  document.querySelector('#minimumHistoryToolbar').hidden = true;
+  document.querySelector('#minimumHistoryEvents').replaceChildren();
+  document.querySelector('#minimumHistoryMore').hidden = true;
+  document.querySelector('#minimumHistoryNote').hidden = true;
   document.querySelector('#minimumHistoryRetry').hidden = true;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -1874,11 +1920,13 @@ async function loadMinimumHistory() {
       minimumHistoryUi.data = value;
       renderMinimumHistory();
     } catch {
-      document.querySelector('#minimumHistoryNote').textContent = '最低价历史暂时无法读取，当前价格表不受影响。';
+      const status = document.querySelector('#minimumHistoryStatus');
+      status.textContent = '最低价历史暂时无法读取，当前价格表不受影响。';
+      status.hidden = false;
+      document.querySelector('#minimumHistoryToolbar').hidden = true;
       document.querySelector('#minimumHistoryEvents').replaceChildren();
       document.querySelector('#minimumHistoryMore').hidden = true;
-      document.querySelector('#minimumHistoryCurrent').hidden = true;
-      document.querySelector('#minimumHistoryTierControl').replaceChildren();
+      document.querySelector('#minimumHistoryNote').hidden = true;
       document.querySelector('#minimumHistoryRetry').hidden = false;
     } finally {
       clearTimeout(timer); minimumHistoryUi.promise = null;
@@ -1889,7 +1937,7 @@ async function loadMinimumHistory() {
 
 function openMinimumHistory() {
   const dialog = ensureMinimumHistoryDialog();
-  minimumHistoryUi.tier = state.sortTier;
+  minimumHistoryUi.filterTier = 'all';
   minimumHistoryUi.limit = 20;
   dialog.showModal();
   if (minimumHistoryUi.data && (!state.data || minimumHistoryUi.data.checkedAt === state.data.generatedAt)) renderMinimumHistory();
