@@ -3587,18 +3587,21 @@ test('prioritizes exact market IDs without hiding partial matches and distinguis
     assert.equal(await page.locator('#rankHeaderLabel > span[aria-hidden="true"]').innerText(), '序号');
     const sequenceLayout = await page.locator('#priceRows .country-history-button').evaluateAll((buttons) => (
       buttons.slice(0, 40).map((button) => {
-        const name = button.querySelector('.country-name').getBoundingClientRect();
-        const rank = button.querySelector('.mobile-rank').getBoundingClientRect();
+        const nameElement = button.querySelector('.country-name');
+        const rankElement = button.querySelector('.mobile-rank');
+        const name = nameElement.getBoundingClientRect();
+        const rank = rankElement.getBoundingClientRect();
         return {
           overlap: Math.max(0, Math.min(name.right, rank.right) - Math.max(name.left, rank.left))
             * Math.max(0, Math.min(name.bottom, rank.bottom) - Math.max(name.top, rank.top)),
-          nameBottom: name.bottom,
-          rankTop: rank.top
+          nameGridRow: getComputedStyle(nameElement).gridRowStart,
+          rankGridRow: getComputedStyle(rankElement).gridRowStart
         };
       })
     ));
-    assert.ok(sequenceLayout.every(({ overlap, nameBottom, rankTop }) => overlap === 0 && rankTop >= nameBottom - 1),
-      'mobile country sorting must keep sequence badges out of the primary country-name row');
+    assert.ok(sequenceLayout.every(({ overlap, nameGridRow, rankGridRow }) => (
+      overlap === 0 && nameGridRow === '1' && rankGridRow === '2'
+    )), 'mobile country sorting must keep sequence badges out of the primary country-name row');
 
     await page.locator('button[data-sort-tier="200GB"]').click();
     await page.waitForFunction(() => document.querySelector('.mobile-rank')?.textContent === '1');
