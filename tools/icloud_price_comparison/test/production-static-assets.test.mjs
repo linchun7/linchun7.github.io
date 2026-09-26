@@ -60,6 +60,11 @@ async function startServer(sequence = [{}]) {
       response.end(expectedData.raw.runLog);
       return;
     }
+    if (pathName === '/minimum-history.json') {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(expectedData.raw.minimumHistory);
+      return;
+    }
     if (pathName === '/index.html') {
       response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       response.end(item.indexHtml ?? expectedStatic.indexHtml);
@@ -93,6 +98,7 @@ async function startServer(sequence = [{}]) {
       productionPricesUrl: `${base}/prices.json`,
       productionHistoryUrl: `${base}/history.json`,
       productionRunLogUrl: `${base}/run-log.json`,
+      productionMinimumHistoryUrl: `${base}/minimum-history.json`,
       productionIndexUrl: `${base}/index.html`,
       productionAssetBaseUrl: `${base}/`
     },
@@ -181,11 +187,11 @@ test('production acceptance verifies all five static assets byte-for-byte', asyn
   for (const { path } of CORE_STATIC_ASSETS) {
     assert.equal(result.resources[path], 'verified byte-for-byte');
   }
-  assert.equal(server.observedRequests.length, 13);
+  assert.equal(server.observedRequests.length, 15);
   const diagnosticRequests = server.observedRequests.filter(({ url }) => /[?&]verify=/.test(url));
   const acceptanceRequests = server.observedRequests.filter(({ url }) => !/[?&]verify=/.test(url));
-  assert.equal(diagnosticRequests.length, 4);
-  assert.equal(acceptanceRequests.length, 9);
+  assert.equal(diagnosticRequests.length, 5);
+  assert.equal(acceptanceRequests.length, 10);
   for (const request of diagnosticRequests) {
     assert.equal(request.cacheControl, 'no-cache');
     assert.equal(request.pragma, 'no-cache');

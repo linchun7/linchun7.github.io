@@ -107,6 +107,12 @@ test('stale observations are gaps rather than synthetic winner changes, and reco
 test('same timestamps are idempotent but conflicting data and backwards observations fail', () => {
   const a=fixture(),h=first(a);
   assert.deepEqual(advanceMinimumHistory(h,a),h);
+  const renamed=structuredClone(a);
+  renamed.countries.find(c=>c.marketId==='mx').nameZh='墨西哥（显示名更新）';
+  const projection=advanceMinimumHistory(h,renamed);
+  assert.equal(projection.observations,h.observations,'display-only changes are not new observations');
+  assert.deepEqual(projection.events,h.events,'historical labels stay immutable');
+  assert.equal(assertMinimumHistoryMatches(projection,renamed),true);
   assert.throws(()=>advanceMinimumHistory(h,fixture({values:[900,100,100]})), /Conflicting/);
   assert.throws(()=>advanceMinimumHistory(h,fixture({day:-1})), /roll back/);
   assert.throws(()=>assertMinimumHistoryMatches(h,fixture({day:1})), /does not match/);

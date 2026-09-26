@@ -372,3 +372,5 @@ Apple 108047 从逐市场列表切换为地区表格时，预期修复是增加�
 第一次引入时，使用完整 Git 历史执行 `node scripts/minimum-history.mjs --backfill --ref <审核过的提交>`；这不是日常命令，也不能在浅克隆中声称完整回溯。回溯按 payload.generatedAt 排序去重，而不是使用可能被重写的 Git 提交时间；保留来源 commit，排除不可靠或冲突观测并标记缺口，不用现今汇率补历史。更新后执行 `pnpm render:static`、`pnpm assets:update`、`pnpm test:core`、`pnpm test:ui`、`pnpm validate:artifact`，复核 Apple history.json 未受 FX 事件污染。
 
 历史中的“首次可核验记录”不计作易主；观察间隔不是连续行情，也不是 Apple 调价生效时间。调查原因时应查看完整比较范围的标价及 FX 指纹，不能仅凭新旧第一名价格或 Apple 页发布日期判断。混合变动不承诺哪种因素占主导，未知原因不能改写成已确认的 Apple 调价。
+
+最低价历史纳入原有生产回读验收：`minimum-history.json` 必须与预期工件逐字节一致，并绑定同一份 `prices.json`。cache-bypass 诊断通过不能代替普通 canonical URL 的回读；CDN 仍返回旧历史、缺失文件或无效内容时不得标记部署成功。

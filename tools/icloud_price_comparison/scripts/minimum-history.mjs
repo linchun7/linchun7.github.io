@@ -91,7 +91,7 @@ export function advanceMinimumHistory(previous, data, options = {}) {
   const last = result.checkpoint;
   if (last?.at === current.at) {
     // A projection/schema-only rewrite is not a new price observation.
-    const comparable = (s) => s.tiers.map(({ id, scope, prices, winners }) => ({ id, scope, prices, winners }));
+    const comparable = (s) => s.tiers.map(({ id, scope, prices, winners }) => ({ id, scope, prices, winners: winners.map(({ name, ...row }) => row) }));
     if (JSON.stringify(comparable(last)) !== JSON.stringify(comparable(current))) throw new Error('Conflicting minimum snapshots at the same timestamp');
     result.checkpoint = current;
     result.checkedAt = current.at;
@@ -192,7 +192,7 @@ export async function backfillMinimumHistory({ ref = 'HEAD', projectDir = ROOT }
         if (snapshot) valid.push({ ...record, snapshot }); else excluded += 1;
       } catch { excluded += 1; }
     }
-    const signature = (s) => JSON.stringify(s.tiers.map(({ id, scope, prices, winners }) => ({ id, scope, prices, winners })));
+    const signature = (s) => JSON.stringify(s.tiers.map(({ id, scope, prices, winners }) => ({ id, scope, prices, winners: winners.map(({ name, ...row }) => row) })));
     if (!valid.length || new Set(valid.map((r) => signature(r.snapshot))).size > 1) {
       ledger.pendingGap = true;
       if (valid.length) excluded += valid.length;
