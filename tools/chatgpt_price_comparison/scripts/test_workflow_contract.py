@@ -120,6 +120,12 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("SUPERSEDED_CHATGPT_EXISTING_VERIFY", self.text)
         self.assertIn("--expected-minimum-history tools/chatgpt_price_comparison/data/minimum-history.json", self.text)
         self.assertIn("EXISTING_VERIFY: ${{ needs.verify-existing-production.result }}", self.text)
+        self.assertIn("EXISTING_SUPERSEDED: ${{ needs.verify-existing-production.outputs.superseded }}", self.text)
+        self.assertIn("superseded: ${{ steps.freshness.outputs.superseded }}", self.text)
+        self.assertIn('echo "superseded=false" >> "$GITHUB_OUTPUT"', self.text)
+        self.assertIn('echo "superseded=true" >> "$GITHUB_OUTPUT"', self.text)
+        self.assertIn("superseded_skip=true", self.text)
+        self.assertIn("keep incident state unchanged", self.text)
         self.assertIn("automatic_skip_ok=true", self.text)
         self.assertNotIn("SHOULD_RUN\" != true ]] ||", self.text)
 

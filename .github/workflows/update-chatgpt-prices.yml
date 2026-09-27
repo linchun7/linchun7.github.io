@@ -261,6 +261,8 @@ jobs:
     timeout-minutes: 7
     permissions:
       contents: read
+    outputs:
+      superseded: ${{ steps.freshness.outputs.superseded }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -277,6 +279,7 @@ jobs:
         run: |
           set -euo pipefail
           echo "should_verify=true" >> "$GITHUB_OUTPUT"
+          echo "superseded=false" >> "$GITHUB_OUTPUT"
           git fetch origin main --depth=1
           current_main_sha=$(git rev-parse origin/main)
           if [[ "$current_main_sha" == "$VALIDATED_MAIN_SHA" ]]; then
@@ -285,6 +288,7 @@ jobs:
           if ! git diff --quiet "$VALIDATED_MAIN_SHA" "$current_main_sha" --             tools/chatgpt_price_comparison '.github/workflows/*chatgpt*.yml'; then
             echo "::notice title=SUPERSEDED_CHATGPT_EXISTING_VERIFY::A newer ChatGPT project commit exists; its own updater or push production verification owns the newer deployment."
             echo "should_verify=false" >> "$GITHUB_OUTPUT"
+            echo "superseded=true" >> "$GITHUB_OUTPUT"
           fi
       - name: Verify canonical production for the pinned successful snapshot
         if: steps.freshness.outputs.should_verify == 'true'
@@ -309,6 +313,7 @@ jobs:
       SHOULD_RUN: ${{ needs.prepare.outputs.should_run }}
       TRIGGER_SOURCE: ${{ needs.prepare.outputs.trigger_source }}
       EXISTING_VERIFY: ${{ needs.verify-existing-production.result }}
+      EXISTING_SUPERSEDED: ${{ needs.verify-existing-production.outputs.superseded }}
     steps:
       - name: Maintain one incident issue and close it after recovery
         run: |
@@ -317,13 +322,18 @@ jobs:
           issue=$(gh issue list --state open --search "$title in:title" --json number,title --jq '.[] | select(.title == "ChatGPT 价格自动更新需要关注") | .number' | head -1)
           automatic_skip_ok=false
           full_update_ok=false
-          if [[ "$PREPARE" == success && "$SHOULD_RUN" != true && "$TRIGGER_SOURCE" != manual && "$EXISTING_VERIFY" == success ]]; then
+          superseded_skip=false
+          if [[ "$PREPARE" == success && "$SHOULD_RUN" != true && "$TRIGGER_SOURCE" != manual && "$EXISTING_VERIFY" == success && "$EXISTING_SUPERSEDED" == true ]]; then
+            superseded_skip=true
+          elif [[ "$PREPARE" == success && "$SHOULD_RUN" != true && "$TRIGGER_SOURCE" != manual && "$EXISTING_VERIFY" == success && "$EXISTING_SUPERSEDED" != true ]]; then
             automatic_skip_ok=true
           fi
           if [[ "$PREPARE" == success && "$SHOULD_RUN" == true && "$GENERATE" == success && "$PUBLISH" == success && "$VERIFY" == success && "$DEGRADED" == false ]]; then
             full_update_ok=true
           fi
-          if [[ "$automatic_skip_ok" == true || "$full_update_ok" == true ]]; then
+          if [[ "$superseded_skip" == true ]]; then
+            echo "A newer ChatGPT project commit owns production verification; keep incident state unchanged."
+          elif [[ "$automatic_skip_ok" == true || "$full_update_ok" == true ]]; then
             if [[ -n "$issue" ]]; then gh issue close "$issue" --comment '自动更新/幂等检查及生产验证已恢复。'; fi
           elif [[ -z "$issue" ]]; then
             gh issue create --title "$title" --body "自动触发检查、核验、发布、Pages 构建或生产验证失败，或部分地区未完整核验/汇率处于降级状态。未验证的新价格不会覆盖旧价；无可保留旧价的地区会标记为 unavailable 并继续重试。Cloudflare 主触发失败时 GitHub 备用仍会重试；持续失败可能需要维护来源或部署链路。运行：$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
