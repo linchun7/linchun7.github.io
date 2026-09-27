@@ -85,6 +85,7 @@ test('static rendering removes minimum cues and explains rankings when FX is sta
   const payload = structuredClone(current);
   payload.fx.stale = true;
   payload.fx.fallbackReason = 'request-failed';
+  delete payload.fx.comparisonFingerprint;
   const rendered = renderSeoProjection(replaceStaticFragments(html, renderStaticFragments(payload)), payload);
   const $ = load(rendered);
   assert.equal(assertStaticPageMatches(rendered, payload), true);

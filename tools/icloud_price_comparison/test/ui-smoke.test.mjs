@@ -704,6 +704,7 @@ test('keeps stale-FX static safety cues when the network refresh fails', { timeo
   const payload = structuredClone(current);
   payload.fx.stale = true;
   payload.fx.fallbackReason = 'request-failed';
+  delete payload.fx.comparisonFingerprint;
   const html = replaceStaticFragments(shell, renderStaticFragments(payload));
   const server = await startServer();
   const { port } = server.address();
