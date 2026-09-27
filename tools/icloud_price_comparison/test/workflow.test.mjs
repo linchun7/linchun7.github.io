@@ -96,7 +96,7 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /workflow_dispatch:[\s\S]*?trigger_source:[\s\S]*?default: manual[\s\S]*?options:[\s\S]*?- manual[\s\S]*?- cloudflare/);
   assert.match(workflow, /name: 检查每日幂等状态[\s\S]*?id: daily_guard[\s\S]*?node scripts\/daily-run-guard\.mjs/);
   assert.match(workflow, /name: 读取并深验最新 main 的每日幂等状态[\s\S]*?id: validate_main_data[\s\S]*?git archive --format=tar "\$validated_main_sha" tools\/icloud_price_comparison\/data[\s\S]*?tar --extract --file=-/);
-  assert.match(workflow, /validated_main_sha=\$\(git rev-parse origin\/main\)[\s\S]*?git archive --format=tar "\$validated_main_sha"[\s\S]*?validate-data-artifact\.mjs[\s\S]*?validated_main_sha=\$validated_main_sha/);
+  assert.match(workflow, /validated_main_sha=\$\(git rev-parse origin\/main\)[\s\S]*?git diff --quiet "\$executing_sha" "\$validated_main_sha"[\s\S]*?git checkout --detach "\$validated_main_sha"[\s\S]*?git archive --format=tar "\$validated_main_sha"[\s\S]*?validate-data-artifact\.mjs[\s\S]*?validated_main_sha=\$validated_main_sha/);
   assert.match(workflow, /validated_main_sha:\s*\$\{\{ steps\.validate_main_data\.outputs\.validated_main_sha \}\}/);
   assert.match(workflow, /validate-data-artifact\.mjs[\s\S]*?--data-dir "\$main_snapshot\/tools\/icloud_price_comparison\/data"/);
   assert.match(workflow, /ICLOUD_RUN_LOG_PATH:\s*\$\{\{ runner\.temp \}\}\/icloud-main-snapshot\/tools\/icloud_price_comparison\/data\/run-log\.json/);
@@ -413,6 +413,8 @@ test('backup idempotence requires full production proof and stale updater reruns
   const workflow = await readFile(workflowUrl, 'utf8');
   assert.match(workflow, /permissions:[\s\S]*?contents: read[\s\S]*?actions: read/);
   assert.match(workflow, /executing_sha=\$\(git rev-parse HEAD\)[\s\S]*?git diff --quiet "\$executing_sha" "\$validated_main_sha" -- \.github\/workflows\/update-icloud-prices\.yml[\s\S]*?STALE_WORKFLOW_DEFINITION/);
+  assert.match(workflow, /STALE_WORKFLOW_DEFINITION[\s\S]*?git checkout --detach "\$validated_main_sha"[\s\S]*?test "\$\(git rev-parse HEAD\)" = "\$validated_main_sha"/,
+    'after the workflow compatibility check, prepare validators and guards must execute from the same validated main SHA');
   assert.match(workflow, /name: 检查今天完整生产成功证明[\s\S]*?id: production_proof[\s\S]*?actions\/workflows\/update-icloud-prices\.yml\/runs\?status=success&per_page=50[\s\S]*?production_success_today=/);
   assert.match(workflow, /PRODUCTION_SUCCESS_TODAY:\s*\$\{\{ steps\.production_proof\.outputs\.production_success_today \}\}[\s\S]*?node scripts\/daily-run-guard\.mjs/);
   assert.match(workflow, /classify_prepare[\s\S]*?steps\.validate_main_data\.outcome[\s\S]*?steps\.production_proof\.outcome[\s\S]*?steps\.daily_guard\.outcome/);

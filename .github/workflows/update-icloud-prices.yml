@@ -59,6 +59,10 @@ jobs:
             echo "::error title=STALE_WORKFLOW_DEFINITION::当前运行使用的 iCloud workflow 已落后于 main；不要 rerun 旧 run，请从最新 main 新发起 workflow_dispatch。"
             exit 1
           fi
+          # Workflow definition is compatible; from this point onward all guard,
+          # validator and data code must come from the same validated main SHA.
+          git checkout --detach "$validated_main_sha"
+          test "$(git rev-parse HEAD)" = "$validated_main_sha"
           main_snapshot="$RUNNER_TEMP/icloud-main-snapshot"
           mkdir -p "$main_snapshot"
           git archive --format=tar "$validated_main_sha" tools/icloud_price_comparison/data | tar --extract --file=- --directory="$main_snapshot"
