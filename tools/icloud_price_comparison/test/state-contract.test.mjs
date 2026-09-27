@@ -36,11 +36,13 @@ test('validates FX fallback and stale state transitions from a canonical baselin
     (payload) => {
       payload.fx.stale = true;
       payload.fx.fallbackReason = 'request-failed';
+      delete payload.fx.comparisonFingerprint;
     },
     (payload) => {
       payload.fx.stale = true;
       payload.fx.fallbackUsed = true;
       payload.fx.fallbackReason = 'source-unavailable';
+      delete payload.fx.comparisonFingerprint;
     }
   ];
 
@@ -74,6 +76,14 @@ test('validates FX fallback and stale state transitions from a canonical baselin
 
   for (const mutate of invalidVariants) {
     const payload = structuredClone(baseline);
+    Object.assign(payload.fx, {
+      sourceUrl: 'https://v6.exchangerate-api.com/v6/latest/USD',
+      sourceMode: 'api-key',
+      fallbackUsed: false,
+      fallbackReason: null,
+      stale: false
+    });
+    delete payload.fx.comparisonFingerprint;
     mutate(payload);
     rejectBoth(payload);
   }

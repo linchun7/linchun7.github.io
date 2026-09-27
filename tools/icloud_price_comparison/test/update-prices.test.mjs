@@ -1710,7 +1710,7 @@ test('reuses schema 4 CNY prices and ranks without reranking rounded ties', () =
   }
 });
 
-test('publishes an explicit FX metadata allowlist and drops every internal field', () => {
+test('publishes an explicit FX metadata allowlist, conditionally exposes the comparison fingerprint, and drops every internal field', () => {
   const metadata = publicExchangeRateMetadata({
     sourceUrl: 'https://example.test/rates',
     sourceMode: 'open-access',
@@ -1739,6 +1739,30 @@ test('publishes an explicit FX metadata allowlist and drops every internal field
     ...metadata,
     fallbackReason: 'invalid-key'
   }).fallbackReason, 'source-unavailable');
+
+  const freshInput = {
+    sourceUrl: 'https://v6.exchangerate-api.com/v6/latest/USD',
+    sourceMode: 'api-key',
+    fallbackUsed: false,
+    fallbackReason: null,
+    base: 'USD',
+    fetchedAt: '2026-08-09T00:00:00.000Z',
+    stale: false,
+    rates: { USD: 1, CNY: 7.2, EUR: 0.9 },
+    futureInternalField: 'must-not-leak'
+  };
+  const countries = [{ currency: 'USD' }, { currency: 'EUR' }];
+  const freshMetadata = publicExchangeRateMetadata(freshInput, countries);
+  assert.match(freshMetadata.comparisonFingerprint, /^[a-f0-9]{64}$/);
+  assert.equal(Object.hasOwn(freshMetadata, 'rates'), false);
+  assert.equal(Object.hasOwn(freshMetadata, 'futureInternalField'), false);
+
+  const staleMetadata = publicExchangeRateMetadata({
+    ...freshInput,
+    stale: true,
+    fallbackReason: 'request-failed'
+  }, countries);
+  assert.equal(Object.hasOwn(staleMetadata, 'comparisonFingerprint'), false);
 });
 
 async function runDryMain({ html, fxPayload, apiKey = '', authenticatedFxPayload, githubActions = false }) {

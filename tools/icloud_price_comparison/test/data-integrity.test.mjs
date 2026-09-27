@@ -132,7 +132,7 @@ test('committed prices and history form a complete usable snapshot', async () =>
 
 test('committed public prices expose only allowlisted FX metadata and complete derived CNY values', async () => {
   const data = await readJson('../data/prices.json');
-  assert.deepEqual(Object.keys(data.fx).sort(), [
+  const expectedFxKeys = [
     'base',
     'derivedCurrency',
     'fallbackReason',
@@ -141,7 +141,13 @@ test('committed public prices expose only allowlisted FX metadata and complete d
     'sourceMode',
     'sourceUrl',
     'stale'
-  ]);
+  ];
+  if (Object.hasOwn(data.fx, 'comparisonFingerprint')) expectedFxKeys.push('comparisonFingerprint');
+  assert.deepEqual(Object.keys(data.fx).sort(), expectedFxKeys.sort());
+  if (Object.hasOwn(data.fx, 'comparisonFingerprint')) {
+    assert.equal(data.fx.stale, false);
+    assert.match(data.fx.comparisonFingerprint, /^[a-f0-9]{64}$/);
+  }
   assert.equal(data.fx.derivedCurrency, 'CNY');
   assert.equal(data.countries.flatMap(({ plans }) => Object.values(plans)).length, data.run.pricePoints);
   assert.ok(data.countries.every(({ plans }) => Object.values(plans).every(({ cnyPrice }) => (

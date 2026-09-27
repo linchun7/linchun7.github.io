@@ -326,11 +326,13 @@ test('enforces coherent stale and fallback exchange-rate metadata', async () => 
       payload.fx.stale = true;
       payload.fx.fallbackUsed = false;
       payload.fx.fallbackReason = 'request-failed';
+      delete payload.fx.comparisonFingerprint;
     },
     (payload) => {
       payload.fx.stale = true;
       payload.fx.fallbackUsed = true;
       payload.fx.fallbackReason = 'source-unavailable';
+      delete payload.fx.comparisonFingerprint;
     }
   ];
   for (const mutate of validVariants) {
@@ -339,6 +341,24 @@ test('enforces coherent stale and fallback exchange-rate metadata', async () => 
     assert.doesNotThrow(() => validatePricePayload(payload));
     assert.doesNotThrow(() => validateExistingPrices(payload));
   }
+
+  const fingerprinted = structuredClone(prices);
+  Object.assign(fingerprinted.fx, {
+    sourceUrl: 'https://v6.exchangerate-api.com/v6/latest/USD',
+    sourceMode: 'api-key',
+    fallbackUsed: false,
+    fallbackReason: null,
+    stale: false,
+    comparisonFingerprint: 'a'.repeat(64)
+  });
+  assert.doesNotThrow(() => validatePricePayload(fingerprinted));
+  assert.doesNotThrow(() => validateExistingPrices(fingerprinted));
+
+  const staleFingerprinted = structuredClone(fingerprinted);
+  staleFingerprinted.fx.stale = true;
+  staleFingerprinted.fx.fallbackReason = 'request-failed';
+  assert.throws(() => validatePricePayload(staleFingerprinted), /unexpected or invalid fields/);
+  assert.throws(() => validateExistingPrices(staleFingerprinted));
 
   const invalidVariants = [
     (payload) => { payload.fx.fallbackReason = 'request-failed'; },
@@ -372,6 +392,7 @@ test('enforces coherent stale and fallback exchange-rate metadata', async () => 
       fallbackReason: null,
       stale: false
     });
+    delete payload.fx.comparisonFingerprint;
     mutate(payload);
     assert.throws(() => validatePricePayload(payload), /unexpected or invalid fields/);
     assert.throws(() => validateExistingPrices(payload));
