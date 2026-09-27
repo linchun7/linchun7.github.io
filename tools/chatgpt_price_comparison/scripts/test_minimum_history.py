@@ -71,7 +71,7 @@ class MinimumHistoryTests(unittest.TestCase):
         changes=[e for e in updated['events'] if e['kind']=='change']
         self.assertTrue(changes)
         self.assertEqual(changes[-1]['to'][0]['code'],'jp')
-        self.assertIn(changes[-1]['cause'],('storefront','mixed'))
+        self.assertEqual(changes[-1]['cause'],'storefront')
 
     def test_degraded_observation_creates_gap_not_winner_event(self):
         first=fixture()

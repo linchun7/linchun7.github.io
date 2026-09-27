@@ -313,7 +313,7 @@ def advance_history(history: dict | None, data: dict) -> dict:
     before = {plan['id']: plan for plan in (last['plans'] if last else [])}
     after = {plan['id']: plan for plan in current['plans']}
     seen = {event['plan'] for event in result['events']}
-    fx_changed = None if last is None else canonical(last['fx']) != canonical(current['fx'])
+    fx_changed = None if last is None else canonical(last['fx']['rates']) != canonical(current['fx']['rates'])
 
     for plan_id in sorted(set(before) | set(after), key=lambda value: (PLAN_ORDER.index(value) if value in PLAN_ORDER else len(PLAN_ORDER), value)):
         old_plan, new_plan = before.get(plan_id), after.get(plan_id)
