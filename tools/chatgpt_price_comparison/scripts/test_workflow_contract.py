@@ -112,6 +112,17 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("git diff --quiet", validate)
         self.assertIn("steps.pages.outputs.should_verify == 'true'", validate)
 
+    def test_idempotent_backup_revalidates_current_production(self):
+        self.assertIn("verify-existing-production:", self.text)
+        self.assertIn("needs.prepare.outputs.should_run != 'true'", self.text)
+        self.assertIn("needs.prepare.outputs.trigger_source != 'manual'", self.text)
+        self.assertIn("ref: ${{ needs.prepare.outputs.validated_main_sha }}", self.text)
+        self.assertIn("SUPERSEDED_CHATGPT_EXISTING_VERIFY", self.text)
+        self.assertIn("--expected-minimum-history tools/chatgpt_price_comparison/data/minimum-history.json", self.text)
+        self.assertIn("EXISTING_VERIFY: ${{ needs.verify-existing-production.result }}", self.text)
+        self.assertIn("automatic_skip_ok=true", self.text)
+        self.assertNotIn("SHOULD_RUN\" != true ]] ||", self.text)
+
     def test_only_main_can_publish(self):
         self.assertIn("github.ref == 'refs/heads/main'", self.text)
         self.assertNotIn("feat/chatgpt-price-comparison", self.text)

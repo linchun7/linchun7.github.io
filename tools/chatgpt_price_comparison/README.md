@@ -70,3 +70,7 @@ node tools/chatgpt_price_comparison/scripts/browser-test.mjs
 ### Prepare → generate 固定基线
 
 prepare 会在拒绝 stale workflow 后输出精确 `validated_main_sha`，generate 只从该 SHA 生成候选，不会再次从可变 main 取代码。prepare 之后若 main 前进，候选仍基于已验证版本；publish 的严格 CAS 会拒绝覆盖任何后续 main。
+
+### 自动幂等跳过仍需生产复核
+
+Cloudflare/GitHub 自动入口如果因为同日已有完整成功证明而跳过抓取，不再把“跳过”本身当成功。它会用 prepare 固定的 `validated_main_sha` 重新验证 canonical 线上价格 JSON、最低价历史、HTML build revision 与版本化资源。若验证期间已有更晚的 ChatGPT 项目提交接管生产，则旧检查标记为 superseded，由更新提交自己的生产验证负责。
