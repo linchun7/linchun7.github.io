@@ -154,6 +154,8 @@ await assert.rejects(
 const other = fixture();
 other.generated_at = '2026-09-24T00:00:02Z';
 other.revision = revisionOf(other);
+const otherMinimumHistory = structuredClone(minimumHistory);
+otherMinimumHistory.checked_at = other.generated_at;
 await assert.rejects(
   verifyOnce(data, {
     expectedMinimumHistory: minimumHistory,
@@ -162,6 +164,7 @@ await assert.rejects(
     fetchImpl: async url => {
       const pathname = new URL(String(url)).pathname;
       if (pathname.endsWith('/data/prices.json')) return new Response(JSON.stringify(other), { status: 200 });
+      if (pathname.endsWith('/data/minimum-history.json')) return new Response(JSON.stringify(otherMinimumHistory), { status: 200 });
       return responseFor(url);
     },
     requestTimeoutMs: 1000
