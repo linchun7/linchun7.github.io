@@ -585,7 +585,7 @@
   }
 
   function validateMinimumHistory(value) {
-    const keys = 'checkpoint,checked_at,events,excluded_versions,first_observed_at,gaps,observations,pending_gap,project_since,schema';
+    const keys = 'checked_at,checkpoint,events,excluded_versions,first_observed_at,gaps,observations,pending_gap,project_since,schema';
     if (!value || typeof value !== 'object' || Array.isArray(value)
       || Object.keys(value).sort().join(',') !== keys
       || value.schema !== 1 || value.project_since !== '2026-09-24'
