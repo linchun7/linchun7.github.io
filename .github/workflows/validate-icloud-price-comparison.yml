@@ -4,13 +4,25 @@ on:
   pull_request:
     paths:
       - '.github/dependabot.yml'
-      - '.github/workflows/**'
+      - '.github/workflows/auto-merge-official-actions.yml'
+      - '.github/workflows/icloud-repository-maintenance.yml'
+      - '.github/workflows/monitor-icloud-zh-markets.yml'
+      - '.github/workflows/update-icloud-prices.yml'
+      - '.github/workflows/validate-action-artifact-roundtrip.yml'
+      - '.github/workflows/validate-icloud-price-comparison.yml'
+      - '.github/workflows/validate-static-tools.yml'
       - 'tools/icloud_price_comparison/**'
   push:
     branches: [main]
     paths:
       - '.github/dependabot.yml'
-      - '.github/workflows/**'
+      - '.github/workflows/auto-merge-official-actions.yml'
+      - '.github/workflows/icloud-repository-maintenance.yml'
+      - '.github/workflows/monitor-icloud-zh-markets.yml'
+      - '.github/workflows/update-icloud-prices.yml'
+      - '.github/workflows/validate-action-artifact-roundtrip.yml'
+      - '.github/workflows/validate-icloud-price-comparison.yml'
+      - '.github/workflows/validate-static-tools.yml'
       - 'tools/icloud_price_comparison/**'
   workflow_dispatch:
   schedule:

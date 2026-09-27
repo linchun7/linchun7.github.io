@@ -320,6 +320,20 @@ test('keeps pull-request validation read-only, complete, and SHA-pinned', async 
   assert.ok(actionReferences.every((reference) => /^[a-f0-9]{40}$/.test(reference)), 'all third-party actions must use full commit SHAs');
 
   assert.match(ciWorkflow, /pull_request:[\s\S]*?\.github\/dependabot\.yml[\s\S]*?push:[\s\S]*?\.github\/dependabot\.yml[\s\S]*?workflow_dispatch:/);
+  assert.doesNotMatch(ciWorkflow, /\.github\/workflows\/\*\*/);
+  assert.doesNotMatch(ciWorkflow, /update-chatgpt-prices\.yml|validate-chatgpt-prices\.yml/,
+    'ChatGPT workflow-only changes must not enqueue the full iCloud browser matrix');
+  for (const workflowName of [
+    'auto-merge-official-actions.yml',
+    'icloud-repository-maintenance.yml',
+    'monitor-icloud-zh-markets.yml',
+    'update-icloud-prices.yml',
+    'validate-action-artifact-roundtrip.yml',
+    'validate-icloud-price-comparison.yml',
+    'validate-static-tools.yml'
+  ]) {
+    assert.ok(ciWorkflow.includes(`.github/workflows/${workflowName}`), `missing iCloud validation trigger: ${workflowName}`);
+  }
   assert.match(ciWorkflow, /permissions:\s+contents: read/);
   assert.match(ciWorkflow, /uses: actions\/checkout@[a-f0-9]{40}[^]*?persist-credentials: false/);
   assert.doesNotMatch(ciWorkflow, /contents: write|secrets\./);
