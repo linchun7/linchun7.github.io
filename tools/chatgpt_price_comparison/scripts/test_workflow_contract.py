@@ -74,7 +74,15 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertNotIn("tools/icloud_price_comparison", validate)
         self.assertIn("branches: [main]", validate)
         self.assertNotIn("feat/chatgpt-price-comparison", validate)
-        for relative in ("app.js", "index.template.html", "scripts/pipeline.py"):
+        self.assertIn("browser: [chromium, firefox, webkit]", validate)
+        self.assertIn("pnpm install --frozen-lockfile --ignore-scripts", validate)
+        self.assertIn("pnpm audit --audit-level low", validate)
+        self.assertIn("PLAYWRIGHT_BROWSER:", validate)
+        package = (ROOT / "tools" / "chatgpt_price_comparison" / "package.json").read_text(encoding="utf-8")
+        lock = (ROOT / "tools" / "chatgpt_price_comparison" / "pnpm-lock.yaml").read_text(encoding="utf-8")
+        self.assertIn('"playwright": "1.63.0"', package)
+        self.assertIn("playwright@1.63.0", lock)
+        for relative in ("app.js", "index.template.html", "scripts/pipeline.py", "scripts/browser-matrix.mjs"):
             project_file = (ROOT / "tools" / "chatgpt_price_comparison" / relative).read_text(encoding="utf-8")
             self.assertNotIn("icloud_price_comparison", project_file)
 
