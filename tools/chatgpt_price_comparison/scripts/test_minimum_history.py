@@ -44,17 +44,21 @@ class MinimumHistoryTests(unittest.TestCase):
         self.assertEqual(len([e for e in same['events'] if e['kind']=='change']),0)
 
         changed=fixture(2*86400)
-        market=changed['markets'][0]
-        plan=market['offers'][0]
+        target_plan=same['checkpoint']['plans'][0]['id']
+        winner_codes=set(row['code'] for row in same['checkpoint']['plans'][0]['winners'])
+        market=next(
+            market for market in changed['markets']
+            if market['code'] not in winner_codes
+            and any(offer['label']==target_plan for offer in market['offers'])
+        )
+        plan=next(offer for offer in market['offers'] if offer['label']==target_plan)
         plan['amounts'][0]['amount']='1'
-        plan['amounts'][0]['display']='$1.00'
-        market['fingerprint']=p.digest(p.semantic(market))
-        for amount in plan['amounts']:
-            amount['cny']=p.converted(market,amount['amount'],changed['fx'],NOW+2*86400)
+        plan['amounts'][0]['cny']='0.01'
         revise(changed)
         updated=h.advance_history(same,changed)
         changes=[e for e in updated['events'] if e['kind']=='change']
         self.assertTrue(changes)
+        self.assertEqual(changes[-1]['to'][0]['code'],market['code'])
         self.assertIn(changes[-1]['cause'],('storefront','mixed'))
 
     def test_degraded_observation_creates_gap_not_winner_event(self):
@@ -88,7 +92,7 @@ class MinimumHistoryTests(unittest.TestCase):
             lambda x: x.update(schema=2),
             lambda x: x['events'][0].update(cause='fx'),
             lambda x: x['checkpoint']['plans'][0]['winners'][0].update(code='BAD'),
-            lambda x: x['checkpoint']['plans'][0]['prices'].reverse(),
+            lambda x: x['checkpoint']['plans'][0]['prices'][0].__setitem__(2,'bad'),
         ):
             broken=copy.deepcopy(history); mutate(broken)
             with self.assertRaises(ValueError):
