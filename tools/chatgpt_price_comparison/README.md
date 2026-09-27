@@ -62,3 +62,6 @@ node tools/chatgpt_price_comparison/scripts/browser-test.mjs
 每日自动幂等跳过现在同时要求价格数据与 `minimum-history.json` 对齐；历史缺失、损坏或落后时，09:10 备用不会误跳过。更新器使用完整 Git 历史从既有 `prices.json` 快照重建最低价账本，无法可靠回填时失败关闭，不会静默清空历史。
 
 主分支 production-smoke 若等待期间已有更新的 ChatGPT 项目提交部署，会将旧验证标记为 superseded，而不是拿旧快照去误判新生产版本失败；若后继提交与 ChatGPT 项目无关，则继续验证当前预期字节。
+
+
+最低价历史的 Git 回填不会让正常日更每天拉取完整仓库历史：generate 默认保持浅检出，只有账本缺失、损坏或与当前价格快照不同步时才临时 unshallow 获取可审计证据。

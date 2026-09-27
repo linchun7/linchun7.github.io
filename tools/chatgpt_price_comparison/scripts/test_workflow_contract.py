@@ -33,7 +33,10 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("STALE_WORKFLOW_DEFINITION", self.text)
         self.assertIn("git fetch origin main --depth=1", self.text)
         self.assertGreaterEqual(self.text.count("ref: main"), 1)
-        self.assertIn("fetch-depth: 0", self.text)
+        self.assertIn("Fetch full Git evidence only when minimum history needs recovery", self.text)
+        self.assertIn("minimum_history.assert_matches(history, prices)", self.text)
+        self.assertIn("git fetch --unshallow origin main", self.text)
+        self.assertNotIn("fetch-depth: 0", self.text)
 
     def test_daily_guard_requires_successful_production_proof(self):
         self.assertIn("daily_run_guard.py", self.text)

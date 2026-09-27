@@ -91,7 +91,25 @@ jobs:
         with:
           ref: main
           persist-credentials: false
-          fetch-depth: 0
+      - name: Fetch full Git evidence only when minimum history needs recovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          if python3 - <<'PY'
+          import json, sys
+          sys.path.insert(0, 'tools/chatgpt_price_comparison/scripts')
+          import minimum_history
+          root = minimum_history.ROOT
+          prices = json.loads((root / 'data/prices.json').read_text(encoding='utf-8'))
+          history = json.loads((root / 'data/minimum-history.json').read_text(encoding='utf-8'))
+          minimum_history.assert_matches(history, prices)
+          PY
+          then
+            echo "Minimum history is current; shallow checkout is sufficient."
+          else
+            echo "::warning title=MINIMUM_HISTORY_RECOVERY::Minimum history needs Git-backed recovery; fetching full first-parent evidence."
+            git fetch --unshallow origin main
+          fi
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
