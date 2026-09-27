@@ -156,6 +156,8 @@ jobs:
     if: needs.prepare.outputs.should_run == 'true' && needs.generate.result == 'success' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      published_sha: ${{ steps.push_data.outputs.pushed_sha }}
     permissions:
       contents: write
       pages: read
@@ -238,6 +240,8 @@ jobs:
     timeout-minutes: 7
     permissions:
       contents: read
+    outputs:
+      superseded: ${{ steps.freshness.outputs.superseded }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -250,7 +254,31 @@ jobs:
         with:
           name: chatgpt-candidate-${{ github.run_id }}
           path: ${{ runner.temp }}/chatgpt-candidate
+      - name: Detect a newer ChatGPT deployment before verifying the published candidate
+        id: freshness
+        env:
+          PUBLISHED_SHA: ${{ needs.publish.outputs.published_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "should_verify=true" >> "$GITHUB_OUTPUT"
+          echo "superseded=false" >> "$GITHUB_OUTPUT"
+          test -n "$PUBLISHED_SHA" || {
+            echo "::error title=CHATGPT_PUBLISHED_SHA_MISSING::Publish completed without exposing the commit used as the production baseline."
+            exit 1
+          }
+          git fetch origin main --depth=1
+          current_main_sha=$(git rev-parse origin/main)
+          if [[ "$current_main_sha" == "$PUBLISHED_SHA" ]]; then
+            exit 0
+          fi
+          if ! git diff --quiet "$PUBLISHED_SHA" "$current_main_sha" --             tools/chatgpt_price_comparison '.github/workflows/*chatgpt*.yml'; then
+            echo "::notice title=SUPERSEDED_CHATGPT_UPDATE_VERIFY::A newer ChatGPT project commit owns production verification; this older updater will not compare stale candidate bytes against the newer deployment."
+            echo "should_verify=false" >> "$GITHUB_OUTPUT"
+            echo "superseded=true" >> "$GITHUB_OUTPUT"
+          fi
       - name: Verify canonical production JSON and HTML
+        if: steps.freshness.outputs.should_verify == 'true'
         run: node tools/chatgpt_price_comparison/scripts/verify-production.mjs --expected "$RUNNER_TEMP/chatgpt-candidate/prices.json" --expected-minimum-history "$RUNNER_TEMP/chatgpt-candidate/minimum-history.json" --expected-index "$RUNNER_TEMP/chatgpt-candidate/index.html"
 
   verify-existing-production:
@@ -309,6 +337,7 @@ jobs:
       GENERATE: ${{ needs.generate.result }}
       PUBLISH: ${{ needs.publish.result }}
       VERIFY: ${{ needs.verify-production.result }}
+      VERIFY_SUPERSEDED: ${{ needs.verify-production.outputs.superseded }}
       DEGRADED: ${{ needs.generate.outputs.degraded }}
       SHOULD_RUN: ${{ needs.prepare.outputs.should_run }}
       TRIGGER_SOURCE: ${{ needs.prepare.outputs.trigger_source }}
@@ -323,15 +352,18 @@ jobs:
           automatic_skip_ok=false
           full_update_ok=false
           superseded_skip=false
+          superseded_update=false
           if [[ "$PREPARE" == success && "$SHOULD_RUN" != true && "$TRIGGER_SOURCE" != manual && "$EXISTING_VERIFY" == success && "$EXISTING_SUPERSEDED" == true ]]; then
             superseded_skip=true
           elif [[ "$PREPARE" == success && "$SHOULD_RUN" != true && "$TRIGGER_SOURCE" != manual && "$EXISTING_VERIFY" == success && "$EXISTING_SUPERSEDED" != true ]]; then
             automatic_skip_ok=true
           fi
-          if [[ "$PREPARE" == success && "$SHOULD_RUN" == true && "$GENERATE" == success && "$PUBLISH" == success && "$VERIFY" == success && "$DEGRADED" == false ]]; then
+          if [[ "$PREPARE" == success && "$SHOULD_RUN" == true && "$GENERATE" == success && "$PUBLISH" == success && "$VERIFY" == success && "$VERIFY_SUPERSEDED" == true ]]; then
+            superseded_update=true
+          elif [[ "$PREPARE" == success && "$SHOULD_RUN" == true && "$GENERATE" == success && "$PUBLISH" == success && "$VERIFY" == success && "$VERIFY_SUPERSEDED" != true && "$DEGRADED" == false ]]; then
             full_update_ok=true
           fi
-          if [[ "$superseded_skip" == true ]]; then
+          if [[ "$superseded_skip" == true || "$superseded_update" == true ]]; then
             echo "A newer ChatGPT project commit owns production verification; keep incident state unchanged."
           elif [[ "$automatic_skip_ok" == true || "$full_update_ok" == true ]]; then
             if [[ -n "$issue" ]]; then gh issue close "$issue" --comment '自动更新/幂等检查及生产验证已恢复。'; fi

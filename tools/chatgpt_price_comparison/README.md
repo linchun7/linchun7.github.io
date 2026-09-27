@@ -76,3 +76,6 @@ prepare 会在拒绝 stale workflow 后输出精确 `validated_main_sha`，gener
 Cloudflare/GitHub 自动入口如果因为同日已有完整成功证明而跳过抓取，不再把“跳过”本身当成功。它会用 prepare 固定的 `validated_main_sha` 重新验证 canonical 线上价格 JSON、最低价历史、HTML build revision 与版本化资源。若验证期间已有更晚的 ChatGPT 项目提交接管生产，则旧检查标记为 superseded，由更新提交自己的生产验证负责。
 
 幂等生产复核若被更晚的 ChatGPT 项目提交 supersede，旧运行只让出生产验证所有权，不会把既有 incident 误关闭为“已恢复”；只有实际验证了 pinned 生产快照，或完整新一轮更新、发布与生产验证成功，才会关闭告警。
+
+
+完整更新发布后的生产复核也具备 supersede 保护：若在 Pages/生产验证窗口内出现更晚的 ChatGPT 项目提交，旧 updater 只让出验证所有权，不再拿旧候选字节误报新生产版本失败，也不会因此错误关闭或新建 incident；后继提交自己的 push/updater 生产验证负责证明最终线上状态。

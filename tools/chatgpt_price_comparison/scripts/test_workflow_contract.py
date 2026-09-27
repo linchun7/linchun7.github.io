@@ -112,6 +112,16 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("git diff --quiet", validate)
         self.assertIn("steps.pages.outputs.should_verify == 'true'", validate)
 
+    def test_full_update_verification_yields_to_newer_chatgpt_deployment(self):
+        self.assertIn("published_sha: ${{ steps.push_data.outputs.pushed_sha }}", self.text)
+        self.assertIn("PUBLISHED_SHA: ${{ needs.publish.outputs.published_sha }}", self.text)
+        self.assertIn("SUPERSEDED_CHATGPT_UPDATE_VERIFY", self.text)
+        self.assertIn("superseded: ${{ steps.freshness.outputs.superseded }}", self.text)
+        self.assertIn("VERIFY_SUPERSEDED: ${{ needs.verify-production.outputs.superseded }}", self.text)
+        self.assertIn("superseded_update=true", self.text)
+        self.assertIn('"$VERIFY_SUPERSEDED" != true', self.text)
+        self.assertIn("keep incident state unchanged", self.text)
+
     def test_idempotent_backup_revalidates_current_production(self):
         self.assertIn("verify-existing-production:", self.text)
         self.assertIn("needs.prepare.outputs.should_run != 'true'", self.text)
