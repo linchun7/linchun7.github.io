@@ -33,11 +33,13 @@ jobs:
     outputs:
       should_run: ${{ steps.daily_guard.outputs.should_run }}
       trigger_source: ${{ steps.daily_guard.outputs.trigger_source }}
+      validated_main_sha: ${{ steps.resolve_main.outputs.validated_main_sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Resolve latest main and reject stale workflow rerun
+        id: resolve_main
         shell: bash
         run: |
           set -euo pipefail
@@ -49,6 +51,7 @@ jobs:
             exit 1
           fi
           git checkout --detach "$latest_sha"
+          echo "validated_main_sha=$latest_sha" >> "$GITHUB_OUTPUT"
       - name: Check today's successful production proof
         id: production_proof
         env:
@@ -89,8 +92,18 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
+          ref: ${{ needs.prepare.outputs.validated_main_sha }}
           persist-credentials: false
+      - name: Confirm prepare-pinned generation base
+        env:
+          VALIDATED_MAIN_SHA: ${{ needs.prepare.outputs.validated_main_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$VALIDATED_MAIN_SHA" || {
+            echo "::error title=CHATGPT_GENERATION_BASE_DRIFT::Generate did not checkout the exact main validated by prepare."
+            exit 1
+          }
       - name: Fetch full Git evidence only when minimum history needs recovery
         shell: bash
         run: |

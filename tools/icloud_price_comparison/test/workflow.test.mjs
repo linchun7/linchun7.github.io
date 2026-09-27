@@ -101,6 +101,10 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /validate-data-artifact\.mjs[\s\S]*?--data-dir "\$main_snapshot\/tools\/icloud_price_comparison\/data"/);
   assert.match(workflow, /ICLOUD_RUN_LOG_PATH:\s*\$\{\{ runner\.temp \}\}\/icloud-main-snapshot\/tools\/icloud_price_comparison\/data\/run-log\.json/);
   assert.match(workflow, /update:[\s\S]*?needs: prepare[\s\S]*?if: needs\.prepare\.outputs\.should_run == 'true'/);
+  const updateJob = workflow.slice(workflow.indexOf('\n  update:'), workflow.indexOf('\n  publish:'));
+  assert.match(updateJob, /name: 检出 prepare 已验证的精确 main[\s\S]*?ref: \$\{\{ needs\.prepare\.outputs\.validated_main_sha \}\}[\s\S]*?fetch-depth: 1/);
+  assert.match(updateJob, /VALIDATED_MAIN_SHA: \$\{\{ needs\.prepare\.outputs\.validated_main_sha \}\}[\s\S]*?git rev-parse HEAD[\s\S]*?GENERATION_BASE_SHA=\$VALIDATED_MAIN_SHA/);
+  assert.doesNotMatch(updateJob, /git checkout --detach origin\/main|git fetch origin main --depth=1/, 'generation must not re-resolve mutable main after prepare');
   assert.match(workflow, /ICLOUD_TRIGGER_SOURCE:\s*\$\{\{ needs\.prepare\.outputs\.trigger_source \}\}/);
   assert.match(workflow, /ICLOUD_AUTOMATIC_RUN_DATE_BEIJING:\s*\$\{\{ needs\.prepare\.outputs\.automatic_run_date_beijing \}\}/);
   assert.match(workflow, /concurrency:[\s\S]*?group: update-icloud-prices[\s\S]*?cancel-in-progress: false/);

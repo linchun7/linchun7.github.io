@@ -32,7 +32,12 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("Resolve latest main and reject stale workflow rerun", self.text)
         self.assertIn("STALE_WORKFLOW_DEFINITION", self.text)
         self.assertIn("git fetch origin main --depth=1", self.text)
-        self.assertGreaterEqual(self.text.count("ref: main"), 1)
+        self.assertIn("validated_main_sha: ${{ steps.resolve_main.outputs.validated_main_sha }}", self.text)
+        self.assertIn("validated_main_sha=$latest_sha", self.text)
+        self.assertIn("ref: ${{ needs.prepare.outputs.validated_main_sha }}", self.text)
+        self.assertIn("CHATGPT_GENERATION_BASE_DRIFT", self.text)
+        generate = self.text[self.text.index("\n  generate:"):self.text.index("\n  publish:")]
+        self.assertNotIn("ref: main", generate)
         self.assertIn("Fetch full Git evidence only when minimum history needs recovery", self.text)
         self.assertIn("minimum_history.assert_matches(history, prices)", self.text)
         self.assertIn("git fetch --unshallow origin main", self.text)

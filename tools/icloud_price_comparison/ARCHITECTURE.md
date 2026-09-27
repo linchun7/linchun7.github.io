@@ -267,3 +267,8 @@ archive importer 重放完整 snapshot ledger（包括此前 live revision），
 同一比较范围、本地价格完全不变而赢家变了可记为汇率变化；本地价格变化且相关换算因子明确相同才标 Apple 调价；两者都变化标“调价与汇率均有变化”（非唯一因果结论）。地区/容量/币种变化单列，FX 不新鲜不制造赢家事件，恢复或历史证据缺口的变动保守标原因未能确定。已有精度 cnyRank 是当前权威；历史旧版只在保存原始 FX 或金额区间能严格区分时重建。
 
 UI 复用原生 dialog、焦点约束、字体与现有历史样式。独立“最低价历史”按钮保持卡片原导航契约；每批显示 20 条，明细安全 textContent 输出，并列集合不擅自选一个国家。无浏览器持久化，历史读取有超时/大小/结构/时间边界，历史失败不使价格表失效。
+
+
+### Prepare → update 固定基线
+
+每日 updater 的 prepare 在验证 workflow 定义与最新 main 后会输出精确 `validated_main_sha`。后续 update 只能检出这个 SHA，不再在生成开始时重新解析可变的 `origin/main`。因此即使 prepare 通过后有人提交新的 iCloud workflow/代码，也不会出现“旧 workflow 编排 + 新代码”组合；发布阶段会按既有敏感路径/CAS 规则丢弃过期候选。

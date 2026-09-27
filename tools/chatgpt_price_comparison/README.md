@@ -65,3 +65,8 @@ node tools/chatgpt_price_comparison/scripts/browser-test.mjs
 
 
 最低价历史的 Git 回填不会让正常日更每天拉取完整仓库历史：generate 默认保持浅检出，只有账本缺失、损坏或与当前价格快照不同步时才临时 unshallow 获取可审计证据。
+
+
+### Prepare → generate 固定基线
+
+prepare 会在拒绝 stale workflow 后输出精确 `validated_main_sha`，generate 只从该 SHA 生成候选，不会再次从可变 main 取代码。prepare 之后若 main 前进，候选仍基于已验证版本；publish 的严格 CAS 会拒绝覆盖任何后续 main。

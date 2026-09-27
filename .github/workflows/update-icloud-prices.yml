@@ -142,22 +142,28 @@ jobs:
       run:
         working-directory: tools/icloud_price_comparison
     steps:
-      - name: 检出仓库
+      - name: 检出 prepare 已验证的精确 main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.prepare.outputs.validated_main_sha }}
           fetch-depth: 1
           persist-credentials: false
 
-      - name: 固定本次生成基线
+      - name: 固定本次已验证生成基线
         id: generation_base
         working-directory: .
+        env:
+          VALIDATED_MAIN_SHA: ${{ needs.prepare.outputs.validated_main_sha }}
         shell: bash
         run: |
-          git fetch origin main --depth=1
-          git checkout --detach origin/main
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$VALIDATED_MAIN_SHA" || {
+            echo "::error title=iCloud 生成基线漂移::update 未检出 prepare 已验证的精确 main；拒绝继续。"
+            exit 1
+          }
           cp tools/icloud_price_comparison/data/prices.json "$RUNNER_TEMP/icloud-prices-before-update.json"
-          echo "GENERATION_BASE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
-          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "GENERATION_BASE_SHA=$VALIDATED_MAIN_SHA" >> "$GITHUB_ENV"
+          echo "sha=$VALIDATED_MAIN_SHA" >> "$GITHUB_OUTPUT"
 
       - name: 配置 Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
