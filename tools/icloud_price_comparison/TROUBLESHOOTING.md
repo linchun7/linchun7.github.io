@@ -38,6 +38,7 @@ pnpm check:live
 2. 是 prepare/daily guard、Apple、FX、数据校验、静态生成、artifact 还是 publish 阶段失败；
 3. `main` 是否在生成或最终提交期间被其他提交推进；若只改了其他工具，正常发布器应自动跟随最新 `main`；若仍报 `main_advanced`，检查是否包含 iCloud 敏感路径或最终推送前再次发生竞态；
 4. 上一次成功 `data/run-log.json` 是否仍完整。
+5. 若出现 `STALE_WORKFLOW_DEFINITION`，说明是在 rerun 旧 run，而最新 main 上的 updater workflow 已变化；不要继续 rerun，该 run 必须废弃并从最新 main 新发起。若 08:05 已写入当日 run-log 但 Pages 或 canonical production verification 没有完整成功，08:10 备用应继续执行而不是仅做幂等跳过。
 
 不要：
 

@@ -53,7 +53,7 @@ Apple 简体中文价格页只提供已人工复核的中文名称，欧元区�
 
 生成/测试 job 只有 `contents: read`；仅不安装项目依赖的发布 job 获得 `contents: write`。工件重验、Pages 证明、真实 URL 验证和外部心跳是不同边界，不作为重复检查删除。
 
-生产设计为 Cloudflare 每日北京时间 08:05 外部 dispatch（`trigger_source=cloudflare`），GitHub cron 每日 08:10 兜底；main 上手动运行不受每日幂等跳过。自动入口共用已验证的成功记录、抓取日期及汇率 freshness 条件。仓库不能单独证明 Cloudflare 控制面当天真的触发，实时状态见外部控制面。
+生产设计为 Cloudflare 每日北京时间 08:05 外部 dispatch（`trigger_source=cloudflare`），GitHub cron 每日 08:10 兜底；main 上手动运行不受每日幂等跳过。自动入口只有在当前数据/运行日志满足 freshness 条件，且 GitHub Actions 能证明对应数据生成之后已经有当日完整成功的生产 workflow 时才幂等跳过；Actions 证明暂不可读时按 fail-open 执行更新。旧 run 若使用的 `update-icloud-prices.yml` 已落后于最新 main 会失败关闭，恢复必须从最新 main 新发起。仓库不能单独证明 Cloudflare 控制面当天真的触发，实时状态见外部控制面。
 
 历史回填只使用 Apple 页面证据，Wayback 不构成另一价格源。输入须覆盖既有索引，缺失、冲突、未知市场或跨文件校验失败均拒绝提交。已发布 ID 与在线首次确认时间不能被回填重写；规则及命令见快照文档。
 

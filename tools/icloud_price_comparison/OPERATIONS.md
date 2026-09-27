@@ -77,7 +77,7 @@ Apple Support HTML ─┐
 | GitHub cron 备用（仓库可验证） | 每日 08:10 | 主触发未形成合格成功结果时兜底 |
 | GitHub 手动触发 | 随时 | 人工验证或恢复；`main` 上不受每日幂等跳过 |
 
-两个自动入口使用北京时间、`run-log.json` 和当前数据状态做每日幂等判断。stale 汇率、未来时间或不完整成功记录都不能阻止备用任务重试。仓库测试能证明幂等规则和 GitHub 08:10 入口，但不能单独证明 Cloudflare 08:05 dispatch 当天实际执行。
+两个自动入口使用北京时间、当前数据/运行日志以及 GitHub Actions 的完整生产成功证明做每日幂等判断。只有同日 fresh 数据存在，且对应数据生成之后已有一次完整成功的 `Update iCloud prices` workflow，备用任务才允许跳过；stale 汇率、未来时间、只写入了 run-log 但 Pages/生产验证未完成、或 Actions 证明暂不可读，都不能阻止 08:10 继续执行。旧 run 的 workflow 定义若已经落后于最新 main 会直接失败关闭，恢复时必须从最新 main 新发起，不 rerun 旧 YAML。仓库测试能证明这些幂等规则和 GitHub 08:10 入口，但不能单独证明 Cloudflare 08:05 dispatch 当天实际执行。
 
 注意：Cloudflare 外部触发使用的 GitHub 身份和凭据不在仓库定义。当前 `trigger_source` 是 caller 声明，不应被当作认证边界。外部凭据必须保持最小权限并独立轮换；控制面状态应按生产检查而不是按本文文字推断。
 
