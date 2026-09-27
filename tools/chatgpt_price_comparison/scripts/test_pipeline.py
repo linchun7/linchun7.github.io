@@ -541,6 +541,47 @@ class ContractTests(unittest.TestCase):
     def test_bad_template_fails(self):
         with self.assertRaises(ValueError): p.render(data_fixture(),'no markers')
 
+    def test_successful_run_writes_self_consistent_three_file_candidate(self):
+        import minimum_history
+        original_root=p.ROOT
+        config=[{'code':code,'name':code.upper()} for code in ['us','gb','ca','au','nz','in','sg','ph','ae','za']]
+        base=good_market()
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)
+            (root/'data').mkdir(parents=True)
+            (root/'vendor').mkdir(parents=True)
+            (root/'markets.json').write_text(json.dumps(config),encoding='utf-8')
+            for relative in ('index.template.html','app.js','style.css','vendor/lucide-subset.js'):
+                target=root/relative
+                target.parent.mkdir(parents=True,exist_ok=True)
+                target.write_bytes((original_root/relative).read_bytes())
+            baseline=minimum_history.empty_history()
+            (root/'data/minimum-history.json').write_text(json.dumps(baseline),encoding='utf-8')
+
+            def observed(item, old, now, getter):
+                market=copy.deepcopy(base)
+                market.update(
+                    code=item['code'], name=item['name'], source_url=p.url_for(item['code']),
+                    last_checked_at=p.stamp(now), last_verified_at=p.stamp(now), status='verified'
+                )
+                market['fingerprint']=p.digest(p.semantic(market))
+                return market
+
+            fx={'source_url':p.FX_URL,'updated_at':p.stamp(NOW),'rates':{'USD':'1','CNY':'7'},'fallback':False}
+            output=root/'candidate'
+            with patch.object(p,'ROOT',root), patch.object(p,'observe',side_effect=observed), patch.object(p,'collect_fx',return_value=fx):
+                data=p.run(output,NOW)
+
+            self.assertEqual({item.name for item in output.iterdir()},{'prices.json','minimum-history.json','index.html'})
+            staged=json.loads((output/'prices.json').read_text(encoding='utf-8'))
+            history=json.loads((output/'minimum-history.json').read_text(encoding='utf-8'))
+            self.assertEqual(staged,data)
+            self.assertTrue(minimum_history.assert_matches(history,staged))
+            self.assertEqual(
+                (output/'index.html').read_text(encoding='utf-8'),
+                p.render(staged,(root/'index.template.html').read_text(encoding='utf-8'))
+            )
+
     def test_total_fx_failure_does_not_publish_candidate(self):
         config=[{'code':c,'name':c} for c in ['us','jp','de','gb','fr','it','ca','au','kr','in']]
         base=good_market()
