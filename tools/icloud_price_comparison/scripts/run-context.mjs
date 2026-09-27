@@ -53,6 +53,38 @@ export function isAutomaticTriggerSource(source) {
   return AUTOMATIC_TRIGGER_SOURCES.has(source);
 }
 
+function githubTimestampMs(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value)) return Number.NaN;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : Number.NaN;
+}
+
+export function findSuccessfulProductionWorkflowRun(
+  runs,
+  generatedAt,
+  automaticRunDateBeijing,
+  now = new Date()
+) {
+  if (!Array.isArray(runs) || !automaticRunDateBeijing || !isCanonicalIsoTimestamp(generatedAt)) return null;
+  const nowMs = now instanceof Date ? now.getTime() : Number.NaN;
+  const generatedAtMs = Date.parse(generatedAt);
+  if (!Number.isFinite(nowMs) || !Number.isFinite(generatedAtMs)) return null;
+  return runs.find((run) => {
+    const createdAtMs = githubTimestampMs(run?.created_at);
+    const updatedAtMs = githubTimestampMs(run?.updated_at);
+    return run?.conclusion === 'success'
+      && run?.head_branch === 'main'
+      && ['schedule', 'workflow_dispatch'].includes(run?.event)
+      && formatBeijingDate(run.created_at) === automaticRunDateBeijing
+      && Number.isFinite(createdAtMs)
+      && Number.isFinite(updatedAtMs)
+      && createdAtMs <= updatedAtMs
+      && updatedAtMs >= generatedAtMs
+      && createdAtMs <= nowMs
+      && updatedAtMs <= nowMs;
+  }) ?? null;
+}
+
 export function findSuccessfulAutomaticRun(runLog, automaticRunDateBeijing, now = new Date()) {
   if (!Array.isArray(runLog?.runs) || !automaticRunDateBeijing) return null;
   const nowMs = now instanceof Date ? now.getTime() : Number.NaN;

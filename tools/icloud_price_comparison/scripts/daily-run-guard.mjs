@@ -23,18 +23,26 @@ export async function readRunLog(filePath = RUN_LOG_PATH) {
   }
 }
 
-export function evaluateDailyRun({ runLog, eventName, requestedSource, now = new Date() }) {
+export function evaluateDailyRun({
+  runLog,
+  eventName,
+  requestedSource,
+  productionSuccessToday = false,
+  now = new Date()
+}) {
   const triggerSource = resolveTriggerSource(eventName, requestedSource);
   const automatic = isAutomaticTriggerSource(triggerSource);
   const automaticRunDateBeijing = automatic ? formatBeijingDate(now) : null;
   const previousRun = automatic
     ? findSuccessfulAutomaticRun(runLog, automaticRunDateBeijing, now)
     : null;
+  const completeProductionProof = automatic && Boolean(previousRun) && productionSuccessToday === true;
   return {
     triggerSource,
     automaticRunDateBeijing,
-    shouldRun: !previousRun,
-    previousRun
+    shouldRun: !automatic || !completeProductionProof,
+    previousRun,
+    productionSuccessToday: productionSuccessToday === true
   };
 }
 
@@ -53,6 +61,7 @@ async function writeSkipSummary(result, summaryPath) {
     `- 触发方式：${describeTriggerSource(result.triggerSource)}`,
     `- 北京时间日期：${result.automaticRunDateBeijing}`,
     `- 已成功运行：${result.previousRun.id}`,
+    '- 已确认：对应当日数据之后存在完整成功的生产 workflow 证明。',
     '- 数据、历史和运行日志均未重复写入。',
     ''
   ].join('\n'), 'utf8');
@@ -62,6 +71,7 @@ export async function main({
   runLogPath = process.env.ICLOUD_RUN_LOG_PATH ?? RUN_LOG_PATH,
   eventName = process.env.GITHUB_EVENT_NAME,
   requestedSource = process.env.REQUESTED_TRIGGER_SOURCE,
+  productionSuccessToday = process.env.PRODUCTION_SUCCESS_TODAY === 'true',
   now = new Date(),
   outputPath = process.env.GITHUB_OUTPUT,
   summaryPath = process.env.GITHUB_STEP_SUMMARY,
@@ -72,6 +82,7 @@ export async function main({
     runLog,
     eventName,
     requestedSource,
+    productionSuccessToday,
     now
   });
   await appendOutput('should_run', String(result.shouldRun), outputPath);
@@ -79,8 +90,8 @@ export async function main({
   await appendOutput('automatic_run_date_beijing', result.automaticRunDateBeijing, outputPath);
   await writeSkipSummary(result, summaryPath);
   log(result.shouldRun
-    ? `${describeTriggerSource(result.triggerSource)}：允许执行。`
-    : `${describeTriggerSource(result.triggerSource)}：${result.automaticRunDateBeijing} 已成功更新，本次跳过。`);
+    ? `${describeTriggerSource(result.triggerSource)}：允许执行；没有同时满足数据与完整生产成功证明的幂等条件。`
+    : `${describeTriggerSource(result.triggerSource)}：${result.automaticRunDateBeijing} 已完成数据与生产闭环，本次跳过。`);
   return result;
 }
 

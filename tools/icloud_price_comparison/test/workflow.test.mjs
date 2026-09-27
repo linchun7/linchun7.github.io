@@ -404,3 +404,12 @@ test('auto-merges only isolated Dependabot scopes after the matching validation 
   assert.match(autoMergeWorkflow, /VALIDATION_WORKFLOW: \$\{\{ github\.event\.workflow_run\.name \}\}/);
   assert.match(autoMergeWorkflow, /node tools\/icloud_price_comparison\/scripts\/auto-merge-official-actions\.mjs/);
 });
+
+test('backup idempotence requires full production proof and stale updater reruns fail closed', async () => {
+  const workflow = await readFile(workflowUrl, 'utf8');
+  assert.match(workflow, /permissions:[\s\S]*?contents: read[\s\S]*?actions: read/);
+  assert.match(workflow, /executing_sha=\$\(git rev-parse HEAD\)[\s\S]*?git diff --quiet "\$executing_sha" "\$validated_main_sha" -- \.github\/workflows\/update-icloud-prices\.yml[\s\S]*?STALE_WORKFLOW_DEFINITION/);
+  assert.match(workflow, /name: 检查今天完整生产成功证明[\s\S]*?id: production_proof[\s\S]*?actions\/workflows\/update-icloud-prices\.yml\/runs\?status=success&per_page=50[\s\S]*?production_success_today=/);
+  assert.match(workflow, /PRODUCTION_SUCCESS_TODAY:\s*\$\{\{ steps\.production_proof\.outputs\.production_success_today \}\}[\s\S]*?node scripts\/daily-run-guard\.mjs/);
+  assert.match(workflow, /classify_prepare[\s\S]*?steps\.validate_main_data\.outcome[\s\S]*?steps\.production_proof\.outcome[\s\S]*?steps\.daily_guard\.outcome/);
+});

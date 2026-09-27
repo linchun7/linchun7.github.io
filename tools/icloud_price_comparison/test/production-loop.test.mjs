@@ -12,6 +12,8 @@ import { main, createNetworkBudget, validateAppleMarketRenameReview, getExchange
 import { validateExtractedDataArtifact } from '../scripts/validate-data-artifact.mjs';
 import { emptyMinimumHistory, writeMinimumHistory, updateMinimumHistory } from '../scripts/minimum-history.mjs';
 import { importAppleArchives } from '../scripts/import-apple-archives.mjs';
+import { assertStaticPageMatches, renderStaticFragments, replaceStaticFragments } from '../scripts/static-page.mjs';
+import { assertSeoProjectionMatches, renderSeoProjection } from '../scripts/render-static-page.mjs';
 
 // Canonical synthetic source: no dependency on production count, FX, publication
 // date or current wall clock. Values below are test evidence, not Apple facts.
@@ -80,6 +82,13 @@ async function run(t, paths, htmls, now) {
     await updateMinimumHistory(prices, path.join(dataDir, 'minimum-history.json'));
     await validateExtractedDataArtifact(dataDir); // Different implementation, full public boundary.
     const history = JSON.parse(await readFile(paths.historyPath));
+    const shell = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+    const rendered = renderSeoProjection(
+      replaceStaticFragments(shell, renderStaticFragments(prices, history)),
+      prices
+    );
+    assert.equal(assertStaticPageMatches(rendered, prices, history), true);
+    assert.equal(assertSeoProjectionMatches(rendered, prices), true);
     const index = JSON.parse(await readFile(paths.snapshotIndexPath));
     return { appleRequests, prices, history, index };
   } finally {

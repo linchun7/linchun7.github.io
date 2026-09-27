@@ -17,6 +17,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: update-icloud-prices
@@ -53,6 +54,11 @@ jobs:
           set -euo pipefail
           git fetch origin main --depth=1
           validated_main_sha=$(git rev-parse origin/main)
+          executing_sha=$(git rev-parse HEAD)
+          if ! git diff --quiet "$executing_sha" "$validated_main_sha" -- .github/workflows/update-icloud-prices.yml; then
+            echo "::error title=STALE_WORKFLOW_DEFINITION::当前运行使用的 iCloud workflow 已落后于 main；不要 rerun 旧 run，请从最新 main 新发起 workflow_dispatch。"
+            exit 1
+          fi
           main_snapshot="$RUNNER_TEMP/icloud-main-snapshot"
           mkdir -p "$main_snapshot"
           git archive --format=tar "$validated_main_sha" tools/icloud_price_comparison/data | tar --extract --file=- --directory="$main_snapshot"
@@ -61,11 +67,50 @@ jobs:
           echo "已验证最新 main 数据工件：$validated_main_sha"
           echo "validated_main_sha=$validated_main_sha" >> "$GITHUB_OUTPUT"
 
+      - name: 检查今天完整生产成功证明
+        id: production_proof
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          proof_file="$RUNNER_TEMP/icloud-success-runs.json"
+          if ! gh api \
+            -H 'Accept: application/vnd.github+json' \
+            "repos/$GITHUB_REPOSITORY/actions/workflows/update-icloud-prices.yml/runs?status=success&per_page=50" \
+            > "$proof_file"; then
+            echo "::warning title=生产证明暂不可读::无法读取既有 iCloud workflow 结果；按 fail-open 策略继续执行更新，不做幂等跳过。"
+            echo "production_success_today=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          PROOF_FILE="$proof_file" \
+          PRICE_FILE="$RUNNER_TEMP/icloud-main-snapshot/tools/icloud_price_comparison/data/prices.json" \
+          node --input-type=module <<'NODE' >> "$GITHUB_OUTPUT"
+          import { readFile } from 'node:fs/promises';
+          import {
+            findSuccessfulProductionWorkflowRun,
+            formatBeijingDate
+          } from './tools/icloud_price_comparison/scripts/run-context.mjs';
+
+          const prices = JSON.parse(await readFile(process.env.PRICE_FILE, 'utf8'));
+          const response = JSON.parse(await readFile(process.env.PROOF_FILE, 'utf8'));
+          const now = new Date();
+          const date = formatBeijingDate(now);
+          const proof = findSuccessfulProductionWorkflowRun(
+            response.workflow_runs ?? [],
+            prices.generatedAt,
+            date,
+            now
+          );
+          console.log(`production_success_today=${proof ? 'true' : 'false'}`);
+          NODE
+
       - name: 检查每日幂等状态
         id: daily_guard
         working-directory: tools/icloud_price_comparison
         env:
           REQUESTED_TRIGGER_SOURCE: ${{ inputs.trigger_source }}
+          PRODUCTION_SUCCESS_TODAY: ${{ steps.production_proof.outputs.production_success_today }}
           ICLOUD_RUN_LOG_PATH: ${{ runner.temp }}/icloud-main-snapshot/tools/icloud_price_comparison/data/run-log.json
         run: node scripts/daily-run-guard.mjs
 
@@ -76,6 +121,7 @@ jobs:
         run: |
           severe_failure=false
           if [[ "${{ steps.validate_main_data.outcome }}" == "failure" ]] \
+            || [[ "${{ steps.production_proof.outcome }}" == "failure" ]] \
             || [[ "${{ steps.daily_guard.outcome }}" == "failure" ]]; then
             severe_failure=true
           fi

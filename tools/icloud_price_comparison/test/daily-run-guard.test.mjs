@@ -6,9 +6,20 @@ import test from 'node:test';
 import { evaluateDailyRun, main, readRunLog } from '../scripts/daily-run-guard.mjs';
 import {
   findSuccessfulAutomaticRun,
+  findSuccessfulProductionWorkflowRun,
   formatBeijingDate,
   resolveTriggerSource
 } from '../scripts/run-context.mjs';
+
+function workflowRun({
+  conclusion = 'success',
+  headBranch = 'main',
+  event = 'workflow_dispatch',
+  createdAt = '2026-08-02T00:05:00Z',
+  updatedAt = '2026-08-02T00:07:00Z'
+} = {}) {
+  return { conclusion, head_branch: headBranch, event, created_at: createdAt, updated_at: updatedAt };
+}
 
 function run({
   id = '2026-08-02T00:06:00.000Z',
@@ -47,16 +58,29 @@ test('uses Beijing calendar dates at the UTC day boundary', () => {
   assert.equal(formatBeijingDate('invalid'), null);
 });
 
-test('skips a repeated automatic run only after fresh rates were committed', () => {
+test('skips a repeated automatic run only after fresh committed data and complete production proof', () => {
   const result = evaluateDailyRun({
     runLog: { schemaVersion: 1, runs: [run()] },
     eventName: 'schedule',
+    productionSuccessToday: true,
     now: new Date('2026-08-02T00:10:00.000Z')
   });
   assert.equal(result.triggerSource, 'github-schedule');
   assert.equal(result.automaticRunDateBeijing, '2026-08-02');
   assert.equal(result.shouldRun, false);
   assert.equal(result.previousRun.id, '2026-08-02T00:06:00.000Z');
+  assert.equal(result.productionSuccessToday, true);
+});
+
+test('retries clean same-day data when the earlier workflow never completed production', () => {
+  const result = evaluateDailyRun({
+    runLog: { schemaVersion: 1, runs: [run()] },
+    eventName: 'schedule',
+    productionSuccessToday: false,
+    now: new Date('2026-08-02T00:10:00.000Z')
+  });
+  assert.equal(result.previousRun.id, '2026-08-02T00:06:00.000Z');
+  assert.equal(result.shouldRun, true);
 });
 
 test('reruns when a same-day automatic run has future exchange-rate data', () => {
@@ -98,6 +122,30 @@ test('reruns when the earlier automatic run used stale or previous-day rates', (
     });
     assert.equal(result.shouldRun, true, JSON.stringify(previousRun));
   }
+});
+
+test('production proof must finish after current data generation', () => {
+  const generatedAt = '2026-08-02T00:06:00.000Z';
+  const now = new Date('2026-08-02T00:10:00.000Z');
+  assert.equal(findSuccessfulProductionWorkflowRun(
+    [workflowRun({ updatedAt: '2026-08-02T00:05:59Z' })], generatedAt, '2026-08-02', now
+  ), null);
+  assert.equal(findSuccessfulProductionWorkflowRun(
+    [workflowRun()], generatedAt, '2026-08-02', now
+  )?.conclusion, 'success');
+});
+
+test('production proof rejects wrong branch, event, day, future timestamps and failures', () => {
+  const generatedAt = '2026-08-02T00:06:00.000Z';
+  const now = new Date('2026-08-02T00:10:00.000Z');
+  for (const candidate of [
+    workflowRun({ conclusion: 'failure' }),
+    workflowRun({ headBranch: 'other' }),
+    workflowRun({ event: 'push' }),
+    workflowRun({ createdAt: '2026-08-01T15:50:00Z', updatedAt: '2026-08-02T00:07:00Z' }),
+    workflowRun({ updatedAt: '2026-08-02T00:11:00Z' }),
+    workflowRun({ createdAt: 'invalid' })
+  ]) assert.equal(findSuccessfulProductionWorkflowRun([candidate], generatedAt, '2026-08-02', now), null);
 });
 
 test('manual runs are always allowed and do not create an automatic date', () => {
@@ -146,6 +194,7 @@ test('writes deterministic GitHub outputs and a safe duplicate-run summary', asy
     const result = await main({
       runLogPath,
       eventName: 'schedule',
+      productionSuccessToday: true,
       now: new Date('2026-08-02T00:10:00.000Z'),
       outputPath,
       summaryPath,
@@ -161,7 +210,8 @@ test('writes deterministic GitHub outputs and a safe duplicate-run summary', asy
     const summary = await readFile(summaryPath, 'utf8');
     assert.match(summary, /状态：已跳过重复自动更新/);
     assert.match(summary, /已成功运行：2026-08-02T00:06:00\.000Z/);
-    assert.deepEqual(messages, ['GitHub 定时备用：2026-08-02 已成功更新，本次跳过。']);
+    assert.match(summary, /完整成功的生产 workflow 证明/);
+    assert.deepEqual(messages, ['GitHub 定时备用：2026-08-02 已完成数据与生产闭环，本次跳过。']);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
