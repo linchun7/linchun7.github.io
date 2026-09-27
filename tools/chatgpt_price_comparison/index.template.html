@@ -45,7 +45,10 @@
     <section class="overview" aria-labelledby="overviewTitle">
       <div class="overview-reference">
         <div class="overview-copy">
-          <h2 id="overviewTitle">各套餐全球最低价</h2>
+          <div class="overview-heading">
+            <h2 id="overviewTitle">各套餐全球最低价</h2>
+            <button id="minimumHistoryButton" class="minimum-history-button" type="button" disabled>最低价历史</button>
+          </div>
           <p class="overview-note">按人民币换算，方便比较不同地区价格。</p>
         </div>
         <div id="minimumSummary" class="minimum-stats overview-stat-list" role="group" aria-label="各套餐全球最低价概览" style="--plan-count: {{PLAN_COUNT_STYLE}}">

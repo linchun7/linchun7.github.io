@@ -87,6 +87,12 @@ try {
   assert.equal(await evaluate('document.querySelectorAll("#mobilePlanControl button").length'),plans.length,'mobile plan selector includes every plan');
   assert.equal(await evaluate('document.querySelector(".search-field svg")!==null && document.querySelector("button[data-sort=country] svg")!==null'),true,'Lucide search and sort icons render');
   assert.equal(await evaluate('document.querySelector("#refresh")===null && document.querySelector("#plan")===null && document.querySelector("#status")===null'),true,'legacy reload and filters removed');
+  assert.equal(await evaluate('document.querySelector("#minimumHistoryButton").disabled'),false,'minimum history action becomes interactive');
+  await evaluate('document.querySelector("#minimumHistoryButton").click()');
+  await until(()=>evaluate('document.querySelector("#minimumHistoryDialog")?.open===true'),'minimum history dialog');
+  assert.match(await evaluate('document.querySelector("#minimumHistoryEvents").textContent'),/暂无最低价变更记录|→/,'minimum history renders an auditable timeline or explicit empty state');
+  assert.equal(await evaluate('document.querySelector("#minimumHistoryNote").hidden'),false,'minimum history displays its scope note');
+  await evaluate('document.querySelector("#closeMinimumHistory").click()');
 
   await evaluate(`document.querySelector('button[data-sort="country"]').click()`);
   assert.equal(await evaluate(`document.querySelector('#rankHeaderLabel > [aria-hidden="true"]').textContent`),'序号','country sort switches rank header to sequence');
@@ -176,6 +182,11 @@ try {
   await evaluate(`document.querySelector('.minimum-card:not(:disabled)').click()`);
   await until(()=>evaluate(`document.querySelector('#priceRows tr.is-highlighted')!==null`),'minimum card row focus');
 
+  await command('Emulation.setDeviceMetricsOverride',{width:641,height:844,deviceScaleFactor:1,mobile:true});
+  await delay(150);
+  assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth + 1'),'no body overflow at the 641px responsive seam');
+  assert.equal(await evaluate(`getComputedStyle(document.querySelector('.data-status')).whiteSpace`),'normal','641px update status can wrap instead of overflowing');
+
   await command('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
   await delay(150);
   assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth + 1'),'no body overflow on narrow screens');
@@ -185,6 +196,14 @@ try {
   assert.equal(await evaluate(`getComputedStyle(document.querySelector('.page-main')).rowGap`),'12px','mobile vertical rhythm matches the iCloud spacing');
   assert.equal(await evaluate(`getComputedStyle(document.querySelector('#mobilePlanControl')).overflowX`),'auto','future plan selector stays internally scrollable');
   assert.equal(await evaluate(`[...document.querySelectorAll('#priceRows tr[data-market-id]')].every(row => [...row.querySelectorAll('td[data-plan]')].filter(td => getComputedStyle(td).display !== 'none').length === 1)`),true,'mobile shows one active plan column');
+  const mobileCountryShare=await evaluate(`{const table=document.querySelector('.price-table');const cell=document.querySelector('#priceRows tr[data-market-id] td:nth-child(2)');cell.getBoundingClientRect().width/table.getBoundingClientRect().width}`);
+  assert.ok(mobileCountryShare>=0.46&&mobileCountryShare<=0.49,'mobile country column stays near the iCloud-aligned 47% width');
+  await evaluate(`document.querySelector('button[data-sort="country"]').click()`);
+  assert.equal(await evaluate(`document.querySelector('#priceRows .mobile-rank').textContent`),'序1','mobile country sort exposes sequence text');
+  const rankLayout=await evaluate(`{const row=document.querySelector('#priceRows tr[data-market-id]');const name=row.querySelector('.country-name').getBoundingClientRect();const sub=row.querySelector('.country-name-en').getBoundingClientRect();const rank=row.querySelector('.mobile-rank').getBoundingClientRect();({nameBottom:name.bottom,subTop:sub.top,rankTop:rank.top,rankBottom:rank.bottom,subBottom:sub.bottom})}`);
+  assert.ok(rankLayout.rankTop>=rankLayout.nameBottom-1,'mobile sequence badge no longer competes with the primary country-name row');
+  assert.ok(Math.abs(rankLayout.rankTop-rankLayout.subTop)<=4,'mobile sequence badge sits on the subtitle row');
+  await evaluate(`document.querySelector('button[data-sort-plan="${defaultPlan}"]').click()`);
 
   await command('Emulation.setDeviceMetricsOverride',{width:320,height:568,deviceScaleFactor:1,mobile:true});
   await delay(150);
