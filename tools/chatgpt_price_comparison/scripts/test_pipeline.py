@@ -524,6 +524,12 @@ class ContractTests(unittest.TestCase):
         committed=(p.ROOT/'index.html').read_text(encoding='utf-8')
         self.assertEqual(committed, p.render(data, template))
 
+    def test_committed_minimum_history_matches_current_prices(self):
+        import minimum_history
+        data=json.loads((p.ROOT/'data/prices.json').read_text(encoding='utf-8'))
+        history=json.loads((p.ROOT/'data/minimum-history.json').read_text(encoding='utf-8'))
+        self.assertTrue(minimum_history.assert_matches(history,data))
+
     def test_browser_acceptance_does_not_pin_live_market_prices(self):
         browser = (p.ROOT/'scripts/browser-test.mjs').read_text(encoding='utf-8')
         self.assertIn('sampleMarket', browser)

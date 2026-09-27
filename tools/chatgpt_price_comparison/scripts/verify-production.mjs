@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
 export const PRICES_URL = 'https://www.linchun.com.cn/tools/chatgpt_price_comparison/data/prices.json';
+export const MINIMUM_HISTORY_URL = 'https://www.linchun.com.cn/tools/chatgpt_price_comparison/data/minimum-history.json';
 export const INDEX_URL = 'https://www.linchun.com.cn/tools/chatgpt_price_comparison/';
 const MAX_JSON = 2_000_000;
 const MAX_HTML = 4_000_000;
@@ -33,6 +34,14 @@ export function validateSnapshot(data) {
     throw new Error('production JSON failed revision validation');
   }
   return data.revision;
+}
+
+export function validateMinimumHistory(history, data) {
+  if (!history || history.schema !== 1 || history.checked_at !== data.generated_at ||
+      !Array.isArray(history.events) || typeof history.pending_gap !== 'boolean') {
+    throw new Error('minimum history failed production validation');
+  }
+  return history;
 }
 
 export function pageRevisionOf(html) {
@@ -117,6 +126,7 @@ async function getText(fetchImpl, base, maxBytes, signal, attempt) {
 }
 
 export async function verifyOnce(expected, {
+  expectedMinimumHistory,
   expectedPageRevision,
   expectedAssets,
   fetchImpl = globalThis.fetch,
@@ -127,16 +137,21 @@ export async function verifyOnce(expected, {
     throw new Error('expected page revision is invalid');
   }
   validateAssetVersions(expectedAssets);
+  validateMinimumHistory(expectedMinimumHistory, expected);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), requestTimeoutMs);
   try {
-    const [jsonText, html] = await Promise.all([
+    const [jsonText, minimumText, html] = await Promise.all([
       getText(fetchImpl, PRICES_URL, MAX_JSON, controller.signal, attempt),
+      getText(fetchImpl, MINIMUM_HISTORY_URL, MAX_JSON, controller.signal, attempt),
       getText(fetchImpl, INDEX_URL, MAX_HTML, controller.signal, attempt)
     ]);
     const actual = JSON.parse(jsonText);
+    const actualMinimumHistory = JSON.parse(minimumText);
     validateSnapshot(actual);
+    validateMinimumHistory(actualMinimumHistory, actual);
     if (actual.revision !== expected.revision) throw new Error('production revision is not expected revision');
+    if (canonical(actualMinimumHistory) !== canonical(expectedMinimumHistory)) throw new Error('production minimum history is not expected history');
     const revisionMeta = `<meta name="chatgpt-data-revision" content="${expected.revision}">`;
     if (!html.includes(revisionMeta)) throw new Error('production HTML data revision meta does not match expected revision');
     if (pageRevisionOf(html) !== expectedPageRevision) {
@@ -164,6 +179,7 @@ export async function verifyOnce(expected, {
 }
 
 export async function verifyWithRetry(expected, {
+  expectedMinimumHistory,
   expectedPageRevision,
   expectedAssets,
   maxWaitMs = 5 * 60_000,
@@ -174,13 +190,14 @@ export async function verifyWithRetry(expected, {
   now = () => Date.now()
 } = {}) {
   validateSnapshot(expected);
+  validateMinimumHistory(expectedMinimumHistory, expected);
   const start = now();
   let attempt = 0;
   let lastReason = 'not-attempted';
   while (now() - start <= maxWaitMs) {
     attempt += 1;
     try {
-      const revision = await verifyOnce(expected, { expectedPageRevision, expectedAssets, fetchImpl, requestTimeoutMs, attempt });
+      const revision = await verifyOnce(expected, { expectedMinimumHistory, expectedPageRevision, expectedAssets, fetchImpl, requestTimeoutMs, attempt });
       console.log('Verified live JSON and HTML revision:', revision, 'attempt:', attempt);
       return { revision, attempt };
     } catch (error) {
@@ -196,13 +213,16 @@ export async function verifyWithRetry(expected, {
 
 async function main() {
   const dataIndex = process.argv.indexOf('--expected');
+  const historyIndex = process.argv.indexOf('--expected-minimum-history');
   const pageIndex = process.argv.indexOf('--expected-index');
-  if (dataIndex < 0 || !process.argv[dataIndex + 1] || pageIndex < 0 || !process.argv[pageIndex + 1]) {
-    throw new Error('usage: verify-production.mjs --expected <prices.json> --expected-index <index.html>');
+  if (dataIndex < 0 || !process.argv[dataIndex + 1] || historyIndex < 0 || !process.argv[historyIndex + 1] || pageIndex < 0 || !process.argv[pageIndex + 1]) {
+    throw new Error('usage: verify-production.mjs --expected <prices.json> --expected-minimum-history <minimum-history.json> --expected-index <index.html>');
   }
   const expected = JSON.parse(await readFile(process.argv[dataIndex + 1], 'utf8'));
+  const expectedMinimumHistory = JSON.parse(await readFile(process.argv[historyIndex + 1], 'utf8'));
   const expectedHtml = await readFile(process.argv[pageIndex + 1], 'utf8');
   await verifyWithRetry(expected, {
+    expectedMinimumHistory,
     expectedPageRevision: pageRevisionOf(expectedHtml),
     expectedAssets: assetVersionsOf(expectedHtml)
   });

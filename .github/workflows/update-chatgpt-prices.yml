@@ -36,8 +36,19 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
           persist-credentials: false
+      - name: Resolve latest main and reject stale workflow rerun
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --depth=1
+          executing_sha=$(git rev-parse HEAD)
+          latest_sha=$(git rev-parse origin/main)
+          if ! git diff --quiet "$executing_sha" "$latest_sha" -- .github/workflows/update-chatgpt-prices.yml; then
+            echo "::error title=STALE_WORKFLOW_DEFINITION::This run uses an older ChatGPT updater workflow. Start a new workflow_dispatch from current main instead of rerunning the old run."
+            exit 1
+          fi
+          git checkout --detach "$latest_sha"
       - name: Check today's successful production proof
         id: production_proof
         env:
@@ -98,6 +109,7 @@ jobs:
           python3 tools/chatgpt_price_comparison/scripts/pipeline.py --check "$RUNNER_TEMP/chatgpt-candidate"
           mkdir -p tools/chatgpt_price_comparison/data
           cp "$RUNNER_TEMP/chatgpt-candidate/prices.json" tools/chatgpt_price_comparison/data/prices.json
+          cp "$RUNNER_TEMP/chatgpt-candidate/minimum-history.json" tools/chatgpt_price_comparison/data/minimum-history.json
           cp "$RUNNER_TEMP/chatgpt-candidate/index.html" tools/chatgpt_price_comparison/index.html
           node tools/chatgpt_price_comparison/scripts/browser-test.mjs
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -126,7 +138,7 @@ jobs:
           path: ${{ runner.temp }}/chatgpt-candidate
       - name: Independently validate exact artifact
         run: python3 tools/chatgpt_price_comparison/scripts/pipeline.py --check "$RUNNER_TEMP/chatgpt-candidate"
-      - name: Publish two files atomically without overwriting concurrent work
+      - name: Publish three files atomically without overwriting concurrent work
         id: push_data
         env:
           TARGET: main
@@ -139,8 +151,9 @@ jobs:
           test "$(git rev-parse FETCH_HEAD)" = "$BASE" || { echo '::error::Branch advanced; discard old candidate. Next automatic run retries.'; exit 1; }
           mkdir -p tools/chatgpt_price_comparison/data
           cp "$RUNNER_TEMP/chatgpt-candidate/prices.json" tools/chatgpt_price_comparison/data/prices.json
+          cp "$RUNNER_TEMP/chatgpt-candidate/minimum-history.json" tools/chatgpt_price_comparison/data/minimum-history.json
           cp "$RUNNER_TEMP/chatgpt-candidate/index.html" tools/chatgpt_price_comparison/index.html
-          git add tools/chatgpt_price_comparison/data/prices.json tools/chatgpt_price_comparison/index.html
+          git add tools/chatgpt_price_comparison/data/prices.json tools/chatgpt_price_comparison/data/minimum-history.json tools/chatgpt_price_comparison/index.html
           if git diff --cached --quiet; then
             echo "pushed_sha=$BASE" >> "$GITHUB_OUTPUT"
             exit 0
@@ -206,7 +219,7 @@ jobs:
           name: chatgpt-candidate-${{ github.run_id }}
           path: ${{ runner.temp }}/chatgpt-candidate
       - name: Verify canonical production JSON and HTML
-        run: node tools/chatgpt_price_comparison/scripts/verify-production.mjs --expected "$RUNNER_TEMP/chatgpt-candidate/prices.json" --expected-index "$RUNNER_TEMP/chatgpt-candidate/index.html"
+        run: node tools/chatgpt_price_comparison/scripts/verify-production.mjs --expected "$RUNNER_TEMP/chatgpt-candidate/prices.json" --expected-minimum-history "$RUNNER_TEMP/chatgpt-candidate/minimum-history.json" --expected-index "$RUNNER_TEMP/chatgpt-candidate/index.html"
 
   notify:
     needs: [prepare, generate, publish, verify-production]

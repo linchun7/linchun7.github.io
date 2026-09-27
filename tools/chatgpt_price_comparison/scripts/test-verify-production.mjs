@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { assetVersionsOf, pageRevisionOf, revisionOf, validateSnapshot, verifyOnce } from './verify-production.mjs';
+import { assetVersionsOf, pageRevisionOf, revisionOf, validateMinimumHistory, validateSnapshot, verifyOnce } from './verify-production.mjs';
 
 function fixture() {
   const data = {
@@ -19,6 +19,11 @@ function fixture() {
 }
 
 const data = fixture();
+const minimumHistory = {
+  schema: 1, project_since: '2026-09-24', first_observed_at: null,
+  checked_at: data.generated_at, observations: 0, excluded_versions: 1,
+  pending_gap: true, gaps: [], events: [], checkpoint: null
+};
 const pageRevision = 'b'.repeat(64);
 const assetBodies = {
   app: 'console.log("app");\n',
@@ -42,6 +47,7 @@ const expectedHtml =
 
 assert.match(data.revision, /^[a-f0-9]{64}$/);
 assert.equal(validateSnapshot(data), data.revision);
+assert.equal(validateMinimumHistory(minimumHistory, data), minimumHistory);
 assert.equal(pageRevisionOf(expectedHtml), pageRevision);
 assert.deepEqual(assetVersionsOf(expectedHtml), expectedAssets);
 
@@ -49,6 +55,7 @@ function responseFor(url, { html = expectedHtml, app = assetBodies.app, style = 
   const pathname = new URL(String(url)).pathname;
   let body;
   if (pathname.endsWith('/data/prices.json')) body = JSON.stringify(data);
+  else if (pathname.endsWith('/data/minimum-history.json')) body = JSON.stringify(minimumHistory);
   else if (pathname.endsWith('/app.js')) body = app;
   else if (pathname.endsWith('/style.css')) body = style;
   else if (pathname.endsWith('/vendor/lucide-subset.js')) body = lucide;
@@ -59,6 +66,7 @@ function responseFor(url, { html = expectedHtml, app = assetBodies.app, style = 
 const goodFetch = async url => responseFor(url);
 assert.equal(
   await verifyOnce(data, {
+    expectedMinimumHistory: minimumHistory,
     expectedPageRevision: pageRevision,
     expectedAssets,
     fetchImpl: goodFetch,
@@ -69,6 +77,7 @@ assert.equal(
 
 await assert.rejects(
   verifyOnce(data, {
+    expectedMinimumHistory: minimumHistory,
     expectedPageRevision: pageRevision,
     expectedAssets,
     fetchImpl: async url => responseFor(url, {
@@ -81,6 +90,7 @@ await assert.rejects(
 
 await assert.rejects(
   verifyOnce(data, {
+    expectedMinimumHistory: minimumHistory,
     expectedPageRevision: pageRevision,
     expectedAssets,
     fetchImpl: async url => responseFor(url, { html: expectedHtml.replace(pageRevision, 'c'.repeat(64)) }),
@@ -91,6 +101,7 @@ await assert.rejects(
 
 await assert.rejects(
   verifyOnce(data, {
+    expectedMinimumHistory: minimumHistory,
     expectedPageRevision: pageRevision,
     expectedAssets,
     fetchImpl: async url => responseFor(url, {
@@ -103,6 +114,7 @@ await assert.rejects(
 
 await assert.rejects(
   verifyOnce(data, {
+    expectedMinimumHistory: minimumHistory,
     expectedPageRevision: pageRevision,
     expectedAssets,
     fetchImpl: async url => responseFor(url, { app: 'console.log("different");\n' }),
@@ -115,8 +127,22 @@ const bad = structuredClone(data);
 bad.generated_at = '2026-09-24T00:00:01Z';
 assert.throws(() => validateSnapshot(bad), /revision/);
 
+const wrongHistory = structuredClone(minimumHistory);
+wrongHistory.checked_at = '2026-09-24T00:00:01Z';
 await assert.rejects(
   verifyOnce(data, {
+    expectedMinimumHistory: wrongHistory,
+    expectedPageRevision: pageRevision,
+    expectedAssets,
+    fetchImpl: goodFetch,
+    requestTimeoutMs: 1000
+  }),
+  /minimum history/
+);
+
+await assert.rejects(
+  verifyOnce(data, {
+    expectedMinimumHistory: minimumHistory,
     expectedPageRevision: pageRevision,
     expectedAssets,
     fetchImpl: async () => new Response('blocked', { status: 403 }),
@@ -130,6 +156,7 @@ other.generated_at = '2026-09-24T00:00:02Z';
 other.revision = revisionOf(other);
 await assert.rejects(
   verifyOnce(data, {
+    expectedMinimumHistory: minimumHistory,
     expectedPageRevision: pageRevision,
     expectedAssets,
     fetchImpl: async url => {

@@ -26,9 +26,13 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertNotIn("\n  push:\n", self.text)
 
     def test_prepare_and_generate_resolve_latest_main(self):
-        # Scheduled/dispatch runs can wait behind the primary. Resolve main when
-        # the jobs actually start so the backup sees a just-published primary.
-        self.assertGreaterEqual(self.text.count("ref: main"), 2)
+        # Prepare starts from the triggering SHA so an old rerun can detect a
+        # changed workflow, then explicitly resolves latest main. Generate also
+        # resolves main when it actually starts.
+        self.assertIn("Resolve latest main and reject stale workflow rerun", self.text)
+        self.assertIn("STALE_WORKFLOW_DEFINITION", self.text)
+        self.assertIn("git fetch origin main --depth=1", self.text)
+        self.assertGreaterEqual(self.text.count("ref: main"), 1)
 
     def test_daily_guard_requires_successful_production_proof(self):
         self.assertIn("daily_run_guard.py", self.text)
@@ -47,6 +51,7 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("within 7.5 minutes", self.text)
         self.assertIn("verify-production:", self.text)
         self.assertIn("verify-production.mjs --expected", self.text)
+        self.assertIn("--expected-minimum-history", self.text)
         self.assertIn("--expected-index", self.text)
         verifier = (ROOT / "tools" / "chatgpt_price_comparison" / "scripts" / "verify-production.mjs").read_text(encoding="utf-8")
         self.assertIn("assetVersionsOf", verifier)
@@ -72,6 +77,11 @@ class WorkflowContractTests(unittest.TestCase):
         for relative in ("app.js", "index.template.html", "scripts/pipeline.py"):
             project_file = (ROOT / "tools" / "chatgpt_price_comparison" / relative).read_text(encoding="utf-8")
             self.assertNotIn("icloud_price_comparison", project_file)
+
+    def test_minimum_history_is_candidate_validated_and_published_atomically(self):
+        self.assertIn("minimum-history.json", self.text)
+        self.assertIn("Publish three files atomically", self.text)
+        self.assertIn("git add tools/chatgpt_price_comparison/data/prices.json tools/chatgpt_price_comparison/data/minimum-history.json tools/chatgpt_price_comparison/index.html", self.text)
 
     def test_only_main_can_publish(self):
         self.assertIn("github.ref == 'refs/heads/main'", self.text)

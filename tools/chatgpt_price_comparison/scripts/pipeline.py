@@ -18,6 +18,7 @@ from pathlib import Path
 import re
 import time
 import unicodedata
+import minimum_history
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -765,10 +766,19 @@ def run(output: Path, now: float | None = None) -> dict:
             'generated_at': stamp(now), 'markets': markets, 'fx': fx, 'changes': changes[-200:]}
     data['revision'] = digest(data)
     validate(data, now)
+    minimum_path = ROOT / 'data/minimum-history.json'
+    if not minimum_path.exists():
+        raise ValueError('minimum history baseline missing; refusing to reset auditable history')
+    minimum = minimum_history.advance_history(
+        json.loads(minimum_path.read_text(encoding='utf-8')),
+        data,
+    )
+    minimum_history.assert_matches(minimum, data)
     page = render(data, (ROOT / 'index.template.html').read_text(encoding='utf-8'))
     output.mkdir(parents=True, exist_ok=True)
-    # Output is staging only. Git publication atomically commits JSON and its HTML projection.
+    # Output is staging only. Git publication atomically commits JSON, minimum history and HTML projection.
     (output / 'prices.json').write_text(json.dumps(data, ensure_ascii=False, indent=2, allow_nan=False) + '\n', encoding='utf-8')
+    (output / 'minimum-history.json').write_text(json.dumps(minimum, ensure_ascii=False, indent=2, allow_nan=False) + '\n', encoding='utf-8')
     (output / 'index.html').write_text(page, encoding='utf-8')
     degraded = any(m['status'] != 'verified' for m in markets) or fx['fallback']
     degraded_markets = sum(m['status'] != 'verified' for m in markets)
@@ -793,9 +803,11 @@ def main():
     if args.check:
         data = json.loads((args.check / 'prices.json').read_text(encoding='utf-8'))
         validate(data)
+        minimum = json.loads((args.check / 'minimum-history.json').read_text(encoding='utf-8'))
+        minimum_history.assert_matches(minimum, data)
         if (args.check / 'index.html').read_text(encoding='utf-8') != render(data, (ROOT / 'index.template.html').read_text(encoding='utf-8')):
             raise ValueError('HTML is not the validated data projection')
-        print('Data contract and static projection passed.')
+        print('Data contract, minimum history and static projection passed.')
     elif args.output:
         run(args.output)
     else:
