@@ -90,6 +90,8 @@ try {
   assert.equal(await evaluate('document.querySelector("#minimumHistoryButton").disabled'),false,'minimum history action becomes interactive');
   await evaluate('document.querySelector("#minimumHistoryButton").click()');
   await until(()=>evaluate('document.querySelector("#minimumHistoryDialog")?.open===true'),'minimum history dialog');
+  await until(()=>evaluate(`document.querySelector("#minimumHistoryEvents").textContent.trim().length>0 || !document.querySelector("#minimumHistoryRetry").hidden`),'minimum history load');
+  assert.equal(await evaluate('document.querySelector("#minimumHistoryRetry").hidden'),true,'committed minimum history loads without entering the isolated error state');
   assert.match(await evaluate('document.querySelector("#minimumHistoryEvents").textContent'),/暂无最低价变更记录|→/,'minimum history renders an auditable timeline or explicit empty state');
   assert.equal(await evaluate('document.querySelector("#minimumHistoryNote").hidden'),false,'minimum history displays its scope note');
   await evaluate('document.querySelector("#closeMinimumHistory").click()');
