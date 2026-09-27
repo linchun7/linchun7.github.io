@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import copy
 import json
+import tempfile
+import subprocess
 import unittest
 from pathlib import Path
 from decimal import Decimal
@@ -109,6 +111,39 @@ class MinimumHistoryTests(unittest.TestCase):
             broken=copy.deepcopy(history); mutate(broken)
             with self.assertRaises(ValueError):
                 h.validate_history(broken)
+
+
+    def test_backfill_is_reproducible_in_self_contained_git_fixture(self):
+        with tempfile.TemporaryDirectory() as temp:
+            repo=Path(temp)/'repo'
+            project=repo/'tools/chatgpt_price_comparison'
+            data_dir=project/'data'
+            data_dir.mkdir(parents=True)
+            def git(*args, cwd=repo):
+                return subprocess.check_output(
+                    ['git', *args], cwd=cwd, text=True, stderr=subprocess.DEVNULL,
+                    env={**__import__('os').environ, 'GIT_CONFIG_NOSYSTEM':'1'}
+                ).strip()
+            subprocess.check_call(['git','init','--initial-branch=main'],cwd=repo,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+            def save(data, message):
+                (data_dir/'prices.json').write_text(json.dumps(data),encoding='utf-8')
+                git('add','.')
+                subprocess.check_call(
+                    ['git','-c','user.name=Fixture','-c','user.email=fixture@example.invalid',
+                     '-c','commit.gpgSign=false','commit','-m',message],
+                    cwd=repo,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL
+                )
+            first=fixture()
+            second=fixture(86400)
+            save(first,'first observation')
+            save(second,'second observation')
+            actual, versions=h.backfill_history(project_dir=project)
+            again, again_versions=h.backfill_history(project_dir=project)
+            self.assertEqual(versions,2)
+            self.assertEqual(again_versions,2)
+            self.assertEqual(actual,again)
+            self.assertEqual(actual['observations'],2)
+            self.assertTrue(h.assert_matches(actual,second))
 
 
 if __name__ == '__main__':
