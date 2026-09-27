@@ -134,15 +134,22 @@ class MinimumHistoryTests(unittest.TestCase):
                     cwd=repo,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL
                 )
             first=fixture()
+            degraded=fixture(43200)
+            degraded['fx']['fallback']=True
+            revise(degraded)
             second=fixture(86400)
             save(first,'first observation')
+            save(degraded,'unreliable fallback observation')
             save(second,'second observation')
             actual, versions=h.backfill_history(project_dir=project)
             again, again_versions=h.backfill_history(project_dir=project)
-            self.assertEqual(versions,2)
-            self.assertEqual(again_versions,2)
+            self.assertEqual(versions,3)
+            self.assertEqual(again_versions,3)
             self.assertEqual(actual,again)
             self.assertEqual(actual['observations'],2)
+            self.assertEqual(actual['excluded_versions'],1)
+            self.assertEqual(len(actual['gaps']),1)
+            self.assertFalse(actual['pending_gap'])
             self.assertTrue(h.assert_matches(actual,second))
 
 

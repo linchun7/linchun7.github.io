@@ -382,10 +382,14 @@ def backfill_history(ref='HEAD', project_dir=ROOT):
     for at in sorted(groups, key=epoch):
         candidates = groups[at]
         reliable = [(data,snapshot) for data,snapshot in candidates if snapshot is not None]
+        unreliable_count = len(candidates) - len(reliable)
         if not reliable:
-            excluded += len(candidates)
+            # advance_history records one excluded observation while preserving
+            # the checked-at/gap state; count only the remaining versions here.
+            excluded += max(0, unreliable_count - 1)
             history = advance_history(history, candidates[-1][0])
             continue
+        excluded += unreliable_count
         signatures = {canonical(projection(snapshot)) for _,snapshot in reliable}
         if len(signatures) != 1:
             excluded += len(reliable)
