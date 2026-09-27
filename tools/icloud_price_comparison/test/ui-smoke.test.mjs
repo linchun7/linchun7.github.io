@@ -1725,6 +1725,7 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
         data.fx.fetchedAt = data.generatedAt;
         data.fx.stale = true;
         data.fx.fallbackReason = 'request-failed';
+        delete data.fx.comparisonFingerprint;
       },
       expected: /参考汇率暂未更新/,
       minimumDegraded: true
@@ -1736,6 +1737,7 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
         data.fx.fetchedAt = data.generatedAt;
         data.fx.stale = true;
         data.fx.fallbackReason = 'request-failed';
+        delete data.fx.comparisonFingerprint;
       },
       expected: /价格暂未更新/,
       minimumDegraded: true
