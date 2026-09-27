@@ -91,6 +91,15 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("Publish three files atomically", self.text)
         self.assertIn("git add tools/chatgpt_price_comparison/data/prices.json tools/chatgpt_price_comparison/data/minimum-history.json tools/chatgpt_price_comparison/index.html", self.text)
 
+    def test_push_validation_verifies_real_pages_after_cross_browser_gate(self):
+        validate = (ROOT / ".github" / "workflows" / "validate-chatgpt-prices.yml").read_text(encoding="utf-8")
+        self.assertIn("production-smoke:", validate)
+        self.assertIn("if: github.event_name == 'push'", validate)
+        self.assertIn("needs: [tests, browser-matrix]", validate)
+        self.assertIn("pages/builds/latest", validate)
+        self.assertIn("--expected-minimum-history tools/chatgpt_price_comparison/data/minimum-history.json", validate)
+        self.assertIn("--expected-index tools/chatgpt_price_comparison/index.html", validate)
+
     def test_only_main_can_publish(self):
         self.assertIn("github.ref == 'refs/heads/main'", self.text)
         self.assertNotIn("feat/chatgpt-price-comparison", self.text)

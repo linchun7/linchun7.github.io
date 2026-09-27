@@ -116,3 +116,61 @@ jobs:
         env:
           PLAYWRIGHT_BROWSER: ${{ matrix.browser }}
         run: pnpm test:browser-matrix
+
+
+  production-smoke:
+    name: Verify deployed ChatGPT price page
+    if: github.event_name == 'push'
+    needs: [tests, browser-matrix]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: Wait for Pages build of this commit or verified successor
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 90); do
+            read -r built_sha build_status build_error < <(
+              gh api -H 'Accept: application/vnd.github+json' \
+                "repos/$GITHUB_REPOSITORY/pages/builds/latest" \
+                --jq '[.commit, .status, (.error.message // "")] | @tsv'
+            )
+            relation=unrelated
+            if [[ "$built_sha" == "$TARGET_SHA" ]]; then
+              relation=identical
+            elif [[ "$built_sha" =~ ^[0-9a-f]{40}$ ]]; then
+              compare_status=$(gh api "repos/$GITHUB_REPOSITORY/compare/$TARGET_SHA...$built_sha" --jq '.status' 2>/dev/null || true)
+              [[ "$compare_status" == ahead ]] && relation=successor
+            fi
+            if [[ "$relation" == identical || "$relation" == successor ]]; then
+              if [[ "$build_status" == built ]]; then
+                echo "Pages built $built_sha ($relation)."
+                exit 0
+              fi
+              if [[ "$build_status" == errored || -n "$build_error" ]]; then
+                echo "::error::Pages build failed: ${build_error:-$build_status}"
+                exit 1
+              fi
+            fi
+            sleep 5
+          done
+          echo "::error::Pages did not build this commit or a verified successor within 7.5 minutes."
+          exit 1
+      - name: Verify canonical JSON, minimum history, HTML and versioned assets
+        run: |
+          node tools/chatgpt_price_comparison/scripts/verify-production.mjs \
+            --expected tools/chatgpt_price_comparison/data/prices.json \
+            --expected-minimum-history tools/chatgpt_price_comparison/data/minimum-history.json \
+            --expected-index tools/chatgpt_price_comparison/index.html

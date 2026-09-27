@@ -52,3 +52,6 @@ node tools/chatgpt_price_comparison/scripts/browser-test.mjs
 ### 跨浏览器验收
 
 保留现有无第三方运行依赖的 Chromium 深度 fixture；另外使用项目自己的精确锁定 Playwright 1.63.0 门禁，在 Chromium、Firefox、WebKit 上复核最低价历史、641px 临界宽度、390/320px 移动布局、序号副标题位置和无 JavaScript 静态表。浏览器测试依赖仅用于验证，不进入页面运行时。
+
+
+主分支代码/UI push 在核心与三浏览器门禁通过后，还会等待对应 GitHub Pages build，再用同一个生产 verifier 校验 canonical 线上价格 JSON、最低价历史、HTML build revision 与版本化静态资源字节。自动价格提交由更新 workflow 自己完成同等级生产验证，避免重复触发。
