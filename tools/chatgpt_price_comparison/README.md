@@ -55,3 +55,10 @@ node tools/chatgpt_price_comparison/scripts/browser-test.mjs
 
 
 主分支代码/UI push 在核心与三浏览器门禁通过后，还会等待对应 GitHub Pages build，再用同一个生产 verifier 校验 canonical 线上价格 JSON、最低价历史、HTML build revision 与版本化静态资源字节。自动价格提交由更新 workflow 自己完成同等级生产验证，避免重复触发。
+
+
+### 副作用与恢复边界
+
+每日自动幂等跳过现在同时要求价格数据与 `minimum-history.json` 对齐；历史缺失、损坏或落后时，09:10 备用不会误跳过。更新器使用完整 Git 历史从既有 `prices.json` 快照重建最低价账本，无法可靠回填时失败关闭，不会静默清空历史。
+
+主分支 production-smoke 若等待期间已有更新的 ChatGPT 项目提交部署，会将旧验证标记为 superseded，而不是拿旧快照去误判新生产版本失败；若后继提交与 ChatGPT 项目无关，则继续验证当前预期字节。

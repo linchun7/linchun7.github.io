@@ -135,6 +135,7 @@ jobs:
         with:
           node-version: 22
       - name: Wait for Pages build of this commit or verified successor
+        id: pages
         env:
           GH_TOKEN: ${{ github.token }}
           TARGET_SHA: ${{ github.sha }}
@@ -156,7 +157,16 @@ jobs:
             fi
             if [[ "$relation" == identical || "$relation" == successor ]]; then
               if [[ "$build_status" == built ]]; then
+                if [[ "$relation" == successor ]]; then
+                  git fetch origin "$built_sha" --depth=1
+                  if ! git diff --quiet "$TARGET_SHA" FETCH_HEAD -- tools/chatgpt_price_comparison; then
+                    echo "::notice title=SUPERSEDED_CHATGPT_BUILD::A later ChatGPT project commit is already deployed; this older validation run is superseded."
+                    echo "should_verify=false" >> "$GITHUB_OUTPUT"
+                    exit 0
+                  fi
+                fi
                 echo "Pages built $built_sha ($relation)."
+                echo "should_verify=true" >> "$GITHUB_OUTPUT"
                 exit 0
               fi
               if [[ "$build_status" == errored || -n "$build_error" ]]; then
@@ -169,6 +179,7 @@ jobs:
           echo "::error::Pages did not build this commit or a verified successor within 7.5 minutes."
           exit 1
       - name: Verify canonical JSON, minimum history, HTML and versioned assets
+        if: steps.pages.outputs.should_verify == 'true'
         run: |
           node tools/chatgpt_price_comparison/scripts/verify-production.mjs \
             --expected tools/chatgpt_price_comparison/data/prices.json \

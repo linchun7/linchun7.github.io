@@ -33,6 +33,7 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("STALE_WORKFLOW_DEFINITION", self.text)
         self.assertIn("git fetch origin main --depth=1", self.text)
         self.assertGreaterEqual(self.text.count("ref: main"), 1)
+        self.assertIn("fetch-depth: 0", self.text)
 
     def test_daily_guard_requires_successful_production_proof(self):
         self.assertIn("daily_run_guard.py", self.text)
@@ -99,6 +100,9 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("pages/builds/latest", validate)
         self.assertIn("--expected-minimum-history tools/chatgpt_price_comparison/data/minimum-history.json", validate)
         self.assertIn("--expected-index tools/chatgpt_price_comparison/index.html", validate)
+        self.assertIn("SUPERSEDED_CHATGPT_BUILD", validate)
+        self.assertIn("git diff --quiet", validate)
+        self.assertIn("steps.pages.outputs.should_verify == 'true'", validate)
 
     def test_only_main_can_publish(self):
         self.assertIn("github.ref == 'refs/heads/main'", self.text)

@@ -10,10 +10,15 @@ sys.path.insert(0, str(SCRIPTS))
 
 import daily_run_guard as guard
 import pipeline as p
+import minimum_history as mh
 from test_pipeline import NOW, data_fixture, revise
 
 
 class DailyRunGuardTests(unittest.TestCase):
+    @staticmethod
+    def history_for(data):
+        return mh.advance_history(mh.empty_history(), data)
+
     def test_production_proof_must_finish_after_current_data_generation(self):
         data = data_fixture()
         base = {
@@ -39,7 +44,9 @@ class DailyRunGuardTests(unittest.TestCase):
         wrong_branch = dict(valid, head_branch="other")
         wrong_event = dict(valid, event="push")
         previous_day = dict(valid, created_at=p.stamp(NOW - 86400))
-        self.assertFalse(guard.successful_production_proof([wrong_branch, wrong_event, previous_day], data, NOW + 120))
+        future = dict(valid, created_at=p.stamp(NOW + 180), updated_at=p.stamp(NOW + 240))
+        reversed_time = dict(valid, created_at=p.stamp(NOW + 30), updated_at=p.stamp(NOW))
+        self.assertFalse(guard.successful_production_proof([wrong_branch, wrong_event, previous_day, future, reversed_time], data, NOW + 120))
         self.assertTrue(guard.successful_production_proof([valid], data, NOW + 120))
 
     def test_cloudflare_skips_only_with_clean_data_and_successful_production_run(self):
@@ -49,8 +56,15 @@ class DailyRunGuardTests(unittest.TestCase):
         self.assertTrue(result["production_success_today"])
 
     def test_github_backup_skips_after_successful_primary(self):
-        result = guard.decide("schedule", None, data_fixture(), NOW, True)
+        data = data_fixture()
+        result = guard.decide("schedule", None, data, NOW, True, True)
         self.assertFalse(result["should_run"])
+
+    def test_history_mismatch_keeps_backup_active(self):
+        data = data_fixture()
+        result = guard.decide("schedule", None, data, NOW, True, False)
+        self.assertTrue(result["should_run"])
+        self.assertFalse(result["minimum_history_clean"])
 
     def test_clean_data_without_production_success_retries(self):
         result = guard.decide("schedule", None, data_fixture(), NOW, False)

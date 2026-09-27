@@ -767,10 +767,19 @@ def run(output: Path, now: float | None = None) -> dict:
     data['revision'] = digest(data)
     validate(data, now)
     minimum_path = ROOT / 'data/minimum-history.json'
-    if not minimum_path.exists():
-        raise ValueError('minimum history baseline missing; refusing to reset auditable history')
+    try:
+        baseline = json.loads(minimum_path.read_text(encoding='utf-8'))
+        minimum_history.validate_history(baseline)
+        if old:
+            minimum_history.assert_matches(baseline, old)
+    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
+        # Recover from the immutable prices.json Git history; never silently reset
+        # an auditable ledger. Production checkout is intentionally full-depth.
+        baseline, _ = minimum_history.backfill_history(project_dir=ROOT)
+        if old:
+            minimum_history.assert_matches(baseline, old)
     minimum = minimum_history.advance_history(
-        json.loads(minimum_path.read_text(encoding='utf-8')),
+        baseline,
         data,
     )
     minimum_history.assert_matches(minimum, data)

@@ -8,9 +8,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pipeline
+import minimum_history
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA_PATH = ROOT / "data" / "prices.json"
+MINIMUM_HISTORY_PATH = ROOT / "data" / "minimum-history.json"
 BEIJING = timezone(timedelta(hours=8))
 ALLOWED_DISPATCH_SOURCES = {"manual", "cloudflare"}
 
@@ -48,7 +50,12 @@ def successful_production_proof(runs: list[dict], data: dict, now: float) -> boo
             updated = pipeline.epoch(run["updated_at"])
         except ValueError:
             continue
-        if _beijing_date(created) == today and updated >= generated:
+        if (
+            created <= updated <= now
+            and created <= now
+            and _beijing_date(created) == today
+            and updated >= generated
+        ):
             return True
     return False
 
@@ -69,14 +76,16 @@ def clean_publication_today(data: dict, now: float) -> bool:
 
 
 def decide(event_name: str, requested: str | None, data: dict, now: float,
-           production_success_today: bool = False) -> dict:
+           production_success_today: bool = False, minimum_history_clean: bool = True) -> dict:
     source, automatic = _source(event_name, requested)
     clean_today = clean_publication_today(data, now)
-    should_run = not automatic or not (clean_today and production_success_today)
+    complete_publication = clean_today and minimum_history_clean
+    should_run = not automatic or not (complete_publication and production_success_today)
     return {
         "should_run": should_run,
         "trigger_source": source,
         "clean_today": clean_today,
+        "minimum_history_clean": minimum_history_clean,
         "production_success_today": production_success_today,
         "date_beijing": str(_beijing_date(now)),
     }
@@ -92,12 +101,19 @@ def _append(path: str | None, lines: list[str]) -> None:
 def main() -> None:
     data = json.loads(DATA_PATH.read_text(encoding="utf-8"))
     now = datetime.now(timezone.utc).timestamp()
+    try:
+        history = json.loads(MINIMUM_HISTORY_PATH.read_text(encoding="utf-8"))
+        minimum_history.assert_matches(history, data)
+        history_clean = True
+    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
+        history_clean = False
     result = decide(
         os.environ.get("GITHUB_EVENT_NAME", ""),
         os.environ.get("REQUESTED_TRIGGER_SOURCE"),
         data,
         now,
         os.environ.get("PRODUCTION_SUCCESS_TODAY", "").lower() == "true",
+        history_clean,
     )
     _append(os.environ.get("GITHUB_OUTPUT"), [
         f"should_run={str(result['should_run']).lower()}",
@@ -113,7 +129,8 @@ def main() -> None:
         "",
         f"- 触发来源：{result['trigger_source']}",
         f"- 北京日期：{result['date_beijing']}",
-        f"- 当日数据非降级：{'是' if result['clean_today'] else '否'}",
+        f"- 当日价格数据非降级：{'是' if result['clean_today'] else '否'}",
+        f"- 最低价历史与当前价格同步：{'是' if result['minimum_history_clean'] else '否'}",
         f"- 当日完整生产运行成功：{'是' if result['production_success_today'] else '否'}",
         f"- 本次执行抓取：{'是' if result['should_run'] else '否'}",
     ])
