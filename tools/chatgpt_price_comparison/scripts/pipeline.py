@@ -19,6 +19,7 @@ import re
 import time
 import unicodedata
 import minimum_history
+import plan_identity as plan_ids
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -40,7 +41,7 @@ PLAN = re.compile(r'ChatGPT [^\x00-\x1f\x7f<>]{1,70}\Z')
 AMOUNT = re.compile(r'(?:0|[1-9][0-9]*)(?:\.[0-9]{1,3})?\Z')
 ZERO_DECIMAL = {'JPY', 'KRW', 'VND', 'CLP', 'PYG', 'UGX', 'RWF', 'XOF', 'XAF'}
 THREE_DECIMAL = {'BHD', 'IQD', 'JOD', 'KWD', 'OMR', 'TND'}
-PLAN_ORDER = ('ChatGPT Go', 'ChatGPT Plus', 'ChatGPT Pro 5x', 'ChatGPT Pro 20x')
+PLAN_ORDER = plan_ids.PLAN_ORDER
 STATUS_LABEL = {'verified': '已核验', 'retained': '沿用旧价', 'pending': '待复核', 'unavailable': '暂无标价'}
 BEIJING = timezone(timedelta(hours=8))
 
@@ -306,17 +307,32 @@ def fetch(url: str, *, confirm=False, deadline=float('inf')) -> str:
     raise RuntimeError('unreachable')
 
 
+def offers_by_identity(offers: list[dict]) -> dict[str, dict] | None:
+    """Index offers by stable identity; duplicate aliases are intentionally ambiguous."""
+    result = {}
+    for offer in offers:
+        identity = plan_ids.plan_identity(offer['label'])
+        if identity in result:
+            return None
+        result[identity] = offer
+    return result
+
+
 def unusual(old: dict, new: dict) -> bool:
     if old['currency'] != new['currency']:
         return True
-    old_offers = {x['label']: x for x in old['offers']}
-    new_offers = {x['label']: x for x in new['offers']}
-    # New plans can be accepted after the normal independent confirmation fetch,
-    # but disappearance of an existing plan or variant first waits in pending.
+    old_offers = offers_by_identity(old['offers'])
+    new_offers = offers_by_identity(new['offers'])
+    if old_offers is None or new_offers is None:
+        return True
+    # Known source-label renames keep the same stable identity.  They can be
+    # accepted after the normal independent fetch instead of waiting 18 hours.
+    # Real removals, ambiguous aliases, or material price/variant changes still
+    # enter the existing pending path.
     if not old_offers.keys() <= new_offers.keys():
         return True
-    for label in old_offers.keys() & new_offers.keys():
-        before, after = old_offers[label]['amounts'], new_offers[label]['amounts']
+    for identity in old_offers.keys() & new_offers.keys():
+        before, after = old_offers[identity]['amounts'], new_offers[identity]['amounts']
         if len(before) != len(after):
             return True
         for a, b in zip(before, after):
@@ -497,8 +513,34 @@ def converted(market: dict, amount: str, fx: dict | None, now: float) -> str | N
 
 
 def plan_labels(data: dict) -> list[str]:
-    labels = {offer['label'] for market in data['markets'] for offer in market['offers']}
-    return [label for label in PLAN_ORDER if label in labels] + sorted(labels.difference(PLAN_ORDER))
+    """Return one current display label per stable plan identity.
+
+    During a staggered App Store rename, old and new aliases collapse into one
+    column.  The label seen in the most storefronts wins; ties keep the stable
+    historical label to avoid UI flip-flop.
+    """
+    counts: dict[str, dict[str, int]] = {}
+    for market in data['markets']:
+        seen = set()
+        for offer in market['offers']:
+            identity = plan_ids.plan_identity(offer['label'])
+            # A storefront exposing two aliases for one identity is ambiguous;
+            # count it once for display selection. market_offer() will fail
+            # closed for that storefront instead of merging two products.
+            marker = (identity, offer['label'])
+            if marker in seen:
+                continue
+            seen.add(marker)
+            counts.setdefault(identity, {}).setdefault(offer['label'], 0)
+            counts[identity][offer['label']] += 1
+
+    representatives = []
+    for identity, labels in counts.items():
+        representatives.append(sorted(
+            labels,
+            key=lambda label: (-labels[label], 0 if label == identity else 1, label),
+        )[0])
+    return sorted(representatives, key=plan_ids.plan_order_key)
 
 
 def short_plan(label: str) -> str:
@@ -506,7 +548,9 @@ def short_plan(label: str) -> str:
 
 
 def market_offer(market: dict, label: str) -> dict | None:
-    return next((offer for offer in market['offers'] if offer['label'] == label), None)
+    identity = plan_ids.plan_identity(label)
+    matches = [offer for offer in market['offers'] if plan_ids.plan_identity(offer['label']) == identity]
+    return matches[0] if len(matches) == 1 else None
 
 
 def offer_min_cny(market: dict, label: str) -> Decimal | None:
