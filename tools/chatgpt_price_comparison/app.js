@@ -240,17 +240,23 @@
   }
 
   function orderedPlans() {
-    const groups = new Map();
+    const allGroups = new Map();
+    const verifiedGroups = new Map();
+    const add = (groups, identity, label) => {
+      if (!groups.has(identity)) groups.set(identity, new Map());
+      const labels = groups.get(identity);
+      labels.set(label, (labels.get(label) || 0) + 1);
+    };
     for (const market of state.data.markets) {
       for (const offer of market.offers) {
         const identity = planIdentity(offer.label);
-        if (!groups.has(identity)) groups.set(identity, new Map());
-        const labels = groups.get(identity);
-        labels.set(offer.label, (labels.get(offer.label) || 0) + 1);
+        add(allGroups, identity, offer.label);
+        if (market.status === 'verified') add(verifiedGroups, identity, offer.label);
       }
     }
     const representatives = [];
-    for (const [identity, labels] of groups) {
+    for (const [identity, fallbackLabels] of allGroups) {
+      const labels = verifiedGroups.get(identity) || fallbackLabels;
       const candidates = [...labels].sort((a, b) =>
         b[1] - a[1]
         || (a[0] === identity ? -1 : b[0] === identity ? 1 : 0)
