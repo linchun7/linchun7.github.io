@@ -96,21 +96,24 @@ def history_semantic(market: dict) -> dict:
     Ambiguous duplicate aliases remain distinguishable and therefore recordable.
     """
     offers = {}
-    duplicate_identities = set()
     for offer in market['offers']:
         identity = plan_ids.plan_identity(offer['label'])
-        amounts = [x['amount'] for x in offer['amounts']]
         if identity in offers:
-            duplicate_identities.add(identity)
-            offers[offer['label']] = amounts
-        else:
-            offers[identity] = amounts
-    if duplicate_identities:
-        return semantic(market)
+            return semantic(market)
+        offers[identity] = [x['amount'] for x in offer['amounts']]
     return {'currency': market['currency'], 'offers': [
         {'label': label, 'amounts': offers[label]}
         for label in sorted(offers, key=plan_ids.plan_order_key)
     ]}
+
+
+def should_record_history_change(before: dict | None, after: dict) -> bool:
+    return bool(
+        before
+        and before.get('offers')
+        and before.get('fingerprint') != after.get('fingerprint')
+        and canonical(history_semantic(before)) != canonical(history_semantic(after))
+    )
 
 
 class Element:
@@ -836,10 +839,7 @@ def run(output: Path, now: float | None = None) -> dict:
         before = previous.get(market['code'])
         if (
             market['status'] == 'verified'
-            and before
-            and before.get('offers')
-            and before['fingerprint'] != market['fingerprint']
-            and canonical(history_semantic(before)) != canonical(history_semantic(market))
+            and should_record_history_change(before, market)
         ):
             changes.append({'at': stamp(now), 'code': market['code'], 'before': semantic(before), 'after': semantic(market)})
     data = {'schema': 1, 'channel': 'ios-app-store', 'billing_period': 'not_disclosed', 'purchase_eligibility': 'not_verified',
