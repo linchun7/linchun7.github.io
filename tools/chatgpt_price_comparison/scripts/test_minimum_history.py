@@ -75,6 +75,36 @@ class MinimumHistoryTests(unittest.TestCase):
         self.assertEqual(changes[-1]['to'][0]['code'],'jp')
         self.assertEqual(changes[-1]['cause'],'storefront')
 
+    def test_known_plan_rename_keeps_same_history_identity(self):
+        first=fixture()
+        history=h.advance_history(h.empty_history(), first)
+        before_events=len(history['events'])
+
+        renamed=fixture(86400)
+        for market in renamed['markets']:
+            for offer in market['offers']:
+                if offer['label']=='ChatGPT Pro 20x':
+                    offer['label']='ChatGPT Pro $200'
+            market['fingerprint']=p.digest(p.semantic(market))
+        revise(renamed)
+
+        updated=h.advance_history(history, renamed)
+        self.assertEqual(len(updated['events']), before_events)
+        self.assertIn('ChatGPT Pro 20x', [plan['id'] for plan in updated['checkpoint']['plans']])
+        self.assertNotIn('ChatGPT Pro $200', [plan['id'] for plan in updated['checkpoint']['plans']])
+        self.assertTrue(h.assert_matches(updated, renamed))
+
+    def test_same_storefront_duplicate_aliases_make_minimum_snapshot_unreliable(self):
+        data=fixture()
+        market=data['markets'][0]
+        original=next(offer for offer in market['offers'] if offer['label']=='ChatGPT Pro 20x')
+        duplicate=copy.deepcopy(original)
+        duplicate['label']='ChatGPT Pro $200'
+        market['offers'].append(duplicate)
+        market['fingerprint']=p.digest(p.semantic(market))
+        revise(data)
+        self.assertIsNone(h.build_snapshot(data))
+
     def test_degraded_observation_creates_gap_not_winner_event(self):
         first=fixture()
         history=h.advance_history(h.empty_history(),first)
