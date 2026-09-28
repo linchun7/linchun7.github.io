@@ -4,6 +4,19 @@
   const FRESH = 36 * 3600e3;
   const EXPIRE = 7 * 86400e3;
   const ORDER = ['ChatGPT Go', 'ChatGPT Plus', 'ChatGPT Pro 5x', 'ChatGPT Pro 20x'];
+  const PLAN_ALIASES = new Map([
+    ['ChatGPT Go', 'ChatGPT Go'],
+    ['ChatGPT Plus', 'ChatGPT Plus'],
+    ['ChatGPT Pro 5x', 'ChatGPT Pro 5x'],
+    ['ChatGPT Pro 5X', 'ChatGPT Pro 5x'],
+    ['ChatGPT Pro $100', 'ChatGPT Pro 5x'],
+    ['ChatGPT Pro 100', 'ChatGPT Pro 5x'],
+    ['ChatGPT Pro', 'ChatGPT Pro 5x'],
+    ['ChatGPT Pro 20x', 'ChatGPT Pro 20x'],
+    ['ChatGPT Pro 20X', 'ChatGPT Pro 20x'],
+    ['ChatGPT Pro $200', 'ChatGPT Pro 20x'],
+    ['ChatGPT Pro 200', 'ChatGPT Pro 20x'],
+  ]);
   const STATUS = { verified: '已核验', retained: '沿用旧价', pending: '待复核', unavailable: '暂无标价' };
   const $ = (id) => document.getElementById(id);
   const el = {
@@ -36,6 +49,13 @@
   const usable = (value) => Number.isFinite(age(value)) && age(value) >= -300e3 && age(value) <= EXPIRE;
   const fresh = (market) => market.status === 'verified' && usable(market.last_verified_at) && age(market.last_verified_at) <= FRESH;
   const shortPlan = (label) => label.replace(/^ChatGPT\s+/, '');
+  const planIdentity = (label) => PLAN_ALIASES.get(label) || label;
+  const comparePlans = (a, b) => {
+    const ai = ORDER.indexOf(planIdentity(a)), bi = ORDER.indexOf(planIdentity(b));
+    return (ai < 0 ? ORDER.length : ai) - (bi < 0 ? ORDER.length : bi)
+      || planIdentity(a).localeCompare(planIdentity(b))
+      || a.localeCompare(b);
+  };
   const dateTime = (value) => new Date(value).toLocaleString('zh-CN', {
     timeZone: 'Asia/Shanghai', hour12: false, year: 'numeric', month: '2-digit',
     day: '2-digit', hour: '2-digit', minute: '2-digit',
@@ -223,10 +243,31 @@
   }
 
   function orderedPlans() {
-    const labels = [...new Set(state.data.markets.flatMap((m) => m.offers.map((o) => o.label)))];
-    return [...ORDER.filter((p) => labels.includes(p)), ...labels.filter((p) => !ORDER.includes(p)).sort()];
+    const groups = new Map();
+    for (const market of state.data.markets) {
+      for (const offer of market.offers) {
+        const identity = planIdentity(offer.label);
+        if (!groups.has(identity)) groups.set(identity, new Map());
+        const labels = groups.get(identity);
+        labels.set(offer.label, (labels.get(offer.label) || 0) + 1);
+      }
+    }
+    const representatives = [];
+    for (const [identity, labels] of groups) {
+      const candidates = [...labels].sort((a, b) =>
+        b[1] - a[1]
+        || (a[0] === identity ? -1 : b[0] === identity ? 1 : 0)
+        || a[0].localeCompare(b[0])
+      );
+      representatives.push(candidates[0][0]);
+    }
+    return representatives.sort(comparePlans);
   }
-  function offerFor(market, plan) { return market.offers.find((offer) => offer.label === plan) || null; }
+  function offerFor(market, plan) {
+    const identity = planIdentity(plan);
+    const matches = market.offers.filter((offer) => planIdentity(offer.label) === identity);
+    return matches.length === 1 ? matches[0] : null;
+  }
   function displayAmounts(offer) {
     if (!offer?.amounts?.length) return [];
     // The comparison table is plan-local: show the lowest public amount for
@@ -515,7 +556,11 @@
   }
 
   function semantic(market) { return { currency: market.currency, offers: market.offers.map((o) => ({ label: o.label, amounts: o.amounts.map((a) => a.amount) })) }; }
-  function snapshotOffer(snapshot, plan) { return snapshot.offers.find((o) => o.label === plan) || null; }
+  function snapshotOffer(snapshot, plan) {
+    const identity = planIdentity(plan);
+    const matches = snapshot.offers.filter((offer) => planIdentity(offer.label) === identity);
+    return matches.length === 1 ? matches[0] : null;
+  }
   function historyEvents(market) {
     const changes = state.data.changes.filter((c) => c.code === market.code).sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
     const events = [];
@@ -686,11 +731,12 @@
   function renderMinimumHistory() {
     const history = minimumHistoryUi.data;
     if (!history || !minimumHistoryUi.dialog?.open) return;
-    const plans = [...new Set([...state.plans, ...history.events.map((event) => event.plan)])]
-      .sort((a, b) => {
-        const ai = ORDER.indexOf(a), bi = ORDER.indexOf(b);
-        return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi) || a.localeCompare(b);
-      });
+    const currentDisplay = new Map(state.plans.map((plan) => [planIdentity(plan), plan]));
+    const plans = [...new Set([
+      ...state.plans.map(planIdentity),
+      ...history.events.map((event) => planIdentity(event.plan)),
+    ])].sort(comparePlans);
+    const displayPlan = (identity) => currentDisplay.get(identity) || identity;
     if (minimumHistoryUi.filterPlan !== 'all' && !plans.includes(minimumHistoryUi.filterPlan)) minimumHistoryUi.filterPlan = 'all';
 
     const select = document.querySelector('#minimumHistoryPlanFilter');
@@ -698,15 +744,16 @@
     select.replaceChildren();
     const all = minimumHistoryNode('option', '全部套餐'); all.value = 'all'; select.append(all);
     for (const plan of plans) {
-      const option = minimumHistoryNode('option', shortPlan(plan)); option.value = plan; select.append(option);
+      const option = minimumHistoryNode('option', shortPlan(displayPlan(plan))); option.value = plan; select.append(option);
     }
     select.value = minimumHistoryUi.filterPlan;
     document.querySelector('#minimumHistoryToolbar').hidden = false;
     if (keepFocus) select.focus({ preventScroll: true });
 
     const series = history.events
-      .filter((event) => event.kind === 'change' && (minimumHistoryUi.filterPlan === 'all' || event.plan === minimumHistoryUi.filterPlan))
-      .sort((a, b) => Date.parse(b.at) - Date.parse(a.at) || a.plan.localeCompare(b.plan));
+      .filter((event) => event.kind === 'change'
+        && (minimumHistoryUi.filterPlan === 'all' || planIdentity(event.plan) === minimumHistoryUi.filterPlan))
+      .sort((a, b) => Date.parse(b.at) - Date.parse(a.at) || comparePlans(a.plan, b.plan));
 
     const status = document.querySelector('#minimumHistoryStatus');
     const messages = [];
@@ -723,7 +770,7 @@
       const meta = minimumHistoryNode('div', '', 'minimum-history-event-meta');
       meta.append(
         minimumHistoryNode('span', dateTime(event.at), 'minimum-history-date'),
-        minimumHistoryNode('span', shortPlan(event.plan), 'minimum-history-plan')
+        minimumHistoryNode('span', shortPlan(displayPlan(planIdentity(event.plan))), 'minimum-history-plan')
       );
       const change = minimumHistoryNode('strong', `${minimumWinnerSummary(event.from)} → ${minimumWinnerSummary(event.to)}`, 'minimum-history-change');
       const cause = minimumHistoryNode('span', MINIMUM_CAUSE_LABELS[event.cause] || '原因未确定', 'minimum-history-cause');
