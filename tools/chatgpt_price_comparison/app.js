@@ -10,12 +10,9 @@
     ['ChatGPT Pro 5x', 'ChatGPT Pro 5x'],
     ['ChatGPT Pro 5X', 'ChatGPT Pro 5x'],
     ['ChatGPT Pro $100', 'ChatGPT Pro 5x'],
-    ['ChatGPT Pro 100', 'ChatGPT Pro 5x'],
-    ['ChatGPT Pro', 'ChatGPT Pro 5x'],
     ['ChatGPT Pro 20x', 'ChatGPT Pro 20x'],
     ['ChatGPT Pro 20X', 'ChatGPT Pro 20x'],
     ['ChatGPT Pro $200', 'ChatGPT Pro 20x'],
-    ['ChatGPT Pro 200', 'ChatGPT Pro 20x'],
   ]);
   const STATUS = { verified: '已核验', retained: '沿用旧价', pending: '待复核', unavailable: '暂无标价' };
   const $ = (id) => document.getElementById(id);
