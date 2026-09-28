@@ -35,12 +35,12 @@ class ChangePolicyTests(unittest.TestCase):
         ]))
         self.assertEqual((result.kind, result.quarantine), ('extreme_price_change', True))
 
-    def test_plan_addition_is_non_destructive(self):
+    def test_plan_addition_is_time_separated_before_publication(self):
         result = self.decision(market(), market(offers=[
             {'label': 'ChatGPT Plus', 'amounts': [{'amount': '20'}]},
             {'label': 'ChatGPT Future', 'amounts': [{'amount': '40'}]},
         ]))
-        self.assertEqual((result.kind, result.quarantine), ('plan_added', False))
+        self.assertEqual((result.kind, result.quarantine), ('plan_added', True))
 
     def test_plan_removal_replacement_split_or_merge_is_quarantined(self):
         old = market(offers=[
@@ -59,6 +59,16 @@ class ChangePolicyTests(unittest.TestCase):
             {'label': 'ChatGPT Plus', 'amounts': [{'amount': '20'}, {'amount': '200'}]},
         ]))
         self.assertEqual((result.kind, result.quarantine), ('variant_set_changed', True))
+
+    def test_same_count_multi_variant_price_change_is_quarantined(self):
+        old = market(offers=[
+            {'label': 'ChatGPT Plus', 'amounts': [{'amount': '20'}, {'amount': '200'}]},
+        ])
+        new = market(offers=[
+            {'label': 'ChatGPT Plus', 'amounts': [{'amount': '25'}, {'amount': '180'}]},
+        ])
+        result = self.decision(old, new)
+        self.assertEqual((result.kind, result.quarantine), ('multi_variant_price_change', True))
 
     def test_known_rename_preserves_identity(self):
         old = market(offers=[{'label': 'ChatGPT Pro 5x', 'amounts': [{'amount': '100'}]}])
