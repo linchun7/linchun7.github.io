@@ -106,6 +106,16 @@ class ParsingTests(unittest.TestCase):
         result = p.parse_store(renamed, 'us')
         self.assertEqual([offer['label'] for offer in result['offers']], ['ChatGPT Go', 'ChatGPT Plus'])
 
+    def test_developer_url_path_can_change_but_host_and_id_cannot(self):
+        changed = fixture().replace(
+            'https://apps.apple.com/us/developer/openai-opco-llc/id1684349733',
+            'https://apps.apple.com/us/publisher/openai-opco-llc/id1684349733',
+        )
+        self.assertEqual(p.parse_store(changed, 'us')['currency'], 'USD')
+        evil = changed.replace('https://apps.apple.com/us/publisher/', 'https://evil.example/us/publisher/')
+        with self.assertRaises(ValueError):
+            p.parse_store(evil, 'us')
+
     def test_fake_developer(self):
         with self.assertRaises(ValueError): p.parse_store(fixture().replace('1684349733','9999999999'), 'us')
 
@@ -162,11 +172,18 @@ class ObservationTests(unittest.TestCase):
         self.assertEqual(new['status'], 'unavailable')
         self.assertEqual(new['offers'], [])
 
-    def test_normal_change_double_confirmed(self):
+    def test_normal_single_variant_change_double_confirmed(self):
         old = good_market()
-        new = p.observe({'code':'us','name':'美国'}, old, NOW+86400, lambda *a,**kw: fixture().replace('19.99','21.99'))
+        new = p.observe({'code':'us','name':'美国'}, old, NOW+86400, lambda *a,**kw: fixture().replace('$8.00','$9.00'))
         self.assertEqual(new['status'], 'verified')
         self.assertNotEqual(new['fingerprint'], old['fingerprint'])
+
+    def test_same_count_multi_variant_change_enters_pending(self):
+        old = good_market()
+        getter = lambda *a,**kw: fixture().replace('$19.99','$21.99').replace('$200.00','$189.99')
+        pending = p.observe({'code':'us','name':'美国'}, old, NOW+86400, getter)
+        self.assertEqual(pending['status'], 'pending')
+        self.assertEqual(pending['pending']['reason'], 'multi_variant_price_change')
 
     def test_changed_price_disagreement_keeps_old(self):
         old = good_market()
@@ -194,7 +211,7 @@ class ObservationTests(unittest.TestCase):
         self.assertEqual(pending_variant['status'], 'pending')
         self.assertEqual(pending_variant['fingerprint'], old['fingerprint'])
 
-    def test_new_plan_addition_is_not_quarantined(self):
+    def test_new_plan_addition_waits_then_accepts(self):
         old = good_market()
         getter = lambda *a, **kw: fixture(pairs=[
             ['ChatGPT Plus', '$19.99'],
@@ -203,9 +220,12 @@ class ObservationTests(unittest.TestCase):
             ['ChatGPT New Tier', '$44.00'],
             ['100 Credits', '$4.00'],
         ])
-        result = p.observe({'code':'us','name':'美国'}, old, NOW+86400, getter)
-        self.assertEqual(result['status'], 'verified')
-        self.assertIn('ChatGPT New Tier', [offer['label'] for offer in result['offers']])
+        pending = p.observe({'code':'us','name':'美国'}, old, NOW+86400, getter)
+        self.assertEqual(pending['status'], 'pending')
+        self.assertEqual(pending['pending']['reason'], 'plan_added')
+        accepted = p.observe({'code':'us','name':'美国'}, pending, NOW+2*86400, getter)
+        self.assertEqual(accepted['status'], 'verified')
+        self.assertIn('ChatGPT New Tier', [offer['label'] for offer in accepted['offers']])
 
     def test_known_pro_rename_is_not_quarantined(self):
         old_getter = lambda *a, **kw: fixture(pairs=[['ChatGPT Pro 5x', '$100.00']])
