@@ -397,19 +397,17 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(pro200, ['ChatGPT Pro $200'])
 
     def test_known_rename_does_not_consume_country_history_capacity(self):
-        old=good_market()
-        new=copy.deepcopy(old)
-        for offer in new['offers']:
-            if offer['label']=='ChatGPT Go':
-                continue
-            if offer['label']=='ChatGPT Plus':
-                continue
-        # Use a dedicated Pro fixture so the assertion is about aliasing only.
         old=p.observe({'code':'us','name':'美国'}, None, NOW, lambda *a,**kw: fixture(pairs=[['ChatGPT Pro 5x','$100.00']]))
-        new=p.observe({'code':'us','name':'美国'}, old, NOW+86400, lambda *a,**kw: fixture(pairs=[['ChatGPT Pro $100','$100.00']]))
-        self.assertEqual(p.canonical(p.history_semantic(old)), p.canonical(p.history_semantic(new)))
+        renamed=p.observe({'code':'us','name':'美国'}, old, NOW+86400, lambda *a,**kw: fixture(pairs=[['ChatGPT Pro $100','$100.00']]))
+        self.assertFalse(p.should_record_history_change(old, renamed))
+
         changed=p.observe({'code':'us','name':'美国'}, old, NOW+86400, lambda *a,**kw: fixture(pairs=[['ChatGPT Pro $100','$105.00']]))
-        self.assertNotEqual(p.canonical(p.history_semantic(old)), p.canonical(p.history_semantic(changed)))
+        self.assertTrue(p.should_record_history_change(old, changed))
+
+    def test_ambiguous_bare_pro_name_is_not_guessed_as_known_rename(self):
+        self.assertEqual(p.plan_ids.plan_identity('ChatGPT Pro'), 'ChatGPT Pro')
+        self.assertEqual(p.plan_ids.plan_identity('ChatGPT Pro 100'), 'ChatGPT Pro 100')
+        self.assertEqual(p.plan_ids.plan_identity('ChatGPT Pro 200'), 'ChatGPT Pro 200')
 
     def test_main_table_uses_plan_local_minimum_without_cross_plan_inference(self):
         plus = {'label':'ChatGPT Plus','amounts':[{'amount':'19.99'},{'amount':'200'}]}
