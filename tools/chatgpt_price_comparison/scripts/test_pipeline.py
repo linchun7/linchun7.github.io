@@ -97,6 +97,15 @@ class ParsingTests(unittest.TestCase):
         )
         self.assertEqual(p.parse_store(changed, 'us')['currency'], 'USD')
 
+    def test_app_display_name_can_change_without_breaking_identity(self):
+        renamed = fixture().replace('"name": "ChatGPT"', '"name": "ChatGPT by OpenAI"', 1)
+        self.assertEqual(p.parse_store(renamed, 'us')['currency'], 'USD')
+
+    def test_purchase_annotation_title_can_change_when_structure_is_unique(self):
+        renamed = fixture().replace('"title": "In-App Purchases"', '"title": "Subscriptions"', 1)
+        result = p.parse_store(renamed, 'us')
+        self.assertEqual([offer['label'] for offer in result['offers']], ['ChatGPT Go', 'ChatGPT Plus'])
+
     def test_fake_developer(self):
         with self.assertRaises(ValueError): p.parse_store(fixture().replace('1684349733','9999999999'), 'us')
 
@@ -277,6 +286,25 @@ class ObservationTests(unittest.TestCase):
 
 class ContractTests(unittest.TestCase):
     def test_valid_data(self): p.validate(data_fixture(), NOW)
+
+    def test_pending_evidence_contract_and_legacy_reason_compatibility(self):
+        data=data_fixture()
+        market=data['markets'][0]
+        market['status']='pending'
+        market['pending']={'fingerprint':'a'*64,'since':market['last_checked_at'],'reason':'extreme_price_change'}
+        revise(data)
+        p.validate(data,NOW)
+
+        legacy=copy.deepcopy(data)
+        legacy['markets'][0]['pending'].pop('reason')
+        revise(legacy)
+        p.validate(legacy,NOW)
+
+        bad=copy.deepcopy(data)
+        bad['markets'][0]['pending']['reason']='guess_the_plan'
+        revise(bad)
+        with self.assertRaises(ValueError):
+            p.validate(bad,NOW)
 
     def test_corruption(self):
         d=data_fixture(); d['markets'][0]['name']='changed'
@@ -650,6 +678,68 @@ class ContractTests(unittest.TestCase):
                 (output/'index.html').read_text(encoding='utf-8'),
                 p.render(staged,(root/'index.template.html').read_text(encoding='utf-8'))
             )
+
+    def test_global_pending_change_is_published_so_confirmation_clock_can_progress(self):
+        import minimum_history
+        original_root=p.ROOT
+        config=[{'code':code,'name':code.upper()} for code in ['us','gb','ca','au','nz','in','sg','ph','ae','za']]
+        base=good_market()
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)
+            (root/'data').mkdir(parents=True)
+            (root/'vendor').mkdir(parents=True)
+            (root/'markets.json').write_text(json.dumps(config),encoding='utf-8')
+            for relative in ('index.template.html','app.js','style.css','vendor/lucide-subset.js'):
+                target=root/relative
+                target.parent.mkdir(parents=True,exist_ok=True)
+                target.write_bytes((original_root/relative).read_bytes())
+
+            old_markets=[]
+            fx={'source_url':p.FX_URL,'updated_at':p.stamp(NOW),'rates':{'USD':'1','CNY':'7'},'fallback':False}
+            for item in config:
+                market=copy.deepcopy(base)
+                market.update(
+                    code=item['code'], name=item['name'], source_url=p.url_for(item['code']),
+                    last_checked_at=p.stamp(NOW), last_verified_at=p.stamp(NOW), status='verified'
+                )
+                for offer in market['offers']:
+                    for amount in offer['amounts']:
+                        amount['cny']=p.converted(market,amount['amount'],fx,NOW)
+                market['fingerprint']=p.digest(p.semantic(market))
+                old_markets.append(market)
+            old_data={
+                'schema':1,'channel':'ios-app-store','billing_period':'not_disclosed',
+                'purchase_eligibility':'not_verified','generated_at':p.stamp(NOW),
+                'markets':old_markets,'fx':fx,'changes':[]
+            }
+            revise(old_data)
+            (root/'data/prices.json').write_text(json.dumps(old_data),encoding='utf-8')
+            baseline=minimum_history.advance_history(minimum_history.empty_history(),old_data)
+            (root/'data/minimum-history.json').write_text(json.dumps(baseline),encoding='utf-8')
+
+            run_now=NOW+3600
+            fresh_fx={'source_url':p.FX_URL,'updated_at':p.stamp(run_now),'rates':{'USD':'1','CNY':'7'},'fallback':False}
+            def observed(item, old, now, getter):
+                market=copy.deepcopy(old)
+                market['last_checked_at']=p.stamp(now)
+                market['status']='pending'
+                market['pending']={
+                    'fingerprint':'b'*64,
+                    'since':p.stamp(now-60),
+                    'reason':'extreme_price_change',
+                }
+                return market
+
+            output=root/'candidate'
+            with patch.object(p,'ROOT',root), patch.object(p,'observe',side_effect=observed), patch.object(p,'collect_fx',return_value=fresh_fx):
+                data=p.run(output,run_now)
+
+            self.assertTrue(output.exists())
+            self.assertTrue(all(market['status']=='pending' for market in data['markets']))
+            self.assertTrue(all(market['pending']['since']==p.stamp(run_now-60) for market in data['markets']))
+            history=json.loads((output/'minimum-history.json').read_text(encoding='utf-8'))
+            self.assertTrue(history['pending_gap'])
+            self.assertEqual(history['checked_at'],data['generated_at'])
 
     def test_total_fx_failure_does_not_publish_candidate(self):
         config=[{'code':c,'name':c} for c in ['us','jp','de','gb','fr','it','ca','au','kr','in']]
