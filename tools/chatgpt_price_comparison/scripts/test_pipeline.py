@@ -241,6 +241,22 @@ class ObservationTests(unittest.TestCase):
         self.assertNotIn('error', pending)
         self.assertNotIn('error_detail', pending)
 
+    def test_pending_clock_survives_transient_fetch_failure(self):
+        old = good_market()
+        getter = lambda *a, **kw: fixture().replace('19.99','99.99')
+        pending = p.observe({'code':'us','name':'美国'}, old, NOW+86400, getter)
+        self.assertEqual(pending['status'], 'pending')
+        evidence = copy.deepcopy(pending['pending'])
+
+        failed = p.observe(
+            {'code':'us','name':'美国'},
+            pending,
+            NOW+86400+3600,
+            lambda *a, **kw: (_ for _ in ()).throw(URLError('offline')),
+        )
+        self.assertEqual(failed['status'], 'retained')
+        self.assertEqual(failed['pending'], evidence)
+
     def test_large_jump_recovers_automatically_after_18_hours(self):
         old = good_market()
         getter = lambda *a,**kw: fixture().replace('19.99','99.99')
@@ -299,6 +315,13 @@ class ContractTests(unittest.TestCase):
         legacy['markets'][0]['pending'].pop('reason')
         revise(legacy)
         p.validate(legacy,NOW)
+
+        retained=copy.deepcopy(data)
+        retained['markets'][0]['status']='retained'
+        retained['markets'][0]['error']='source_unverified'
+        retained['markets'][0]['error_detail']='URLError: offline'
+        revise(retained)
+        p.validate(retained,NOW)
 
         bad=copy.deepcopy(data)
         bad['markets'][0]['pending']['reason']='guess_the_plan'
