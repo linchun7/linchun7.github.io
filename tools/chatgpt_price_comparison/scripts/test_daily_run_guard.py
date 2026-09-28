@@ -101,7 +101,14 @@ class DailyRunGuardTests(unittest.TestCase):
         for status in ("retained", "pending"):
             with self.subTest(status=status):
                 data = copy.deepcopy(data_fixture())
-                data["markets"][0]["status"] = status
+                market = data["markets"][0]
+                market["status"] = status
+                if status == "pending":
+                    market["pending"] = {
+                        "fingerprint": "a" * 64,
+                        "since": market["last_checked_at"],
+                        "reason": "extreme_price_change",
+                    }
                 revise(data)
                 self.assertTrue(guard.decide("schedule", None, data, NOW, True)["should_run"])
 
