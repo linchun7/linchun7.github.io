@@ -88,6 +88,31 @@ def semantic(market: dict) -> dict:
         for offer in market['offers']]}
 
 
+def history_semantic(market: dict) -> dict:
+    """Normalize only known aliases for price-history change detection.
+
+    Raw Apple labels stay in prices.json and stored snapshots.  This projection
+    exists solely to avoid consuming history capacity for a label-only rename.
+    Ambiguous duplicate aliases remain distinguishable and therefore recordable.
+    """
+    offers = {}
+    duplicate_identities = set()
+    for offer in market['offers']:
+        identity = plan_ids.plan_identity(offer['label'])
+        amounts = [x['amount'] for x in offer['amounts']]
+        if identity in offers:
+            duplicate_identities.add(identity)
+            offers[offer['label']] = amounts
+        else:
+            offers[identity] = amounts
+    if duplicate_identities:
+        return semantic(market)
+    return {'currency': market['currency'], 'offers': [
+        {'label': label, 'amounts': offers[label]}
+        for label in sorted(offers, key=plan_ids.plan_order_key)
+    ]}
+
+
 class Element:
     def __init__(self, tag='', attrs=()):
         self.tag, self.attrs, self.children = tag, dict(attrs), []
@@ -519,23 +544,28 @@ def plan_labels(data: dict) -> list[str]:
     column.  The label seen in the most storefronts wins; ties keep the stable
     historical label to avoid UI flip-flop.
     """
-    counts: dict[str, dict[str, int]] = {}
+    all_counts: dict[str, dict[str, int]] = {}
+    verified_counts: dict[str, dict[str, int]] = {}
     for market in data['markets']:
         seen = set()
         for offer in market['offers']:
             identity = plan_ids.plan_identity(offer['label'])
             # A storefront exposing two aliases for one identity is ambiguous;
-            # count it once for display selection. market_offer() will fail
-            # closed for that storefront instead of merging two products.
+            # count each visible label as evidence, but market_offer() still
+            # fails closed for that storefront instead of merging products.
             marker = (identity, offer['label'])
             if marker in seen:
                 continue
             seen.add(marker)
-            counts.setdefault(identity, {}).setdefault(offer['label'], 0)
-            counts[identity][offer['label']] += 1
+            all_counts.setdefault(identity, {}).setdefault(offer['label'], 0)
+            all_counts[identity][offer['label']] += 1
+            if market.get('status') == 'verified':
+                verified_counts.setdefault(identity, {}).setdefault(offer['label'], 0)
+                verified_counts[identity][offer['label']] += 1
 
     representatives = []
-    for identity, labels in counts.items():
+    for identity, fallback_labels in all_counts.items():
+        labels = verified_counts.get(identity) or fallback_labels
         representatives.append(sorted(
             labels,
             key=lambda label: (-labels[label], 0 if label == identity else 1, label),
@@ -804,7 +834,13 @@ def run(output: Path, now: float | None = None) -> dict:
                 price['cny'] = converted(market, price['amount'], fx, now)
     for market in markets:
         before = previous.get(market['code'])
-        if market['status'] == 'verified' and before and before.get('offers') and before['fingerprint'] != market['fingerprint']:
+        if (
+            market['status'] == 'verified'
+            and before
+            and before.get('offers')
+            and before['fingerprint'] != market['fingerprint']
+            and canonical(history_semantic(before)) != canonical(history_semantic(market))
+        ):
             changes.append({'at': stamp(now), 'code': market['code'], 'before': semantic(before), 'after': semantic(market)})
     data = {'schema': 1, 'channel': 'ios-app-store', 'billing_period': 'not_disclosed', 'purchase_eligibility': 'not_verified',
             'generated_at': stamp(now), 'markets': markets, 'fx': fx, 'changes': changes[-200:]}
