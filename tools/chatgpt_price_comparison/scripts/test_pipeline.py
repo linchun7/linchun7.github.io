@@ -373,6 +373,44 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(pro200, ['ChatGPT Pro 20x'])
         self.assertEqual(p.market_offer(second, 'ChatGPT Pro 20x')['label'], 'ChatGPT Pro $200')
 
+    def test_verified_new_label_beats_more_stale_old_labels(self):
+        d=copy.deepcopy(data_fixture())
+        current=d['markets'][0]
+        for offer in current['offers']:
+            if offer['label']=='ChatGPT Pro 20x':
+                offer['label']='ChatGPT Pro $200'
+        current['fingerprint']=p.digest(p.semantic(current))
+
+        for code in ('jp','gb'):
+            stale=copy.deepcopy(current)
+            stale['code']=code
+            stale['name']=code.upper()
+            stale['source_url']=p.url_for(code)
+            stale['status']='retained'
+            for offer in stale['offers']:
+                if offer['label']=='ChatGPT Pro $200':
+                    offer['label']='ChatGPT Pro 20x'
+            stale['fingerprint']=p.digest(p.semantic(stale))
+            d['markets'].append(stale)
+
+        pro200=[plan for plan in p.plan_labels(d) if p.plan_ids.plan_identity(plan)=='ChatGPT Pro 20x']
+        self.assertEqual(pro200, ['ChatGPT Pro $200'])
+
+    def test_known_rename_does_not_consume_country_history_capacity(self):
+        old=good_market()
+        new=copy.deepcopy(old)
+        for offer in new['offers']:
+            if offer['label']=='ChatGPT Go':
+                continue
+            if offer['label']=='ChatGPT Plus':
+                continue
+        # Use a dedicated Pro fixture so the assertion is about aliasing only.
+        old=p.observe({'code':'us','name':'美国'}, None, NOW, lambda *a,**kw: fixture(pairs=[['ChatGPT Pro 5x','$100.00']]))
+        new=p.observe({'code':'us','name':'美国'}, old, NOW+86400, lambda *a,**kw: fixture(pairs=[['ChatGPT Pro $100','$100.00']]))
+        self.assertEqual(p.canonical(p.history_semantic(old)), p.canonical(p.history_semantic(new)))
+        changed=p.observe({'code':'us','name':'美国'}, old, NOW+86400, lambda *a,**kw: fixture(pairs=[['ChatGPT Pro $100','$105.00']]))
+        self.assertNotEqual(p.canonical(p.history_semantic(old)), p.canonical(p.history_semantic(changed)))
+
     def test_main_table_uses_plan_local_minimum_without_cross_plan_inference(self):
         plus = {'label':'ChatGPT Plus','amounts':[{'amount':'19.99'},{'amount':'200'}]}
         close_prices = {'label':'ChatGPT Plus','amounts':[{'amount':'19.99'},{'amount':'29.99'}]}
