@@ -198,6 +198,23 @@ class ObservationTests(unittest.TestCase):
         self.assertEqual(result['status'], 'verified')
         self.assertIn('ChatGPT New Tier', [offer['label'] for offer in result['offers']])
 
+    def test_known_pro_rename_is_not_quarantined(self):
+        old_getter = lambda *a, **kw: fixture(pairs=[['ChatGPT Pro 5x', '$100.00']])
+        old = p.observe({'code':'us','name':'美国'}, None, NOW, old_getter)
+        renamed_getter = lambda *a, **kw: fixture(pairs=[['ChatGPT Pro $100', '$100.00']])
+        renamed = p.observe({'code':'us','name':'美国'}, old, NOW+86400, renamed_getter)
+        self.assertEqual(renamed['status'], 'verified')
+        self.assertEqual([offer['label'] for offer in renamed['offers']], ['ChatGPT Pro $100'])
+        self.assertFalse(p.unusual(old, renamed))
+
+    def test_rename_plus_material_price_jump_still_enters_pending(self):
+        old_getter = lambda *a, **kw: fixture(pairs=[['ChatGPT Pro 5x', '$100.00']])
+        old = p.observe({'code':'us','name':'美国'}, None, NOW, old_getter)
+        renamed_getter = lambda *a, **kw: fixture(pairs=[['ChatGPT Pro $100', '$300.00']])
+        renamed = p.observe({'code':'us','name':'美国'}, old, NOW+86400, renamed_getter)
+        self.assertEqual(renamed['status'], 'pending')
+        self.assertEqual(renamed['fingerprint'], old['fingerprint'])
+
     def test_successful_pending_observation_clears_stale_source_error(self):
         old = good_market()
         retained = p.observe(
@@ -339,6 +356,58 @@ class ContractTests(unittest.TestCase):
         payload = {'result':'success','base_code':'USD','time_last_update_unix':NOW,'rates':rates}
         result = p.collect_fx(NOW, None, lambda *a, **kw: json.dumps(payload), {'JPY'})
         self.assertEqual(set(result['rates']), {'USD', 'CNY', 'JPY'})
+
+    def test_staggered_known_aliases_collapse_to_one_logical_plan(self):
+        d=copy.deepcopy(data_fixture())
+        second=copy.deepcopy(d['markets'][0])
+        second['code']='jp'
+        second['name']='日本'
+        second['source_url']=p.url_for('jp')
+        for offer in second['offers']:
+            if offer['label']=='ChatGPT Pro 20x':
+                offer['label']='ChatGPT Pro $200'
+        second['fingerprint']=p.digest(p.semantic(second))
+        d['markets'].append(second)
+        plans=p.plan_labels(d)
+        pro200=[plan for plan in plans if p.plan_ids.plan_identity(plan)=='ChatGPT Pro 20x']
+        self.assertEqual(pro200, ['ChatGPT Pro 20x'])
+        self.assertEqual(p.market_offer(second, 'ChatGPT Pro 20x')['label'], 'ChatGPT Pro $200')
+
+    def test_verified_new_label_beats_more_stale_old_labels(self):
+        d=copy.deepcopy(data_fixture())
+        current=d['markets'][0]
+        for offer in current['offers']:
+            if offer['label']=='ChatGPT Pro 20x':
+                offer['label']='ChatGPT Pro $200'
+        current['fingerprint']=p.digest(p.semantic(current))
+
+        for code in ('jp','gb'):
+            stale=copy.deepcopy(current)
+            stale['code']=code
+            stale['name']=code.upper()
+            stale['source_url']=p.url_for(code)
+            stale['status']='retained'
+            for offer in stale['offers']:
+                if offer['label']=='ChatGPT Pro $200':
+                    offer['label']='ChatGPT Pro 20x'
+            stale['fingerprint']=p.digest(p.semantic(stale))
+            d['markets'].append(stale)
+
+        pro200=[plan for plan in p.plan_labels(d) if p.plan_ids.plan_identity(plan)=='ChatGPT Pro 20x']
+        self.assertEqual(pro200, ['ChatGPT Pro $200'])
+
+    def test_known_rename_does_not_consume_country_history_capacity(self):
+        old=p.observe({'code':'us','name':'美国'}, None, NOW, lambda *a,**kw: fixture(pairs=[['ChatGPT Pro 5x','$100.00']]))
+        renamed=p.observe({'code':'us','name':'美国'}, old, NOW+86400, lambda *a,**kw: fixture(pairs=[['ChatGPT Pro $100','$100.00']]))
+        self.assertFalse(p.should_record_history_change(old, renamed))
+
+        changed=p.observe({'code':'us','name':'美国'}, old, NOW+86400, lambda *a,**kw: fixture(pairs=[['ChatGPT Pro $100','$105.00']]))
+        self.assertTrue(p.should_record_history_change(old, changed))
+
+    def test_ambiguous_bare_pro_name_is_not_guessed_as_known_rename(self):
+        self.assertEqual(p.plan_ids.plan_identity('ChatGPT Pro'), 'ChatGPT Pro')
+        self.assertEqual(p.plan_ids.plan_identity('ChatGPT Pro 100'), 'ChatGPT Pro 100')
+        self.assertEqual(p.plan_ids.plan_identity('ChatGPT Pro 200'), 'ChatGPT Pro 200')
 
     def test_main_table_uses_plan_local_minimum_without_cross_plan_inference(self):
         plus = {'label':'ChatGPT Plus','amounts':[{'amount':'19.99'},{'amount':'200'}]}

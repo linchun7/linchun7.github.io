@@ -11,9 +11,11 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 
+import plan_identity as plan_ids
+
 FRESH = 36 * 3600
 PROJECT_SINCE = '2026-09-24'
-PLAN_ORDER = ('ChatGPT Go', 'ChatGPT Plus', 'ChatGPT Pro 5x', 'ChatGPT Pro 20x')
+PLAN_ORDER = plan_ids.PLAN_ORDER
 PLAN = re.compile(r'ChatGPT [^\x00-\x1f\x7f<>]{1,70}\Z')
 AMOUNT = re.compile(r'(?:0|[1-9][0-9]*)(?:\.[0-9]{1,3})?\Z')
 CNY = re.compile(r'(?:0|[1-9][0-9]*)\.\d{2}\Z')
@@ -49,12 +51,20 @@ def decimal_text(value: str) -> str:
 
 
 def ordered_plans(data: dict) -> list[str]:
-    labels = {offer['label'] for market in data.get('markets', []) for offer in market.get('offers', [])}
-    return [label for label in PLAN_ORDER if label in labels] + sorted(labels.difference(PLAN_ORDER))
+    identities = {
+        plan_ids.plan_identity(offer['label'])
+        for market in data.get('markets', [])
+        for offer in market.get('offers', [])
+    }
+    return sorted(identities, key=plan_ids.plan_order_key)
 
 
 def min_offer(market: dict, plan: str):
-    offer = next((item for item in market.get('offers', []) if item.get('label') == plan), None)
+    matches = [
+        item for item in market.get('offers', [])
+        if plan_ids.plan_identity(item.get('label', '')) == plan
+    ]
+    offer = matches[0] if len(matches) == 1 else None
     if not offer or not offer.get('amounts'):
         return None
     amount = min(offer['amounts'], key=lambda item: Decimal(item['amount']))
@@ -91,6 +101,15 @@ def build_snapshot(data: dict) -> dict | None:
         'updated_at': fx['updated_at'],
         'rates': {code: str(rates[code]) for code in sorted(required)},
     }
+
+    # If one storefront simultaneously exposes two known aliases for the same
+    # stable identity, do not manufacture a merged minimum.  Price collection
+    # may still publish the raw evidence, while minimum history records a gap
+    # until the source becomes unambiguous.
+    for market in markets:
+        identities = [plan_ids.plan_identity(offer.get('label', '')) for offer in market.get('offers', [])]
+        if len(identities) != len(set(identities)):
+            return None
 
     plans = []
     for plan in ordered_plans(data):
