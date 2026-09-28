@@ -87,6 +87,10 @@ class ParsingTests(unittest.TestCase):
                 result = p.parse_store(fixture(pairs=[[label, '$44.00']]), 'us')
                 self.assertEqual(result['offers'][0]['label'], label)
 
+    def test_no_recognized_chatgpt_plan_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, 'no recognized paid plans'):
+            p.parse_store(fixture(pairs=[['100 Credits', '$4.00']]), 'us')
+
     def test_country_identity(self):
         with self.assertRaises(ValueError): p.parse_store(fixture('jp','JPY',[['ChatGPT Plus','¥3,000']]), 'us')
 
