@@ -18,6 +18,15 @@ class Decision:
     quarantine: bool
 
 
+QUARANTINE_KINDS = frozenset({
+    'currency_change',
+    'ambiguous_identity',
+    'plan_removed_or_replaced',
+    'variant_set_changed',
+    'extreme_price_change',
+})
+
+
 def _offers_by_identity(offers: list[dict]) -> dict[str, dict] | None:
     indexed: dict[str, dict] = {}
     for offer in offers:
