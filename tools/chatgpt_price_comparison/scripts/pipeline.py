@@ -500,20 +500,19 @@ def validate(data: dict, now: float | None = None) -> None:
         if epoch(market['last_checked_at']) > generated:
             raise ValueError('invalid checked time')
         pending = market.get('pending')
-        if market['status'] == 'pending':
+        if pending is not None:
+            if market['status'] not in ('pending', 'retained'):
+                raise ValueError('unexpected pending evidence')
             if not isinstance(pending, dict) or set(pending) not in ({'fingerprint','since'}, {'fingerprint','since','reason'}):
                 raise ValueError('invalid pending evidence')
             if not re.fullmatch('[a-f0-9]{64}', pending.get('fingerprint', '')):
                 raise ValueError('invalid pending fingerprint')
             if epoch(pending.get('since', '')) > epoch(market['last_checked_at']):
                 raise ValueError('invalid pending timestamp')
-            if 'reason' in pending and pending['reason'] not in {
-                'currency_change','ambiguous_identity','plan_removed_or_replaced',
-                'variant_set_changed','extreme_price_change'
-            }:
+            if 'reason' in pending and pending['reason'] not in change_policy.QUARANTINE_KINDS:
                 raise ValueError('invalid pending reason')
-        elif pending is not None:
-            raise ValueError('unexpected pending evidence')
+        elif market['status'] == 'pending':
+            raise ValueError('missing pending evidence')
         if market['offers']:
             if not re.fullmatch('[A-Z]{3}', market['currency']) or epoch(market['last_verified_at']) > epoch(market['last_checked_at']):
                 raise ValueError('invalid verification time or currency')
