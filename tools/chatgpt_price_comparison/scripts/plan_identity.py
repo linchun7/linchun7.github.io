@@ -23,13 +23,10 @@ PLAN_ALIASES = {
     'ChatGPT Pro 5x': 'ChatGPT Pro 5x',
     'ChatGPT Pro 5X': 'ChatGPT Pro 5x',
     'ChatGPT Pro $100': 'ChatGPT Pro 5x',
-    'ChatGPT Pro 100': 'ChatGPT Pro 5x',
-    'ChatGPT Pro': 'ChatGPT Pro 5x',
     # OpenAI currently describes the higher tier as Pro $200 (Pro 20X).
     'ChatGPT Pro 20x': 'ChatGPT Pro 20x',
     'ChatGPT Pro 20X': 'ChatGPT Pro 20x',
     'ChatGPT Pro $200': 'ChatGPT Pro 20x',
-    'ChatGPT Pro 200': 'ChatGPT Pro 20x',
 }
 
 
