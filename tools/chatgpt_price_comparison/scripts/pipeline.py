@@ -83,6 +83,17 @@ def app_storefront(url: str) -> str | None:
     return match.group(1) if match else None
 
 
+def official_developer_url(url: object) -> bool:
+    if not isinstance(url, str):
+        return False
+    parsed = urllib.parse.urlsplit(url)
+    return (
+        parsed.scheme == 'https'
+        and parsed.netloc == 'apps.apple.com'
+        and bool(re.search(r'/id1684349733/?$', parsed.path))
+    )
+
+
 def semantic(market: dict) -> dict:
     return {'currency': market['currency'], 'offers': [
         {'label': offer['label'], 'amounts': [x['amount'] for x in offer['amounts']]}
@@ -244,8 +255,7 @@ def parse_store(text: str, code: str) -> dict:
     if (
         not isinstance(app_name, str)
         or not 1 <= len(clean(app_name)) <= 120
-        or '/developer/' not in meta['author'].get('url', '')
-        or not re.search(r'/id1684349733(?:\\?|$)', meta['author']['url'])
+        or not official_developer_url(meta['author'].get('url'))
     ):
         raise ValueError('not the official OpenAI application')
     # offers.price is the FREE app download. Only its currency is used here.

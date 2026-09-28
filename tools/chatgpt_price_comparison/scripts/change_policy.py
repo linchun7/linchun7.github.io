@@ -21,8 +21,10 @@ class Decision:
 QUARANTINE_KINDS = frozenset({
     'currency_change',
     'ambiguous_identity',
+    'plan_added',
     'plan_removed_or_replaced',
     'variant_set_changed',
+    'multi_variant_price_change',
     'extreme_price_change',
 })
 
@@ -59,6 +61,7 @@ def classify(old: dict, new: dict, *, ratio_low: Decimal, ratio_high: Decimal) -
 
     saw_known_rename = False
     saw_price_change = False
+    saw_multi_variant_price_change = False
     for identity in sorted(old_ids & new_ids):
         before_offer, after_offer = old_offers[identity], new_offers[identity]
         if before_offer['label'] != after_offer['label']:
@@ -69,19 +72,29 @@ def classify(old: dict, new: dict, *, ratio_low: Decimal, ratio_high: Decimal) -
         if len(before) != len(after):
             return Decision('variant_set_changed', True)
 
+        offer_price_changed = False
         for a, b in zip(before, after):
             old_amount = Decimal(a['amount'])
             new_amount = Decimal(b['amount'])
             if old_amount != new_amount:
                 saw_price_change = True
+                offer_price_changed = True
             ratio = new_amount / old_amount
             if ratio < ratio_low or ratio > ratio_high:
                 return Decision('extreme_price_change', True)
+        if offer_price_changed and len(before) > 1:
+            saw_multi_variant_price_change = True
 
+    # Structural additions are source-confirmed, but still withheld for the
+    # time-separated window. This avoids publishing transient/test IAP rows as
+    # a real new subscription tier.
     if added:
-        # Additions are non-destructive. Existing plans stay intact, so a newly
-        # introduced plan can be published after the normal independent refetch.
-        return Decision('plan_added', False)
+        return Decision('plan_added', True)
+    if saw_multi_variant_price_change:
+        # With multiple public amounts under one label there is no stable variant
+        # ID. A same-count replacement can look exactly like a normal repricing,
+        # so require time-separated confirmation rather than guessing.
+        return Decision('multi_variant_price_change', True)
     if saw_price_change and saw_known_rename:
         return Decision('known_rename_and_price_change', False)
     if saw_price_change:
