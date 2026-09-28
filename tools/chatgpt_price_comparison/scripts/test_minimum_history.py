@@ -155,6 +155,10 @@ class MinimumHistoryTests(unittest.TestCase):
                     env={**__import__('os').environ, 'GIT_CONFIG_NOSYSTEM':'1'}
                 ).strip()
             subprocess.check_call(['git','init','--initial-branch=main'],cwd=repo,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+            # Keep this tiny throwaway repository deterministic. Some Git builds
+            # may launch auto-gc after commits, which can race TemporaryDirectory
+            # cleanup after every assertion has already passed.
+            git('config','gc.auto','0')
             def save(data, message):
                 (data_dir/'prices.json').write_text(json.dumps(data),encoding='utf-8')
                 git('add','.')
