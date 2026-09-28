@@ -20,6 +20,7 @@ import time
 import unicodedata
 import minimum_history
 import plan_identity as plan_ids
+import change_policy
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -239,17 +240,47 @@ def parse_store(text: str, code: str) -> dict:
     meta = json.loads(scripts.get('software-application', '{}'))
     if not isinstance(meta, dict) or not isinstance(meta.get('author'), dict) or not isinstance(meta.get('offers'), dict):
         raise ValueError('invalid application metadata structure')
-    if meta.get('name') != 'ChatGPT' or '/developer/' not in meta['author'].get('url', '') or not re.search(r'/id1684349733(?:\\?|$)', meta['author']['url']):
+    app_name = meta.get('name')
+    if (
+        not isinstance(app_name, str)
+        or not 1 <= len(clean(app_name)) <= 120
+        or '/developer/' not in meta['author'].get('url', '')
+        or not re.search(r'/id1684349733(?:\\?|$)', meta['author']['url'])
+    ):
         raise ValueError('not the official OpenAI application')
     # offers.price is the FREE app download. Only its currency is used here.
     currency = meta['offers'].get('priceCurrency')
     if not isinstance(currency, str) or not re.fullmatch('[A-Z]{3}', currency):
         raise ValueError('missing storefront currency')
     data = json.loads(scripts.get('serialized-server-data', '{}'))
-    annotations = [n for n in walk_json(data) if n.get('$kind') == 'Annotation' and clean(n.get('title', '')).replace('‑', '-') == 'In-App Purchases']
-    if len(annotations) != 1:
+    annotations = [n for n in walk_json(data) if n.get('$kind') == 'Annotation']
+    titled = [
+        n for n in annotations
+        if clean(n.get('title', '')).replace('‑', '-') == 'In-App Purchases'
+    ]
+    if len(titled) == 1:
+        annotation = titled[0]
+    elif len(titled) > 1:
         raise ValueError('missing or ambiguous purchase annotation')
-    annotation = annotations[0]
+    else:
+        # Title text is presentation metadata and may be renamed/localized.
+        # Fall back only when exactly one annotation has both purchase
+        # representations and at least one ChatGPT-looking pair.
+        structural = []
+        for node in annotations:
+            items = node.get('items')
+            items_v3 = node.get('items_V3')
+            if not isinstance(items, list) or not isinstance(items_v3, list):
+                continue
+            pairs = [
+                pair for item in items if isinstance(item, dict)
+                for pair in item.get('textPairs', []) if isinstance(pair, list) and len(pair) == 2
+            ]
+            if any(isinstance(pair[0], str) and PLAN.fullmatch(clean(pair[0])) for pair in pairs):
+                structural.append(node)
+        if len(structural) != 1:
+            raise ValueError('missing or ambiguous purchase annotation')
+        annotation = structural[0]
     items = annotation.get('items', [])
     items_v3 = annotation.get('items_V3', [])
     if not isinstance(items, list) or not isinstance(items_v3, list) or any(not isinstance(item, dict) for item in items + items_v3):
@@ -335,39 +366,18 @@ def fetch(url: str, *, confirm=False, deadline=float('inf')) -> str:
     raise RuntimeError('unreachable')
 
 
-def offers_by_identity(offers: list[dict]) -> dict[str, dict] | None:
-    """Index offers by stable identity; duplicate aliases are intentionally ambiguous."""
-    result = {}
-    for offer in offers:
-        identity = plan_ids.plan_identity(offer['label'])
-        if identity in result:
-            return None
-        result[identity] = offer
-    return result
+def change_decision(old: dict, new: dict) -> change_policy.Decision:
+    return change_policy.classify(
+        old,
+        new,
+        ratio_low=PRICE_CHANGE_RATIO_LOW,
+        ratio_high=PRICE_CHANGE_RATIO_HIGH,
+    )
 
 
 def unusual(old: dict, new: dict) -> bool:
-    if old['currency'] != new['currency']:
-        return True
-    old_offers = offers_by_identity(old['offers'])
-    new_offers = offers_by_identity(new['offers'])
-    if old_offers is None or new_offers is None:
-        return True
-    # Known source-label renames keep the same stable identity.  They can be
-    # accepted after the normal independent fetch instead of waiting 18 hours.
-    # Real removals, ambiguous aliases, or material price/variant changes still
-    # enter the existing pending path.
-    if not old_offers.keys() <= new_offers.keys():
-        return True
-    for identity in old_offers.keys() & new_offers.keys():
-        before, after = old_offers[identity]['amounts'], new_offers[identity]['amounts']
-        if len(before) != len(after):
-            return True
-        for a, b in zip(before, after):
-            ratio = Decimal(b['amount']) / Decimal(a['amount'])
-            if ratio < PRICE_CHANGE_RATIO_LOW or ratio > PRICE_CHANGE_RATIO_HIGH:
-                return True
-    return False
+    """Backward-compatible boolean wrapper for callers/tests."""
+    return change_decision(old, new).quarantine
 
 
 def observe(config: dict, old: dict | None, now: float, getter=fetch) -> dict:
@@ -381,14 +391,22 @@ def observe(config: dict, old: dict | None, now: float, getter=fetch) -> dict:
             if second['fingerprint'] != candidate['fingerprint']:
                 raise ValueError('independent confirmation fetch disagrees')
             candidate = second
-        if changed and old and old.get('offers') and unusual(old, candidate):
-            pending = old.get('pending', {})
-            if pending.get('fingerprint') != candidate['fingerprint'] or now - epoch(pending['since']) < PENDING_CONFIRMATION_SECONDS:
-                result['pending'] = {'fingerprint': candidate['fingerprint'], 'since': pending['since'] if pending.get('fingerprint') == candidate['fingerprint'] else stamp(now)}
-                result['status'] = 'pending'
-                result.pop('error', None)
-                result.pop('error_detail', None)
-                return result
+        if changed and old and old.get('offers'):
+            decision = change_decision(old, candidate)
+            if decision.quarantine:
+                pending = old.get('pending', {})
+                same_candidate = pending.get('fingerprint') == candidate['fingerprint']
+                since = pending.get('since') if same_candidate else None
+                if not same_candidate or not isinstance(since, str) or now - epoch(since) < PENDING_CONFIRMATION_SECONDS:
+                    result['pending'] = {
+                        'fingerprint': candidate['fingerprint'],
+                        'since': since if same_candidate and isinstance(since, str) else stamp(now),
+                        'reason': decision.kind,
+                    }
+                    result['status'] = 'pending'
+                    result.pop('error', None)
+                    result.pop('error_detail', None)
+                    return result
         result.update(candidate, status='verified', last_verified_at=stamp(now))
         result.pop('pending', None)
         result.pop('error', None)
@@ -481,6 +499,20 @@ def validate(data: dict, now: float | None = None) -> None:
             raise ValueError('invalid market status/name')
         if epoch(market['last_checked_at']) > generated:
             raise ValueError('invalid checked time')
+        pending = market.get('pending')
+        if pending is not None:
+            if market['status'] not in ('pending', 'retained'):
+                raise ValueError('unexpected pending evidence')
+            if not isinstance(pending, dict) or set(pending) not in ({'fingerprint','since'}, {'fingerprint','since','reason'}):
+                raise ValueError('invalid pending evidence')
+            if not re.fullmatch('[a-f0-9]{64}', pending.get('fingerprint', '')):
+                raise ValueError('invalid pending fingerprint')
+            if epoch(pending.get('since', '')) > epoch(market['last_checked_at']):
+                raise ValueError('invalid pending timestamp')
+            if 'reason' in pending and pending['reason'] not in change_policy.QUARANTINE_KINDS:
+                raise ValueError('invalid pending reason')
+        elif market['status'] == 'pending':
+            raise ValueError('missing pending evidence')
         if market['offers']:
             if not re.fullmatch('[A-Z]{3}', market['currency']) or epoch(market['last_verified_at']) > epoch(market['last_checked_at']):
                 raise ValueError('invalid verification time or currency')
@@ -822,11 +854,16 @@ def run(output: Path, now: float | None = None) -> dict:
             print('SOURCE_ERROR', market['code'], market['error_detail'], flush=True)
     known = sum(bool(m['offers']) for m in markets)
     verified = sum(m['status'] == 'verified' for m in markets)
+    source_confirmed = sum(m['status'] in ('verified', 'pending') for m in markets)
     previous_known = sum(bool(m['offers']) for m in previous.values())
     minimum_verified = minimum_verified_required(previous_known)
     minimum_known = Decimal(len(config)) * MIN_KNOWN_COVERAGE_RATIO
-    if verified < minimum_verified or Decimal(known) < minimum_known:
-        raise ValueError('insufficient fresh source coverage; existing publication left untouched')
+    # A pending market was successfully fetched twice and only withholds the
+    # semantic change until the time-separated confirmation window expires.
+    # Count it as source-confirmed so a legitimate global repricing/removal can
+    # persist its pending clock instead of being rejected forever.
+    if source_confirmed < minimum_verified or Decimal(known) < minimum_known:
+        raise ValueError('insufficient confirmed source coverage; existing publication left untouched')
     required_currencies = {m.get('currency') for m in markets if m.get('offers') and m.get('currency')}
     fx = collect_fx(now, old.get('fx') if old else None, getter, required_currencies)
     if fx is None:
@@ -871,10 +908,22 @@ def run(output: Path, now: float | None = None) -> dict:
     (output / 'index.html').write_text(page, encoding='utf-8')
     degraded = any(m['status'] != 'verified' for m in markets) or fx['fallback']
     degraded_markets = sum(m['status'] != 'verified' for m in markets)
-    message = f'核验成功 {verified}/{len(config)} 个地区；有标价 {known}；非完整核验 {degraded_markets}；汇率 {"降级" if fx["fallback"] else "正常"}。'
+    pending_markets = [m for m in markets if m['status'] == 'pending']
+    pending_reasons = {}
+    for market in pending_markets:
+        reason = market.get('pending', {}).get('reason', 'legacy_pending')
+        pending_reasons[reason] = pending_reasons.get(reason, 0) + 1
+    reason_text = '，'.join(f'{key}:{pending_reasons[key]}' for key in sorted(pending_reasons)) or '无'
+    message = (
+        f'核验成功 {verified}/{len(config)} 个地区；来源确认 {source_confirmed}/{len(config)}；'
+        f'有标价 {known}；待复核 {len(pending_markets)}（{reason_text}）；'
+        f'非完整核验 {degraded_markets}；汇率 {"降级" if fx["fallback"] else "正常"}。'
+    )
     print(message)
     for m in markets:
-        print(m['code'], m['status'], m.get('currency', '—'), ', '.join(x['label'] + ': ' + '/'.join(v['amount'] for v in x['amounts']) for x in m['offers']))
+        pending_reason = m.get('pending', {}).get('reason', '')
+        suffix = f' pending={pending_reason}' if pending_reason else ''
+        print(m['code'], m['status'] + suffix, m.get('currency', '—'), ', '.join(x['label'] + ': ' + '/'.join(v['amount'] for v in x['amounts']) for x in m['offers']))
     if os.environ.get('GITHUB_OUTPUT'):
         with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
             stream.write(f'degraded={str(degraded).lower()}\n')
