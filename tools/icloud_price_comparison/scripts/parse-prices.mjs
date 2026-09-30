@@ -459,10 +459,12 @@ export function parseApplePrices(html, { allowUnknownCountries = false } = {}) {
   const tableResult = parseApplePriceTables($, options);
   if (tableResult) {
     const unexplainedLists = $('ul, ol').toArray().filter((node) => (
-      !$(node).closest('table').length && isPriceList($, node)
+      $(node).find('li').toArray().some((item) => (
+        STORAGE_TIER_PREFIX_PATTERN.test(itemText($, item))
+      ))
     ));
     if (unexplainedLists.length) {
-      throw new Error('Mixed Apple pricing layouts: unexplained price list outside pricing tables');
+      throw new Error('Mixed Apple pricing layouts: unexplained storage-tier list');
     }
     return tableResult;
   }
