@@ -703,7 +703,8 @@ class ContractTests(unittest.TestCase):
             baseline=minimum_history.empty_history()
             (root/'data/minimum-history.json').write_text(json.dumps(baseline),encoding='utf-8')
 
-            def observed(item, old, now, getter):
+            def observed(item, old, now, getter, *, reviews=None):
+                self.assertIsNone(reviews)
                 market=copy.deepcopy(base)
                 market.update(
                     code=item['code'], name=item['name'], source_url=p.url_for(item['code']),
@@ -767,7 +768,8 @@ class ContractTests(unittest.TestCase):
 
             run_now=NOW+3600
             fresh_fx={'source_url':p.FX_URL,'updated_at':p.stamp(run_now),'rates':{'USD':'1','CNY':'7'},'fallback':False}
-            def observed(item, old, now, getter):
+            def observed(item, old, now, getter, *, reviews=None):
+                self.assertIsNone(reviews)
                 market=copy.deepcopy(old)
                 market['last_checked_at']=p.stamp(now)
                 market['status']='pending'
@@ -796,7 +798,7 @@ class ContractTests(unittest.TestCase):
             root=Path(temp)
             (root/'markets.json').write_text(json.dumps(config), encoding='utf-8')
             output=root/'output'
-            with patch.object(p,'ROOT',root), patch.object(p,'observe',side_effect=lambda item,old,now,getter: dict(
+            with patch.object(p,'ROOT',root), patch.object(p,'observe',side_effect=lambda item,old,now,getter,*,reviews=None: dict(
                 copy.deepcopy(base), code=item['code'], name=item['name'], source_url=p.url_for(item['code'])
             )), patch.object(p,'collect_fx',return_value=None):
                 with self.assertRaisesRegex(ValueError, 'no usable FX snapshot'):
@@ -807,7 +809,7 @@ class ContractTests(unittest.TestCase):
         config=[{'code':c,'name':c} for c in ['us','jp','de','gb','fr','it','ca','au','kr','in']]
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp); (root/'markets.json').write_text(json.dumps(config), encoding='utf-8')
-            with patch.object(p,'ROOT',root), patch.object(p,'observe',side_effect=lambda c,old,now,getter: dict(c,offers=[],status='unavailable')):
+            with patch.object(p,'ROOT',root), patch.object(p,'observe',side_effect=lambda c,old,now,getter,*,reviews=None: dict(c,offers=[],status='unavailable')):
                 with self.assertRaises(ValueError): p.run(root/'output',NOW)
             self.assertFalse((root/'output').exists())
 

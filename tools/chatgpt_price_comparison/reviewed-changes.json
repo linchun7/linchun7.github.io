@@ -1,0 +1,304 @@
+{
+  "schema": 1,
+  "reason": "plan_added",
+  "reviewed_at": "2026-09-30T23:25:00Z",
+  "expires_at": "2026-10-01T23:25:00Z",
+  "evidence_url": "https://github.com/linchun7/linchun7.github.io/actions/runs/36790877836",
+  "markets": {
+    "ae": {
+      "before_fingerprint": "b0d6a10a8311299dbfcd01c2a42239aa4b79a011719cdb68891fe8632f2a9854",
+      "candidate_fingerprint": "d7c0422085b8323cf96094a421dad4d056aef7bc51f8f4dd47012f7ed1fefdcc",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "ar": {
+      "before_fingerprint": "04253baade283db23cf17d5c4a068e127fc65d686b6daffa3115561cd127fb47",
+      "candidate_fingerprint": "23af09300c1e5718fcfab3cab7dae274bf44fe3425fbfa4e4412954f6ccf6c04",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "at": {
+      "before_fingerprint": "1eb766856847d84d556276b14eab859f4013c17a79577e5961cbb4e0b910a2d1",
+      "candidate_fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "au": {
+      "before_fingerprint": "389a0a65fa4e6e31b4931f6c61be6b8c78879d76fad0ce79befff1574f01c652",
+      "candidate_fingerprint": "2fd9616bbdcfb03d4bf4ea294c02fe2aff90483fbda55a7674231f007bdf85c1",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "be": {
+      "before_fingerprint": "1eb766856847d84d556276b14eab859f4013c17a79577e5961cbb4e0b910a2d1",
+      "candidate_fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "bh": {
+      "before_fingerprint": "2fb017986c6bd6a95774e1779ac97142f36d65b62038ae6f8e1ecdcdb0b1b3e7",
+      "candidate_fingerprint": "4e43be5f7e909482a30873be9b67c24e9df1225e4e067de78b56f1731fcc49aa",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "br": {
+      "before_fingerprint": "27da107efa8a1015f94994468df8d5f305ad5a6369fc03c62c22db76fc574a5c",
+      "candidate_fingerprint": "8fb8679167d0d4c2f9d4567891745dfd2e556e793cecf727998013289cefe31d",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "ca": {
+      "before_fingerprint": "22a4b86c896b83e428ca738f56bc883740349d850c8a0eb9c8f3a65455ee5083",
+      "candidate_fingerprint": "b9ad4f0bae30e2584d380984716fe9208289d3e8397798e110768581e5867f5b",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "ch": {
+      "before_fingerprint": "389cd3b57ef486cf024d482438bd9892aa6ba1ced7ba44225e4f3935ecb14beb",
+      "candidate_fingerprint": "8afcef3a7b8272618fa05d3ca93221984ad2c11af9e42883b041cf17d050b201",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "cl": {
+      "before_fingerprint": "7ce4b60b5efb362cfe9d87f4e8fb6c0facae8ae6d59bae2ccba4c8eeb4e12c58",
+      "candidate_fingerprint": "48f2ba35c6ad42058563b97b87a302a5bc0820284c8f33e43d939be84a3d86cb",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "co": {
+      "before_fingerprint": "96a2f27d191631ce6e126860eeaae2bb468e1897594652f23bc8cfd38bf19ea7",
+      "candidate_fingerprint": "7763a68e559239ef561a7b2238796936ecd3835ef96a1ee8abe9f2f90eb68681",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "cz": {
+      "before_fingerprint": "d4061762498b8d8829afe8f901f7a20e07c4bcc6c06deede33d414ea0d3b3958",
+      "candidate_fingerprint": "15abe03a1e91df654c6660559c8e1407aa0f2f20fe3a64caaa781382d1a80263",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "de": {
+      "before_fingerprint": "1eb766856847d84d556276b14eab859f4013c17a79577e5961cbb4e0b910a2d1",
+      "candidate_fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "dk": {
+      "before_fingerprint": "a2212ae9dd91f49e9a44e7ba7b6d7bfba03b6fb8989bdeda90ef6205cf84645a",
+      "candidate_fingerprint": "a85dacb68f294c8007495c977e00b09b5f40b1573921f691834eac491ce83211",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "eg": {
+      "before_fingerprint": "b6995ea5f50e1e011232ca2337f59f39d52b34c2b9392ef3355dcbad06694042",
+      "candidate_fingerprint": "cb65ffa70ac93eb4b52a95adf0b6fb54c46cbdbd99c1e2ff45d8f036c8647ade",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "es": {
+      "before_fingerprint": "1eb766856847d84d556276b14eab859f4013c17a79577e5961cbb4e0b910a2d1",
+      "candidate_fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "fi": {
+      "before_fingerprint": "1eb766856847d84d556276b14eab859f4013c17a79577e5961cbb4e0b910a2d1",
+      "candidate_fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "fr": {
+      "before_fingerprint": "1eb766856847d84d556276b14eab859f4013c17a79577e5961cbb4e0b910a2d1",
+      "candidate_fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "gb": {
+      "before_fingerprint": "694f4d5c9ef7ccab2b3758de227d26c790cd5e94a441eecc0225e9efd4e0a0c1",
+      "candidate_fingerprint": "5e006f799506322c8a283d60971ebeeec0592487bab7c2110394ef7494ea540e",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "gr": {
+      "before_fingerprint": "1eb766856847d84d556276b14eab859f4013c17a79577e5961cbb4e0b910a2d1",
+      "candidate_fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "hu": {
+      "before_fingerprint": "846467c62fe489a90e47ff35d7ca54b4671042bea5ed3266606f1fe086b67782",
+      "candidate_fingerprint": "48819bf4878f0d60ec375915f60b84b60c22a19659c72ed912d37c454da95575",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "id": {
+      "before_fingerprint": "b11b3e42e04a95157d292e7f32f14fd82e7f3c0fba974fc61dd33227e0ce1652",
+      "candidate_fingerprint": "7707ad58e86fb751ea899b6e2b09749db1dee2764a08e82ee8d5480893e202b8",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "ie": {
+      "before_fingerprint": "1eb766856847d84d556276b14eab859f4013c17a79577e5961cbb4e0b910a2d1",
+      "candidate_fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "il": {
+      "before_fingerprint": "425093a8fb2b02081635447a85dee375e09e444f265987bd37a79c7f76638363",
+      "candidate_fingerprint": "ebf69c564d9d5767415ed0635bae2fec63ee5147c12cedc4caf664fbe6fc66e0",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "in": {
+      "before_fingerprint": "253c5368ba59d570ad1b92eb85d61f9ca641239cd75cd450c2a1c1497cc8bd90",
+      "candidate_fingerprint": "cf1fe72d03fab0a9b659200aff22ce4fb59bc2c79aa531855eac1a4d221d6301",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "it": {
+      "before_fingerprint": "1eb766856847d84d556276b14eab859f4013c17a79577e5961cbb4e0b910a2d1",
+      "candidate_fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "jp": {
+      "before_fingerprint": "a64d32dd5b2ce567bed04e47f9b9228b4a775a4d6ae7f947437b1de1265bec80",
+      "candidate_fingerprint": "5c6f7179031cad0a2c03216bfa6840ca4298c4d855be4862d2640cf5681d9403",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "ke": {
+      "before_fingerprint": "b0dc1c294d2cf20ac7c72888902c2aab9096ba6328cfe735b32f9d1838600a65",
+      "candidate_fingerprint": "46ebf53dd348d38221028d4b4adffc802dbf9576a5f7e4211f1d152b32fa5c45",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "kr": {
+      "before_fingerprint": "8ecba181789de0b1d9ff0e044ef0e23d7afab79dccc2e8a86a801c445d5c1bfd",
+      "candidate_fingerprint": "75d836479cf98578e088580a66714a01f38341951af3fdd2d8dd6f683a0de36c",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "kw": {
+      "before_fingerprint": "f64efdf493f1c65c7a1c5280e3f08ef2071fad4017b16ae3af3c45f9c7372f77",
+      "candidate_fingerprint": "ed63a35b37558c3e540c3f0d43630013cb0232367e8d8de5ac3fb041997e45e1",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "kz": {
+      "before_fingerprint": "c217bb4a31622249af7779cb779807c7b3d1ef73a688527dc8a94f05ca2229df",
+      "candidate_fingerprint": "825f9a6be43a75a8fa48d2434d9972190bcdfd34c4f535d45e3d63f13e52a197",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "lk": {
+      "before_fingerprint": "4792e2ea0c750968d58ed214af6617f36a27eefdd7243f5b7ba72dad79cee551",
+      "candidate_fingerprint": "37659de9e050d98d5052700f992d4f2a0f152bb1df283bf617a494ec7e788c2d",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "ma": {
+      "before_fingerprint": "04253baade283db23cf17d5c4a068e127fc65d686b6daffa3115561cd127fb47",
+      "candidate_fingerprint": "23af09300c1e5718fcfab3cab7dae274bf44fe3425fbfa4e4412954f6ccf6c04",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "mx": {
+      "before_fingerprint": "57fc7efbf24f930ed86fec19a017649d56e0f8a4961c07998406970a17a7eb78",
+      "candidate_fingerprint": "e31344d3154fa582bbd31426bdc92ff4a03107d37d50eb60fa4fa8930a28f0a6",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "my": {
+      "before_fingerprint": "25c7125ee15a1e5f0bbe294dea84b5eab22ff659c88298db9cd140889cca8e71",
+      "candidate_fingerprint": "b65f1a297ce4f053abb17026ab62b3deb06037d57051dd28b50df74d12585fad",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "ng": {
+      "before_fingerprint": "16b0e26ec0f40bb30da15a13dfe966c85235aed467df214b43ba16e6b36e0170",
+      "candidate_fingerprint": "264ffa5f433899266cbd5f47282a9abd1777b135ec426004ab6e87f5aa2f23c3",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "nl": {
+      "before_fingerprint": "1eb766856847d84d556276b14eab859f4013c17a79577e5961cbb4e0b910a2d1",
+      "candidate_fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "no": {
+      "before_fingerprint": "2ad63df4fa73daad479bd763c2f0fce3fc0cadc770327f0f89445c53e2bb0f45",
+      "candidate_fingerprint": "9aa797486a42904774ebfa052ab22ee81ae0fcc11e676fdff43db708727cf29a",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "np": {
+      "before_fingerprint": "95e732b314be45adc7ed0395ea9c191aacd4b4acdddee76df59e9e8a317cf5ee",
+      "candidate_fingerprint": "15ba98d6b689ee09975c3e5f8ea0daeb95f4cd0d0297d5e226379704e5a6158e",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "nz": {
+      "before_fingerprint": "f98dfde29efa1948905ddbf0320dd6d419b2fe80ec3970f3a14dcb03615bafab",
+      "candidate_fingerprint": "56029c95a94f68ad259b327ebe0d92750b3d5abc90b6ba8381663745aa235e5d",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "om": {
+      "before_fingerprint": "5ea513cf9079121537b5562c3617f61b7b07c2152a445db1f6ed084df2ddda9b",
+      "candidate_fingerprint": "a7d774fda7b03898867bc4dddeec8ec2ac6ab17df654277e0e3cf75cd576c22f",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "pe": {
+      "before_fingerprint": "85eb58b265a1cd6d23e0b6ee1bc7ec2f274e9caf26338e39c7db9a4403b5d8b1",
+      "candidate_fingerprint": "8ceaa1ef3cb6c5b97a8818824c5992f1fea979bba63833da9a0bdbbca12dc6a0",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "ph": {
+      "before_fingerprint": "98271499dab6d45c1b335356e100740088adc3fc5f8ed770a81f07922248386e",
+      "candidate_fingerprint": "f1d8bea17d20c637303d6bdb1b94f55a4bf530488c4ccbd6a2934a4ce6064519",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "pk": {
+      "before_fingerprint": "aa2985e7b200fe3caec4d812f472d0d76a8fbb9bf932c599c47d7d04c0d0f5c5",
+      "candidate_fingerprint": "9535c7d69d8d55be17e1729cea21887a14580d3dfe7df6da4f5a5692b7e5a30e",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "pl": {
+      "before_fingerprint": "589229be07def7db528df4013ca6a4ca7da677550e5e3e5fc425eb445c08d4e5",
+      "candidate_fingerprint": "dbef0519a62a075b104f2493820d0a802e5d9911b627f7a9061d1c2c91581dba",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "pt": {
+      "before_fingerprint": "1eb766856847d84d556276b14eab859f4013c17a79577e5961cbb4e0b910a2d1",
+      "candidate_fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "qa": {
+      "before_fingerprint": "c5121ba889a52f051fcd40d7b54ad86dd197860ac3c35492271767f7359d6025",
+      "candidate_fingerprint": "976e57e73bfb744cd2e6ed42cf09c29620521f9720775d652377724cb11693e2",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "ro": {
+      "before_fingerprint": "bb5c7f52def3f2ae8bb125b23c80dc81cfef9ab4cd4f3f6f3ab0a9250029e927",
+      "candidate_fingerprint": "981ca6274eb15df3a78665fda9ee5d2293435a06daa5d77ceacb3675bbadb60f",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "sa": {
+      "before_fingerprint": "6a044be91eb2e71a45af0a6470ff6e6c3c159f02d23d685a5148a7aea808ea71",
+      "candidate_fingerprint": "88d73d64d2c288d52d81cfd6f13247d60ef004d429c335eae0b7bb45a003e4f2",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "se": {
+      "before_fingerprint": "ed6bcd9ff66e6fca87f6021ee9c323b037abd69700af767659bc0df6f712d31f",
+      "candidate_fingerprint": "d9c89fa61cf30ac72c6e0e33ebcb2888057c7e23589bdf6b0ffbf4dc99d6f146",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "sg": {
+      "before_fingerprint": "f1c574f3c156513093c254817171751654fcef8e6833ea53e3b8163fc50ff006",
+      "candidate_fingerprint": "ce184c3ee89b8834bfeb9b4fc860098dbdc1edb9195daf1c2dc64aec7e62a332",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "th": {
+      "before_fingerprint": "4ad37e2b0bdd64d17919720cd689e2277b85782f65e5490438da5bd14d71b483",
+      "candidate_fingerprint": "03653cd69827bc35f6b23b0ecee458353c2011f630c13b1401a886c63f8b0a48",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "tr": {
+      "before_fingerprint": "9ca7247ecf01658f87021f9f754e185fd0da7e15c217ee7093b99b7c0864aeab",
+      "candidate_fingerprint": "2638e3d43c57eabdfc9ef93a99c509ce00eb9ef435ffadd47c6a7c589a237f5b",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "tw": {
+      "before_fingerprint": "b1ad32661665eec20dfb213280460aa0fbdd7ce059121a29d706a5edc2c0af51",
+      "candidate_fingerprint": "b015f4c5afec3477a3c721fdc0c56130b7cdf23ac98d3ad16281a7aa5e9f8cc4",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "ua": {
+      "before_fingerprint": "085858fb8942906b27f151ee945426f49e7a7da6d417fe7e84ef05fa08984209",
+      "candidate_fingerprint": "042a794d4a4736eea87f67e3956175bea799cacd9b4b403160e57c1a98d4fb85",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "us": {
+      "before_fingerprint": "20b3c44e183e3efdf4f7fd029714604e7c2f15918c214a3f0009fcfe92cecfa5",
+      "candidate_fingerprint": "e23b43a341fcd1de008d8e849f917a50debc3a1d3cfd4973f6e7b26988cc109f",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "uy": {
+      "before_fingerprint": "5c44bee53b513759a4ce1b013fc2bd8046040eb71aaf8b5e858fe1b497f1a167",
+      "candidate_fingerprint": "7c91f5d2692377d79af46a225c22243b3b39f086b58254629cead83c7a4eae51",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "vn": {
+      "before_fingerprint": "8b6f09dbec84d3484802af2392d31e7060ded9f3fa76e8dea30cac1414508e32",
+      "candidate_fingerprint": "7fc1029876e80ed72f481ce5db73c8fb608adefa1b4c42bc95d58a172095777f",
+      "pending_since": "2026-09-30T15:11:48Z"
+    },
+    "za": {
+      "before_fingerprint": "81b3d20d68d2e5f95b9fd08184c4a30afcf8dab572b7248586c15e07affcb62c",
+      "candidate_fingerprint": "c64845b2685938b99b6ac0965b9200d19340de54a729364ff2db867c1b838743",
+      "pending_since": "2026-09-30T15:11:48Z"
+    }
+  }
+}
