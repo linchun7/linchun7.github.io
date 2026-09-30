@@ -2,10 +2,10 @@
   "schema": 1,
   "project_since": "2026-09-24",
   "first_observed_at": "2026-09-24T02:13:15Z",
-  "checked_at": "2026-09-29T01:06:08Z",
+  "checked_at": "2026-09-30T15:11:48Z",
   "observations": 11,
-  "excluded_versions": 1,
-  "pending_gap": false,
+  "excluded_versions": 2,
+  "pending_gap": true,
   "gaps": [
     {
       "from": "2026-09-24T09:49:05Z",

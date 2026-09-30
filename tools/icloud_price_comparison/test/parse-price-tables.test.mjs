@@ -181,3 +181,29 @@ test('review: mixed layouts account for malformed and table-wrapped storage list
     }
   }
 });
+
+test('live Apple About feature lists are not unexplained market prices', () => {
+  // Triggering structure observed at https://support.apple.com/en-us/108047 on 2026-09-30.
+  const features = ['50 GB', '200 GB', '2 TB, 6 TB, or 12 TB'].map((capacity) => (
+    `<h3 class="gb-header">iCloud+ with ${capacity} storage</h3><ul role="list" class="list gb-list">`
+    + `<li role="listitem" class="gb-list_item"><p class="gb-paragraph">${capacity} of storage</p></li>`
+    + '<li><p>iCloud Private Relay</p></li><li><p>Hide My Email</p></li></ul>'
+  )).join('');
+  const intro = `<h2 class="gb-header">About iCloud+</h2>${features}<h2>iCloud+ pricing</h2>`;
+  const html = CURRENT_TABLE_HTML.replace('<body>', `<body>${intro}`);
+  assert.deepEqual(parseApplePrices(html), parseApplePrices(CURRENT_TABLE_HTML));
+
+  for (const label of ['50 GB', '1 PB: $999.99', '50 GiB: $0.99', '50GB: $0.99']) {
+    const withPrice = html.replace('<li><p>iCloud Private Relay</p></li>', `<li>${label}</li>`);
+    assert.throws(() => parseApplePrices(withPrice), /Mixed Apple pricing layouts/, label);
+  }
+  for (const changed of [
+    html.replace('About iCloud+', 'More regions'),
+    html.replace('iCloud+ with 50 GB storage', 'New Market (USD)'),
+    html.replace('50 GB of storage', '200 GB of storage'),
+    html.replace('iCloud+ with 50 GB storage', 'iCloud+ with 50 GB: $0.99 storage').replace('50 GB of storage', '50 GB: $0.99 of storage'),
+    html.replace('<ul role="list"', '<h4>New Market (USD)</h4><ul role="list"')
+  ]) {
+    assert.throws(() => parseApplePrices(changed), /Mixed Apple pricing layouts/);
+  }
+});
