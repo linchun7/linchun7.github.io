@@ -1,0 +1,44 @@
+name: Inspect fixed Undici metadata
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/inspect-undici-metadata.yml'
+permissions:
+  contents: read
+jobs:
+  metadata:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '22'
+      - name: Verify official package metadata and tarball integrity
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { createHash } from 'node:crypto';
+          const metadataUrl = 'https://registry.npmjs.org/undici/7.29.1';
+          const tarballUrl = 'https://registry.npmjs.org/undici/-/undici-7.29.1.tgz';
+          const get = async (url) => {
+            const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(30000) });
+            assert.equal(response.ok, true, `HTTP ${response.status}: ${url}`);
+            return response;
+          };
+          const metadata = await (await get(metadataUrl)).json();
+          assert.equal(metadata.name, 'undici');
+          assert.equal(metadata.version, '7.29.1');
+          assert.equal(metadata.engines?.node, '>=20.18.1');
+          for (const key of ['dependencies', 'optionalDependencies', 'peerDependencies']) {
+            assert.deepEqual(metadata[key] ?? {}, {}, `Unexpected ${key}`);
+          }
+          assert.equal(metadata.dist?.tarball, tarballUrl);
+          assert.match(metadata.dist?.integrity ?? '', /^sha512-[A-Za-z0-9+/]+={0,2}$/);
+          const bytes = Buffer.from(await (await get(tarballUrl)).arrayBuffer());
+          const integrity = `sha512-${createHash('sha512').update(bytes).digest('base64')}`;
+          assert.equal(integrity, metadata.dist.integrity, 'Published tarball integrity mismatch');
+          console.log('VERIFIED_UNDICI_METADATA=' + JSON.stringify({
+            name: metadata.name, version: metadata.version, engines: metadata.engines,
+            integrity, tarball: tarballUrl, verifiedTarballBytes: bytes.length
+          }));
+          NODE
