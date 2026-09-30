@@ -56,7 +56,9 @@ async function pressKey(key) {
 try {
   // Use an isolated free loopback port; this avoids collisions with runner services.
   let port;
-  const launchDeadline = Date.now() + 30000;
+  // Hosted runners can take over 30 seconds to launch Chrome under load.
+  // Only startup receives this bounded grace period; page assertions stay strict.
+  const launchDeadline = Date.now() + 60000;
   while (Date.now() < launchDeadline) {
     if (launchError || browser.exitCode !== null) throw Error('Chrome exited before ready: ' + (launchError || browser.exitCode) + '\n' + diagnostics);
     try {
