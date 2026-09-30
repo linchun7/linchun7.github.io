@@ -47,6 +47,12 @@ async function evaluate(expression) {
   if(result.exceptionDetails) throw Error(JSON.stringify(result.exceptionDetails));
   return result.result.value;
 }
+async function pressKey(key) {
+  const code = key === ' ' ? 'Space' : key;
+  const virtualKey = key === ' ' ? 32 : key === 'Tab' ? 9 : 13;
+  await command('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode: virtualKey });
+  await command('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: virtualKey });
+}
 try {
   // Use an isolated free loopback port; this avoids collisions with runner services.
   let port;
@@ -155,6 +161,11 @@ try {
   assert.equal(await evaluate(`document.querySelector('#priceRows .mobile-rank').textContent`),'序1','country sort uses mobile sequence label');
   assert.equal(await evaluate(`document.querySelector('#priceRows .mobile-rank-sr').textContent`),'当前列表序号第 1','country sort exposes accessible sequence label');
   await clickPlan(defaultPlan);
+  for (const key of ['Enter', ' ']) {
+    await evaluate(`[...document.querySelectorAll('button[data-sort-plan]')].find(button => button.dataset.sortPlan === ${JSON.stringify(defaultPlan)}).focus()`);
+    await pressKey(key);
+    assert.equal(await evaluate('document.activeElement?.dataset.sortPlan'), defaultPlan, 'keyboard sorting preserves the replaced header focus');
+  }
   assert.equal(await evaluate(`document.querySelector('#rankHeaderLabel > [aria-hidden="true"]').textContent`),'排名','plan sort restores ranking header');
   assert.equal(await evaluate(`document.querySelector('#rankHeaderLabel .visually-hidden').textContent`),'全球参考排名','ranking label follows the global comparison wording');
   await assertRanks(defaultPlan);
@@ -185,6 +196,14 @@ try {
     for(const amount of sampleOffer.amounts) assert.ok(historyLocal.includes(amount.display),'history preserves every same-label public amount');
   }
   assert.ok(await evaluate(`document.querySelector('#historySubtitle').textContent.includes('近期公开标价记录')`),'history scope is explicit');
+  for (const key of ['Enter', ' ']) {
+    await evaluate(`[...document.querySelectorAll('#historyPlanControl button')].find(button => button.dataset.plan === ${JSON.stringify(defaultPlan)}).focus()`);
+    await pressKey(key);
+    assert.equal(await evaluate('document.activeElement?.dataset.plan'), defaultPlan, 'history plan activation retains keyboard focus');
+    assert.equal(await evaluate('document.querySelector("#historyPlanControl").contains(document.activeElement)'), true);
+    await pressKey('Tab');
+    assert.equal(await evaluate('document.querySelector("#historyDialog").contains(document.activeElement)'), true, 'Tab after a plan change remains inside the modal');
+  }
   assert.equal(await evaluate(`document.querySelector('.history-current div:nth-child(3) span').textContent`),'近期变更次数','history count is scoped to retained events');
   await evaluate(`document.querySelector('#closeHistory').click()`);
 
@@ -261,6 +280,12 @@ try {
   assert.equal(await evaluate(`getComputedStyle(document.querySelector('.page-main')).rowGap`),'12px','mobile vertical rhythm matches the iCloud spacing');
   assert.equal(await evaluate(`getComputedStyle(document.querySelector('#mobilePlanControl')).overflowX`),'auto','future plan selector stays internally scrollable');
   assert.equal(await evaluate(`[...document.querySelectorAll('#priceRows tr[data-market-id]')].every(row => [...row.querySelectorAll('td[data-plan]')].filter(td => getComputedStyle(td).display !== 'none').length === 1)`),true,'mobile shows one active plan column');
+  for (const key of ['Enter', ' ']) {
+    await evaluate(`[...document.querySelectorAll('#mobilePlanControl button')].find(button => button.dataset.plan === ${JSON.stringify(defaultPlan)}).focus()`);
+    await pressKey(key);
+    assert.equal(await evaluate('document.activeElement?.dataset.plan'), defaultPlan, 'mobile plan activation retains keyboard focus');
+    assert.equal(await evaluate('document.querySelector("#mobilePlanControl").contains(document.activeElement)'), true);
+  }
   const mobileCountryShare=await evaluate(`{const table=document.querySelector('.price-table');const cell=document.querySelector('#priceRows tr[data-market-id] td:nth-child(2)');cell.getBoundingClientRect().width/table.getBoundingClientRect().width}`);
   assert.ok(mobileCountryShare>=0.46&&mobileCountryShare<=0.49,'mobile country column stays near the iCloud-aligned 47% width');
   await evaluate(`document.querySelector('button[data-sort="country"]').click()`);

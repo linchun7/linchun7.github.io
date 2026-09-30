@@ -167,6 +167,12 @@
       }
       codes.add(market.code);
 
+      if (market.pending && Object.hasOwn(market.pending, 'comparison_fingerprint')
+        && (typeof market.pending.comparison_fingerprint !== 'string'
+          || !/^[a-f0-9]{64}$/.test(market.pending.comparison_fingerprint))) {
+        throw Error('待复核比较指纹不合法');
+      }
+
       if (!market.offers.length) {
         if (market.status !== 'unavailable') throw Error('空地区状态错误');
         continue;
@@ -411,6 +417,8 @@
   }
 
   function renderHeaders() {
+    const focusedPlan = document.activeElement?.closest('button[data-sort-plan]')?.dataset.sortPlan;
+    let focusTarget = null;
     const row = document.querySelector('.price-table thead tr');
     row.querySelectorAll('[data-plan-header]').forEach((n) => n.remove());
 
@@ -426,6 +434,7 @@
       const button = document.createElement('button');
       button.type = 'button';
       button.dataset.sortPlan = plan;
+      if (plan === focusedPlan) focusTarget = button;
       button.append(document.createTextNode(shortPlan(plan) + ' '));
       const icon = document.createElement('i');
       icon.dataset.lucide = active ? (state.sortDirection === 'asc' ? 'arrow-up' : 'arrow-down') : 'arrow-up-down';
@@ -448,6 +457,7 @@
 
     updateRankingPresentation();
     refreshIcons();
+    focusTarget?.focus({ preventScroll: true });
   }
 
   function isMinimum(plan, market, amount) {
@@ -574,15 +584,20 @@
   }
 
   function planButtons(container, selected, handler, plans = state.plans) {
+    const focusedPlan = container.contains(document.activeElement) ? document.activeElement?.dataset.plan : null;
+    let focusTarget = null;
     container.replaceChildren();
     container.style.setProperty('--plan-count', String(plans.length));
     for (const plan of plans) {
       const button = document.createElement('button');
       button.type = 'button'; button.textContent = shortPlan(plan);
+      button.dataset.plan = plan;
+      if (plan === focusedPlan) focusTarget = button;
       button.setAttribute('aria-pressed', String(plan === selected));
       button.addEventListener('click', () => handler(plan));
       container.append(button);
     }
+    focusTarget?.focus({ preventScroll: true });
   }
   function renderMobilePlans() {
     planButtons(el.mobilePlanControl, state.activePlan, (plan) => { state.activePlan = plan; state.sortKey = 'plan'; state.sortPlan = plan; state.sortDirection = 'asc'; renderMobilePlans(); renderTable(); });
@@ -661,7 +676,22 @@
     el.historyTitle.textContent = market.name; el.historySubtitle.textContent = `${market.code.toUpperCase()} · ${market.currency || '—'} · 近期公开标价记录`;
     renderHistoryPlans(); renderHistory(); el.historyDialog.showModal();
   }
-  function closeHistory() { if (el.historyDialog.open) el.historyDialog.close(); }
+  function restoreHistoryFocus() {
+    const marketId = state.activeMarket?.code;
+    const original = state.historyReturnFocus;
+    const current = [...el.priceRows.querySelectorAll('tr[data-market-id]')]
+      .find(row => row.dataset.marketId === marketId)?.querySelector('.country-history-button');
+    state.activeMarket = null;
+    state.historyReturnFocus = null;
+    (original?.isConnected ? original : current || el.priceWorkspace).focus({ preventScroll: true });
+  }
+  function closeHistory() {
+    if (!el.historyDialog.open) return;
+    el.historyDialog.close();
+    // The native close event is queued. Restore synchronously so a replacement
+    // table row owns focus as soon as the dialog has been dismissed.
+    restoreHistoryFocus();
+  }
 
 
 
@@ -899,7 +929,10 @@
     el.searchInput.addEventListener('input', () => { state.query = el.searchInput.value.normalize('NFKC').slice(0, 80); renderTable(); });
     el.minimumHistoryButton?.addEventListener('click', openMinimumHistory);
     el.closeHistory.addEventListener('click', closeHistory);
-    el.historyDialog.addEventListener('close', () => { const target = state.historyReturnFocus; state.activeMarket = null; state.historyReturnFocus = null; target?.focus({ preventScroll: true }); });
+    el.historyDialog.addEventListener('close', () => {
+      if (!el.historyDialog.open && (state.activeMarket || state.historyReturnFocus)) restoreHistoryFocus();
+    });
+    el.historyDialog.addEventListener('cancel', event => { event.preventDefault(); closeHistory(); });
     el.historyDialog.addEventListener('click', (event) => { if (event.target === el.historyDialog) closeHistory(); });
     el.backToTableButton.addEventListener('click', () => { el.priceWorkspace.scrollIntoView({ behavior: 'smooth', block: 'start' }); el.priceWorkspace.focus({ preventScroll: true }); });
     addEventListener('scroll', () => { if (!state.scrollFrame) state.scrollFrame = requestAnimationFrame(() => { state.scrollFrame = null; backButton(); }); }, { passive: true });
