@@ -225,6 +225,27 @@ function itemText($, item) {
   return cleanText($item.text());
 }
 
+function isDocumentedStorageFeature($, list, text) {
+  const description = text.match(/^(\d+(?:\.\d+)?\s*(?:GB|TB)(?:,\s*(?:or\s+)?\d+(?:\.\d+)?\s*(?:GB|TB))*) of storage$/);
+  if (!description) return false;
+  // Apple's About section describes capacity, not a market price. Require the
+  // exact matching feature heading and section; never exempt an entire table.
+  const heading = $(list).prevAll('h2, h3, h4, h5').first();
+  const section = $(list).prevAll('h2').first();
+  const documentedFeature = heading.is('h3')
+    && headingText($, heading) === `iCloud+ with ${description[1]} storage`
+    && headingText($, section) === 'About iCloud+';
+  if (!documentedFeature) return false;
+  // A separate price item can turn an otherwise valid feature list into a
+  // pricing card. Limit this check to the exact About list being exempted.
+  const currencyCodes = Object.keys(PRICE_CURRENCY_MARKERS).join('|');
+  const currencyAmount = new RegExp(
+    `(?:\\p{Sc}\\s*\\d|\\d[\\d.,'’\\s]*\\p{Sc}|\\b(?:${currencyCodes})\\s*\\d|\\d[\\d.,'’\\s]*(?:${currencyCodes})\\b)`,
+    'iu'
+  );
+  return !$(list).find('li').toArray().some((item) => currencyAmount.test(itemText($, item)));
+}
+
 function isCountryHeading($, node) {
   return /\([^)]+\)\s*$/.test(headingText($, node));
 }
@@ -459,9 +480,10 @@ export function parseApplePrices(html, { allowUnknownCountries = false } = {}) {
   const tableResult = parseApplePriceTables($, options);
   if (tableResult) {
     const unexplainedLists = $('ul, ol').toArray().filter((node) => (
-      $(node).find('li').toArray().some((item) => (
-        STORAGE_TIER_PREFIX_PATTERN.test(itemText($, item))
-      ))
+      $(node).find('li').toArray().some((item) => {
+        const text = itemText($, item);
+        return STORAGE_TIER_PREFIX_PATTERN.test(text) && !isDocumentedStorageFeature($, node, text);
+      })
     ));
     if (unexplainedLists.length) {
       throw new Error('Mixed Apple pricing layouts: unexplained storage-tier list');

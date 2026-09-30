@@ -160,7 +160,16 @@ test('reviewed Chinese page names are sticky history, independent from marketId 
   assert.ok(names.includes('老挝'));
   assert.ok(names.includes('毛里求斯'));
   assert.ok(names.includes('莫尔多瓦'));
-  assert.equal(names.includes('摩尔多瓦'), false);
+  assert.ok(names.includes('摩尔多瓦'), 'newly reviewed wording must coexist with historical spelling');
+  const displayNames = JSON.parse(await readFile(new URL('../scripts/country-names.zh.json', import.meta.url), 'utf8'));
+  assert.equal(displayNames.cg, null, 'reviewed source wording must not automatically bind a display name');
+  assert.equal(displayNames.mu, null, 'label review and production display-name mapping stay independent');
+  const futureName = '尚未复核测试地区';
+  assert.equal(names.includes(futureName), false);
+  assert.deepEqual(compareMarketNameSets(names, [...names, futureName]), { added: [futureName], removed: [] });
+  assert.deepEqual(compareMarketNameSets(names, names.filter((name) => name !== '莫尔多瓦')), {
+    added: [], removed: ['莫尔多瓦']
+  });
 });
 
 test('publication UI projection folds only a one-to-one reviewed rename anchored to the current stable market', () => {
