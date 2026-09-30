@@ -6,7 +6,12 @@
   "observations": 11,
   "excluded_versions": 1,
   "pending_gap": false,
-  "gaps": [],
+  "gaps": [
+    {
+      "from": "2026-09-24T09:49:05Z",
+      "to": "2026-09-25T01:50:31Z"
+    }
+  ],
   "events": [
     {
       "plan": "ChatGPT Go",
