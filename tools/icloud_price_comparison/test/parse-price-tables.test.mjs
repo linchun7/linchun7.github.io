@@ -193,7 +193,11 @@ test('live Apple About feature lists are not unexplained market prices', () => {
   const html = CURRENT_TABLE_HTML.replace('<body>', `<body>${intro}`);
   assert.deepEqual(parseApplePrices(html), parseApplePrices(CURRENT_TABLE_HTML));
 
-  for (const label of ['50 GB', '1 PB: $999.99', '50 GiB: $0.99', '50GB: $0.99']) {
+  for (const label of [
+    '50 GB', '1 PB: $999.99', '50 GiB: $0.99', '50GB: $0.99',
+    '$0.99 per month', 'USD 0.99/month', '0,99 €',
+    '0.99 USD/month', '<span>USD</span> <span>0.99/month</span>'
+  ]) {
     const withPrice = html.replace('<li><p>iCloud Private Relay</p></li>', `<li>${label}</li>`);
     assert.throws(() => parseApplePrices(withPrice), /Mixed Apple pricing layouts/, label);
   }
@@ -206,4 +210,6 @@ test('live Apple About feature lists are not unexplained market prices', () => {
   ]) {
     assert.throws(() => parseApplePrices(changed), /Mixed Apple pricing layouts/);
   }
+  const unrelatedAmount = html.replace('</body>', '<h2>Billing examples</h2><ul><li>Example: $0.99 per month</li></ul></body>');
+  assert.deepEqual(parseApplePrices(unrelatedAmount), parseApplePrices(CURRENT_TABLE_HTML));
 });

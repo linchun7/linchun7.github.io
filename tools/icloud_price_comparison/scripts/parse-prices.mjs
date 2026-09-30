@@ -232,9 +232,18 @@ function isDocumentedStorageFeature($, list, text) {
   // exact matching feature heading and section; never exempt an entire table.
   const heading = $(list).prevAll('h2, h3, h4, h5').first();
   const section = $(list).prevAll('h2').first();
-  return heading.is('h3')
+  const documentedFeature = heading.is('h3')
     && headingText($, heading) === `iCloud+ with ${description[1]} storage`
     && headingText($, section) === 'About iCloud+';
+  if (!documentedFeature) return false;
+  // A separate price item can turn an otherwise valid feature list into a
+  // pricing card. Limit this check to the exact About list being exempted.
+  const currencyCodes = Object.keys(PRICE_CURRENCY_MARKERS).join('|');
+  const currencyAmount = new RegExp(
+    `(?:\\p{Sc}\\s*\\d|\\d[\\d.,'’\\s]*\\p{Sc}|\\b(?:${currencyCodes})\\s*\\d|\\d[\\d.,'’\\s]*(?:${currencyCodes})\\b)`,
+    'iu'
+  );
+  return !$(list).find('li').toArray().some((item) => currencyAmount.test(itemText($, item)));
 }
 
 function isCountryHeading($, node) {
