@@ -156,6 +156,7 @@ try {
   assert.equal(await evaluate('document.querySelector("#minimumHistoryNote").hidden'),false,'minimum history displays its scope note');
   await evaluate('document.querySelector("#closeMinimumHistory").click()');
 
+  assert.equal(await evaluate('document.activeElement?.id'), 'minimumHistoryButton', 'minimum history restores focus synchronously');
   await evaluate(`document.querySelector('button[data-sort="country"]').click()`);
   assert.equal(await evaluate(`document.querySelector('#rankHeaderLabel > [aria-hidden="true"]').textContent`),'序号','country sort switches rank header to sequence');
   assert.equal(await evaluate(`document.querySelector('#priceRows .mobile-rank').textContent`),'序1','country sort uses mobile sequence label');

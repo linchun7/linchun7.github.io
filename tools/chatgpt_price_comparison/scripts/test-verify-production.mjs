@@ -172,4 +172,38 @@ await assert.rejects(
   /expected revision/
 );
 
+
+for (const failurePhase of ['documents', 'assets']) {
+  let pendingRequests = 0;
+  let abortedRequests = 0;
+  const hangingFetch = async (url, { signal }) => {
+    const pathname = new URL(String(url)).pathname;
+    const isDocument = pathname.endsWith('/data/prices.json')
+      || pathname.endsWith('/data/minimum-history.json') || pathname.endsWith('/');
+    if (failurePhase === 'assets' && isDocument) return responseFor(url);
+    const failHere = failurePhase === 'documents'
+      ? pathname.endsWith('/data/prices.json')
+      : pathname.endsWith('/app.js');
+    if (failHere) return new Response('unavailable', { status: 503 });
+    pendingRequests += 1;
+    return new Promise((resolve, reject) => {
+      const abort = () => { abortedRequests += 1; reject(new DOMException('Cancelled sibling request', 'AbortError')); };
+      if (signal.aborted) abort();
+      else signal.addEventListener('abort', abort, { once: true });
+    });
+  };
+  await assert.rejects(
+    verifyOnce(data, {
+      expectedMinimumHistory: minimumHistory,
+      expectedPageRevision: pageRevision,
+      expectedAssets,
+      fetchImpl: hangingFetch,
+      requestTimeoutMs: 1000
+    }),
+    /HTTP_503/
+  );
+  assert.equal(pendingRequests, 2, failurePhase + ': two sibling requests were in flight');
+  assert.equal(abortedRequests, 2, failurePhase + ': failure cancels all in-flight siblings before returning');
+}
+
 console.log('verify-production tests passed');

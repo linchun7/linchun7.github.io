@@ -789,7 +789,17 @@
 
     const close = minimumHistoryNode('button', '×', 'icon-button');
     close.type = 'button'; close.id = 'closeMinimumHistory'; close.setAttribute('aria-label', '关闭最低价历史');
-    close.addEventListener('click', () => dialog.close());
+    function restoreFocus() {
+      if (dialog.open || !minimumHistoryUi.returnFocusPending) return;
+      minimumHistoryUi.returnFocusPending = false;
+      el.minimumHistoryButton?.focus({ preventScroll: true });
+    }
+    function closeDialog() {
+      if (!dialog.open) return;
+      dialog.close();
+      restoreFocus();
+    }
+    close.addEventListener('click', closeDialog);
     header.append(title, toolbar, close);
 
     const content = minimumHistoryNode('section', '', 'history-list');
@@ -807,8 +817,9 @@
 
     content.append(status, list, more, note, retry);
     dialog.append(header, content);
-    dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
-    dialog.addEventListener('close', () => el.minimumHistoryButton?.focus({ preventScroll: true }));
+    dialog.addEventListener('click', (event) => { if (event.target === dialog) closeDialog(); });
+    dialog.addEventListener('cancel', event => { event.preventDefault(); closeDialog(); });
+    dialog.addEventListener('close', restoreFocus);
     document.body.append(dialog);
     minimumHistoryUi.dialog = dialog;
     return dialog;
@@ -916,6 +927,7 @@
     const dialog = ensureMinimumHistoryDialog();
     minimumHistoryUi.filterPlan = 'all';
     minimumHistoryUi.limit = 20;
+    minimumHistoryUi.returnFocusPending = true;
     dialog.showModal();
     if (minimumHistoryUi.data && (!state.data || minimumHistoryUi.data.checked_at === state.data.generated_at)) renderMinimumHistory();
     else void loadMinimumHistory();
