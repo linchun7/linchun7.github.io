@@ -159,11 +159,17 @@ jobs:
               if [[ "$build_status" == built ]]; then
                 if [[ "$relation" == successor ]]; then
                   git fetch origin "$built_sha" --depth=1
-                  if ! git diff --quiet "$TARGET_SHA" FETCH_HEAD -- tools/chatgpt_price_comparison; then
-                    echo "::notice title=SUPERSEDED_CHATGPT_BUILD::A later ChatGPT project commit is already deployed; this older validation run is superseded."
-                    echo "should_verify=false" >> "$GITHUB_OUTPUT"
-                    exit 0
-                  fi
+                  diff_status=0
+                  python3 tools/chatgpt_price_comparison/scripts/deployment_scope.py --base "$TARGET_SHA" --head "$built_sha" || diff_status=$?
+                  case "$diff_status" in
+                    0) ;;
+                    1)
+                      echo "::notice title=SUPERSEDED_CHATGPT_BUILD::A later ChatGPT project commit is already deployed; this older validation run is superseded."
+                      echo "should_verify=false" >> "$GITHUB_OUTPUT"
+                      exit 0
+                      ;;
+                    *) echo "::error::Cannot establish ChatGPT deployment supersession."; exit "$diff_status" ;;
+                  esac
                 fi
                 echo "Pages built $built_sha ($relation)."
                 echo "should_verify=true" >> "$GITHUB_OUTPUT"

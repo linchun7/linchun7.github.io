@@ -109,7 +109,9 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("--expected-minimum-history tools/chatgpt_price_comparison/data/minimum-history.json", validate)
         self.assertIn("--expected-index tools/chatgpt_price_comparison/index.html", validate)
         self.assertIn("SUPERSEDED_CHATGPT_BUILD", validate)
-        self.assertIn("git diff --quiet", validate)
+        self.assertIn('deployment_scope.py', validate)
+        self.assertIn('case "$diff_status" in', validate)
+        self.assertIn('exit "$diff_status"', validate)
         self.assertIn("steps.pages.outputs.should_verify == 'true'", validate)
 
     def test_full_update_verification_yields_to_newer_chatgpt_deployment(self):
@@ -121,6 +123,13 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("superseded_update=true", self.text)
         self.assertIn('"$VERIFY_SUPERSEDED" != true', self.text)
         self.assertIn("keep incident state unchanged", self.text)
+
+    def test_supersession_fetches_publication_and_distinguishes_errors(self):
+        self.assertIn('git fetch origin "$PUBLISHED_SHA" --depth=1', self.text)
+        self.assertIn('--base "$PUBLISHED_SHA" --head "$current_main_sha"', self.text)
+        self.assertIn('case "$diff_status" in', self.text)
+        self.assertIn('exit "$diff_status"', self.text)
+        self.assertNotIn('if ! git diff --quiet "$PUBLISHED_SHA"', self.text)
 
     def test_idempotent_backup_revalidates_current_production(self):
         self.assertIn("verify-existing-production:", self.text)
