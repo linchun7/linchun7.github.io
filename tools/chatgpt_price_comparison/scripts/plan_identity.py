@@ -27,6 +27,10 @@ PLAN_ALIASES = {
     'ChatGPT Pro 20x': 'ChatGPT Pro 20x',
     'ChatGPT Pro 20X': 'ChatGPT Pro 20x',
     'ChatGPT Pro $200': 'ChatGPT Pro 20x',
+    # Official Apple IAP and https://help.openai.com/en/articles/9793128-about-chatgpt-pro-tiers verified 2026-09-30.
+    # These aliases preserve price-series identity, not historical usage entitlements.
+    'ChatGPT Pro 100': 'ChatGPT Pro 5x',
+    'ChatGPT Pro 200': 'ChatGPT Pro 20x',
 }
 
 
