@@ -457,7 +457,15 @@ export function parseApplePrices(html, { allowUnknownCountries = false } = {}) {
   const $ = cheerio.load(html);
   const options = { allowUnknownCountries };
   const tableResult = parseApplePriceTables($, options);
-  if (tableResult) return tableResult;
+  if (tableResult) {
+    const unexplainedLists = $('ul, ol').toArray().filter((node) => (
+      !$(node).closest('table').length && isPriceList($, node)
+    ));
+    if (unexplainedLists.length) {
+      throw new Error('Mixed Apple pricing layouts: unexplained price list outside pricing tables');
+    }
+    return tableResult;
+  }
   let documentOrderResult = null;
   let appleMarkerResult = null;
   let documentOrderError = null;

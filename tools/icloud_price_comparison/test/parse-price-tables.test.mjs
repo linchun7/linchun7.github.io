@@ -144,3 +144,21 @@ test('ignores unrelated tables outside explicitly bounded pricing sections', asy
   assert.equal(parsed.parser, 'cross-checked');
   assert.deepEqual(parsed.countries, parseApplePrices(CURRENT_TABLE_HTML).countries);
 });
+
+
+test('review: mixed table and legacy list pricing fails closed', () => {
+  const legacy = `<h4 class="gb-header">New Market (USD)</h4><ul><li>50GB: $0.99</li><li>200GB: $2.99</li></ul>`;
+  const variants = [
+    CURRENT_TABLE_HTML.replace('<table>', `${legacy}<table>`),
+    CURRENT_TABLE_HTML.replace('</table>', `</table>${legacy}`),
+    CURRENT_TABLE_HTML.replace('</body>', `${legacy}</body>`),
+    CURRENT_TABLE_HTML.replace('</body>', `${legacy.replaceAll('<ul>', '<ol>').replaceAll('</ul>', '</ol>')}</body>`)
+  ];
+  for (const html of variants) {
+    assert.notEqual(html, CURRENT_TABLE_HTML, 'mixed fixture insertion must change HTML');
+    assert.throws(() => parseApplePrices(html, { allowUnknownCountries: true }), /Mixed Apple pricing layouts/);
+  }
+  const unrelated = CURRENT_TABLE_HTML.replace('</body>', '<ul><li>Learn about iCloud</li><li>Contact Apple Support</li></ul></body>');
+  assert.notEqual(unrelated, CURRENT_TABLE_HTML);
+  assert.deepEqual(parseApplePrices(unrelated), parseApplePrices(CURRENT_TABLE_HTML));
+});

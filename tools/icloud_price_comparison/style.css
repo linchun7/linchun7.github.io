@@ -755,7 +755,7 @@ th button:active { background: rgba(17, 104, 212, .13); }
   .price-table td:first-child { display: none; }
   .price-table td.loading-cell:first-child,
   .price-table td.empty-cell:first-child { display: table-cell; }
-  .price-table [data-tier]:not(.is-active-tier) { display: none; }
+  .workspace.price-ui-ready .price-table [data-tier]:not(.is-active-tier) { display: none; }
   .price-table th:nth-child(2),
   .price-table td:nth-child(2) { width: 46%; }
   .price-table td:nth-child(2) { position: static; background: inherit; box-shadow: none; }
@@ -907,4 +907,14 @@ th button:active { background: rgba(17, 104, 212, .13); }
 
 @media (forced-colors: active) {
   .minimum-history-button, .minimum-history-filter select, .minimum-history-tier { border-color: ButtonText; color: ButtonText; }
+}
+
+@media (max-width: 1100px) {
+  .workspace:not(.price-ui-ready) .table-scroll { overflow-x: auto; }
+  .workspace:not(.price-ui-ready) .price-table { width: 100%; min-width: 1030px; table-layout: fixed; }
+  .workspace:not(.price-ui-ready) .price-table th:nth-child(2),
+  .workspace:not(.price-ui-ready) .price-table td:nth-child(2) { width: 220px; }
+  .workspace:not(.price-ui-ready) .price-table th[data-tier],
+  .workspace:not(.price-ui-ready) .price-table td[data-tier] { display: table-cell; width: 154px; }
+  .workspace:not(.price-ui-ready) .mobile-tier-picker { display: none; }
 }

@@ -274,3 +274,6 @@ UI 复用原生 dialog、焦点约束、字体与现有历史样式。独立“�
 每日 updater 的 prepare 在验证 workflow 定义与最新 main 后会输出精确 `validated_main_sha`。后续 update 只能检出这个 SHA，不再在生成开始时重新解析可变的 `origin/main`。因此即使 prepare 通过后有人提交新的 iCloud workflow/代码，也不会出现“旧 workflow 编排 + 新代码”组合；发布阶段会按既有敏感路径/CAS 规则丢弃过期候选。
 
 prepare 的 stale-workflow 检查只在“执行中的 YAML 与当前 main YAML 相同”时允许继续；通过后立即 checkout 到同一个 `validated_main_sha`。因此 validate-data-artifact、run-context、daily-run-guard 和 data snapshot 不会出现“旧脚本校验新数据”的组合。
+
+### 全页价格证据覆盖
+表格解析成功不代表全页价格证据已被解释。表格模式还检查表格外的疑似价格列表；当前不合并两种布局，发现混合价格结构时失败关闭，保留上一份生产数据。
