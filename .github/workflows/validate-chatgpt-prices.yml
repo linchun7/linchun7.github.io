@@ -80,6 +80,7 @@ jobs:
           )
           PY
           REQUIRE_FUTURE_PLAN=1 node tools/chatgpt_price_comparison/scripts/browser-test.mjs
+          python3 tools/chatgpt_price_comparison/scripts/browser-state-fixtures.py
 
 
   browser-matrix:

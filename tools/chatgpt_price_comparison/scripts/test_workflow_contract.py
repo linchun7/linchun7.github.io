@@ -100,6 +100,10 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("Publish three files atomically", self.text)
         self.assertIn("git add tools/chatgpt_price_comparison/data/prices.json tools/chatgpt_price_comparison/data/minimum-history.json tools/chatgpt_price_comparison/index.html", self.text)
 
+    def test_degraded_browser_states_are_exercised_offline(self):
+        validate = (ROOT/'.github/workflows/validate-chatgpt-prices.yml').read_text(encoding='utf-8')
+        self.assertIn('scripts/browser-state-fixtures.py',validate)
+
     def test_push_validation_verifies_real_pages_after_cross_browser_gate(self):
         validate = (ROOT / ".github" / "workflows" / "validate-chatgpt-prices.yml").read_text(encoding="utf-8")
         self.assertIn("production-smoke:", validate)

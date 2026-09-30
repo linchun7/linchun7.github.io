@@ -7,6 +7,7 @@ import {tmpdir} from 'node:os';
 import {createServer} from 'node:net';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import { plansFor, offerFor, comparisonFor } from './browser-oracle.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const chrome = process.env.CHROME_BIN || ['/usr/bin/google-chrome','/usr/bin/chromium','/usr/bin/chromium-browser'].find(existsSync);
@@ -68,14 +69,67 @@ try {
   await command('Emulation.setTimezoneOverride', {timezoneId: 'Asia/Tokyo'});
   const url='http://127.0.0.1:4177/tools/chatgpt_price_comparison/';
   await until(async()=> (await fetch(url)).ok,'HTTP server');
+  const testNow = Date.now();
+  await command('Page.addScriptToEvaluateOnNewDocument', { source: `
+    Date.now = () => ${testNow};
+    globalThis.__chatgptTestIntervals = [];
+    const originalSetInterval = globalThis.setInterval.bind(globalThis);
+    globalThis.setInterval = (callback, milliseconds, ...args) => {
+      if (milliseconds === 30000 && typeof callback === 'function') globalThis.__chatgptTestIntervals.push(() => callback(...args));
+      return originalSetInterval(callback, milliseconds, ...args);
+    };
+  ` });
   await command('Page.navigate',{url});
   await until(()=>evaluate('document.querySelectorAll("#priceRows tr[data-market-id]").length > 0 && document.querySelector(".country-history-button:not(:disabled)")'),'interactive matrix');
-  const expected=JSON.parse(await readFile(path.join(root,'tools/chatgpt_price_comparison/data/prices.json'),'utf8'));
-  const plans=[...new Set(expected.markets.flatMap(m=>m.offers.map(o=>o.label)))];
-  const defaultPlan=plans.includes('ChatGPT Plus')?'ChatGPT Plus':plans[0];
-  const sampleMarket=expected.markets.find(m=>m.offers.some(o=>o.label===defaultPlan));
-  assert.ok(defaultPlan && sampleMarket,'at least one comparable plan and market');
-  const sampleOffer=sampleMarket.offers.find(o=>o.label===defaultPlan);
+  const expected = JSON.parse(await readFile(path.join(root, 'tools/chatgpt_price_comparison/data/prices.json'), 'utf8'));
+  const plans = plansFor(expected);
+  const defaultPlan = plans.includes('ChatGPT Plus') ? 'ChatGPT Plus' : plans[0];
+  const sampleMarket = expected.markets.find(m => offerFor(m, defaultPlan)) || expected.markets.find(m => m.offers.length);
+  assert.ok(defaultPlan && sampleMarket, 'at least one observed plan and market');
+  const sampleOffer = offerFor(sampleMarket, defaultPlan);
+  async function clickPlan(plan) {
+    await evaluate(`{
+      const button = [...document.querySelectorAll('button[data-sort-plan]')].find(node => node.dataset.sortPlan === ${JSON.stringify(plan)});
+      if (!button) throw Error('Missing plan sort button');
+      button.click();
+    }`);
+  }
+  async function assertRanks(plan) {
+    const oracle = comparisonFor(expected, plan, testNow);
+    const actual = await evaluate(`[...document.querySelectorAll('#priceRows tr[data-market-id]')].map(row => ({ code: row.dataset.marketId, rank: row.querySelector('td:first-child').textContent, accessible: row.querySelector('.mobile-rank-sr').textContent }))`);
+    assert.equal(actual.length, expected.markets.length, 'every market remains visible');
+    assert.equal(new Set(actual.map(row => row.code)).size, actual.length, 'no duplicate market rows');
+    for (const row of actual) {
+      const reference = oracle.rows.find(item => item.market.code === row.code);
+      assert.ok(reference, `unexpected market ${row.code}`);
+      const rank = reference.cents == null ? null : oracle.ranks.get(reference.cents);
+      assert.equal(row.rank, rank == null ? '—' : String(rank), `${plan}/${row.code}: exact eligible rank`);
+      assert.equal(row.accessible, rank == null ? '排名暂不可用' : `全球价格排名第 ${rank}`, `${plan}/${row.code}: accessible rank follows eligibility`);
+    }
+  }
+  async function assertMinimums() {
+    const actual = await evaluate(`[...document.querySelectorAll('.minimum-card')].map(card => ({ disabled: card.disabled, plan: card.dataset.plan || '', marketId: card.dataset.marketId || '', label: card.querySelector('.minimum-plan-label').textContent, country: card.querySelector('.minimum-country').textContent, price: card.querySelector('.minimum-price').textContent }))`);
+    assert.equal(actual.length, plans.length);
+    let expectedEnabled = 0;
+    for (let index = 0; index < plans.length; index += 1) {
+      const plan = plans[index]; const oracle = comparisonFor(expected, plan, testNow); const card = actual[index];
+      assert.equal(card.label, plan.replace(/^ChatGPT\s+/, ''));
+      const badges = await evaluate(`[...document.querySelectorAll('#priceRows td[data-plan].is-minimum')].filter(cell => cell.dataset.plan === ${JSON.stringify(plan)}).map(cell => cell.closest('tr').dataset.marketId).sort()`);
+      assert.deepEqual(badges, oracle.winners.map(m => m.code).sort(), `${plan}: exact minimum badge winners`);
+      if (oracle.minimum == null) {
+        assert.equal(card.disabled, true, `${plan}: no eligible price disables card`);
+        assert.equal(card.country, '暂无可靠最低价'); assert.equal(card.price, '—'); assert.equal(card.marketId, '');
+      } else {
+        expectedEnabled += 1;
+        assert.equal(card.disabled, false); assert.equal(card.plan, plan); assert.equal(card.marketId, oracle.winners[0].code);
+        assert.equal(card.country, oracle.winners.length > 3 ? `${oracle.winners.length} 个地区并列最低` : oracle.winners.map(m => m.name).join('、'));
+        assert.equal(card.price, `¥${(oracle.minimum / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+      }
+    }
+    assert.equal(actual.filter(card => !card.disabled).length, expectedEnabled);
+    return expectedEnabled;
+  }
+
   if(process.env.REQUIRE_FUTURE_PLAN==='1') {
     assert.ok(plans.length>=5,'future-plan fixture exercises at least five plans');
   }
@@ -100,10 +154,10 @@ try {
   assert.equal(await evaluate(`document.querySelector('#rankHeaderLabel > [aria-hidden="true"]').textContent`),'序号','country sort switches rank header to sequence');
   assert.equal(await evaluate(`document.querySelector('#priceRows .mobile-rank').textContent`),'序1','country sort uses mobile sequence label');
   assert.equal(await evaluate(`document.querySelector('#priceRows .mobile-rank-sr').textContent`),'当前列表序号第 1','country sort exposes accessible sequence label');
-  await evaluate(`document.querySelector('button[data-sort-plan="${defaultPlan}"]').click()`);
+  await clickPlan(defaultPlan);
   assert.equal(await evaluate(`document.querySelector('#rankHeaderLabel > [aria-hidden="true"]').textContent`),'排名','plan sort restores ranking header');
   assert.equal(await evaluate(`document.querySelector('#rankHeaderLabel .visually-hidden').textContent`),'全球参考排名','ranking label follows the global comparison wording');
-  assert.ok(await evaluate(`document.querySelector('#priceRows .mobile-rank-sr').textContent.startsWith('全球价格排名第 ')`),'row ranking follows the global comparison wording');
+  await assertRanks(defaultPlan);
 
   await evaluate(`document.querySelector('#searchInput').value=${JSON.stringify(sampleMarket.name)};document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);
   await until(()=>evaluate('document.querySelectorAll("#priceRows tr[data-market-id]").length===1'),'sample market filter');
@@ -112,7 +166,10 @@ try {
   if(sampleOffer?.amounts.length) {
     const sortedAmounts=[...sampleOffer.amounts].sort((a,b)=>Number(a.amount)-Number(b.amount));
     const comparisonDisplay=sortedAmounts[0].display;
-    const comparisonCellText=await evaluate(`document.querySelector('#priceRows tr[data-market-id="${sampleMarket.code}"] [data-plan="${defaultPlan}"]').textContent`);
+    const comparisonCellText = await evaluate(`{
+      const row = document.querySelector(${JSON.stringify(`#priceRows tr[data-market-id="${sampleMarket.code}"]`)});
+      [...row.querySelectorAll('[data-plan]')].find(cell => cell.dataset.plan === ${JSON.stringify(defaultPlan)}).textContent;
+    }`);
     assert.ok(comparisonCellText.includes(comparisonDisplay),'main table shows the plan-local minimum public amount');
     for(const other of sortedAmounts.slice(1)) {
       assert.equal(comparisonCellText.includes(other.display),false,'main table excludes non-minimum same-label amounts');
@@ -131,14 +188,38 @@ try {
   assert.equal(await evaluate(`document.querySelector('.history-current div:nth-child(3) span').textContent`),'近期变更次数','history count is scoped to retained events');
   await evaluate(`document.querySelector('#closeHistory').click()`);
 
-  const fxUpdated=Date.parse(expected.fx?.updated_at || '');
-  const newestVerified=Math.max(...expected.markets.filter(m=>m.offers.length).map(m=>Date.parse(m.last_verified_at)).filter(Number.isFinite));
-  const staleFxNow=fxUpdated + 36*3600e3 + 60e3;
-  if(Number.isFinite(fxUpdated) && Number.isFinite(newestVerified) && staleFxNow < newestVerified + 36*3600e3) {
-    await evaluate(`globalThis.__chatgptRealDateNow=Date.now;Date.now=()=>${staleFxNow};document.querySelector('button[data-sort-plan="${defaultPlan}"]').click()`);
-    assert.equal(await evaluate(`[...document.querySelectorAll('#priceRows tr[data-market-id] td:first-child')].every(td=>td.textContent==='—')`),true,'stale FX is excluded from comparison ranks');
-    await evaluate(`Date.now=globalThis.__chatgptRealDateNow;delete globalThis.__chatgptRealDateNow;document.querySelector('button[data-sort-plan="${defaultPlan}"]').click()`);
+  if (process.env.BROWSER_STATE_FIXTURE === 'retired_plan') {
+    await evaluate(`document.querySelector(${JSON.stringify(`#priceRows tr[data-market-id="${sampleMarket.code}"] .country-history-button`)}).click()`);
+    await until(() => evaluate('document.querySelector("#historyDialog").open'), 'retired-plan country history');
+    assert.equal(await evaluate(`[...document.querySelectorAll('#historyPlanControl button')].some(button => button.textContent === 'Retired Fixture')`), true, 'retired plan remains selectable in country history');
+    await evaluate(`[...document.querySelectorAll('#historyPlanControl button')].find(button => button.textContent === 'Retired Fixture').click()`);
+    assert.equal(await evaluate(`document.querySelector('#historyLocalPrice').textContent`), '—', 'retired plan has no invented current price');
+    assert.ok(await evaluate(`document.querySelector('#historyRows').textContent.includes('42 USD')`), 'retired plan retains its historical amount');
+    assert.equal(await evaluate(`[...document.querySelectorAll('[data-plan-header]')].some(header => header.dataset.plan === 'ChatGPT Retired Fixture')`), false, 'retired plan does not become a current comparison column');
+    await evaluate(`document.querySelector('#closeHistory').click()`);
   }
+
+  await evaluate(`document.querySelector('#searchInput').value='';document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);
+  assert.equal(await evaluate('globalThis.__chatgptTestIntervals.length'), 1, 'one freshness refresh interval is registered');
+  const observationTimes = [Date.parse(expected.generated_at), Date.parse(expected.fx?.updated_at || ''), ...expected.markets.filter(market => market.offers.length).map(market => Date.parse(market.last_verified_at))].filter(Number.isFinite);
+  const latestObservation = Math.max(...observationTimes);
+  const staleNow = latestObservation + 36 * 3600e3 + 1000;
+  const expiredNow = latestObservation + 7 * 86400e3 + 1000;
+  await evaluate(`{ globalThis.__chatgptBeforeAgeTest = Date.now; Date.now = () => ${staleNow}; globalThis.__chatgptTestIntervals.forEach(callback => callback()); }`);
+  assert.equal(await evaluate(`document.querySelectorAll('.minimum-card:not(:disabled)').length`), 0, 'open-tab freshness expiry disables all minimum cards');
+  assert.equal(await evaluate(`document.querySelectorAll('#priceRows .minimum-badge').length`), 0, 'open-tab freshness expiry removes minimum badges');
+  assert.equal(await evaluate(`[...document.querySelectorAll('#priceRows tr[data-market-id] td:first-child')].every(cell => cell.textContent === '—')`), true, 'open-tab freshness expiry removes price ranks');
+  assert.equal(await evaluate(`document.querySelector('#freshnessWarning').hidden`), false, 'open-tab freshness expiry updates the warning');
+  await evaluate(`document.querySelector(${JSON.stringify(`#priceRows tr[data-market-id="${sampleMarket.code}"] .country-history-button`)}).click()`);
+  await until(() => evaluate('document.querySelector("#historyDialog").open'), 'history stays usable for stale local prices');
+  await evaluate(`{ Date.now = () => ${expiredNow}; globalThis.__chatgptTestIntervals.forEach(callback => callback()); }`);
+  assert.equal(await evaluate(`[...document.querySelectorAll('#priceRows .price-cny')].every(node => node.textContent === '—')`), true, 'seven-day expiry hides table CNY without reloading');
+  assert.equal(await evaluate(`document.querySelector('#historyCnyPrice').textContent.includes('¥')`), false, 'seven-day expiry refreshes an already-open history dialog');
+  await evaluate(`document.querySelector('#closeHistory').click()`);
+  assert.equal(await evaluate(`document.activeElement?.closest('tr[data-market-id]')?.dataset.marketId`), sampleMarket.code, 'history returns focus to the replacement table row');
+  await evaluate(`{ Date.now = globalThis.__chatgptBeforeAgeTest; delete globalThis.__chatgptBeforeAgeTest; document.dispatchEvent(new Event('visibilitychange')); }`);
+  assert.equal(await evaluate('document.hidden'), false, 'visibility-return regression runs in a visible document');
+  await assertRanks(defaultPlan); await assertMinimums();
 
   await evaluate(`document.querySelector('#searchInput').value='<img src=x onerror=alert(1)>';document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);
   assert.equal(await evaluate(`document.querySelector('#emptyState').hidden`),false,'empty search state');
@@ -156,33 +237,15 @@ try {
     await evaluate(`document.querySelector('#searchInput').value='';document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);
   }
 
-  const tiedPlan=plans.find(plan=>{
-    const rows=expected.markets.map(m=>{
-      const offer=m.offers.find(o=>o.label===plan);
-      if(!offer)return null;
-      const values=offer.amounts.filter(a=>a.cny!=null).map(a=>Number(a.cny)).filter(Number.isFinite);
-      return values.length?{code:m.code,value:Math.min(...values)}:null;
-    }).filter(Boolean);
-    if(!rows.length)return false;
-    const minimum=Math.min(...rows.map(row=>row.value));
-    return rows.filter(row=>Math.abs(row.value-minimum)<=0.005).length>3;
-  });
-  if(tiedPlan){
-    const rows=expected.markets.map(m=>{
-      const offer=m.offers.find(o=>o.label===tiedPlan);
-      if(!offer)return null;
-      const values=offer.amounts.filter(a=>a.cny!=null).map(a=>Number(a.cny)).filter(Number.isFinite);
-      return values.length?{code:m.code,value:Math.min(...values)}:null;
-    }).filter(Boolean);
-    const minimum=Math.min(...rows.map(row=>row.value));
-    const count=rows.filter(row=>Math.abs(row.value-minimum)<=0.005).length;
-    assert.equal(await evaluate(`document.querySelector('.minimum-card[data-plan="${tiedPlan}"] .minimum-country').textContent`),`${count} 个地区并列最低`,'large tied minimum is compacted');
+  for (const plan of plans) { await clickPlan(plan); await assertRanks(plan); }
+  const enabledMinimumCount = await assertMinimums();
+  if (enabledMinimumCount > 0) {
+    await evaluate(`document.querySelector('.minimum-card:not(:disabled)').click()`);
+    await until(() => evaluate(`document.querySelector('#priceRows tr.is-highlighted') !== null`), 'minimum card row focus');
+  } else {
+    assert.equal(await evaluate(`document.querySelectorAll('.minimum-card:not(:disabled)').length`), 0, 'degraded data never advertises an actionable minimum');
   }
-
-  const enabledMinimum=await evaluate(`document.querySelector('.minimum-card:not(:disabled)')?.dataset.marketId || ''`);
-  assert.ok(enabledMinimum,'minimum card available');
-  await evaluate(`document.querySelector('.minimum-card:not(:disabled)').click()`);
-  await until(()=>evaluate(`document.querySelector('#priceRows tr.is-highlighted')!==null`),'minimum card row focus');
+  await clickPlan(defaultPlan);
 
   await command('Emulation.setDeviceMetricsOverride',{width:641,height:844,deviceScaleFactor:1,mobile:true});
   await delay(150);
@@ -205,7 +268,7 @@ try {
   const rankLayout=await evaluate(`{const row=document.querySelector('#priceRows tr[data-market-id]');const name=row.querySelector('.country-name').getBoundingClientRect();const sub=row.querySelector('.country-name-en').getBoundingClientRect();const rank=row.querySelector('.mobile-rank').getBoundingClientRect();({nameBottom:name.bottom,subTop:sub.top,rankTop:rank.top,rankBottom:rank.bottom,subBottom:sub.bottom})}`);
   assert.ok(rankLayout.rankTop>=rankLayout.nameBottom-1,'mobile sequence badge no longer competes with the primary country-name row');
   assert.ok(Math.abs(rankLayout.rankTop-rankLayout.subTop)<=4,'mobile sequence badge sits on the subtitle row');
-  await evaluate(`document.querySelector('button[data-sort-plan="${defaultPlan}"]').click()`);
+  await clickPlan(defaultPlan);
 
   await command('Emulation.setDeviceMetricsOverride',{width:320,height:568,deviceScaleFactor:1,mobile:true});
   await delay(150);
