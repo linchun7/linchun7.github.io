@@ -13,7 +13,7 @@ const MAX_PLAUSIBLE_MARKETS = 400;
 const CAPACITY_RE = /\b\d+(?:[.,]\d+)?\s*(?:GB|TB|PB)\b/giu;
 const MARKET_HEADER_RE = /^(?:国家(?:或地区)?|国家\s*\/\s*地区|地区|市场|country(?:\s*\/\s*region)?|region|market)(?:\s*[（(][^）)]*[）)])?$/iu;
 const NON_MARKET_RE = /(?:icloud|homekit|储存空间|存储空间|价格|定价|方案|月费|国家或地区|国家\s*\/\s*地区|付款方式|发布日期|有帮助|北美洲|南美洲|拉丁美洲|加勒比地区|欧洲、中东和非洲|亚太地区)/iu;
-const FOOTNOTE_SUFFIX_RE = /(?:\s*(?:\d+(?:\s*[,，]\s*\d+)*|[⁰¹²³⁴⁵⁶⁷⁸⁹]+))+$/u;
+const FOOTNOTE_SUFFIX_RE = /(?:\s*(?:\d+(?:\s*[,，\u{1D112}]\s*\d+)*|[⁰¹²³⁴⁵⁶⁷⁸⁹]+))+$/u;
 const ZERO_WIDTH_RE = /[\u200B-\u200D\u2060\uFEFF]/gu;
 
 export function normalizeVisibleText(value) {
@@ -102,8 +102,14 @@ function tableMarketNames($, table) {
     if (!cells.length || cells.some((cell) => ['rowspan', 'colspan'].some((attribute) => $(cell).attr(attribute) && $(cell).attr(attribute) !== '1'))) {
       throw new Error('Unexplained Chinese market table row');
     }
-    const name = marketNameFromLabel($(cells[column]).text(), { allowPlain: true });
-    if (!name) throw new Error('Chinese market table contains an empty or unexplained country cell');
+    const rawLabel = $(cells[column]).text();
+    const name = marketNameFromLabel(rawLabel, { allowPlain: true });
+    if (!name) {
+      const diagnosticLabel = normalizeVisibleText(rawLabel)
+        .replace(/[\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/gu, ' ')
+        .slice(0, 160);
+      throw new Error(`Chinese market table contains an empty or unexplained country cell: ${JSON.stringify(diagnosticLabel)}`);
+    }
     names.push(name);
   }
   if (column >= 0 && !names.length) throw new Error('Chinese market table contains no countries');

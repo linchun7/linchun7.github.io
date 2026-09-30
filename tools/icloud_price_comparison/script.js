@@ -52,6 +52,7 @@ const state = {
   eventsBound: false,
   loading: false,
   historyStatus: 'idle',
+  publishedDatePending: false,
   historyRequestId: 0,
   historyPromise: null,
   historyReturnFocus: null,
@@ -505,6 +506,10 @@ function formatConverted(value, symbol) {
 }
 
 function createTierButtons(container, selectedTier, handler) {
+  const active = document.activeElement;
+  const focusedTier = active instanceof HTMLElement && container.contains(active)
+    ? active.dataset.tier
+    : null;
   container.replaceChildren();
   container.style.setProperty('--tier-count', String(state.data.tiers.length));
   for (const tier of state.data.tiers) {
@@ -515,6 +520,12 @@ function createTierButtons(container, selectedTier, handler) {
     button.setAttribute('aria-pressed', String(tier.id === selectedTier));
     button.addEventListener('click', () => handler(tier.id));
     container.append(button);
+  }
+  if (focusedTier) {
+    const buttons = [...container.querySelectorAll('button[data-tier]')];
+    const target = buttons.find((button) => button.dataset.tier === focusedTier)
+      ?? buttons.find((button) => button.dataset.tier === selectedTier);
+    target?.focus({ preventScroll: true });
   }
 }
 
@@ -1075,7 +1086,14 @@ function renderPublishedDateHistory() {
   const entries = getPublishedDateHistory();
   if (state.historyStatus === 'ready') {
     const latest = displayedPublishedDate(state.history);
-    if (latest) elements.applePublishedDate.textContent = formatPublishedDate(latest);
+    if (latest) {
+      elements.applePublishedDate.textContent = formatPublishedDate(latest);
+      state.publishedDatePending = false;
+    } else if (state.publishedDatePending) {
+      elements.applePublishedDate.textContent = '暂无可展示日期';
+    }
+  } else if (state.publishedDatePending) {
+    elements.applePublishedDate.textContent = state.historyStatus === 'loading' ? '正在核对' : state.historyStatus === 'unavailable' ? '暂时无法核对' : '待核对';
   }
   elements.publishedDateDialogCurrent.textContent = elements.applePublishedDate.textContent || '--';
   elements.publishedDateRows.replaceChildren();
@@ -1453,6 +1471,7 @@ function resetHistoryForPriceSnapshot() {
   state.history = null;
   state.historyStatus = 'idle';
   state.historyPromise = null;
+  state.publishedDatePending = true;
 }
 
 function applyPriceData(data, { origin = 'network' } = {}) {
@@ -1480,6 +1499,7 @@ function applyPriceData(data, { origin = 'network' } = {}) {
   state.dataFreshness = freshness;
   renderCurrentPriceFreshness();
   scheduleFreshnessBoundary();
+  elements.workspace.classList.add('price-ui-ready');
   if (elements.historyDialog.open || elements.publishedDateDialog.open) void ensureHistoryLoaded();
 }
 
@@ -1510,7 +1530,9 @@ function hydrateStaticPriceData(data) {
     updateTierPresentation();
     refreshIcons();
   }
+  updateUrlState();
   scheduleFreshnessBoundary();
+  elements.workspace.classList.add('price-ui-ready');
 }
 
 const DIALOG_FOCUSABLE_SELECTOR = [

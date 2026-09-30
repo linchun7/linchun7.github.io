@@ -13,6 +13,9 @@
     ['ChatGPT Pro 20x', 'ChatGPT Pro 20x'],
     ['ChatGPT Pro 20X', 'ChatGPT Pro 20x'],
     ['ChatGPT Pro $200', 'ChatGPT Pro 20x'],
+    // Official current labels verified 2026-09-30; price-series continuity does not assert unchanged usage allowance.
+    ['ChatGPT Pro 100', 'ChatGPT Pro 5x'],
+    ['ChatGPT Pro 200', 'ChatGPT Pro 20x'],
   ]);
   const STATUS = { verified: '已核验', retained: '沿用旧价', pending: '待复核', unavailable: '暂无标价' };
   const $ = (id) => document.getElementById(id);
@@ -59,6 +62,7 @@
   });
 
   let createIcons = null;
+  let freshnessSignature = null;
 
   async function loadIcons() {
     try {
@@ -162,6 +166,12 @@
         throw Error('地区数据不合法');
       }
       codes.add(market.code);
+
+      if (market.pending && Object.hasOwn(market.pending, 'comparison_fingerprint')
+        && (typeof market.pending.comparison_fingerprint !== 'string'
+          || !/^[a-f0-9]{64}$/.test(market.pending.comparison_fingerprint))) {
+        throw Error('待复核比较指纹不合法');
+      }
 
       if (!market.offers.length) {
         if (market.status !== 'unavailable') throw Error('空地区状态错误');
@@ -357,6 +367,44 @@
     el.fxStatus.textContent = state.data.fx ? `汇率更新：${dateTime(state.data.fx.updated_at)}${state.data.fx.fallback ? '（沿用）' : ''}` : '汇率暂不可用';
   }
 
+  function timeDependentSignature() {
+    const fx = state.data?.fx;
+    return JSON.stringify([
+      usable(state.data.generated_at),
+      !!fx && usable(fx.updated_at),
+      !!fx && usable(fx.updated_at) && age(fx.updated_at) <= FRESH,
+      state.data.markets.map(market => [fresh(market), usable(market.last_verified_at)]),
+    ]);
+  }
+  function refreshTimeDependentUi() {
+    if (!state.data) return;
+    const next = timeDependentSignature();
+    if (next === freshnessSignature) return;
+    freshnessSignature = next;
+    const focused = document.activeElement;
+    const focusedMarket = focused?.closest('tr[data-market-id]')?.dataset.marketId;
+    const focusedPlan = focused?.closest('button[data-sort-plan]')?.dataset.sortPlan;
+    const focusedCountrySort = focused?.matches('button[data-sort="country"]');
+    const focusedMinimum = focused?.closest('.minimum-card')?.dataset.plan;
+    calculateMinimums(); renderMinimums(); renderFreshness(); renderTable();
+    if (state.activeMarket) {
+      renderHistory();
+      const row = [...el.priceRows.querySelectorAll('tr[data-market-id]')].find(node => node.dataset.marketId === state.activeMarket.code);
+      state.historyReturnFocus = row?.querySelector('.country-history-button') || null;
+    }
+    if (document.querySelector('dialog[open]')) return;
+    let replacement = null;
+    if (focusedMarket) {
+      replacement = [...el.priceRows.querySelectorAll('tr[data-market-id]')].find(node => node.dataset.marketId === focusedMarket)?.querySelector('.country-history-button');
+    } else if (focusedPlan) {
+      replacement = [...document.querySelectorAll('button[data-sort-plan]')].find(node => node.dataset.sortPlan === focusedPlan);
+    } else if (focusedCountrySort) {
+      replacement = document.querySelector('button[data-sort="country"]');
+    } else if (focusedMinimum) {
+      replacement = [...el.minimumSummary.querySelectorAll('.minimum-card')].find(node => node.dataset.plan === focusedMinimum && !node.disabled) || el.minimumHistoryButton;
+    }
+    replacement?.focus({ preventScroll: true });
+  }
   function calculateRanks() {
     state.ranks = new Map();
     const values = [...new Set(state.data.markets.map((m) => minCny(m, state.sortPlan)).filter(Number.isFinite).map((v) => v.toFixed(2)))]
@@ -369,6 +417,8 @@
   }
 
   function renderHeaders() {
+    const focusedPlan = document.activeElement?.closest('button[data-sort-plan]')?.dataset.sortPlan;
+    let focusTarget = null;
     const row = document.querySelector('.price-table thead tr');
     row.querySelectorAll('[data-plan-header]').forEach((n) => n.remove());
 
@@ -384,6 +434,7 @@
       const button = document.createElement('button');
       button.type = 'button';
       button.dataset.sortPlan = plan;
+      if (plan === focusedPlan) focusTarget = button;
       button.append(document.createTextNode(shortPlan(plan) + ' '));
       const icon = document.createElement('i');
       icon.dataset.lucide = active ? (state.sortDirection === 'asc' ? 'arrow-up' : 'arrow-down') : 'arrow-up-down';
@@ -406,6 +457,7 @@
 
     updateRankingPresentation();
     refreshIcons();
+    focusTarget?.focus({ preventScroll: true });
   }
 
   function isMinimum(plan, market, amount) {
@@ -531,12 +583,21 @@
     el.resultSummary.textContent = `${state.query ? markets.length + ' / ' + state.data.markets.length : markets.length} 个地区 · ${suffix}`;
   }
 
-  function planButtons(container, selected, handler) {
-    container.replaceChildren(); container.style.setProperty('--plan-count', String(state.plans.length));
-    for (const plan of state.plans) {
-      const b = document.createElement('button'); b.type = 'button'; b.textContent = shortPlan(plan); b.setAttribute('aria-pressed', String(plan === selected));
-      b.addEventListener('click', () => handler(plan)); container.append(b);
+  function planButtons(container, selected, handler, plans = state.plans) {
+    const focusedPlan = container.contains(document.activeElement) ? document.activeElement?.dataset.plan : null;
+    let focusTarget = null;
+    container.replaceChildren();
+    container.style.setProperty('--plan-count', String(plans.length));
+    for (const plan of plans) {
+      const button = document.createElement('button');
+      button.type = 'button'; button.textContent = shortPlan(plan);
+      button.dataset.plan = plan;
+      if (plan === focusedPlan) focusTarget = button;
+      button.setAttribute('aria-pressed', String(plan === selected));
+      button.addEventListener('click', () => handler(plan));
+      container.append(button);
     }
+    focusTarget?.focus({ preventScroll: true });
   }
   function renderMobilePlans() {
     planButtons(el.mobilePlanControl, state.activePlan, (plan) => { state.activePlan = plan; state.sortKey = 'plan'; state.sortPlan = plan; state.sortDirection = 'asc'; renderMobilePlans(); renderTable(); });
@@ -581,7 +642,20 @@
     }
     return out;
   }
-  function renderHistoryPlans() { planButtons(el.historyPlanControl, state.historyPlan, (plan) => { state.historyPlan = plan; renderHistoryPlans(); renderHistory(); }); }
+  function countryHistoryPlans(market) {
+    const labels = new Map(state.plans.map(plan => [planIdentity(plan), plan]));
+    for (const event of historyEvents(market)) for (const offer of event.snapshot.offers) {
+      const identity = planIdentity(offer.label);
+      if (!labels.has(identity)) labels.set(identity, offer.label);
+    }
+    return [...labels.values()].sort(comparePlans);
+  }
+  function renderHistoryPlans() {
+    const plans = countryHistoryPlans(state.activeMarket);
+    planButtons(el.historyPlanControl, state.historyPlan, plan => {
+      state.historyPlan = plan; renderHistoryPlans(); renderHistory();
+    }, plans);
+  }
   function renderHistory() {
     const market = state.activeMarket; if (!market) return;
     const offer = offerFor(market, state.historyPlan);
@@ -602,7 +676,22 @@
     el.historyTitle.textContent = market.name; el.historySubtitle.textContent = `${market.code.toUpperCase()} · ${market.currency || '—'} · 近期公开标价记录`;
     renderHistoryPlans(); renderHistory(); el.historyDialog.showModal();
   }
-  function closeHistory() { if (el.historyDialog.open) el.historyDialog.close(); }
+  function restoreHistoryFocus() {
+    const marketId = state.activeMarket?.code;
+    const original = state.historyReturnFocus;
+    const current = [...el.priceRows.querySelectorAll('tr[data-market-id]')]
+      .find(row => row.dataset.marketId === marketId)?.querySelector('.country-history-button');
+    state.activeMarket = null;
+    state.historyReturnFocus = null;
+    (original?.isConnected ? original : current || el.priceWorkspace).focus({ preventScroll: true });
+  }
+  function closeHistory() {
+    if (!el.historyDialog.open) return;
+    el.historyDialog.close();
+    // The native close event is queued. Restore synchronously so a replacement
+    // table row owns focus as soon as the dialog has been dismissed.
+    restoreHistoryFocus();
+  }
 
 
 
@@ -700,7 +789,17 @@
 
     const close = minimumHistoryNode('button', '×', 'icon-button');
     close.type = 'button'; close.id = 'closeMinimumHistory'; close.setAttribute('aria-label', '关闭最低价历史');
-    close.addEventListener('click', () => dialog.close());
+    function restoreFocus() {
+      if (dialog.open || !minimumHistoryUi.returnFocusPending) return;
+      minimumHistoryUi.returnFocusPending = false;
+      el.minimumHistoryButton?.focus({ preventScroll: true });
+    }
+    function closeDialog() {
+      if (!dialog.open) return;
+      dialog.close();
+      restoreFocus();
+    }
+    close.addEventListener('click', closeDialog);
     header.append(title, toolbar, close);
 
     const content = minimumHistoryNode('section', '', 'history-list');
@@ -718,8 +817,9 @@
 
     content.append(status, list, more, note, retry);
     dialog.append(header, content);
-    dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
-    dialog.addEventListener('close', () => el.minimumHistoryButton?.focus({ preventScroll: true }));
+    dialog.addEventListener('click', (event) => { if (event.target === dialog) closeDialog(); });
+    dialog.addEventListener('cancel', event => { event.preventDefault(); closeDialog(); });
+    dialog.addEventListener('close', restoreFocus);
     document.body.append(dialog);
     minimumHistoryUi.dialog = dialog;
     return dialog;
@@ -827,6 +927,7 @@
     const dialog = ensureMinimumHistoryDialog();
     minimumHistoryUi.filterPlan = 'all';
     minimumHistoryUi.limit = 20;
+    minimumHistoryUi.returnFocusPending = true;
     dialog.showModal();
     if (minimumHistoryUi.data && (!state.data || minimumHistoryUi.data.checked_at === state.data.generated_at)) renderMinimumHistory();
     else void loadMinimumHistory();
@@ -840,7 +941,10 @@
     el.searchInput.addEventListener('input', () => { state.query = el.searchInput.value.normalize('NFKC').slice(0, 80); renderTable(); });
     el.minimumHistoryButton?.addEventListener('click', openMinimumHistory);
     el.closeHistory.addEventListener('click', closeHistory);
-    el.historyDialog.addEventListener('close', () => { const target = state.historyReturnFocus; state.activeMarket = null; state.historyReturnFocus = null; target?.focus({ preventScroll: true }); });
+    el.historyDialog.addEventListener('close', () => {
+      if (!el.historyDialog.open && (state.activeMarket || state.historyReturnFocus)) restoreHistoryFocus();
+    });
+    el.historyDialog.addEventListener('cancel', event => { event.preventDefault(); closeHistory(); });
     el.historyDialog.addEventListener('click', (event) => { if (event.target === el.historyDialog) closeHistory(); });
     el.backToTableButton.addEventListener('click', () => { el.priceWorkspace.scrollIntoView({ behavior: 'smooth', block: 'start' }); el.priceWorkspace.focus({ preventScroll: true }); });
     addEventListener('scroll', () => { if (!state.scrollFrame) state.scrollFrame = requestAnimationFrame(() => { state.scrollFrame = null; backButton(); }); }, { passive: true });
@@ -868,6 +972,9 @@
     bind();
     renderTable();
     backButton();
+    freshnessSignature = timeDependentSignature();
+    setInterval(refreshTimeDependentUi, 30_000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshTimeDependentUi(); });
   }
   start().catch((error) => { console.error(error); el.freshnessWarning.hidden = false; el.freshnessWarning.textContent = '交互功能未能启动，当前仍显示静态价格'; });
 })();

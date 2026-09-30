@@ -3904,3 +3904,184 @@ test('minimum history keeps all-capacity pagination, cause labels and optional f
     assert.equal(await page.evaluate(()=>document.querySelector('#minimumHistoryDialog').scrollWidth<=document.querySelector('#minimumHistoryDialog').clientWidth+1),true);
   } finally{await browser.close();}
 });
+
+
+async function reviewOpenPage(context, { javaScriptEnabled = true } = {}) {
+  const config = await resolveBrowser(context, 'the review regression tests');
+  if (!config) return null;
+  const data = await readFixture('prices.json');
+  const server = await startServer();
+  const browser = await config.browserType.launch(config.launchOptions);
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, javaScriptEnabled });
+  await page.addInitScript((nowMs) => { Date.now = () => nowMs; }, Date.parse(data.generatedAt) + 60 * 60 * 1000);
+  await page.route('https://**/*', (route) => route.abort());
+  return { page, browser, data, url: `http://127.0.0.1:${server.address().port}/` };
+}
+async function reviewAssertAllStaticTiers(page, data) {
+  for (const { id } of data.tiers) {
+    assert.equal(await page.locator(`th[data-tier="${id}"]`).isVisible(), true, `${id} header must remain accessible in static fallback`);
+    assert.equal(await page.locator(`.price-cell[data-tier="${id}"]`).first().isVisible(), true, `${id} prices must remain accessible in static fallback`);
+  }
+  const geometry = await page.evaluate(() => {
+    const scroller = document.querySelector('.table-scroll');
+    scroller.scrollLeft = scroller.scrollWidth;
+    return { overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth, scrollWidth: scroller.scrollWidth, clientWidth: scroller.clientWidth, scrollLeft: scroller.scrollLeft };
+  });
+  assert.ok(geometry.overflow <= 2, JSON.stringify(geometry));
+  assert.ok(geometry.scrollWidth > geometry.clientWidth, JSON.stringify(geometry));
+  assert.ok(geometry.scrollLeft > 0, JSON.stringify(geometry));
+}
+test('review: all mobile static tiers remain accessible without JavaScript', { timeout: 30000 }, async (context) => {
+  const env = await reviewOpenPage(context, { javaScriptEnabled: false });
+  if (!env) return;
+  const { page, browser, data, url } = env;
+  try {
+    await page.goto(`${url}?tier=6TB`, { waitUntil: 'domcontentloaded' });
+    assert.equal(await page.locator('.noscript-notice').isVisible(), true);
+    assert.equal(await page.locator('.workspace.price-ui-ready').count(), 0);
+    await reviewAssertAllStaticTiers(page, data);
+    assert.equal(await page.locator('th[data-tier="200GB"]').getAttribute('aria-sort'), 'ascending');
+  } finally { await browser.close(); }
+});
+test('review: mobile network failure preserves every tier and retry enables the picker', { timeout: 30000 }, async (context) => {
+  const env = await reviewOpenPage(context);
+  if (!env) return;
+  const { page, browser, data, url } = env;
+  let attempts = 0;
+  await page.route('**/data/prices.json*', (route) => {
+    attempts += 1;
+    return attempts === 1 ? route.fulfill({ status: 503, body: '{}' }) : route.fulfill({ json: data });
+  });
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
+    assert.equal(await page.locator('.workspace.price-ui-ready').count(), 0);
+    await reviewAssertAllStaticTiers(page, data);
+    await page.locator('#retryButton').click();
+    await page.waitForFunction(() => document.querySelector('.workspace.price-ui-ready'));
+    assert.equal(await page.locator('#mobileTierControl button').count(), data.tiers.length);
+    const selected = await page.locator('#mobileTierControl button[aria-pressed="true"]').getAttribute('data-tier');
+    for (const { id } of data.tiers) assert.equal(await page.locator(`th[data-tier="${id}"]`).isVisible(), id === selected);
+    assert.equal(attempts, 2);
+  } finally { await browser.close(); }
+});
+test('review: keyboard tier activation preserves focus in mobile and history controls', { timeout: 30000 }, async (context) => {
+  const env = await reviewOpenPage(context);
+  if (!env) return;
+  const { page, browser, data, url } = env;
+  await page.route('**/data/prices.json*', (route) => route.fulfill({ json: data }));
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('.workspace.price-ui-ready'));
+    const [first, second] = data.tiers;
+    assert.ok(first && second);
+    for (const [tier, key] of [[first.id, 'Enter'], [second.id, 'Space']]) {
+      const button = page.locator(`#mobileTierControl button[data-tier="${tier}"]`);
+      await button.focus();
+      await page.keyboard.press(key);
+      assert.equal(await button.getAttribute('aria-pressed'), 'true');
+      assert.equal(await button.evaluate((node) => document.activeElement === node), true);
+    }
+    const trigger = page.locator('.country-history-button').first();
+    await trigger.click();
+    await page.waitForFunction(() => document.querySelector('#historyDialog')?.open === true);
+    for (const [tier, key] of [[first.id, 'Enter'], [second.id, 'Space']]) {
+      const button = page.locator(`#historyTierControl button[data-tier="${tier}"]`);
+      await button.focus();
+      await page.keyboard.press(key);
+      assert.equal(await button.getAttribute('aria-pressed'), 'true');
+      assert.equal(await button.evaluate((node) => document.activeElement === node), true);
+      await page.keyboard.press('Tab');
+      assert.equal(await page.locator('#historyDialog').evaluate((dialog) => dialog.contains(document.activeElement)), true);
+      await page.keyboard.press('Shift+Tab');
+      assert.equal(await page.locator('#historyDialog').evaluate((dialog) => dialog.contains(document.activeElement)), true);
+    }
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => document.querySelector('#historyDialog')?.open === false);
+    assert.equal(await trigger.evaluate((node) => document.activeElement === node), true);
+  } finally { await browser.close(); }
+});
+test('review: unsupported valid tier is canonicalized without rebuilding static rows', { timeout: 30000 }, async (context) => {
+  const env = await reviewOpenPage(context);
+  if (!env) return;
+  const { page, browser, data, url } = env;
+  const absentTier = ['100GB', '300GB', '400GB'].find((id) => !data.tiers.some((tier) => tier.id === id));
+  assert.ok(absentTier);
+  const expectedTier = data.tiers.find(({ id }) => id === '200GB')?.id ?? data.tiers[0].id;
+  let release;
+  const released = new Promise((resolve) => { release = resolve; });
+  await page.route('**/data/prices.json*', async (route) => { await released; await route.fulfill({ json: data }); });
+  try {
+    await page.goto(`${url}?tier=${absentTier}`, { waitUntil: 'domcontentloaded' });
+    await page.locator('#priceRows tr[data-market-id]').first().evaluate((row) => { row.dataset.reviewStaticMarker = 'retained'; });
+    release();
+    await page.waitForFunction(() => document.querySelector('.workspace.price-ui-ready'));
+    assert.equal(new URL(page.url()).searchParams.get('tier'), expectedTier);
+    assert.equal(await page.locator('tr[data-review-static-marker="retained"]').count(), 1);
+    assert.equal(await page.locator(`th[data-tier="${expectedTier}"]`).getAttribute('aria-sort'), 'ascending');
+    assert.equal(await page.locator('#mobileTierControl button[aria-pressed="true"]').getAttribute('data-tier'), expectedTier);
+  } finally { release(); await browser.close(); }
+});
+test('review: changed snapshot clears the old displayed date while history stays deferred', { timeout: 60000 }, async (context) => {
+  const config = await resolveBrowser(context, 'the changed publication-date regression');
+  if (!config) return;
+  const original = await readFixture('prices.json');
+  const oldHistory = await readFixture('history.json');
+  const next = structuredClone(original);
+  const nextHistory = structuredClone(oldHistory);
+  const nextAt = new Date(Date.parse(original.generatedAt) + 60000).toISOString();
+  setPayloadGeneratedAt(next, nextAt);
+  next.source.publishedDate = next.run.observedAtBeijing;
+  assert.ok(parsePublicationDate(next.source.publishedDate) > parsePublicationDate(original.source.publishedDate), 'fixture requires an observation date later than the previous Apple publication');
+  const country = next.countries[0];
+  const tier = next.tiers[0].id;
+  const previousPrice = country.plans[tier].price;
+  country.plans[tier].price = Number((previousPrice + 1).toFixed(2));
+  country.plans[tier].formattedPrice = String(country.plans[tier].price);
+  country.plans[tier].cnyPrice = Number((country.plans[tier].cnyPrice * country.plans[tier].price / previousPrice).toFixed(2));
+  rerankPriceFixture(next);
+  nextHistory.updatedAt = nextAt;
+  nextHistory.markets[country.marketId].events.push({
+    observedAt: next.run.observedAtBeijing, observedAtBeijing: next.run.observedAtBeijing, observedAtUtc: nextAt, currency: country.currency,
+    plans: Object.fromEntries(next.tiers.map(({ id }) => [id, country.plans[id].price]))
+  });
+  nextHistory.sourcePublishedDates.push({
+    publishedDate: next.source.publishedDate, observedAt: next.run.observedAtBeijing, observedAtBeijing: next.run.observedAtBeijing, observedAtUtc: nextAt, kind: 'change',
+    changes: { addedTiers: [], removedTiers: [], addedCountries: [], removedCountries: [], changedCountries: [{
+      country: country.country, nameZh: country.nameZh, fromCurrency: country.currency, toCurrency: country.currency, fromRegion: country.region, toRegion: country.region,
+      tiers: [{ id: tier, from: previousPrice, to: country.plans[tier].price }]
+    }] }
+  });
+  validatePriceHistoryConsistency(next, nextHistory);
+  const oldDate = formatUiDate(visiblePublicationEntries(oldHistory.sourcePublishedDates).at(-1).publishedDate);
+  const nextDate = formatUiDate(next.source.publishedDate);
+  const server = await startServer();
+  const url = `http://127.0.0.1:${server.address().port}/`;
+  const browser = await config.browserType.launch(config.launchOptions);
+  try {
+    for (const unavailable of [false, true]) {
+      const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+      let priceCalls = 0; let historyCalls = 0;
+      await page.addInitScript((nowMs) => { Date.now = () => nowMs; }, Date.parse(nextAt) + 60000);
+      await page.route('https://**/*', (route) => route.abort());
+      await page.route('**/data/prices.json*', (route) => { priceCalls += 1; return route.fulfill({ json: priceCalls === 1 ? original : next }); });
+      await page.route('**/data/history.json*', (route) => { historyCalls += 1; return unavailable ? route.fulfill({ status: 503, body: '{}' }) : route.fulfill({ json: nextHistory }); });
+      try {
+        await page.goto(url, { waitUntil: 'domcontentloaded' });
+        await page.waitForFunction(() => document.querySelector('.workspace.price-ui-ready'));
+        assert.equal(await page.locator('#applePublishedDate').textContent(), oldDate);
+        assert.equal(historyCalls, 0, 'unchanged initial hydration must defer history');
+        await page.locator('#retryButton').dispatchEvent('click');
+        await page.waitForFunction(() => document.querySelector('#applePublishedDate')?.textContent === '待核对');
+        assert.equal(historyCalls, 0, 'changed prices must not eagerly fetch the history ledger');
+        assert.notEqual(await page.locator('#applePublishedDate').textContent(), oldDate);
+        await page.locator('#publishedDateButton').click();
+        const expected = unavailable ? '暂时无法核对' : nextDate;
+        await page.waitForFunction((text) => document.querySelector('#applePublishedDate')?.textContent === text, expected);
+        assert.equal(historyCalls, 1);
+        assert.equal(await page.locator('#searchInput').isEnabled(), true);
+        await page.keyboard.press('Escape');
+      } finally { await page.close(); }
+    }
+  } finally { await browser.close(); }
+});

@@ -144,3 +144,40 @@ test('ignores unrelated tables outside explicitly bounded pricing sections', asy
   assert.equal(parsed.parser, 'cross-checked');
   assert.deepEqual(parsed.countries, parseApplePrices(CURRENT_TABLE_HTML).countries);
 });
+
+
+test('review: mixed table and legacy list pricing fails closed', () => {
+  const legacy = `<h4 class="gb-header">New Market (USD)</h4><ul><li>50GB: $0.99</li><li>200GB: $2.99</li></ul>`;
+  const variants = [
+    CURRENT_TABLE_HTML.replace('<table>', `${legacy}<table>`),
+    CURRENT_TABLE_HTML.replace('</table>', `</table>${legacy}`),
+    CURRENT_TABLE_HTML.replace('</body>', `${legacy}</body>`),
+    CURRENT_TABLE_HTML.replace('</body>', `${legacy.replaceAll('<ul>', '<ol>').replaceAll('</ul>', '</ol>')}</body>`)
+  ];
+  for (const html of variants) {
+    assert.notEqual(html, CURRENT_TABLE_HTML, 'mixed fixture insertion must change HTML');
+    assert.throws(() => parseApplePrices(html, { allowUnknownCountries: true }), /Mixed Apple pricing layouts/);
+  }
+  const unrelated = CURRENT_TABLE_HTML.replace('</body>', '<ul><li>Learn about iCloud</li><li>Contact Apple Support</li></ul></body>');
+  assert.notEqual(unrelated, CURRENT_TABLE_HTML);
+  assert.deepEqual(parseApplePrices(unrelated), parseApplePrices(CURRENT_TABLE_HTML));
+});
+
+test('review: mixed layouts account for malformed and table-wrapped storage lists', () => {
+  for (const tag of ['ul', 'ol']) {
+    for (const label of ['50 GB', '50<sup>1</sup> GB', '1 PB: $999.99', '50 GiB: $0.99', '50GB: $0.99']) {
+      const list = `<h4 class="gb-header">New Market (USD)</h4><${tag}><li>${label}</li></${tag}>`;
+      for (const fragment of [list, `<h2>More regions</h2><table><tr><td>${list}</td></tr></table>`]) {
+        const html = CURRENT_TABLE_HTML.replace('</body>', `${fragment}</body>`);
+        assert.notEqual(html, CURRENT_TABLE_HTML, 'fixture insertion must change HTML');
+        assert.throws(() => parseApplePrices(html, { allowUnknownCountries: true }), /Mixed Apple pricing layouts/, fragment);
+      }
+    }
+    const help = `<${tag}><li>Learn about iCloud</li><li>Contact Apple Support</li><li>How to use your 50 GB plan</li></${tag}>`;
+    for (const fragment of [help, `<h2>Billing information</h2><table><tr><td>${help}</td></tr></table>`]) {
+      const html = CURRENT_TABLE_HTML.replace('</body>', `${fragment}</body>`);
+      assert.notEqual(html, CURRENT_TABLE_HTML, 'help fixture insertion must change HTML');
+      assert.deepEqual(parseApplePrices(html), parseApplePrices(CURRENT_TABLE_HTML));
+    }
+  }
+});

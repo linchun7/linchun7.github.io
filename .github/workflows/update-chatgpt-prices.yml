@@ -241,7 +241,7 @@ jobs:
     permissions:
       contents: read
     outputs:
-      superseded: ${{ steps.freshness.outputs.superseded }}
+      superseded: ${{ steps.recheck.outputs.superseded || steps.freshness.outputs.superseded }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -263,23 +263,51 @@ jobs:
           set -euo pipefail
           echo "should_verify=true" >> "$GITHUB_OUTPUT"
           echo "superseded=false" >> "$GITHUB_OUTPUT"
-          test -n "$PUBLISHED_SHA" || {
-            echo "::error title=CHATGPT_PUBLISHED_SHA_MISSING::Publish completed without exposing the commit used as the production baseline."
-            exit 1
-          }
+          [[ "$PUBLISHED_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error title=CHATGPT_PUBLISHED_SHA_MISSING::Publish did not expose an exact production commit."; exit 1; }
           git fetch origin main --depth=1
           current_main_sha=$(git rev-parse origin/main)
-          if [[ "$current_main_sha" == "$PUBLISHED_SHA" ]]; then
-            exit 0
-          fi
-          if ! git diff --quiet "$PUBLISHED_SHA" "$current_main_sha" --             tools/chatgpt_price_comparison '.github/workflows/*chatgpt*.yml'; then
-            echo "::notice title=SUPERSEDED_CHATGPT_UPDATE_VERIFY::A newer ChatGPT project commit owns production verification; this older updater will not compare stale candidate bytes against the newer deployment."
-            echo "should_verify=false" >> "$GITHUB_OUTPUT"
-            echo "superseded=true" >> "$GITHUB_OUTPUT"
-          fi
+          if [[ "$current_main_sha" == "$PUBLISHED_SHA" ]]; then exit 0; fi
+          git fetch origin "$PUBLISHED_SHA" --depth=1
+          diff_status=0
+          python3 tools/chatgpt_price_comparison/scripts/deployment_scope.py --base "$PUBLISHED_SHA" --head "$current_main_sha" || diff_status=$?
+          case "$diff_status" in
+            0) echo "Main advanced outside the ChatGPT project; verify the published candidate." ;;
+            1)
+              echo "::notice title=SUPERSEDED_CHATGPT_UPDATE_VERIFY::A newer ChatGPT project commit owns production verification."
+              echo "should_verify=false" >> "$GITHUB_OUTPUT"
+              echo "superseded=true" >> "$GITHUB_OUTPUT"
+              ;;
+            *) echo "::error::Cannot establish ChatGPT deployment supersession."; exit "$diff_status" ;;
+          esac
       - name: Verify canonical production JSON and HTML
+        id: verification
+        continue-on-error: true
         if: steps.freshness.outputs.should_verify == 'true'
         run: node tools/chatgpt_price_comparison/scripts/verify-production.mjs --expected "$RUNNER_TEMP/chatgpt-candidate/prices.json" --expected-minimum-history "$RUNNER_TEMP/chatgpt-candidate/minimum-history.json" --expected-index "$RUNNER_TEMP/chatgpt-candidate/index.html"
+
+      - name: Recheck supersession after failed production verification
+        id: recheck
+        if: ${{ !cancelled() && steps.verification.outcome == 'failure' }}
+        env:
+          BASE_SHA: ${{ needs.publish.outputs.published_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "superseded=false" >> "$GITHUB_OUTPUT"
+          [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Missing exact production baseline."; exit 1; }
+          git fetch origin main --depth=1
+          current_main_sha=$(git rev-parse origin/main)
+          git fetch origin "$BASE_SHA" --depth=1
+          diff_status=0
+          python3 tools/chatgpt_price_comparison/scripts/deployment_scope.py --base "$BASE_SHA" --head "$current_main_sha" || diff_status=$?
+          case "$diff_status" in
+            1)
+              echo "::notice title=SUPERSEDED_CHATGPT_VERIFY_RECHECK::A newer ChatGPT project commit took over during verification."
+              echo "superseded=true" >> "$GITHUB_OUTPUT"
+              ;;
+            0) echo "::error::Production verification failed and the expected ChatGPT snapshot is still current."; exit 1 ;;
+            *) echo "::error::Cannot establish ChatGPT deployment supersession."; exit "$diff_status" ;;
+          esac
 
   verify-existing-production:
     name: Verify existing deployed ChatGPT price page
@@ -290,7 +318,7 @@ jobs:
     permissions:
       contents: read
     outputs:
-      superseded: ${{ steps.freshness.outputs.superseded }}
+      superseded: ${{ steps.recheck.outputs.superseded || steps.freshness.outputs.superseded }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -310,18 +338,48 @@ jobs:
           echo "superseded=false" >> "$GITHUB_OUTPUT"
           git fetch origin main --depth=1
           current_main_sha=$(git rev-parse origin/main)
-          if [[ "$current_main_sha" == "$VALIDATED_MAIN_SHA" ]]; then
-            exit 0
-          fi
-          if ! git diff --quiet "$VALIDATED_MAIN_SHA" "$current_main_sha" --             tools/chatgpt_price_comparison '.github/workflows/*chatgpt*.yml'; then
-            echo "::notice title=SUPERSEDED_CHATGPT_EXISTING_VERIFY::A newer ChatGPT project commit exists; its own updater or push production verification owns the newer deployment."
-            echo "should_verify=false" >> "$GITHUB_OUTPUT"
-            echo "superseded=true" >> "$GITHUB_OUTPUT"
-          fi
+          if [[ "$current_main_sha" == "$VALIDATED_MAIN_SHA" ]]; then exit 0; fi
+          diff_status=0
+          python3 tools/chatgpt_price_comparison/scripts/deployment_scope.py --base "$VALIDATED_MAIN_SHA" --head "$current_main_sha" || diff_status=$?
+          case "$diff_status" in
+            0) echo "Main advanced outside the ChatGPT project; verify pinned production." ;;
+            1)
+              echo "::notice title=SUPERSEDED_CHATGPT_EXISTING_VERIFY::A newer ChatGPT project commit owns production verification."
+              echo "should_verify=false" >> "$GITHUB_OUTPUT"
+              echo "superseded=true" >> "$GITHUB_OUTPUT"
+              ;;
+            *) echo "::error::Cannot establish ChatGPT deployment supersession."; exit "$diff_status" ;;
+          esac
       - name: Verify canonical production for the pinned successful snapshot
+        id: verification
+        continue-on-error: true
         if: steps.freshness.outputs.should_verify == 'true'
         run: |
           node tools/chatgpt_price_comparison/scripts/verify-production.mjs             --expected tools/chatgpt_price_comparison/data/prices.json             --expected-minimum-history tools/chatgpt_price_comparison/data/minimum-history.json             --expected-index tools/chatgpt_price_comparison/index.html
+
+      - name: Recheck supersession after failed production verification
+        id: recheck
+        if: ${{ !cancelled() && steps.verification.outcome == 'failure' }}
+        env:
+          BASE_SHA: ${{ needs.prepare.outputs.validated_main_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "superseded=false" >> "$GITHUB_OUTPUT"
+          [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Missing exact production baseline."; exit 1; }
+          git fetch origin main --depth=1
+          current_main_sha=$(git rev-parse origin/main)
+          git fetch origin "$BASE_SHA" --depth=1
+          diff_status=0
+          python3 tools/chatgpt_price_comparison/scripts/deployment_scope.py --base "$BASE_SHA" --head "$current_main_sha" || diff_status=$?
+          case "$diff_status" in
+            1)
+              echo "::notice title=SUPERSEDED_CHATGPT_VERIFY_RECHECK::A newer ChatGPT project commit took over during verification."
+              echo "superseded=true" >> "$GITHUB_OUTPUT"
+              ;;
+            0) echo "::error::Production verification failed and the expected ChatGPT snapshot is still current."; exit 1 ;;
+            *) echo "::error::Cannot establish ChatGPT deployment supersession."; exit "$diff_status" ;;
+          esac
 
   notify:
     needs: [prepare, generate, publish, verify-production, verify-existing-production]

@@ -80,6 +80,7 @@ jobs:
           )
           PY
           REQUIRE_FUTURE_PLAN=1 node tools/chatgpt_price_comparison/scripts/browser-test.mjs
+          python3 tools/chatgpt_price_comparison/scripts/browser-state-fixtures.py
 
 
   browser-matrix:
@@ -123,7 +124,7 @@ jobs:
     if: github.event_name == 'push'
     needs: [tests, browser-matrix]
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: read
       pages: read
@@ -159,11 +160,17 @@ jobs:
               if [[ "$build_status" == built ]]; then
                 if [[ "$relation" == successor ]]; then
                   git fetch origin "$built_sha" --depth=1
-                  if ! git diff --quiet "$TARGET_SHA" FETCH_HEAD -- tools/chatgpt_price_comparison; then
-                    echo "::notice title=SUPERSEDED_CHATGPT_BUILD::A later ChatGPT project commit is already deployed; this older validation run is superseded."
-                    echo "should_verify=false" >> "$GITHUB_OUTPUT"
-                    exit 0
-                  fi
+                  diff_status=0
+                  python3 tools/chatgpt_price_comparison/scripts/deployment_scope.py --base "$TARGET_SHA" --head "$built_sha" || diff_status=$?
+                  case "$diff_status" in
+                    0) ;;
+                    1)
+                      echo "::notice title=SUPERSEDED_CHATGPT_BUILD::A later ChatGPT project commit is already deployed; this older validation run is superseded."
+                      echo "should_verify=false" >> "$GITHUB_OUTPUT"
+                      exit 0
+                      ;;
+                    *) echo "::error::Cannot establish ChatGPT deployment supersession."; exit "$diff_status" ;;
+                  esac
                 fi
                 echo "Pages built $built_sha ($relation)."
                 echo "should_verify=true" >> "$GITHUB_OUTPUT"
@@ -179,9 +186,35 @@ jobs:
           echo "::error::Pages did not build this commit or a verified successor within 7.5 minutes."
           exit 1
       - name: Verify canonical JSON, minimum history, HTML and versioned assets
+        id: verification
+        continue-on-error: true
         if: steps.pages.outputs.should_verify == 'true'
         run: |
           node tools/chatgpt_price_comparison/scripts/verify-production.mjs \
             --expected tools/chatgpt_price_comparison/data/prices.json \
             --expected-minimum-history tools/chatgpt_price_comparison/data/minimum-history.json \
             --expected-index tools/chatgpt_price_comparison/index.html
+
+      - name: Recheck supersession after failed production verification
+        id: recheck
+        if: ${{ !cancelled() && steps.verification.outcome == 'failure' }}
+        env:
+          BASE_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "superseded=false" >> "$GITHUB_OUTPUT"
+          [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Missing exact production baseline."; exit 1; }
+          git fetch origin main --depth=1
+          current_main_sha=$(git rev-parse origin/main)
+          git fetch origin "$BASE_SHA" --depth=1
+          diff_status=0
+          python3 tools/chatgpt_price_comparison/scripts/deployment_scope.py --base "$BASE_SHA" --head "$current_main_sha" || diff_status=$?
+          case "$diff_status" in
+            1)
+              echo "::notice title=SUPERSEDED_CHATGPT_VERIFY_RECHECK::A newer ChatGPT project commit took over during verification."
+              echo "superseded=true" >> "$GITHUB_OUTPUT"
+              ;;
+            0) echo "::error::Production verification failed and the expected ChatGPT snapshot is still current."; exit 1 ;;
+            *) echo "::error::Cannot establish ChatGPT deployment supersession."; exit "$diff_status" ;;
+          esac

@@ -396,7 +396,10 @@ def observe(config: dict, old: dict | None, now: float, getter=fetch) -> dict:
     try:
         candidate = parse_store(getter(url_for(config['code']) + '?l=en-US'), config['code'])
         changed = not old or old.get('fingerprint') != candidate['fingerprint']
-        if changed:
+        # Clearing a pending observation is itself a semantic decision. A
+        # single cached response matching the published baseline must not erase
+        # independently confirmed pending evidence or renew its verification.
+        if changed or (old and old.get('pending')):
             second = parse_store(getter(url_for(config['code']) + '?l=en-US', confirm=True), config['code'])
             if second['fingerprint'] != candidate['fingerprint']:
                 raise ValueError('independent confirmation fetch disagrees')
@@ -405,11 +408,19 @@ def observe(config: dict, old: dict | None, now: float, getter=fetch) -> dict:
             decision = change_decision(old, candidate)
             if decision.quarantine:
                 pending = old.get('pending', {})
-                same_candidate = pending.get('fingerprint') == candidate['fingerprint']
+                # Preserve the raw fingerprint for source evidence, but do not
+                # restart a waiting period for a reviewed label-only rename.
+                # history_semantic keeps duplicate identities unmerged. Legacy
+                # pending records without this field require an exact raw match.
+                comparison_fingerprint = digest(history_semantic(candidate))
+                same_candidate = pending.get('fingerprint') == candidate['fingerprint'] or (
+                    pending.get('comparison_fingerprint') == comparison_fingerprint
+                )
                 since = pending.get('since') if same_candidate else None
                 if not same_candidate or not isinstance(since, str) or now - epoch(since) < PENDING_CONFIRMATION_SECONDS:
                     result['pending'] = {
                         'fingerprint': candidate['fingerprint'],
+                        'comparison_fingerprint': comparison_fingerprint,
                         'since': since if same_candidate and isinstance(since, str) else stamp(now),
                         'reason': decision.kind,
                     }
@@ -513,10 +524,17 @@ def validate(data: dict, now: float | None = None) -> None:
         if pending is not None:
             if market['status'] not in ('pending', 'retained'):
                 raise ValueError('unexpected pending evidence')
-            if not isinstance(pending, dict) or set(pending) not in ({'fingerprint','since'}, {'fingerprint','since','reason'}):
+            if (not isinstance(pending, dict)
+                or not {'fingerprint', 'since'} <= set(pending)
+                or not set(pending) <= {'fingerprint', 'since', 'reason', 'comparison_fingerprint'}):
                 raise ValueError('invalid pending evidence')
             if not re.fullmatch('[a-f0-9]{64}', pending.get('fingerprint', '')):
                 raise ValueError('invalid pending fingerprint')
+            if 'comparison_fingerprint' in pending and (
+                not isinstance(pending['comparison_fingerprint'], str)
+                or not re.fullmatch('[a-f0-9]{64}', pending['comparison_fingerprint'])
+            ):
+                raise ValueError('invalid pending comparison fingerprint')
             if epoch(pending.get('since', '')) > epoch(market['last_checked_at']):
                 raise ValueError('invalid pending timestamp')
             if 'reason' in pending and pending['reason'] not in change_policy.QUARANTINE_KINDS:

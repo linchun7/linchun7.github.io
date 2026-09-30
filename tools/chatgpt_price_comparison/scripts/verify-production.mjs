@@ -174,6 +174,7 @@ export async function verifyOnce(expected, {
     }
     return actual.revision;
   } finally {
+    controller.abort();
     clearTimeout(timer);
   }
 }

@@ -389,16 +389,35 @@ def backfill_history(ref='HEAD', project_dir=ROOT):
         raise ValueError('backfill requires full Git history')
     shas = [line for line in git('log','--first-parent','--reverse','--format=%H',ref,'--',PRICE_PATH).splitlines() if line]
     groups, excluded = {}, 0
+    gaps_before, gaps_after = set(), set()
+    deletion_pending = False
     for sha in shas:
         try:
+            # A proven deletion is an auditable missing-publication interval,
+            # unlike a missing object/read failure. Do not guess its timestamp.
+            entry = git('ls-tree', '--name-only', sha, '--', PRICE_PATH).strip()
+            if not entry:
+                excluded += 1
+                deletion_pending = True
+                continue
             data = json.loads(git('show', f'{sha}:{PRICE_PATH}'))
             snapshot = build_snapshot(data)
-        except Exception:
-            excluded += 1
-            continue
-        groups.setdefault(data['generated_at'], []).append((data, snapshot))
+        except Exception as exc:
+            # An unreadable version has no trustworthy observation time or
+            # semantics. Skipping it would falsely join two audited snapshots
+            # across an unmarked gap and invent a confident change cause.
+            raise ValueError('unreadable or invalid Git price snapshot: ' + sha) from exc
+        at = data['generated_at']
+        if deletion_pending:
+            # Restoring identical bytes is not a later price observation. Keep
+            # its gap open after this group until a genuinely later snapshot.
+            (gaps_after if at in groups else gaps_before).add(at)
+            deletion_pending = False
+        groups.setdefault(at, []).append((data, snapshot))
     history = empty_history()
     for at in sorted(groups, key=epoch):
+        if at in gaps_before:
+            history['pending_gap'] = True
         candidates = groups[at]
         reliable = [(data,snapshot) for data,snapshot in candidates if snapshot is not None]
         unreliable_count = len(candidates) - len(reliable)
@@ -407,15 +426,19 @@ def backfill_history(ref='HEAD', project_dir=ROOT):
             # the checked-at/gap state; count only the remaining versions here.
             excluded += max(0, unreliable_count - 1)
             history = advance_history(history, candidates[-1][0])
-            continue
-        excluded += unreliable_count
-        signatures = {canonical(projection(snapshot)) for _,snapshot in reliable}
-        if len(signatures) != 1:
-            excluded += len(reliable)
+        else:
+            excluded += unreliable_count
+            signatures = {canonical(projection(snapshot)) for _,snapshot in reliable}
+            if len(signatures) != 1:
+                excluded += len(reliable)
+                history['pending_gap'] = True
+            else:
+                history = advance_history(history, reliable[-1][0])
+        if at in gaps_after:
             history['pending_gap'] = True
-            continue
-        history = advance_history(history, reliable[-1][0])
     history['excluded_versions'] += excluded
+    if deletion_pending:
+        history['pending_gap'] = True
     current = json.loads((project_dir/'data/prices.json').read_text(encoding='utf-8'))
     history = advance_history(history, current)
     assert_matches(history, current)

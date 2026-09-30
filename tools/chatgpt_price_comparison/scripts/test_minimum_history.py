@@ -5,6 +5,7 @@ import json
 import tempfile
 import subprocess
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from decimal import Decimal
 
@@ -30,6 +31,92 @@ def fixture(offset=0):
 
 
 class MinimumHistoryTests(unittest.TestCase):
+    def test_unreadable_git_versions_fail_closed_instead_of_hiding_a_gap(self):
+        first = fixture()
+        latest = fixture(86400)
+        first_sha, broken_sha, last_sha = ('a' * 40, 'b' * 40, 'c' * 40)
+        for broken in ('{ invalid JSON', json.dumps({'generated_at': 'not-a-timestamp'}), '{}', 'missing-price-file', 'missing-git-object'):
+            with self.subTest(broken=broken), tempfile.TemporaryDirectory() as directory:
+                project = Path(directory) / 'repo/tools/chatgpt_price_comparison'
+                data_dir = project / 'data'
+                data_dir.mkdir(parents=True)
+                price_path = data_dir / 'prices.json'
+                price_bytes = json.dumps(latest).encode()
+                price_path.write_bytes(price_bytes)
+                def git_output(args, **kwargs):
+                    if args[1] == 'rev-parse':
+                        return 'false\n'
+                    if args[1] == 'log':
+                        return '\n'.join((first_sha, broken_sha, last_sha)) + '\n'
+                    if args[1] == 'ls-tree':
+                        return h.PRICE_PATH + '\n'
+                    self.assertEqual(args[1], 'show')
+                    if args[2].startswith(first_sha):
+                        return json.dumps(first)
+                    if args[2].startswith(last_sha):
+                        return json.dumps(latest)
+                    if broken in ('missing-price-file', 'missing-git-object'):
+                        raise subprocess.CalledProcessError(128, args)
+                    return broken
+                with patch.object(h.subprocess, 'check_output', side_effect=git_output):
+                    with self.assertRaisesRegex(ValueError, 'unreadable or invalid Git price snapshot: ' + broken_sha):
+                        h.backfill_history(project_dir=project)
+                self.assertEqual(price_path.read_bytes(), price_bytes)
+                self.assertFalse((data_dir / 'minimum-history.json').exists())
+
+    def test_proven_deletion_marks_gap_including_same_snapshot_restoration(self):
+        def data_at(offset, cheaper):
+            data = fixture(offset)
+            second = copy.deepcopy(data['markets'][0])
+            second.update(code='jp', name='Japan', source_url=p.url_for('jp'))
+            for offer in second['offers']:
+                for amount in offer['amounts']:
+                    local = Decimal(amount['amount']) * (1 if cheaper else 2)
+                    amount['amount'] = format(local.normalize(), 'f')
+                    amount['display'] = 'USD ' + format(local, '.2f')
+                    amount['cny'] = p.converted(second, amount['amount'], data['fx'], p.epoch(data['generated_at']))
+            second['fingerprint'] = p.digest(p.semantic(second))
+            data['markets'].append(second)
+            revise(data)
+            p.validate(data, NOW + 86400)
+            return data
+        first, current = data_at(0, False), data_at(86400, True)
+        for restore_same, trailing_deletion in ((False, False), (True, False), (False, True)):
+            with self.subTest(restore_same=restore_same, trailing_deletion=trailing_deletion), tempfile.TemporaryDirectory() as directory:
+                repo = Path(directory)
+                project = repo / 'tools/chatgpt_price_comparison'
+                path = project / 'data/prices.json'
+                path.parent.mkdir(parents=True)
+                def git(*args):
+                    return subprocess.check_output(['git', *args], cwd=repo, text=True, stderr=subprocess.DEVNULL).strip()
+                git('init', '-b', 'main')
+                git('config', 'gc.auto', '0')
+                git('config', 'user.name', 'Fixture')
+                git('config', 'user.email', 'fixture@example.invalid')
+                def save(data, message):
+                    if data is None:
+                        path.unlink()
+                    else:
+                        path.write_text(json.dumps(data))
+                    git('add', '-A')
+                    git('-c', 'commit.gpgSign=false', 'commit', '-m', message)
+                save(first, 'A verified prices')
+                save(None, 'Published price artifact deleted')
+                if restore_same:
+                    save(first, 'Restore A without inventing a later observation')
+                if trailing_deletion:
+                    path.write_text(json.dumps(current))
+                else:
+                    save(current, 'C verified prices')
+                history, _ = h.backfill_history(project_dir=project)
+                self.assertEqual(history['excluded_versions'], 1)
+                self.assertEqual(history['gaps'], [{'from': first['generated_at'], 'to': current['generated_at']}])
+                changes = [event for event in history['events'] if event['kind'] == 'change']
+                self.assertTrue(changes)
+                self.assertTrue(all(event['evidence']['gap'] and event['cause'] == 'unknown' for event in changes))
+                self.assertFalse(history['pending_gap'])
+                self.assertTrue(h.assert_matches(history, current))
+
     def test_committed_history_matches_prices(self):
         data=json.loads((p.ROOT/'data/prices.json').read_text(encoding='utf-8'))
         history=json.loads((p.ROOT/'data/minimum-history.json').read_text(encoding='utf-8'))

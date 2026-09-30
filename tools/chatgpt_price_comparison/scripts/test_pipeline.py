@@ -479,10 +479,11 @@ class ContractTests(unittest.TestCase):
         changed=p.observe({'code':'us','name':'美国'}, old, NOW+86400, lambda *a,**kw: fixture(pairs=[['ChatGPT Pro $100','$105.00']]))
         self.assertTrue(p.should_record_history_change(old, changed))
 
-    def test_ambiguous_bare_pro_name_is_not_guessed_as_known_rename(self):
+    def test_documented_numeric_pro_labels_keep_price_series_identity(self):
         self.assertEqual(p.plan_ids.plan_identity('ChatGPT Pro'), 'ChatGPT Pro')
-        self.assertEqual(p.plan_ids.plan_identity('ChatGPT Pro 100'), 'ChatGPT Pro 100')
-        self.assertEqual(p.plan_ids.plan_identity('ChatGPT Pro 200'), 'ChatGPT Pro 200')
+        self.assertEqual(p.plan_ids.plan_identity('ChatGPT Pro 100'), 'ChatGPT Pro 5x')
+        self.assertEqual(p.plan_ids.plan_identity('ChatGPT Pro 200'), 'ChatGPT Pro 20x')
+        self.assertEqual(p.plan_ids.plan_identity('ChatGPT Pro 500'), 'ChatGPT Pro 500')
 
     def test_main_table_uses_plan_local_minimum_without_cross_plan_inference(self):
         plus = {'label':'ChatGPT Plus','amounts':[{'amount':'19.99'},{'amount':'200'}]}

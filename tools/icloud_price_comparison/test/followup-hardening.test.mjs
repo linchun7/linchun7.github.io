@@ -206,3 +206,15 @@ test('Chinese market monitor is an isolated read-only service triggered after th
   assert.match(monitorSource, /仅提示人工复核，不自动修改中文名称/);
   assert.match(monitorSource, /process\.exitCode = monitorExitCode\(result\)/);
 });
+
+
+test('review: Chinese market labels support mixed Unicode footnotes without stripping interior digits', () => {
+  for (const label of ['巴哈马²𝄒³（美元）', '巴哈马²,³（美元）', '巴哈马<sup>2,3</sup>（美元）', '巴哈马（美元）']) {
+    const table = `<main><table><thead><tr><th>国家或地区（货币）</th><th>50 GB</th><th>200 GB</th></tr></thead><tbody><tr><td>${label}</td><td>$0.99</td><td>$2.99</td></tr></tbody></table></main>`;
+    assert.deepEqual(extractAppleZhMarketNames(table), ['巴哈马'], label);
+    const legacy = `<main><h4>${label}</h4><ul><li>50GB：$0.99</li><li>200GB：$2.99</li><li>2TB：$10.99</li></ul></main>`;
+    assert.deepEqual(extractAppleZhMarketNames(legacy), ['巴哈马'], label);
+  }
+  const invalid = `<main><table><thead><tr><th>国家或地区（货币）</th><th>50 GB</th></tr></thead><tbody><tr><td>巴2哈马（美元）</td><td>$0.99</td></tr></tbody></table></main>`;
+  assert.throws(() => extractAppleZhMarketNames(invalid), /Chinese market table contains an empty or unexplained country cell/);
+});
