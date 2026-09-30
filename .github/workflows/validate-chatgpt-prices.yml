@@ -83,49 +83,6 @@ jobs:
           python3 tools/chatgpt_price_comparison/scripts/browser-state-fixtures.py
 
 
-
-  review-pending-source:
-    name: Review pending source evidence
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 6
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-      - name: Fetch each official storefront twice for human review
-        run: |
-          python3 - <<'PY'
-          import concurrent.futures, json, sys, time
-          sys.path.insert(0, 'tools/chatgpt_price_comparison/scripts')
-          import pipeline as p
-          data = json.loads((p.ROOT / 'data/prices.json').read_text())
-          deadline = time.monotonic() + 240
-          def review(old):
-              url = p.url_for(old['code']) + '?l=en-US'
-              first = p.parse_store(p.fetch(url, deadline=deadline), old['code'])
-              second = p.parse_store(p.fetch(url, confirm=True, deadline=deadline), old['code'])
-              if first['fingerprint'] != second['fingerprint']:
-                  raise ValueError('independent observations disagree: ' + old['code'])
-              result = {'code': old['code'], 'observed_at': p.stamp(time.time()),
-                  'url': url, 'before_fingerprint': old['fingerprint'],
-                  'candidate_fingerprint': second['fingerprint'],
-                  'candidate_comparison_fingerprint': p.digest(p.history_semantic(second)),
-                  'pending_since': old.get('pending', {}).get('since'),
-                  'matches_pending': old.get('pending', {}).get('fingerprint') == second['fingerprint'],
-                  'decision': p.change_decision(old, second).kind,
-                  'before': p.semantic(old), 'candidate': p.semantic(second),
-                  'source_sha256_first': first['source_sha256'],
-                  'source_sha256_second': second['source_sha256']}
-              print('REVIEW_EVIDENCE ' + json.dumps(result, ensure_ascii=False, sort_keys=True), flush=True)
-              return result
-          with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-              results = list(executor.map(review, data['markets']))
-          print('REVIEW_COUNT', len(results), 'PENDING_MATCHES', sum(r['matches_pending'] for r in results))
-          PY
-
   browser-matrix:
     name: Browser smoke (${{ matrix.browser }})
     needs: tests

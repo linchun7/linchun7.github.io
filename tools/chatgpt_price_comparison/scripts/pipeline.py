@@ -21,6 +21,7 @@ import unicodedata
 import minimum_history
 import plan_identity as plan_ids
 import change_policy
+import reviewed_confirmation
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -390,7 +391,7 @@ def unusual(old: dict, new: dict) -> bool:
     return change_decision(old, new).quarantine
 
 
-def observe(config: dict, old: dict | None, now: float, getter=fetch) -> dict:
+def observe(config: dict, old: dict | None, now: float, getter=fetch, *, reviews=None) -> dict:
     result = copy.deepcopy(old) if old else {'code': config['code'], 'name': config['name'], 'source_url': url_for(config['code']), 'offers': []}
     result.update(name=config['name'], last_checked_at=stamp(now))
     try:
@@ -417,7 +418,9 @@ def observe(config: dict, old: dict | None, now: float, getter=fetch) -> dict:
                     pending.get('comparison_fingerprint') == comparison_fingerprint
                 )
                 since = pending.get('since') if same_candidate else None
-                if not same_candidate or not isinstance(since, str) or now - epoch(since) < PENDING_CONFIRMATION_SECONDS:
+                waiting = not same_candidate or not isinstance(since, str) or now - epoch(since) < PENDING_CONFIRMATION_SECONDS
+                approved = reviewed_confirmation.allows(reviews, config['code'], old, candidate, decision.kind, now)
+                if waiting and not approved:
                     result['pending'] = {
                         'fingerprint': candidate['fingerprint'],
                         'comparison_fingerprint': comparison_fingerprint,
@@ -428,6 +431,8 @@ def observe(config: dict, old: dict | None, now: float, getter=fetch) -> dict:
                     result.pop('error', None)
                     result.pop('error_detail', None)
                     return result
+                if waiting and approved:
+                    print('REVIEWED_CONFIRMATION', config['code'], candidate['fingerprint'], flush=True)
         result.update(candidate, status='verified', last_verified_at=stamp(now))
         result.pop('pending', None)
         result.pop('error', None)
@@ -873,10 +878,11 @@ def run(output: Path, now: float | None = None) -> dict:
     if old:
         validate(old, now)
     previous, changes = scope_previous(old, configured_codes)
+    reviews = reviewed_confirmation.load(ROOT / 'reviewed-changes.json', configured_codes)
     deadline = time.monotonic() + 240
     getter = lambda url, **kw: fetch(url, deadline=deadline, **kw)
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-        markets = list(executor.map(lambda c: observe(c, previous.get(c['code']), now, getter), config))
+        markets = list(executor.map(lambda c: observe(c, previous.get(c['code']), now, getter, reviews=reviews), config))
     for market in markets:
         if market.get('error'):
             print('SOURCE_ERROR', market['code'], market['error_detail'], flush=True)
