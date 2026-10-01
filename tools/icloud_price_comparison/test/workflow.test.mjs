@@ -306,7 +306,27 @@ test('moves full-history growth checks into a weekly read-only workflow', async 
   assert.match(workflow, /schedule:[\s\S]*?cron:\s*['"]15 22 \* \* 6['"]/);
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /permissions:\s+contents: read/);
-  assert.doesNotMatch(workflow, /contents: write|secrets\.|pnpm install|npm install/);
+  // The weekly audit remains read-only. A user-requested, fixed-manifest
+  // one-shot cleanup is separately gated and is removed after execution.
+  const [audit, cleanup] = workflow.split('\n  branch-preflight:');
+  assert.doesNotMatch(audit, /contents: write|secrets\.|pnpm install|npm install/);
+  if (cleanup !== undefined) {
+    assert.doesNotMatch(cleanup, /secrets\.|pnpm install|npm install|pull_request_target/);
+    assert.match(cleanup, /if: github\.event_name == 'pull_request'[\s\S]*?permissions:\s+contents: read\s+pull-requests: read/);
+    assert.match(cleanup, /cleanup-branches:\s+if: github\.event_name == 'push' && github\.ref == 'refs\/heads\/main' && contains\(github\.event\.head_commit\.message, '\[cleanup-reviewed-branches-20261001\]'\)/);
+    assert.equal((cleanup.match(/contents: write/g) || []).length, 1);
+    assert.match(cleanup, /CLEANUP_APPLY: 'false'/);
+    assert.match(cleanup, /CLEANUP_APPLY: 'true'/);
+    assert.match(cleanup, /run: python3 \.github\/scripts\/cleanup-reviewed-branches-20261001\.py/);
+    const script = await readFile(path.join(repositoryRoot, '.github/scripts/cleanup-reviewed-branches-20261001.py'), 'utf8');
+    assert.doesNotMatch(script, /\bassert\b/);
+    assert.match(script, /Main moved before deletion/);
+    assert.match(script, /Target acquired an open PR/);
+    assert.match(script, /Branch changed before deletion/);
+    assert.match(script, /Ref changed before deletion/);
+    assert.match(script, /status == 204/);
+    assert.match(script, /status == 404/);
+  }
   assert.match(workflow, /actions\/checkout@[a-f0-9]{40} # v\d+[\s\S]*?fetch-depth: 0[\s\S]*?persist-credentials: false/);
   assert.match(workflow, /git count-objects -vH/);
   assert.match(workflow, /history\.json/);
