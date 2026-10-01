@@ -4471,4 +4471,3 @@ test('optional icons never block validated price interactions', { timeout: 60_00
     await new Promise(resolve => server.close(resolve));
   }
 });
-
