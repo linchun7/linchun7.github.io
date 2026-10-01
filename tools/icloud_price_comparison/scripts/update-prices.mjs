@@ -2794,6 +2794,16 @@ export async function main({
   }
 }
 
+export function failureNextStep(report) {
+  if (report.error?.code === 'MARKET_IDENTITY_RENAME_REVIEW_REQUIRED') {
+    return '核对 Apple 新旧官方名称，为已发布 marketId 补充人工复核 alias；不要重建市场身份。';
+  }
+  if (report.healthcheckSeverity === 'transient') {
+    return '保留当前可靠数据，等待备用任务重试；需要手动重试时从最新 main 新发起运行。';
+  }
+  return '定位首个解析、契约或测试错误，修复后跑完整验收；不要手改生产价格数据消除告警。';
+}
+
 export async function writeFailureDiagnostics(error, {
   diagnosticsDir = DIAGNOSTICS_DIR,
   appleSnapshot = lastAppleSnapshot,
@@ -2819,11 +2829,12 @@ export async function writeFailureDiagnostics(error, {
       '- **状态：失败**',
       `- 触发方式：${describeTriggerSource(report.trigger)}`,
       `- 失败时间（北京时间）：${formatBeijingDateTime(finishedAt)}`,
-      `- **失败原因：${markdownInline(error?.message ?? error)}**`,
+      `- **失败原因：${markdownInline(report.error.message)}**`,
       `- Apple 规范化 JSON：${report.appleSnapshotCaptured ? '已保存到运行附件' : '解析完成前失败，未生成'}`,
       '',
       '### 处理建议',
-      '- 请先查看当前失败步骤日志，再下载 `icloud-price-diagnostics-*` 附件。',
+      `- ${failureNextStep(report)}`,
+      '- 先看当前失败步骤日志，详细证据见 `icloud-price-diagnostics-*` 附件。',
       ''
     ].join('\n'), 'utf8');
   }

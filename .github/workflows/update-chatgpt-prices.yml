@@ -34,6 +34,7 @@ jobs:
       should_run: ${{ steps.daily_guard.outputs.should_run }}
       trigger_source: ${{ steps.daily_guard.outputs.trigger_source }}
       validated_main_sha: ${{ steps.resolve_main.outputs.validated_main_sha }}
+      failure_stage: ${{ steps.resolve_main.outcome == 'failure' && '准备/工作流版本' || steps.production_proof.outcome == 'failure' && '生产成功证明' || steps.daily_guard.outcome == 'failure' && '每日判断' || '环境准备' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -89,6 +90,8 @@ jobs:
     outputs:
       base: ${{ steps.base.outputs.sha }}
       degraded: ${{ steps.collect.outputs.degraded }}
+      source_summary: ${{ steps.collect.outputs.source_summary }}
+      failure_stage: ${{ steps.offline.outcome == 'failure' && '离线回归测试' || steps.collect.outcome == 'failure' && '来源采集或数据校验' || steps.candidate.outcome == 'failure' && '候选或浏览器验收' || steps.upload.outcome == 'failure' && '候选工件上传' || '环境准备' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -129,6 +132,7 @@ jobs:
       - id: base
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Offline regression tests
+        id: offline
         run: |
           python3 -m unittest discover -s tools/chatgpt_price_comparison/scripts -p 'test_*.py' -v
           node --check tools/chatgpt_price_comparison/app.js
@@ -137,6 +141,7 @@ jobs:
         id: collect
         run: python3 tools/chatgpt_price_comparison/scripts/pipeline.py --output "$RUNNER_TEMP/chatgpt-candidate"
       - name: Validate candidate and browser behavior
+        id: candidate
         run: |
           python3 tools/chatgpt_price_comparison/scripts/pipeline.py --check "$RUNNER_TEMP/chatgpt-candidate"
           mkdir -p tools/chatgpt_price_comparison/data
@@ -145,6 +150,7 @@ jobs:
           cp "$RUNNER_TEMP/chatgpt-candidate/index.html" tools/chatgpt_price_comparison/index.html
           node tools/chatgpt_price_comparison/scripts/browser-test.mjs
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        id: upload
         with:
           name: chatgpt-candidate-${{ github.run_id }}
           path: ${{ runner.temp }}/chatgpt-candidate/
@@ -158,6 +164,7 @@ jobs:
     timeout-minutes: 10
     outputs:
       published_sha: ${{ steps.push_data.outputs.pushed_sha }}
+      failure_stage: ${{ steps.artifact_check.outcome == 'failure' && '发布工件复验' || steps.push_data.outcome == 'failure' && '原子发布或并发保护' || steps.pages.outcome == 'failure' && 'Pages 部署' || '环境准备' }}
     permissions:
       contents: write
       pages: read
@@ -171,6 +178,7 @@ jobs:
           name: chatgpt-candidate-${{ github.run_id }}
           path: ${{ runner.temp }}/chatgpt-candidate
       - name: Independently validate exact artifact
+        id: artifact_check
         run: python3 tools/chatgpt_price_comparison/scripts/pipeline.py --check "$RUNNER_TEMP/chatgpt-candidate"
       - name: Publish three files atomically without overwriting concurrent work
         id: push_data
@@ -200,6 +208,7 @@ jobs:
           echo "pushed=true" >> "$GITHUB_OUTPUT"
           echo "pushed_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Wait for Pages build of published commit or successor
+        id: pages
         if: steps.push_data.outputs.pushed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -397,6 +406,10 @@ jobs:
       VERIFY: ${{ needs.verify-production.result }}
       VERIFY_SUPERSEDED: ${{ needs.verify-production.outputs.superseded }}
       DEGRADED: ${{ needs.generate.outputs.degraded }}
+      SOURCE_SUMMARY: ${{ needs.generate.outputs.source_summary }}
+      PREPARE_STAGE: ${{ needs.prepare.outputs.failure_stage }}
+      GENERATE_STAGE: ${{ needs.generate.outputs.failure_stage }}
+      PUBLISH_STAGE: ${{ needs.publish.outputs.failure_stage }}
       SHOULD_RUN: ${{ needs.prepare.outputs.should_run }}
       TRIGGER_SOURCE: ${{ needs.prepare.outputs.trigger_source }}
       EXISTING_VERIFY: ${{ needs.verify-existing-production.result }}
@@ -425,6 +438,33 @@ jobs:
             echo "A newer ChatGPT project commit owns production verification; keep incident state unchanged."
           elif [[ "$automatic_skip_ok" == true || "$full_update_ok" == true ]]; then
             if [[ -n "$issue" ]]; then gh issue close "$issue" --comment '自动更新/幂等检查及生产验证已恢复。'; fi
-          elif [[ -z "$issue" ]]; then
-            gh issue create --title "$title" --body "自动触发检查、核验、发布、Pages 构建或生产验证失败，或部分地区未完整核验/汇率处于降级状态。未验证的新价格不会覆盖旧价；无可保留旧价的地区会标记为 unavailable 并继续重试。Cloudflare 主触发失败时 GitHub 备用仍会重试；持续失败可能需要维护来源或部署链路。运行：$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          else
+            stage='来源核验未完整恢复'
+            advice='保留最近可靠价格；先检查下列地区和汇率状态。待复核变化需等待后续独立确认，不绕过确认窗口。'
+            if [[ "$PREPARE" != success ]]; then
+              stage="${PREPARE_STAGE:-环境准备}"
+              advice='查看准备步骤的首个错误；若为旧工作流，请从当前 main 新运行，勿反复重跑旧定义。'
+            elif [[ "$SHOULD_RUN" == true && "$GENERATE" != success ]]; then
+              stage="${GENERATE_STAGE:-环境准备}"
+              advice='查看该步骤首个错误；网络故障可等备用重试，解析或测试失败需修复后完整验收，勿手改生产数据消红。'
+            elif [[ "$SHOULD_RUN" == true && "$PUBLISH" != success ]]; then
+              stage="${PUBLISH_STAGE:-环境准备}"
+              advice='检查工件、并发提交或 Pages 状态；并发保护拒绝旧候选时从当前 main 新运行，勿强推覆盖。'
+            elif [[ "$SHOULD_RUN" == true && "$VERIFY" != success ]] || [[ "$SHOULD_RUN" != true && "$EXISTING_VERIFY" != success ]]; then
+              stage='线上生产验证'
+              advice='检查 Pages 构建和线上 JSON、HTML、资源版本是否一致；未确认上线前不能关闭告警。'
+            fi
+            body_file=$(mktemp)
+            trap 'rm -f "$body_file"' EXIT
+            {
+              printf '失败或待确认阶段：%s\n\n下一步：%s\n\n' "$stage" "$advice"
+              printf '来源概况：%s\n\n' "${SOURCE_SUMMARY:-本轮未取得完整来源概况，请查看失败步骤。}"
+              printf '最新运行：%s/%s/actions/runs/%s（第 %s 次）\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" "${GITHUB_RUN_ATTEMPT:-1}"
+              printf '\n最近可靠价格继续显示，价格和汇率日期保持真实；待复核的新价格不会直接覆盖旧价。\n'
+            } > "$body_file"
+            if [[ -n "$issue" ]]; then
+              gh issue edit "$issue" --body-file "$body_file"
+            else
+              gh issue create --title "$title" --body-file "$body_file"
+            fi
           fi

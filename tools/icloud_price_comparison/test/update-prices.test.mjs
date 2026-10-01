@@ -43,6 +43,7 @@ import {
   validateCountryNameMapping,
   validateAppleMarketRenameReview,
   writeFailureDiagnostics,
+  failureNextStep,
   updateHistory,
   updatePublishedDateHistory,
   writeJsonAtomic
@@ -2637,6 +2638,8 @@ test('writes a failure report and normalized Apple diagnostic', async () => {
     assert.equal(storedMessage, failureMessage.replace(secret, '[REDACTED]'));
     assert.doesNotMatch(await readFile(path.join(diagnosticsDir, 'run-report.json'), 'utf8'), new RegExp(secret));
     const renderedSummary = await readFile(summaryPath, 'utf8');
+    assert.doesNotMatch(renderedSummary, new RegExp(secret));
+    assert.match(renderedSummary, /不要手改生产价格/);
     assert.ok(renderedSummary.includes(String.raw`\[click\]\(https://evil\.example\)`));
     assert.ok(renderedSummary.includes(String.raw`\<img src=x onerror=alert\(1\)\>`));
     assert.match(renderedSummary, /…/);
@@ -4804,4 +4807,10 @@ test('publication snapshot changes keep Apple source-name renames visible even w
   assert.deepEqual(changes.addedCountries, [{ country: "Cote D'Ivoire", nameZh: '科特迪瓦' }]);
   assert.deepEqual(changes.removedCountries, [{ country: 'Ivory Coast', nameZh: '科特迪瓦' }]);
   assert.deepEqual(changes.changedCountries, []);
+});
+
+test('failure advice reuses existing classification without weakening severity', () => {
+  assert.match(failureNextStep({error:{code:'MARKET_IDENTITY_RENAME_REVIEW_REQUIRED'},healthcheckSeverity:'severe'}), /marketId.*alias/);
+  assert.match(failureNextStep({error:{},healthcheckSeverity:'transient'}), /备用任务重试/);
+  assert.match(failureNextStep({error:{},healthcheckSeverity:'severe'}), /完整验收/);
 });

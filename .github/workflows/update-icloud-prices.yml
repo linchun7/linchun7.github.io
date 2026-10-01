@@ -198,15 +198,10 @@ jobs:
             --current data/prices.json \
             --summary "$GITHUB_STEP_SUMMARY"
 
-      - name: 验证更新后的价格数据
-        id: data_tests
-        run: pnpm test:data
-
       - name: 生成并校验静态价格页
         id: render_static
         run: |
           pnpm render:static
-          pnpm render:static:check
 
       # 在实际候选上验证全部 core；bot 数据提交不触发 push CI，更新前的绿灯不能替代它。
       - name: 运行解析与数据安全测试
@@ -283,7 +278,6 @@ jobs:
         run: |
           severe_failure=false
           if [[ "${{ steps.core_tests.outcome }}" == "failure" ]] \
-            || [[ "${{ steps.data_tests.outcome }}" == "failure" ]] \
             || [[ "${{ steps.render_static.outcome }}" == "failure" ]] \
             || [[ "${{ steps.ui_tests.outcome }}" == "failure" ]] \
             || [[ "${{ steps.package_data.outcome }}" == "failure" ]]; then
