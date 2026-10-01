@@ -135,6 +135,9 @@ async function resolveBrowser(context, purpose) {
   } catch {
     // Fall back to a system browser when Playwright Chromium is not installed.
   }
+  if (process.env.GITHUB_ACTIONS === 'true') {
+    assert.fail('Pinned Playwright Chromium is required on GitHub Actions; system Chrome fallback is disabled');
+  }
   const executablePath = await findChrome();
   if (!executablePath) {
     if (process.env.CI) assert.fail(`Chrome or Chromium is required for ${purpose}`);
@@ -147,12 +150,25 @@ async function resolveBrowser(context, purpose) {
 function sharedBrowserType(browserType) {
   return {
     async launch(launchOptions) {
-      if (!sharedBrowserPromise) {
+      let pendingLaunch = sharedBrowserPromise;
+      if (!pendingLaunch) {
         const launching = browserType.launch(launchOptions);
+        pendingLaunch = launching;
         sharedBrowserPromise = launching;
-        launching.catch(() => { if (sharedBrowserPromise === launching) sharedBrowserPromise = null; });
+        const forget = () => { if (sharedBrowserPromise === launching) sharedBrowserPromise = null; };
+        const signal = launchOptions.signal;
+        if (signal?.aborted) forget();
+        else signal?.addEventListener('abort', forget, {once: true});
+        launching.then(browser => {
+          signal?.removeEventListener('abort', forget);
+          if (signal?.aborted) void browser.close().catch(error => console.error('Cancelled browser launch cleanup failed:', error.message));
+        }, () => {
+          signal?.removeEventListener('abort', forget);
+          forget();
+        });
       }
-      const sharedBrowser = await sharedBrowserPromise;
+      const sharedBrowser = await pendingLaunch;
+      launchOptions.signal?.throwIfAborted();
       const pages = new Set();
       const contexts = new Set();
       return {
