@@ -367,7 +367,7 @@ Apple 108047 从逐市场列表切换为地区表格时，预期修复是增加�
 
 ## 最低价历史维护
 
-日常仍用原有更新工作流：`update:data` → 数据验证 → `render:static`（同步派生账本）→ `render:static:check` → core/UI → `validate:artifact` → 同一工件发布。不增加定时任务、不访问新的价格或 FX 服务。完整 `data/` 工件现在必须包含 `minimum-history.json`；缺失、损坏或与当前价格指纹不匹配时阻断发布，不静默重建清空。不要只更新 index.html 或只拷贝价格文件。
+日常仍用原有更新工作流：`update:data` → `render:static`（同步派生账本）→ core（包含数据和静态投影检查）→ UI → `validate:artifact` → 同一工件发布。不增加定时任务、不访问新的价格或 FX 服务。完整 `data/` 工件现在必须包含 `minimum-history.json`；缺失、损坏或与当前价格指纹不匹配时阻断发布，不静默重建清空。不要只更新 index.html 或只拷贝价格文件。
 
 第一次引入时，使用完整 Git 历史执行 `node scripts/minimum-history.mjs --backfill --ref <审核过的提交>`；这不是日常命令，也不能在浅克隆中声称完整回溯。回溯按 payload.generatedAt 排序去重，而不是使用可能被重写的 Git 提交时间；保留来源 commit，排除不可靠或冲突观测并标记缺口，不用现今汇率补历史。更新后执行 `pnpm render:static`、`pnpm assets:update`、`pnpm test:core`、`pnpm test:ui`、`pnpm validate:artifact`，复核 Apple history.json 未受 FX 事件污染。
 
@@ -396,3 +396,10 @@ Apple 中英文价格页没有共同地区 ID，程序不按行号、同价或�
 ## 更新流程浏览器版本一致性（2026-10-01）
 
 真实更新复现卡点为浏览器启动阶段，页面尚未创建；runner 自带 Chrome 154 与校验使用的 Playwright Chromium 153 不一致。test:ui 现在先调用 prepare-updater-browser.mjs，仅在 GITHUB_ACTIONS=true 时用锁定的本地 Playwright CLI 安装完整 Chromium/headless-shell 包。安装失败停止 UI 与发布，不回退系统 Chrome；非 GitHub 本地运行不自动安装软件。测试仍保留原 30 秒限制、分阶段诊断及取消清理，不以延长等待或同一测试内重试掩盖失败。此措施消除已确认的版本差异；不将一次启动卡顿的底层 OS 原因宣称为已证明。
+
+## 低复杂度维护调整（2026-10-01）
+
+- 更新后的实际候选只跑一次完整 core；其中已包含 data-contract、data-integrity、state-contract 和静态投影检查，不在同一 job 重复执行 test:data 或 render:static:check。手动聚焦入口仍保留，跨 job 工件复验和上线验证不合并。
+- 失败摘要复用已有严重度和脱敏错误，给出重试、人工市场别名复核或修复后完整验收建议，不新增告警状态或重试系统。
+- 国家价格历史保留容量下架及恢复的中间记录；恢复为相同价格也不能抹掉下架阶段。缺价显示“—”，恢复后不直接跨缺口计算涨跌幅。
+- Apple 来源失败时仍保留整份旧快照。单独汇率更新需要独立价格观察日期和来源沿用状态，暂不通过伪造成功观察或汇率状态实现。

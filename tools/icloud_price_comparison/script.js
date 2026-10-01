@@ -861,12 +861,15 @@ function renderHistoryTierButtons() {
 }
 
 function compactHistorySeries(events, tier) {
-  const availableEvents = events.filter((event) => Number.isFinite(event.plans[tier]));
-  return availableEvents.filter((event, index) => (
-    index === 0
-    || event.currency !== availableEvents[index - 1].currency
-    || event.plans[tier] !== availableEvents[index - 1].plans[tier]
-  ));
+  const result = [];
+  for (const event of events) {
+    const value = Number.isFinite(event.plans[tier]) ? event.plans[tier] : null;
+    if (!result.length && value === null) continue;
+    const previous = result.at(-1);
+    const previousValue = previous && Number.isFinite(previous.plans[tier]) ? previous.plans[tier] : null;
+    if (!previous || event.currency !== previous.currency || value !== previousValue) result.push(event);
+  }
+  return result;
 }
 
 function renderLocalPriceWithTrend(plan, country, changedSeries) {
@@ -884,8 +887,8 @@ function renderLocalPriceWithTrend(plan, country, changedSeries) {
     const previousPrice = previous.plans[state.historyTier];
     if (!Number.isFinite(previousPrice)) {
       trend.classList.add('is-neutral');
-      trend.textContent = '（暂无上一期记录）';
-      trend.title = '该容量是新发布的方案，暂无上一期价格可比较';
+      trend.textContent = '（恢复提供）';
+      trend.title = '上次记录未提供该容量，不能直接计算涨跌幅';
       elements.historyLocalPrice.append(trend);
       return;
     }
@@ -909,7 +912,7 @@ function renderHistoryRows(record) {
   [...changedSeries].reverse().forEach((event) => {
     const row = document.createElement('tr');
     row.append(createCell(formatDate(event.observedAt)), createCell(event.currency, 'currency-code'));
-    row.append(createCell(numberFormatter.format(event.plans[state.historyTier])));
+    row.append(createCell(Number.isFinite(event.plans[state.historyTier]) ? numberFormatter.format(event.plans[state.historyTier]) : '—'));
     elements.historyRows.append(row);
   });
 }

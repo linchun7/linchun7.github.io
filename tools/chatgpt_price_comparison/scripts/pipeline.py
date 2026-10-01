@@ -939,6 +939,47 @@ def minimum_verified_required(previous_known: int) -> int:
     return max(MIN_VERIFIED_ABSOLUTE, int(required))
 
 
+def source_summary(markets: list[dict], fx: dict | None = None) -> str:
+    counts = {status: sum(m['status'] == status for m in markets)
+              for status in ('verified', 'retained', 'pending', 'unavailable')}
+    details = []
+    for market in markets:
+        if market['status'] == 'verified':
+            continue
+        reason = market.get('pending', {}).get('reason') if market['status'] == 'pending' else market.get('error')
+        details.append(market['code'] + ':' + str(reason or market['status']))
+    text = (f"已核验 {counts['verified']}/{len(markets)}；沿用 {counts['retained']}；"
+            f"待复核 {counts['pending']}；无价 {counts['unavailable']}")
+    if details:
+        text += '；示例 ' + ', '.join(details[:5])
+    if fx is not None:
+        text += '；汇率' + ('沿用，源日期未改变' if fx.get('fallback') else '来源核验成功')
+    return clean(text)[:700]
+
+
+def report_source_summary(markets: list[dict], fx: dict | None = None) -> None:
+    summary = source_summary(markets, fx)
+    print('SOURCE_SUMMARY', summary, flush=True)
+    if os.environ.get('GITHUB_OUTPUT'):
+        with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as stream:
+            stream.write('source_summary=' + summary + '\n')
+
+
+def retained_batch(old: dict | None, observed: list[dict], configured_codes: set[str], now: float) -> list[dict]:
+    # Reuse one complete validated baseline, never mix rejected new prices into an FX-only update.
+    if not old or {m['code'] for m in old['markets']} != configured_codes or not any(m['offers'] for m in old['markets']):
+        raise ValueError('insufficient source coverage and no complete compatible price baseline')
+    attempts = {m['code']: m for m in observed}
+    markets = copy.deepcopy(old['markets'])
+    for market in markets:
+        attempt = attempts[market['code']]
+        market['last_checked_at'] = stamp(now)
+        market['status'] = 'retained' if market['offers'] else 'unavailable'
+        market['error'] = attempt.get('error', 'source_unverified')
+        market['error_detail'] = attempt.get('error_detail', 'Whole price batch retained after insufficient source coverage')
+    return markets
+
+
 def run(output: Path, now: float | None = None) -> dict:
     now = time.time() if now is None else now
     config = json.loads((ROOT / 'markets.json').read_text(encoding='utf-8'))
@@ -952,7 +993,8 @@ def run(output: Path, now: float | None = None) -> dict:
     previous, changes = scope_previous(old, configured_codes)
     reviews = reviewed_confirmation.load(ROOT / 'reviewed-changes.json', configured_codes)
     deadline = time.monotonic() + 240
-    getter = lambda url, **kw: fetch(url, deadline=deadline, **kw)
+    getter = lambda url, **kw: fetch(url, deadline=deadline - 45, **kw)
+    fx_getter = lambda url, **kw: fetch(url, deadline=deadline, **kw)
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
         markets = list(executor.map(lambda c: observe(c, previous.get(c['code']), now, getter, reviews=reviews), config))
     for market in markets:
@@ -968,12 +1010,22 @@ def run(output: Path, now: float | None = None) -> dict:
     # semantic change until the time-separated confirmation window expires.
     # Count it as source-confirmed so a legitimate global repricing/removal can
     # persist its pending clock instead of being rejected forever.
-    if source_confirmed < minimum_verified or Decimal(known) < minimum_known:
-        raise ValueError('insufficient confirmed source coverage; existing publication left untouched')
+    report_source_summary(markets)
+    retained_source = source_confirmed < minimum_verified or Decimal(known) < minimum_known
+    if retained_source:
+        markets = retained_batch(old, markets, configured_codes, now)
+        known = sum(bool(m['offers']) for m in markets)
+        verified = 0
+        source_confirmed = 0
     required_currencies = {m.get('currency') for m in markets if m.get('offers') and m.get('currency')}
-    fx = collect_fx(now, old.get('fx') if old else None, getter, required_currencies)
+    fx = collect_fx(now, old.get('fx') if old else None, fx_getter, required_currencies)
     if fx is None:
         raise ValueError('no usable FX snapshot; existing publication left untouched')
+    if retained_source and fx.get('fallback'):
+        raise ValueError('no newly verified FX snapshot for retained prices; existing publication left untouched')
+    if retained_source and any(currency not in fx['rates'] for currency in required_currencies):
+        raise ValueError('incomplete FX snapshot for retained prices; existing publication left untouched')
+    report_source_summary(markets, fx)
     for market in markets:
         for offer in market['offers']:
             for price in offer['amounts']:

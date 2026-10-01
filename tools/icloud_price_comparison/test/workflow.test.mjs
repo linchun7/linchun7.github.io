@@ -123,7 +123,7 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.doesNotMatch(workflow, /ui_failed|pnpm test:ui\s*\|\||记录浏览器界面测试警告/);
   assert.doesNotMatch(workflow, /name: 验证更新后的页面[\s\S]*?playwright install|name: 验证更新后的页面[\s\S]*?pnpm test:browsers/);
   assert.doesNotMatch(workflow, /ui_before|运行浏览器界面测试（更新前）/, 'the workflow must not repeat UI tests before fetching data');
-  assert.match(workflow, /name: 验证更新后的价格数据[\s\S]*?id: data_tests[\s\S]*?run: pnpm test:data/);
+  assert.doesNotMatch(workflow, /id: data_tests|run: pnpm test:data/, 'data validation is covered by the one candidate core suite');
   assert.match(workflow, /name: 抓取并校验 Apple 价格[\s\S]*?id: update_data[\s\S]*?EXCHANGE_RATE_API_KEY:\s*\$\{\{ secrets\.EXCHANGE_RATE_API_KEY \}\}[\s\S]*?run: pnpm update:data/);
   assert.doesNotMatch(workflow, /v6\/\$\{\{ secrets\.EXCHANGE_RATE_API_KEY \}\}/, 'the API key must not be placed in a request URL');
   assert.match(workflow, /actions\/upload-artifact@[a-f0-9]{40} # v\d+\.\d+\.\d+/);
@@ -186,7 +186,8 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
     'one ordinary failed run must not immediately signal a Healthchecks failure',
   );
   assert.match(workflow, /sha256sum --check icloud-price-data\.tar\.sha256/);
-  assert.match(workflow, /pnpm render:static[\s\S]*?pnpm render:static:check/);
+  assert.match(workflow, /pnpm render:static/);
+  assert.doesNotMatch(workflow, /pnpm render:static:check/, 'core owns the static projection check');
   assert.match(workflow, /icloud-price-index\.html\.sha256[\s\S]*?sha256sum --check icloud-price-index\.html\.sha256/);
   assert.match(workflow, /validate-data-artifact\.mjs --data-dir tools\/icloud_price_comparison\/data[\s\S]*?tar --format=ustar/);
   assert.match(workflow, /validate-data-artifact\.mjs"[\s\S]*?--archive icloud-price-data\.tar[\s\S]*?tar --extract[\s\S]*?--no-same-owner --no-same-permissions[\s\S]*?--data-dir unpacked\/tools\/icloud_price_comparison\/data/);
@@ -221,17 +222,18 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   const firstCoreTest = workflow.indexOf('run: pnpm test:core');
   const duplicateCoreTest = workflow.indexOf('run: pnpm test:core', firstCoreTest + 1);
   const update = workflow.indexOf('run: pnpm update:data');
-  const dataTest = workflow.indexOf('run: pnpm test:data');
   const browserTest = workflow.indexOf('run: pnpm test:ui');
   const duplicateBrowserTest = workflow.indexOf('pnpm test:ui', browserTest + 'pnpm test:ui'.length);
   const packageData = workflow.indexOf('name: 打包已测试的数据工件');
   const productionVerification = workflow.indexOf('id: verify_production');
   const healthcheckSuccess = workflow.indexOf('status=0');
-  const render = workflow.indexOf('pnpm render:static:check');
+  const render = workflow.indexOf('pnpm render:static');
   assert.ok(update < render && render < firstCoreTest && firstCoreTest < browserTest, 'the actual rendered candidate must pass full core before UI and publication');
   assert.equal(duplicateCoreTest, -1, 'the workflow runs full core exactly once, against the actual candidate');
-  assert.ok(update < dataTest, 'the updated snapshot must pass data validation');
-  assert.ok(dataTest < browserTest, 'updated data must pass before the browser tests');
+  const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+  for (const file of ['data-contract', 'data-integrity', 'state-contract']) assert.ok(packageJson.scripts['test:core'].includes('test/' + file + '.test.mjs'));
+  assert.ok(packageJson.scripts['test:core'].includes('pnpm render:static:check'));
+  assert.ok(packageJson.scripts['test:data'], 'manual focused data entry point is preserved');
   assert.equal(duplicateBrowserTest, -1, 'the workflow must run the system Chrome suite only once');
   assert.ok(browserTest < packageData, 'the updated browser tests must finish before packaging for publication');
   assert.ok(productionVerification > packageData && healthcheckSuccess > productionVerification, 'Healthcheck success must follow production verification');

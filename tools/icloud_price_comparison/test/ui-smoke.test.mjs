@@ -4183,3 +4183,39 @@ test('review: changed snapshot clears the old displayed date while history stays
     }
   } finally { await browser.close(); }
 });
+
+test('country history retains removal and restoration even at the same price', {timeout:60000}, async context => {
+  const config = await resolveBrowser(context, 'restored tier history');
+  if (!config) return;
+  const data = await readFixture('prices.json');
+  const baseHistory = await readFixture('history.json');
+  const country = data.countries[0];
+  const tier = data.tiers.find(item => item.id === '200GB') || data.tiers[0];
+  const server = await startServer();
+  const browser = await config.browserType.launch(config.launchOptions);
+  try {
+    for (const difference of [0, 0.25]) {
+      const history = structuredClone(baseHistory);
+      const currentPlans = Object.fromEntries(data.tiers.map(item => [item.id, country.plans[item.id].price]));
+      const missing = {...currentPlans}; delete missing[tier.id];
+      const earlier = {...currentPlans, [tier.id]: currentPlans[tier.id] + difference};
+      history.markets[country.marketId].events = [missing, earlier, missing, currentPlans].map((plans,index) => ({
+        observedAt: new Date(Date.parse(data.generatedAt) - (3-index)*86400000).toISOString().slice(0,10),
+        currency: country.currency, plans
+      }));
+      validatePriceHistoryConsistency(data, history);
+      const page = await browser.newPage();
+      try {
+        await page.route('https://**/*', route => route.abort());
+        await page.route('**/data/history.json*', route => route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(history)}));
+        await page.goto('http://127.0.0.1:' + server.address().port + '/?tier=' + tier.id, {waitUntil:'domcontentloaded'});
+        await page.waitForFunction(() => !document.querySelector('#searchInput').disabled);
+        await page.locator('#priceRows tr[data-market-id="' + country.marketId + '"] .country-history-button').click();
+        await page.waitForFunction(() => document.querySelectorAll('#historyRows tr').length === 3);
+        assert.equal(await page.locator('#historyRows tr').nth(1).locator('td').last().textContent(), '—');
+        assert.match(await page.locator('#historyLocalPrice').textContent(), /恢复提供/);
+        assert.doesNotMatch(await page.locator('#historyLocalPrice').textContent(), /[↑↓]/);
+      } finally { await page.close(); }
+    }
+  } finally { await browser.close(); }
+});
