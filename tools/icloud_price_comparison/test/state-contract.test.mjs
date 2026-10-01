@@ -109,5 +109,6 @@ test('validates FX timestamp boundaries relative to the canonical generatedAt st
 
   const tooOld = structuredClone(baseline);
   tooOld.fx.fetchedAt = new Date(generatedAtMs - (36 * 60 * 60 * 1_000) - (5 * 60 * 1_000) - 1).toISOString();
-  rejectBoth(tooOld);
+  assert.doesNotThrow(() => validatePricePayload(tooOld));
+  assert.doesNotThrow(() => validateExistingPrices(tooOld));
 });

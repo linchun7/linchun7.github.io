@@ -77,7 +77,7 @@ test('social metadata points to one valid 1200x630 PNG contract', async () => {
   assert.equal(image.readUInt32BE(20), 630);
 });
 
-test('static rendering removes minimum cues and explains rankings when FX is stale', async () => {
+test('static rendering keeps accepted values and minimum cues when FX is retained', async () => {
   const [html, current] = await Promise.all([
     readFile(indexUrl, 'utf8'),
     readFile(pricesUrl, 'utf8').then(JSON.parse)
@@ -90,9 +90,11 @@ test('static rendering removes minimum cues and explains rankings when FX is sta
   const $ = load(rendered);
   assert.equal(assertStaticPageMatches(rendered, payload), true);
   assert.equal(assertSeoProjectionMatches(rendered, payload), true);
-  assert.equal($('.minimum-card, .minimum-badge, .is-minimum, .rank-top').length, 0);
-  assert.match($('#minimumSummary').text(), /参考汇率暂未更新/);
-  assert.match($('#rankingScopeNote').text(), /最近一次可用汇率/);
+  assert.equal($('.minimum-card').length, payload.tiers.length);
+  assert.ok($('.minimum-badge, .is-minimum, .rank-top').length > 0);
+  assert.equal($('#rankingScopeNote').is('[hidden]'), true);
+  assert.match($('#updatedAt').text(), /更新于/);
+  assert.match($('#fxStatus').text(), /汇率更新/);
   assert.ok($('.price-local').first().text());
   assert.ok($('.price-cny').first().text().includes('¥'));
   assert.equal($('meta[name="icloud-price-snapshot"]').attr('data-fingerprint'), publicPayloadFingerprint(payload));

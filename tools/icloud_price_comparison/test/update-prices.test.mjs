@@ -2160,46 +2160,30 @@ test('does not rewrite history when an observation has no historical changes', a
   }
 });
 
-test('rejects anomalous online FX when the previous safe fallback is expired', async (t) => {
+test('preserves accepted fallback FX beyond the old age boundary', async (t) => {
   const { root, paths } = await createTemporaryProductionPaths();
-  const { data, fixedNow } = await prepareTemporaryFxFallbackTimeline(paths, {
+  const { data, fixedNow, previousFxFetchedAt } = await prepareTemporaryFxFallbackTimeline(paths, {
     nowAfterLatestRunMs: 2 * 60 * 60 * 1_000,
     previousFxAgeMs: 37 * 60 * 60 * 1_000
   });
-  assert.equal(fixedNow.getTime() - Date.parse(data.fx.fetchedAt), 37 * 60 * 60 * 1_000);
   t.mock.timers.enable({ apis: ['Date'], now: fixedNow });
   const rates = compatibleExchangeRates(data);
   rates.JPY /= 2;
-  const fxPayload = {
-    result: 'success',
-    base_code: 'USD',
-    time_last_update_unix: recentFxTimestamp(),
-    rates
-  };
-  const before = await Promise.all([
-    readFile(paths.currentDataPath, 'utf8'),
-    readFile(paths.historyPath, 'utf8'),
-    readFile(paths.runLogPath, 'utf8')
-  ]);
-  const snapshotStoreBefore = await readSnapshotStoreState(paths);
+  const fxPayload = { result: 'success', base_code: 'USD', time_last_update_unix: recentFxTimestamp(), rates };
   try {
-    await withMockedFetch(
-      { html: buildAppleHtml(data), fxPayload },
-      () => assert.rejects(
-        main({ dryRun: false, paths, stepSummaryPath: null }),
-        (error) => error.code === 'EXCHANGE_RATE_SOURCES_UNAVAILABLE'
-          && classifyHealthcheckFailure(error) === 'transient'
-      )
-    );
-    assert.deepEqual(await Promise.all([
-      readFile(paths.currentDataPath, 'utf8'),
-      readFile(paths.historyPath, 'utf8'),
-      readFile(paths.runLogPath, 'utf8')
-    ]), before);
-    assert.deepEqual(await readSnapshotStoreState(paths), snapshotStoreBefore);
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
+    await withMockedFetch({ html: buildAppleHtml(data), fxPayload },
+      () => main({ dryRun: false, paths, stepSummaryPath: null }));
+    const published = JSON.parse(await readFile(paths.currentDataPath, 'utf8'));
+    assert.equal(published.fx.stale, true);
+    assert.equal(published.fx.fetchedAt, previousFxFetchedAt);
+    for (const previous of data.countries) {
+      const current = published.countries.find(row => row.marketId === previous.marketId);
+      for (const tier of data.tiers) {
+        assert.equal(current.plans[tier.id].cnyPrice, previous.plans[tier.id].cnyPrice);
+        assert.equal(current.plans[tier.id].cnyRank, previous.plans[tier.id].cnyRank);
+      }
+    }
+  } finally { await rm(root, { recursive: true, force: true }); }
 });
 
 test('publishes with stale previous CNY values when every online FX candidate fails sanity', async (t) => {
@@ -2678,24 +2662,23 @@ test('captures the current Apple response for failure diagnostics', async (t) =>
     { html: buildAppleHtml(data, 'January 1, 2099'), fxPayload },
     () => assert.rejects(main({ dryRun: true }), /Apple published date is in the future/)
   );
-
   const { root, paths } = await createTemporaryProductionPaths();
   const diagnosticsDir = path.join(root, 'diagnostics');
-  // Expire the FX baseline without making prices, history or snapshot evidence
-  // predate the currently committed publication. No production calendar constant.
-  const expiredNow = new Date(Date.parse(data.generatedAt) + 3 * 24 * 60 * 60 * 1000);
-  t.mock.timers.enable({ apis: ['Date'], now: expiredNow });
+  // A changed local amount cannot reuse rounded historical CNY when FX fails.
+  const changed = structuredClone(data);
+  const market = changed.countries.find(country => country.currency === 'USD');
+  const tier = changed.tiers[0].id;
+  market.plans[tier].price += 0.01;
+  market.plans[tier].formattedPrice = '$' + market.plans[tier].price.toFixed(2);
+  const later = new Date(Date.parse(data.generatedAt) + 3 * 24 * 60 * 60 * 1000);
+  t.mock.timers.enable({ apis: ['Date'], now: later });
   try {
     await withMockedFetch(
-      { html: buildAppleHtml(data), fxPayload: { result: 'error', 'error-type': 'quota-reached' } },
-      () => assert.rejects(main({ dryRun: true, paths }), /quota-reached.*previous exchange-rate-derived prices are unusable/i)
+      { html: buildAppleHtml(changed), fxPayload: { result: 'error', 'error-type': 'quota-reached' } },
+      () => assert.rejects(main({ dryRun: true, paths }), /Cannot reuse .* CNY price and rank/i)
     );
-    await writeFailureDiagnostics(new Error('rate refresh failed'), {
-      diagnosticsDir,
-      stepSummaryPath: null
-    });
-    const diagnosticFile = path.join(diagnosticsDir, 'apple-snapshot.json');
-    const diagnostic = JSON.parse(await readFile(diagnosticFile, 'utf8'));
+    await writeFailureDiagnostics(new Error('rate refresh failed'), { diagnosticsDir, stepSummaryPath: null });
+    const diagnostic = JSON.parse(await readFile(path.join(diagnosticsDir, 'apple-snapshot.json'), 'utf8'));
     assert.equal(diagnostic.publishedDate, publicationDateKey(data.source.publishedDate));
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -3337,26 +3320,21 @@ test('keeps the previous exchange rates when the refresh fails', async () => {
   }
 });
 
-test('rejects expired or incomplete previous rates when both online sources fail', async () => {
+test('retains arbitrarily old accepted rates but rejects incomplete previous rates', async () => {
   const originalFetch = globalThis.fetch;
   const originalSetTimeout = globalThis.setTimeout;
   globalThis.fetch = async () => { throw new Error('temporary outage'); };
   globalThis.setTimeout = (callback, _delay, ...args) => originalSetTimeout(callback, 0, ...args);
   try {
-    await assert.rejects(
-      () => getExchangeRates({
-        fx: {
-          base: 'USD',
-          fetchedAt: new Date(Date.now() - (37 * 60 * 60 * 1000)).toISOString(),
-          rates: { USD: 1, CNY: 7.1, JPY: 150 }
-        }
-      }, { requiredCurrencies: ['USD', 'CNY', 'JPY'] }),
-      (error) => {
-        assert.match(error.message, /previous exchange-rate-derived prices are unusable: Exchange-rate response is too old/);
-        assert.equal(classifyHealthcheckFailure(error), 'transient');
-        return true;
-      }
-    );
+    for (const days of [2, 8, 365, 3650]) {
+      const fetchedAt = new Date(Date.now() - days * 86400_000).toISOString();
+      const retained = await getExchangeRates({fx: {
+        base: 'USD', fetchedAt, rates: { USD: 1, CNY: 7.1, JPY: 150 }
+      }}, { requiredCurrencies: ['USD', 'CNY', 'JPY'] });
+      assert.equal(retained.fetchedAt, fetchedAt);
+      assert.equal(retained.stale, true);
+      assert.deepEqual(retained.rates, { USD: 1, CNY: 7.1, JPY: 150 });
+    }
     await assert.rejects(
       () => getExchangeRates({
         fx: {

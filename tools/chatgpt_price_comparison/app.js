@@ -1,8 +1,6 @@
 'use strict';
 
 (() => {
-  const FRESH = 36 * 3600e3;
-  const EXPIRE = 7 * 86400e3;
   const ORDER = ['ChatGPT Go', 'ChatGPT Plus', 'ChatGPT Pro 5x', 'ChatGPT Pro 20x'];
   const PLAN_ALIASES = new Map([
     ['ChatGPT Go', 'ChatGPT Go'],
@@ -46,8 +44,8 @@
       ? `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(',')}}`
       : JSON.stringify(value);
   const age = (value) => Date.now() - Date.parse(value);
-  const usable = (value) => Number.isFinite(age(value)) && age(value) >= -300e3 && age(value) <= EXPIRE;
-  const fresh = (market) => market.status === 'verified' && usable(market.last_verified_at) && age(market.last_verified_at) <= FRESH;
+  const usable = (value) => Number.isFinite(age(value)) && age(value) >= -300e3;
+  const comparable = (market) => market.offers.length > 0 && usable(market.last_verified_at);
   const shortPlan = (label) => label.replace(/^ChatGPT\s+/, '');
   const planIdentity = (label) => PLAN_ALIASES.get(label) || label;
   const comparePlans = (a, b) => {
@@ -156,6 +154,7 @@
       || !Array.isArray(value.markets) || !value.markets.length || value.markets.length > 250) throw Error('数据格式不匹配');
 
     const generatedAt = Date.parse(value.generated_at);
+    if (generatedAt > Date.now() + 300_000) throw Error('价格数据时间异常');
     const codes = new Set();
     for (const market of value.markets) {
       const checkedAt = Date.parse(market.last_checked_at);
@@ -304,7 +303,7 @@
   }
   function minCny(market, plan) {
     const offer = offerFor(market, plan);
-    if (!offer || !state.data?.fx || !fresh(market) || !usable(state.data.fx.updated_at) || age(state.data.fx.updated_at) > FRESH) return null;
+    if (!offer || !state.data?.fx || !comparable(market) || !usable(state.data.fx.updated_at)) return null;
     const values = offer.amounts
       .filter((amount) => amount.cny != null)
       .map((amount) => Number(amount.cny))
@@ -322,12 +321,12 @@
 
   function calculateMinimums() {
     state.minimums = new Map();
-    const fxFresh = state.data.fx && usable(state.data.fx.updated_at) && age(state.data.fx.updated_at) <= FRESH;
+    const fxFresh = state.data.fx && usable(state.data.fx.updated_at);
     for (const plan of state.plans) {
       let value = Infinity;
       const markets = [];
       if (fxFresh) for (const market of state.data.markets) {
-        if (!fresh(market)) continue;
+        if (!comparable(market)) continue;
         const candidate = minCny(market, plan);
         if (!Number.isFinite(candidate)) continue;
         if (candidate < value - .005) { value = candidate; markets.length = 0; markets.push(market); }
@@ -349,7 +348,7 @@
       const country = document.createElement('strong'); country.className = 'minimum-country';
       const price = document.createElement('small'); price.className = 'minimum-price';
       if (!info.markets.length || !Number.isFinite(info.value)) {
-        card.disabled = true; country.textContent = '暂无可靠最低价'; price.textContent = '—';
+        card.disabled = true; country.textContent = '暂无可比较价格'; price.textContent = '—';
       } else {
         const names = info.markets.map((m) => m.name);
         country.textContent = names.length > 3 ? `${names.length} 个地区并列最低` : names.join('、');
@@ -370,16 +369,20 @@
     el.planCount.textContent = `${state.plans.length} 档`;
   }
 
+  function priceDateLabel() {
+    const dates = state.data.markets.filter(market => market.offers.length)
+      .map(market => market.last_verified_at).sort((a, b) => Date.parse(a) - Date.parse(b));
+    if (!dates.length) return '暂无价格记录';
+    const first = dateTime(dates[0]), last = dateTime(dates.at(-1));
+    return '价格更新于 ' + (first.slice(0, 10) === last.slice(0, 10) ? last : first.slice(0, 10) + ' 至 ' + last.slice(0, 10));
+  }
+
   function renderFreshness() {
-    el.updatedAt.textContent = `更新于 ${dateTime(state.data.generated_at)}`;
-    const stale = state.data.markets.filter((m) => m.offers.length && !fresh(m)).length;
-    const fxStale = !state.data.fx || !usable(state.data.fx.updated_at) || age(state.data.fx.updated_at) > FRESH;
-    const parts = [];
-    if (!usable(state.data.generated_at)) parts.push('价格数据已过期');
-    if (stale) parts.push(`${stale} 个地区为旧价或待复核`);
-    if (fxStale) parts.push('汇率可能已旧');
-    el.freshnessWarning.hidden = !parts.length; el.freshnessWarning.textContent = parts.join(' · ');
-    el.fxStatus.textContent = state.data.fx ? `汇率更新：${dateTime(state.data.fx.updated_at)}${state.data.fx.fallback ? '（沿用）' : ''}` : '汇率暂不可用';
+    el.updatedAt.textContent = priceDateLabel();
+    el.updatedAt.title = '北京时间；各地区实际核验时间见价格历史';
+    el.freshnessWarning.hidden = true;
+    el.freshnessWarning.textContent = '';
+    el.fxStatus.textContent = state.data.fx ? `汇率更新：${dateTime(state.data.fx.updated_at)}` : '汇率暂不可用';
   }
 
   function timeDependentSignature() {
@@ -387,8 +390,7 @@
     return JSON.stringify([
       usable(state.data.generated_at),
       !!fx && usable(fx.updated_at),
-      !!fx && usable(fx.updated_at) && age(fx.updated_at) <= FRESH,
-      state.data.markets.map(market => [fresh(market), usable(market.last_verified_at)]),
+      state.data.markets.map(market => usable(market.last_verified_at)),
     ]);
   }
   function refreshTimeDependentUi() {
@@ -547,7 +549,7 @@
     });
     const secondary = document.createElement('span');
     secondary.className = 'country-name-en';
-    secondary.textContent = `${market.code.toUpperCase()} · ${market.currency || '—'}${market.status === 'verified' ? '' : ' · ' + STATUS[market.status]}`;
+    secondary.textContent = `${market.code.toUpperCase()} · ${market.currency || '—'}`;
     const arrow = Object.assign(document.createElement('span'), {
       className: 'history-affordance',
       textContent: '›',
@@ -698,7 +700,7 @@
   }
   function openHistory(market, returnFocus) {
     state.activeMarket = market; state.historyReturnFocus = returnFocus; state.historyPlan = state.activePlan;
-    el.historyTitle.textContent = market.name; el.historySubtitle.textContent = `${market.code.toUpperCase()} · ${market.currency || '—'} · 近期公开标价记录`;
+    el.historyTitle.textContent = market.name; el.historySubtitle.textContent = `${market.code.toUpperCase()} · ${market.currency || '—'} · 价格更新于 ${dateTime(market.last_verified_at)}`;
     renderHistoryPlans(); renderHistory(); el.historyDialog.showModal();
   }
   function restoreHistoryFocus() {

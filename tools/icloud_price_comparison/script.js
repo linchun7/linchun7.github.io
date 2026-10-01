@@ -6,7 +6,7 @@ import {
   validatePayload,
   validatePriceHistoryConsistency,
   visiblePublicationEntries
-} from './data-contract.js?v=239c1b97';
+} from './data-contract.js?v=2faecdc5';
 import { createIcons } from './vendor/lucide-subset.js?v=2b21b7af';
 import { foldPublicationCountryRenames, marketSearchPriority, matchesMarketSearch, normalizeMarketSearchText, REGION_LABELS, VALID_REGIONS } from './data-model.js?v=27f94e24';
 
@@ -16,8 +16,6 @@ const SLOW_LOADING_MS = 1_500;
 const DEFAULT_SORT_TIER = '200GB';
 const DEFAULT_TIER_COLUMN_COUNT = 5;
 const FIXED_PRICE_TABLE_COLUMN_COUNT = 2;
-const PRICE_FRESH_MAX_AGE_MS = 36 * 60 * 60 * 1_000;
-const PRICE_HARD_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1_000;
 const MAX_PRICE_FUTURE_SKEW_MS = 5 * 60 * 1_000;
 const MAX_RESPONSE_BYTES = Object.freeze({
   'prices.json': 1024 * 1024,
@@ -349,11 +347,9 @@ async function fetchJson(fileName, { forceRefresh = false } = {}) {
 
 export function classifyPriceFreshness(data, nowMs = Date.now()) {
   const ageMs = nowMs - Date.parse(data?.generatedAt);
-  if (!Number.isFinite(ageMs)) return { status: 'unusable', reason: 'price-expired', ageMs };
+  // Age is not a validity limit: a validated observation remains displayable indefinitely.
+  if (!Number.isFinite(ageMs)) return { status: 'unusable', reason: 'invalid-time', ageMs };
   if (ageMs < -MAX_PRICE_FUTURE_SKEW_MS) return { status: 'unusable', reason: 'future-data', ageMs };
-  if (ageMs > PRICE_HARD_MAX_AGE_MS) return { status: 'unusable', reason: 'price-expired', ageMs };
-  if (ageMs > PRICE_FRESH_MAX_AGE_MS) return { status: 'degraded', reason: 'price-stale', ageMs };
-  if (data?.fx?.stale) return { status: 'degraded', reason: 'fx-stale', ageMs };
   return { status: 'fresh', reason: null, ageMs };
 }
 
@@ -361,7 +357,6 @@ function validatePriceFreshness(data) {
   const freshness = classifyPriceFreshness(data);
   if (!Number.isFinite(freshness.ageMs)) throw new Error('价格数据生成时间无效');
   if (freshness.reason === 'future-data') throw new Error('价格数据生成时间超过允许的未来偏差');
-  if (freshness.reason === 'price-expired') throw new Error('价格数据已超过七天有效期');
   return freshness;
 }
 
@@ -421,7 +416,7 @@ function reconcileStaticTierState() {
   for (const { rank, row } of rankedRows) {
     const rankCell = row.cells[0];
     rankCell.textContent = String(rank);
-    rankCell.classList.toggle('rank-top', !staticSnapshotFxStale && state.sortDirection === 'asc' && rank <= 3);
+    rankCell.classList.toggle('rank-top', state.minimumCuesEnabled && state.sortDirection === 'asc' && rank <= 3);
     const mobileRank = row.querySelector('.mobile-rank');
     if (mobileRank) mobileRank.textContent = String(rank);
     const mobileRankSr = row.querySelector('.mobile-rank-sr');
@@ -455,13 +450,7 @@ function renderMinimumSummary() {
   if (!state.minimumCuesEnabled) {
     const unavailable = document.createElement('p');
     unavailable.className = 'minimum-unavailable cache-stale-notice';
-    unavailable.textContent = state.minimumCuesReason === 'fx-stale'
-      ? '参考汇率暂未更新，人民币金额使用最近一次可用汇率。'
-      : (state.minimumCuesReason === 'price-expired'
-        ? '价格已经较久没有更新，暂不作为当前价格比较。'
-        : (state.minimumCuesReason === 'future-data'
-          ? '数据时间异常，暂不作为当前价格展示。'
-          : '价格暂未更新，当前显示最近一次获取的 Apple 标价。'));
+    unavailable.textContent = '数据时间异常，暂不作为当前价格展示。';
     elements.minimumSummary.replaceChildren(unavailable);
     elements.minimumSummary.setAttribute('aria-busy', 'false');
     return;
@@ -776,8 +765,6 @@ function updateRankingPresentation({ filtered = Boolean(state.query.trim() || st
   const tierRanking = state.sortKey === 'tier';
   const notes = [];
   if (unusable) notes.push('排名暂不可用。');
-  else if (state.dataFreshness?.reason === 'fx-stale') notes.push('排名基于最近一次可用汇率，仅供参考。');
-  else if (state.dataFreshness?.reason === 'price-stale') notes.push('排名为最近一次获取价格时的全球参考排名。');
   if (!unusable && filtered && tierRanking) notes.push('筛选结果中的排名仍对应全部地区。');
   if (elements.rankingScopeNote) {
     elements.rankingScopeNote.textContent = notes.join(' ');
@@ -1370,7 +1357,7 @@ function applyStaticSnapshotFreshness() {
   if (freshness.status === 'unusable') {
     const message = freshness.reason === 'future-data'
       ? '数据时间异常，暂不作为当前价格展示。请稍后重试。'
-      : '价格已经较久没有更新，暂不作为当前价格比较。请稍后重试。';
+      : '数据时间异常，暂不作为当前价格展示。请稍后重试。';
     elements.dataStatus.classList.add('is-error');
     elements.updatedAt.textContent = message;
     elements.priceRows.querySelectorAll('tr[data-market-id] > td:first-child, .mobile-rank').forEach((element) => { element.textContent = '—'; });
@@ -1389,21 +1376,8 @@ function clearFreshnessBoundary() {
 }
 
 function scheduleFreshnessBoundary() {
+  // No age boundary: retain the existing visibility/retry checks for clock anomalies.
   clearFreshnessBoundary();
-  const snapshot = state.data ?? (hasStaticSnapshot ? { generatedAt: staticSnapshotGeneratedAt } : null);
-  if (!snapshot || classifyPriceFreshness(snapshot).status === 'unusable') return;
-  const generatedAtMs = Date.parse(snapshot.generatedAt);
-  const nowMs = Date.now();
-  const boundaries = [
-    generatedAtMs + PRICE_FRESH_MAX_AGE_MS + 1,
-    generatedAtMs + PRICE_HARD_MAX_AGE_MS + 1
-  ];
-  const nextBoundary = boundaries.find((boundary) => boundary > nowMs);
-  if (!nextBoundary) return;
-  freshnessBoundaryTimer = setTimeout(() => {
-    freshnessBoundaryTimer = null;
-    void refreshPriceFreshnessLifecycle();
-  }, nextBoundary - nowMs);
 }
 
 function normalizeCurrentPriceFreshnessUi() {
@@ -1414,11 +1388,7 @@ function normalizeCurrentPriceFreshnessUi() {
     elements.overviewTitle.textContent = '各容量全球最低价';
   }
   if (elements.overviewNote) {
-    elements.overviewNote.textContent = freshness.reason === 'price-stale'
-      ? '价格暂未更新，当前显示最近一次获取的 Apple 标价。'
-      : (freshness.reason === 'fx-stale'
-        ? '参考汇率暂未更新，人民币金额使用最近一次可用汇率。'
-        : '按人民币换算，方便比较不同地区价格。');
+    elements.overviewNote.textContent = '按人民币换算，方便比较不同地区价格。';
   }
   const dataUpdatedAt = formatBeijingDateTime(state.data.generatedAt);
   const fxUpdatedAt = formatBeijingDateTime(state.data.fx.fetchedAt);
@@ -1426,16 +1396,6 @@ function normalizeCurrentPriceFreshnessUi() {
   elements.updatedAt.title = '北京时间';
   elements.fxStatus.textContent = `汇率更新：${fxUpdatedAt}`;
   elements.dataStatus.classList.remove('is-error', 'is-stale');
-  const freshnessWarning = freshness.reason === 'price-stale'
-    ? '价格暂未更新'
-    : (freshness.reason === 'fx-stale' ? '参考汇率暂未更新' : null);
-  if (freshnessWarning) {
-    elements.dataStatus.classList.add('is-stale');
-    const warning = document.createElement('span');
-    warning.className = 'freshness-warning';
-    warning.textContent = freshnessWarning;
-    elements.updatedAt.append(warning);
-  }
   updateRankingPresentation();
 }
 
@@ -1648,7 +1608,7 @@ function showLoadError(error) {
 function showUnusableDataError(reason) {
   const message = reason === 'future-data'
     ? '数据时间异常，暂不作为当前价格展示。请稍后重试。'
-    : '价格已经较久没有更新，暂不作为当前价格比较。请稍后重试。';
+    : '数据时间异常，暂不作为当前价格展示。请稍后重试。';
   elements.dataStatus.classList.add('is-error');
   if (elements.historyDialog.open) elements.historyDialog.close();
   elements.updatedAt.textContent = message;

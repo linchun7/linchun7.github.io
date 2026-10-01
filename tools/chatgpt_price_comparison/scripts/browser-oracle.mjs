@@ -3,7 +3,6 @@ const ALIASES = new Map([
   ['ChatGPT Pro 5X', 'ChatGPT Pro 5x'], ['ChatGPT Pro $100', 'ChatGPT Pro 5x'], ['ChatGPT Pro 100', 'ChatGPT Pro 5x'],
   ['ChatGPT Pro 20X', 'ChatGPT Pro 20x'], ['ChatGPT Pro $200', 'ChatGPT Pro 20x'], ['ChatGPT Pro 200', 'ChatGPT Pro 20x'],
 ]);
-const FRESH = 36 * 3600e3;
 export const identity = label => ALIASES.get(label) || label;
 function comparePlans(a, b) {
   const ai = ORDER.indexOf(identity(a));
@@ -30,10 +29,10 @@ export function offerFor(market, plan) {
 }
 function freshAt(timestamp, now) {
   const age = now - Date.parse(timestamp);
-  return Number.isFinite(age) && age >= -300e3 && age <= FRESH;
+  return Number.isFinite(age) && age >= -300e3;
 }
 export function comparableCents(data, market, plan, now) {
-  if (market.status !== 'verified' || !freshAt(market.last_verified_at, now) || !data.fx || !freshAt(data.fx.updated_at, now)) return null;
+  if (!freshAt(market.last_verified_at, now) || !data.fx || !freshAt(data.fx.updated_at, now)) return null;
   const offer = offerFor(market, plan);
   if (!offer) return null;
   const values = offer.amounts.filter(amount => amount.cny != null).map(amount => Number(amount.cny)).filter(Number.isFinite).map(value => Math.round(value * 100));

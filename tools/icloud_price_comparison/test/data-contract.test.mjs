@@ -206,7 +206,6 @@ test('shared browser and updater contracts reject the same price schema divergen
     (payload) => { payload.generatedAt = payload.generatedAt.replace(/\.\d{3}Z$/, 'Z'); },
     (payload) => { payload.fx.fetchedAt = payload.fx.fetchedAt.replace(/\.\d{3}Z$/, 'Z'); },
     (payload) => { payload.fx.fetchedAt = new Date(Date.parse(payload.generatedAt) + (5 * 60 * 1_000) + 1).toISOString(); },
-    (payload) => { payload.fx.fetchedAt = new Date(Date.parse(payload.generatedAt) - (36 * 60 * 60 * 1_000) - (5 * 60 * 1_000) - 1).toISOString(); },
     (payload) => { payload.source.publishedDate = '2099-01-01'; },
     (payload) => { payload.countries[0].plans[payload.tiers[0].id].price = Number.MAX_SAFE_INTEGER + 1; }
   ];

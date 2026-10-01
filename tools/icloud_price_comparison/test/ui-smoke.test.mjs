@@ -243,10 +243,11 @@ after(async () => {
 
 for (const scenario of [
   { name: 'stale', ageHours: 37, unusable: false },
-  { name: 'expired', ageHours: 169, unusable: true },
+  { name: 'expired', ageHours: 169, unusable: false },
+  { name: 'year-old', ageHours: 365 * 24, unusable: false },
   { name: 'future', ageHours: -1, unusable: true }
 ]) {
-  test(`static fallback removes misleading minimum cues when ${scenario.name}`, { timeout: 30_000 }, async (context) => {
+  test(`static fallback preserves accepted prices unless time is invalid: ${scenario.name}`, { timeout: 30_000 }, async (context) => {
     const started = performance.now();
     const deadline = AbortSignal.any([context.signal, AbortSignal.timeout(25_000)]);
     const remaining = () => Math.max(1, 25_000 - (performance.now() - started));
@@ -313,14 +314,15 @@ for (const scenario of [
       }
       phase = 'assert safety cues';
       assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), data.countries.length);
-      assert.equal(await page.locator('#minimumSummary .minimum-card').count(), 0);
-      assert.equal(await page.locator('.minimum-badge, .is-minimum, .rank-top').count(), 0);
+      assert.equal(await page.locator('#minimumSummary .minimum-card').count(), scenario.unusable ? 0 : data.tiers.length);
+      assert.equal(await page.locator('.minimum-badge, .is-minimum, .rank-top').count() > 0, !scenario.unusable);
       if (scenario.unusable) {
         assert.ok((await page.locator('#priceRows tr[data-market-id] > td:first-child').allTextContents()).every(text => text === '—'));
         assert.ok((await page.locator('.mobile-rank').allTextContents()).every(text => text === '—'));
         assert.ok((await page.locator('.mobile-rank-sr').allTextContents()).every(text => text === '排名暂不可用'));
       } else {
-        assert.match(await page.locator('#rankingScopeNote').textContent(), /最近一次/);
+        assert.match(await page.locator('#updatedAt').textContent(), /更新于/);
+        assert.equal(await page.locator('#priceRows tr[data-market-id] > td:first-child').first().textContent(), '1');
       }
     } catch (error) {
       console.error(`[freshness:${scenario.name}] failed stage=${phase} elapsed=${Math.round(performance.now() - started)}ms errors=${JSON.stringify(pageErrors)} pending=${JSON.stringify([...pending])}`);
@@ -336,7 +338,7 @@ for (const scenario of [
   });
 }
 
-test('static fallback reclassifies offline pages and keeps retry warnings singular', { timeout: 30_000 }, async (context) => {
+test('static fallback preserves dates and minimums indefinitely with retry warnings singular', { timeout: 30_000 }, async (context) => {
   const browserConfig = await resolveBrowser(context, 'offline static lifecycle');
   if (!browserConfig) return;
   const server = await startServer();
@@ -358,19 +360,23 @@ test('static fallback reclassifies offline pages and keeps retry warnings singul
       await page.waitForFunction(() => !document.getElementById('retryButton').hidden);
     }
     assert.equal(await page.locator('.cache-warning').count(), 1);
-    await page.evaluate(now => { window.__staticTestNow = now; window.dispatchEvent(new Event('pageshow')); }, Date.parse(data.generatedAt) + 37 * 3600000);
-    await page.waitForFunction(() => !document.querySelector('#minimumSummary .minimum-card'));
-    assert.match(await page.locator('#rankingScopeNote').textContent(), /最近一次/);
-    await page.evaluate(now => { window.__staticTestNow = now; window.dispatchEvent(new Event('pageshow')); }, Date.parse(data.generatedAt) + 169 * 3600000);
-    await page.waitForFunction(() => [...document.querySelectorAll('.mobile-rank')].every(el => el.textContent === '—'));
-    assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), data.countries.length);
+    const priceDate = await page.locator('#updatedAt').textContent();
+    const fxDate = await page.locator('#fxStatus').textContent();
+    for (const days of [2, 8, 365, 3650]) {
+      await page.evaluate(now => { window.__staticTestNow = now; window.dispatchEvent(new Event('pageshow')); }, Date.parse(data.generatedAt) + days * 86400_000);
+      assert.equal(await page.locator('#minimumSummary .minimum-card').count(), data.tiers.length);
+      assert.equal(await page.locator('#priceRows tr[data-market-id] > td:first-child').first().textContent(), '1');
+      assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), data.countries.length);
+      assert.equal(await page.locator('#updatedAt').textContent(), priceDate);
+      assert.equal(await page.locator('#fxStatus').textContent(), fxDate);
+    }
   } finally {
     await browser.close();
     await new Promise(resolve => server.close(resolve));
   }
 });
 
-for (const ageHours of [-1, 37]) {
+for (const ageHours of [-1]) {
   test(`static fallback restores safety cues after clock correction from ${ageHours}h`, { timeout: 30_000 }, async (context) => {
     const browserConfig = await resolveBrowser(context, 'static fallback recovery');
     if (!browserConfig) return;
@@ -476,9 +482,8 @@ test('shows static prices immediately and refreshes them without blocking first 
   assert.match(moduleSource, /MAX_RESPONSE_BYTES[\s\S]*?'prices\.json': 1024 \* 1024[\s\S]*?'history\.json': 8 \* 1024 \* 1024/);
   assert.match(moduleSource, /TextDecoder\('utf-8', \{ fatal: true \}\)/, 'network JSON must use strict UTF-8 decoding');
   assert.match(moduleSource, /fetch\(url,[\s\S]*?redirect:\s*'error'/, 'all later data requests must reject redirects');
-  assert.match(moduleSource, /PRICE_FRESH_MAX_AGE_MS = 36 \* 60 \* 60 \* 1_000/);
-  assert.match(moduleSource, /PRICE_HARD_MAX_AGE_MS = 7 \* 24 \* 60 \* 60 \* 1_000/);
-  assert.match(moduleSource, /function scheduleFreshnessBoundary\(\)[\s\S]*?setTimeout\([\s\S]*?refreshPriceFreshnessLifecycle/);
+  assert.doesNotMatch(moduleSource, /PRICE_FRESH_MAX_AGE_MS|PRICE_HARD_MAX_AGE_MS/);
+  assert.match(moduleSource, /MAX_PRICE_FUTURE_SKEW_MS/, 'future timestamp checks remain');
   assert.doesNotMatch(moduleSource, /setInterval\(/, 'freshness lifecycle must use one-shot boundaries, not polling');
   assert.match(moduleSource, /document\.addEventListener\('visibilitychange'/);
   assert.match(moduleSource, /window\.addEventListener\('pageshow'/);
@@ -784,7 +789,7 @@ test('reconciles a non-default static tier before network hydration completes', 
   }
 });
 
-test('keeps stale-FX static safety cues when the network refresh fails', { timeout: 30_000 }, async (context) => {
+test('keeps accepted static FX and minimums when the network refresh fails', { timeout: 30_000 }, async (context) => {
   const browserConfig = await resolveBrowser(context, 'the stale-FX static fallback test');
   if (!browserConfig) return;
   const [shell, current] = await Promise.all([
@@ -806,9 +811,9 @@ test('keeps stale-FX static safety cues when the network refresh fails', { timeo
   try {
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
-    assert.equal(await page.locator('.minimum-card, .minimum-badge, .is-minimum, .rank-top').count(), 0);
-    assert.match(await page.locator('#minimumSummary').innerText(), /参考汇率暂未更新/);
-    assert.match(await page.locator('#rankingScopeNote').innerText(), /最近一次可用汇率/);
+    assert.equal(await page.locator('.minimum-card').count(), payload.tiers.length);
+    assert.ok(await page.locator('.minimum-badge, .is-minimum, .rank-top').count() > 0);
+    assert.match(await page.locator('#fxStatus').innerText(), /汇率更新/);
     assert.ok(await page.locator('.price-local').count() > 0);
     assert.ok(await page.locator('.price-cny').count() > 0);
   } finally {
@@ -1762,11 +1767,11 @@ test('rebuilds tier headers and filters after a successful retry with changed ti
   }
 });
 
-test('marks stale data clearly and falls back from an invalid tier query', { timeout: 30_000 }, async (context) => {
+test('keeps old and retained-FX snapshots usable and falls back from an invalid tier query', { timeout: 30_000 }, async (context) => {
   const browserConfig = await resolveBrowser(context, 'the stale-data UI test');
   if (!browserConfig) return;
   const validData = await readFixture('prices.json');
-  const referenceNow = Date.parse(validData.generatedAt) + (8 * 24 * 60 * 60 * 1_000);
+  const referenceNow = Date.parse(validData.generatedAt) + (373 * 24 * 60 * 60 * 1_000);
   const scenarios = [
     {
       label: 'old snapshot',
@@ -1775,8 +1780,8 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
         data.fx.fetchedAt = data.generatedAt;
         data.fx.stale = false;
       },
-      expected: /价格暂未更新/,
-      minimumDegraded: true
+      expected: /更新于/,
+      minimumDegraded: false
     },
     {
       label: 'future snapshot',
@@ -1799,14 +1804,14 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
       expectedStale: false
     },
     {
-      label: 'maximum usable historical age',
+      label: 'one year old snapshot',
       mutate: (data) => {
-        setPayloadGeneratedAt(data, new Date(referenceNow - (7 * 24 * 60 * 60 * 1_000)).toISOString());
+        setPayloadGeneratedAt(data, new Date(referenceNow - (365 * 24 * 60 * 60 * 1_000)).toISOString());
         data.fx.fetchedAt = data.generatedAt;
         data.fx.stale = false;
       },
-      expected: /价格暂未更新/,
-      minimumDegraded: true
+      expected: /更新于/,
+      minimumDegraded: false
     },
     {
       label: 'fallback rates',
@@ -1817,8 +1822,8 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
         data.fx.fallbackReason = 'request-failed';
         delete data.fx.comparisonFingerprint;
       },
-      expected: /参考汇率暂未更新/,
-      minimumDegraded: true
+      expected: /更新于/,
+      minimumDegraded: false
     },
     {
       label: 'old snapshot with fallback rates',
@@ -1829,15 +1834,15 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
         data.fx.fallbackReason = 'request-failed';
         delete data.fx.comparisonFingerprint;
       },
-      expected: /价格暂未更新/,
-      minimumDegraded: true
+      expected: /更新于/,
+      minimumDegraded: false
     }
   ];
   const server = await startServer();
   const { port } = server.address();
   const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
   try {
-    for (const { label, mutate, expected, expectedPublishedDate, minimumDegraded = false, expectedStale = true } of scenarios) {
+    for (const { label, mutate, expected, expectedPublishedDate, minimumDegraded = false, expectedStale = false } of scenarios) {
       const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
       await page.addInitScript((nowMs) => { Date.now = () => nowMs; }, referenceNow);
       const payload = structuredClone(validData);
@@ -1895,7 +1900,7 @@ test('marks stale data clearly and falls back from an invalid tier query', { tim
   }
 });
 
-test('reclassifies long-lived pages across lifecycle boundaries without replacing equal snapshots', { timeout: 45_000 }, async (context) => {
+test('keeps long-lived pages usable without age-triggered refreshes and preserves equal snapshots', { timeout: 45_000 }, async (context) => {
   const browserConfig = await resolveBrowser(context, 'the long-lived freshness lifecycle test');
   if (!browserConfig) return;
   const fixture = await readFixture('prices.json');
@@ -1944,31 +1949,30 @@ test('reclassifies long-lived pages across lifecycle boundaries without replacin
     const historyCallsAfterLoad = historyCalls;
     assert.ok(historyCallsAfterLoad >= 1);
 
-    await page.evaluate((nowMs) => {
-      Date.now = () => nowMs;
-      Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
-      document.dispatchEvent(new Event('visibilitychange'));
-    }, Date.parse(original.generatedAt) + (36 * 60 * 60 * 1_000) + 1);
-    await page.waitForFunction(() => document.querySelector('#updatedAt')?.textContent.includes('价格暂未更新'));
-    assert.equal(await page.locator('.minimum-card').count(), 0);
-    assert.equal(await page.locator('.minimum-badge').count(), 0);
-    assert.equal(await page.locator('.price-cell.is-minimum').count(), 0);
-    assert.equal(await page.locator('.rank-top').count(), 0);
-    assert.equal(await page.locator('#searchInput').isEnabled(), true);
+    const dates = await page.locator('#updatedAt, #fxStatus').allTextContents();
+    const beforeCalls = priceCalls;
+    for (const days of [2, 8, 365, 3650]) {
+      await page.evaluate(now => {
+        Date.now = () => now;
+        document.dispatchEvent(new Event('visibilitychange'));
+        window.dispatchEvent(new Event('pageshow'));
+      }, Date.parse(original.generatedAt) + days * 86400_000);
+      assert.equal(await page.locator('.minimum-card').count(), fixture.tiers.length);
+      assert.ok(await page.locator('.minimum-badge').count() > 0);
+      assert.ok(await page.locator('.rank-top').count() > 0);
+      assert.equal(await page.locator('#searchInput').isEnabled(), true);
+      assert.deepEqual(await page.locator('#updatedAt, #fxStatus').allTextContents(), dates);
+    }
+    assert.equal(priceCalls, beforeCalls, 'elapsed days do not require a new snapshot');
     await page.locator('#retryButton').dispatchEvent('click');
     await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
-    assert.equal(await page.locator('#overviewTitle').textContent(), '各容量全球最低价', 'an equal network snapshot must still use current time');
-    assert.equal(await page.locator('#searchInput').isEnabled(), true);
-    assert.equal(historyCalls, historyCallsAfterLoad, 'an equal snapshot freshness change must retain loaded history');
-
+    assert.equal(historyCalls, historyCallsAfterLoad, 'equal-snapshot retry retains validated history');
     serveRefreshed = true;
-    await page.evaluate((nowMs) => {
-      Date.now = () => nowMs;
-      window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
-    }, Date.parse(original.generatedAt) + (7 * 24 * 60 * 60 * 1_000) + 1);
-    await page.waitForFunction(() => document.querySelector('#overviewTitle')?.textContent === '各容量全球最低价');
-    assert.ok(priceCalls >= 3, 'crossing seven days must force a network refresh');
-    assert.equal(await page.locator('#retryButton').isHidden(), true);
+    await page.locator('#retryButton').dispatchEvent('click');
+    await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
+    assert.ok(priceCalls >= beforeCalls + 2);
+    assert.notDeepEqual(await page.locator('#updatedAt, #fxStatus').allTextContents(), dates);
+
   } finally {
     await page.close();
     await browser.close();
@@ -1994,7 +1998,7 @@ test('normalizes transient network warnings after an equal-snapshot retry', { ti
       {
         label: 'price-stale',
         nowMs: Date.parse(fixture.generatedAt) + (48 * 60 * 60 * 1_000),
-        expectedWarning: /价格暂未更新/
+        expectedWarning: null
       }
     ];
     for (const scenario of scenarios) {
@@ -2064,9 +2068,8 @@ test('restores all controls after loaded snapshots recover from unusable clocks'
   const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
   try {
     for (const scenario of [
-      { badAgeHours: 169, recoveredAgeHours: 1, offline: false },
       { badAgeHours: -1, recoveredAgeHours: 1, offline: false },
-      { badAgeHours: 169, recoveredAgeHours: 37, offline: false },
+      { badAgeHours: -1, recoveredAgeHours: 37, offline: false },
       { badAgeHours: -1, recoveredAgeHours: 1, offline: true }
     ]) {
       const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
@@ -2105,7 +2108,7 @@ test('restores all controls after loaded snapshots recover from unusable clocks'
         assert.equal(priceCalls, callsBeforeCorrection + 1, 'clock correction must complete one guarded refresh');
         assert.equal(await page.locator('#searchInput').inputValue(), fixture.countries[0].country);
         assert.equal(await page.locator('#regionSelect').inputValue(), fixture.countries[0].region);
-        assert.equal(await page.locator('.minimum-card').count(), scenario.recoveredAgeHours > 36 ? 0 : fixture.tiers.length);
+        assert.equal(await page.locator('.minimum-card').count(), fixture.tiers.length);
         assert.equal(await page.locator('#loadStatus').isVisible(), scenario.offline);
         assert.doesNotMatch(await page.locator('#loadStatusText').textContent(), /价格已经较久没有更新|数据时间异常/);
         assert.equal(await page.locator('.cache-warning').count(), scenario.offline ? 1 : 0);
@@ -2125,7 +2128,7 @@ test('restores all controls after loaded snapshots recover from unusable clocks'
   }
 });
 
-test('shows an explicit expired state when lifecycle refresh fails', { timeout: 30_000 }, async (context) => {
+test('keeps open history and all prices when time passes beyond seven days', { timeout: 30_000 }, async (context) => {
   const browserConfig = await resolveBrowser(context, 'the expired lifecycle failure test');
   if (!browserConfig) return;
   const payload = await readFixture('prices.json');
@@ -2160,16 +2163,18 @@ test('shows an explicit expired state when lifecycle refresh fails', { timeout: 
       Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
       document.dispatchEvent(new Event('visibilitychange'));
     }, Date.parse(payload.generatedAt) + (7 * 24 * 60 * 60 * 1_000) + 1);
+    assert.equal(await page.locator('#historyDialog').evaluate(dialog => dialog.open), true);
+    assert.equal(await page.locator('.country-history-button').first().isEnabled(), true);
+    assert.equal(await page.locator('#searchInput').isEnabled(), true);
+    assert.ok(await page.locator('.minimum-badge').count() > 0);
+    assert.equal(await page.locator('.minimum-card').count(), payload.tiers.length);
+    assert.match(await page.locator('#updatedAt').textContent(), /更新于/);
+    await page.locator('#closeHistory').click();
+    await page.locator('#retryButton').dispatchEvent('click');
     await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
-    assert.equal(await page.locator('#historyDialog').evaluate((dialog) => dialog.open), false);
-    const expiredHistoryButton = page.locator('.country-history-button').first();
-    assert.equal(await expiredHistoryButton.isDisabled(), true);
-    await expiredHistoryButton.evaluate((button) => button.click());
-    assert.equal(await page.locator('#historyDialog').evaluate((dialog) => dialog.open), false);
-    assert.match(await page.locator('#loadStatusText').textContent(), /价格已经较久没有更新.*请稍后重试/);
-    assert.equal(await page.locator('#searchInput').isDisabled(), true);
-    assert.equal(await page.locator('.minimum-badge').count(), 0);
-    assert.match(await page.locator('#minimumSummary').textContent(), /价格已经较久没有更新/);
+    assert.equal(await page.locator('#searchInput').isEnabled(), true);
+    assert.equal(await page.locator('.minimum-card').count(), payload.tiers.length);
+
   } finally {
     await page.close();
     await browser.close();
@@ -3355,7 +3360,7 @@ test('rejects redirected, oversized, and malformed UTF-8 price responses before 
   }
 });
 
-test('rejects network price data older than seven days or more than five minutes in the future', { timeout: 60_000 }, async (context) => {
+test('rejects rollback and more-than-five-minute future network data', { timeout: 60_000 }, async (context) => {
   const browserConfig = await resolveBrowser(context, 'the network freshness boundary test');
   if (!browserConfig) return;
   const validData = await readFixture('prices.json');
