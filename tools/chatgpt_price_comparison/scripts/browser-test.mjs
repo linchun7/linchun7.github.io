@@ -184,14 +184,14 @@ try {
   await until(()=>evaluate(`!document.querySelector('#minimumHistoryRetry').hidden && document.querySelector('#minimumHistoryStatus').textContent.includes('暂无法刷新')`),'future history is rejected without dropping old records');
   assert.equal(await evaluate('document.querySelector("#minimumHistoryEvents").textContent'), acceptedHistoryText);
   assert.ok((await evaluate('document.querySelector("#minimumHistoryStatus").textContent')).startsWith(acceptedHistoryDate), 'failed refresh preserves actual cutoff');
-  await evaluate('document.querySelector("#minimumHistoryPlanFilter").dispatchEvent(new Event("change")); document.querySelector("#minimumHistoryMore").click();');
+  await evaluate('document.querySelector("#minimumHistoryPlanFilter").dispatchEvent(new Event("change")); document.querySelector("#minimumHistoryMore").click(); document.querySelector("#minimumHistoryPlanFilter").dispatchEvent(new Event("change"));');
   assert.equal(await evaluate('document.querySelector("#minimumHistoryRetry").hidden'), false, 'filter/pagination retain retry');
   await evaluate(`globalThis.fetch = (input, init) => new URL(input.url || input, location.href).pathname.endsWith('/minimum-history.json') ? Promise.reject(Error('offline')) : globalThis.__originalHistoryFetch(input, init); document.querySelector('#minimumHistoryRetry').click();`);
   await until(()=>evaluate(`document.querySelector('#minimumHistoryStatus').textContent.includes('暂无法刷新') && !document.querySelector('#minimumHistoryRetry').disabled`), 'network failure preserves history');
   assert.equal(await evaluate('document.querySelector("#minimumHistoryEvents").textContent'), acceptedHistoryText);
   assert.ok(await evaluate('document.querySelectorAll("#priceRows tr[data-market-id]").length>0'),'bad history never removes current prices');
   await evaluate(`{globalThis.fetch=globalThis.__originalHistoryFetch;delete globalThis.__originalHistoryFetch;document.querySelector('#minimumHistoryRetry').click();}`);
-  await until(()=>evaluate(`document.querySelector('#minimumHistoryRetry').hidden && !document.querySelector('#minimumHistoryNote').hidden`),'valid history recovers after retry');
+  await until(()=>evaluate(`document.querySelector('#minimumHistoryRetry').hidden && !document.querySelector('#minimumHistoryRetry').disabled && !document.querySelector('#minimumHistoryNote').hidden`),'valid history recovers after retry');
 
   await evaluate('document.querySelector("#closeMinimumHistory").click()');
 

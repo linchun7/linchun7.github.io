@@ -12,7 +12,6 @@ import { foldPublicationCountryRenames, marketSearchPriority, matchesMarketSearc
 
 const REQUEST_TIMEOUT_MS = 8_000;
 const ANALYTICS_ID = 'G-K2S9L4CHNP';
-const SLOW_LOADING_MS = 1_500;
 const DEFAULT_SORT_TIER = '200GB';
 const DEFAULT_TIER_COLUMN_COUNT = 5;
 const FIXED_PRICE_TABLE_COLUMN_COUNT = 2;
@@ -105,7 +104,6 @@ const numberFormatter = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 
 const moneyFormatter = new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const percentFormatter = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 });
 const collator = new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base' });
-let slowLoadingTimer = null;
 let freshnessRefreshPromise = null;
 let analyticsScheduled = false;
 let staticSnapshotDomDowngraded = false;
@@ -206,7 +204,10 @@ function setLoadStatus(message, { error = false, retry = error, hidden = false }
   elements.loadStatus.classList.toggle('is-error', error);
   elements.loadStatus.hidden = hidden;
   if (elements.retryButton) elements.retryButton.hidden = !retry;
-  elements.workspace?.setAttribute('aria-busy', String(!hidden && !error && !retry));
+  const busy = !hidden && !error && !retry;
+  const spinner = elements.loadStatus.querySelector('.spinner');
+  if (spinner) spinner.style.display = busy ? '' : 'none';
+  elements.workspace?.setAttribute('aria-busy', String(busy));
 }
 
 function setFiltersDisabled(disabled) {
@@ -1362,7 +1363,7 @@ function applyStaticSnapshotFreshness() {
     staticFallbackPresentation = null;
     staticSnapshotDomDowngraded = false;
     elements.dataStatus.classList.remove('is-error', 'is-stale');
-    setLoadStatus(state.loading ? '正在检查最新价格…' : '暂时无法获取更新，当前显示最近一次可用价格', {error: !state.loading});
+    setLoadStatus(state.loading ? '正在读取…' : '', {retry: !state.loading});
     // The restored HTML is readable; controls still wait for validated JSON.
     setFiltersDisabled(true);
   }
@@ -1382,7 +1383,7 @@ function applyStaticSnapshotFreshness() {
     if (elements.overviewNote) elements.overviewNote.textContent = elements.minimumSummary.textContent;
   }
   if (freshness.status === 'unusable') {
-    const message = freshness.'数据时间异常，暂不作为当前价格展示。请稍后重试。';
+    const message = '数据时间异常，暂不作为当前价格展示。请稍后重试。';
     elements.dataStatus.classList.add('is-error');
     elements.updatedAt.textContent = message;
     elements.priceRows.querySelectorAll('tr[data-market-id] > td:first-child, .mobile-rank').forEach((element) => { element.textContent = '—'; });
@@ -1656,7 +1657,6 @@ async function refreshPriceFreshnessLifecycle() {
 async function initialize({ forceRefresh = false } = {}) {
   if (state.loading) return;
   state.loading = true;
-  clearTimeout(slowLoadingTimer);
   elements.updatedAt.querySelectorAll('.cache-warning').forEach((warning) => warning.remove());
   setLoadStatus('正在读取…');
   if (!state.data) setFiltersDisabled(true);
@@ -1664,9 +1664,6 @@ async function initialize({ forceRefresh = false } = {}) {
 
   const fallbackData = state.data;
 
-  slowLoadingTimer = setTimeout(() => {
-    if (!hasStaticSnapshot && !fallbackData) setLoadStatus('正在读取…');
-  }, SLOW_LOADING_MS);
 
   try {
     const networkData = await fetchJson('prices.json', { forceRefresh });
@@ -1708,9 +1705,7 @@ async function initialize({ forceRefresh = false } = {}) {
       showLoadError(error);
     }
   } finally {
-    clearTimeout(slowLoadingTimer);
-    slowLoadingTimer = null;
-    state.loading = false;
+      state.loading = false;
     scheduleAnalytics();
   }
 }
@@ -1915,6 +1910,10 @@ async function loadMinimumHistory() {
       const previous = minimumHistoryUi.data?.checkedAt;
       if (previous && (!value.checkedAt || Date.parse(value.checkedAt) < Date.parse(previous))) {
         throw new Error('History response would roll back accepted records');
+      }
+      const previousCheckpoint = minimumHistoryUi.data?.checkpoint?.at;
+      if (previousCheckpoint && (!value.checkpoint?.at || Date.parse(value.checkpoint.at) < Date.parse(previousCheckpoint))) {
+        throw new Error('History response would roll back accepted checkpoint');
       }
       minimumHistoryUi.data = value;
       minimumHistoryUi.status = 'ready';

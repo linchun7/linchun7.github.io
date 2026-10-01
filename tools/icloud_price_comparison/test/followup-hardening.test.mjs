@@ -237,7 +237,7 @@ test('minimum history uses a short guarded FX-gap badge without changing raw evi
   const evidence = {pricesChanged:false,scopeChanged:false,basisChanged:false,fxChanged:true,gap:true};
   const event = {cause:'unknown',evidence};
   const before = JSON.stringify(event);
-  assert.equal(label(event),'汇率变化 · 记录有缺口');
+  assert.equal(label(event),'汇率等因素');
   for (const [key,value] of [['pricesChanged',true],['scopeChanged',true],['basisChanged',true],['fxChanged',false],['fxChanged',null],['gap',false],['pricesChanged','false']]) {
     assert.equal(label({cause:'unknown',evidence:{...evidence,[key]:value}}),'原因未确定');
   }

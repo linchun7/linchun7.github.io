@@ -984,6 +984,10 @@
         if (previous && (!value.checked_at || Date.parse(value.checked_at) < Date.parse(previous))) {
           throw new Error('History response would roll back accepted records');
         }
+        const previousCheckpoint = minimumHistoryUi.data?.checkpoint?.at;
+        if (previousCheckpoint && (!value.checkpoint?.at || Date.parse(value.checkpoint.at) < Date.parse(previousCheckpoint))) {
+          throw new Error('History response would roll back accepted checkpoint');
+        }
         minimumHistoryUi.data = value;
         minimumHistoryUi.status = 'ready';
         renderMinimumHistory();
