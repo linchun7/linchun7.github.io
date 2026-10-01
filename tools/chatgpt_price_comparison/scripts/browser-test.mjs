@@ -198,7 +198,8 @@ try {
     const historyLocal=await evaluate(`document.querySelector('#historyLocalPrice').textContent`);
     for(const amount of sampleOffer.amounts) assert.ok(historyLocal.includes(amount.display),'history preserves every same-label public amount');
   }
-  assert.ok(await evaluate(`document.querySelector('#historySubtitle').textContent.includes('近期公开标价记录')`),'history scope is explicit');
+  const sampleVerifiedDate = await evaluate(`new Date(${JSON.stringify(sampleMarket.last_verified_at)}).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai',hour12:false,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})`);
+  assert.ok(await evaluate(`document.querySelector('#historySubtitle').textContent.includes(${JSON.stringify('价格更新于 ' + sampleVerifiedDate)})`), 'history exposes the actual market observation date');
   for (const key of ['Enter', ' ']) {
     await evaluate(`[...document.querySelectorAll('#historyPlanControl button')].find(button => button.dataset.plan === ${JSON.stringify(defaultPlan)}).focus()`);
     await pressKey(key);

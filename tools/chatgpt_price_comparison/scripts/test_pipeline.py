@@ -598,6 +598,19 @@ class ContractTests(unittest.TestCase):
         self.assertNotIn('排名暂不可用',row.group(1))
         self.assertIn('minimum-badge',row.group(1))
 
+    def test_price_date_label_does_not_use_job_time(self):
+        d=copy.deepcopy(data_fixture())
+        observed=p.stamp(NOW-365*86400)
+        d['markets'][0]['last_verified_at']=observed
+        d['markets'][0]['status']='retained'
+        self.assertEqual(p.price_date_label(d), '价格更新于 '+p.beijing_display(observed))
+        second=copy.deepcopy(d['markets'][0])
+        second['code']='jp'
+        second['last_verified_at']=p.stamp(NOW-8*86400)
+        d['markets'].append(second)
+        self.assertEqual(p.price_date_label(d),
+            '价格更新于 '+p.beijing_display(observed)[:10]+' 至 '+p.beijing_display(second['last_verified_at'])[:10])
+
     def test_static_price_ties_use_stable_market_code_order(self):
         d=copy.deepcopy(data_fixture())
         base=d['markets'][0]
