@@ -56,6 +56,30 @@ try {
   await page.locator('#closeMinimumHistory').click();
 
 
+
+  // A self-consistent future cutoff must not poison rollback protection.
+  const acceptedText = await page.locator('#minimumHistoryEvents').textContent();
+  const acceptedCutoff = await page.locator('#minimumHistoryStatus').textContent();
+  const futureHistory = JSON.parse(await readFile(resolve(projectDir, 'data/minimum-history.json'), 'utf8'));
+  assert.ok(futureHistory.checkpoint, 'future-cutoff regression needs an accepted checkpoint');
+  futureHistory.checked_at = new Date(Date.now() + 86400000).toISOString();
+  futureHistory.checkpoint.at = futureHistory.checked_at;
+  await page.route('**/data/minimum-history.json*', route => route.fulfill({
+    contentType: 'application/json', body: JSON.stringify(futureHistory)
+  }));
+  await page.locator('#minimumHistoryButton').click();
+  await page.evaluate(() => document.querySelector('#minimumHistoryRetry').click());
+  await page.waitForFunction(() => document.querySelector('#minimumHistoryStatus').textContent.includes('暂无法刷新'));
+  assert.equal(await page.locator('#minimumHistoryEvents').textContent(), acceptedText);
+  assert.equal(await page.locator('#minimumHistoryStatus').textContent(), acceptedCutoff + ' · 暂无法刷新');
+  await page.unroute('**/data/minimum-history.json*');
+  await page.locator('#minimumHistoryRetry').click();
+  await page.waitForFunction(() => document.querySelector('#minimumHistoryRetry').hidden
+    && !document.querySelector('#minimumHistoryRetry').disabled);
+  assert.equal(await page.locator('#minimumHistoryStatus').textContent(), acceptedCutoff);
+  assert.equal(await page.locator('#minimumHistoryEvents').textContent(), acceptedText);
+  await page.locator('#closeMinimumHistory').click();
+
   const priceData = JSON.parse(await readFile(resolve(projectDir, 'data/prices.json'), 'utf8'));
   const us = priceData.markets.find(market => market.code === 'us');
   assert.ok(us?.history_baseline, 'US country history must retain an observed baseline');
