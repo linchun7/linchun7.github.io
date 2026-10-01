@@ -300,7 +300,7 @@ for (const scenario of [
       });
       await stage('navigate local page', signal => page.goto(origin + '/', {waitUntil: 'domcontentloaded', timeout: Math.min(8000, remaining()), signal}));
       await stage('wait for error state', signal => page.waitForFunction(
-        () => document.querySelector('#loadStatus')?.classList.contains('is-error'),
+        () => document.querySelector('#retryButton')?.hidden === false,
         undefined, {timeout: Math.min(8000, remaining()), signal}
       ));
       if (scenario.name === 'stale') {
@@ -353,13 +353,14 @@ test('static fallback preserves dates and minimums indefinitely with retry warni
     await page.route('**/data/prices.json', route => route.abort());
     await page.route('**/googletagmanager.com/**', route => route.abort());
     await page.goto(`http://127.0.0.1:${server.address().port}/`, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(() => document.querySelector('#loadStatus')?.classList.contains('is-error'));
+    await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
     assert.equal(await page.locator('#minimumSummary .minimum-card').count(), data.tiers.length);
     for (let attempt = 0; attempt < 2; attempt++) {
       await page.click('#retryButton');
       await page.waitForFunction(() => !document.getElementById('retryButton').hidden);
     }
-    assert.equal(await page.locator('.cache-warning').count(), 1);
+    assert.equal(await page.locator('.cache-warning').count(), 0);
+    assert.equal(await page.locator('#loadStatus .spinner').isVisible(), false);
     const priceDate = await page.locator('#updatedAt').textContent();
     const fxDate = await page.locator('#fxStatus').textContent();
     for (const days of [2, 8, 365, 3650]) {
@@ -484,7 +485,7 @@ test('shows static prices immediately and refreshes them without blocking first 
   assert.match(moduleSource, /fetch\(url,[\s\S]*?redirect:\s*'error'/, 'all later data requests must reject redirects');
   assert.doesNotMatch(moduleSource, /PRICE_FRESH_MAX_AGE_MS|PRICE_HARD_MAX_AGE_MS/);
   assert.match(moduleSource, /MAX_PRICE_FUTURE_SKEW_MS/, 'future timestamp checks remain');
-  assert.doesNotMatch(moduleSource, /setInterval\(/, 'freshness lifecycle must use one-shot boundaries, not polling');
+  assert.doesNotMatch(moduleSource, /setInterval\(/, 'freshness lifecycle must not poll or expire accepted snapshots');
   assert.match(moduleSource, /document\.addEventListener\('visibilitychange'/);
   assert.match(moduleSource, /window\.addEventListener\('pageshow'/);
   assert.match(moduleSource, /fileName === 'prices\.json' \? 'no-cache' : 'default'/, 'ordinary prices requests must revalidate while preserving HTTP caching');
@@ -872,8 +873,8 @@ test('renders current prices, sorting, and country history in a real browser', {
 
       try {
         await page.goto(`${baseUrl}/`, { waitUntil: 'domcontentloaded' });
-        assert.equal(await page.locator('#loadStatus').isVisible(), true, `${viewport.name} should show loading status before price data arrives`);
-        assert.match(await page.locator('#loadStatusText').textContent(), /正在检查最新价格/);
+        assert.equal(await page.locator('#loadStatus').isVisible(), true, `${viewport.name} shows one compact progress indicator`);
+        assert.equal(await page.locator('#updatedAt .cache-warning').count(), 0);
         assert.equal(await page.locator('.workspace').getAttribute('aria-busy'), 'true');
         assert.equal(await page.locator('#searchInput').isDisabled(), true);
         assert.equal(await page.locator('#regionSelect').isDisabled(), true);
@@ -886,7 +887,7 @@ test('renders current prices, sorting, and country history in a real browser', {
         }
         if (viewport.name === 'desktop') {
           await page.waitForTimeout(1_600);
-          assert.match(await page.locator('#loadStatusText').textContent(), /正在检查更新，当前价格仍可查看/);
+          assert.equal(await page.locator('#loadStatusText').textContent(), '正在读取…');
         }
         releasePriceRequest();
         await page.waitForFunction(
@@ -1576,7 +1577,7 @@ test('shows an actionable error and recovers after a temporary price-data outage
     assert.equal(await page.locator('#minimumSummary .minimum-card').first().isEnabled(), false);
     assert.equal(await page.locator('#priceRows .country-history-button').first().isEnabled(), false);
     assert.equal(await page.locator('#publishedDateButton').isEnabled(), false);
-    assert.equal(await page.locator('#loadStatusText').textContent(), '暂时无法获取更新，当前显示最近一次可用价格');
+    assert.equal(await page.locator('#loadStatusText').textContent(), '');
     assert.equal(await page.locator('#retryButton').textContent(), '重试');
     await page.locator('#retryButton').click();
     await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
@@ -1661,7 +1662,7 @@ test('keeps current prices usable when optional history data is unavailable or m
         );
         if (scenario.unavailable) {
           await page.locator('#priceRows tr[data-market-id]').first().click();
-          await page.waitForFunction(() => document.querySelector('#historySubtitle')?.textContent.includes('暂时无法读取历史记录'));
+          await page.waitForFunction(() => document.querySelector('#historySubtitle')?.textContent.includes('历史暂无法读取'));
           await page.locator('#closeHistory').click();
           await page.locator('#publishedDateButton').click();
           await page.waitForFunction(() => document.querySelector('#publishedDateRows')?.textContent.includes('暂时无法读取发布日期记录'));
@@ -1709,7 +1710,7 @@ test('rejects malformed price payloads and recovers without a full-page refresh'
       try {
         await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
         await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
-        assert.equal(await page.locator('#loadStatusText').textContent(), '暂时无法获取更新，当前显示最近一次可用价格', label);
+        assert.equal(await page.locator('#loadStatusText').textContent(), '', label);
         assert.equal(await page.locator('#searchInput').isEnabled(), false, label);
         serveValidData = true;
         await page.locator('#retryButton').click();
@@ -2025,7 +2026,7 @@ test('normalizes transient network warnings after an equal-snapshot retry', { ti
         const loadedHistoryCalls = historyCalls;
 
         await page.locator('#retryButton').dispatchEvent('click');
-        await page.waitForFunction(() => document.querySelector('.cache-warning') !== null);
+        await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
         assert.equal(await page.locator('#retryButton').isVisible(), true, scenario.label);
 
         await page.locator('#retryButton').click();
@@ -2111,7 +2112,7 @@ test('restores all controls after loaded snapshots recover from unusable clocks'
         assert.equal(await page.locator('.minimum-card').count(), fixture.tiers.length);
         assert.equal(await page.locator('#loadStatus').isVisible(), scenario.offline);
         assert.doesNotMatch(await page.locator('#loadStatusText').textContent(), /价格已经较久没有更新|数据时间异常/);
-        assert.equal(await page.locator('.cache-warning').count(), scenario.offline ? 1 : 0);
+        assert.equal(await page.locator('.cache-warning').count(), 0);
         await page.locator('.country-history-button').first().click();
         await page.waitForFunction(() => document.querySelectorAll('#historyRows tr').length > 0);
         assert.equal(historyCalls, loadedHistoryCalls, 'equal-snapshot recovery must preserve previously validated history');
@@ -3249,7 +3250,7 @@ test('arbitrates static and network snapshots without a third state layer', { ti
         assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), expectRows, label);
         assert.equal(await page.locator('#searchInput').isEnabled(), expectEnabled, label);
         if (label === 'older network keeps static') {
-          assert.match(await page.locator('#loadStatusText').textContent(), /当前显示最近一次可用价格/);
+          assert.equal(await page.locator('#loadStatusText').textContent(), '');
         }
       } finally {
         await page.close();
@@ -3388,7 +3389,7 @@ test('rejects rollback and more-than-five-minute future network data', { timeout
       await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
       assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), validData.countries.length, label);
       assert.match(await page.locator('#updatedAt').textContent(), /更新于/ , label);
-      assert.match(await page.locator('#loadStatusText').textContent(), /当前显示最近一次可用价格/, label);
+      assert.equal(await page.locator('#loadStatusText').textContent(), '', label);
       await page.close();
     }
   } finally {
@@ -3868,7 +3869,7 @@ test('minimum history defaults to one dense timeline, filters optionally, and st
       );
       assert.notEqual(separatorLayout.noteBackground,'rgba(0, 0, 0, 0)','history note should use a soft background instead of another rule');
       assert.ok(separatorLayout.contentPaddingTop <= 12,'minimum-history content should avoid excess empty space below the header');
-      assert.equal(await page.locator('#minimumHistoryStatus').isHidden(),true,'normal result should not spend space on status prose');
+      assert.match(await page.locator('#minimumHistoryStatus').textContent(), /记录截至/, 'history has one truthful cutoff date');
       assert.equal(await page.locator('.minimum-history-event details').count(),0);
       assert.equal(await page.getByText(/起始最低价|首次可核验记录/).count(),0);
       assert.match(await page.locator('.minimum-history-event').first().innerText(),/¥\d/);
@@ -3937,7 +3938,7 @@ test('minimum history failures are isolated, retryable and restore the complete 
     const rows=await page.locator('#priceRows tr').count();
     await page.locator('#minimumHistoryButton').click();
     await page.locator('#minimumHistoryRetry').waitFor({state:'visible'});
-    assert.match(await page.locator('#minimumHistoryStatus').textContent(),/当前价格表不受影响/);
+    assert.match(await page.locator('#minimumHistoryStatus').textContent(),/暂无法读取/);
     assert.equal(await page.locator('#minimumHistoryToolbar').isHidden(),true);
     assert.equal(await page.locator('#minimumHistoryNote').isHidden(),true);
     assert.equal(await page.locator('#priceRows tr').count(),rows);
@@ -3983,7 +3984,7 @@ test('minimum history keeps all-capacity pagination, cause labels and optional f
     await page.locator('#minimumHistoryButton').click();
     await page.waitForFunction(()=>document.querySelectorAll('.minimum-history-event').length===20);
     assert.equal(await page.locator('#minimumHistoryTierFilter').inputValue(),'all');
-    assert.match(await page.locator('#minimumHistoryStatus').textContent(),/历史记录暂未同步到当前价格/);
+    assert.match(await page.locator('#minimumHistoryStatus').textContent(),/记录截至/);
     assert.match(await page.locator('#minimumHistoryNote').textContent(),/人民币价格按当时汇率折算/);
     assert.equal(await page.locator('.minimum-history-event[data-cause="mixed"]').count()>0,true);
     assert.match(await page.locator('.minimum-history-event[data-cause="mixed"]').first().innerText(),/汇率 \+ Apple 调价/);
@@ -4120,7 +4121,7 @@ test('review: unsupported valid tier is canonicalized without rebuilding static 
     assert.equal(await page.locator('#mobileTierControl button[aria-pressed="true"]').getAttribute('data-tier'), expectedTier);
   } finally { release(); await browser.close(); }
 });
-test('review: changed snapshot clears the old displayed date while history stays deferred', { timeout: 60000 }, async (context) => {
+test('review: changed snapshot preserves the last recorded date while history stays deferred', { timeout: 60000 }, async (context) => {
   const config = await resolveBrowser(context, 'the changed publication-date regression');
   if (!config) return;
   const original = await readFixture('prices.json');
@@ -4170,11 +4171,11 @@ test('review: changed snapshot clears the old displayed date while history stays
         assert.equal(await page.locator('#applePublishedDate').textContent(), oldDate);
         assert.equal(historyCalls, 0, 'unchanged initial hydration must defer history');
         await page.locator('#retryButton').dispatchEvent('click');
-        await page.waitForFunction(() => document.querySelector('#applePublishedDate')?.textContent === '待核对');
+        await page.waitForFunction((at) => document.querySelector('#updatedAt')?.textContent === `更新于 ${new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Shanghai' }).format(new Date(at))}`, nextAt);
         assert.equal(historyCalls, 0, 'changed prices must not eagerly fetch the history ledger');
-        assert.notEqual(await page.locator('#applePublishedDate').textContent(), oldDate);
+        assert.equal(await page.locator('#applePublishedDate').textContent(), oldDate);
         await page.locator('#publishedDateButton').click();
-        const expected = unavailable ? '暂时无法核对' : nextDate;
+        const expected = unavailable ? oldDate : nextDate;
         await page.waitForFunction((text) => document.querySelector('#applePublishedDate')?.textContent === text, expected);
         assert.equal(historyCalls, 1);
         assert.equal(await page.locator('#searchInput').isEnabled(), true);
@@ -4247,4 +4248,163 @@ test('static prices recover after clock correction while JSON stays offline', {t
     assert.doesNotMatch(await page.locator('#updatedAt').textContent(),/时间异常/);
     assert.equal(await page.locator('.minimum-card').count(),data.tiers.length);
   } finally {await browser.close();}
+});
+
+test('accepted minimum history survives pending, failed and older refreshes', { timeout: 60000 }, async (context) => {
+  const history = await readFixture('minimum-history.json');
+  const { emptyMinimumHistory } = await import('../scripts/minimum-history.mjs');
+  let response = { json: history };
+  let pendingRoute = null;
+  let defer = false;
+  let calls = 0;
+  const session = await minimumHistoryTestPage(context, { historyRoute: route => {
+    calls += 1;
+    if (defer) { pendingRoute = route; return; }
+    return route.fulfill(response);
+  }});
+  if (!session) return;
+  const { page, browser } = session;
+  try {
+    await page.locator('#minimumHistoryButton').click();
+    await page.locator('#minimumHistoryNote').waitFor({ state: 'visible' });
+    const original = await page.locator('#minimumHistoryEvents').textContent();
+    const priceDate = await page.locator('#updatedAt').textContent();
+    for (const failure of [
+      { status: 503, body: '{}' },
+      { status: 200, contentType: 'application/json', body: '{' },
+      { json: { schemaVersion: 1 } },
+      { json: { ...history, checkedAt: new Date(Date.parse(history.checkedAt) + 86400000).toISOString() } },
+      { json: emptyMinimumHistory() }
+    ]) {
+      defer = true; pendingRoute = null;
+      const before = calls;
+      await page.locator('#minimumHistoryRetry').dispatchEvent('click');
+      await page.waitForTimeout(20);
+      assert.equal(await page.locator('#minimumHistoryEvents').textContent(), original, 'pending request retains accepted records');
+      await page.locator('#minimumHistoryRetry').dispatchEvent('click');
+      await page.locator('#closeMinimumHistory').click();
+      await page.locator('#minimumHistoryButton').click();
+      assert.equal(await page.locator('#minimumHistoryEvents').textContent(), original, 'reopen retains records');
+      for (let i = 0; !pendingRoute && i < 100; i += 1) await page.waitForTimeout(10);
+      assert.ok(pendingRoute);
+      assert.equal(calls, before + 1, 'repeated clicks deduplicate requests');
+      defer = false;
+      await pendingRoute.fulfill(failure);
+      await page.locator('#minimumHistoryRetry').waitFor({ state: 'visible' });
+      assert.equal(await page.locator('#minimumHistoryEvents').textContent(), original);
+      assert.match(await page.locator('#minimumHistoryStatus').textContent(), /记录截至.*暂无法刷新/);
+      await page.locator('#minimumHistoryTierFilter').selectOption('all');
+      await page.locator('#minimumHistoryMore').dispatchEvent('click');
+      assert.equal(await page.locator('#minimumHistoryRetry').isVisible(), true, 'filter and pagination preserve retry');
+      assert.equal(await page.locator('#updatedAt').textContent(), priceDate);
+      response = { json: history };
+      await page.locator('#minimumHistoryRetry').click();
+      await page.waitForFunction(() => document.querySelector('#minimumHistoryRetry').hidden && !document.querySelector('#minimumHistoryRetry').disabled);
+      assert.doesNotMatch(await page.locator('#minimumHistoryStatus').textContent(), /暂无法/);
+      await page.locator('#minimumHistoryTierFilter').selectOption('all');
+    }
+  } finally { await browser.close(); }
+});
+
+test('accepted country and publication histories survive price refresh failures', { timeout: 60000 }, async (context) => {
+  const env = await reviewOpenPage(context);
+  if (!env) return;
+  const { page, browser, data, url } = env;
+  const history = await readFixture('history.json');
+  let current = data; let failHistory = false; let historyCalls = 0;
+  await page.route('**/data/prices.json*', route => route.fulfill({ json: current }));
+  await page.route('**/data/history.json*', route => {
+    historyCalls += 1;
+    return failHistory ? route.fulfill({ status: 503, body: '{}' }) : route.fulfill({ json: history });
+  });
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('.workspace.price-ui-ready'));
+    const marketId = data.countries[0].marketId;
+    await page.locator('tr[data-market-id="' + marketId + '"] .country-history-button').click();
+    await page.waitForFunction(() => !document.querySelector('#historySubtitle').textContent.includes('正在读取'));
+    const rows = await page.locator('#historyRows').textContent();
+    const published = await page.locator('#applePublishedDate').textContent();
+    await page.locator('#closeHistory').click();
+    current = structuredClone(data);
+    setPayloadGeneratedAt(current, new Date(Date.parse(data.generatedAt) + 30000).toISOString());
+    failHistory = true;
+    await page.locator('#retryButton').dispatchEvent('click');
+    await page.waitForFunction(() => document.querySelector('#loadStatus').hidden);
+    await page.locator('tr[data-market-id="' + marketId + '"] .country-history-button').click();
+    assert.equal(await page.locator('#historyRows').textContent(), rows);
+    assert.equal(historyCalls, 1, 'compatible history needs no new request');
+    await page.locator('#closeHistory').click();
+    const tier = current.tiers[0].id;
+    const plan = current.countries[0].plans[tier];
+    plan.cnyPrice = Number((plan.cnyPrice * (plan.price + 1) / plan.price).toFixed(2));
+    plan.price += 1; plan.formattedPrice = String(plan.price);
+    setPayloadGeneratedAt(current, new Date(Date.parse(data.generatedAt) + 60000).toISOString());
+    rerankPriceFixture(current);
+    await page.locator('#retryButton').dispatchEvent('click');
+    await page.waitForFunction(() => document.querySelector('#loadStatus').hidden);
+    const failureResponse = page.waitForResponse(response => response.url().includes('/data/history.json') && response.status() === 503);
+    await page.locator('tr[data-market-id="' + marketId + '"] .country-history-button').click();
+    await failureResponse;
+    assert.equal(await page.locator('#historyRows').textContent(), rows, 'failed incompatible refresh preserves dated historical rows');
+    assert.equal(await page.locator('#historyLocalPrice .price-trend').count(), 0, 'old records cannot imply a current trend');
+    assert.match(await page.locator('#historySubtitle').textContent(), /记录截至/);
+    assert.equal(await page.locator('#applePublishedDate').textContent(), published);
+    await page.locator('#closeHistory').click();
+    await page.locator('#publishedDateButton').click();
+    assert.ok(await page.locator('#publishedDateRows tr').count() > 0);
+    assert.doesNotMatch(await page.locator('#publishedDateRows').textContent(), /无法读取/);
+  } finally { await browser.close(); }
+});
+
+test('newer history check cannot replace a newer accepted checkpoint with older evidence', { timeout: 30000 }, async context => {
+  const { advanceMinimumHistory, emptyMinimumHistory } = await import('../scripts/minimum-history.mjs');
+  const { validateMinimumHistoryPayload } = await import('../data-contract.js');
+  const data = await readFixture('prices.json');
+  const earlier = structuredClone(data);
+  setPayloadGeneratedAt(earlier, new Date(Date.parse(data.generatedAt) - 3600000).toISOString());
+  earlier.fx.fetchedAt = earlier.generatedAt;
+  const old = advanceMinimumHistory(emptyMinimumHistory(), earlier);
+  const accepted = advanceMinimumHistory(old, data);
+  const rollback = { ...old, pendingGap: true, checkedAt: new Date(Date.parse(data.generatedAt) + 1000).toISOString() };
+  validateMinimumHistoryPayload(rollback);
+  let calls = 0;
+  const session = await minimumHistoryTestPage(context, { historyRoute: route => route.fulfill({ json: ++calls === 1 ? accepted : rollback }) });
+  if (!session) return;
+  const { page, browser } = session;
+  try {
+    await page.locator('#minimumHistoryButton').click();
+    await page.locator('#minimumHistoryNote').waitFor({ state: 'visible' });
+    const cutoff = await page.locator('#minimumHistoryStatus').textContent();
+    const rows = await page.locator('#minimumHistoryEvents').textContent();
+    await page.locator('#minimumHistoryRetry').dispatchEvent('click');
+    await page.locator('#minimumHistoryRetry').waitFor({ state: 'visible' });
+    assert.match(await page.locator('#minimumHistoryStatus').textContent(), /暂无法刷新/);
+    assert.ok((await page.locator('#minimumHistoryStatus').textContent()).startsWith(cutoff));
+    assert.equal(await page.locator('#minimumHistoryEvents').textContent(), rows);
+  } finally { await browser.close(); }
+});
+
+test('empty minimum history never presents a failed check as an accepted cutoff', { timeout: 30000 }, async context => {
+  const { emptyMinimumHistory } = await import('../scripts/minimum-history.mjs');
+  const data = await readFixture('prices.json');
+  for (const checkedAt of [null, data.generatedAt]) {
+    const history = { ...emptyMinimumHistory(), checkedAt, pendingGap: checkedAt !== null };
+    let fail = false;
+    const session = await minimumHistoryTestPage(context, { historyRoute: route => fail
+      ? route.fulfill({ status: 503, body: '{}' }) : route.fulfill({ json: history }) });
+    if (!session) return;
+    const { page, browser } = session;
+    try {
+      await page.locator('#minimumHistoryButton').click();
+      await page.locator('#minimumHistoryNote').waitFor({ state: 'visible' });
+      assert.match(await page.locator('#minimumHistoryEvents').textContent(), /暂无可核验记录/);
+      assert.equal(await page.locator('#minimumHistoryStatus').textContent(), '');
+      fail = true;
+      await page.locator('#minimumHistoryRetry').dispatchEvent('click');
+      await page.locator('#minimumHistoryRetry').waitFor({ state: 'visible' });
+      assert.doesNotMatch(await page.locator('#minimumHistoryStatus').textContent(), /记录截至/);
+      assert.match(await page.locator('#minimumHistoryEvents').textContent(), /暂无可核验记录/);
+    } finally { await browser.close(); }
+  }
 });

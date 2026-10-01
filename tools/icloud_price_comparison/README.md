@@ -10,7 +10,7 @@
 - 最近通过校验的价格、人民币折算、排名、最低价与历史不设展示期限。更新失败仍显示旧数据，价格核验日期和汇率源日期保持真实。
 - 非法、损坏或明显未来的数据仍被拒绝。静态 HTML 提供无 JavaScript/网络失败时的价格兜底；通过校验的 JSON 才接管交互，网络响应不能回退到更早快照。
 - 搜索经 NFKC 规范化，支持 marketId、中英文名称、地区和完整币种代码。URL 只保存容量、排序和地区筛选，不保存搜索词。价格不写浏览器持久缓存。
-- 国家价格历史与最低价历史独立；容量下架、恢复及证据缺口不合并为虚假涨跌。历史加载失败不影响当前价格表。
+- 国家价格历史与最低价历史独立；容量下架、恢复及证据缺口不合并为虚假涨跌。已读取历史在刷新失败时保留并显示真实截止时间；不同步的历史不用于推算当前涨跌。
 
 ## 数据与代码入口
 
@@ -29,10 +29,10 @@
 GitHub Actions 执行测试和发布：
 
 - [更新价格](../../.github/workflows/update-icloud-prices.yml)：Cloudflare 主触发约北京时间 08:05，GitHub 08:10 兜底；手动运行选择 main
-- [完整验证](../../.github/workflows/validate-icloud-price-comparison.yml)：核心、工件、全部快照、依赖安全及 Chromium / Firefox / WebKit
+- [完整验证](../../.github/workflows/validate-icloud-price-comparison.yml)：核心、工件、全部快照、依赖安全及 Chromium / Firefox / WebKit；main 代码提交随后复验实际线上数据、页面和资源哈希
 - [中文名称监测](../../.github/workflows/monitor-icloud-zh-markets.yml)：只提醒需要人工复核的名称，不自动绑定中英文市场
 
-自动入口只有取得当日完整生产成功证明才跳过；手动更新不跳过。上游失败保留已发布数据。Cloudflare 实际触发、DNS 和安全头需单独查看控制面，不能由仓库文字证明。
+自动入口只有取得当日完整生产成功证明才跳过；手动更新不跳过。上游失败保留已发布数据；汇率降级不会发送健康心跳，也不会跳过后续自动重试。Cloudflare 实际触发、DNS 和安全头需单独查看控制面，不能由仓库文字证明。
 
 运行环境：Node.js >=22.1.0、pnpm 10.14.0；依赖以 package/lockfile 为准。CI 使用以下入口（项目目录内）：
 

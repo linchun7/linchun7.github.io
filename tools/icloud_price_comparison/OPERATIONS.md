@@ -28,7 +28,7 @@
 4. `stage-price-publication.mjs` 只强制暂存已测 data/index 路径，从 Git tree 读取原始 blob，核对完整文件集和字节，再深验。忽略规则或属性转码造成差异时必须在 commit/push 前停止。
 5. 等待 Pages 并验证 canonical URL 的数据、HTML 投影和版本化资源；仅完整成功才构成每日幂等/恢复证明。被新部署取代的旧验证不能冒充恢复。
 
-生成 job 不具备写权限，发布 job 不安装项目依赖。GITHUB_TOKEN 发布数据提交不会再触发普通 push 验证，因此 updater 必须保留自身的完整验收。手动恢复使用 main 的新 Run workflow；如 YAML 已改变，不重跑旧记录。
+生成 job 不具备写权限，发布 job 不安装项目依赖。普通 main 代码提交在核心与三浏览器通过后复用同一生产校验器检查实际部署。GITHUB_TOKEN 发布数据提交不会再触发普通 push 验证，因此 updater 必须保留自身的完整验收。手动恢复使用 main 的新 Run workflow；如 YAML 已改变，不重跑旧记录。
 
 关键契约/生成器/update/validate workflow 修改需同步 README 和本文件；仅改文档不修改价格。测试、工件复验、生产验收各守不同边界，不能以精简文档为由删减。
 
@@ -53,7 +53,7 @@
 
 诊断入口：`pnpm test:core`、`pnpm validate:artifact`、`pnpm validate:snapshots`，界面问题再看三浏览器结果。不要用 `pnpm update:data` 试探生产数据；在线只读检查用 `pnpm check:live`。
 
-外部心跳：完整生产成功发送 /0；数据/测试/发布严重失败发送 /1；单次 transient 故障由缺失成功心跳的宽限时间处理。只有真实验证恢复才关闭故障状态。中文监测与价格更新独立，分别检查结果。
+外部心跳：完整生产成功且汇率未降级时发送 /0；沿用旧汇率仍可发布可靠价格，但不发送成功心跳，由既有宽限期发现持续汇率故障；当前快照汇率降级时不因当天较早成功而跳过更新；数据/测试/发布严重失败发送 /1；单次 transient 故障由缺失成功心跳的宽限时间处理。只有真实验证恢复才关闭故障状态。中文监测与价格更新独立，分别检查结果。
 
 ## 回滚与外部配置
 

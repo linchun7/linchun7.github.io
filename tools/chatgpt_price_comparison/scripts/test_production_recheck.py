@@ -15,10 +15,8 @@ class ProductionRecheckTests(unittest.TestCase):
         cls.workflow = (ROOT / '.github/workflows/update-chatgpt-prices.yml').read_text()
         cls.validation = (ROOT / '.github/workflows/validate-chatgpt-prices.yml').read_text()
         blocks = (cls.workflow + '\n\n' + cls.validation).split('      - name: Recheck supersession after failed production verification\n')[1:]
-        cls.rechecks = []
-        for block in blocks:
-            raw = block.split('        run: |\n', 1)[1].split('\n\n', 1)[0]
-            cls.rechecks.append('\n'.join(line[10:] for line in raw.splitlines()))
+        cls.rechecks = [block.split('        run: ', 1)[1].splitlines()[0] for block in blocks]
+        cls.helper = 'tools/chatgpt_price_comparison/scripts/recheck-production.sh'
 
     def git(self, cwd, *args):
         return subprocess.check_output(['git', *args], cwd=cwd, text=True, stderr=subprocess.DEVNULL).strip()
@@ -33,6 +31,7 @@ class ProductionRecheckTests(unittest.TestCase):
 
     def test_both_verifiers_keep_failure_until_explicit_recheck(self):
         self.assertEqual(len(self.rechecks), 3)
+        self.assertEqual(self.rechecks[0], 'bash ' + self.helper)
         self.assertEqual(self.rechecks[0], self.rechecks[1])
         self.assertEqual(self.rechecks[0], self.rechecks[2])
         self.assertEqual(self.workflow.count('id: verification\n        continue-on-error: true'), 2)
@@ -45,7 +44,7 @@ class ProductionRecheckTests(unittest.TestCase):
         self.assertIn('timeout-minutes: 15', production)
 
     def test_only_real_project_successor_can_supersede_failure(self):
-        for scenario in ('unchanged', 'unrelated', 'project-change', 'missing-base', 'comparison-error'):
+        for scenario in ('unchanged', 'unrelated', 'project-change', 'missing-base', 'comparison-error', 'malformed-base', 'empty-base', 'fetch-error'):
             with self.subTest(scenario=scenario), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 origin = root / 'origin'
@@ -55,7 +54,8 @@ class ProductionRecheckTests(unittest.TestCase):
                 self.git(origin, 'config', 'user.name', 'Fixture')
                 self.git(origin, 'config', 'user.email', 'fixture@example.invalid')
                 helper = 'tools/chatgpt_price_comparison/scripts/deployment_scope.py'
-                baseline = self.commit(origin, helper, (SCRIPTS / 'deployment_scope.py').read_text())
+                self.commit(origin, helper, (SCRIPTS / 'deployment_scope.py').read_text())
+                baseline = self.commit(origin, self.helper, (SCRIPTS / 'recheck-production.sh').read_text())
                 checkout = root / 'checkout'
                 self.git(root, 'clone', '--depth=1', origin.as_uri(), str(checkout))
                 if scenario in ('project-change', 'comparison-error'):
@@ -64,10 +64,13 @@ class ProductionRecheckTests(unittest.TestCase):
                     self.commit(origin, 'unrelated.txt', 'other project')
                 if scenario == 'comparison-error':
                     (checkout / helper).write_text('raise SystemExit(2)\n')
+                if scenario == 'fetch-error':
+                    self.git(checkout, 'remote', 'set-url', 'origin', str(root / 'missing-origin'))
+                base = 'f' * 40 if scenario == 'missing-base' else 'bad' if scenario == 'malformed-base' else '' if scenario == 'empty-base' else baseline
                 output = root / 'outputs'
                 result = subprocess.run(
-                    ['bash', '-c', self.rechecks[0]], cwd=checkout, text=True, capture_output=True,
-                    env={**os.environ, 'BASE_SHA': 'f' * 40 if scenario == 'missing-base' else baseline, 'GITHUB_OUTPUT': str(output)},
+                    ['bash', self.helper], cwd=checkout, text=True, capture_output=True,
+                    env={**os.environ, 'BASE_SHA': base, 'GITHUB_OUTPUT': str(output)},
                 )
                 text = output.read_text() if output.exists() else ''
                 if scenario == 'project-change':

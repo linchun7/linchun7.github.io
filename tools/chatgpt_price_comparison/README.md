@@ -11,7 +11,7 @@
 - 同名套餐多金额全部保留，主表仅取该套餐自身最低公开金额，不依赖其他套餐或推断周期。人民币按实际核验汇率用 Decimal 折算到分。
 - 最近通过校验的价格、人民币值、排名、最低价与历史不设展示期限。更新失败仍显示旧数据；价格核验时间和汇率源时间保持真实，失败不刷新核验时间。
 - 国家历史由 `history_baseline` 和真实变更组成，不用每天更新的 `last_verified_at` 伪造历史起点。新套餐从首次有效观察开始；旧记录超预算时只推进对应市场基线，完整证据仍在 Git 历史。
-- 最低价历史独立记录赢家变化。降级或旧汇率形成证据缺口，不制造新事件；只有确认部分汇率影响时用简短“汇率等因素”。事件/缺口/检查点时间必须自洽，损坏历史只影响历史弹窗。
+- 最低价历史独立记录赢家变化。降级或旧汇率形成证据缺口，不制造新事件；只有确认部分汇率影响时用简短“汇率等因素”。事件/缺口/检查点时间必须自洽，刷新失败保留已读取历史及真实截止时间；无可用历史时只显示简短提示与重试；没有已确认观察时不伪造历史截止日期。
 - 静态 HTML 保留无 JavaScript/网络失败时的表格；网络数据校验通过才接管，应用不新增持久价格缓存。
 
 ## 更新与防错
@@ -35,7 +35,9 @@
 - `scripts/daily_run_guard.py`、`scripts/verify-production.mjs`：幂等判断及线上验收
 - `index.template.html`、`app.js`、`style.css`：页面源；`data/prices.json`、`data/minimum-history.json`、`index.html`：整组生成产物，不手工改价
 
-测试在 [GitHub Actions](../../.github/workflows/validate-chatgpt-prices.yml) 执行：Python 离线回归、候选校验、Chromium 深度 fixture 及锁定 Playwright 的 Chromium/Firefox/WebKit 矩阵；main 还验证实际部署。运行环境 Python 3.10+、Node 22，浏览器依赖版本见 package/lockfile。基础开发与离线测试无需额外 API Key。
+测试在 [GitHub Actions](../../.github/workflows/validate-chatgpt-prices.yml) 执行：Python 离线回归、候选校验、Chromium 深度 fixture 及锁定 Playwright 的 Chromium/Firefox/WebKit 矩阵；main 还验证实际部署。浏览器默认执行完整界面验收；七类数据 fixture 复用 state 模式，保留全部价格、排名、最低价、历史、日期、长期保留与静态兜底断言，pending/alias 仍检查响应式布局。生产失败后的版本接管复核统一由 `scripts/recheck-production.sh` 执行，不能将普通失败当作恢复。
+
+运行环境 Python 3.10+、Node 22，浏览器依赖版本见 package/lockfile。基础开发与离线测试无需额外 API Key。
 
 从仓库根目录使用以下维护入口：
 

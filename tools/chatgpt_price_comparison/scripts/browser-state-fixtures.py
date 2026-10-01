@@ -86,7 +86,7 @@ def main():
             paths[1].write_text(json.dumps(history,ensure_ascii=False),encoding='utf-8')
             paths[2].write_text(p.render(data,(p.ROOT/'index.template.html').read_text(encoding='utf-8')),encoding='utf-8')
             print('Browser state fixture:',mode,flush=True)
-            subprocess.run(['node',str(p.ROOT/'scripts/browser-test.mjs')],cwd=p.ROOT.parents[1],env={**os.environ,'REQUIRE_FUTURE_PLAN':'1','BROWSER_STATE_FIXTURE':mode},check=True)
+            subprocess.run(['node',str(p.ROOT/'scripts/browser-test.mjs')],cwd=p.ROOT.parents[1],env={**os.environ,'REQUIRE_FUTURE_PLAN':'1','BROWSER_STATE_FIXTURE':mode,'BROWSER_TEST_SCOPE':'state'},check=True)
     finally:
         for path,content in original.items(): path.write_bytes(content)
 if __name__ == '__main__': main()

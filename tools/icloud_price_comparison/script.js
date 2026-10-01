@@ -12,7 +12,6 @@ import { foldPublicationCountryRenames, marketSearchPriority, matchesMarketSearc
 
 const REQUEST_TIMEOUT_MS = 8_000;
 const ANALYTICS_ID = 'G-K2S9L4CHNP';
-const SLOW_LOADING_MS = 1_500;
 const DEFAULT_SORT_TIER = '200GB';
 const DEFAULT_TIER_COLUMN_COUNT = 5;
 const FIXED_PRICE_TABLE_COLUMN_COUNT = 2;
@@ -34,6 +33,7 @@ const initialSortDirection = initialUrlState.get('dir') === 'desc' ? 'desc' : 'a
 const state = {
   data: null,
   history: null,
+  historyCompatible: false,
   sortTier: canonicalUrlTier(initialUrlState.get('tier')) ?? DEFAULT_SORT_TIER,
   query: initialQuery,
   region: canonicalUrlRegion(initialUrlState.get('region')) ?? 'all',
@@ -104,8 +104,6 @@ const numberFormatter = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 
 const moneyFormatter = new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const percentFormatter = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 });
 const collator = new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base' });
-let slowLoadingTimer = null;
-let freshnessBoundaryTimer = null;
 let freshnessRefreshPromise = null;
 let analyticsScheduled = false;
 let staticSnapshotDomDowngraded = false;
@@ -200,13 +198,16 @@ function scheduleAnalytics() {
   else globalThis.addEventListener('load', scheduleWhenIdle, { once: true });
 }
 
-function setLoadStatus(message, { error = false, hidden = false } = {}) {
+function setLoadStatus(message, { error = false, retry = error, hidden = false } = {}) {
   if (!elements.loadStatus || !elements.loadStatusText) return;
   elements.loadStatusText.textContent = message;
   elements.loadStatus.classList.toggle('is-error', error);
   elements.loadStatus.hidden = hidden;
-  if (elements.retryButton) elements.retryButton.hidden = !error;
-  elements.workspace?.setAttribute('aria-busy', String(!hidden && !error));
+  if (elements.retryButton) elements.retryButton.hidden = !retry;
+  const busy = !hidden && !error && !retry;
+  const spinner = elements.loadStatus.querySelector('.spinner');
+  if (spinner) spinner.style.display = busy ? '' : 'none';
+  elements.workspace?.setAttribute('aria-busy', String(busy));
 }
 
 function setFiltersDisabled(disabled) {
@@ -957,16 +958,19 @@ function ensureHistoryLoaded() {
         if (requestId !== state.historyRequestId) return null;
         validatePriceHistoryConsistency(state.data, historyData);
       }
+      if (state.history && Date.parse(historyData.updatedAt) < Date.parse(state.history.updatedAt)) {
+        throw new Error('历史响应早于已读取记录');
+      }
       state.history = historyData;
+      state.historyCompatible = true;
       state.historyStatus = 'ready';
       refreshOpenHistoryViews();
       return historyData;
     })
     .catch((error) => {
       if (requestId !== state.historyRequestId) return null;
-      state.history = null;
       state.historyStatus = 'unavailable';
-      console.warn(`价格历史加载失败，使用当前价格作为临时记录：${error.message}`);
+      console.warn(`价格历史刷新失败，保留已读取记录：${error.message}`);
       refreshOpenHistoryViews();
       return null;
     })
@@ -1075,21 +1079,21 @@ function createPublishedDateChangesCell(changes, isInitial = false) {
 function renderPublishedDateHistory() {
   if (!state.data || !elements.applePublishedDate) return;
   const entries = getPublishedDateHistory();
-  if (state.historyStatus === 'ready') {
+  if (state.history) {
     const latest = displayedPublishedDate(state.history);
     if (latest) {
       elements.applePublishedDate.textContent = formatPublishedDate(latest);
-      state.publishedDatePending = false;
-    } else if (state.publishedDatePending) {
+      state.publishedDatePending = !state.historyCompatible;
+    } else if (state.publishedDatePending && !elements.applePublishedDate.textContent.trim()) {
       elements.applePublishedDate.textContent = '暂无可展示日期';
     }
-  } else if (state.publishedDatePending) {
-    elements.applePublishedDate.textContent = state.historyStatus === 'loading' ? '正在核对' : state.historyStatus === 'unavailable' ? '暂时无法核对' : '待核对';
+  } else if (state.publishedDatePending && !elements.applePublishedDate.textContent.trim()) {
+    elements.applePublishedDate.textContent = '—';
   }
   elements.publishedDateDialogCurrent.textContent = elements.applePublishedDate.textContent || '--';
   elements.publishedDateRows.replaceChildren();
 
-  if (state.historyStatus !== 'ready') {
+  if (!state.history) {
     const row = document.createElement('tr');
     const message = state.historyStatus === 'loading'
       ? '发布日期记录正在读取'
@@ -1129,14 +1133,14 @@ function openPublishedDateHistory() {
 }
 
 function renderHistorySubtitle(country, record) {
-  const historyState = state.historyStatus === 'loading'
-    ? ' · 正在读取历史记录'
-    : state.historyStatus === 'unavailable'
-      ? ' · 暂时无法读取历史记录，先显示当前价格'
-      : '';
-  elements.historySubtitle.textContent = `${country.country} · ${REGION_LABELS[country.region] || country.region} · 记录自 ${formatDate(record.events[0].observedAt)}${historyState}`;
+  const accepted = state.history?.markets?.[country.marketId]?.events?.length;
+  const historyState = accepted && !state.historyCompatible
+    ? ` · 记录截至 ${formatBeijingDateTime(state.history.updatedAt)}`
+    : !accepted && state.historyStatus === 'loading' ? ' · 正在读取…'
+      : !accepted && state.historyStatus === 'unavailable' ? ' · 历史暂无法读取' : '';
+  const start = accepted ? ` · 记录自 ${formatDate(record.events[0].observedAt)}` : '';
+  elements.historySubtitle.textContent = `${country.country} · ${REGION_LABELS[country.region] || country.region}${start}${historyState}`;
 }
-
 function renderHistoryContent() {
   const country = state.activeCountry;
   const record = getHistoryRecord(country);
@@ -1144,7 +1148,7 @@ function renderHistoryContent() {
   const cny = plan.cnyPrice;
   const changedSeries = compactHistorySeries(record.events, state.historyTier);
 
-  renderLocalPriceWithTrend(plan, country, changedSeries);
+  renderLocalPriceWithTrend(plan, country, state.historyCompatible ? changedSeries : []);
   elements.historyCnyPrice.textContent = formatConverted(cny, '¥');
   elements.historyEventCount.textContent = `${Math.max(changedSeries.length - 1, 0)} 次`;
   renderHistoryRows(record);
@@ -1359,7 +1363,7 @@ function applyStaticSnapshotFreshness() {
     staticFallbackPresentation = null;
     staticSnapshotDomDowngraded = false;
     elements.dataStatus.classList.remove('is-error', 'is-stale');
-    setLoadStatus(state.loading ? '正在检查最新价格…' : '暂时无法获取更新，当前显示最近一次可用价格', {error: !state.loading});
+    setLoadStatus(state.loading ? '正在读取…' : '', {retry: !state.loading});
     // The restored HTML is readable; controls still wait for validated JSON.
     setFiltersDisabled(true);
   }
@@ -1379,9 +1383,7 @@ function applyStaticSnapshotFreshness() {
     if (elements.overviewNote) elements.overviewNote.textContent = elements.minimumSummary.textContent;
   }
   if (freshness.status === 'unusable') {
-    const message = freshness.reason === 'future-data'
-      ? '数据时间异常，暂不作为当前价格展示。请稍后重试。'
-      : '数据时间异常，暂不作为当前价格展示。请稍后重试。';
+    const message = '数据时间异常，暂不作为当前价格展示。请稍后重试。';
     elements.dataStatus.classList.add('is-error');
     elements.updatedAt.textContent = message;
     elements.priceRows.querySelectorAll('tr[data-market-id] > td:first-child, .mobile-rank').forEach((element) => { element.textContent = '—'; });
@@ -1390,18 +1392,7 @@ function applyStaticSnapshotFreshness() {
     setLoadStatus(message, { error: true });
     setFiltersDisabled(true);
   }
-  scheduleFreshnessBoundary();
   return freshness;
-}
-
-function clearFreshnessBoundary() {
-  clearTimeout(freshnessBoundaryTimer);
-  freshnessBoundaryTimer = null;
-}
-
-function scheduleFreshnessBoundary() {
-  // No age boundary: retain the existing visibility/retry checks for clock anomalies.
-  clearFreshnessBoundary();
 }
 
 function normalizeCurrentPriceFreshnessUi() {
@@ -1440,30 +1431,33 @@ function applyCurrentPriceFreshness() {
   const freshness = classifyPriceFreshness(state.data);
   state.dataFreshness = freshness;
   if (freshness.status === 'unusable') {
-    clearFreshnessBoundary();
     return freshness;
   }
   if (previousFreshness?.status !== freshness.status || previousFreshness?.reason !== freshness.reason) {
     renderCurrentPriceFreshness();
   }
-  scheduleFreshnessBoundary();
   return freshness;
 }
 
-function resetHistoryForPriceSnapshot() {
+function resetHistoryForPriceSnapshot(data) {
   state.historyRequestId += 1;
-  state.history = null;
-  state.historyStatus = 'idle';
+  state.historyCompatible = false;
+  if (state.history) {
+    try {
+      validatePriceHistoryConsistency(data, state.history);
+      state.historyCompatible = true;
+    } catch { /* Keep accepted records as history, never as current-price evidence. */ }
+  }
+  state.historyStatus = state.historyCompatible ? 'ready' : 'idle';
   state.historyPromise = null;
-  state.publishedDatePending = true;
+  state.publishedDatePending = !state.historyCompatible;
 }
 
 function applyPriceData(data, { origin = 'network' } = {}) {
   const freshness = classifyPriceFreshness(data);
   if (freshness.status === 'unusable') throw new Error(`价格数据不可用：${freshness.reason}`);
   const snapshotChanged = !priceSnapshotsEqual(state.data, data);
-  if (snapshotChanged) resetHistoryForPriceSnapshot();
-  clearFreshnessBoundary();
+  if (snapshotChanged) resetHistoryForPriceSnapshot(data);
   state.data = data;
   staticFallbackPresentation = null;
   state.dataOrigin = origin;
@@ -1483,7 +1477,6 @@ function applyPriceData(data, { origin = 'network' } = {}) {
   renderPublishedDateHistory();
   state.dataFreshness = freshness;
   renderCurrentPriceFreshness();
-  scheduleFreshnessBoundary();
   elements.workspace.classList.add('price-ui-ready');
   if (elements.historyDialog.open || elements.publishedDateDialog.open) void ensureHistoryLoaded();
 }
@@ -1517,7 +1510,6 @@ function hydrateStaticPriceData(data) {
     refreshIcons();
   }
   updateUrlState();
-  scheduleFreshnessBoundary();
   elements.workspace.classList.add('price-ui-ready');
 }
 
@@ -1632,9 +1624,7 @@ function showLoadError(error) {
 }
 
 function showUnusableDataError(reason) {
-  const message = reason === 'future-data'
-    ? '数据时间异常，暂不作为当前价格展示。请稍后重试。'
-    : '数据时间异常，暂不作为当前价格展示。请稍后重试。';
+  const message = '数据时间异常，暂不作为当前价格展示。请稍后重试。';
   elements.dataStatus.classList.add('is-error');
   if (elements.historyDialog.open) elements.historyDialog.close();
   elements.updatedAt.textContent = message;
@@ -1667,19 +1657,13 @@ async function refreshPriceFreshnessLifecycle() {
 async function initialize({ forceRefresh = false } = {}) {
   if (state.loading) return;
   state.loading = true;
-  clearTimeout(slowLoadingTimer);
   elements.updatedAt.querySelectorAll('.cache-warning').forEach((warning) => warning.remove());
-  setLoadStatus('正在检查最新价格…');
+  setLoadStatus('正在读取…');
   if (!state.data) setFiltersDisabled(true);
   elements.dataStatus.classList.remove('is-error');
 
   const fallbackData = state.data;
 
-  slowLoadingTimer = setTimeout(() => {
-    setLoadStatus(hasStaticSnapshot || fallbackData
-      ? '正在检查更新，当前价格仍可查看'
-      : '网络连接较慢，请稍候…');
-  }, SLOW_LOADING_MS);
 
   try {
     const networkData = await fetchJson('prices.json', { forceRefresh });
@@ -1710,36 +1694,23 @@ async function initialize({ forceRefresh = false } = {}) {
       }
       console.warn(`网络价格刷新失败，继续显示现有数据：${error.message}`);
       if (state.data !== fallbackData) applyPriceData(fallbackData, { origin: state.dataOrigin ?? 'network' });
-      elements.dataStatus.classList.add('is-stale');
-      const warning = document.createElement('span');
-      warning.className = 'freshness-warning cache-warning';
-      warning.textContent = '暂时无法获取更新';
-      elements.updatedAt.append(warning);
-      setLoadStatus('暂时无法获取更新，当前显示最近一次可用价格', { error: true });
+      setLoadStatus('', { retry: true });
       setFiltersDisabled(false);
     } else if (hasStaticSnapshot) {
       console.warn(`网络价格刷新失败，继续显示静态价格：${error.message}`);
       const staticFreshness = applyStaticSnapshotFreshness();
       if (staticFreshness.status === 'unusable') return;
-      elements.dataStatus.classList.add('is-stale');
-      const warning = document.createElement('span');
-      warning.className = 'freshness-warning cache-warning';
-      warning.textContent = '暂时无法获取更新';
-      elements.updatedAt.append(warning);
-      setLoadStatus('暂时无法获取更新，当前显示最近一次可用价格', { error: true });
+      setLoadStatus('', { retry: true });
     } else {
       showLoadError(error);
     }
   } finally {
-    clearTimeout(slowLoadingTimer);
-    slowLoadingTimer = null;
-    state.loading = false;
+      state.loading = false;
     scheduleAnalytics();
   }
 }
 elements.retryButton?.addEventListener('click', () => {
   elements.retryButton.hidden = true;
-  setLoadStatus('正在检查最新价格…');
   initialize({ forceRefresh: true });
 });
 
@@ -1752,7 +1723,7 @@ window.addEventListener('pageshow', () => {
 
 
 // A dedicated history button leaves the existing minimum-card navigation intact.
-const minimumHistoryUi = { data: null, promise: null, dialog: null, filterTier: 'all', limit: 20 };
+const minimumHistoryUi = { data: null, promise: null, status: 'idle', dialog: null, filterTier: 'all', limit: 20 };
 
 function minimumHistoryNode(tag, text = '', className = '') {
   const node = document.createElement(tag);
@@ -1805,7 +1776,7 @@ function ensureMinimumHistoryDialog() {
 
   const retry = minimumHistoryNode('button', '重新读取历史', 'minimum-history-button');
   retry.type = 'button'; retry.id = 'minimumHistoryRetry'; retry.hidden = true;
-  retry.addEventListener('click', () => { minimumHistoryUi.data = null; void loadMinimumHistory(); });
+  retry.addEventListener('click', () => { void loadMinimumHistory(); });
 
   content.append(status, list, more, note, retry);
   dialog.append(header, content);
@@ -1829,7 +1800,7 @@ function minimumHistoryCauseLabel(event) {
   const cause = event.cause;
   const e = event.evidence;
   if (cause === 'unknown' && e?.pricesChanged === false && e?.scopeChanged === false
-    && e?.basisChanged === false && e?.fxChanged === true && e?.gap === true) return '汇率变化 · 记录有缺口';
+    && e?.basisChanged === false && e?.fxChanged === true && e?.gap === true) return '汇率等因素';
   if (cause === 'mixed') return '汇率 + Apple 调价';
   if (cause === 'scope') return '地区范围变化';
   return MINIMUM_CAUSE_LABELS[cause] || '原因未确定';
@@ -1842,6 +1813,21 @@ function minimumHistoryTierIds(history) {
   ])].sort((first, second) => (
     canonicalTierDefinition(first).capacityGb - canonicalTierDefinition(second).capacityGb
   ));
+}
+
+function renderMinimumHistoryStatus() {
+  const h = minimumHistoryUi.data;
+  const status = document.querySelector('#minimumHistoryStatus');
+  const parts = [];
+  const recordedAt = h?.checkpoint?.at;
+  if (recordedAt) parts.push(`记录截至 ${formatBeijingDateTime(recordedAt)}`);
+  if (minimumHistoryUi.status === 'loading' && !h) parts.push('正在读取…');
+  if (minimumHistoryUi.status === 'error') parts.push(h ? '暂无法刷新' : '暂无法读取');
+  status.textContent = parts.join(' · ');
+  status.hidden = !parts.length;
+  const retry = document.querySelector('#minimumHistoryRetry');
+  retry.hidden = minimumHistoryUi.status !== 'error';
+  retry.disabled = minimumHistoryUi.status === 'loading';
 }
 
 function renderMinimumHistory() {
@@ -1876,16 +1862,11 @@ function renderMinimumHistory() {
       || canonicalTierDefinition(first.tier).capacityGb - canonicalTierDefinition(second.tier).capacityGb
     ));
 
-  const status = document.querySelector('#minimumHistoryStatus');
-  const statusParts = [];
-  if (state.data && h.checkedAt !== state.data.generatedAt) statusParts.push('历史记录暂未同步到当前价格。');
-  if (h.pendingGap) statusParts.push('最近最低价变化暂未确认。');
-  status.textContent = statusParts.join(' ');
-  status.hidden = statusParts.length === 0;
+  renderMinimumHistoryStatus();
 
   const list = document.querySelector('#minimumHistoryEvents');
   list.replaceChildren();
-  if (!series.length) list.append(minimumHistoryNode('p', '暂无最低价变更记录。', 'minimum-history-empty'));
+  if (!series.length) list.append(minimumHistoryNode('p', h.checkpoint ? '暂无最低价变更记录。' : '暂无可核验记录。', 'minimum-history-empty'));
   for (const event of series.slice(0, minimumHistoryUi.limit)) {
     const item = minimumHistoryNode('article', '', 'minimum-history-event');
     item.dataset.cause = event.cause;
@@ -1902,26 +1883,20 @@ function renderMinimumHistory() {
       'minimum-history-change'
     );
     const cause = minimumHistoryNode('span', minimumHistoryCauseLabel(event), 'minimum-history-cause');
-    if (cause.textContent === '汇率变化 · 记录有缺口') cause.title = '前后标价未变、汇率有变；期间记录不连续，无法完整归因';
+    if (cause.textContent === '汇率等因素') cause.title = '前后标价未变、汇率有变；期间记录不连续，无法完整归因';
     item.append(meta, change, cause);
     list.append(item);
   }
 
   document.querySelector('#minimumHistoryMore').hidden = series.length <= minimumHistoryUi.limit;
   document.querySelector('#minimumHistoryNote').hidden = false;
-  document.querySelector('#minimumHistoryRetry').hidden = true;
 }
 
 async function loadMinimumHistory() {
   if (minimumHistoryUi.promise) return minimumHistoryUi.promise;
-  const status = document.querySelector('#minimumHistoryStatus');
-  status.textContent = '正在读取最低价历史…';
-  status.hidden = false;
-  document.querySelector('#minimumHistoryToolbar').hidden = true;
-  document.querySelector('#minimumHistoryEvents').replaceChildren();
-  document.querySelector('#minimumHistoryMore').hidden = true;
-  document.querySelector('#minimumHistoryNote').hidden = true;
-  document.querySelector('#minimumHistoryRetry').hidden = true;
+  minimumHistoryUi.status = 'loading';
+  if (minimumHistoryUi.data) renderMinimumHistory();
+  renderMinimumHistoryStatus();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   minimumHistoryUi.promise = (async () => {
@@ -1932,19 +1907,24 @@ async function loadMinimumHistory() {
       if (!response.ok || !/application\/json/i.test(response.headers.get('content-type') ?? '')) throw new Error('History unavailable');
       const value = validateMinimumHistoryPayload(await readBoundedJsonResponse(response, 'minimum-history.json'));
       if (Date.parse(value.checkedAt) > Date.now() + MAX_PRICE_FUTURE_SKEW_MS) throw new Error('Future history');
+      const previous = minimumHistoryUi.data?.checkedAt;
+      if (previous && (!value.checkedAt || Date.parse(value.checkedAt) < Date.parse(previous))) {
+        throw new Error('History response would roll back accepted records');
+      }
+      const previousCheckpoint = minimumHistoryUi.data?.checkpoint?.at;
+      if (previousCheckpoint && (!value.checkpoint?.at || Date.parse(value.checkpoint.at) < Date.parse(previousCheckpoint))) {
+        throw new Error('History response would roll back accepted checkpoint');
+      }
       minimumHistoryUi.data = value;
+      minimumHistoryUi.status = 'ready';
       renderMinimumHistory();
     } catch {
-      const status = document.querySelector('#minimumHistoryStatus');
-      status.textContent = '最低价历史暂时无法读取，当前价格表不受影响。';
-      status.hidden = false;
-      document.querySelector('#minimumHistoryToolbar').hidden = true;
-      document.querySelector('#minimumHistoryEvents').replaceChildren();
-      document.querySelector('#minimumHistoryMore').hidden = true;
-      document.querySelector('#minimumHistoryNote').hidden = true;
-      document.querySelector('#minimumHistoryRetry').hidden = false;
+      minimumHistoryUi.status = 'error';
+      if (minimumHistoryUi.data) renderMinimumHistory();
     } finally {
-      clearTimeout(timer); minimumHistoryUi.promise = null;
+      clearTimeout(timer);
+      minimumHistoryUi.promise = null;
+      renderMinimumHistoryStatus();
     }
   })();
   return minimumHistoryUi.promise;
@@ -1955,8 +1935,8 @@ function openMinimumHistory() {
   minimumHistoryUi.filterTier = 'all';
   minimumHistoryUi.limit = 20;
   dialog.showModal();
-  if (minimumHistoryUi.data && (!state.data || minimumHistoryUi.data.checkedAt === state.data.generatedAt)) renderMinimumHistory();
-  else void loadMinimumHistory();
+  if (minimumHistoryUi.data) renderMinimumHistory();
+  if (!minimumHistoryUi.data || (state.data && minimumHistoryUi.data.checkedAt !== state.data.generatedAt)) void loadMinimumHistory();
 }
 const minimumHistoryButton = document.querySelector('#minimumHistoryButton');
 if (minimumHistoryButton) {
