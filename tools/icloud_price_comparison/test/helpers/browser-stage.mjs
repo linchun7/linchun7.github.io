@@ -17,7 +17,10 @@ export async function runBrowserStage(name, operation, { signal, timeoutMs = 800
       };
       controller.signal.addEventListener('abort', abort, { once: true });
       if (controller.signal.aborted) { abort(); return; }
-      Promise.resolve().then(() => operation(controller.signal)).then(async value => {
+      Promise.resolve().then(() => {
+        controller.signal.throwIfAborted();
+        return operation(controller.signal);
+      }).then(async value => {
         if (settled) {
           try { await dispose(value); } catch (error) { console.error('Late UI resource cleanup failed:', name, error.message); }
           return;

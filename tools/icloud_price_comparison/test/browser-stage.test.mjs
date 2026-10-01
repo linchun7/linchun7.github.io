@@ -36,3 +36,13 @@ test('operation failures keep the original error as cause', async () => {
 test('cleanup has its own bounded deadline', async () => {
   await assert.rejects(runBrowserStage('cleanup', () => new Promise(() => {}), {timeoutMs: 15}), /cleanup/);
 });
+
+test('cancellation before the operation microtask prevents late browser startup', async () => {
+  const controller = new AbortController();
+  let called = false;
+  const result = runBrowserStage('queued startup', () => {called = true;}, {signal: controller.signal});
+  controller.abort();
+  await assert.rejects(result, /queued startup/);
+  await Promise.resolve();
+  assert.equal(called, false);
+});
