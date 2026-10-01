@@ -1396,7 +1396,7 @@
     },
     "mu": {
       "country": "Mauritius",
-      "nameZh": "Mauritius",
+      "nameZh": "毛里求斯",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -1414,7 +1414,7 @@
     },
     "cg": {
       "country": "Republic of Congo",
-      "nameZh": "Republic of Congo",
+      "nameZh": "刚果共和国",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -1450,7 +1450,7 @@
     },
     "apple-anguilla-a4a0c7e7": {
       "country": "Anguilla",
-      "nameZh": "Anguilla",
+      "nameZh": "安圭拉",
       "region": "Americas",
       "events": [
         {
@@ -1470,7 +1470,7 @@
     },
     "apple-antigua-and-barbuda-100c4768": {
       "country": "Antigua and Barbuda",
-      "nameZh": "Antigua and Barbuda",
+      "nameZh": "安提瓜和巴布达",
       "region": "Americas",
       "events": [
         {
@@ -1490,7 +1490,7 @@
     },
     "apple-argentina-ea0b937e": {
       "country": "Argentina",
-      "nameZh": "Argentina",
+      "nameZh": "阿根廷",
       "region": "Americas",
       "events": [
         {
@@ -1510,7 +1510,7 @@
     },
     "apple-belize-71dc81f1": {
       "country": "Belize",
-      "nameZh": "Belize",
+      "nameZh": "伯利兹",
       "region": "Americas",
       "events": [
         {
@@ -1530,7 +1530,7 @@
     },
     "apple-bermuda-79c89fd4": {
       "country": "Bermuda",
-      "nameZh": "Bermuda",
+      "nameZh": "百慕大",
       "region": "Americas",
       "events": [
         {
@@ -1550,7 +1550,7 @@
     },
     "apple-bolivia-9621c073": {
       "country": "Bolivia",
-      "nameZh": "Bolivia",
+      "nameZh": "玻利维亚",
       "region": "Americas",
       "events": [
         {
@@ -1570,7 +1570,7 @@
     },
     "apple-cayman-islands-83f2b333": {
       "country": "Cayman Islands",
-      "nameZh": "Cayman Islands",
+      "nameZh": "开曼群岛",
       "region": "Americas",
       "events": [
         {
@@ -1590,7 +1590,7 @@
     },
     "apple-costa-rica-e26742d7": {
       "country": "Costa Rica",
-      "nameZh": "Costa Rica",
+      "nameZh": "哥斯达黎加",
       "region": "Americas",
       "events": [
         {
@@ -1610,7 +1610,7 @@
     },
     "apple-dominica-be2a7f56": {
       "country": "Dominica",
-      "nameZh": "Dominica",
+      "nameZh": "多米尼克",
       "region": "Americas",
       "events": [
         {
@@ -1630,7 +1630,7 @@
     },
     "apple-dominican-republic-81e884cb": {
       "country": "Dominican Republic",
-      "nameZh": "Dominican Republic",
+      "nameZh": "多米尼加共和国",
       "region": "Americas",
       "events": [
         {
@@ -1650,7 +1650,7 @@
     },
     "apple-ecuador-2ca26c60": {
       "country": "Ecuador",
-      "nameZh": "Ecuador",
+      "nameZh": "厄瓜多尔",
       "region": "Americas",
       "events": [
         {
@@ -1670,7 +1670,7 @@
     },
     "apple-el-salvador-c408d26c": {
       "country": "El Salvador",
-      "nameZh": "El Salvador",
+      "nameZh": "萨尔瓦多",
       "region": "Americas",
       "events": [
         {
@@ -1690,7 +1690,7 @@
     },
     "apple-grenada-0593aa0c": {
       "country": "Grenada",
-      "nameZh": "Grenada",
+      "nameZh": "格林纳达",
       "region": "Americas",
       "events": [
         {
@@ -1710,7 +1710,7 @@
     },
     "apple-guatemala-45a15a24": {
       "country": "Guatemala",
-      "nameZh": "Guatemala",
+      "nameZh": "危地马拉",
       "region": "Americas",
       "events": [
         {
@@ -1730,7 +1730,7 @@
     },
     "apple-guyana-ea3bfc26": {
       "country": "Guyana",
-      "nameZh": "Guyana",
+      "nameZh": "圭亚那",
       "region": "Americas",
       "events": [
         {
@@ -1750,7 +1750,7 @@
     },
     "apple-honduras-b79b5f97": {
       "country": "Honduras",
-      "nameZh": "Honduras",
+      "nameZh": "洪都拉斯",
       "region": "Americas",
       "events": [
         {
@@ -1770,7 +1770,7 @@
     },
     "apple-jamaica-42c298ba": {
       "country": "Jamaica",
-      "nameZh": "Jamaica",
+      "nameZh": "牙买加",
       "region": "Americas",
       "events": [
         {
@@ -1790,7 +1790,7 @@
     },
     "apple-montserrat-127bcfe9": {
       "country": "Montserrat",
-      "nameZh": "Montserrat",
+      "nameZh": "蒙特塞拉特",
       "region": "Americas",
       "events": [
         {
@@ -1810,7 +1810,7 @@
     },
     "apple-nicaragua-94e6bd57": {
       "country": "Nicaragua",
-      "nameZh": "Nicaragua",
+      "nameZh": "尼加拉瓜",
       "region": "Americas",
       "events": [
         {
@@ -1830,7 +1830,7 @@
     },
     "apple-panama-c3668f58": {
       "country": "Panama",
-      "nameZh": "Panama",
+      "nameZh": "巴拿马",
       "region": "Americas",
       "events": [
         {
@@ -1850,7 +1850,7 @@
     },
     "apple-paraguay-7fb4d179": {
       "country": "Paraguay",
-      "nameZh": "Paraguay",
+      "nameZh": "巴拉圭",
       "region": "Americas",
       "events": [
         {
@@ -1870,7 +1870,7 @@
     },
     "apple-saint-lucia-abe06aae": {
       "country": "Saint Lucia",
-      "nameZh": "Saint Lucia",
+      "nameZh": "圣卢西亚",
       "region": "Americas",
       "events": [
         {
@@ -1890,7 +1890,7 @@
     },
     "apple-st-kitts-and-nevis-3b3cb85d": {
       "country": "St. Kitts and Nevis",
-      "nameZh": "St. Kitts and Nevis",
+      "nameZh": "圣基茨和尼维斯",
       "region": "Americas",
       "events": [
         {
@@ -1910,7 +1910,7 @@
     },
     "apple-st-vincent-and-the-grenadines-72424fd7": {
       "country": "St. Vincent and The Grenadines",
-      "nameZh": "St. Vincent and The Grenadines",
+      "nameZh": "圣文森特和格林纳丁斯",
       "region": "Americas",
       "events": [
         {
@@ -1930,7 +1930,7 @@
     },
     "apple-trinidad-and-tobago-0c0177b5": {
       "country": "Trinidad and Tobago",
-      "nameZh": "Trinidad and Tobago",
+      "nameZh": "特立尼达和多巴哥",
       "region": "Americas",
       "events": [
         {
@@ -1950,7 +1950,7 @@
     },
     "apple-turks-and-caicos-a24c1d4d": {
       "country": "Turks and Caicos",
-      "nameZh": "Turks and Caicos",
+      "nameZh": "特克斯和凯科斯群岛",
       "region": "Americas",
       "events": [
         {
@@ -1970,7 +1970,7 @@
     },
     "apple-uruguay-fe2403f2": {
       "country": "Uruguay",
-      "nameZh": "Uruguay",
+      "nameZh": "乌拉圭",
       "region": "Americas",
       "events": [
         {
@@ -1990,7 +1990,7 @@
     },
     "apple-venezuela-020e438b": {
       "country": "Venezuela",
-      "nameZh": "Venezuela",
+      "nameZh": "委内瑞拉",
       "region": "Americas",
       "events": [
         {
@@ -2010,7 +2010,7 @@
     },
     "apple-virgin-islands-british-4b60323d": {
       "country": "Virgin Islands, British",
-      "nameZh": "Virgin Islands, British",
+      "nameZh": "英属维尔京群岛",
       "region": "Americas",
       "events": [
         {
@@ -2030,7 +2030,7 @@
     },
     "apple-afghanistan-5dbddf91": {
       "country": "Afghanistan",
-      "nameZh": "Afghanistan",
+      "nameZh": "阿富汗",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2050,7 +2050,7 @@
     },
     "apple-algeria-30e23022": {
       "country": "Algeria",
-      "nameZh": "Algeria",
+      "nameZh": "阿尔及利亚",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2070,7 +2070,7 @@
     },
     "apple-angola-22b96532": {
       "country": "Angola",
-      "nameZh": "Angola",
+      "nameZh": "安哥拉",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2090,7 +2090,7 @@
     },
     "apple-bosnia-and-herzegovina-b0772b9c": {
       "country": "Bosnia and Herzegovina",
-      "nameZh": "Bosnia and Herzegovina",
+      "nameZh": "波斯尼亚和黑塞哥维那",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2110,7 +2110,7 @@
     },
     "apple-botswana-1672f60c": {
       "country": "Botswana",
-      "nameZh": "Botswana",
+      "nameZh": "博茨瓦纳",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2130,7 +2130,7 @@
     },
     "apple-burkina-faso-a564371a": {
       "country": "Burkina Faso",
-      "nameZh": "Burkina Faso",
+      "nameZh": "布基纳法索",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2150,7 +2150,7 @@
     },
     "apple-cape-verde-9fa6f2da": {
       "country": "Cape Verde",
-      "nameZh": "Cape Verde",
+      "nameZh": "佛得角",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2170,7 +2170,7 @@
     },
     "apple-chad-4256e512": {
       "country": "Chad",
-      "nameZh": "Chad",
+      "nameZh": "乍得",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2190,7 +2190,7 @@
     },
     "apple-democratic-republic-of-the-congo-098c6424": {
       "country": "Democratic Republic of the Congo",
-      "nameZh": "Democratic Republic of the Congo",
+      "nameZh": "刚果民主共和国",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2210,7 +2210,7 @@
     },
     "apple-eswatini-e0568e4c": {
       "country": "Eswatini",
-      "nameZh": "Eswatini",
+      "nameZh": "斯威士兰",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2230,7 +2230,7 @@
     },
     "apple-gabon-7e222a78": {
       "country": "Gabon",
-      "nameZh": "Gabon",
+      "nameZh": "加蓬",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2250,7 +2250,7 @@
     },
     "apple-gambia-c6e681b1": {
       "country": "Gambia",
-      "nameZh": "Gambia",
+      "nameZh": "冈比亚",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2270,7 +2270,7 @@
     },
     "apple-guinea-bissau-75e8f462": {
       "country": "Guinea-Bissau",
-      "nameZh": "Guinea-Bissau",
+      "nameZh": "几内亚比绍",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2290,7 +2290,7 @@
     },
     "apple-iraq-de5008d1": {
       "country": "Iraq",
-      "nameZh": "Iraq",
+      "nameZh": "伊拉克",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2310,7 +2310,7 @@
     },
     "apple-jordan-e8bfe1ed": {
       "country": "Jordan",
-      "nameZh": "Jordan",
+      "nameZh": "约旦",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2330,7 +2330,7 @@
     },
     "apple-kosovo-4a867424": {
       "country": "Kosovo",
-      "nameZh": "Kosovo",
+      "nameZh": "科索沃",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2350,7 +2350,7 @@
     },
     "apple-kuwait-10c3c2e2": {
       "country": "Kuwait",
-      "nameZh": "Kuwait",
+      "nameZh": "科威特",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2370,7 +2370,7 @@
     },
     "apple-lebanon-e34dd616": {
       "country": "Lebanon",
-      "nameZh": "Lebanon",
+      "nameZh": "黎巴嫩",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2390,7 +2390,7 @@
     },
     "apple-liberia-c9d2604d": {
       "country": "Liberia",
-      "nameZh": "Liberia",
+      "nameZh": "利比里亚",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2410,7 +2410,7 @@
     },
     "apple-libya-2aa2fcef": {
       "country": "Libya",
-      "nameZh": "Libya",
+      "nameZh": "利比亚",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2430,7 +2430,7 @@
     },
     "apple-madagascar-d6804464": {
       "country": "Madagascar",
-      "nameZh": "Madagascar",
+      "nameZh": "马达加斯加",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2450,7 +2450,7 @@
     },
     "apple-malawi-611025cd": {
       "country": "Malawi",
-      "nameZh": "Malawi",
+      "nameZh": "马拉维",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2470,7 +2470,7 @@
     },
     "apple-mali-ee5721a5": {
       "country": "Mali",
-      "nameZh": "Mali",
+      "nameZh": "马里",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2490,7 +2490,7 @@
     },
     "apple-mauritania-bfb0c8d3": {
       "country": "Mauritania",
-      "nameZh": "Mauritania",
+      "nameZh": "毛里塔尼亚",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2510,7 +2510,7 @@
     },
     "apple-montenegro-7ab597e1": {
       "country": "Montenegro",
-      "nameZh": "Montenegro",
+      "nameZh": "黑山",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2530,7 +2530,7 @@
     },
     "apple-morocco-b675f5df": {
       "country": "Morocco",
-      "nameZh": "Morocco",
+      "nameZh": "摩洛哥",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2550,7 +2550,7 @@
     },
     "apple-mozambique-c9054826": {
       "country": "Mozambique",
-      "nameZh": "Mozambique",
+      "nameZh": "莫桑比克",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2570,7 +2570,7 @@
     },
     "apple-namibia-ea5bd398": {
       "country": "Namibia",
-      "nameZh": "Namibia",
+      "nameZh": "纳米比亚",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2590,7 +2590,7 @@
     },
     "apple-niger-2cbebc54": {
       "country": "Niger",
-      "nameZh": "Niger",
+      "nameZh": "尼日尔",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2610,7 +2610,7 @@
     },
     "apple-north-macedonia-cd847226": {
       "country": "North Macedonia",
-      "nameZh": "North Macedonia",
+      "nameZh": "北马其顿",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2630,7 +2630,7 @@
     },
     "apple-oman-c3ce4bf8": {
       "country": "Oman",
-      "nameZh": "Oman",
+      "nameZh": "阿曼",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2650,7 +2650,7 @@
     },
     "apple-rwanda-12c8f8f4": {
       "country": "Rwanda",
-      "nameZh": "Rwanda",
+      "nameZh": "卢旺达",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2670,7 +2670,7 @@
     },
     "apple-sao-tome-and-principe-003c6e4d": {
       "country": "São Tomé and Príncipe",
-      "nameZh": "São Tomé and Príncipe",
+      "nameZh": "圣多美和普林西比",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2690,7 +2690,7 @@
     },
     "apple-serbia-e8739c83": {
       "country": "Serbia",
-      "nameZh": "Serbia",
+      "nameZh": "塞尔维亚",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2710,7 +2710,7 @@
     },
     "apple-seychelles-d1d63320": {
       "country": "Seychelles",
-      "nameZh": "Seychelles",
+      "nameZh": "塞舌尔",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2730,7 +2730,7 @@
     },
     "apple-sierra-leone-f405b98d": {
       "country": "Sierra Leone",
-      "nameZh": "Sierra Leone",
+      "nameZh": "塞拉利昂",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2750,7 +2750,7 @@
     },
     "apple-tunisia-4609682a": {
       "country": "Tunisia",
-      "nameZh": "Tunisia",
+      "nameZh": "突尼斯",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2770,7 +2770,7 @@
     },
     "apple-ukraine-580eedc6": {
       "country": "Ukraine",
-      "nameZh": "Ukraine",
+      "nameZh": "乌克兰",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2790,7 +2790,7 @@
     },
     "apple-yemen-21c1903a": {
       "country": "Yemen",
-      "nameZh": "Yemen",
+      "nameZh": "也门",
       "region": "Europe, Middle East & Africa",
       "events": [
         {
@@ -2810,7 +2810,7 @@
     },
     "apple-bhutan-d889e217": {
       "country": "Bhutan",
-      "nameZh": "Bhutan",
+      "nameZh": "不丹",
       "region": "Asia Pacific",
       "events": [
         {
@@ -2830,7 +2830,7 @@
     },
     "apple-brunei-darussalam-f196e55e": {
       "country": "Brunei Darussalam",
-      "nameZh": "Brunei Darussalam",
+      "nameZh": "文莱达鲁萨兰国",
       "region": "Asia Pacific",
       "events": [
         {
@@ -2850,7 +2850,7 @@
     },
     "apple-fiji-679c02dc": {
       "country": "Fiji",
-      "nameZh": "Fiji",
+      "nameZh": "斐济",
       "region": "Asia Pacific",
       "events": [
         {
@@ -2870,7 +2870,7 @@
     },
     "apple-macao-e10953f7": {
       "country": "Macao",
-      "nameZh": "Macao",
+      "nameZh": "澳门",
       "region": "Asia Pacific",
       "events": [
         {
@@ -2890,7 +2890,7 @@
     },
     "apple-maldives-8fb54471": {
       "country": "Maldives",
-      "nameZh": "Maldives",
+      "nameZh": "马尔代夫",
       "region": "Asia Pacific",
       "events": [
         {
@@ -2910,7 +2910,7 @@
     },
     "apple-micronesia-federated-states-of-4cae1724": {
       "country": "Micronesia, Federated States of",
-      "nameZh": "Micronesia, Federated States of",
+      "nameZh": "密克罗尼西亚联邦",
       "region": "Asia Pacific",
       "events": [
         {
@@ -2930,7 +2930,7 @@
     },
     "apple-mongolia-99a7c065": {
       "country": "Mongolia",
-      "nameZh": "Mongolia",
+      "nameZh": "蒙古",
       "region": "Asia Pacific",
       "events": [
         {
@@ -2950,7 +2950,7 @@
     },
     "apple-myanmar-ba2039a4": {
       "country": "Myanmar",
-      "nameZh": "Myanmar",
+      "nameZh": "缅甸",
       "region": "Asia Pacific",
       "events": [
         {
@@ -2970,7 +2970,7 @@
     },
     "apple-nauru-57e90088": {
       "country": "Nauru",
-      "nameZh": "Nauru",
+      "nameZh": "瑙鲁",
       "region": "Asia Pacific",
       "events": [
         {
@@ -2990,7 +2990,7 @@
     },
     "apple-palau-7fa64773": {
       "country": "Palau",
-      "nameZh": "Palau",
+      "nameZh": "帕劳",
       "region": "Asia Pacific",
       "events": [
         {
@@ -3010,7 +3010,7 @@
     },
     "apple-papua-new-guinea-c65742ce": {
       "country": "Papua New Guinea",
-      "nameZh": "Papua New Guinea",
+      "nameZh": "巴布亚新几内亚",
       "region": "Asia Pacific",
       "events": [
         {
@@ -3030,7 +3030,7 @@
     },
     "apple-solomon-islands-cff4c58d": {
       "country": "Solomon Islands",
-      "nameZh": "Solomon Islands",
+      "nameZh": "所罗门群岛",
       "region": "Asia Pacific",
       "events": [
         {
@@ -3050,7 +3050,7 @@
     },
     "apple-sri-lanka-07f8d114": {
       "country": "Sri Lanka",
-      "nameZh": "Sri Lanka",
+      "nameZh": "斯里兰卡",
       "region": "Asia Pacific",
       "events": [
         {
@@ -3070,7 +3070,7 @@
     },
     "apple-tonga-310bc325": {
       "country": "Tonga",
-      "nameZh": "Tonga",
+      "nameZh": "汤加",
       "region": "Asia Pacific",
       "events": [
         {
@@ -3090,7 +3090,7 @@
     },
     "apple-turkmenistan-b3dfc850": {
       "country": "Turkmenistan",
-      "nameZh": "Turkmenistan",
+      "nameZh": "土库曼斯坦",
       "region": "Asia Pacific",
       "events": [
         {
@@ -3110,7 +3110,7 @@
     },
     "apple-vanuatu-c5b2a6de": {
       "country": "Vanuatu",
-      "nameZh": "Vanuatu",
+      "nameZh": "瓦努阿图",
       "region": "Asia Pacific",
       "events": [
         {

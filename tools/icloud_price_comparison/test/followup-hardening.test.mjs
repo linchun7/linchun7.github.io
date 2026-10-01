@@ -162,8 +162,8 @@ test('reviewed Chinese page names are sticky history, independent from marketId 
   assert.ok(names.includes('莫尔多瓦'));
   assert.ok(names.includes('摩尔多瓦'), 'newly reviewed wording must coexist with historical spelling');
   const displayNames = JSON.parse(await readFile(new URL('../scripts/country-names.zh.json', import.meta.url), 'utf8'));
-  assert.equal(displayNames.cg, null, 'reviewed source wording must not automatically bind a display name');
-  assert.equal(displayNames.mu, null, 'label review and production display-name mapping stay independent');
+  assert.equal(displayNames.cg, '刚果共和国', 'explicit human-reviewed binding now exists');
+  assert.equal(displayNames.mu, '毛里求斯', 'explicit human-reviewed binding now exists');
   const futureName = '尚未复核测试地区';
   assert.equal(names.includes(futureName), false);
   assert.deepEqual(compareMarketNameSets(names, [...names, futureName]), { added: [futureName], removed: [] });

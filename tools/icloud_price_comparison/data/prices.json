@@ -92,7 +92,7 @@
         }
       },
       "marketId": "apple-anguilla-a4a0c7e7",
-      "nameZh": "Anguilla"
+      "nameZh": "安圭拉"
     },
     {
       "country": "Antigua and Barbuda",
@@ -131,7 +131,7 @@
         }
       },
       "marketId": "apple-antigua-and-barbuda-100c4768",
-      "nameZh": "Antigua and Barbuda"
+      "nameZh": "安提瓜和巴布达"
     },
     {
       "country": "Argentina",
@@ -170,7 +170,7 @@
         }
       },
       "marketId": "apple-argentina-ea0b937e",
-      "nameZh": "Argentina"
+      "nameZh": "阿根廷"
     },
     {
       "country": "Bahamas",
@@ -287,7 +287,7 @@
         }
       },
       "marketId": "apple-belize-71dc81f1",
-      "nameZh": "Belize"
+      "nameZh": "伯利兹"
     },
     {
       "country": "Bermuda",
@@ -326,7 +326,7 @@
         }
       },
       "marketId": "apple-bermuda-79c89fd4",
-      "nameZh": "Bermuda"
+      "nameZh": "百慕大"
     },
     {
       "country": "Bolivia",
@@ -365,7 +365,7 @@
         }
       },
       "marketId": "apple-bolivia-9621c073",
-      "nameZh": "Bolivia"
+      "nameZh": "玻利维亚"
     },
     {
       "country": "Brazil",
@@ -482,7 +482,7 @@
         }
       },
       "marketId": "apple-cayman-islands-83f2b333",
-      "nameZh": "Cayman Islands"
+      "nameZh": "开曼群岛"
     },
     {
       "country": "Chile",
@@ -599,7 +599,7 @@
         }
       },
       "marketId": "apple-costa-rica-e26742d7",
-      "nameZh": "Costa Rica"
+      "nameZh": "哥斯达黎加"
     },
     {
       "country": "Dominica",
@@ -638,7 +638,7 @@
         }
       },
       "marketId": "apple-dominica-be2a7f56",
-      "nameZh": "Dominica"
+      "nameZh": "多米尼克"
     },
     {
       "country": "Dominican Republic",
@@ -677,7 +677,7 @@
         }
       },
       "marketId": "apple-dominican-republic-81e884cb",
-      "nameZh": "Dominican Republic"
+      "nameZh": "多米尼加共和国"
     },
     {
       "country": "Ecuador",
@@ -716,7 +716,7 @@
         }
       },
       "marketId": "apple-ecuador-2ca26c60",
-      "nameZh": "Ecuador"
+      "nameZh": "厄瓜多尔"
     },
     {
       "country": "El Salvador",
@@ -755,7 +755,7 @@
         }
       },
       "marketId": "apple-el-salvador-c408d26c",
-      "nameZh": "El Salvador"
+      "nameZh": "萨尔瓦多"
     },
     {
       "country": "Grenada",
@@ -794,7 +794,7 @@
         }
       },
       "marketId": "apple-grenada-0593aa0c",
-      "nameZh": "Grenada"
+      "nameZh": "格林纳达"
     },
     {
       "country": "Guatemala",
@@ -833,7 +833,7 @@
         }
       },
       "marketId": "apple-guatemala-45a15a24",
-      "nameZh": "Guatemala"
+      "nameZh": "危地马拉"
     },
     {
       "country": "Guyana",
@@ -872,7 +872,7 @@
         }
       },
       "marketId": "apple-guyana-ea3bfc26",
-      "nameZh": "Guyana"
+      "nameZh": "圭亚那"
     },
     {
       "country": "Honduras",
@@ -911,7 +911,7 @@
         }
       },
       "marketId": "apple-honduras-b79b5f97",
-      "nameZh": "Honduras"
+      "nameZh": "洪都拉斯"
     },
     {
       "country": "Jamaica",
@@ -950,7 +950,7 @@
         }
       },
       "marketId": "apple-jamaica-42c298ba",
-      "nameZh": "Jamaica"
+      "nameZh": "牙买加"
     },
     {
       "country": "Mexico",
@@ -1028,7 +1028,7 @@
         }
       },
       "marketId": "apple-montserrat-127bcfe9",
-      "nameZh": "Montserrat"
+      "nameZh": "蒙特塞拉特"
     },
     {
       "country": "Nicaragua",
@@ -1067,7 +1067,7 @@
         }
       },
       "marketId": "apple-nicaragua-94e6bd57",
-      "nameZh": "Nicaragua"
+      "nameZh": "尼加拉瓜"
     },
     {
       "country": "Panama",
@@ -1106,7 +1106,7 @@
         }
       },
       "marketId": "apple-panama-c3668f58",
-      "nameZh": "Panama"
+      "nameZh": "巴拿马"
     },
     {
       "country": "Paraguay",
@@ -1145,7 +1145,7 @@
         }
       },
       "marketId": "apple-paraguay-7fb4d179",
-      "nameZh": "Paraguay"
+      "nameZh": "巴拉圭"
     },
     {
       "country": "Peru",
@@ -1223,7 +1223,7 @@
         }
       },
       "marketId": "apple-saint-lucia-abe06aae",
-      "nameZh": "Saint Lucia"
+      "nameZh": "圣卢西亚"
     },
     {
       "country": "St. Kitts and Nevis",
@@ -1262,7 +1262,7 @@
         }
       },
       "marketId": "apple-st-kitts-and-nevis-3b3cb85d",
-      "nameZh": "St. Kitts and Nevis"
+      "nameZh": "圣基茨和尼维斯"
     },
     {
       "country": "St. Vincent and The Grenadines",
@@ -1301,7 +1301,7 @@
         }
       },
       "marketId": "apple-st-vincent-and-the-grenadines-72424fd7",
-      "nameZh": "St. Vincent and The Grenadines"
+      "nameZh": "圣文森特和格林纳丁斯"
     },
     {
       "country": "Suriname",
@@ -1379,7 +1379,7 @@
         }
       },
       "marketId": "apple-trinidad-and-tobago-0c0177b5",
-      "nameZh": "Trinidad and Tobago"
+      "nameZh": "特立尼达和多巴哥"
     },
     {
       "country": "Turks and Caicos",
@@ -1418,7 +1418,7 @@
         }
       },
       "marketId": "apple-turks-and-caicos-a24c1d4d",
-      "nameZh": "Turks and Caicos"
+      "nameZh": "特克斯和凯科斯群岛"
     },
     {
       "country": "United States",
@@ -1496,7 +1496,7 @@
         }
       },
       "marketId": "apple-uruguay-fe2403f2",
-      "nameZh": "Uruguay"
+      "nameZh": "乌拉圭"
     },
     {
       "country": "Venezuela",
@@ -1535,7 +1535,7 @@
         }
       },
       "marketId": "apple-venezuela-020e438b",
-      "nameZh": "Venezuela"
+      "nameZh": "委内瑞拉"
     },
     {
       "country": "Virgin Islands, British",
@@ -1574,7 +1574,7 @@
         }
       },
       "marketId": "apple-virgin-islands-british-4b60323d",
-      "nameZh": "Virgin Islands, British"
+      "nameZh": "英属维尔京群岛"
     },
     {
       "country": "Afghanistan",
@@ -1613,7 +1613,7 @@
         }
       },
       "marketId": "apple-afghanistan-5dbddf91",
-      "nameZh": "Afghanistan"
+      "nameZh": "阿富汗"
     },
     {
       "country": "Albania",
@@ -1691,7 +1691,7 @@
         }
       },
       "marketId": "apple-algeria-30e23022",
-      "nameZh": "Algeria"
+      "nameZh": "阿尔及利亚"
     },
     {
       "country": "Angola",
@@ -1730,7 +1730,7 @@
         }
       },
       "marketId": "apple-angola-22b96532",
-      "nameZh": "Angola"
+      "nameZh": "安哥拉"
     },
     {
       "country": "Armenia",
@@ -1964,7 +1964,7 @@
         }
       },
       "marketId": "apple-bosnia-and-herzegovina-b0772b9c",
-      "nameZh": "Bosnia and Herzegovina"
+      "nameZh": "波斯尼亚和黑塞哥维那"
     },
     {
       "country": "Botswana",
@@ -2003,7 +2003,7 @@
         }
       },
       "marketId": "apple-botswana-1672f60c",
-      "nameZh": "Botswana"
+      "nameZh": "博茨瓦纳"
     },
     {
       "country": "Bulgaria",
@@ -2081,7 +2081,7 @@
         }
       },
       "marketId": "apple-burkina-faso-a564371a",
-      "nameZh": "Burkina Faso"
+      "nameZh": "布基纳法索"
     },
     {
       "country": "Cameroon",
@@ -2159,7 +2159,7 @@
         }
       },
       "marketId": "apple-cape-verde-9fa6f2da",
-      "nameZh": "Cape Verde"
+      "nameZh": "佛得角"
     },
     {
       "country": "Chad",
@@ -2198,7 +2198,7 @@
         }
       },
       "marketId": "apple-chad-4256e512",
-      "nameZh": "Chad"
+      "nameZh": "乍得"
     },
     {
       "country": "Cote D'Ivoire",
@@ -2354,7 +2354,7 @@
         }
       },
       "marketId": "apple-democratic-republic-of-the-congo-098c6424",
-      "nameZh": "Democratic Republic of the Congo"
+      "nameZh": "刚果民主共和国"
     },
     {
       "country": "Denmark",
@@ -2471,7 +2471,7 @@
         }
       },
       "marketId": "apple-eswatini-e0568e4c",
-      "nameZh": "Eswatini"
+      "nameZh": "斯威士兰"
     },
     {
       "country": "Euro Zone",
@@ -2549,7 +2549,7 @@
         }
       },
       "marketId": "apple-gabon-7e222a78",
-      "nameZh": "Gabon"
+      "nameZh": "加蓬"
     },
     {
       "country": "Gambia",
@@ -2588,7 +2588,7 @@
         }
       },
       "marketId": "apple-gambia-c6e681b1",
-      "nameZh": "Gambia"
+      "nameZh": "冈比亚"
     },
     {
       "country": "Georgia",
@@ -2705,7 +2705,7 @@
         }
       },
       "marketId": "apple-guinea-bissau-75e8f462",
-      "nameZh": "Guinea-Bissau"
+      "nameZh": "几内亚比绍"
     },
     {
       "country": "Hungary",
@@ -2822,7 +2822,7 @@
         }
       },
       "marketId": "apple-iraq-de5008d1",
-      "nameZh": "Iraq"
+      "nameZh": "伊拉克"
     },
     {
       "country": "Israel",
@@ -2900,7 +2900,7 @@
         }
       },
       "marketId": "apple-jordan-e8bfe1ed",
-      "nameZh": "Jordan"
+      "nameZh": "约旦"
     },
     {
       "country": "Kenya",
@@ -2978,7 +2978,7 @@
         }
       },
       "marketId": "apple-kosovo-4a867424",
-      "nameZh": "Kosovo"
+      "nameZh": "科索沃"
     },
     {
       "country": "Kuwait",
@@ -3017,7 +3017,7 @@
         }
       },
       "marketId": "apple-kuwait-10c3c2e2",
-      "nameZh": "Kuwait"
+      "nameZh": "科威特"
     },
     {
       "country": "Lebanon",
@@ -3056,7 +3056,7 @@
         }
       },
       "marketId": "apple-lebanon-e34dd616",
-      "nameZh": "Lebanon"
+      "nameZh": "黎巴嫩"
     },
     {
       "country": "Liberia",
@@ -3095,7 +3095,7 @@
         }
       },
       "marketId": "apple-liberia-c9d2604d",
-      "nameZh": "Liberia"
+      "nameZh": "利比里亚"
     },
     {
       "country": "Libya",
@@ -3134,7 +3134,7 @@
         }
       },
       "marketId": "apple-libya-2aa2fcef",
-      "nameZh": "Libya"
+      "nameZh": "利比亚"
     },
     {
       "country": "Madagascar",
@@ -3173,7 +3173,7 @@
         }
       },
       "marketId": "apple-madagascar-d6804464",
-      "nameZh": "Madagascar"
+      "nameZh": "马达加斯加"
     },
     {
       "country": "Malawi",
@@ -3212,7 +3212,7 @@
         }
       },
       "marketId": "apple-malawi-611025cd",
-      "nameZh": "Malawi"
+      "nameZh": "马拉维"
     },
     {
       "country": "Mali",
@@ -3251,7 +3251,7 @@
         }
       },
       "marketId": "apple-mali-ee5721a5",
-      "nameZh": "Mali"
+      "nameZh": "马里"
     },
     {
       "country": "Mauritania",
@@ -3290,7 +3290,7 @@
         }
       },
       "marketId": "apple-mauritania-bfb0c8d3",
-      "nameZh": "Mauritania"
+      "nameZh": "毛里塔尼亚"
     },
     {
       "country": "Mauritius",
@@ -3329,7 +3329,7 @@
         }
       },
       "marketId": "mu",
-      "nameZh": "Mauritius"
+      "nameZh": "毛里求斯"
     },
     {
       "country": "Moldova",
@@ -3407,7 +3407,7 @@
         }
       },
       "marketId": "apple-montenegro-7ab597e1",
-      "nameZh": "Montenegro"
+      "nameZh": "黑山"
     },
     {
       "country": "Morocco",
@@ -3446,7 +3446,7 @@
         }
       },
       "marketId": "apple-morocco-b675f5df",
-      "nameZh": "Morocco"
+      "nameZh": "摩洛哥"
     },
     {
       "country": "Mozambique",
@@ -3485,7 +3485,7 @@
         }
       },
       "marketId": "apple-mozambique-c9054826",
-      "nameZh": "Mozambique"
+      "nameZh": "莫桑比克"
     },
     {
       "country": "Namibia",
@@ -3524,7 +3524,7 @@
         }
       },
       "marketId": "apple-namibia-ea5bd398",
-      "nameZh": "Namibia"
+      "nameZh": "纳米比亚"
     },
     {
       "country": "Niger",
@@ -3563,7 +3563,7 @@
         }
       },
       "marketId": "apple-niger-2cbebc54",
-      "nameZh": "Niger"
+      "nameZh": "尼日尔"
     },
     {
       "country": "Nigeria",
@@ -3641,7 +3641,7 @@
         }
       },
       "marketId": "apple-north-macedonia-cd847226",
-      "nameZh": "North Macedonia"
+      "nameZh": "北马其顿"
     },
     {
       "country": "Norway",
@@ -3719,7 +3719,7 @@
         }
       },
       "marketId": "apple-oman-c3ce4bf8",
-      "nameZh": "Oman"
+      "nameZh": "阿曼"
     },
     {
       "country": "Poland",
@@ -3836,7 +3836,7 @@
         }
       },
       "marketId": "cg",
-      "nameZh": "Republic of Congo"
+      "nameZh": "刚果共和国"
     },
     {
       "country": "Romania",
@@ -3953,7 +3953,7 @@
         }
       },
       "marketId": "apple-rwanda-12c8f8f4",
-      "nameZh": "Rwanda"
+      "nameZh": "卢旺达"
     },
     {
       "country": "São Tomé and Príncipe",
@@ -3992,7 +3992,7 @@
         }
       },
       "marketId": "apple-sao-tome-and-principe-003c6e4d",
-      "nameZh": "São Tomé and Príncipe"
+      "nameZh": "圣多美和普林西比"
     },
     {
       "country": "Saudi Arabia",
@@ -4109,7 +4109,7 @@
         }
       },
       "marketId": "apple-serbia-e8739c83",
-      "nameZh": "Serbia"
+      "nameZh": "塞尔维亚"
     },
     {
       "country": "Seychelles",
@@ -4148,7 +4148,7 @@
         }
       },
       "marketId": "apple-seychelles-d1d63320",
-      "nameZh": "Seychelles"
+      "nameZh": "塞舌尔"
     },
     {
       "country": "Sierra Leone",
@@ -4187,7 +4187,7 @@
         }
       },
       "marketId": "apple-sierra-leone-f405b98d",
-      "nameZh": "Sierra Leone"
+      "nameZh": "塞拉利昂"
     },
     {
       "country": "South Africa",
@@ -4382,7 +4382,7 @@
         }
       },
       "marketId": "apple-tunisia-4609682a",
-      "nameZh": "Tunisia"
+      "nameZh": "突尼斯"
     },
     {
       "country": "Türkiye",
@@ -4499,7 +4499,7 @@
         }
       },
       "marketId": "apple-ukraine-580eedc6",
-      "nameZh": "Ukraine"
+      "nameZh": "乌克兰"
     },
     {
       "country": "United Arab Emirates",
@@ -4616,7 +4616,7 @@
         }
       },
       "marketId": "apple-yemen-21c1903a",
-      "nameZh": "Yemen"
+      "nameZh": "也门"
     },
     {
       "country": "Zambia",
@@ -4772,7 +4772,7 @@
         }
       },
       "marketId": "apple-bhutan-d889e217",
-      "nameZh": "Bhutan"
+      "nameZh": "不丹"
     },
     {
       "country": "Brunei Darussalam",
@@ -4811,7 +4811,7 @@
         }
       },
       "marketId": "apple-brunei-darussalam-f196e55e",
-      "nameZh": "Brunei Darussalam"
+      "nameZh": "文莱达鲁萨兰国"
     },
     {
       "country": "Cambodia",
@@ -4928,7 +4928,7 @@
         }
       },
       "marketId": "apple-fiji-679c02dc",
-      "nameZh": "Fiji"
+      "nameZh": "斐济"
     },
     {
       "country": "Hong Kong",
@@ -5240,7 +5240,7 @@
         }
       },
       "marketId": "apple-macao-e10953f7",
-      "nameZh": "Macao"
+      "nameZh": "澳门"
     },
     {
       "country": "Malaysia",
@@ -5318,7 +5318,7 @@
         }
       },
       "marketId": "apple-maldives-8fb54471",
-      "nameZh": "Maldives"
+      "nameZh": "马尔代夫"
     },
     {
       "country": "Micronesia, Federated States of",
@@ -5357,7 +5357,7 @@
         }
       },
       "marketId": "apple-micronesia-federated-states-of-4cae1724",
-      "nameZh": "Micronesia, Federated States of"
+      "nameZh": "密克罗尼西亚联邦"
     },
     {
       "country": "Mongolia",
@@ -5396,7 +5396,7 @@
         }
       },
       "marketId": "apple-mongolia-99a7c065",
-      "nameZh": "Mongolia"
+      "nameZh": "蒙古"
     },
     {
       "country": "Myanmar",
@@ -5435,7 +5435,7 @@
         }
       },
       "marketId": "apple-myanmar-ba2039a4",
-      "nameZh": "Myanmar"
+      "nameZh": "缅甸"
     },
     {
       "country": "Nauru",
@@ -5474,7 +5474,7 @@
         }
       },
       "marketId": "apple-nauru-57e90088",
-      "nameZh": "Nauru"
+      "nameZh": "瑙鲁"
     },
     {
       "country": "Nepal",
@@ -5630,7 +5630,7 @@
         }
       },
       "marketId": "apple-palau-7fa64773",
-      "nameZh": "Palau"
+      "nameZh": "帕劳"
     },
     {
       "country": "Papua New Guinea",
@@ -5669,7 +5669,7 @@
         }
       },
       "marketId": "apple-papua-new-guinea-c65742ce",
-      "nameZh": "Papua New Guinea"
+      "nameZh": "巴布亚新几内亚"
     },
     {
       "country": "Philippines",
@@ -5825,7 +5825,7 @@
         }
       },
       "marketId": "apple-solomon-islands-cff4c58d",
-      "nameZh": "Solomon Islands"
+      "nameZh": "所罗门群岛"
     },
     {
       "country": "Sri Lanka",
@@ -5864,7 +5864,7 @@
         }
       },
       "marketId": "apple-sri-lanka-07f8d114",
-      "nameZh": "Sri Lanka"
+      "nameZh": "斯里兰卡"
     },
     {
       "country": "Taiwan",
@@ -6020,7 +6020,7 @@
         }
       },
       "marketId": "apple-tonga-310bc325",
-      "nameZh": "Tonga"
+      "nameZh": "汤加"
     },
     {
       "country": "Turkmenistan",
@@ -6059,7 +6059,7 @@
         }
       },
       "marketId": "apple-turkmenistan-b3dfc850",
-      "nameZh": "Turkmenistan"
+      "nameZh": "土库曼斯坦"
     },
     {
       "country": "Uzbekistan",
@@ -6137,7 +6137,7 @@
         }
       },
       "marketId": "apple-vanuatu-c5b2a6de",
-      "nameZh": "Vanuatu"
+      "nameZh": "瓦努阿图"
     },
     {
       "country": "Vietnam",

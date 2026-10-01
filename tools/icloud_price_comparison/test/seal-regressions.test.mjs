@@ -55,20 +55,24 @@ test('seal: response size limit aborts the stream before it has been buffered', 
 test('seal: real CLI exit codes and summary distinguish unchanged, changed, HTTP failure and malformed partial tables', async () => {
   const root = new URL('../', import.meta.url);
   const baseline = JSON.parse(await readFile(new URL('scripts/apple-zh-reviewed-markets.json', root), 'utf8'));
+  const mapping = JSON.parse(await readFile(new URL('scripts/country-names.zh.json', root), 'utf8'));
+  const published = JSON.parse(await readFile(new URL('data/prices.json', root), 'utf8'));
+  const boundNames = published.countries.map(market => market.nameZh).filter(name => baseline.markets.includes(name));
   const protectedPaths = ['scripts/apple-zh-reviewed-markets.json', 'scripts/country-names.zh.json', 'data/prices.json', 'data/history.json', 'data/run-log.json'];
   const before = await Promise.all(protectedPaths.map((path) => readFile(new URL(path, root), 'utf8')));
   const directory = await mkdtemp(join(tmpdir(), 'icloud-seal-cli-'));
   try {
     const cases = [
-      { title: 'unchanged', names: baseline.markets, code: 0, summary: /未发现新的中文地区名称/ },
-      { title: 'removed-only', names: baseline.markets.slice(1), code: 0, summary: /不告警/ },
-      { title: 'changed', names: [...baseline.markets.slice(1), '新增测试岛'], code: 1, summary: /新增测试岛/ },
+      { title: 'unchanged', names: boundNames, code: 0, summary: /未发现新的中文地区名称/ },
+      { title: 'removed-only', names: boundNames.slice(1), code: 0, summary: /不告警/ },
+      { title: 'reviewed-but-unapplied', names: [...boundNames, '莫尔多瓦'], code: 1, summary: /尚未显示的官方中文名称：莫尔多瓦/ },
+      { title: 'changed', names: [...boundNames.slice(1), '新增测试岛'], code: 1, summary: /新增测试岛/ },
       { title: 'http-unavailable', http: 503, code: 1, summary: /不可用/ },
-      { title: 'partial-unavailable', names: ['', ...baseline.markets.slice(1)], code: 1, summary: /不可用/ },
+      { title: 'partial-unavailable', names: ['', ...boundNames.slice(1)], code: 1, summary: /不可用/ },
     ];
     for (const entry of cases) {
       const html = `<main>${table((entry.names ?? []).map(row).join(''))}</main>${' '.repeat(1000)}`;
-      const setup = `globalThis.fetch = async () => new Response(${JSON.stringify(html)}, {status:${entry.http ?? 200}});`;
+      const setup = `import {readFile} from 'node:fs/promises'; globalThis.fetch = async (url) => new Response(String(url).includes('support.apple.com') ? ${JSON.stringify(html)} : await readFile(${JSON.stringify(fileURLToPath(new URL('data/prices.json', root)))}, 'utf8'), {status:${entry.http ?? 200}});`;
       const summary = join(directory, `${entry.title}.md`);
       const child = spawnSync(process.execPath, ['--import', `data:text/javascript,${encodeURIComponent(setup)}`, fileURLToPath(new URL('scripts/check-apple-zh-markets.mjs', root))], { env: { ...process.env, GITHUB_STEP_SUMMARY: summary }, encoding: 'utf8', timeout: 20000, windowsHide: true });
       assert.equal(child.error, undefined);

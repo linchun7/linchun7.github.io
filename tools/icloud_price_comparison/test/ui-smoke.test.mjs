@@ -3474,8 +3474,10 @@ test('keeps mobile ranking visible and UX fallbacks stable', { timeout: 60_000 }
   const browserConfig = await resolveBrowser(context, 'the mobile ranking and UX regression test');
   if (!browserConfig) return;
   const data = await readFixture('prices.json');
-  const fallbackCountry = data.countries.find(({ country, nameZh }) => nameZh === country);
-  assert.ok(fallbackCountry, 'the fixture needs at least one market pending an official Chinese name');
+  // Pending-name behavior is a fixture, not a requirement on production translations.
+  const fallbackCountry = data.countries.find(({ marketId }) => !['us', 'jp'].includes(marketId));
+  assert.ok(fallbackCountry);
+  fallbackCountry.nameZh = fallbackCountry.country;
   const server = await startServer();
   const { port } = server.address();
   const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
@@ -3492,6 +3494,7 @@ test('keeps mobile ranking visible and UX fallbacks stable', { timeout: 60_000 }
         }
         return route.abort();
       });
+      await page.route('**/data/prices.json*', route => route.fulfill({ json: data }));
       try {
         await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded' });
         await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, data.countries.length);

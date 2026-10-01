@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const APPLE_ZH_ICLOUD_URL = 'https://support.apple.com/zh-cn/108047';
+const PUBLISHED_PRICES_URL = new URL('../data/prices.json', import.meta.url);
 const REVIEWED_MARKETS_URL = new URL('./apple-zh-reviewed-markets.json', import.meta.url);
 const REQUEST_TIMEOUT_MS = 15_000;
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
@@ -225,6 +226,26 @@ export function validateObservedMarketSet(reviewedNames, observedNames) {
   }
 }
 
+// Compare visible Chinese labels only. Never infer English/Chinese identity.
+export function findUnappliedChineseLabels(observedNames, data) {
+  if (data?.schemaVersion !== 4 || !Array.isArray(data.countries) || !data.countries.length) {
+    throw new Error('Published price data is unavailable for Chinese-name monitoring');
+  }
+  const ids = new Set();
+  const displayed = new Set();
+  for (const market of data.countries) {
+    if (typeof market?.marketId !== 'string' || !market.marketId || ids.has(market.marketId)
+      || typeof market.country !== 'string' || !market.country
+      || typeof market.nameZh !== 'string' || !market.nameZh.trim()) {
+      throw new Error('Published price data contains an invalid or duplicate market');
+    }
+    ids.add(market.marketId);
+    displayed.add(normalizeVisibleText(market.nameZh));
+  }
+  return [...new Set(observedNames.map(normalizeVisibleText))]
+    .filter(name => !displayed.has(name)).sort((a,b) => a.localeCompare(b, 'zh-CN'));
+}
+
 export function monitorExitCode(result) {
   return result?.status === 'unchanged' ? 0 : 1;
 }
@@ -286,8 +307,9 @@ export async function runAppleZhMarketMonitor({ fetchImpl = fetch, report = true
     const observedNames = extractAppleZhMarketNames(await fetchAppleHtml(fetchImpl));
     validateObservedMarketSet(reviewedNames, observedNames);
     const diff = compareMarketNameSets(reviewedNames, observedNames);
+    const pendingNames = findUnappliedChineseLabels(observedNames, JSON.parse(await readFile(PUBLISHED_PRICES_URL, 'utf8')));
 
-    if (!diff.added.length) {
+    if (!diff.added.length && !pendingNames.length) {
       if (report) {
         console.log(`Apple 中文 iCloud+ 未发现新地区名称（当前页面 ${observedNames.length} 个；历史已复核 ${reviewedNames.length} 个）。`);
         await appendSummary([
@@ -297,29 +319,32 @@ export async function runAppleZhMarketMonitor({ fetchImpl = fetch, report = true
           diff.removed.length
             ? `- 当前页面暂未出现 ${diff.removed.length} 个历史已复核名称；不告警，也不删除已有中文名。`
             : '- 当前页面覆盖全部历史已复核名称。',
-          '- 口径说明：历史已复核名称集合只增不减；同名地区消失后再出现不会重复告警。'
+          '- 当前官方中文名称均已出现在项目展示数据中；历史已审名单不代替展示检查。'
         ]);
       }
-      return { status: 'unchanged', reviewedNames, observedNames, ...diff };
+      return { status: 'unchanged', reviewedNames, observedNames, pendingNames, ...diff };
     }
 
-    const message = `当前页面 ${observedNames.length} 个；发现 ${diff.added.length} 个从未复核的中文地区名称；仅提示人工复核，不自动修改中文名称。`;
+    const message = `当前页面 ${observedNames.length} 个；发现 ${diff.added.length} 个从未复核的中文地区名称；${pendingNames.length} 个当前官方名称尚未出现在项目展示数据；仅提示人工复核，不自动修改中文名称。`;
     if (report) {
       console.log(`::error title=Apple 中文 iCloud+ 出现新地区名称::${escapeWorkflowCommand(message)}`);
       console.log(`页面新增地区：${diff.added.join('、')}`);
+      console.log(`尚未显示的官方中文名称：${pendingNames.join('、')}`);
       if (diff.removed.length) console.log(`当前页面暂未出现的历史名称（不告警）：${diff.removed.join('、')}`);
       await appendSummary([
         '### ⚠️ Apple 中文页面 iCloud+ 出现新地区名称',
         '',
         message,
         `- 新名称：${diff.added.join('、')}`,
+        `- 尚未显示的官方中文名称：${pendingNames.join('、')}`,
+        '- 只比较官方中文词与展示数据，不据此推断其对应哪个英文地区；由人工核实后绑定既有 marketId。',
         diff.removed.length ? `- 当前页面暂未出现的历史名称（不告警）：${diff.removed.join('、')}` : '- 当前页面覆盖全部历史已复核名称。',
-        '- 同名地区曾经出现、后来消失、之后再次出现：因为名称已在历史复核集合中，不重复告警。',
+        '- 已审名称只要尚未显示，每次检查仍列为待处理；仅追加历史已审名单不会消除提醒。',
         '- 若旧名称消失、出现一个从未复核的新名称，仍会红灯，供人工判断是否属于官方改名或新市场。',
         '- 只有人工确认后才把新名称追加到历史复核集合；已有名称不因页面暂时消失而删除。',
       ]);
     }
-    return { status: 'changed', reviewedNames, observedNames, ...diff };
+    return { status: 'changed', reviewedNames, observedNames, pendingNames, ...diff };
   } catch (error) {
     const message = `本次中文名称监测不可用：${error instanceof Error ? error.message : String(error)}；不影响价格更新。`;
     if (report) {
