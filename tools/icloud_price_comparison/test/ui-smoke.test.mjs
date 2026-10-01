@@ -8,6 +8,7 @@ import { chromium, firefox, webkit } from 'playwright';
 
 import { validatePriceHistoryConsistency, visiblePublicationEntries } from '../data-contract.js';
 import { renderStaticFragments, replaceStaticFragments } from '../scripts/static-page.mjs';
+import { runBrowserStage } from './helpers/browser-stage.mjs';
 
 const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REPOSITORY_DIR = path.resolve(PROJECT_DIR, '../..');
@@ -146,10 +147,22 @@ async function resolveBrowser(context, purpose) {
 function sharedBrowserType(browserType) {
   return {
     async launch(launchOptions) {
-      if (!sharedBrowserPromise) sharedBrowserPromise = browserType.launch(launchOptions);
+      if (!sharedBrowserPromise) {
+        const launching = browserType.launch(launchOptions);
+        sharedBrowserPromise = launching;
+        launching.catch(() => { if (sharedBrowserPromise === launching) sharedBrowserPromise = null; });
+      }
       const sharedBrowser = await sharedBrowserPromise;
       const pages = new Set();
+      const contexts = new Set();
       return {
+        version: () => sharedBrowser.version(),
+        async newContext(options) {
+          const owned = await sharedBrowser.newContext(options);
+          contexts.add(owned);
+          owned.once('close', () => contexts.delete(owned));
+          return owned;
+        },
         async newPage(options) {
           const page = await sharedBrowser.newPage(options);
           pages.add(page);
@@ -157,8 +170,9 @@ function sharedBrowserType(browserType) {
           return page;
         },
         async close() {
-          await Promise.allSettled([...pages].map((page) => page.close()));
+          await Promise.allSettled([...pages].map((page) => page.close()).concat([...contexts].map((owned) => owned.close())));
           pages.clear();
+          contexts.clear();
         }
       };
     }
@@ -217,18 +231,71 @@ for (const scenario of [
   { name: 'future', ageHours: -1, unusable: true }
 ]) {
   test(`static fallback removes misleading minimum cues when ${scenario.name}`, { timeout: 30_000 }, async (context) => {
-    const browserConfig = await resolveBrowser(context, 'static fallback freshness');
-    if (!browserConfig) return;
-    const server = await startServer();
-    const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
-    const data = await readFixture('prices.json');
+    const started = performance.now();
+    const deadline = AbortSignal.any([context.signal, AbortSignal.timeout(25_000)]);
+    const remaining = () => Math.max(1, 25_000 - (performance.now() - started));
+    let phase = 'setup';
+    const stage = async (name, operation, {limit = 8000, dispose} = {}) => {
+      phase = name;
+      console.log(`[freshness:${scenario.name}] start ${name} +${Math.round(performance.now() - started)}ms`);
+      const result = await runBrowserStage(name, operation, {signal: deadline, timeoutMs: Math.min(limit, remaining()), dispose});
+      console.log(`[freshness:${scenario.name}] done ${name} +${Math.round(performance.now() - started)}ms`);
+      return result;
+    };
+    let server;
+    let browser;
+    let owned;
+    let page;
+    const pageErrors = [];
+    const pending = new Set();
+    const blockedHosts = new Set();
+    const abort = () => {
+      console.error(`[freshness:${scenario.name}] cancelled during ${phase}`);
+      if (owned) void owned.close().catch(error => console.error('UI cancellation cleanup failed:', error.message));
+    };
+    deadline.addEventListener('abort', abort, {once: true});
     try {
-      const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-      await page.addInitScript(now => { Date.now = () => now; }, Date.parse(data.generatedAt) + scenario.ageHours * 3600000);
-      await page.route('**/data/prices.json', route => route.abort());
-      await page.route('**/googletagmanager.com/**', route => route.abort());
-      await page.goto(`http://127.0.0.1:${server.address().port}/`, { waitUntil: 'domcontentloaded' });
-      await page.waitForFunction(() => document.querySelector('#loadStatus')?.classList.contains('is-error'));
+      const browserConfig = await stage('resolve browser', () => resolveBrowser(context, 'static fallback freshness'));
+      if (!browserConfig) return;
+      server = await stage('start server', () => startServer());
+      browser = await stage('launch browser', signal => browserConfig.browserType.launch({
+        ...browserConfig.launchOptions, timeout: Math.min(15_000, remaining()), signal
+      }), {limit: 15_000});
+      console.log(`[freshness:${scenario.name}] browser=${browser.version()} executable=${browserConfig.launchOptions.executablePath ?? 'pinned Playwright'} node=${process.version} runner=${process.env.ImageOS ?? 'local'}`);
+      const data = await stage('read fixture', () => readFixture('prices.json'));
+      owned = await stage('create context', () => browser.newContext({viewport: {width: 390, height: 844}}), {dispose: value => value.close()});
+      page = await stage('create page', () => owned.newPage(), {dispose: value => value.close()});
+      page.setDefaultTimeout(8000);
+      page.on('pageerror', error => { if (pageErrors.length < 5) pageErrors.push(error.message.slice(0, 300)); });
+      page.on('request', request => pending.add(new URL(request.url()).pathname));
+      for (const event of ['requestfinished', 'requestfailed']) page.on(event, request => pending.delete(new URL(request.url()).pathname));
+      const origin = `http://127.0.0.1:${server.address().port}`;
+      await stage('install deterministic routes', async () => {
+        await page.addInitScript(now => { Date.now = () => now; }, Date.parse(data.generatedAt) + scenario.ageHours * 3600000);
+        // These are offline-fallback tests: no analytics or other external request is relevant.
+        await page.route('**/*', route => {
+          const target = new URL(route.request().url());
+          if (target.origin === origin) return route.continue();
+          blockedHosts.add(target.hostname);
+          return route.abort();
+        });
+        await page.route('**/data/prices.json*', route => route.abort());
+      });
+      await stage('navigate local page', signal => page.goto(origin + '/', {waitUntil: 'domcontentloaded', timeout: Math.min(8000, remaining()), signal}));
+      await stage('wait for error state', signal => page.waitForFunction(
+        () => document.querySelector('#loadStatus')?.classList.contains('is-error'),
+        undefined, {timeout: Math.min(8000, remaining()), signal}
+      ));
+      if (scenario.name === 'stale') {
+        await stage('verify external isolation', async () => {
+          assert.equal(await page.evaluate(async () => {
+            try { await fetch('https://www.googletagmanager.com/__offline_test'); return false; }
+            catch { return true; }
+          }), true);
+          assert.ok(blockedHosts.has('www.googletagmanager.com'));
+        });
+      }
+      phase = 'assert safety cues';
       assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), data.countries.length);
       assert.equal(await page.locator('#minimumSummary .minimum-card').count(), 0);
       assert.equal(await page.locator('.minimum-badge, .is-minimum, .rank-top').count(), 0);
@@ -239,9 +306,16 @@ for (const scenario of [
       } else {
         assert.match(await page.locator('#rankingScopeNote').textContent(), /最近一次/);
       }
+    } catch (error) {
+      console.error(`[freshness:${scenario.name}] failed stage=${phase} elapsed=${Math.round(performance.now() - started)}ms errors=${JSON.stringify(pageErrors)} pending=${JSON.stringify([...pending])}`);
+      throw error;
     } finally {
-      await browser.close();
-      await new Promise(resolve => server.close(resolve));
+      deadline.removeEventListener('abort', abort);
+      await runBrowserStage('freshness cleanup', async () => {
+        if (owned) await owned.close();
+        if (browser) await browser.close();
+        if (server) await new Promise(resolve => server.close(resolve));
+      }, {timeoutMs: 3000});
     }
   });
 }
