@@ -1771,7 +1771,7 @@ test('keeps old and retained-FX snapshots usable and falls back from an invalid 
   const browserConfig = await resolveBrowser(context, 'the stale-data UI test');
   if (!browserConfig) return;
   const validData = await readFixture('prices.json');
-  const referenceNow = Date.parse(validData.generatedAt) + (8 * 24 * 60 * 60 * 1_000);
+  const referenceNow = Date.parse(validData.generatedAt) + (373 * 24 * 60 * 60 * 1_000);
   const scenarios = [
     {
       label: 'old snapshot',

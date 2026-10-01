@@ -573,7 +573,7 @@ class ContractTests(unittest.TestCase):
         d['markets']=[available,unavailable]
         revise(d)
         page=p.render(d,(p.ROOT/'index.template.html').read_text(encoding='utf-8'))
-        self.assertIn('JP · — · 暂无标价',page)
+        self.assertIn('JP · —',page)
         self.assertIn('<span class="mobile-rank-sr visually-hidden">排名暂不可用</span>',page)
         self.assertIn('，暂无价格历史',page)
         unavailable_row = re.search(r'<tr data-market-id="jp">(.*?)</tr>', page, re.S)

@@ -6,7 +6,7 @@ import {
   validatePayload,
   validatePriceHistoryConsistency,
   visiblePublicationEntries
-} from './data-contract.js?v=239c1b97';
+} from './data-contract.js?v=2faecdc5';
 import { createIcons } from './vendor/lucide-subset.js?v=2b21b7af';
 import { foldPublicationCountryRenames, marketSearchPriority, matchesMarketSearch, normalizeMarketSearchText, REGION_LABELS, VALID_REGIONS } from './data-model.js?v=27f94e24';
 
