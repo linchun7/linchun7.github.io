@@ -391,7 +391,7 @@ export function validateFxSanity(previousData, fx, {
   return { status: 'passed', warnings, checks };
 }
 
-function validateExchangeRateFreshness(fetchedAt, now = new Date()) {
+function validateExchangeRateFreshness(fetchedAt, now = new Date(), { acceptedFallback = false } = {}) {
   const fetchedAtMs = Date.parse(fetchedAt);
   const nowMs = now.getTime();
   if (!Number.isFinite(fetchedAtMs) || !Number.isFinite(nowMs)) {
@@ -400,7 +400,7 @@ function validateExchangeRateFreshness(fetchedAt, now = new Date()) {
   if (fetchedAtMs > nowMs + FX_MAX_FUTURE_SKEW_MS) {
     throw exchangeRateError('Exchange-rate timestamp is in the future', 'future-timestamp');
   }
-  if (nowMs - fetchedAtMs > FX_MAX_AGE_MS) {
+  if (!acceptedFallback && nowMs - fetchedAtMs > FX_MAX_AGE_MS) {
     throw exchangeRateError('Exchange-rate response is too old', 'stale-response');
   }
 }
@@ -504,7 +504,7 @@ export async function getExchangeRates(previousData, {
 
   const failureMessage = failures.map(({ sourceMode, message }) => `${sourceMode}: ${message}`).join('; ');
   try {
-    validateExchangeRateFreshness(previousData?.fx?.fetchedAt, now);
+    validateExchangeRateFreshness(previousData?.fx?.fetchedAt, now, { acceptedFallback: true });
   } catch (error) {
     throw transientHealthcheckError(`${failureMessage}; previous exchange-rate-derived prices are unusable: ${error.message}`, {
       code: 'EXCHANGE_RATE_SOURCES_UNAVAILABLE',

@@ -218,3 +218,32 @@ jobs:
             0) echo "::error::Production verification failed and the expected ChatGPT snapshot is still current."; exit 1 ;;
             *) echo "::error::Cannot establish ChatGPT deployment supersession."; exit "$diff_status" ;;
           esac
+
+  prepare-display-projection:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22
+      - name: Render exact accepted snapshots without fetching sources
+        run: |
+          node tools/icloud_price_comparison/scripts/update-asset-versions.mjs --write
+          node --input-type=module -e "const m = await import('./tools/icloud_price_comparison/scripts/render-static-page.mjs'); await m.renderStaticPage({write:true});"
+          python3 - <<'PY'
+          import base64, json, sys
+          from pathlib import Path
+          sys.path.insert(0, 'tools/chatgpt_price_comparison/scripts')
+          import pipeline as p
+          data = json.loads((p.ROOT/'data/prices.json').read_text())
+          p.validate(data)
+          (p.ROOT/'index.html').write_text(p.render(data, (p.ROOT/'index.template.html').read_text()), encoding='utf-8')
+          for path in ['tools/icloud_price_comparison/index.html', 'tools/chatgpt_price_comparison/index.html']:
+              encoded = base64.b64encode(Path(path).read_bytes()).decode()
+              for offset in range(0, len(encoded), 16000):
+                  print('PROJECTION', path, offset, encoded[offset:offset+16000])
+          PY

@@ -38,7 +38,6 @@ const MAX_HISTORY_COUNTRIES = 500;
 const MAX_HISTORY_EVENTS_PER_COUNTRY = 1000;
 const MAX_PUBLICATION_HISTORY_ENTRIES = 1000;
 const MAX_FX_FUTURE_SKEW_MS = 5 * 60 * 1_000;
-const MAX_FX_ARTIFACT_AGE_MS = (36 * 60 * 60 * 1_000) + MAX_FX_FUTURE_SKEW_MS;
 const PUBLIC_FX_FALLBACK_REASONS = new Set([
   'source-unavailable',
   'request-failed',
@@ -300,8 +299,7 @@ export function validatePricePayload(payload, { minCountries = 1 } = {}) {
       || payload.fx.sourceMode === 'open-access';
     const generatedAtMs = Date.parse(payload.generatedAt);
     const fxFetchedAtMs = Date.parse(payload.fx.fetchedAt);
-    const fxTimestampPlausible = fxFetchedAtMs <= generatedAtMs + MAX_FX_FUTURE_SKEW_MS
-      && generatedAtMs - fxFetchedAtMs <= MAX_FX_ARTIFACT_AGE_MS;
+    const fxTimestampPlausible = fxFetchedAtMs <= generatedAtMs + MAX_FX_FUTURE_SKEW_MS;
     if (!hasExactKeys(payload, PUBLIC_PRICE_TOP_LEVEL_KEYS)
       || !hasExactKeys(payload.source, PUBLIC_PRICE_SOURCE_KEYS)
       || payload.source.name !== 'Apple Support'

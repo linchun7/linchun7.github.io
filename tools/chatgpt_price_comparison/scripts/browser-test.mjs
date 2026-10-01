@@ -126,7 +126,7 @@ try {
       assert.deepEqual(badges, oracle.winners.map(m => m.code).sort(), `${plan}: exact minimum badge winners`);
       if (oracle.minimum == null) {
         assert.equal(card.disabled, true, `${plan}: no eligible price disables card`);
-        assert.equal(card.country, '暂无可靠最低价'); assert.equal(card.price, '—'); assert.equal(card.marketId, '');
+        assert.equal(card.country, '暂无可比较价格'); assert.equal(card.price, '—'); assert.equal(card.marketId, '');
       } else {
         expectedEnabled += 1;
         assert.equal(card.disabled, false); assert.equal(card.plan, plan); assert.equal(card.marketId, oracle.winners[0].code);
@@ -225,22 +225,28 @@ try {
   assert.equal(await evaluate('globalThis.__chatgptTestIntervals.length'), 1, 'one freshness refresh interval is registered');
   const observationTimes = [Date.parse(expected.generated_at), Date.parse(expected.fx?.updated_at || ''), ...expected.markets.filter(market => market.offers.length).map(market => Date.parse(market.last_verified_at))].filter(Number.isFinite);
   const latestObservation = Math.max(...observationTimes);
-  const staleNow = latestObservation + 36 * 3600e3 + 1000;
-  const expiredNow = latestObservation + 7 * 86400e3 + 1000;
-  await evaluate(`{ globalThis.__chatgptBeforeAgeTest = Date.now; Date.now = () => ${staleNow}; globalThis.__chatgptTestIntervals.forEach(callback => callback()); }`);
-  assert.equal(await evaluate(`document.querySelectorAll('.minimum-card:not(:disabled)').length`), 0, 'open-tab freshness expiry disables all minimum cards');
-  assert.equal(await evaluate(`document.querySelectorAll('#priceRows .minimum-badge').length`), 0, 'open-tab freshness expiry removes minimum badges');
-  assert.equal(await evaluate(`[...document.querySelectorAll('#priceRows tr[data-market-id] td:first-child')].every(cell => cell.textContent === '—')`), true, 'open-tab freshness expiry removes price ranks');
-  assert.equal(await evaluate(`document.querySelector('#freshnessWarning').hidden`), false, 'open-tab freshness expiry updates the warning');
-  await evaluate(`document.querySelector(${JSON.stringify(`#priceRows tr[data-market-id="${sampleMarket.code}"] .country-history-button`)}).click()`);
-  await until(() => evaluate('document.querySelector("#historyDialog").open'), 'history stays usable for stale local prices');
-  await evaluate(`{ Date.now = () => ${expiredNow}; globalThis.__chatgptTestIntervals.forEach(callback => callback()); }`);
-  assert.equal(await evaluate(`[...document.querySelectorAll('#priceRows .price-cny')].every(node => node.textContent === '—')`), true, 'seven-day expiry hides table CNY without reloading');
-  assert.equal(await evaluate(`document.querySelector('#historyCnyPrice').textContent.includes('¥')`), false, 'seven-day expiry refreshes an already-open history dialog');
-  await evaluate(`document.querySelector('#closeHistory').click()`);
-  assert.equal(await evaluate(`document.activeElement?.closest('tr[data-market-id]')?.dataset.marketId`), sampleMarket.code, 'history returns focus to the replacement table row');
+  const retainedUi = await evaluate(`JSON.stringify({
+    table: document.querySelector('#priceRows').innerHTML,
+    minimums: document.querySelector('#minimumSummary').innerHTML,
+    priceDate: document.querySelector('#updatedAt').textContent,
+    fxDate: document.querySelector('#fxStatus').textContent
+  })`);
+  await evaluate(`globalThis.__chatgptBeforeAgeTest = Date.now`);
+  for (const days of [2, 8, 365, 3650]) {
+    await evaluate(`{ Date.now = () => ${latestObservation + days * 86400e3}; globalThis.__chatgptTestIntervals.forEach(callback => callback()); }`);
+    assert.equal(await evaluate(`JSON.stringify({
+      table: document.querySelector('#priceRows').innerHTML,
+      minimums: document.querySelector('#minimumSummary').innerHTML,
+      priceDate: document.querySelector('#updatedAt').textContent,
+      fxDate: document.querySelector('#fxStatus').textContent
+    })`), retainedUi, days + '-day age must not erase or relabel accepted prices');
+    assert.equal(await evaluate(`document.querySelector('#freshnessWarning').hidden`), true);
+    await evaluate(`document.querySelector(${JSON.stringify(`#priceRows tr[data-market-id="${sampleMarket.code}"] .country-history-button`)}).click()`);
+    await until(() => evaluate('document.querySelector("#historyDialog").open'), 'old prices keep country history usable');
+    assert.ok(await evaluate(`document.querySelector('#historySubtitle').textContent.includes('价格更新于')`));
+    await evaluate(`document.querySelector('#closeHistory').click()`);
+  }
   await evaluate(`{ Date.now = globalThis.__chatgptBeforeAgeTest; delete globalThis.__chatgptBeforeAgeTest; document.dispatchEvent(new Event('visibilitychange')); }`);
-  assert.equal(await evaluate('document.hidden'), false, 'visibility-return regression runs in a visible document');
   await assertRanks(defaultPlan); await assertMinimums();
 
   await evaluate(`document.querySelector('#searchInput').value='<img src=x onerror=alert(1)>';document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);

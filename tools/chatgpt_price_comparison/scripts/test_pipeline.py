@@ -373,9 +373,10 @@ class ContractTests(unittest.TestCase):
         d=data_fixture(); d['generated_at']=p.stamp(NOW+10000); revise(d)
         with self.assertRaises(ValueError): p.validate(d,NOW)
 
-    def test_expired_prices_not_converted(self):
+    def test_old_verified_prices_remain_converted_without_age_limit(self):
         d=data_fixture(); m=d['markets'][0]
-        self.assertIsNone(p.converted(m,'20',d['fx'],NOW+8*86400))
+        for days in (2, 8, 365, 3650):
+            self.assertEqual(p.converted(m,'20',d['fx'],NOW+days*86400), '140.00')
 
     def test_missing_currency_not_converted(self):
         d=data_fixture(); m=d['markets'][0]; m['currency']='AAA'
@@ -408,7 +409,10 @@ class ContractTests(unittest.TestCase):
         fx=data_fixture()['fx']
         result=p.collect_fx(NOW+86400,fx,lambda *a,**kw: '{}')
         self.assertEqual(result['updated_at'],fx['updated_at']); self.assertTrue(result['fallback'])
-        self.assertIsNone(p.collect_fx(NOW+8*86400,fx,lambda *a,**kw: '{}'))
+        for days in (8, 365, 3650):
+            retained = p.collect_fx(NOW+days*86400,fx,lambda *a,**kw: '{}')
+            self.assertEqual(retained['updated_at'], fx['updated_at'])
+            self.assertEqual(retained['rates'], result['rates'])
 
     def test_fx_fallback_keeps_known_currencies_when_new_currency_is_missing(self):
         fx=data_fixture()['fx']
@@ -577,7 +581,7 @@ class ContractTests(unittest.TestCase):
         self.assertNotIn('全球价格排名第', unavailable_row.group(1))
         self.assertNotIn('JP · — · unavailable',page)
 
-    def test_static_ranks_exclude_stale_or_nonverified_prices(self):
+    def test_static_ranks_include_last_accepted_prices_after_failure(self):
         d=copy.deepcopy(data_fixture())
         stale=copy.deepcopy(d['markets'][0])
         stale['code']='jp'
@@ -590,8 +594,9 @@ class ContractTests(unittest.TestCase):
         page=p.render(d,(p.ROOT/'index.template.html').read_text(encoding='utf-8'))
         row=re.search(r'<tr data-market-id="jp">([\s\S]*?)</tr>',page)
         self.assertIsNotNone(row)
-        self.assertIn('<td>—</td>',row.group(1))
-        self.assertIn('排名暂不可用',row.group(1))
+        self.assertIn('全球价格排名第 1',row.group(1))
+        self.assertNotIn('排名暂不可用',row.group(1))
+        self.assertIn('minimum-badge',row.group(1))
 
     def test_static_price_ties_use_stable_market_code_order(self):
         d=copy.deepcopy(data_fixture())

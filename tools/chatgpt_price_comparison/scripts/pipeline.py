@@ -473,7 +473,7 @@ def collect_fx(now: float, old: dict | None, getter=fetch, required_currencies=(
         selected = {code: str(rates[code]) for code in required}
         return {'source_url': FX_URL, 'updated_at': stamp(updated), 'rates': selected, 'fallback': False}
     except (ValueError, KeyError, TypeError, urllib.error.URLError, TimeoutError, OSError):
-        if old and -300 <= now - epoch(old['updated_at']) <= EXPIRE:
+        if old and -300 <= now - epoch(old['updated_at']):
             old_rates = old.get('rates', {})
             selected = {code: str(old_rates[code]) for code in required if code in old_rates}
             if 'USD' in selected and 'CNY' in selected:
@@ -661,7 +661,7 @@ def validate(data: dict, now: float | None = None) -> None:
 
 
 def converted(market: dict, amount: str, fx: dict | None, now: float) -> str | None:
-    if not fx or now - epoch(fx['updated_at']) > EXPIRE or now - epoch(market['last_verified_at']) > EXPIRE:
+    if not fx or now - epoch(fx['updated_at']) < -300 or now - epoch(market['last_verified_at']) < -300:
         return None
     rate = fx['rates'].get(market['currency'])
     if not rate:
@@ -724,13 +724,11 @@ def offer_min_cny(market: dict, label: str) -> Decimal | None:
     return min(values) if values else None
 
 
-def comparable_min_cny(market: dict, label: str, generated: float, fx_fresh: bool) -> Decimal | None:
-    if (
-        not fx_fresh
-        or market.get('status') != 'verified'
-        or not market.get('last_verified_at')
-        or not -300 <= generated - epoch(market['last_verified_at']) <= FRESH
-    ):
+def comparable_min_cny(market: dict, label: str, generated: float, fx_usable: bool) -> Decimal | None:
+    # Retained/pending entries contain the last accepted prices, not the unverified candidate.
+    if not fx_usable or not market.get('offers') or not market.get('last_verified_at'):
+        return None
+    if generated - epoch(market['last_verified_at']) < -300:
         return None
     return offer_min_cny(market, label)
 
@@ -772,13 +770,21 @@ def render_price_options(market: dict, plan: str, minimum: Decimal | None) -> st
     return ''.join(options)
 
 
+def price_date_label(data: dict) -> str:
+    dates = sorted(m['last_verified_at'] for m in data['markets'] if m['offers'])
+    if not dates:
+        return '暂无价格记录'
+    first, last = beijing_display(dates[0]), beijing_display(dates[-1])
+    return '价格更新于 ' + (last if first[:10] == last[:10] else first[:10] + ' 至 ' + last[:10])
+
+
 def render(data: dict, template: str) -> str:
     plans = plan_labels(data)
     if not plans:
         raise ValueError('no plans available for static projection')
     default_plan = 'ChatGPT Plus' if 'ChatGPT Plus' in plans else plans[0]
     generated = epoch(data['generated_at'])
-    fx_fresh = bool(data['fx']) and -300 <= generated - epoch(data['fx']['updated_at']) <= FRESH
+    fx_fresh = bool(data['fx']) and -300 <= generated - epoch(data['fx']['updated_at'])
 
     minimums: dict[str, Decimal | None] = {}
     winners: dict[str, list[dict]] = {}
@@ -804,7 +810,7 @@ def render(data: dict, template: str) -> str:
             minimum_cards.append(
                 '<button type="button" class="minimum-card" disabled>'
                 f'<span class="minimum-plan-label">{html.escape(short_plan(plan))}</span>'
-                '<strong class="minimum-country">暂无可靠最低价</strong>'
+                '<strong class="minimum-country">暂无可比较价格</strong>'
                 '<small class="minimum-price">—</small>'
                 '</button>'
             )
@@ -851,7 +857,7 @@ def render(data: dict, template: str) -> str:
         value = comparable_min_cny(market, default_plan, generated, fx_fresh)
         rank = rank_map.get(value) if value is not None else None
         rank_class = ' class="rank-top"' if rank is not None and rank <= 3 else ''
-        status = '' if market['status'] == 'verified' else f' · {STATUS_LABEL[market["status"]]}'
+        status = ''
         rank_accessibility = f'全球价格排名第 {rank}' if rank is not None else '排名暂不可用'
         history_accessibility = '，启用 JavaScript 后查看价格历史' if market['offers'] else '，暂无价格历史'
         cells = []
@@ -897,7 +903,8 @@ def render(data: dict, template: str) -> str:
         'TABLE_HEAD': '\n'.join(head),
         'ROWS': '\n'.join(rows),
         'DATA': payload,
-        'GENERATED_BEIJING': beijing_display(data['generated_at']),
+        'PRICE_DATE_LABEL': price_date_label(data),
+        'FX_DATE_LABEL': '汇率更新：' + beijing_display(data['fx']['updated_at']) if data['fx'] else '汇率暂不可用',
         'REVISION': data['revision'],
         'PAGE_REVISION': page_revision,
         'COUNT': str(len(priced_markets)),
