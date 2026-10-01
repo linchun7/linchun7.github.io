@@ -29,7 +29,7 @@
 GitHub Actions 执行测试和发布：
 
 - [更新价格](../../.github/workflows/update-icloud-prices.yml)：Cloudflare 主触发约北京时间 08:05，GitHub 08:10 兜底；手动运行选择 main
-- [完整验证](../../.github/workflows/validate-icloud-price-comparison.yml)：核心、工件、全部快照、依赖安全及 Chromium / Firefox / WebKit
+- [完整验证](../../.github/workflows/validate-icloud-price-comparison.yml)：核心、工件、全部快照、依赖安全及 Chromium / Firefox / WebKit；main 代码提交随后复验实际线上数据、页面和资源哈希
 - [中文名称监测](../../.github/workflows/monitor-icloud-zh-markets.yml)：只提醒需要人工复核的名称，不自动绑定中英文市场
 
 自动入口只有取得当日完整生产成功证明才跳过；手动更新不跳过。上游失败保留已发布数据；汇率降级不会发送健康心跳，也不会跳过后续自动重试。Cloudflare 实际触发、DNS 和安全头需单独查看控制面，不能由仓库文字证明。

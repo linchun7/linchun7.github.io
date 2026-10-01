@@ -491,3 +491,18 @@ test('retained FX stays publishable but cannot report a healthy heartbeat or ski
   }
   assert.match(workflow, /needs\.update\.result == 'success'/, 'degradation metadata never blocks accepted snapshot publication');
 });
+
+test('main code pushes verify the deployed iCloud artifact and assets after all local checks', async () => {
+  const workflow = await readFile(ciWorkflowUrl, 'utf8');
+  const job = workflow.split('\n  production:\n')[1];
+  assert.ok(job);
+  assert.match(job, /if: github\.event_name == 'push'/);
+  assert.match(job, /needs: \[core, browser\]/);
+  assert.match(job, /permissions:\s*contents: read/);
+  assert.doesNotMatch(job, /contents: write|secrets\.|git push|pnpm update:data/);
+  assert.match(job, /persist-credentials: false/);
+  assert.match(job, /verify-production-deployment\.mjs/);
+  assert.match(job, /--expected-data-dir tools\/icloud_price_comparison\/data/);
+  assert.match(job, /--current-main-data-dir/);
+  assert.match(job, /--max-wait-ms 600000/);
+});

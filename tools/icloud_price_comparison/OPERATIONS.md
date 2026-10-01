@@ -28,7 +28,7 @@
 4. `stage-price-publication.mjs` 只强制暂存已测 data/index 路径，从 Git tree 读取原始 blob，核对完整文件集和字节，再深验。忽略规则或属性转码造成差异时必须在 commit/push 前停止。
 5. 等待 Pages 并验证 canonical URL 的数据、HTML 投影和版本化资源；仅完整成功才构成每日幂等/恢复证明。被新部署取代的旧验证不能冒充恢复。
 
-生成 job 不具备写权限，发布 job 不安装项目依赖。GITHUB_TOKEN 发布数据提交不会再触发普通 push 验证，因此 updater 必须保留自身的完整验收。手动恢复使用 main 的新 Run workflow；如 YAML 已改变，不重跑旧记录。
+生成 job 不具备写权限，发布 job 不安装项目依赖。普通 main 代码提交在核心与三浏览器通过后复用同一生产校验器检查实际部署。GITHUB_TOKEN 发布数据提交不会再触发普通 push 验证，因此 updater 必须保留自身的完整验收。手动恢复使用 main 的新 Run workflow；如 YAML 已改变，不重跑旧记录。
 
 关键契约/生成器/update/validate workflow 修改需同步 README 和本文件；仅改文档不修改价格。测试、工件复验、生产验收各守不同边界，不能以精简文档为由删减。
 
