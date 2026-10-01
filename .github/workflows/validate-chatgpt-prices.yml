@@ -218,3 +218,63 @@ jobs:
             0) echo "::error::Production verification failed and the expected ChatGPT snapshot is still current."; exit 1 ;;
             *) echo "::error::Cannot establish ChatGPT deployment supersession."; exit "$diff_status" ;;
           esac
+
+  prepare-country-history-projection:
+    name: 临时核验历史基线并生成投影
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22
+      - name: 从不可变 Git 证据恢复基线并核对历史不变
+        run: |
+          python3 - <<'PY'
+          import base64, copy, json, subprocess, sys
+          from pathlib import Path
+          root=Path('tools/chatgpt_price_comparison')
+          sys.path.insert(0,str(root/'scripts'))
+          import pipeline as p
+          import minimum_history as h
+          source=json.loads(subprocess.check_output(['git','show','d60f7fecea49b8da47645120f6b2813fbf786179:tools/chatgpt_price_comparison/data/prices.json'],text=True))
+          original=json.loads((root/'data/prices.json').read_text())
+          data=copy.deepcopy(original)
+          old={m['code']:m for m in source['markets']}
+          for market in data['markets']:
+              if not market.get('offers'): continue
+              evidence=old[market['code']]
+              assert evidence['status']=='verified' and evidence['source_url']==p.url_for(market['code'])
+              snapshot=p.semantic(evidence)
+              p.validate_history_snapshot(snapshot)
+              changes=[c for c in data['changes'] if c['code']==market['code']]
+              expected=changes[0]['before'] if changes else p.semantic(market)
+              assert p.canonical(snapshot)==p.canonical(expected), market['code']
+              at=evidence['last_verified_at']
+              assert p.epoch(at)<=p.epoch(changes[0]['at'] if changes else data['generated_at'])
+              market['history_baseline']={'at':at,'snapshot':snapshot}
+          data['revision']=p.digest({k:v for k,v in data.items() if k!='revision'})
+          p.validate(data)
+          stripped=copy.deepcopy(data)
+          for market in stripped['markets']: market.pop('history_baseline',None)
+          stripped['revision']=original['revision']
+          assert stripped==original, 'Current source prices, changes, FX or timestamps changed'
+          previous=json.loads((root/'data/minimum-history.json').read_text())
+          minimum=h.advance_history(previous,data)
+          h.assert_matches(minimum,data)
+          for key in previous:
+              if key!='checkpoint': assert minimum[key]==previous[key], key
+          (root/'data/prices.json').write_text(json.dumps(data,ensure_ascii=False,indent=2)+'\n')
+          (root/'data/minimum-history.json').write_text(json.dumps(minimum,ensure_ascii=False,indent=2)+'\n')
+          (root/'index.html').write_text(p.render(data,(root/'index.template.html').read_text()))
+          print('COUNTRY_BASELINES_VERIFIED',sum('history_baseline' in m for m in data['markets']))
+          for path in ['data/prices.json','data/minimum-history.json','index.html']:
+              encoded=base64.b64encode((root/path).read_bytes()).decode()
+              print('COUNTRY_HISTORY_BEGIN '+path)
+              for i in range(0,len(encoded),8000): print('COUNTRY_HISTORY_CHUNK '+encoded[i:i+8000])
+              print('COUNTRY_HISTORY_END '+path)
+          PY

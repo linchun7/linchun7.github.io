@@ -506,6 +506,70 @@ def validate_history_snapshot(snapshot: dict) -> None:
             raise ValueError('duplicate or unordered history amounts')
 
 
+def history_snapshot_identity(snapshot: dict) -> str:
+    market = {'currency': snapshot['currency'], 'offers': [
+        {'label': offer['label'], 'amounts': [{'amount': amount} for amount in offer['amounts']]}
+        for offer in snapshot['offers']
+    ]}
+    return canonical(history_semantic(market))
+
+
+def update_country_history(previous: dict, markets: list, changes: list, limit: int = 200) -> list:
+    """Retain a timestamp bound to a real snapshot, not a moving verification clock."""
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 200:
+        raise ValueError('invalid country history retention limit')
+    by_code = {market['code']: market for market in markets}
+    for market in markets:
+        if 'history_baseline' in market or not market.get('offers'):
+            continue
+        old = previous.get(market['code'])
+        if old and 'history_baseline' in old:
+            market['history_baseline'] = copy.deepcopy(old['history_baseline'])
+            continue
+        first = next((change for change in changes if change['code'] == market['code']), None)
+        if first:
+            at = None
+            if old and old.get('offers') and old.get('last_verified_at'):
+                if (history_snapshot_identity(semantic(old)) == history_snapshot_identity(first['before'])
+                        and epoch(old['last_verified_at']) <= epoch(first['at'])):
+                    at = old['last_verified_at']
+            # Missing legacy timestamp remains unknown; never fabricate an earlier date.
+            baseline = {'at': at, 'snapshot': copy.deepcopy(first['before'])}
+        else:
+            source = old if old and old.get('offers') else market
+            baseline = {'at': source.get('last_verified_at'), 'snapshot': semantic(source)}
+        market['history_baseline'] = baseline
+    for change in changes[:-limit]:
+        if change['code'] in by_code:
+            by_code[change['code']]['history_baseline'] = {
+                'at': change['at'], 'snapshot': copy.deepcopy(change['after'])
+            }
+    return changes[-limit:]
+
+
+def validate_country_history_baselines(data: dict) -> None:
+    generated = epoch(data['generated_at'])
+    for market in data['markets']:
+        if 'history_baseline' not in market:
+            continue  # Legacy schema-1 payloads remain readable.
+        baseline = market['history_baseline']
+        if not isinstance(baseline, dict) or set(baseline) != {'at', 'snapshot'}:
+            raise ValueError('invalid country history baseline')
+        if baseline['at'] is not None and not isinstance(baseline['at'], str):
+            raise ValueError('invalid country history baseline time')
+        at = float('-inf') if baseline['at'] is None else epoch(baseline['at'])
+        if at > generated or (market.get('last_verified_at') and at > epoch(market['last_verified_at'])):
+            raise ValueError('future country history baseline')
+        validate_history_snapshot(baseline['snapshot'])
+        snapshot = baseline['snapshot']
+        for change in (entry for entry in data['changes'] if entry['code'] == market['code']):
+            if epoch(change['at']) < at or history_snapshot_identity(snapshot) != history_snapshot_identity(change['before']):
+                raise ValueError('discontinuous country history baseline')
+            at, snapshot = epoch(change['at']), change['after']
+        if not market.get('offers') or history_snapshot_identity(snapshot) != history_snapshot_identity(semantic(market)):
+            raise ValueError('country history baseline does not match current prices')
+
+
 def validate(data: dict, now: float | None = None) -> None:
     now = time.time() if now is None else now
     if data.get('schema') != 1 or data.get('channel') != 'ios-app-store' or data.get('billing_period') != 'not_disclosed' or data.get('purchase_eligibility') != 'not_verified':
@@ -593,6 +657,7 @@ def validate(data: dict, now: float | None = None) -> None:
         validate_history_snapshot(change['after'])
         if canonical(change['before']) == canonical(change['after']):
             raise ValueError('history entry has no semantic change')
+    validate_country_history_baselines(data)
 
 
 def converted(market: dict, amount: str, fx: dict | None, now: float) -> str | None:
@@ -913,8 +978,9 @@ def run(output: Path, now: float | None = None) -> dict:
             and should_record_history_change(before, market)
         ):
             changes.append({'at': stamp(now), 'code': market['code'], 'before': semantic(before), 'after': semantic(market)})
+    changes = update_country_history(previous, markets, changes)
     data = {'schema': 1, 'channel': 'ios-app-store', 'billing_period': 'not_disclosed', 'purchase_eligibility': 'not_verified',
-            'generated_at': stamp(now), 'markets': markets, 'fx': fx, 'changes': changes[-200:]}
+            'generated_at': stamp(now), 'markets': markets, 'fx': fx, 'changes': changes}
     data['revision'] = digest(data)
     validate(data, now)
     minimum_path = ROOT / 'data/minimum-history.json'
