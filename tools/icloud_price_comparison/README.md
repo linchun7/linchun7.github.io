@@ -96,7 +96,7 @@ pnpm audit --audit-level low
 | 本地 `pnpm test:browsers` / PR / push / 每周矩阵 | UI 套件 + 独立降序 URL / static fallback 场景；Chromium、Firefox、WebKit 都执行 |
 | `pnpm test:firefox` / `pnpm test:webkit` | 对应浏览器的上述完整场景 |
 
-forced-colors 只保留 UI 套件中的一个实现，Chromium 真正执行，其他引擎按能力跳过；不另起浏览器、不用名称黑名单绕开它、不增加重试。日更仍可使用 runner 自带 Chrome，不新增浏览器下载。浏览器缺失/启动失败必须报错退出，并释放已经创建的测试服务器；core 含不联网的缺浏览器故障回归。
+forced-colors 只保留 UI 套件中的一个实现，Chromium 真正执行，其他引擎按能力跳过；不另起浏览器、不用名称黑名单绕开它、不增加重试。日更在 GitHub Actions 中使用锁定 Playwright 配套 Chromium，test:ui 先安装/核对完整浏览器包，不再回退到 runner 自带 Chrome。浏览器缺失/启动失败必须报错退出，并释放已经创建的测试服务器；core 含不联网的缺浏览器故障回归。
 
 `pnpm check:live` 是只读在线 dry-run，结束后工作树应不变；`pnpm update:data` 会写数据，只用于明确手动更新或隔离环境。不要用它替代只读诊断。
 
@@ -132,3 +132,7 @@ Apple 中英文价格页没有共同地区 ID，程序不按行号、同价或�
 继续使用现有独立只读监测，仅补一项检查：当前官方中文名称若尚未出现在项目 prices.json 的 nameZh 展示集合中，持续列出具体名称并报待处理，即使已加入历史已审名单也不能消除提醒。这只是发现未显示的词，不断言它对应哪个英文地区；人工核实对应、更新映射并发布后才能消除该差异。未来新市场保留英文价格显示，不能为凑齐中文而自动猜配。
 
 抓取或结构解析异常仍是监测失败，不能当成无变化；当前官方页暂时缺少历史名称时，不删除既有翻译。监测只读、不阻塞英文价格更新，提醒仍通过 Actions 失败状态和具体差异摘要提供，不新增自动配对、外部推送或状态系统。
+
+## 更新流程浏览器版本一致性（2026-10-01）
+
+真实更新复现卡点为浏览器启动阶段，页面尚未创建；runner 自带 Chrome 154 与校验使用的 Playwright Chromium 153 不一致。test:ui 现在先调用 prepare-updater-browser.mjs，仅在 GITHUB_ACTIONS=true 时用锁定的本地 Playwright CLI 安装完整 Chromium/headless-shell 包。安装失败停止 UI 与发布，不回退系统 Chrome；非 GitHub 本地运行不自动安装软件。测试仍保留原 30 秒限制、分阶段诊断及取消清理，不以延长等待或同一测试内重试掩盖失败。此措施消除已确认的版本差异；不将一次启动卡顿的底层 OS 原因宣称为已证明。

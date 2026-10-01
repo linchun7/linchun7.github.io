@@ -32,7 +32,8 @@ test('keeps one forced-colors implementation and no hidden test imports', async 
     readFile(new URL('./static-descending-url-state.test.mjs', import.meta.url), 'utf8'),
     readFile(new URL('../scripts/test-browsers.mjs', import.meta.url), 'utf8')
   ]);
-  assert.equal(packageJson.scripts['test:ui'], 'node --test --test-concurrency=1 test/ui-smoke.test.mjs');
+  assert.equal(packageJson.scripts['test:ui'], 'node scripts/prepare-updater-browser.mjs && node --test --test-concurrency=1 test/ui-smoke.test.mjs');
+  assert.match(ui, /Pinned Playwright Chromium is required on GitHub Actions/);
   assert.equal((ui.match(/test\('preserves sorting and minimum-price cues in forced-colors mode'/g) || []).length, 1);
   assert.doesNotMatch(runner, /test-skip-pattern|LEGACY_FORCED_COLORS/);
   assert.doesNotMatch(descending, /import\s+['"][^'"]+\.test\.mjs['"]/);
