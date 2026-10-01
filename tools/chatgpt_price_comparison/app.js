@@ -722,7 +722,7 @@
 
 
 
-  const minimumHistoryUi = { data: null, promise: null, dialog: null, filterPlan: 'all', limit: 20 };
+  const minimumHistoryUi = { data: null, promise: null, status: 'idle', dialog: null, filterPlan: 'all', limit: 20 };
   const MINIMUM_CAUSE_LABELS = {
     fx: '汇率变化',
     storefront: 'App Store 标价变化',
@@ -881,7 +881,7 @@
     note.id = 'minimumHistoryNote'; note.hidden = true;
     const retry = minimumHistoryNode('button', '重新读取历史', 'minimum-history-button');
     retry.type = 'button'; retry.id = 'minimumHistoryRetry'; retry.hidden = true;
-    retry.addEventListener('click', () => { minimumHistoryUi.data = null; void loadMinimumHistory(); });
+    retry.addEventListener('click', () => { void loadMinimumHistory(); });
 
     content.append(status, list, more, note, retry);
     dialog.append(header, content);
@@ -897,6 +897,21 @@
     if (!rows.length) return '暂无';
     const values = rows.map((row) => `${row.name} ¥${Number(row.cny).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
     return values.length > 3 ? `${values.slice(0, 3).join('、')}等 ${values.length} 个地区并列` : values.join('、');
+  }
+
+  function renderMinimumHistoryStatus() {
+    const h = minimumHistoryUi.data;
+    const status = document.querySelector('#minimumHistoryStatus');
+    const parts = [];
+    const recordedAt = h?.checkpoint?.at || h?.checked_at;
+    if (recordedAt) parts.push(`记录截至 ${dateTime(recordedAt)}`);
+    if (minimumHistoryUi.status === 'loading' && !h) parts.push('正在读取…');
+    if (minimumHistoryUi.status === 'error') parts.push(h ? '暂无法刷新' : '暂无法读取');
+    status.textContent = parts.join(' · ');
+    status.hidden = !parts.length;
+    const retry = document.querySelector('#minimumHistoryRetry');
+    retry.hidden = minimumHistoryUi.status !== 'error';
+    retry.disabled = minimumHistoryUi.status === 'loading';
   }
 
   function renderMinimumHistory() {
@@ -926,12 +941,7 @@
         && (minimumHistoryUi.filterPlan === 'all' || planIdentity(event.plan) === minimumHistoryUi.filterPlan))
       .sort((a, b) => Date.parse(b.at) - Date.parse(a.at) || comparePlans(a.plan, b.plan));
 
-    const status = document.querySelector('#minimumHistoryStatus');
-    const messages = [];
-    if (state.data && history.checked_at !== state.data.generated_at) messages.push('历史记录暂未同步到当前价格。');
-    if (history.pending_gap) messages.push('最近最低价变化暂未确认。');
-    status.textContent = messages.join(' ');
-    status.hidden = messages.length === 0;
+    renderMinimumHistoryStatus();
 
     const list = document.querySelector('#minimumHistoryEvents');
     list.replaceChildren();
@@ -950,18 +960,13 @@
     }
     document.querySelector('#minimumHistoryMore').hidden = series.length <= minimumHistoryUi.limit;
     document.querySelector('#minimumHistoryNote').hidden = false;
-    document.querySelector('#minimumHistoryRetry').hidden = true;
   }
 
   async function loadMinimumHistory() {
     if (minimumHistoryUi.promise) return minimumHistoryUi.promise;
-    const status = document.querySelector('#minimumHistoryStatus');
-    status.textContent = '正在读取最低价历史…'; status.hidden = false;
-    document.querySelector('#minimumHistoryToolbar').hidden = true;
-    document.querySelector('#minimumHistoryEvents').replaceChildren();
-    document.querySelector('#minimumHistoryMore').hidden = true;
-    document.querySelector('#minimumHistoryNote').hidden = true;
-    document.querySelector('#minimumHistoryRetry').hidden = true;
+    minimumHistoryUi.status = 'loading';
+    if (minimumHistoryUi.data) renderMinimumHistory();
+    renderMinimumHistoryStatus();
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
     minimumHistoryUi.promise = (async () => {
@@ -974,19 +979,21 @@
         if (declared > 2_000_000) throw Error('最低价历史过大');
         const text = await response.text();
         if (text.length > 2_000_000) throw Error('最低价历史过大');
-        minimumHistoryUi.data = validateMinimumHistory(JSON.parse(text));
+        const value = validateMinimumHistory(JSON.parse(text));
+        const previous = minimumHistoryUi.data?.checked_at;
+        if (previous && (!value.checked_at || Date.parse(value.checked_at) < Date.parse(previous))) {
+          throw new Error('History response would roll back accepted records');
+        }
+        minimumHistoryUi.data = value;
+        minimumHistoryUi.status = 'ready';
         renderMinimumHistory();
       } catch {
-        status.textContent = '最低价历史暂时无法读取，当前价格表不受影响。';
-        status.hidden = false;
-        document.querySelector('#minimumHistoryToolbar').hidden = true;
-        document.querySelector('#minimumHistoryEvents').replaceChildren();
-        document.querySelector('#minimumHistoryMore').hidden = true;
-        document.querySelector('#minimumHistoryNote').hidden = true;
-        document.querySelector('#minimumHistoryRetry').hidden = false;
+        minimumHistoryUi.status = 'error';
+        if (minimumHistoryUi.data) renderMinimumHistory();
       } finally {
         clearTimeout(timer);
         minimumHistoryUi.promise = null;
+        renderMinimumHistoryStatus();
       }
     })();
     return minimumHistoryUi.promise;
@@ -998,8 +1005,8 @@
     minimumHistoryUi.limit = 20;
     minimumHistoryUi.returnFocusPending = true;
     dialog.showModal();
-    if (minimumHistoryUi.data && (!state.data || minimumHistoryUi.data.checked_at === state.data.generated_at)) renderMinimumHistory();
-    else void loadMinimumHistory();
+    if (minimumHistoryUi.data) renderMinimumHistory();
+    if (!minimumHistoryUi.data || (state.data && minimumHistoryUi.data.checked_at !== state.data.generated_at)) void loadMinimumHistory();
   }
 
   function backButton() {

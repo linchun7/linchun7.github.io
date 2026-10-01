@@ -9,6 +9,11 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import { plansFor, offerFor, comparisonFor } from './browser-oracle.mjs';
 
+const scope = process.env.BROWSER_TEST_SCOPE || 'full';
+assert.ok(['full', 'state'].includes(scope), 'Unknown BROWSER_TEST_SCOPE');
+const fullUi = scope === 'full';
+const responsiveUi = fullUi || ['pending', 'aliases'].includes(process.env.BROWSER_STATE_FIXTURE);
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const chrome = process.env.CHROME_BIN || ['/usr/bin/google-chrome','/usr/bin/chromium','/usr/bin/chromium-browser'].find(existsSync);
 assert.ok(chrome, 'A local Chrome/Chromium installation is required');
@@ -156,6 +161,9 @@ try {
   assert.equal(await evaluate('document.querySelector("#minimumHistoryRetry").hidden'),true,'committed minimum history loads without entering the isolated error state');
   assert.match(await evaluate('document.querySelector("#minimumHistoryEvents").textContent'),/暂无最低价变更记录|→/,'minimum history renders an auditable timeline or explicit empty state');
   assert.equal(await evaluate('document.querySelector("#minimumHistoryNote").hidden'),false,'minimum history displays its scope note');
+  const acceptedHistoryText = await evaluate('document.querySelector("#minimumHistoryEvents").textContent');
+  const acceptedHistoryDate = await evaluate('document.querySelector("#minimumHistoryStatus").textContent');
+  assert.match(acceptedHistoryDate, /记录截至/);
   const badHistory = JSON.parse(await readFile(path.join(root,'tools/chatgpt_price_comparison/data/minimum-history.json'),'utf8'));
   const futureHistoryTime = new Date(Date.parse(expected.generated_at)+86400e3).toISOString();
   if (badHistory.events.length) badHistory.events.at(-1).at = futureHistoryTime;
@@ -164,11 +172,23 @@ try {
     globalThis.__originalHistoryFetch = globalThis.fetch;
     const bad = ${JSON.stringify(badHistory)};
     globalThis.fetch = (input,init) => new URL(input.url || input,location.href).pathname.endsWith('/minimum-history.json')
-      ? Promise.resolve(new Response(JSON.stringify(bad),{status:200,headers:{'content-type':'application/json'}}))
+      ? new Promise(resolve => { globalThis.__releaseHistory = () => resolve(new Response(JSON.stringify(bad),{status:200,headers:{'content-type':'application/json'}})); })
       : globalThis.__originalHistoryFetch(input,init);
     document.querySelector('#minimumHistoryRetry').click();
   }`);
-  await until(()=>evaluate(`!document.querySelector('#minimumHistoryRetry').hidden && document.querySelector('#minimumHistoryStatus').textContent.includes('暂时无法读取')`),'future history is rejected in isolation');
+  await until(()=>evaluate('typeof globalThis.__releaseHistory === "function"'), 'deferred history request');
+  assert.equal(await evaluate('document.querySelector("#minimumHistoryEvents").textContent'), acceptedHistoryText, 'pending refresh preserves accepted history');
+  await evaluate('document.querySelector("#closeMinimumHistory").click(); document.querySelector("#minimumHistoryButton").click();');
+  assert.equal(await evaluate('document.querySelector("#minimumHistoryEvents").textContent'), acceptedHistoryText, 'pending reopen preserves accepted history');
+  await evaluate('globalThis.__releaseHistory(); delete globalThis.__releaseHistory;');
+  await until(()=>evaluate(`!document.querySelector('#minimumHistoryRetry').hidden && document.querySelector('#minimumHistoryStatus').textContent.includes('暂无法刷新')`),'future history is rejected without dropping old records');
+  assert.equal(await evaluate('document.querySelector("#minimumHistoryEvents").textContent'), acceptedHistoryText);
+  assert.ok((await evaluate('document.querySelector("#minimumHistoryStatus").textContent')).startsWith(acceptedHistoryDate), 'failed refresh preserves actual cutoff');
+  await evaluate('document.querySelector("#minimumHistoryPlanFilter").dispatchEvent(new Event("change")); document.querySelector("#minimumHistoryMore").click();');
+  assert.equal(await evaluate('document.querySelector("#minimumHistoryRetry").hidden'), false, 'filter/pagination retain retry');
+  await evaluate(`globalThis.fetch = (input, init) => new URL(input.url || input, location.href).pathname.endsWith('/minimum-history.json') ? Promise.reject(Error('offline')) : globalThis.__originalHistoryFetch(input, init); document.querySelector('#minimumHistoryRetry').click();`);
+  await until(()=>evaluate(`document.querySelector('#minimumHistoryStatus').textContent.includes('暂无法刷新') && !document.querySelector('#minimumHistoryRetry').disabled`), 'network failure preserves history');
+  assert.equal(await evaluate('document.querySelector("#minimumHistoryEvents").textContent'), acceptedHistoryText);
   assert.ok(await evaluate('document.querySelectorAll("#priceRows tr[data-market-id]").length>0'),'bad history never removes current prices');
   await evaluate(`{globalThis.fetch=globalThis.__originalHistoryFetch;delete globalThis.__originalHistoryFetch;document.querySelector('#minimumHistoryRetry').click();}`);
   await until(()=>evaluate(`document.querySelector('#minimumHistoryRetry').hidden && !document.querySelector('#minimumHistoryNote').hidden`),'valid history recovers after retry');
@@ -181,7 +201,7 @@ try {
   assert.equal(await evaluate(`document.querySelector('#priceRows .mobile-rank').textContent`),'序1','country sort uses mobile sequence label');
   assert.equal(await evaluate(`document.querySelector('#priceRows .mobile-rank-sr').textContent`),'当前列表序号第 1','country sort exposes accessible sequence label');
   await clickPlan(defaultPlan);
-  for (const key of ['Enter', ' ']) {
+  if (fullUi) for (const key of ['Enter', ' ']) {
     await evaluate(`[...document.querySelectorAll('button[data-sort-plan]')].find(button => button.dataset.sortPlan === ${JSON.stringify(defaultPlan)}).focus()`);
     await pressKey(key);
     assert.equal(await evaluate('document.activeElement?.dataset.sortPlan'), defaultPlan, 'keyboard sorting preserves the replaced header focus');
@@ -217,7 +237,7 @@ try {
   }
   const sampleVerifiedDate = await evaluate(`new Date(${JSON.stringify(sampleMarket.last_verified_at)}).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai',hour12:false,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})`);
   assert.ok(await evaluate(`document.querySelector('#historySubtitle').textContent.includes(${JSON.stringify('价格更新于 ' + sampleVerifiedDate)})`), 'history exposes the actual market observation date');
-  for (const key of ['Enter', ' ']) {
+  if (fullUi) for (const key of ['Enter', ' ']) {
     await evaluate(`[...document.querySelectorAll('#historyPlanControl button')].find(button => button.dataset.plan === ${JSON.stringify(defaultPlan)}).focus()`);
     await pressKey(key);
     assert.equal(await evaluate('document.activeElement?.dataset.plan'), defaultPlan, 'history plan activation retains keyboard focus');
@@ -267,10 +287,12 @@ try {
   await evaluate(`{ Date.now = globalThis.__chatgptBeforeAgeTest; delete globalThis.__chatgptBeforeAgeTest; document.dispatchEvent(new Event('visibilitychange')); }`);
   await assertRanks(defaultPlan); await assertMinimums();
 
+  if (fullUi) {
   await evaluate(`document.querySelector('#searchInput').value='<img src=x onerror=alert(1)>';document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);
   assert.equal(await evaluate(`document.querySelector('#emptyState').hidden`),false,'empty search state');
   assert.equal(await evaluate(`document.querySelectorAll('#priceRows img').length`),0,'search never becomes HTML');
   await evaluate(`document.querySelector('#searchInput').value='';document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);
+  }
 
   const missingFxMarket=expected.markets.find(m=>m.name==='缺汇率测试');
   if(missingFxMarket){
@@ -293,6 +315,7 @@ try {
   }
   await clickPlan(defaultPlan);
 
+  if (responsiveUi) {
   await command('Emulation.setDeviceMetricsOverride',{width:641,height:844,deviceScaleFactor:1,mobile:true});
   await delay(150);
   assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth + 1'),'no body overflow at the 641px responsive seam');
@@ -307,7 +330,7 @@ try {
   assert.equal(await evaluate(`getComputedStyle(document.querySelector('.page-main')).rowGap`),'12px','mobile vertical rhythm matches the iCloud spacing');
   assert.equal(await evaluate(`getComputedStyle(document.querySelector('#mobilePlanControl')).overflowX`),'auto','future plan selector stays internally scrollable');
   assert.equal(await evaluate(`[...document.querySelectorAll('#priceRows tr[data-market-id]')].every(row => [...row.querySelectorAll('td[data-plan]')].filter(td => getComputedStyle(td).display !== 'none').length === 1)`),true,'mobile shows one active plan column');
-  for (const key of ['Enter', ' ']) {
+  if (fullUi) for (const key of ['Enter', ' ']) {
     await evaluate(`[...document.querySelectorAll('#mobilePlanControl button')].find(button => button.dataset.plan === ${JSON.stringify(defaultPlan)}).focus()`);
     await pressKey(key);
     assert.equal(await evaluate('document.activeElement?.dataset.plan'), defaultPlan, 'mobile plan activation retains keyboard focus');
@@ -328,6 +351,12 @@ try {
   assert.ok(await evaluate('document.querySelector(".minimum-stats").scrollWidth <= document.querySelector(".minimum-stats").clientWidth + 1'),'minimum cards stay inside the 320px overview');
   assert.ok(await evaluate('document.querySelector(".workspace").scrollWidth <= document.querySelector(".workspace").clientWidth + 1'),'workspace shell stays inside the 320px viewport');
 
+  } else {
+    await command('Emulation.setDeviceMetricsOverride', {width:390,height:844,deviceScaleFactor:1,mobile:true});
+    await delay(150);
+    assert.equal(await evaluate(`[...document.querySelectorAll('#priceRows tr[data-market-id]')].every(row => [...row.querySelectorAll('td[data-plan]')].filter(td => getComputedStyle(td).display !== 'none').length === 1)`), true, 'each data state shows exactly one mobile plan column');
+  }
+
   if(process.env.SCREENSHOT) {
     const result=await command('Page.captureScreenshot',{format:'png'});
     await writeFile(process.env.SCREENSHOT,Buffer.from(result.data,'base64'));
@@ -339,7 +368,7 @@ try {
   assert.equal(await evaluate(`document.querySelector('.country-history-button').disabled`),true,'no-JS country history is safely disabled');
   assert.equal(await evaluate(`document.querySelector('i[data-lucide="search"]')!==null`),true,'no-JS keeps Lucide placeholder in static HTML');
   assert.equal(await evaluate(`document.querySelector('#refresh')===null`),true,'no-JS has no reload button');
-  console.log('Browser tests passed: matrix columns, minimum cards, country history, variants, search/XSS, mobile plan view, no-JS static matrix.');
+  console.log(`Browser tests passed (scope=${scope}): prices, ranks, minima, history, dates, mobile data and static fallback${fullUi ? '; complete keyboard, XSS and responsive checks' : ''}.`);
 } catch(error) {
   if (socket?.readyState === 1) console.error('PAGE STATE',await evaluate('({url:location.href,rows:document.querySelectorAll("#priceRows tr").length,dialog:document.querySelector("#historyDialog")?.open,body:document.body?.textContent.slice(0,1200)})'));
   throw error;
