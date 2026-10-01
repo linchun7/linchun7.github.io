@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { runInNewContext } from 'node:vm';
 
 import { displayedPublishedDate, visiblePublicationEntries } from '../data-contract.js';
 import {
@@ -226,4 +227,22 @@ test('review: Chinese market labels support mixed Unicode footnotes without stri
   }
   const invalid = `<main><table><thead><tr><th>国家或地区（货币）</th><th>50 GB</th></tr></thead><tbody><tr><td>巴2哈马（美元）</td><td>$0.99</td></tr></tbody></table></main>`;
   assert.throws(() => extractAppleZhMarketNames(invalid), /Chinese market table contains an empty or unexplained country cell/);
+});
+
+test('minimum history uses a short guarded FX-gap badge without changing raw evidence', async () => {
+  const source = await readFile(new URL('../script.js', import.meta.url), 'utf8');
+  const match = source.match(/function minimumHistoryCauseLabel\(event\) \{[\s\S]*?\n\}/);
+  assert.ok(match);
+  const label = runInNewContext('(' + match[0] + ')', { MINIMUM_CAUSE_LABELS: {unknown:'原因未确定',fx:'汇率变化'} });
+  const evidence = {pricesChanged:false,scopeChanged:false,basisChanged:false,fxChanged:true,gap:true};
+  const event = {cause:'unknown',evidence};
+  const before = JSON.stringify(event);
+  assert.equal(label(event),'汇率变化 · 记录有缺口');
+  for (const [key,value] of [['pricesChanged',true],['scopeChanged',true],['basisChanged',true],['fxChanged',false],['fxChanged',null],['gap',false],['pricesChanged','false']]) {
+    assert.equal(label({cause:'unknown',evidence:{...evidence,[key]:value}}),'原因未确定');
+  }
+  assert.equal(label({cause:'unknown',evidence:{}}),'原因未确定');
+  assert.equal(label({cause:'fx',evidence}),'汇率变化');
+  assert.equal(JSON.stringify(event),before);
+  assert.match(source,/minimumHistoryNode\('span', minimumHistoryCauseLabel\(event\), 'minimum-history-cause'\)/);
 });
