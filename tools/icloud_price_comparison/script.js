@@ -7,7 +7,7 @@ import {
   validatePriceHistoryConsistency,
   visiblePublicationEntries
 } from './data-contract.js?v=2faecdc5';
-import { createIcons } from './vendor/lucide-subset.js?v=2b21b7af';
+let createIcons = null;
 import { foldPublicationCountryRenames, marketSearchPriority, matchesMarketSearch, normalizeMarketSearchText, REGION_LABELS, VALID_REGIONS } from './data-model.js?v=27f94e24';
 
 const REQUEST_TIMEOUT_MS = 8_000;
@@ -114,7 +114,17 @@ const staticSnapshotFxStale = staticSnapshotMeta?.dataset.fxStale === 'true';
 const hasStaticSnapshot = /^\d{4}-\d{2}-\d{2}T/.test(staticSnapshotGeneratedAt ?? '')
   && /^[a-f0-9]{64}$/.test(staticSnapshotMeta?.dataset.fingerprint ?? '');
 
+async function loadIcons() {
+  try {
+    ({ createIcons } = await import('./vendor/lucide-subset.js?v=2b21b7af'));
+    refreshIcons();
+  } catch (error) {
+    console.warn(`图标加载失败：${error.message}`);
+  }
+}
+
 function refreshIcons() {
+  if (!createIcons) return;
   try {
     createIcons({ attrs: { 'stroke-width': 1.8 } });
   } catch (error) {
@@ -1946,3 +1956,4 @@ if (minimumHistoryButton) {
 
 reconcileStaticTierState();
 initialize();
+void loadIcons();

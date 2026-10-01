@@ -573,6 +573,9 @@ class ContractTests(unittest.TestCase):
         d['markets']=[available,unavailable]
         revise(d)
         page=p.render(d,(p.ROOT/'index.template.html').read_text(encoding='utf-8'))
+        self.assertIn('id="marketCount">1 个地区', page)
+        self.assertIn('id="resultSummary" aria-live="polite">2 个地区', page)
+        self.assertEqual(len(re.findall(r'<tr data-market-id=', page)), 2)
         self.assertIn('JP · —',page)
         self.assertIn('<span class="mobile-rank-sr visually-hidden">排名暂不可用</span>',page)
         self.assertIn('，暂无价格历史',page)

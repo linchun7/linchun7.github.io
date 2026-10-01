@@ -1041,9 +1041,6 @@
     state.activePlan = defaultPlan;
     state.sortPlan = defaultPlan;
     state.historyPlan = defaultPlan;
-    el.searchInput.disabled = false;
-    if (el.minimumHistoryButton) el.minimumHistoryButton.disabled = false;
-    await loadIcons();
     calculateMinimums();
     renderMinimums();
     renderStats();
@@ -1052,6 +1049,9 @@
     bind();
     renderTable();
     backButton();
+    el.searchInput.disabled = false;
+    if (el.minimumHistoryButton) el.minimumHistoryButton.disabled = false;
+    void loadIcons();
     freshnessSignature = timeDependentSignature();
     setInterval(refreshTimeDependentUi, 30_000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshTimeDependentUi(); });
