@@ -92,7 +92,7 @@ test('static rendering keeps accepted values and minimum cues when FX is retaine
   assert.equal(assertSeoProjectionMatches(rendered, payload), true);
   assert.equal($('.minimum-card').length, payload.tiers.length);
   assert.ok($('.minimum-badge, .is-minimum, .rank-top').length > 0);
-  assert.equal($('#rankingScopeNote').attr('hidden'), '');
+  assert.equal($('#rankingScopeNote').is('[hidden]'), true);
   assert.match($('#updatedAt').text(), /更新于/);
   assert.match($('#fxStatus').text(), /汇率更新/);
   assert.ok($('.price-local').first().text());
