@@ -76,7 +76,40 @@
       "source_sha256": "d76b28ad834a90182e2cb290856223b7d63c429835110ea678edf09f9a362385",
       "fingerprint": "e23b43a341fcd1de008d8e849f917a50debc3a1d3cfd4973f6e7b26988cc109f",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "USD",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "8"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "19.99",
+                "200"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "200"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "100"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "gb",
@@ -145,7 +178,40 @@
       "source_sha256": "fe7bfa221f87581c7eb5379a125e3b1335d8d14235d7ab4124a9337dbd404b3f",
       "fingerprint": "5e006f799506322c8a283d60971ebeeec0592487bab7c2110394ef7494ea540e",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "GBP",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "6.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "19.99",
+                "200"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "200"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "88.9"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "ca",
@@ -214,7 +280,40 @@
       "source_sha256": "61ec869b16b9c6f0772186b81ba1d95ea388c41ee17773506f995e14466a136d",
       "fingerprint": "b9ad4f0bae30e2584d380984716fe9208289d3e8397798e110768581e5867f5b",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "CAD",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "12.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "24.99",
+                "249"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "249"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "152.99"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "au",
@@ -283,7 +382,40 @@
       "source_sha256": "db84903e32ac2a1b0661dd9a8f307b351a797f81bf1a96021d4a1a042bed22c0",
       "fingerprint": "2fd9616bbdcfb03d4bf4ea294c02fe2aff90483fbda55a7674231f007bdf85c1",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "AUD",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "13"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "29.99",
+                "300"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "300"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "154.99"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "nz",
@@ -352,7 +484,40 @@
       "source_sha256": "a7a78ab3927c7d73a4b7f59efa66b375ec57a9f9499992df267184d522bb3bbc",
       "fingerprint": "56029c95a94f68ad259b327ebe0d92750b3d5abc90b6ba8381663745aa235e5d",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "NZD",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "13.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "39.99",
+                "400"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "400"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "190"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "jp",
@@ -421,7 +586,40 @@
       "source_sha256": "a974feff4597d5bd4667af9e6901ecc18d5c4a3f3c183c3cd7b9e10fd2120c81",
       "fingerprint": "5c6f7179031cad0a2c03216bfa6840ca4298c4d855be4862d2640cf5681d9403",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "JPY",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "1400"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "3000",
+                "30000"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "30000"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "16800"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "kr",
@@ -490,7 +688,40 @@
       "source_sha256": "0c32e27885e780d1412850bdc94f0a43905dd6e564ad5e8946d800a8f8b92575",
       "fingerprint": "75d836479cf98578e088580a66714a01f38341951af3fdd2d8dd6f683a0de36c",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "KRW",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "13000"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "29000",
+                "299000"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "299000"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "159000"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "tw",
@@ -559,7 +790,40 @@
       "source_sha256": "d9b968e0b0664af08e18db51b22a716774ec68dc1a7875ca688f00a354df5aa8",
       "fingerprint": "b015f4c5afec3477a3c721fdc0c56130b7cdf23ac98d3ad16281a7aa5e9f8cc4",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "TWD",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "270"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "690",
+                "6990"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "6990"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "3300"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "sg",
@@ -628,7 +892,40 @@
       "source_sha256": "094bfdd35eb631d7882c3e6776b74afbed3f5832ee8c9f332174fcf48b0a1ae8",
       "fingerprint": "ce184c3ee89b8834bfeb9b4fc860098dbdc1edb9195daf1c2dc64aec7e62a332",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "SGD",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "10.98"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "29.98",
+                "299.98"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "299.98"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "137.98"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "my",
@@ -697,7 +994,40 @@
       "source_sha256": "ff805f609e65f0125091437a927de0c4bf6ccdabe6314e6eb15468132641e1a8",
       "fingerprint": "b65f1a297ce4f053abb17026ab62b3deb06037d57051dd28b50df74d12585fad",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "MYR",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "23.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "99.9",
+                "999.9"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "999.9"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "419.9"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "th",
@@ -766,7 +1096,40 @@
       "source_sha256": "e12a4da07c71fc75027b3d0158c7f7c05377718a3a1f7e58bfbda6543ea796a1",
       "fingerprint": "03653cd69827bc35f6b23b0ecee458353c2011f630c13b1401a886c63f8b0a48",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "THB",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "259"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "699",
+                "6990"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "6990"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "3350"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "vn",
@@ -835,7 +1198,40 @@
       "source_sha256": "ad33139e7f70d787d87097580f7e77bdca11e42c3fe620556f2b2d7910f1ca40",
       "fingerprint": "7fc1029876e80ed72f481ce5db73c8fb608adefa1b4c42bc95d58a172095777f",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "VND",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "132000"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "499000",
+                "4999000"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "4999000"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "2849000"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "id",
@@ -904,7 +1300,40 @@
       "source_sha256": "ae6371d31cbff39564a0e9ca500242de0d6d2a25b9d73252de708030de897560",
       "fingerprint": "7707ad58e86fb751ea899b6e2b09749db1dee2764a08e82ee8d5480893e202b8",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "IDR",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "75000"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "349000",
+                "3499000"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "3499000"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "1889000"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "ph",
@@ -973,7 +1402,40 @@
       "source_sha256": "cf380854012444022b19eef2c46e741b25a76eeac9fde9790f9b01af3f23a257",
       "fingerprint": "f1d8bea17d20c637303d6bdb1b94f55a4bf530488c4ccbd6a2934a4ce6064519",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "PHP",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "300"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "999",
+                "9990"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "9990"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "6490"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "in",
@@ -1042,7 +1504,40 @@
       "source_sha256": "01ccbec56aaf3c63658bccc163a9dbf1df02822820a48f73f3e0e2f680d8d1b7",
       "fingerprint": "cf1fe72d03fab0a9b659200aff22ce4fb59bc2c79aa531855eac1a4d221d6301",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "INR",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "399"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "1999",
+                "19900"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "19900"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "10699"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "pk",
@@ -1111,7 +1606,40 @@
       "source_sha256": "f5cad66ca90516b4130d9571ec0fa5f355678a30b394b53321e260353acce2f1",
       "fingerprint": "9535c7d69d8d55be17e1729cea21887a14580d3dfe7df6da4f5a5692b7e5a30e",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "PKR",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "1400"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "4900",
+                "49900"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "49900"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "27999"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "lk",
@@ -1180,7 +1708,40 @@
       "source_sha256": "6cea3c84fa0a13d2340ed9f714cb361b1f534d0d21eb8d0babaf6a4655d7a411",
       "fingerprint": "37659de9e050d98d5052700f992d4f2a0f152bb1df283bf617a494ec7e788c2d",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "USD",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "5"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "19.99",
+                "200"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "200"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "100"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "np",
@@ -1249,7 +1810,40 @@
       "source_sha256": "814b6cf38b5f0fd4c5ca3419132b565931dcf8cabf8c2424a1d6e68b296f603e",
       "fingerprint": "15ba98d6b689ee09975c3e5f8ea0daeb95f4cd0d0297d5e226379704e5a6158e",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "USD",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "5.69"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "19.99",
+                "250"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "250"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "112.99"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "tr",
@@ -1318,7 +1912,40 @@
       "source_sha256": "25983dfcf1a37546061984473374d1abf178b1fb98791aeb44fd4a833710aac5",
       "fingerprint": "2638e3d43c57eabdfc9ef93a99c509ce00eb9ef435ffadd47c6a7c589a237f5b",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "TRY",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "249.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "999.99",
+                "9999.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "9999.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "5299.99"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "br",
@@ -1387,7 +2014,40 @@
       "source_sha256": "ccf0d17558341635b429a61610b91da2e27b3b2639850313f3ca338e198083b2",
       "fingerprint": "8fb8679167d0d4c2f9d4567891745dfd2e556e793cecf727998013289cefe31d",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "BRL",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "39.9"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "99.9",
+                "999.9"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "999.9"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "524.9"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "mx",
@@ -1456,7 +2116,40 @@
       "source_sha256": "7f2e4b70dcafc276d388b6aba3cf8198e6533b75f41ac81f7894a619a371912c",
       "fingerprint": "e31344d3154fa582bbd31426bdc92ff4a03107d37d50eb60fa4fa8930a28f0a6",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "MXN",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "129"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "399",
+                "3999"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "3999"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "1989"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "ar",
@@ -1525,7 +2218,40 @@
       "source_sha256": "bf785425f5e0dcc03f647289c12e468ee78870397ca82b2dfb86ea5730d69b9c",
       "fingerprint": "23af09300c1e5718fcfab3cab7dae274bf44fe3425fbfa4e4412954f6ccf6c04",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "USD",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "5.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "19.99",
+                "200"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "200"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "100"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "cl",
@@ -1594,7 +2320,40 @@
       "source_sha256": "4a0622ce3bb55f4103599b9845852e697a7af31e786a182544bd67671f27ef9b",
       "fingerprint": "48f2ba35c6ad42058563b97b87a302a5bc0820284c8f33e43d939be84a3d86cb",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "CLP",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "7990"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "19990",
+                "229990"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "199990"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "102990"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "co",
@@ -1663,7 +2422,40 @@
       "source_sha256": "7439d85f2f895e3989159c0362e0827b8a28b30ce16e1df43dc0a6f92c89cbf5",
       "fingerprint": "7763a68e559239ef561a7b2238796936ecd3835ef96a1ee8abe9f2f90eb68681",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "COP",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "24900"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "99900",
+                "999900"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "999900"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "364900"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "pe",
@@ -1732,7 +2524,40 @@
       "source_sha256": "8f9f021f907da91e97b5885a517c63832b5f867bc2d7fd94f7440ae3efd3c2ca",
       "fingerprint": "8ceaa1ef3cb6c5b97a8818824c5992f1fea979bba63833da9a0bdbbca12dc6a0",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "PEN",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "19.9"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "79.9",
+                "899.9"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "799.9"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "394.9"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "uy",
@@ -1801,7 +2626,40 @@
       "source_sha256": "24ff1943655f0f7fd91a1806e3a6837b72df570619c55c073b79c6683b774fac",
       "fingerprint": "7c91f5d2692377d79af46a225c22243b3b39f086b58254629cead83c7a4eae51",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "USD",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "8.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "19.99",
+                "200"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "200"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "121.99"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "za",
@@ -1870,7 +2728,40 @@
       "source_sha256": "d0f238c0d4c4081f48cea8e76f00ce302ed14d3ba634ee023558c01a3e8410b8",
       "fingerprint": "c64845b2685938b99b6ac0965b9200d19340de54a729364ff2db867c1b838743",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "ZAR",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "149.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "399.99",
+                "3999.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "3999.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "1839"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "eg",
@@ -1939,7 +2830,40 @@
       "source_sha256": "5431f2c09f7d338087c36b118b06237d9a99bfb1a148d94cf2fadb6771c49fc1",
       "fingerprint": "cb65ffa70ac93eb4b52a95adf0b6fb54c46cbdbd99c1e2ff45d8f036c8647ade",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "EGP",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "249.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "999.99",
+                "9999.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "9999.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "5399.99"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "sa",
@@ -2008,7 +2932,40 @@
       "source_sha256": "278528bc18c87d098e3f27b0f5e78440e29a4db94f18ab5802523a77106dc319",
       "fingerprint": "88d73d64d2c288d52d81cfd6f13247d60ef004d429c335eae0b7bb45a003e4f2",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "SAR",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "35"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "89.99",
+                "899.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "899.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "429.99"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "ae",
@@ -2077,7 +3034,40 @@
       "source_sha256": "3dba3a1877e339f7305d38085e4a2cc3ffa0ce1df67f9de2e8a6f8543ac9d1d5",
       "fingerprint": "d7c0422085b8323cf96094a421dad4d056aef7bc51f8f4dd47012f7ed1fefdcc",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "AED",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "29.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "79.99",
+                "799.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "799.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "384.99"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "il",
@@ -2146,7 +3136,40 @@
       "source_sha256": "8b1a0070815c37afe3a9638c68e428260ef5f6c41c278b838b435f7716a55030",
       "fingerprint": "ebf69c564d9d5767415ed0635bae2fec63ee5147c12cedc4caf664fbe6fc66e0",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "ILS",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "25"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "69.9",
+                "699.9"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "699.9"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "309.9"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "qa",
@@ -2215,7 +3238,40 @@
       "source_sha256": "c11777f9a4a002525a3d648293c0b25819779ef481c08a5575040d51a857d66b",
       "fingerprint": "976e57e73bfb744cd2e6ed42cf09c29620521f9720775d652377724cb11693e2",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "QAR",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "29.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "69.99",
+                "699.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "699.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "364.99"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "kw",
@@ -2284,7 +3340,40 @@
       "source_sha256": "b20750f5c722885ddab61b98871fc6b0c4f4a878d3c3a8f33a7953459ebd780e",
       "fingerprint": "ed63a35b37558c3e540c3f0d43630013cb0232367e8d8de5ac3fb041997e45e1",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "USD",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "7.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "19.99",
+                "200"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "200"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "100"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "bh",
@@ -2353,7 +3442,40 @@
       "source_sha256": "6ebcc914f3b9f6f4093e71315e05162cb776e4a1525c04733bb19c1fe9287fc9",
       "fingerprint": "4e43be5f7e909482a30873be9b67c24e9df1225e4e067de78b56f1731fcc49aa",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "USD",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "7.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "19.99",
+                "200"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "200"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "109"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "om",
@@ -2422,7 +3544,40 @@
       "source_sha256": "f4bd11d834f38894a633ffefc5ea748f30b2f69a7c4cf468b22285b6991645e4",
       "fingerprint": "a7d774fda7b03898867bc4dddeec8ec2ac6ab17df654277e0e3cf75cd576c22f",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "USD",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "7.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "19.99",
+                "200"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "200"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "104.99"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "de",
@@ -2491,7 +3646,40 @@
       "source_sha256": "e4453f2f0bec23569df7b57904b0e684c52d0456d47c38de3d0e783e371bc3b2",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "EUR",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "7.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "22.99",
+                "229"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "229"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "102.99"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "fr",
@@ -2560,7 +3748,40 @@
       "source_sha256": "d7cd2579d034e912b4ca423a5ebb44557d4b4f00824acadef231673fbc8edf74",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "EUR",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "7.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "22.99",
+                "229"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "229"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "102.99"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "it",
@@ -2629,7 +3850,40 @@
       "source_sha256": "3f507b00b985dc4f07e607deadac1bfbd8e0e469457c2961184d431a2a6a0b0a",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "EUR",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "7.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "22.99",
+                "229"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "229"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "102.99"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "es",
@@ -2700,7 +3954,40 @@
       "source_sha256": "41c188098b166c333a265a7713012dfd9352fbdf4943ef9493a6dfa727b75283",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "EUR",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "7.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "22.99",
+                "229"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "229"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "102.99"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "pt",
@@ -2771,7 +4058,40 @@
       "source_sha256": "7d6368eb06a8cd924ce870fc72b36e768a2f568b87a6b7a8908a46f1a87a5c09",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "EUR",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "7.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "22.99",
+                "229"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "229"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "102.99"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "nl",
@@ -2840,7 +4160,40 @@
       "source_sha256": "f9966c80e189e477dd4caab086bd7c111fe0ef05dc0c2c1f3a9240ce06cfd0fc",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "EUR",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "7.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "22.99",
+                "229"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "229"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "102.99"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "be",
@@ -2909,7 +4262,40 @@
       "source_sha256": "e2e5282dad9003e079a734a2d605f3cab1cf0980dfc61bbcaa7c1f75eb8f9d85",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "EUR",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "7.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "22.99",
+                "229"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "229"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "102.99"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "at",
@@ -2978,7 +4364,40 @@
       "source_sha256": "83af21b5cbf9fd423ed5b73e741c5f5e8cd56ff1ce28dc5965f4d7a15846a10d",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "EUR",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "7.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "22.99",
+                "229"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "229"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "102.99"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "ie",
@@ -3047,7 +4466,40 @@
       "source_sha256": "1d10cda067d201655591d810e74edd53107c91943f1139cd63f5c611973aa045",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "EUR",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "7.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "22.99",
+                "229"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "229"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "102.99"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "fi",
@@ -3116,7 +4568,40 @@
       "source_sha256": "293616d8c8665077c1dcfa3772c55a2fa5cff9c27b0a9048a9d7f5a745d30e93",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "EUR",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "7.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "22.99",
+                "229"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "229"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "102.99"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "gr",
@@ -3185,7 +4670,40 @@
       "source_sha256": "57e94fc3c23d5a8b2709d6eba05111b793f83f1c79b8058c3520e104088f3093",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "EUR",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "7.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "22.99",
+                "229"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "229"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "102.99"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "cz",
@@ -3254,7 +4772,40 @@
       "source_sha256": "c2e74f0f19d0a81f1afe1936830c327d0d98527f6010c74c4f5f3213d65b94ec",
       "fingerprint": "15abe03a1e91df654c6660559c8e1407aa0f2f20fe3a64caaa781382d1a80263",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "CZK",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "200"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "499",
+                "4990"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "4990"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "2490"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "pl",
@@ -3323,7 +4874,40 @@
       "source_sha256": "660052d3b3ae534a73a9b893a5a2b0a1a151381a85bcfe54d63b182dcedeae59",
       "fingerprint": "dbef0519a62a075b104f2493820d0a802e5d9911b627f7a9061d1c2c91581dba",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "PLN",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "34.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "99.99",
+                "999.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "999.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "439"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "ro",
@@ -3392,7 +4976,40 @@
       "source_sha256": "1b1bf17ed8436014591983cebe589ae301b1824565940f5c0bdb6a21cc1a6f44",
       "fingerprint": "981ca6274eb15df3a78665fda9ee5d2293435a06daa5d77ceacb3675bbadb60f",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "RON",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "29.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "99.99",
+                "999.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "999.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "519.99"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "hu",
@@ -3461,7 +5078,40 @@
       "source_sha256": "69d60854d42719b966139cadd5d37f8d5950773229c8e5b626c26a9fb94cf614",
       "fingerprint": "48819bf4878f0d60ec375915f60b84b60c22a19659c72ed912d37c454da95575",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "HUF",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "2990"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "8990",
+                "89990"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "89990"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "40490"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "se",
@@ -3530,7 +5180,40 @@
       "source_sha256": "439ad47a81d1b5f9bf90266cc372aab7898334315433ea8d10520eb8049701a3",
       "fingerprint": "d9c89fa61cf30ac72c6e0e33ebcb2888057c7e23589bdf6b0ffbf4dc99d6f146",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "SEK",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "85"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "249",
+                "2495"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "2495"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "1120"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "no",
@@ -3599,7 +5282,40 @@
       "source_sha256": "ccac70dafd01fc3511c5406099bdfe75f7e9fb93b1ece9af4db80be195d982f0",
       "fingerprint": "9aa797486a42904774ebfa052ab22ee81ae0fcc11e676fdff43db708727cf29a",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "NOK",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "249",
+                "2490"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "2490"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "1190"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "dk",
@@ -3668,7 +5384,40 @@
       "source_sha256": "4dd66430a48dc7fc1c11a4b773380672b758fae85668c991ecef6fbe69e2e7e8",
       "fingerprint": "a85dacb68f294c8007495c977e00b09b5f40b1573921f691834eac491ce83211",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "DKK",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "64"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "179",
+                "1799"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "1799"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "789"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "ch",
@@ -3737,7 +5486,40 @@
       "source_sha256": "6a2ccd704a22e8db51b5e7915c29dc97ab02dab1827cd90671057530018aafe0",
       "fingerprint": "8afcef3a7b8272618fa05d3ca93221984ad2c11af9e42883b041cf17d050b201",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "CHF",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "7"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "20",
+                "200"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "200"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "83"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "ua",
@@ -3806,7 +5588,40 @@
       "source_sha256": "bca66aad2f837eab6c5ad6c04607f5b1761e21b59961bf7a873bd483e146dde7",
       "fingerprint": "042a794d4a4736eea87f67e3956175bea799cacd9b4b403160e57c1a98d4fb85",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "USD",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "6.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "22.99",
+                "250"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "250"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "119"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "kz",
@@ -3875,7 +5690,40 @@
       "source_sha256": "b44a9335965b0633986dc63ef4b5e0e4d893285a05496f00e423ee3154cf30b8",
       "fingerprint": "825f9a6be43a75a8fa48d2434d9972190bcdfd34c4f535d45e3d63f13e52a197",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "KZT",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "3390"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "9990",
+                "99990"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "99990"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "54990"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "ng",
@@ -3944,7 +5792,40 @@
       "source_sha256": "ac759206d02258bb619bb6fc730d14fd494a874f1be9ebde7e199a0d62f40fa1",
       "fingerprint": "264ffa5f433899266cbd5f47282a9abd1777b135ec426004ab6e87f5aa2f23c3",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "NGN",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "6900"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "31500",
+                "299900"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "299900"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "144900"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "ke",
@@ -4013,7 +5894,40 @@
       "source_sha256": "84a2a16754e2721e7806f628b87b499a069e9dcfde5afcf95f4dd5731e54cf1d",
       "fingerprint": "46ebf53dd348d38221028d4b4adffc802dbf9576a5f7e4211f1d152b32fa5c45",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "USD",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "5.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "22.99",
+                "250"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "250"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "115.99"
+              ]
+            }
+          ]
+        }
+      }
     },
     {
       "code": "ma",
@@ -4082,7 +5996,40 @@
       "source_sha256": "c14920ca4f256a613b112b85f5d09df66bb1cc38c44420d7b80befc448acd994",
       "fingerprint": "23af09300c1e5718fcfab3cab7dae274bf44fe3425fbfa4e4412954f6ccf6c04",
       "status": "verified",
-      "last_verified_at": "2026-10-01T01:06:03Z"
+      "last_verified_at": "2026-10-01T01:06:03Z",
+      "history_baseline": {
+        "at": "2026-09-24T02:13:15Z",
+        "snapshot": {
+          "currency": "USD",
+          "offers": [
+            {
+              "label": "ChatGPT Go",
+              "amounts": [
+                "5.99"
+              ]
+            },
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                "19.99",
+                "200"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 20x",
+              "amounts": [
+                "200"
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                "100"
+              ]
+            }
+          ]
+        }
+      }
     }
   ],
   "fx": {
@@ -8264,5 +10211,5 @@
       }
     }
   ],
-  "revision": "dd2dddd3601fd54c35ee3957f84161e6cebee2b480c306d313ec4524e1e85605"
+  "revision": "574186d6ea70ca5e5df43d882fbf921da425bd62b789db43c467f2163081d53e"
 }

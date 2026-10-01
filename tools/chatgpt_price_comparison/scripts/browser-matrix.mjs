@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
-import { identity, offerFor } from './browser-oracle.mjs';
+import { identity, offerFor, plansFor } from './browser-oracle.mjs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, firefox, webkit } from 'playwright';
@@ -66,7 +66,8 @@ try {
   for (const wanted of ['ChatGPT Plus', 'ChatGPT Pro 5x', 'ChatGPT Pro 500']) {
     const currentOffer = us.offers.find(offer => identity(offer.label) === identity(wanted));
     if (!currentOffer) continue;
-    const representative = currentOffer.label;
+    const representative = plansFor(priceData).find(plan => identity(plan) === identity(wanted));
+    assert.ok(representative, 'global display representative must exist for a current plan');
     await page.locator('#historyPlanControl button[data-plan=' + JSON.stringify(representative) + ']').click();
     const expected = [];
     let previousKey = null;
