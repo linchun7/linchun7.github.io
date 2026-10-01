@@ -704,6 +704,13 @@
     unknown: '原因未能确定',
   };
 
+  function minimumHistoryCauseLabel(event) {
+    const e = event.evidence;
+    if (event.cause === 'unknown' && e?.prices_changed === false && e?.scope_changed === false
+      && e?.fx_changed === true && e?.gap === true) return '汇率变化 · 记录有缺口';
+    return MINIMUM_CAUSE_LABELS[event.cause] || '原因未确定';
+  }
+
   function minimumHistoryNode(tag, text = '', className = '') {
     const node = document.createElement(tag);
     node.textContent = text;
@@ -876,7 +883,8 @@
         minimumHistoryNode('span', shortPlan(displayPlan(planIdentity(event.plan))), 'minimum-history-plan')
       );
       const change = minimumHistoryNode('strong', `${minimumWinnerSummary(event.from)} → ${minimumWinnerSummary(event.to)}`, 'minimum-history-change');
-      const cause = minimumHistoryNode('span', MINIMUM_CAUSE_LABELS[event.cause] || '原因未确定', 'minimum-history-cause');
+      const cause = minimumHistoryNode('span', minimumHistoryCauseLabel(event), 'minimum-history-cause');
+      if (cause.textContent === '汇率变化 · 记录有缺口') cause.title = '前后标价未变、汇率有变；期间记录不连续，无法完整归因';
       item.append(meta, change, cause); list.append(item);
     }
     document.querySelector('#minimumHistoryMore').hidden = series.length <= minimumHistoryUi.limit;

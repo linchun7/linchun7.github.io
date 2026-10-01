@@ -1839,7 +1839,11 @@ function minimumWinnerSummary(rows) {
     : summaries.join('、');
 }
 
-function minimumHistoryCauseLabel(cause) {
+function minimumHistoryCauseLabel(event) {
+  const cause = event.cause;
+  const e = event.evidence;
+  if (cause === 'unknown' && e?.pricesChanged === false && e?.scopeChanged === false
+    && e?.basisChanged === false && e?.fxChanged === true && e?.gap === true) return '汇率变化 · 记录有缺口';
   if (cause === 'mixed') return '汇率 + Apple 调价';
   if (cause === 'scope') return '地区范围变化';
   return MINIMUM_CAUSE_LABELS[cause] || '原因未确定';
@@ -1911,7 +1915,8 @@ function renderMinimumHistory() {
       `${minimumWinnerSummary(event.from)} → ${minimumWinnerSummary(event.to)}`,
       'minimum-history-change'
     );
-    const cause = minimumHistoryNode('span', minimumHistoryCauseLabel(event.cause), 'minimum-history-cause');
+    const cause = minimumHistoryNode('span', minimumHistoryCauseLabel(event), 'minimum-history-cause');
+    if (cause.textContent === '汇率变化 · 记录有缺口') cause.title = '前后标价未变、汇率有变；期间记录不连续，无法完整归因';
     item.append(meta, change, cause);
     list.append(item);
   }
