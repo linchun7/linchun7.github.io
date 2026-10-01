@@ -69,8 +69,10 @@ test('redacts credentials from diagnostic text', () => {
 test('strictly validates the committed country-name mapping and rejects unsafe entries', async () => {
   const mapping = JSON.parse(await readFile(namesUrl, 'utf8'));
   assert.equal(validateCountryNameMapping(mapping), mapping);
-  assert.equal(mapping.mu, null);
-  assert.equal(mapping.cg, null);
+  assert.equal(mapping.mu, '毛里求斯');
+  assert.equal(mapping.cg, '刚果共和国');
+  const pending = { ...mapping, mu: null, cg: null };
+  assert.equal(validateCountryNameMapping(pending), pending);
   assert.throws(() => validateCountryNameMapping([]), /unsupported structure/);
   assert.throws(() => validateCountryNameMapping({ Alpha: '甲' }), /incomplete/);
 
@@ -2081,7 +2083,7 @@ test('migrates pending Chinese names in prices and history without price events'
   const data = JSON.parse(await readFile(paths.currentDataPath, 'utf8'));
   const history = JSON.parse(await readFile(paths.historyPath, 'utf8'));
   const previousEventCounts = {};
-  for (const [marketId, legacyName] of [['mu', '毛里求斯'], ['cg', '刚果共和国']]) {
+  for (const [marketId, legacyName] of [['mu', 'Mauritius'], ['cg', 'Republic of Congo']]) {
     data.countries.find((country) => country.marketId === marketId).nameZh = legacyName;
     history.markets[marketId].nameZh = legacyName;
     previousEventCounts[marketId] = history.markets[marketId].events.length;
@@ -2128,10 +2130,6 @@ test('does not rewrite history when an observation has no historical changes', a
   const { root, paths } = await createTemporaryProductionPaths();
   const data = JSON.parse(await readFile(pricesUrl, 'utf8'));
   const history = JSON.parse(await readFile(paths.historyPath, 'utf8'));
-  for (const [marketId, sourceName] of [['mu', 'Mauritius'], ['cg', 'Republic of Congo']]) {
-    data.countries.find((country) => country.marketId === marketId).nameZh = sourceName;
-    history.markets[marketId].nameZh = sourceName;
-  }
   await Promise.all([
     writeFile(paths.currentDataPath, `${JSON.stringify(data, null, 2)}\n`, 'utf8'),
     writeFile(paths.historyPath, `${JSON.stringify(history, null, 2)}\n`, 'utf8')
