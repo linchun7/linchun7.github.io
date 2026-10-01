@@ -731,6 +731,14 @@
     unknown: '原因未能确定',
   };
 
+  function minimumHistoryCause(evidence) {
+    if (evidence.gap) return 'unknown';
+    if (evidence.scope_changed) return 'scope';
+    if (!evidence.prices_changed) return evidence.fx_changed === true ? 'fx' : 'unknown';
+    if (evidence.fx_changed === false) return 'storefront';
+    return evidence.fx_changed === true ? 'mixed' : 'unknown';
+  }
+
   function minimumHistoryCauseLabel(event) {
     const e = event.evidence;
     if (event.cause === 'unknown' && e?.prices_changed === false && e?.scope_changed === false
@@ -816,6 +824,13 @@
         || !Array.isArray(event.to) || !event.to.every(validMinimumWinner)
         || !event.evidence || typeof event.evidence !== 'object') {
         throw Error('最低价历史事件错误');
+      }
+      const evidence = event.evidence;
+      if (Object.keys(evidence).sort().join(',') !== 'fx_changed,gap,prices_changed,scope_changed'
+        || !['gap', 'prices_changed', 'scope_changed'].every(key => typeof evidence[key] === 'boolean')
+        || ![true, false, null].includes(evidence.fx_changed)
+        || event.cause !== (event.kind === 'initial' ? 'initial' : minimumHistoryCause(evidence))) {
+        throw Error('最低价历史原因与证据不一致');
       }
     }
     if (value.checkpoint != null) {

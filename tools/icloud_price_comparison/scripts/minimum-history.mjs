@@ -178,7 +178,9 @@ export async function backfillMinimumHistory({ ref = 'HEAD', projectDir = ROOT }
   for (const sha of shas) {
     let data;
     try { data = JSON.parse(git(['show', `${sha}:${PRICE_PATH}`])); }
-    catch { excluded += 1; continue; }
+    catch (error) {
+      throw new Error(`Backfill cannot read price evidence at ${sha}: ${error.message}`);
+    }
     if (!Number.isFinite(Date.parse(data.generatedAt)) || Date.parse(data.generatedAt) > Date.parse(current.generatedAt)) { excluded += 1; continue; }
     const group = groups.get(data.generatedAt) ?? [];
     group.push({ data, sha }); groups.set(data.generatedAt, group);

@@ -80,6 +80,27 @@ try {
   assert.equal(await page.locator('#minimumHistoryEvents').textContent(), acceptedText);
   await page.locator('#closeMinimumHistory').click();
 
+
+  const inconsistentHistory = JSON.parse(await readFile(resolve(projectDir, 'data/minimum-history.json'), 'utf8'));
+  const changedEvent = inconsistentHistory.events.find(event => event.kind === 'change');
+  assert.ok(changedEvent, 'cause-consistency regression needs a real change event');
+  changedEvent.cause = changedEvent.cause === 'fx' ? 'storefront' : 'fx';
+  await page.route('**/data/minimum-history.json*', route => route.fulfill({
+    contentType: 'application/json', body: JSON.stringify(inconsistentHistory)
+  }));
+  await page.locator('#minimumHistoryButton').click();
+  await page.evaluate(() => document.querySelector('#minimumHistoryRetry').click());
+  await page.waitForFunction(() => document.querySelector('#minimumHistoryStatus').textContent.includes('暂无法刷新'));
+  assert.equal(await page.locator('#minimumHistoryEvents').textContent(), acceptedText, 'conflicting cause cannot replace accepted history');
+  assert.equal(await page.locator('#minimumHistoryStatus').textContent(), acceptedCutoff + ' · 暂无法刷新');
+  await page.unroute('**/data/minimum-history.json*');
+  await page.locator('#minimumHistoryRetry').click();
+  await page.waitForFunction(() => document.querySelector('#minimumHistoryRetry').hidden
+    && !document.querySelector('#minimumHistoryRetry').disabled);
+  assert.equal(await page.locator('#minimumHistoryEvents').textContent(), acceptedText);
+  assert.equal(await page.locator('#minimumHistoryStatus').textContent(), acceptedCutoff);
+  await page.locator('#closeMinimumHistory').click();
+
   const priceData = JSON.parse(await readFile(resolve(projectDir, 'data/prices.json'), 'utf8'));
   const us = priceData.markets.find(market => market.code === 'us');
   assert.ok(us?.history_baseline, 'US country history must retain an observed baseline');

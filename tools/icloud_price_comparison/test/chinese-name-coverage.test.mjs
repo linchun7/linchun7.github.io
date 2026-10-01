@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import { compareMarketNameSets, findUnappliedChineseLabels } from '../scripts/check-apple-zh-markets.mjs';
 const data = (names) => ({schemaVersion:4,countries:names.map((nameZh,i)=>({marketId:'id-'+i,country:'English '+i,nameZh}))});
 test('reviewed names still alert until present in display data',()=>{
@@ -33,4 +34,21 @@ test('invalid or empty data is monitoring failure, never no-change',()=>{
 });
 test('whitespace normalization and repeated labels do not create false alarms',()=>{
   assert.deepEqual(findUnappliedChineseLabels([' 日本 ','日本'],data(['日本'])),[]);
+});
+
+test('published Chinese labels come only from the reviewed Apple name list', () => {
+  const read = file => JSON.parse(readFileSync(new URL(file, import.meta.url), 'utf8'));
+  const mapping = read('../scripts/country-names.zh.json');
+  const reviewed = read('../scripts/apple-zh-reviewed-markets.json');
+  const prices = read('../data/prices.json');
+  assert.equal(reviewed.source, 'https://support.apple.com/zh-cn/108047');
+  const official = new Set(reviewed.markets);
+  for (const [id, name] of Object.entries(mapping)) {
+    assert.ok(name === null || (typeof name === 'string' && name.trim() === name
+      && name.length > 0 && official.has(name)), id + ': unreviewed Chinese wording');
+  }
+  for (const market of prices.countries) {
+    assert.equal(market.nameZh, mapping[market.marketId] ?? market.country,
+      market.marketId + ': display must use the reviewed mapping or original English');
+  }
 });

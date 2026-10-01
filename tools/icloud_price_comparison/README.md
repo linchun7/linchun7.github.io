@@ -2,7 +2,7 @@
 
 [打开价格页](https://www.linchun.com.cn/tools/icloud_price_comparison/) · [维护与排障](OPERATIONS.md)
 
-比较 Apple 各地区 iCloud+ 当地月费及人民币参考价。价格、币种、容量和发布日期以 [Apple 英文价格页](https://support.apple.com/en-us/108047) 为准；中文名称来自人工核对的 [Apple 简体中文价格页](https://support.apple.com/zh-cn/108047)。人民币金额仅供比较，税费、付款资格和最终结算以 Apple 为准。
+比较 Apple 各地区 iCloud+ 当地月费及人民币参考价。价格、币种、容量和发布日期以 [Apple 英文价格页](https://support.apple.com/en-us/108047) 为准；中文名称只使用人工核对的 [Apple 简体中文价格页](https://support.apple.com/zh-cn/108047) 原文，不自行翻译或自动猜配；来源缺失或对应关系不确定时保留英文。人民币金额仅供比较，税费、付款资格和最终结算以 Apple 为准。
 
 ## 展示规则
 

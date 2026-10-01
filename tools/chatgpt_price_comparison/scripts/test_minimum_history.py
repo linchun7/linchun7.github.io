@@ -309,6 +309,28 @@ class MinimumHistoryTests(unittest.TestCase):
 
 
 class CauseLabelPresentationTests(unittest.TestCase):
+    def test_frontend_cause_classification_matches_backend(self):
+        import itertools
+        cases = []
+        for gap, scope, prices, fx in itertools.product([False, True], [False, True], [False, True], [False, True, None]):
+            evidence = dict(gap=gap, scope_changed=scope, prices_changed=prices, fx_changed=fx)
+            cases.append(dict(evidence=evidence, expected=h.cause_for(evidence)))
+        script = r"""
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
+const source = readFileSync(process.argv[1], 'utf8');
+const match = source.match(/  function minimumHistoryCause\(evidence\) \{[\s\S]*?\n  \}/);
+assert.ok(match);
+const classify = runInNewContext('(' + match[0].trim() + ')');
+for (const {evidence, expected} of JSON.parse(process.argv[2])) {
+  assert.equal(classify(evidence), expected, JSON.stringify(evidence));
+}
+"""
+        subprocess.run(['node', '--input-type=module', '-e', script, str(p.ROOT / 'app.js'), json.dumps(cases)],
+                       check=True, capture_output=True, text=True, timeout=10)
+
+
     def test_gap_fx_label_is_short_and_strictly_evidence_guarded(self):
         script = "import assert from 'node:assert/strict';\nimport { readFileSync } from 'node:fs';\nimport { runInNewContext } from 'node:vm';\nconst source = readFileSync(process.argv[1], 'utf8');\nconst match = source.match(/  function minimumHistoryCauseLabel\\(event\\) \\{[\\s\\S]*?\\n  \\}/);\nassert.ok(match);\nconst label = runInNewContext('(' + match[0].trim() + ')', { MINIMUM_CAUSE_LABELS: {unknown:'原因未能确定',fx:'汇率变化'} });\nconst evidence = {prices_changed:false,scope_changed:false,fx_changed:true,gap:true};\nassert.equal(label({cause:'unknown',evidence}), '汇率等因素');\nfor (const [key,value] of [['prices_changed',true],['scope_changed',true],['fx_changed',false],['fx_changed',null],['gap',false],['prices_changed','false']]) {\n  assert.equal(label({cause:'unknown',evidence:{...evidence,[key]:value}}), '原因未能确定');\n}\nassert.equal(label({cause:'unknown',evidence:{}}),'原因未能确定');\nassert.equal(label({cause:'fx',evidence}),'汇率变化');\nassert.match(source, /minimumHistoryNode\\('span', minimumHistoryCauseLabel\\(event\\), 'minimum-history-cause'\\)/);\n"
         subprocess.run(['node', '--input-type=module', '-e', script, str(p.ROOT / 'app.js')],
