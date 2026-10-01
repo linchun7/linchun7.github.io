@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
+import { runInNewContext } from 'node:vm';
 
 const workflowUrl = new URL('../../../.github/workflows/update-icloud-prices.yml', import.meta.url);
 const ciWorkflowUrl = new URL('../../../.github/workflows/validate-icloud-price-comparison.yml', import.meta.url);
@@ -439,4 +440,54 @@ test('backup idempotence requires full production proof and stale updater reruns
   assert.match(workflow, /name: 检查今天完整生产成功证明[\s\S]*?id: production_proof[\s\S]*?actions\/workflows\/update-icloud-prices\.yml\/runs\?status=success&per_page=50[\s\S]*?production_success_today=/);
   assert.match(workflow, /PRODUCTION_SUCCESS_TODAY:\s*\$\{\{ steps\.production_proof\.outputs\.production_success_today \}\}[\s\S]*?node scripts\/daily-run-guard\.mjs/);
   assert.match(workflow, /classify_prepare[\s\S]*?steps\.validate_main_data\.outcome[\s\S]*?steps\.production_proof\.outcome[\s\S]*?steps\.daily_guard\.outcome/);
+});
+
+test('retained FX stays publishable but cannot report a healthy heartbeat or skip refresh', async () => {
+  const workflow = await readFile(workflowUrl, 'utf8');
+  const classifier = workflow.match(/if ! parser=\$\(node -e '([\s\S]*?)' 2>\/dev\/null\); then/)[1];
+  for (const [parser, stale, expected] of [
+    ['cross-checked', false, 'cross-checked'],
+    ['cross-checked', true, 'retained-fx'],
+    ['fallback', true, 'fallback'],
+    [null, true, 'missing'],
+  ]) {
+    let output = '';
+    runInNewContext(classifier, {
+      require: () => ({ readFileSync: () => JSON.stringify({ source: { parser }, fx: { stale } }) }),
+      process: { stdout: { write: value => { output += value; } } },
+    });
+    assert.equal(output, expected);
+  }
+  const proofCode = workflow.match(/const proof = ([\s\S]*?);\n\s*console.log\(`production_success_today=/)[1];
+  for (const stale of [false, true, undefined]) {
+    const proof = runInNewContext(proofCode, {
+      prices: { generatedAt: '2026-10-01T00:00:00Z', fx: { stale } },
+      response: { workflow_runs: [] }, date: '2026-10-01', now: new Date(),
+      findSuccessfulProductionWorkflowRun: () => ({ id: 'earlier-fresh-success' }),
+    });
+    assert.equal(Boolean(proof), stale === false, 'earlier fresh proof cannot bless a currently retained-FX snapshot');
+  }
+  const notify = workflow.split('      - name: 报告每日更新结果')[1].split('        run: |\n')[1]
+    .split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n')
+    .replace(/curl --fail[^\n]+/, 'echo "PING=$status"');
+  const healthy = {
+    ...process.env, HEALTHCHECK_PING_URL: 'https://example.invalid/test',
+    PREPARE_RESULT: 'success', SHOULD_RUN: 'true', TRIGGER_SOURCE: 'cloudflare',
+    UPDATE_RESULT: 'success', PUBLISH_RESULT: 'success', VERIFY_RESULT: 'success',
+    PUBLISH_OUTCOME: 'pages_built', PREPARE_SEVERE_FAILURE: 'false',
+    UPDATE_SEVERE_FAILURE: 'false', PUBLISH_SEVERE_FAILURE: 'false',
+    VERIFY_SEVERE_FAILURE: 'false', EXISTING_VERIFY_SEVERE_FAILURE: 'false',
+    UPDATE_RETAINED_FX: 'false',
+  };
+  for (const [overrides, expected] of [
+    [{}, 'PING=0'],
+    [{ UPDATE_RETAINED_FX: 'true' }, '宽限期'],
+    [{ UPDATE_RETAINED_FX: 'true', UPDATE_SEVERE_FAILURE: 'true' }, 'PING=1'],
+    [{ VERIFY_RESULT: 'failure' }, '单次暂时故障'],
+  ]) {
+    const output = execFileSync('bash', ['-c', notify], { env: { ...healthy, ...overrides }, encoding: 'utf8' });
+    assert.ok(output.includes(expected), output);
+    if (overrides.UPDATE_RETAINED_FX === 'true' && overrides.UPDATE_SEVERE_FAILURE !== 'true') assert.doesNotMatch(output, /PING=/);
+  }
+  assert.match(workflow, /needs\.update\.result == 'success'/, 'degradation metadata never blocks accepted snapshot publication');
 });

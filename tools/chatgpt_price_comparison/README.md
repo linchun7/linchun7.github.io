@@ -35,7 +35,9 @@
 - `scripts/daily_run_guard.py`、`scripts/verify-production.mjs`：幂等判断及线上验收
 - `index.template.html`、`app.js`、`style.css`：页面源；`data/prices.json`、`data/minimum-history.json`、`index.html`：整组生成产物，不手工改价
 
-测试在 [GitHub Actions](../../.github/workflows/validate-chatgpt-prices.yml) 执行：Python 离线回归、候选校验、Chromium 深度 fixture 及锁定 Playwright 的 Chromium/Firefox/WebKit 矩阵；main 还验证实际部署。运行环境 Python 3.10+、Node 22，浏览器依赖版本见 package/lockfile。基础开发与离线测试无需额外 API Key。
+测试在 [GitHub Actions](../../.github/workflows/validate-chatgpt-prices.yml) 执行：Python 离线回归、候选校验、Chromium 深度 fixture 及锁定 Playwright 的 Chromium/Firefox/WebKit 矩阵；main 还验证实际部署。浏览器默认执行完整界面验收；七类数据 fixture 复用 state 模式，保留全部价格、排名、最低价、历史、日期、长期保留与静态兜底断言，pending/alias 仍检查响应式布局。生产失败后的版本接管复核统一由 `scripts/recheck-production.sh` 执行，不能将普通失败当作恢复。
+
+运行环境 Python 3.10+、Node 22，浏览器依赖版本见 package/lockfile。基础开发与离线测试无需额外 API Key。
 
 从仓库根目录使用以下维护入口：
 

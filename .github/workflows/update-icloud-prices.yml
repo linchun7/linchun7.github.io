@@ -100,7 +100,7 @@ jobs:
           const response = JSON.parse(await readFile(process.env.PROOF_FILE, 'utf8'));
           const now = new Date();
           const date = formatBeijingDate(now);
-          const proof = findSuccessfulProductionWorkflowRun(
+          const proof = prices.fx?.stale === false && findSuccessfulProductionWorkflowRun(
             response.workflow_runs ?? [],
             prices.generatedAt,
             date,
@@ -140,6 +140,7 @@ jobs:
     outputs:
       generation_base_sha: ${{ steps.generation_base.outputs.sha }}
       severe_failure: ${{ steps.classify_update.outputs.severe_failure }}
+      retained_fx: ${{ steps.classify_update.outputs.retained_fx }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -277,6 +278,7 @@ jobs:
         shell: bash
         run: |
           severe_failure=false
+          retained_fx=false
           if [[ "${{ steps.core_tests.outcome }}" == "failure" ]] \
             || [[ "${{ steps.render_static.outcome }}" == "failure" ]] \
             || [[ "${{ steps.ui_tests.outcome }}" == "failure" ]] \
@@ -303,15 +305,19 @@ jobs:
           elif [[ "${{ steps.update_data.outcome }}" == "success" ]]; then
             if ! parser=$(node -e '
               const data = JSON.parse(require("fs").readFileSync("data/prices.json", "utf8"));
-              process.stdout.write(data?.source?.parser || "missing");
+              const parser = data?.source?.parser || "missing";
+              process.stdout.write(parser === "cross-checked" && data.fx?.stale === true ? "retained-fx" : parser);
             ' 2>/dev/null); then
               severe_failure=true
+            elif [[ "$parser" == "retained-fx" ]]; then
+              retained_fx=true
             elif [[ "$parser" != "cross-checked" ]]; then
               severe_failure=true
             fi
           fi
 
           echo "severe_failure=$severe_failure" >> "$GITHUB_OUTPUT"
+          echo "retained_fx=$retained_fx" >> "$GITHUB_OUTPUT"
 
   publish:
     name: 发布已测试的数据
@@ -753,6 +759,7 @@ jobs:
           VERIFY_RESULT: ${{ needs.verify-production.result }}
           PREPARE_SEVERE_FAILURE: ${{ needs.prepare.outputs.severe_failure }}
           UPDATE_SEVERE_FAILURE: ${{ needs.update.outputs.severe_failure }}
+          UPDATE_RETAINED_FX: ${{ needs.update.outputs.retained_fx }}
           PUBLISH_SEVERE_FAILURE: ${{ needs.publish.outputs.severe_failure }}
           VERIFY_SEVERE_FAILURE: ${{ needs.verify-production.outputs.severe_failure }}
           EXISTING_VERIFY_RESULT: ${{ needs.verify-existing-production.result }}
@@ -769,6 +776,9 @@ jobs:
             || [[ "$VERIFY_SEVERE_FAILURE" == true ]] \
             || [[ "$EXISTING_VERIFY_SEVERE_FAILURE" == true ]]; then
             status=1
+          elif [[ "$UPDATE_RETAINED_FX" == true ]]; then
+            echo "汇率沿用旧结果，保留价格展示；不发送成功心跳，由既有宽限期检测持续故障。"
+            exit 0
           elif [[ "$PREPARE_RESULT" == success ]] \
             && { { [[ "$SHOULD_RUN" != true ]] \
                 && [[ "$TRIGGER_SOURCE" != manual ]] \
