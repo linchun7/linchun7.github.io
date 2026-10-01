@@ -3250,7 +3250,7 @@ test('arbitrates static and network snapshots without a third state layer', { ti
         assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), expectRows, label);
         assert.equal(await page.locator('#searchInput').isEnabled(), expectEnabled, label);
         if (label === 'older network keeps static') {
-          assert.match(await page.locator('#loadStatusText').textContent(), /当前显示最近一次可用价格/);
+          assert.equal(await page.locator('#loadStatusText').textContent(), '');
         }
       } finally {
         await page.close();
@@ -3389,7 +3389,7 @@ test('rejects rollback and more-than-five-minute future network data', { timeout
       await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
       assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), validData.countries.length, label);
       assert.match(await page.locator('#updatedAt').textContent(), /更新于/ , label);
-      assert.match(await page.locator('#loadStatusText').textContent(), /当前显示最近一次可用价格/, label);
+      assert.equal(await page.locator('#loadStatusText').textContent(), '', label);
       await page.close();
     }
   } finally {
@@ -4366,7 +4366,7 @@ test('newer history check cannot replace a newer accepted checkpoint with older 
   earlier.fx.fetchedAt = earlier.generatedAt;
   const old = advanceMinimumHistory(emptyMinimumHistory(), earlier);
   const accepted = advanceMinimumHistory(old, data);
-  const rollback = { ...old, checkedAt: new Date(Date.parse(data.generatedAt) + 1000).toISOString() };
+  const rollback = { ...old, pendingGap: true, checkedAt: new Date(Date.parse(data.generatedAt) + 1000).toISOString() };
   validateMinimumHistoryPayload(rollback);
   let calls = 0;
   const session = await minimumHistoryTestPage(context, { historyRoute: route => route.fulfill({ json: ++calls === 1 ? accepted : rollback }) });
