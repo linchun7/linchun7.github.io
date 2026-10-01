@@ -1,412 +1,74 @@
-# iCloud+ 全球价格比较运维手册
+# iCloud 维护与排障
 
-本文面向项目所有者、发布操作员和事故响应人员，记录生产运行、自动任务、监控、Secret、Cloudflare、部署与回滚。架构原因和修改影响见 [ARCHITECTURE.md](ARCHITECTURE.md)，按现象排障见 [TROUBLESHOOTING.md](TROUBLESHOOTING.md)。一次性的发布清单、审计记录和终验报告由项目所有者内部留存，不进入公开仓库。
+使用、代码入口及测试命令见 [README](README.md)。本文只保留维护生产必需的规则；运行结果、修复过程和验收报告放在 PR / Actions，不追加到仓库文档。
 
-生产页面：<https://www.linchun.com.cn/tools/icloud_price_comparison/>
+## 数据与身份
 
-代码目录：`tools/icloud_price_comparison/`
+- 当前价格唯一事实源为 `data/prices.json`（schema 4）。Apple 英文价格页决定价格、币种、容量及原始 Published Date；中文页只用于人工名称映射。双解析器必须一致，语义变化还需独立抓取确认；不把同一页面的两种解析当成两个独立来源。
+- 市场身份按已发布 prices/history 的 identity ledger → `scripts/market-registry.mjs` → 确定性 `apple-*` 解析。已发布 `marketId` 永久冻结，不 rekey，不复用退市 ID；source alias 只把新来源措辞绑定回原身份，不模糊猜测改名。
+- 价格历史按永久 ID 连续，Apple 发布日期事件保留原 source name 证据。不得为了名称整齐重写历史价格或观测时间。
+- 排名由全精度人民币值生成，显示金额四舍五入到分；前端不按展示金额重新排名。
+- Apple 失败时保留完整旧快照，不另造一次“成功价格观察”来单独刷新汇率。在线汇率失败时只沿用校验通过且兼容的旧派生结果；不设年龄淘汰，但保留原源日期。缺少原始汇率时不能由两位小数人民币反推汇率，更不能计算新价格或新币种。
+- 最低价账本仅追加可核验变化；来源、汇率或历史证据不完整时保留缺口，不虚构价格事件。当前价格、历史、快照、运行日志和静态页必须跨文件一致。
+- Apple 快照不保存原始 HTML，不覆盖同日不同修订。A → B → A 不能擅自倒退活动修订；候选与活动快照不符时停止。历史导入与恢复见[快照说明](data/apple-snapshots/README.md)。
 
-## 1. 服务边界与事实源
+## 中文名称
 
-```text
-Apple Support HTML ─┐
-                    ├─ update workflow（只读生成/测试 job）
-汇率认证/开放源 ────┘        │
-                             ├─ 完整 data/ 深验 + 静态页面投影
-                             └─ 独立 contents:write 发布 job
-                                      │
-                                      └─ main / GitHub Pages → Cloudflare → 浏览器
-```
+`scripts/country-names.zh.json` 只存稳定 ID 对应的人工核验中文名；未知名称显示英文，不阻断价格更新。欧元区显示“欧盟”。
 
-- 页面为静态 HTML/CSS/JavaScript，没有自建应用服务器或数据库。
-- `data/prices.json` 是当前价格的唯一事实源；公共契约为 schema 4。
-- `data/history.json` 保存以稳定 `marketId` 为键的价格、币种和 Apple 发布日期事件。
-- `data/run-log.json` 只保留最近 90 次成功运行，不公开 API Key 配置或状态。
-- `data/apple-snapshots/` 保存规范化 Apple JSON 证据，不保存原始 Apple HTML。
-- `index.html` 是受控生成产物，不是第二套价格或 SEO 事实源。`scripts/static-page.mjs` 负责 `ICLOUD_STATIC_*` 区域；`scripts/render-static-page.mjs` 的 `seoProjection()` 还会在 markers 外生成 description、Open Graph/Twitter description、图片 alt 和 `#brandDescription`。维护这些内容必须改生成源再重新渲染，不能只手工改 `index.html`。
-- Apple 英文 108047 是 active market、价格、币种、容量和原始 `Published Date` 的事实源；底层继续保存全部日期观测，前端只展示首次记录及伴随价格、地区、分区、币种或容量实质变化的发布日期。Apple 简体中文 108047 只用于已复核的中文市场名称。
-- 人民币参考价优先使用 ExchangeRate-API 认证源；认证候选不可用或未通过校验时可尝试开放汇率源。公共 JSON 不发布 raw FX rates、内部全精度换算值或 API Key 状态。
+监测保留两个独立视角：英文价格数据中仍显示英文的成员变化；中文来源新增未复核名称或官方名称尚未显示。复核集合 `scripts/apple-zh-reviewed-markets.json` 只增不减，名称消失不视作新问题。告警只要求人工核对，不自动推测新国家之间的绑定，也不能把“已复核”当作“已上线”。
 
-仓库测试可以证明代码和已提交工件的契约，但不能证明 GitHub、Cloudflare、DNS、外部触发器或第三方服务控制面的实时状态。
+确认对应关系后更新名称映射，保留市场 ID，执行完整验证并检查实际页面。仅改复核集合不能替代显示名称更新。
 
-## 2. 产品与数据不可变约束
+## 发布与权限
 
-维护和事故处理不得绕过以下长期约束：
+1. prepare 拒绝过时工作流，固定最新 main SHA；生成与测试只读 job 从该版本生成候选。
+2. 候选通过 core、锁定 Playwright Chromium、工件和静态投影验证后上传；不重复跑相同 core。
+3. 独立发布 job 重验下载工件。main 仅有其他工具的无关变更时保持工件字节不变并重验；iCloud 相关变更则废弃候选。禁止强推。
+4. `stage-price-publication.mjs` 只强制暂存已测 data/index 路径，从 Git tree 读取原始 blob，核对完整文件集和字节，再深验。忽略规则或属性转码造成差异时必须在 commit/push 前停止。
+5. 等待 Pages 并验证 canonical URL 的数据、HTML 投影和版本化资源；仅完整成功才构成每日幂等/恢复证明。被新部署取代的旧验证不能冒充恢复。
 
-- schema 4；一个市场只要正式发布过一次，其 `marketId` 永久冻结。普通更新、registry 调整或搜索优化都不得 rekey。
-- 欧元区中文名称保持“欧盟”。中文名称尚未确认时使用 Apple 英文 source name，不机器翻译。
-- 新 Apple 市场先匹配 active registry；未命中时直接生成确定性 `apple-*` ID。真正 unknown 完成正常语义确认且无冲突后允许自动发布，一旦发布该 ID 永久不 rekey。
-- 已发布或历史出现过的市场 ID 永久 reserved，不因市场移除而重新分配。
-- 不做模糊 market rename 自动绑定；只有严格高置信 identity ambiguity 才要求维护者显式增加 alias。
-- 运维审计必须区分“稳定市场身份”和“Apple 来源证据”：价格/币种历史按永久 `marketId` 连续；发布日期事件的 `changes` 按 Apple 快照原始 `country` 名称取证。若 Apple 只改 source wording，同一 `marketId` 可以保持不变，但 publication evidence 仍应显示旧名移除与新名新增；价格历史的 artifact 深验必须按解析后的稳定 `marketId` 对齐快照事件，并要求事件日期精确命中 snapshot revision 的 `publishedDate`（历史回填）或 `firstConfirmedDate`（在线首次确认）之一。
-- 默认 200GB 人民币参考价升序；200GB 不存在时使用当前 tier 列表首项作为默认容量。
-- 容量价格排序显示生成器提供的全球 `cnyRank`；搜索和地区筛选不重算局部排名。国家/地区排序改用当前列表序号，移动端显示为 `序N`，并提供独立读屏文本“全球价格排名第 N / 当前列表序号第 N”；视觉徽标本身不重复进入无障碍名称。
-- 搜索输入先做 Unicode NFKC 规范化；`marketId`、中英文国家/地区名做部分匹配。地区搜索同时覆盖 Apple 原始英文 region 与中文显示标签，但仅在查询至少 2 个 Unicode 字符时参与；完整 `marketId` 优先级最高，币种只按完整代码匹配。
-- 最低价提示由生成器 `cnyRank === 1` 决定，不以显示后的两位小数重新排名。
-- 当前价格不写入浏览器持久存储；静态 HTML 是无 JavaScript/网络失败时的正式 fallback。
-- URL query 只保留规范的 `tier`、`sort`、`dir`、`region`；搜索词与未知状态不持久化。唯一允许保留的页面内 fragment 是 `#priceWorkspace`，其他未知 fragment 会被清理。
-- `index.html` 中 `ICLOUD_STATIC_*` 区域和 SEO Projection 目标都是生成产物；直接手改产物而不改生成器必须由 `render:static:check` 失败关闭。
+生成 job 不具备写权限，发布 job 不安装项目依赖。GITHUB_TOKEN 发布数据提交不会再触发普通 push 验证，因此 updater 必须保留自身的完整验收。手动恢复使用 main 的新 Run workflow；如 YAML 已改变，不重跑旧记录。
 
-## 3. 角色与权限
+关键契约/生成器/update/validate workflow 修改需同步 README 和本文件；仅改文档不修改价格。测试、工件复验、生产验收各守不同边界，不能以精简文档为由删减。
 
-| 角色 | 最低职责 |
+## 告警与常见故障
+
+先看失败 run 的首个失败步骤、错误码和实际价格/汇率时间，不先改 JSON。
+
+| 现象 | 处理 |
 | --- | --- |
-| 项目所有者 | 确定产品/数据策略、接受发布结论、批准回滚 |
-| 发布操作员 | 合并候选、执行外部配置、完成部署后验收 |
-| 隐私/合规负责人 | 审核隐私披露和数据处理边界；处理未来收到的外部规则变更、投诉或下架通知 |
-| GitHub 管理员 | Ruleset、Actions 权限、Secret、Dependabot 和审计日志 |
-| Cloudflare/DNS 管理员 | CSP、安全头、TLS、缓存、Web Analytics、DNSSEC、证书与跳转 |
-| 当值响应人 | 每日失败、心跳缺失、数据异常、供应链和凭据事件处理 |
+| 网络/来源失败，旧价仍显示 | 保留旧数据，查看来源状态；短暂失败交给后续正常更新 |
+| STALE_WORKFLOW_DEFINITION | 从最新 main 新建运行，不重跑旧 YAML |
+| parser disagreement、确认抓取不一致 | 检查官方页面/挑战页，以 fixture 修解析；不关闭交叉校验强行发布 |
+| Published Date 倒退/未来 | 核对官方日期与系统时钟，不把日期改成今天 |
+| FX stale 或币种缺失 | 核对真实源时间与兼容条件；不伪造新汇率、不套用缺失币种 |
+| artifact/snapshot/static mismatch | 找跨文件不一致根因；不要逐个手拼 JSON、改 active hash 或只替换 prices.json |
+| main advanced | iCloud 相关变化须从新 main 重新生成；禁止将旧候选强行覆盖 |
+| 页面 JSON 加载失败 | 静态价格仍可读，检查 network/console/CSP；无应用价格缓存，清 localStorage 无助于修复 |
+| 时钟纠正后仍离线 | 有效静态价格/日期/最低价应恢复；交互仍需已校验 JSON，不能假装联网成功 |
+| Actions 绿但页面仍旧 | 核对最终 Pages SHA、canonical 验证及线上资源哈希，不能只靠强刷 |
+| 事务锁/恢复日志残留 | 确认无活跃更新，让正常入口执行恢复；不手删新鲜 lock/journal |
+| bad tree object | 先从权威远端恢复精确 Git 对象；不 prune、删分支或改数据掩盖缺失 |
 
-原则：
+诊断入口：`pnpm test:core`、`pnpm validate:artifact`、`pnpm validate:snapshots`，界面问题再看三浏览器结果。不要用 `pnpm update:data` 试探生产数据；在线只读检查用 `pnpm check:live`。
 
-- 生成/测试 job 默认 `contents: read`；只有依赖隔离的最终发布 job 可以 `contents: write`。
-- 不向 fork PR 暴露 Secret，不在 `pull_request_target` 上运行候选代码。
-- 生产分支不 force push；代码和数据回滚使用 `git revert`。
-- GitHub、Cloudflare 和第三方凭据使用最小权限、可撤销身份，不共用个人全权限 Token。
+外部心跳：完整生产成功发送 /0；数据/测试/发布严重失败发送 /1；单次 transient 故障由缺失成功心跳的宽限时间处理。只有真实验证恢复才关闭故障状态。中文监测与价格更新独立，分别检查结果。
 
-## 4. 自动任务
+## 回滚与外部配置
 
-### 每日价格更新
+回滚用 revert 完整坏提交，保留 Git 历史。数据事故需先协调自动更新，恢复整组数据/快照/索引/HTML，重新跑工件和浏览器验证、核对线上后恢复自动更新。不要单独 checkout prices.json。
 
-工作流：`.github/workflows/update-icloud-prices.yml`
+- `EXCHANGE_RATE_API_KEY` 仅由认证源 HTTPS Authorization: Bearer 使用，不进 URL、日志或工件
+- `ICLOUD_HEALTHCHECK_PING_URL` 整个值都是凭据，不打印或入库
+- GitHub、Cloudflare、DNS 和外部触发器实时状态不能由仓库单独证明
+- HTML/JSON 保持短缓存；静态资源以内容哈希版本管理；版本变更用 assets:update/check，不手填
+- Cloudflare HTTP CSP 与页面 meta CSP 保持最小一致权限，frame-ancestors 需 HTTP header；不要为修复加载扩大第三方域名
 
-| 入口 | 时间（Asia/Shanghai） | 语义 |
-| --- | --- | --- |
-| Cloudflare 外部主触发（生产目标） | 每日 08:05 | 控制面应调用 `workflow_dispatch` + `trigger_source=cloudflare`；实时启用状态需外部确认 |
-| GitHub cron 备用（仓库可验证） | 每日 08:10 | 主触发未形成合格成功结果时兜底 |
-| GitHub 手动触发 | 随时 | 人工验证或恢复；`main` 上不受每日幂等跳过 |
+HTTP 基线：Referrer-Policy: origin、X-Content-Type-Options: nosniff、X-Frame-Options: DENY；Permissions-Policy 禁用摄像头/麦克风/定位/支付/USB；HSTS max-age=31536000; includeSubDomains; preload。保持 HTTPS、最低 TLS 1.2、有效证书和 DNSSEC 链；这些控制面变更需单独核验。
 
-两个自动入口使用北京时间、当前数据/运行日志以及 GitHub Actions 的完整生产成功证明做每日幂等判断。只有同日 fresh 数据存在，且对应数据生成之后已有一次完整成功的 `Update iCloud prices` workflow，备用任务才允许跳过；stale 汇率、未来时间、只写入了 run-log 但 Pages/生产验证未完成、或 Actions 证明暂不可读，都不能阻止 08:10 继续执行。旧 run 的 workflow 定义若已经落后于最新 main 会直接失败关闭，恢复时必须从最新 main 新发起，不 rerun 旧 YAML。仓库测试能证明这些幂等规则和 GitHub 08:10 入口，但不能单独证明 Cloudflare 08:05 dispatch 当天实际执行。
+## 依赖与文档维护
 
-注意：Cloudflare 外部触发使用的 GitHub 身份和凭据不在仓库定义。当前 `trigger_source` 是 caller 声明，不应被当作认证边界。外部凭据必须保持最小权限并独立轮换；控制面状态应按生产检查而不是按本文文字推断。
+Dependabot 每周一北京时间 10:20（iCloud npm）、11:20（共享浏览器 Playwright）、12:20（Actions）错峰检查，保持独立 PR。npm 精确稳定版本 major/minor/patch 可在严格文件范围及完整测试通过后自动合并；Playwright 必须验证 Chromium/Firefox/WebKit。官方 Action 仅同 major 精确 SHA 向前升级可自动合并；Action major 更新及第三方 Action 需人工复核。
 
-### 完整只读验证
-
-工作流：`.github/workflows/validate-icloud-price-comparison.yml`
-
-触发范围：相关 PR、`main` 上相关路径的 push、手动触发、每周计划任务。
-
-它以只读权限运行：
-
-- `pnpm test:core`
-- 当前完整 data artifact 验证
-- 全部 Apple snapshots 深验
-- Chromium / Firefox / WebKit UI 验收
-- `pnpm audit --audit-level low`
-- `git diff --check`
-- 对关键架构 PR 执行文档同步门禁：identity、数据契约、`data-model.js` 搜索事实源、生成器或关键 update/validate workflow 变化时，`README.md`、`ARCHITECTURE.md` 与 `OPERATIONS.md` 必须同时进入 diff；宽泛 `script.js` 的普通 UI/render 小改动不再单独触发该门禁。`TROUBLESHOOTING.md` 仅在故障表现、首查步骤或禁止操作变化时更新。PR 同时比较 base→head 的已发布 marketId ledger，并检查已提交 diff 格式。
-
-每日更新由内置 `GITHUB_TOKEN` 推送的数据提交不会再触发普通 push 验证，因此每日 workflow 自身的 core/data/固定 Chromium/工件验证就是自动数据发布门禁。
-
-### Dependabot 与依赖自动合并
-
-- iCloud npm 依赖每周一北京时间 10:20 检查；静态浏览器测试 Playwright 每周一 11:20 检查；GitHub Actions 每周一 12:20 检查。三个窗口都放在每日价格更新之后并彼此错开，避免多个自动任务同时推进 `main`。
-- iCloud 的 `cheerio`、`lucide`、`playwright` 各自保持独立 PR，不做 grouping。精确稳定版本的 major / minor / patch 都允许进入自动验证；只有严格向前更新、文件范围与 package 结构符合 allowlist、且完整通过 core、artifact、全部 snapshots、`pnpm audit` 和 Chromium / Firefox / WebKit 验收后，可信默认分支上的自动合并器才允许 squash merge 精确 head SHA。
-- `tools/browser-tests` 的 Playwright 也单独更新，不与其他依赖共享失败域。候选版本安装自身浏览器，并运行完整 Chromium / Firefox / WebKit 静态工具测试；通过后允许稳定 major / minor / patch 自动合并。
-- 自动合并器会再次确认作者必须是 `dependabot[bot]`、分支属于本仓库、base/head SHA 与刚通过测试的精确提交一致；iCloud npm 文件范围只能是单独 `pnpm-lock.yaml`，或 `package.json` + `pnpm-lock.yaml`。若 `package.json` 发生变化，依赖名称不得新增/删除，除现有精确版本 pin 外其他字段必须完全不变；若仅 lockfile 变化，则 base/head 的 `package.json` 必须完全一致。依赖新增/删除、版本范围、`packageManager` / scripts / 业务文件变化或任意额外文件改动仍要求人工审核。
-- Lucide 的实际版本只在 `package.json` / `pnpm-lock.yaml` 固定，不再在 vendor manifest 和 notice 重复维护版本字符串。vendor manifest 仍固定本地 subset 的文件名、包名、许可证和 SHA-256；CI 会验证实际安装包的 version/license，并把页面实际使用的每个 Lucide icon node 与当前 package pin 逐个深度比较。若上游修改许可证元数据或任一已使用图标，自动升级会自然失败关闭，直到人工复核并在需要时更新 subset/hash/notice。
-- 官方 `actions/*` 仍走更严格的供应链路径：只允许 workflow 中完整 SHA 一对一替换，自动合并器还会解析对应稳定 `vX.Y.Z` release tag 并确认 tag 最终指向被 pin 的精确 commit。同 major 的向前更新可在相关验证通过后自动合并；Action major 更新、第三方 Action、可变 tag 或附带业务改动必须人工审核。
-- 自动合并 workflow 使用 `workflow_run`，有写权限的 job 只执行默认分支中的可信校验器，不执行 Dependabot PR 自带脚本，也不使用 `pull_request_target`。
-
-## 5. 生产更新顺序
-
-一次完整生产更新应满足：
-
-1. 固定远端 `main` 生成基线，使用 Node.js 22、项目锁定的 pnpm 与 frozen lockfile 安装依赖，生命周期脚本禁用。
-2. 在共享网络预算内抓取 Apple 页面；同一份 HTML 必须由 `document-order` 和 `apple-markers` 两条解析路径逐字段一致后才得到 `cross-checked`。逐市场列表与 `Country (Currency)` 表格两种结构必须使用同一套受约束货币标记规则：仅接受已知符号、完整 ISO 代码或与当前 ISO 前缀一致的已知符号组合（如 EGP 的 `E£ / EG£ / EGP£` 及反向形式），错误币种或任意装饰仍失败关闭。入口容量文本检查不能固定要求 50GB；容量增删继续由完整解析和独立语义确认校验，不放宽响应大小、编码或网络安全边界。
-3. Apple 业务语义发生变化时，执行独立 no-store 完整确认抓取。正常情况是 initial + confirmation；只有 mismatch 或确认解析退化时追加第三样本。
-4. 只有稳定、完整的 Apple 语义证据才能继续。A/B/B 或 A/degraded/A 可自动恢复；A/B/A、A/B/C、无法形成稳定证据或确认始终不可用时保留上一份生产数据，等待后续自动重试。
-5. 获取并校验汇率。认证候选不可用或 sanity 不通过时尝试开放候选；所有 fresh 在线候选均不可用时，仅允许在既定 freshness 条件内沿用上一份安全 FX/CNY 结果。
-6. 事务式生成 prices/history/run-log/Apple snapshots，并执行数据、时间、价格异常、market identity 和跨文件校验。快照保存或去重完成后、提交前再次核对 active revision 与候选 prices/history；不一致时在同一事务中回滚。不得为了接纳旧修订重现而擅自改写历史快照或 active revision 规则。
-7. 从已验证 `prices.json` 生成 `index.html`：`static-page.mjs` 更新静态价格/状态 fragments，`render-static-page.mjs` 更新 SEO Projection。容量列表继续由 payload 动态驱动；description 中的美国、日本、中国大陆、俄罗斯、土耳其、尼日利亚、台湾等常见及低价市场词是稳定搜索意图，不按每日最低价自动替换。
-8. 在实际候选上运行唯一一次完整 core、UI 与独立 artifact 深验；将已测试数据与静态首页作为同一受控发布工件上传。
-9. 独立发布 job 解包后再次验证工件、静态 fragments、SEO Projection、首页生成边界和远端基线；只有远端 `main` 未前进时才提交并推送。
-
-10. 确认数据 commit 对应的 Pages 构建成功，再从 canonical URL 核对 prices/history/run-log/static HTML；仅生成、上传或提交成功均不代表生产发布完成。
-
-远端基线变化时先做路径级判断：iCloud 项目或 iCloud 专属 workflow 发生变化，必须从最新 `main` 重新生成；只有同仓库其他工具的无关路径变化时，发布器才可保持已测试 iCloud 工件字节不变，切到最新 `main` 后重跑静态发布边界校验，并以该最新提交作为最终 compare-and-swap 基线。不得 Git rebase 候选，也不得 force push；最终推送前再次发生任何前进仍安全停止。
-
-## 6. Market identity 与中文名称
-
-- 已发布 `prices.json` / `history.json` source-name identity ledger 永远优先，普通更新不得 rekey。
-- `scripts/market-registry.mjs` 只保存 active Apple 市场的稳定 ID、canonical name 和 reviewed source aliases；source alias 必须保持同一永久 ID。
-- active registry 未命中的新市场直接使用 deterministic `apple-*` fallback；`UNKNOWN_APPLE_MARKET` 只表示首次发布候选中的新身份。首次成功发布后，identity ledger 即成为其永久身份依据，后续运行不得继续把同一 source identity 计为 unknown。
-- 已发布 `apple-*` 永久保持原 ID。后续正式识别或 Apple 英文 wording 改变时，只能在 active registry 中沿用该 ID并补 reviewed source alias；不得改成友好两位码。
-- `scripts/country-names.zh.json` 仍是 Apple iCloud+ 简体中文价格页名称的唯一事实源；pending 继续显示 Apple 英文 `sourceName`，只作为中文页同步状态，不从其他 Apple 中文页面补齐，也不作为 identity review debt。
-- 新 identity 撞到 active registry 或任一历史 ID 时，以 `MARKET_IDENTITY_RESERVED_ID_COLLISION` 失败关闭；该错误码是兼容名称，不表示存在单独的预留表。
-- removed/added 若形成一对一结构改名候选，以 `MARKET_IDENTITY_RENAME_REVIEW_REQUIRED` 停止并要求显式 source alias，不做模糊自动绑定。
-
-### marketId 永久不可变
-
-已发布 `marketId` 不提供常规迁移路径。active registry 只能识别尚未首次发布的身份，或用同一 ID 维护既有 source alias；不能覆盖已发布 ledger。真正的历史身份错误按数据事故单独设计一次性修复。长期边界由 `test/market-registry.test.mjs`、`test/market-identity-stability.test.mjs` 和 `test/documentation-contract.test.mjs` 保护。
-
-## 7. Freshness、异常和 fallback
-
-- 已校验快照不设展示期限；时间格式及最多 5 分钟未来偏差限制仍保留。
-- 已加载的网络快照也有生成时间单调性保护：更早的网络响应不能覆盖当前快照；按刷新失败保留现有数据并提示，不重置其历史状态。真正更新的快照仍走完整契约校验与替换流程。
-- 不再按 36 小时或 7 天改变显示；2 天、8 天、1 年和 10 年快照均保留价格与功能。
-- `fx.stale` 不隐藏最低价与排名。沿用汇率必须保留原始日期；源响应仍按新数据标准检查，已接受的 fallback 无时间上限。
-- 已加载网络快照从不可用恢复时，也必须走一次受并发保护的刷新，统一恢复筛选、排序、历史入口及提示。刷新失败但内存快照仍有效时可恢复操作，但保留失败提示；同一快照不清空已验证历史。
-- 公共排名保留生成器的全精度顺序；同名次公开金额允许由舍入形成相邻一分，但不允许更大跨度，也不允许不同排名与公开金额反序。
-- JavaScript 可用而首次 JSON 读取失败时，保留静态价格。`pageshow` 与 `visibilitychange` 只处理时间异常恢复等有效性问题，不按年龄触发禁用或刷新。
-- 只有未来时间或无效时间等异常才禁用比较；数据较老不会清除卡片、徽标、高亮和历史。首次网络 JSON 未能校验前，静态价格仍可读而交互等待载入；重复重试不得累积 `.cache-warning`。
-- 静态 DOM 一旦清除了最低价或排名提示，就不能因时钟校正、`pageshow` 或 `visibilitychange` 恢复为 fresh 而直接复用；读取到有效网络快照后须重建已降级的 DOM。该标记只描述 DOM 是否被修改，不增加价格事实源。
-- 同币种单项当地价格超过旧价 10 倍或低于旧价 1/10 时拒绝；跨币种按既定换算硬边界验证。
-- 当前市场相对 CNY 中位数超过 20 倍或低于 1/20 时拒绝。
-- Apple 已确认且仍在硬边界内的当地大幅变价可以 warning 后继续；FX-only CNY 异常只能按 FX authority 分类，不能声称由 Apple 确认。
-- 显著换币种变化缺少可靠新币种 FX baseline 时要求 review。
-- Apple HTML、FX JSON、浏览器 prices/history 都有大小、redirect、UTF-8 和超时边界；不要在故障时放宽这些限制。
-
-## 8. Secret 与凭据
-
-| 名称 | 用途 | 要求 |
-| --- | --- | --- |
-| `EXCHANGE_RATE_API_KEY` | ExchangeRate-API 认证请求 | 只通过 `Authorization: Bearer` 发送到固定 HTTPS endpoint；不得进入 URL、公共 JSON、附件或日志 |
-| `ICLOUD_HEALTHCHECK_PING_URL` | 可选外部心跳 | 整个 URL 等同凭据；不得打印、提交、放入 Issue 或截图 |
-
-`GITHUB_TOKEN` 由 GitHub 每次运行临时签发，不创建长期 Secret。发布 checkout 不保留凭据，只在最终 push 所需步骤使用写权限。
-
-立即轮换的情形包括：人员权限变化、Secret 出现在日志/附件/聊天/浏览器包、第三方异常调用、账号接管、MFA 异常或 Token 来源不明。
-
-轮换原则：新凭据先以最小权限验证，再替换生产 Secret，最后撤销旧凭据；已发生泄露时先撤销旧凭据，不等待代码修复。
-
-## 9. 监控与告警
-
-### 每日检查
-
-建议在自动任务结束后确认：
-
-- 最终结论和首个失败步骤。
-- Apple parser 状态必须为 `cross-checked`。
-- 地区、容量、价格点数量是否与当前 `prices.json` 相符；合法上游变化可以改变数量，不把历史数量当永久常量。
-- Apple `Published Date` 是否倒退、未来或异常跳变。
-- 汇率来源、时间和 stale/fallback 状态。
-- 新增/移除地区、容量、币种和价格变化。
-- 发布 job 是否因远端 `main` 前进而安全停止。
-
-### Healthchecks
-
-- `/0`：完整成功，或已经通过完整 production proof 的幂等跳过。
-- `/1`：数据/测试/工件严重失败、解析器降级或 production proof 失败。
-- 单次 transient 网络故障不立即发送 `/1`，依靠 Grace Time 识别连续缺失成功心跳。
-
-### 浏览器与生产
-
-至少每周和每次代码发布后检查：
-
-- 主页面、prices/history/run-log、核心 JS/CSS、社交分享图和真实 404。
-- 无应用 error、CSP violation、水平溢出或加载死锁。
-- GA4 只加载一次，测量 ID 为 `G-K2S9L4CHNP`，`page_location` 不含 `q`、未知参数或未知 fragment。
-- Cloudflare Web Analytics Beacon 正常，且没有新增未批准第三方分析域名。
-- 页面静态价格、网络价格与数据更新时间一致。
-
-## 10. Cloudflare、CSP、TLS、DNS 与缓存
-
-这些配置不完全存储在 Git 中，发布操作员需要在控制面确认。
-
-路径级 CSP 基线：
-
-```text
-default-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-ancestors 'none'; frame-src 'none'; worker-src 'none'; media-src 'none'; manifest-src 'none'; script-src 'self' https://www.googletagmanager.com https://static.cloudflareinsights.com; style-src 'self'; connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com; img-src 'self' data: https://*.google-analytics.com https://www.googletagmanager.com; font-src 'self'
-```
-
-HTML meta CSP 与 HTTP CSP 应保持同一最小边界；`frame-ancestors` 只能依赖 HTTP header。
-
-生产 HTTP 响应头至少保持：
-
-```text
-Referrer-Policy: origin
-X-Content-Type-Options: nosniff
-X-Frame-Options: DENY
-Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
-Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
-```
-
-其中页面自身还使用 `<meta name="referrer" content="origin">` 作为 HTML 侧边界；不要把其他 HTTP-only 安全头误认为可以仅靠 `<meta>` 配置。
-
-同时验证：HTTP→HTTPS、最低 TLS 1.2、证书链、DNS、DNSSEC 信任链和真实 404 行为。
-
-缓存目标：HTML/JSON 只允许短缓存；带内容哈希版本的浏览器静态资源可更长。修改 JS/CSS/数据契约后必须使用 `pnpm assets:update` / `pnpm assets:check`，不要手填资源 query version。
-
-Production verifier 使用 no-store 获取 prices/history/run-log/首页，并以完整数据契约、字节 hash 和静态投影证明部署结果。Cloudflare 可注入 Web Analytics，从而改变 HTML 响应字节，因此 HTML 重点验证语义、资源版本、CSP、页脚和生成区域，而不是强求整页字节 hash。
-
-### 社交分享图与缓存
-
-`og-image.png` 只用于 Open Graph / Twitter metadata，不在页面正文显示。普通页面刷新不会让用户在页面里看到它。
-
-当前 metadata 使用固定资源 URL，因此第三方社交平台可能继续使用自己的旧缓存。若以后**改变分享图视觉内容**并要求平台重新抓取，应同时切换到新的稳定图片 URL（例如新文件名），再验证：
-
-- `og:image` 与 `twitter:image` 一致；
-- PNG signature 正确；
-- 尺寸 1200×630；
-- 页面 metadata 和新图片已经部署；
-- 必要时只 purge 工具路径相关 CDN 缓存，不全站 purge。
-
-不要把“浏览器强制刷新能看到新文件”当作社交平台已经重新抓取的证明。
-
-## 11. 标准发布流程
-
-1. 从最新 `main` 建候选分支并记录 BASE SHA；确认没有临时日志、截图、浏览器、下载包或 Secret。
-2. 按变更范围取得必要批准。只有当隐私边界、外部规则或控制面配置发生变化时，才要求相应负责人重新复核；普通代码/文档维护不重复制造无关发布门禁。
-3. 在 Node.js 22 和 pnpm 10.14.0 环境使用 frozen clean install，运行与改动匹配的完整验证。
-4. 审核 diff、Action SHA、lockfile integrity、vendor hash/notice、秘密泄漏、Unicode/bidi、文件 mode 和文档链接；如果涉及 `index.html` 生成内容，确认修改发生在对应 generator，而不是只改生成产物。
-5. 确认 GitHub ruleset/required checks 与发布方式兼容。
-6. 需要时更新 Cloudflare 路径级 CSP、Referrer Policy、缓存或 TLS 配置，并保留可回滚记录。
-7. 通过正常 PR 合并；不要直接在 `main` 手工编辑生产 JSON，也不要绕过 `render:static:check` 手改静态/SEO 生成目标。
-8. 等待 GitHub Pages 部署完成；必要时定向 purge 工具路径。
-9. 完成部署后验收并保存内部结果。
-10. 对结构性改动观察后续自动更新；纯文档变更无需人为制造价格更新任务。
-
-## 12. 部署后快速验收
-
-```bash
-curl -fsSIL https://www.linchun.com.cn/tools/icloud_price_comparison/
-curl -fsSIL https://www.linchun.com.cn/tools/icloud_price_comparison/data/prices.json
-curl -fsSIL https://www.linchun.com.cn/tools/icloud_price_comparison/not-a-real-file-<随机值>
-```
-
-浏览器使用干净 profile 验证：
-
-- URL query 清理后只保留规范状态键；搜索词仍在内存筛选但不留 URL；`#priceWorkspace` 可作为唯一允许的页面内 fragment 保留。
-- 搜索完整 `marketId` 时对应市场置顶但部分匹配仍保留；中英文名称/地区支持部分匹配，币种要求完整代码匹配。
-- 容量排序的数字保持全球 `cnyRank`；国家/地区排序切换为列表序号，移动端显示 `序N`，搜索/地区筛选不得重算全球排名。
-- 子资源 Referer 最多为 origin，不含私密 query 标记。
-- GA4 / Cloudflare Analytics 域名和次数符合预期。
-- 应用自身不写 Cookie、localStorage、sessionStorage、IndexedDB 或 Service Worker。
-- 控制台无应用 error/CSP violation。
-- schema 4 数据、静态 fallback、历史、排序、筛选、`marketId`/中英文名称/地区/完整币种搜索、`序N` 移动端语义、键盘和窄屏正常。
-- `meta description`、OG/Twitter description 与当前 `seoProjection()` 一致，且容量列表与 `prices.json.tiers` 一致；不要只肉眼看 `index.html` 后认定 SEO 已修改成功。
-
-最初 document URL 在脚本执行前仍可能进入浏览器历史、代理、Cloudflare/GitHub Pages 和访问日志，因此任何 Secret、Token 或个人信息都不得放入 URL。
-
-## 13. 故障处理
-
-按具体症状、首查步骤和禁止操作排查时，使用 [TROUBLESHOOTING.md](TROUBLESHOOTING.md)。本手册只保留事故处理的通用生产原则，避免与排障手册维护两套细节：
-
-1. 先保存失败 workflow/run、commit SHA、首个失败步骤和必要的结构化证据，再修改系统。
-2. Apple 抓取、双解析、语义确认、FX authority、market identity、数据契约、snapshot/transaction 任一关键门禁失败时，不发布未经证明的新数据；上一份已知良好数据继续服务。
-3. 数据事故按完整提交回滚，优先 `git revert <bad-data-commit>`；不要手拼单个 `prices.json`、`history.json` 或 snapshot index。
-4. 远端 `main` 在生成期间前进时先检查变更路径：若涉及 iCloud 项目或 iCloud 专属 workflow，旧候选作废并从新 `main` 重新生成；若只涉及其他工具，则由发布器保持 iCloud 工件字节不变并在最新 `main` 上重验发布边界。人工事故处理不要 rebase 工件，也不要 force push。
-5. 静态页面或 SEO 不一致时改 generator/事实源后重新渲染；不要直接手改生成目标消除错误。
-6. 前端/CSP/缓存/隐私问题先保存 HAR、console、响应头和资源版本；不要临时放宽到 `unsafe-inline`、`unsafe-eval` 或通配域名。
-7. 依赖、Action 或 vendor 供应链事件先停止相关自动合并/发布，固定版本或 SHA 并重新验证；不能证明完整性时回到最后已知良好版本。
-8. 合规、上游规则或下架通知先停止受影响的持续访问/发布范围并保留通知原文；必要确认完成后再恢复。
-9. lock/transaction journal 由正式恢复逻辑处理；没有确认活跃进程与 stale 条件前，不手工删除。
-10. 外部 Cloudflare/DNS/TLS/Healthchecks 状态必须从真实控制面或生产响应验证，不能把本文描述当作实时证明。
-
-## 14. 回滚
-
-代码回滚：
-
-```bash
-git checkout main
-git pull --ff-only origin main
-git revert <引入问题的合并或提交 SHA>
-git push origin main
-```
-
-数据回滚：暂停自动更新 → revert 完整坏数据提交 → 运行 artifact/data/snapshot/UI 验收 → 推送 → 验证生产 → 恢复自动更新。不要只 checkout `prices.json`。
-
-Cloudflare/DNS 回滚使用发布前保存的配置记录；TLS 最低版本不得随意降低。DNSSEC 变更必须保持父区 DS 与 Cloudflare DNSKEY 匹配。
-
-## 15. 仓库卫生与长期文档
-
-- `run-log.json`：最近 90 次成功运行。
-- 诊断 artifact：按 workflow retention；只读发布工件短期保留。
-- Apple 原始 HTML：不入库、不上传 Actions artifact。
-- 规范化 Apple JSON snapshots：作为历史证据长期保留，同日修订不覆盖。
-- 临时浏览器、截图、日志、下载包、本地审计工具和一次性清单放入 ignored `artifacts/`。
-- 公开仓库不保留面向特定 AI/代理的 `AGENTS.md` 或一次性交接说明；长期规则只进入项目正式文档。
-- 项目长期 Markdown 允许列表为 `README.md`、`ARCHITECTURE.md`、`OPERATIONS.md`、`TROUBLESHOOTING.md`、`THIRD_PARTY_NOTICES.md` 和 `data/apple-snapshots/README.md`，由 core 测试保护。
-- 文档职责固定：`README`=产品/开发入口；`ARCHITECTURE`=设计原因、事实源和修改影响；`OPERATIONS`=生产运行/权限/部署/回滚；`TROUBLESHOOTING`=按症状排查；snapshot README=历史证据格式；THIRD_PARTY_NOTICES=第三方许可。不要复制同一段细节到多份文档。
-- 涉及生成页面时，正式文档都应把 generator 视为源、把 `index.html` 视为产物；尤其不能只记录“markers 内生成”，遗漏 markers 外的 SEO Projection。
-- 页面底部当前只展示“本工具与 Apple Inc. 无关联，数据仅供参考。”及版权信息；不要把 GA4 / Cloudflare Web Analytics 运维说明误写成当前可见 footer 文案。
-- GA4 与 Cloudflare Web Analytics 的实际启用状态、隐私边界和检查方法记录在 README/本手册中；若未来要新增用户可见统计披露，应作为明确的产品文案变更，并同步修改页面与 UI 测试。
-- 不要在文档中重新引入已经关闭、已经决策或已经由代码契约解决的历史待办；若事实发生变化，按新的具体事件记录和处理。
-- 修改关键搜索、排序/排名语义、URL 规范、SEO Projection、数据/identity/snapshot 规则、自动任务或发布边界时，同一 PR 至少复核 README/ARCHITECTURE/OPERATIONS；故障表现或首查动作变化时同步复核 TROUBLESHOOTING。
-- 修改文档时同步清理代码、workflow、测试和页面文案中的失效引用。
-- Git 历史和 `history.json` 的增长继续由每周维护 workflow 监控；不要由自动任务重写 Git 历史。
-
-## 16. 定期演练
-
-至少定期验证：
-
-- 数据回滚和恢复。
-- Secret 轮换与 Cloudflare dispatch。
-- Healthchecks 成功、严重失败和缺失心跳。
-- TLS/DNSSEC/证书/HSTS 基线。
-- 干净浏览器隐私检查、三浏览器 UI、窄屏和键盘流程。
-- 外部依赖联系人、账号恢复方式和规则变更通知渠道仍可用。
-
-## 17. Apple 价格页结构切换
-
-Apple 108047 从逐市场列表切换为地区表格时，预期修复是增加结构适配而不是降低校验。表格必须包含 `Country (Currency)` 与可解析的 GB/TB tier 表头，每个 region 只能关联一个价格表，两条解析路径仍必须形成 `cross-checked`。结构迁移可能一次暴露更多 active markets；不要用历史市场数量等固定值过滤，unknown market 按既有 deterministic `apple-*` + 独立语义确认流程处理。修复后至少运行 core、artifact/snapshot 验证和 live dry-run，再允许生产更新。
-
-### 候选验收与故障信号
-
-每日 updater 先生成价格与静态页，再对实际候选运行唯一一次完整 `test:core`，随后 UI 和独立 artifact 深验；这样 bot 数据提交即使不触发 push CI，也不会留下“旧 fixture 测试绿、新数据使回归失效”的空隙。canonical production-loop 测试覆盖 list→table、A/B/B、跨北京时间午夜、同日 revision、unknown source 改写、回填与独立验收的组合路径，不引用可变生产日期或市场数。
-
-只有首次发布候选中的 `UNKNOWN_APPLE_MARKET` 与未解决的 rename suspicion 属于 identity review debt；已发布 fallback identity 不重复告警，`CHINESE_MARKET_NAME_PENDING` 仅汇总为中文页同步状态。Action 摘要可把“同一稳定 `marketId` 的旧 source name removed + 新 source name added”展示为名称变化，但 `sourcePublishedDates`、run-log 与 snapshot 中的原始 added/removed 证据必须保持不变。FX provider 的任意错误正文、HTTP statusText、JSON 片段与 transport exception 不得进入公开日志；只输出受控分类。12% dailyized sanity 仍是保守运维异常拦截值，不是对真实汇率波动的统计保证，阈值不因本轮测试而放宽。
-
-“候选生成成功”不等于发布成功：以已测试数据 commit、该 commit 的 Pages 构建以及 canonical URL 的 prices/history/run-log/static HTML 一致作为生产闭环。修复恢复必须在最新 main 新发起 workflow，不能 rerun 旧 SHA。
-
-- `Monitor Apple Chinese iCloud markets` 是独立只读服务，会在 `Update iCloud prices` workflow 完成后运行，也可手动运行。`scripts/apple-zh-reviewed-markets.json` 记录历史已复核中文名称并只增不减；当前中文页单纯少掉已知名称不告警、不删除映射，同名名称重新出现但尚未显示时仍提醒。出现从未复核的新中文名称或当前官方名称尚未显示时红灯提示人工检查；价格、容量、发布日期、排序或排版变化不提示。抓取/解析不可用仍令这条监测任务红灯，但不影响价格 updater。人工确认新名称后可以追加到历史复核集合，但未显示差异仍持续提醒；“名称已见过/已复核”不等于“已绑定英文市场”，只有能够可靠对应稳定 `marketId` 时才同步更新 `scripts/country-names.zh.json`。
-
-### 封板告警与回归
-
-中文监测仅允许可信 main 调用，checkout 明确固定 main 并在摘要记录实际代码 SHA。独立并发组不取消正在执行的监测；未复核新名称、当前官方名称尚未显示、抓取/解析失败以及前置安装失败产生红灯和可读摘要，已复核名称暂时从中文页消失不告警。不运行或异常不是“无新名称”，也不向英文 updater 反向传播失败。历史复核集合与中文映射仍须人工审查，脚本没有写入权限。
-
-排查英文源结构变动时，特别检查新标题之后的表格片段；两路 parser 都忽略同一片段并不构成完整性证明。`test/seal-regressions.test.mjs` 与 `test/production-loop.test.mjs` 在 `test:core` 生产路径执行，覆盖非法国家单元格、功能文字污染、流式响应上限、实际进程退出码、可信来源门禁、alias 展示一致性和隐藏价格片段。修复不得改动生产价格/快照，也不得把 FX 刷新当作 Apple 调价。
-
-### 中文名称待确认成员差异
-
-每日 `Update iCloud prices` 在调用 updater 前复制当时已验证的 `data/prices.json`。updater 成功后，`scripts/report-chinese-name-sync.mjs` 只读比较更新前后两份 `prices.json` 中 `nameZh === country` 的 pending `marketId` 集合，并把结果写入 Action Summary。运维人员应同时查看当前待确认数量、`新增待确认`、`退出待确认`；即使数量保持 86→86，只要成员一进一出，也会显示两侧成员。
-
-该差异只用于可观测性，不影响价格发布成败，也不引入状态文件。`退出待确认` 不能直接解读成“中文名已确认”或“市场已删除”，必须结合本次英文 active market 变化和 `country-names.zh.json` 修改判断。它与独立的 `Monitor Apple Chinese iCloud markets` 口径不同：前者基于英文价格页 active markets 的正式中文显示名复核状态，后者监测未复核新词及当前官方中文词尚未显示的差异。
-
-## 最低价历史维护
-
-日常仍用原有更新工作流：`update:data` → `render:static`（同步派生账本）→ core（包含数据和静态投影检查）→ UI → `validate:artifact` → 同一工件发布。不增加定时任务、不访问新的价格或 FX 服务。完整 `data/` 工件现在必须包含 `minimum-history.json`；缺失、损坏或与当前价格指纹不匹配时阻断发布，不静默重建清空。不要只更新 index.html 或只拷贝价格文件。
-
-第一次引入时，使用完整 Git 历史执行 `node scripts/minimum-history.mjs --backfill --ref <审核过的提交>`；这不是日常命令，也不能在浅克隆中声称完整回溯。回溯按 payload.generatedAt 排序去重，而不是使用可能被重写的 Git 提交时间；保留来源 commit，排除不可靠或冲突观测并标记缺口，不用现今汇率补历史。更新后执行 `pnpm render:static`、`pnpm assets:update`、`pnpm test:core`、`pnpm test:ui`、`pnpm validate:artifact`，复核 Apple history.json 未受 FX 事件污染。
-
-历史中的“首次可核验记录”不计作易主；观察间隔不是连续行情，也不是 Apple 调价生效时间。调查原因时应查看完整比较范围的标价及 FX 指纹，不能仅凭新旧第一名价格或 Apple 页发布日期判断。混合变动不承诺哪种因素占主导，未知原因不能改写成已确认的 Apple 调价。
-
-最低价历史纳入原有生产回读验收：`minimum-history.json` 必须与预期工件逐字节一致，并绑定同一份 `prices.json`。cache-bypass 诊断通过不能代替普通 canonical URL 的回读；CDN 仍返回旧历史、缺失文件或无效内容时不得标记部署成功。
-
-### 混合布局与中文脚注排查
-出现 Mixed Apple pricing layouts 时，应检查 Apple 是否同时使用表格和旧式价格列表；不得跳过未解释列表或降低市场数量门槛。中文名称监测支持数字脚注间的 Apple 多脚注分隔符；无法解释的名称仍阻断监测，并在错误中提供安全截断的单元格内容。
-当新JSON接管旧页面且历史尚未加载时，发布日期显示待核对，避免显示旧快照日期。历史仍按需加载；本修复不更改每个发布日期首revision的原始记录，也不提供同日后续revision的完整展示投影。
-
-### Apple 功能列表与中文标签告警的恢复
-
-遇到 `Mixed Apple pricing layouts` 时，先对照官方英文 108047 的实际 DOM 区分功能说明和价格记录。About iCloud+ 下与相邻容量标题严格匹配的 GB/TB 存储说明不是市场价格；但同列表出现货币金额、未知单位或空容量仍须失败关闭。修复后运行表格解析正反例和真实来源 dry-run，再执行完整 updater、Pages 和生产 URL 验证；不得删除混合布局门禁来消除红灯。
-
-中文新名称告警只在逐项核对官方中英文价格表的名称语义及价格上下文后，向 `apple-zh-reviewed-markets.json` 追加已复核标签；历史标签不得删除，也不得把标签复核当作生产 `marketId` 或 `country-names.zh.json` 的自动绑定。恢复须验证当前已知标签不再误报、未来未知标签仍会告警。
-
-## 中文名称人工对应与简单监测（2026-10-01）
-
-Apple 中英文价格页没有共同地区 ID，程序不按行号、同价或机器翻译自动配对。此次人工核对并补齐 86 个中文显示名（84 个既有 apple-* ID 加 cg、mu），保留原 marketId、英文 country 和历史价格事件。官方中文依据：https://support.apple.com/zh-cn/108047 （2026-09-29 发布）。
-
-继续使用现有独立只读监测，仅补一项检查：当前官方中文名称若尚未出现在项目 prices.json 的 nameZh 展示集合中，持续列出具体名称并报待处理，即使已加入历史已审名单也不能消除提醒。这只是发现未显示的词，不断言它对应哪个英文地区；人工核实对应、更新映射并发布后才能消除该差异。未来新市场保留英文价格显示，不能为凑齐中文而自动猜配。
-
-抓取或结构解析异常仍是监测失败，不能当成无变化；当前官方页暂时缺少历史名称时，不删除既有翻译。监测只读、不阻塞英文价格更新，提醒仍通过 Actions 失败状态和具体差异摘要提供，不新增自动配对、外部推送或状态系统。
-
-## 更新流程浏览器版本一致性（2026-10-01）
-
-真实更新复现卡点为浏览器启动阶段，页面尚未创建；runner 自带 Chrome 154 与校验使用的 Playwright Chromium 153 不一致。test:ui 现在先调用 prepare-updater-browser.mjs，仅在 GITHUB_ACTIONS=true 时用锁定的本地 Playwright CLI 安装完整 Chromium/headless-shell 包。安装失败停止 UI 与发布，不回退系统 Chrome；非 GitHub 本地运行不自动安装软件。测试仍保留原 30 秒限制、分阶段诊断及取消清理，不以延长等待或同一测试内重试掩盖失败。此措施消除已确认的版本差异；不将一次启动卡顿的底层 OS 原因宣称为已证明。
-
-## 低复杂度维护调整（2026-10-01）
-
-- 更新后的实际候选只跑一次完整 core；其中已包含 data-contract、data-integrity、state-contract 和静态投影检查，不在同一 job 重复执行 test:data 或 render:static:check。手动聚焦入口仍保留，跨 job 工件复验和上线验证不合并。
-- 失败摘要复用已有严重度和脱敏错误，给出重试、人工市场别名复核或修复后完整验收建议，不新增告警状态或重试系统。
-- 国家价格历史保留容量下架及恢复的中间记录；恢复为相同价格也不能抹掉下架阶段。缺价显示“—”，恢复后不直接跨缺口计算涨跌幅。
-- Apple 来源失败时仍保留整份旧快照。单独汇率更新需要独立价格观察日期和来源沿用状态，暂不通过伪造成功观察或汇率状态实现。
-
-## 封板边界补强（2026-10-01）
-
-- 已明确沿用的旧汇率在工件内的运行日志也不设最大年龄；未来、格式和 fallback 元数据校验保留。生产循环覆盖 2、8、365、3650 天的汇率故障，包含完整工件验证。
-- 静态页的未来时钟保护可逆：时钟纠正而 JSON 仍断网时，恢复原静态价格、日期和最低价；网络交互仍等待通过校验的 JSON。
-- 发布只强制暂存验证过的 data/index 路径，并从 git write-tree 读取原始 blob，逐文件比较完整文件集及字节，再独立深验。Git ignore、属性转码或导出规则不得令提交内容偏离测试工件；任何不一致在 commit/push 前停止。
-- 封板固定代码与验收证据，不停止自动数据更新，不引入新调度器或存储。
+保留 LICENSE、THIRD_PARTY_NOTICES 和 vendor 来源/哈希；不删除规范化价格证据来减少文档。仓库长期说明限 README、本文件、短快照说明及第三方归属，不存阶段报告、测试截图、运行日志副本或交接流水账。当前故障修复证据留在 PR 与 Actions。
