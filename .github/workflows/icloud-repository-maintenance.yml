@@ -1,6 +1,11 @@
 name: Audit iCloud repository growth
 
 on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/icloud-repository-maintenance.yml', '.github/scripts/cleanup-approved-action-runs-20261001.py']
+  pull_request:
+    paths: ['.github/workflows/icloud-repository-maintenance.yml', '.github/scripts/cleanup-approved-action-runs-20261001.py']
   workflow_dispatch:
   schedule:
     # 北京时间每周日 06:15；GitHub cron 使用 UTC，因此为周六 22:15。
@@ -15,6 +20,7 @@ concurrency:
 
 jobs:
   audit:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     name: 审计完整 Git 历史与数据增长
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -69,3 +75,35 @@ jobs:
           if (( git_kib >= 512000 )); then
             echo "::warning title=Git 历史体积::完整 Git 历史已达 ${git_mib} MiB，请在达到 800 MiB 前安排人工审查。"
           fi
+
+  verify-approved-cleanup:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Read-only verification of every approved obsolete run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/cleanup-approved-action-runs-20261001.py --check
+
+  delete-approved-cleanup:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[approved-obsolete-actions-22-20261001]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Delete only the 22 individually approved obsolete runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/cleanup-approved-action-runs-20261001.py --delete
