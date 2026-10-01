@@ -1,84 +1,43 @@
 # iCloud+ 全球价格比较
 
-正式页面：<https://www.linchun.com.cn/tools/icloud_price_comparison/>。原 GitHub Pages 地址仅作旧入口：<https://linchun7.github.io/tools/icloud_price_comparison/>。
+[打开价格页](https://www.linchun.com.cn/tools/icloud_price_comparison/) · [维护与排障](OPERATIONS.md)
 
-比较 Apple 各国家和地区的 iCloud+ 当地月费与人民币参考价。价格、币种、容量、市场结构和原始 `Published Date` 以 Apple Support 英文 108047 为准；人民币换算仅供横向比较，不是 Apple 结算价。地区、币种和容量数量直接读取 `data/prices.json`，不写死为永久常量。
+比较 Apple 各地区 iCloud+ 当地月费及人民币参考价。价格、币种、容量和发布日期以 [Apple 英文价格页](https://support.apple.com/en-us/108047) 为准；中文名称来自人工核对的 [Apple 简体中文价格页](https://support.apple.com/zh-cn/108047)。人民币金额仅供比较，税费、付款资格和最终结算以 Apple 为准。
 
-## 文档入口
+## 展示规则
 
-- [ARCHITECTURE.md](ARCHITECTURE.md)：事实源、数据契约、事务、发布边界和修改影响。
-- [OPERATIONS.md](OPERATIONS.md)：自动更新、监控、权限、部署、Cloudflare 和回滚。
-- [TROUBLESHOOTING.md](TROUBLESHOOTING.md)：按症状排障及禁止操作。
-- [data/apple-snapshots/README.md](data/apple-snapshots/README.md)：规范化 Apple 证据与历史导入规则。
+- 默认按 200GB 人民币价格升序；该容量不存在时使用首个容量。价格排名使用生成器给出的全球排名，筛选不重排名；国家排序显示当前列表序号。
+- 最近通过校验的价格、人民币折算、排名、最低价与历史不设展示期限。更新失败仍显示旧数据，价格核验日期和汇率源日期保持真实。
+- 非法、损坏或明显未来的数据仍被拒绝。静态 HTML 提供无 JavaScript/网络失败时的价格兜底；通过校验的 JSON 才接管交互，网络响应不能回退到更早快照。
+- 搜索经 NFKC 规范化，支持 marketId、中英文名称、地区和完整币种代码。URL 只保存容量、排序和地区筛选，不保存搜索词。价格不写浏览器持久缓存。
+- 国家价格历史与最低价历史独立；容量下架、恢复及证据缺口不合并为虚假涨跌。历史加载失败不影响当前价格表。
 
-## 产品契约
+## 数据与代码入口
 
-页面默认按 200GB 人民币参考价升序排列；200GB 不再存在时改用当前首个容量。容量排序使用生成器给出的全球 `cnyRank`，筛选不重排名；按国家/地区排序时显示当前列表序号，移动端以 `序N` 和独立读屏文本区分。最低价卡片是切换容量并定位市场的导航按钮，不是开关。
+- `data/prices.json`：已核验当前价格与全球排名
+- `data/history.json`、`data/minimum-history.json`：原币价格/发布日期历史、最低价变化账本
+- `data/apple-snapshots/`：规范化 Apple JSON 证据；格式见[快照说明](data/apple-snapshots/README.md)
+- `data/run-log.json`：最近 90 次成功运行
+- `scripts/update-prices.mjs`、`data-contract.js`：生成入口与共享数据契约
+- `scripts/market-registry.mjs`、`scripts/country-names.zh.json`：稳定市场身份及人工中文映射
+- `scripts/static-page.mjs`、`scripts/render-static-page.mjs`：静态页面生成源
 
-搜索先做 Unicode NFKC 规范化，匹配 `marketId`、中英文名称、地区标签和完整币种代码；完整 `marketId` 优先，其他部分匹配仍保留。Apple 英文 region 与中文地区标签只在搜索词至少两个 Unicode 字符时参与，避免单字误命中。浏览器不维护另一份搜索名称目录。
+`index.html` 是生成产物。除 `ICLOUD_STATIC_*` 区域外，`seoProjection()` 还维护 markers 外的 SEO Projection；不要直接改生成结果。修改 JS/CSS 后需同步内容哈希资源版本。
 
-容量、排序方向和地区筛选保存在规范 URL；站内搜索词不保留在 URL。仅允许 `#priceWorkspace` 页面内 fragment。应用不持久存储价格到 Cookie、localStorage、sessionStorage、IndexedDB 或 Service Worker。
+## 自动更新与验证
 
-静态 HTML 提供首屏和无 JavaScript/网络失败时的 fallback；网络 JSON 必须通过共享契约校验才能接管。最近一次通过校验的数据不设展示期限：原币价、人民币折算、最低价、排名和历史不因未更新天数或汇率沿用而隐藏。始终显示真实价格核验时间与汇率源时间，更新失败在后台记录，不用错误文案替换日期。未来超过 5 分钟、格式或完整性错误的数据仍被拒绝，重试不能回退到更早快照。沿用旧汇率时不得改变其源时间；只有旧人民币值而没有原始汇率的快照，仍禁止据此推算新价格或新币种。
+GitHub Actions 执行测试和发布：
 
-页面支持当地标价历史、币种变化、最低价并列、键盘操作、读屏、减弱动画、forced-colors 和窄屏。前端日期及发布日期历史隐藏“仅日期变化”的记录；底层 Apple 原始日期证据完整保留。
+- [更新价格](../../.github/workflows/update-icloud-prices.yml)：Cloudflare 主触发约北京时间 08:05，GitHub 08:10 兜底；手动运行选择 main
+- [完整验证](../../.github/workflows/validate-icloud-price-comparison.yml)：核心、工件、全部快照、依赖安全及 Chromium / Firefox / WebKit
+- [中文名称监测](../../.github/workflows/monitor-icloud-zh-markets.yml)：只提醒需要人工复核的名称，不自动绑定中英文市场
 
-## 市场身份与中文名称
+自动入口只有取得当日完整生产成功证明才跳过；手动更新不跳过。上游失败保留已发布数据。Cloudflare 实际触发、DNS 和安全头需单独查看控制面，不能由仓库文字证明。
 
-公共数据使用 schema 4。身份优先级为：已发布 `prices.json` / `history.json` identity ledger → `scripts/market-registry.mjs` active registry → deterministic `apple-*` fallback。已发布 `marketId` 永久冻结，不 rekey；source alias 只处理 Apple 来源措辞变化，不更换历史身份。真正的新市场可获得可复现的 fallback ID，确认无冲突后自动发布；历史身份错误必须作为单独数据事故处理。
+运行环境：Node.js >=22.1.0、pnpm 10.14.0；依赖以 package/lockfile 为准。CI 使用以下入口（项目目录内）：
 
-Apple 简体中文价格页只提供已人工复核的中文名称，欧元区显示“欧盟”。`scripts/country-names.zh.json` 保存稳定 ID 对应的正式中文显示名；未绑定时显示 Apple 英文名称，不阻断价格更新，也不从其他中文网页猜名。
-
-两种中文状态必须区分：
-
-- 英文价格页的待确认显示名：`nameZh === country` 的 active `marketId` 集合。日更的 `report-chinese-name-sync.mjs` 只读比较前后集合，摘要列出当前数量、新增与退出；数量相同也检查成员变化。退出不必然代表已补中文名，也可能是市场退出。
-- 中文价格页的新名称监测：`scripts/apple-zh-reviewed-markets.json` 是只增不减的历史复核集合。已知名称暂时消失不告警；从未复核的新名称或当前官方名称尚未显示时需要人工检查。独立监测对解析/网络不可用报错，但不猜测中文名称到英文市场的绑定，不改写价格数据。
-
-## 数据与发布
-
-| 文件 | 职责 |
-| --- | --- |
-| `data/prices.json` | 当前价格唯一事实源，含稳定 ID、人民币参考价和全球排名，不公开原始汇率及凭据信息 |
-| `data/history.json` | 按永久 `marketId` 累积价格/币种事件及 Apple 日期证据，仅事件或结构变化时改写 |
-| `data/run-log.json` | 最近 90 条成功运行的来源、数量、耗时和变化 |
-| `data/apple-snapshots/` | 规范化 JSON 与索引，不保存原始 HTML，不覆盖同日的不同修订 |
-
-`.github/workflows/update-icloud-prices.yml` 的发布顺序：
-
-1. 深验当前 main 数据并检查每日幂等状态；需要更新时固定生成基线，以 frozen lockfile 安装依赖。
-2. 抓取 Apple HTML，经 `document-order` 与 `apple-markers` 双路径逐字段核对；业务语义变化还须独立 no-store 抓取确认。列表/表格结构切换、新市场与新容量不能成为放宽校验的理由。
-3. 校验汇率并事务式生成候选。认证源不可用时尝试开放源；所有 fresh 在线候选不可用时，沿用已校验的安全派生结果且保留原汇率源日期，不设展示期限；没有原始汇率时仍禁止把旧派生值套用到新价格。快照、当前价格与历史不一致时回滚，不覆盖旧证据。
-4. 候选依次经过 静态页生成、完整 `test:core`（含数据与静态投影检查）、UI 验收和工件深验。完整 core 只运行一次，且针对更新后的真实候选，不以更新前的绿灯替代。
-5. 独立发布 job 重新验证工件和远端基线后才推送；若 `main` 仅被同仓库其他工具的无关路径推进，则保持已验证 iCloud 工件字节不变，切到最新 `main` 重新校验静态发布边界并以它作为最终推送基线；若 iCloud 项目或 iCloud 工作流本身发生变化，则候选作废并从新 `main` 重新生成。任何情况都不 force push。Pages 构建及 canonical 生产 URL 验证完成才算成功；幂等跳过也需生产证明。
-
-生成/测试 job 只有 `contents: read`；仅不安装项目依赖的发布 job 获得 `contents: write`。工件重验、Pages 证明、真实 URL 验证和外部心跳是不同边界，不作为重复检查删除。
-
-生产设计为 Cloudflare 每日北京时间 08:05 外部 dispatch（`trigger_source=cloudflare`），GitHub cron 每日 08:10 兜底；main 上手动运行不受每日幂等跳过。自动入口只有在当前数据/运行日志满足 freshness 条件，且 GitHub Actions 能证明对应数据生成之后已经有当日完整成功的生产 workflow 时才幂等跳过；Actions 证明暂不可读时按 fail-open 执行更新。旧 run 若使用的 `update-icloud-prices.yml` 已落后于最新 main 会失败关闭，恢复必须从最新 main 新发起。仓库不能单独证明 Cloudflare 控制面当天真的触发，实时状态见外部控制面。
-
-历史回填只使用 Apple 页面证据，Wayback 不构成另一价格源。输入须覆盖既有索引，缺失、冲突、未知市场或跨文件校验失败均拒绝提交。已发布 ID 与在线首次确认时间不能被回填重写；规则及命令见快照文档。
-
-## 页面生成、SEO 与隐私
-
-`index.html` 是派生物：`scripts/static-page.mjs` 生成 `ICLOUD_STATIC_*` 区域；`scripts/render-static-page.mjs` 的 `seoProjection()` 生成 markers 外的 SEO Projection，包括 description、分享图 alt 与首屏说明。修改应先改生成源，再运行：
-
-```bash
-pnpm render:static
-pnpm render:static:check
-```
-
-静态正文随当前价格更新。description 的热门地区词属于稳定搜索意图，不是每日最低价榜单；容量列表随 payload 动态变化。`title`、canonical 等未纳入投影的 shell metadata 只在明确 SEO 变更中修改。资源字节变化后使用 `pnpm assets:update` / `pnpm assets:check`，不要手填版本。
-
-`og-image.png` 是 1200×630 PNG 分享卡片，不是正文图片；OG/Twitter 共用该资源。视觉变更需要第三方重新抓取时采用新的稳定资源 URL，普通刷新网页不能证明社交缓存已更新。
-
-页面使用 GA4（`G-K2S9L4CHNP`）和 Cloudflare Web Analytics。加载网络价格及统计脚本前清理搜索词、未知/重复/非法查询参数和未知 fragment；应用不写 Cookie，但 GA4 可能写 `_ga` 系列 Cookie。动态数据使用 DOM API 与 `textContent`。Cloudflare HTTP CSP 与 HTML meta CSP 保持一致的最小权限边界；详细隐私及响应头要求见 OPERATIONS。
-
-## 验证与维护
-
-在 `tools/icloud_price_comparison/` 执行，要求 Node.js >=22.1.0 和声明的 pnpm 10.14.0：
-
-```bash
+```sh
 pnpm install --frozen-lockfile --ignore-scripts
-pnpm exec playwright install chromium firefox webkit
 pnpm test:core
 pnpm validate:artifact
 pnpm validate:snapshots
@@ -86,67 +45,12 @@ pnpm test:browsers
 pnpm audit --audit-level low
 ```
 
-`pnpm test` = core + 三浏览器；`test:core` 包括资源/静态投影、vendor、解析、身份、数据、事务、幂等和工作流契约。`validate:artifact` 校验完整 data 的跨文件语义，`validate:snapshots` 深审所有规范化修订。
+定向生成/检查：`pnpm render:static`、`pnpm render:static:check`、`pnpm assets:update`、`pnpm assets:check`。浏览器矩阵使用锁定 Playwright；日更也使用其配套 Chromium。
 
-浏览器检查保持同一职责划分：
+`pnpm check:live` 是只读在线诊断；`pnpm update:data` 会写数据，不能代替只读排障。修改关键数据或发布规则时，同步维护本说明与 OPERATIONS，不追加阶段报告。验收细节保留在 PR 和 Actions。
 
-| 入口 | 覆盖 |
-| --- | --- |
-| 日更 `pnpm test:ui` | 同一 `ui-smoke.test.mjs`，复用套件内浏览器；保留高对比度、数据加载、排序、最低价、历史、失效恢复与隐私检查 |
-| 本地 `pnpm test:browsers` / PR / push / 每周矩阵 | UI 套件 + 独立降序 URL / static fallback 场景；Chromium、Firefox、WebKit 都执行 |
-| `pnpm test:firefox` / `pnpm test:webkit` | 对应浏览器的上述完整场景 |
+## 来源、隐私与许可
 
-forced-colors 只保留 UI 套件中的一个实现，Chromium 真正执行，其他引擎按能力跳过；不另起浏览器、不用名称黑名单绕开它、不增加重试。日更在 GitHub Actions 中使用锁定 Playwright 配套 Chromium，test:ui 先安装/核对完整浏览器包，不再回退到 runner 自带 Chrome。浏览器缺失/启动失败必须报错退出，并释放已经创建的测试服务器；core 含不联网的缺浏览器故障回归。
+汇率来自 ExchangeRate-API，认证源不可用时尝试[开放源](https://open.er-api.com/v6/latest/USD)。页面加载 GA4 和 Cloudflare Web Analytics；加载前清理搜索词及非法 URL 参数，GA4 可能写统计 Cookie。应用自身不持久化价格。
 
-`pnpm check:live` 是只读在线 dry-run，结束后工作树应不变；`pnpm update:data` 会写数据，只用于明确手动更新或隔离环境。不要用它替代只读诊断。
-
-关键数据源、契约、生成器和 update/validate workflow 改动需同步 README、ARCHITECTURE、OPERATIONS；普通 UI 修改按影响更新相关文档，不堆积过程记录。PR 检查永久 ID、文档契约与已提交 diff 格式。价格与历史、依赖锁、供应链校验和生产验收不得因测试减重而放宽。
-
-iCloud 自动化策略只约束本项目及其明确共享的受管 workflow；同仓库其他工具可独立新增 workflow，但额外 workflow 若引用 iCloud 路径或名称会被策略测试拒绝。
-
-本地预览从仓库根运行 `python -m http.server 4173`，访问 `http://127.0.0.1:4173/tools/icloud_price_comparison/`。
-
-## 来源与许可
-
-Apple 价格：<https://support.apple.com/en-us/108047>；官方中文名称：<https://support.apple.com/zh-cn/108047>。ExchangeRate-API 认证源使用 `https://v6.exchangerate-api.com/v6/latest/USD`，API Key 仅通过 `Authorization: Bearer` 发送；开放回退源为 <https://open.er-api.com/v6/latest/USD>。
-
-税费、可用性、付款方式、购买区域限制和最终结算以 Apple 对应地区页面及实际结算为准。本工具与 Apple Inc. 无关联。自有代码见 [LICENSE](LICENSE)，第三方资源见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 与 `vendor/manifest.json`。
-
-## 最低价历史
-
-顶部最低价卡片仍然只切换容量并定位当前价格表；标题旁的“最低价历史”是独立入口。弹窗内选容量、展开依据、翻阅历史均不改变表格排序、筛选或 URL；只有显式点击“在价格表中查看当前最低价”才执行原来的导航。Escape 关闭并归还焦点。历史按需加载，失败可单独重试，不影响当前价格。
-
-`data/minimum-history.json` 是独立的人民币参考排名派生账本，不改变 Apple 当地月费的 `history.json`，也不增加“价格变更次数”。只在第一名的完整 `marketId` 集合变化时记录（包含并列加入/退出）；首次状态标为基线，每日金额波动但赢家未变不增加事件。
-
-原因分为汇率变化、Apple 调价、调价与汇率均有变化、比较范围变化、原因未能确定。混合标签只声明两种输入都变了，并不证明唯一或主要因果；有数据缺口、口径变化或无法核验汇率时不强行二选一。事件时间是北京时间观测时间，不是实际生效时刻。
-
-回溯起点是现存 Git 历史中首个可核验排名快照（当前为 2026-07-30），不是项目创建日 2024-12-08：早期浏览器实时汇率未留存，不能用固定回退汇率或今天汇率冒充当时用户看到的排名。原始汇率完整时才重算；已有全精度排名时直接使用；仅剩两位小数且无法排除舍入并列的版本记为缺口。
-
-### 静态降级与混合布局保护
-窄屏静态降级保留全部容量列并允许表格内部横向滚动；只有交互控件成功初始化后才切换为单容量视图。混合表格与列表价格结构若存在未解释的价格列表，解析器停止更新而不静默忽略记录。Apple 的 About iCloud+ 容量功能说明仅在章节、相邻容量标题和 GB/TB 描述严格匹配时排除；该功能列表一旦出现独立货币金额，仍按混合价格结构拒绝，不能以功能区标题豁免价格。
-
-## 中文名称人工对应与简单监测（2026-10-01）
-
-Apple 中英文价格页没有共同地区 ID，程序不按行号、同价或机器翻译自动配对。此次人工核对并补齐 86 个中文显示名（84 个既有 apple-* ID 加 cg、mu），保留原 marketId、英文 country 和历史价格事件。官方中文依据：https://support.apple.com/zh-cn/108047 （2026-09-29 发布）。
-
-继续使用现有独立只读监测，仅补一项检查：当前官方中文名称若尚未出现在项目 prices.json 的 nameZh 展示集合中，持续列出具体名称并报待处理，即使已加入历史已审名单也不能消除提醒。这只是发现未显示的词，不断言它对应哪个英文地区；人工核实对应、更新映射并发布后才能消除该差异。未来新市场保留英文价格显示，不能为凑齐中文而自动猜配。
-
-抓取或结构解析异常仍是监测失败，不能当成无变化；当前官方页暂时缺少历史名称时，不删除既有翻译。监测只读、不阻塞英文价格更新，提醒仍通过 Actions 失败状态和具体差异摘要提供，不新增自动配对、外部推送或状态系统。
-
-## 更新流程浏览器版本一致性（2026-10-01）
-
-真实更新复现卡点为浏览器启动阶段，页面尚未创建；runner 自带 Chrome 154 与校验使用的 Playwright Chromium 153 不一致。test:ui 现在先调用 prepare-updater-browser.mjs，仅在 GITHUB_ACTIONS=true 时用锁定的本地 Playwright CLI 安装完整 Chromium/headless-shell 包。安装失败停止 UI 与发布，不回退系统 Chrome；非 GitHub 本地运行不自动安装软件。测试仍保留原 30 秒限制、分阶段诊断及取消清理，不以延长等待或同一测试内重试掩盖失败。此措施消除已确认的版本差异；不将一次启动卡顿的底层 OS 原因宣称为已证明。
-
-## 低复杂度维护调整（2026-10-01）
-
-- 更新后的实际候选只跑一次完整 core；其中已包含 data-contract、data-integrity、state-contract 和静态投影检查，不在同一 job 重复执行 test:data 或 render:static:check。手动聚焦入口仍保留，跨 job 工件复验和上线验证不合并。
-- 失败摘要复用已有严重度和脱敏错误，给出重试、人工市场别名复核或修复后完整验收建议，不新增告警状态或重试系统。
-- 国家价格历史保留容量下架及恢复的中间记录；恢复为相同价格也不能抹掉下架阶段。缺价显示“—”，恢复后不直接跨缺口计算涨跌幅。
-- Apple 来源失败时仍保留整份旧快照。单独汇率更新需要独立价格观察日期和来源沿用状态，暂不通过伪造成功观察或汇率状态实现。
-
-## 封板边界补强（2026-10-01）
-
-- 已明确沿用的旧汇率在工件内的运行日志也不设最大年龄；未来、格式和 fallback 元数据校验保留。生产循环覆盖 2、8、365、3650 天的汇率故障，包含完整工件验证。
-- 静态页的未来时钟保护可逆：时钟纠正而 JSON 仍断网时，恢复原静态价格、日期和最低价；网络交互仍等待通过校验的 JSON。
-- 发布只强制暂存验证过的 data/index 路径，并从 git write-tree 读取原始 blob，逐文件比较完整文件集及字节，再独立深验。Git ignore、属性转码或导出规则不得令提交内容偏离测试工件；任何不一致在 commit/push 前停止。
-- 封板固定代码与验收证据，不停止自动数据更新，不引入新调度器或存储。
+本工具与 Apple Inc. 无关联。自有代码见 [LICENSE](LICENSE)，第三方归属见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
