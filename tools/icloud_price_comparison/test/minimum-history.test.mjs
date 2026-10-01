@@ -196,5 +196,19 @@ test('backfill is reproducible in a self-contained Git fixture and rejects shall
     git(['clone','--depth=1',pathToFileURL(repo).href,shallow]);
     await assert.rejects(backfillMinimumHistory({projectDir:path.join(shallow,'tools/icloud_price_comparison')}),/shallow checkout/);
     await assert.rejects(backfillMinimumHistory({projectDir,ref:'--all'}),/Invalid Git ref/);
+    for (const failure of ['deleted', 'malformed']) {
+      git(['checkout', '--detach', secondSha]);
+      if (failure === 'deleted') git(['rm', pricePath]);
+      else {
+        await writeFile(path.join(repo, pricePath), '{invalid json');
+        git(['add', pricePath]);
+      }
+      git(['-c','user.name=Fixture','-c','user.email=fixture@example.invalid',
+        '-c','commit.gpgSign=false','commit','-m', failure + ' evidence']);
+      const brokenSha = git(['rev-parse','HEAD']);
+      await save(fixture({day:2}), 'restore valid current prices');
+      await assert.rejects(backfillMinimumHistory({projectDir}), error =>
+        error.message.includes('Backfill cannot read price evidence at ' + brokenSha));
+    }
   } finally {await rm(tmp,{recursive:true,force:true});}
 });
