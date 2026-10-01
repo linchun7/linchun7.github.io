@@ -4384,3 +4384,27 @@ test('newer history check cannot replace a newer accepted checkpoint with older 
     assert.equal(await page.locator('#minimumHistoryEvents').textContent(), rows);
   } finally { await browser.close(); }
 });
+
+test('empty minimum history never presents a failed check as an accepted cutoff', { timeout: 30000 }, async context => {
+  const { emptyMinimumHistory } = await import('../scripts/minimum-history.mjs');
+  const data = await readFixture('prices.json');
+  for (const checkedAt of [null, data.generatedAt]) {
+    const history = { ...emptyMinimumHistory(), checkedAt, pendingGap: checkedAt !== null };
+    let fail = false;
+    const session = await minimumHistoryTestPage(context, { historyRoute: route => fail
+      ? route.fulfill({ status: 503, body: '{}' }) : route.fulfill({ json: history }) });
+    if (!session) return;
+    const { page, browser } = session;
+    try {
+      await page.locator('#minimumHistoryButton').click();
+      await page.locator('#minimumHistoryNote').waitFor({ state: 'visible' });
+      assert.match(await page.locator('#minimumHistoryEvents').textContent(), /暂无可核验记录/);
+      assert.equal(await page.locator('#minimumHistoryStatus').textContent(), '');
+      fail = true;
+      await page.locator('#minimumHistoryRetry').dispatchEvent('click');
+      await page.locator('#minimumHistoryRetry').waitFor({ state: 'visible' });
+      assert.doesNotMatch(await page.locator('#minimumHistoryStatus').textContent(), /记录截至/);
+      assert.match(await page.locator('#minimumHistoryEvents').textContent(), /暂无可核验记录/);
+    } finally { await browser.close(); }
+  }
+});

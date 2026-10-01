@@ -903,7 +903,7 @@
     const h = minimumHistoryUi.data;
     const status = document.querySelector('#minimumHistoryStatus');
     const parts = [];
-    const recordedAt = h?.checkpoint?.at || h?.checked_at;
+    const recordedAt = h?.checkpoint?.at;
     if (recordedAt) parts.push(`记录截至 ${dateTime(recordedAt)}`);
     if (minimumHistoryUi.status === 'loading' && !h) parts.push('正在读取…');
     if (minimumHistoryUi.status === 'error') parts.push(h ? '暂无法刷新' : '暂无法读取');
@@ -945,7 +945,7 @@
 
     const list = document.querySelector('#minimumHistoryEvents');
     list.replaceChildren();
-    if (!series.length) list.append(minimumHistoryNode('p', '暂无最低价变更记录。', 'minimum-history-empty'));
+    if (!series.length) list.append(minimumHistoryNode('p', history.checkpoint ? '暂无最低价变更记录。' : '暂无可核验记录。', 'minimum-history-empty'));
     for (const event of series.slice(0, minimumHistoryUi.limit)) {
       const item = minimumHistoryNode('article', '', 'minimum-history-event');
       const meta = minimumHistoryNode('div', '', 'minimum-history-event-meta');

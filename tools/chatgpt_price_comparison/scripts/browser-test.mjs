@@ -159,12 +159,16 @@ try {
   await until(()=>evaluate('document.querySelector("#minimumHistoryDialog")?.open===true'),'minimum history dialog');
   await until(()=>evaluate(`document.querySelector("#minimumHistoryEvents").textContent.trim().length>0 || !document.querySelector("#minimumHistoryRetry").hidden`),'minimum history load');
   assert.equal(await evaluate('document.querySelector("#minimumHistoryRetry").hidden'),true,'committed minimum history loads without entering the isolated error state');
-  assert.match(await evaluate('document.querySelector("#minimumHistoryEvents").textContent'),/暂无最低价变更记录|→/,'minimum history renders an auditable timeline or explicit empty state');
+  assert.match(await evaluate('document.querySelector("#minimumHistoryEvents").textContent'),/暂无最低价变更记录|暂无可核验记录|→/,'minimum history renders an auditable timeline or explicit empty state');
   assert.equal(await evaluate('document.querySelector("#minimumHistoryNote").hidden'),false,'minimum history displays its scope note');
   const acceptedHistoryText = await evaluate('document.querySelector("#minimumHistoryEvents").textContent');
   const acceptedHistoryDate = await evaluate('document.querySelector("#minimumHistoryStatus").textContent');
-  assert.match(acceptedHistoryDate, /记录截至/);
   const badHistory = JSON.parse(await readFile(path.join(root,'tools/chatgpt_price_comparison/data/minimum-history.json'),'utf8'));
+  if (badHistory.checkpoint) assert.match(acceptedHistoryDate, /记录截至/);
+  else {
+    assert.equal(acceptedHistoryDate, '', 'a failed/degraded check without accepted evidence is not a record cutoff');
+    assert.match(acceptedHistoryText, /暂无可核验记录/);
+  }
   const futureHistoryTime = new Date(Date.parse(expected.generated_at)+86400e3).toISOString();
   if (badHistory.events.length) badHistory.events.at(-1).at = futureHistoryTime;
   else badHistory.gaps = [{from:expected.generated_at,to:futureHistoryTime}];
