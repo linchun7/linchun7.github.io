@@ -21,20 +21,24 @@ def api(path, method="GET"):
             return 404, None
         raise RuntimeError("GitHub request failed: " + str(error.code)) from None
 
-assert os.environ["GITHUB_REPOSITORY"] == REPO
+def require(condition, message):
+    if not condition:
+        raise RuntimeError(message)
+
+require(os.environ["GITHUB_REPOSITORY"] == REPO, "Unexpected repository")
 apply = os.environ.get("CLEANUP_APPLY") == "true"
 if apply:
-    assert os.environ["GITHUB_REF"] == "refs/heads/main"
-    assert os.environ["GITHUB_EVENT_NAME"] == "push"
+    require(os.environ["GITHUB_REF"] == "refs/heads/main", "Unexpected ref")
+    require(os.environ["GITHUB_EVENT_NAME"] == "push", "Unexpected event")
     with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as file:
         event = json.load(file)
-    assert "[cleanup-reviewed-branches-20261001]" in event["head_commit"]["message"]
-    assert api("/git/ref/heads/main")[1]["object"]["sha"] == os.environ["GITHUB_SHA"]
+    require("[cleanup-reviewed-branches-20261001]" in event["head_commit"]["message"], "Missing cleanup marker")
+    require(api("/git/ref/heads/main")[1]["object"]["sha"] == os.environ["GITHUB_SHA"], "Main moved")
 for page in range(1, 101):
     status, prs = api("/pulls?state=open&per_page=100&page=" + str(page))
-    assert status == 200
-    assert not any(pr["head"]["repo"] and pr["head"]["repo"]["full_name"] == REPO
-        and pr["head"]["ref"] in {item["name"] for item in TARGETS} for pr in prs)
+    require(status == 200, "Cannot list open PRs")
+    require(not any(pr["head"]["repo"] and pr["head"]["repo"]["full_name"] == REPO
+        and pr["head"]["ref"] in {item["name"] for item in TARGETS} for pr in prs), "A target has an open PR")
     if len(prs) < 100:
         break
 else:
@@ -42,21 +46,28 @@ else:
 # Check the entire fixed manifest before any deletion.
 for item in TARGETS:
     name = item["name"]
-    assert name != "main" and not name.startswith(("prepare/", "duo/"))
+    require(name != "main" and not name.startswith(("prepare/", "duo/")), "Invalid target")
     encoded = urllib.parse.quote(name, safe="")
     status, branch = api("/branches/" + encoded)
-    assert status == 200 and not branch["protected"], name
-    assert branch["commit"]["sha"] == item["sha"], name
+    require(status == 200 and not branch["protected"], "Protected or missing: " + name)
+    require(branch["commit"]["sha"] == item["sha"], "Branch moved: " + name)
     status, ref = api("/git/ref/heads/" + encoded)
-    assert status == 200 and ref["object"]["sha"] == item["sha"], name
+    require(status == 200 and ref["object"]["sha"] == item["sha"], "Ref moved: " + name)
     print("REVIEWED", name, item["sha"], flush=True)
 if apply:
     for item in TARGETS:
         encoded = urllib.parse.quote(item["name"], safe="")
+        require(api("/git/ref/heads/main")[1]["object"]["sha"] == os.environ["GITHUB_SHA"], "Main moved before deletion")
+        status, prs = api("/pulls?state=open&head=" + urllib.parse.quote("linchun7:" + item["name"], safe="") + "&per_page=1")
+        require(status == 200 and not prs, "Target acquired an open PR")
+        status, branch = api("/branches/" + encoded)
+        require(status == 200 and not branch["protected"] and branch["commit"]["sha"] == item["sha"], "Branch changed before deletion")
         status, ref = api("/git/ref/heads/" + encoded)
-        assert status == 200 and ref["object"]["sha"] == item["sha"]
-        assert api("/git/refs/heads/" + encoded, method="DELETE")[0] == 204
-        assert api("/git/ref/heads/" + encoded)[0] == 404
+        require(status == 200 and ref["object"]["sha"] == item["sha"], "Ref changed before deletion")
+        status, _ = api("/git/refs/heads/" + encoded, method="DELETE")
+        require(status == 204, "Deletion was not confirmed")
+        status, _ = api("/git/ref/heads/" + encoded)
+        require(status == 404, "Deleted ref is still present")
         print("DELETED_CONFIRMED", item["name"], item["sha"], flush=True)
 else:
     print("Read-only preflight passed; no branch deleted.", flush=True)
