@@ -117,6 +117,53 @@ try {
   await page.setViewportSize({ width: 320, height: 568 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
 
+
+  // Optional icon delivery must never gate validated prices or controls.
+  for (const mode of ['pending', 'failed', 'malformed']) {
+    const isolated = await browser.newContext();
+    const iconPage = await isolated.newPage();
+    const errors = [];
+    iconPage.on('pageerror', error => errors.push(error.message));
+    let releaseIcons;
+    const held = new Promise(resolve => { releaseIcons = resolve; });
+    let requested = false;
+    await iconPage.route('**/vendor/lucide-subset.js?v=*', async route => {
+      requested = true;
+      if (mode === 'failed') return route.abort();
+      if (mode === 'malformed') return route.fulfill({ contentType: 'text/javascript', body: 'export {' });
+      await held;
+      return route.continue();
+    });
+    try {
+      await iconPage.goto(url, { waitUntil: 'commit' });
+      await iconPage.waitForFunction(() => document.querySelector('.country-history-button:not(:disabled)'));
+      assert.equal(requested, true, mode + ': icon delivery was intercepted');
+      await iconPage.locator('#searchInput').fill('美国');
+      await iconPage.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length === 1);
+      assert.equal(await iconPage.locator('#priceRows tr').getAttribute('data-market-id'), 'us');
+      await iconPage.locator('button[data-sort="country"]').click();
+      await iconPage.locator('#priceRows .country-history-button').click();
+      await iconPage.waitForSelector('#historyDialog[open]');
+      await iconPage.locator('#closeHistory').click();
+      await iconPage.locator('#minimumHistoryButton').click();
+      await iconPage.waitForSelector('#minimumHistoryDialog[open]');
+      await iconPage.waitForFunction(() => document.querySelector('#minimumHistoryEvents').textContent.trim().length > 0);
+      await iconPage.locator('#closeMinimumHistory').click();
+      if (mode === 'pending') {
+        assert.equal(await iconPage.locator('.search-field svg').count(), 0);
+        releaseIcons();
+        await iconPage.waitForSelector('.search-field svg');
+        assert.equal(await iconPage.locator('#searchInput').inputValue(), '美国');
+        assert.equal(await iconPage.locator('#priceRows tr[data-market-id]').count(), 1);
+        assert.equal(await iconPage.locator('#rankHeaderLabel > [aria-hidden="true"]').textContent(), '序号');
+      }
+      assert.deepEqual(errors, [], mode + ': no uncaught optional-icon error');
+    } finally {
+      releaseIcons();
+      await isolated.close();
+    }
+  }
+
   const noJs = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 390, height: 844 } });
   const noJsPage = await noJs.newPage();
   await noJsPage.goto(url, { waitUntil: 'domcontentloaded' });

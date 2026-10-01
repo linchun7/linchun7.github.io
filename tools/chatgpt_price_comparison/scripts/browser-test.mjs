@@ -152,7 +152,7 @@ try {
   assert.equal(await evaluate(`document.querySelector('#priceWorkspace .workspace-heading h2').textContent`),'全球 ChatGPT App Store 标价','workspace wording matches iCloud pattern');
   assert.equal(await evaluate(`document.querySelector('#marketCount').textContent`),`${expected.markets.filter(m=>m.offers.length).length} 个地区`,'coverage uses the compact iCloud count wording');
   assert.equal(await evaluate('document.querySelectorAll("#mobilePlanControl button").length'),plans.length,'mobile plan selector includes every plan');
-  assert.equal(await evaluate('document.querySelector(".search-field svg")!==null && document.querySelector("button[data-sort=country] svg")!==null'),true,'Lucide search and sort icons render');
+  await until(() => evaluate('document.querySelector(".search-field svg")!==null && document.querySelector("button[data-sort=country] svg")!==null'), 'optional Lucide search and sort icons render');
   assert.equal(await evaluate('document.querySelector("#refresh")===null && document.querySelector("#plan")===null && document.querySelector("#status")===null'),true,'legacy reload and filters removed');
   assert.equal(await evaluate('document.querySelector("#minimumHistoryButton").disabled'),false,'minimum history action becomes interactive');
   await evaluate('document.querySelector("#minimumHistoryButton").click()');

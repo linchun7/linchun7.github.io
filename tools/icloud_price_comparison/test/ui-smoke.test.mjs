@@ -896,6 +896,7 @@ test('renders current prices, sorting, and country history in a real browser', {
         );
         await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
         assert.equal(await page.locator('th[data-tier-placeholder]').count(), 0, `${viewport.name} price header placeholders must be replaced after data validation`);
+        await page.waitForSelector('.search-field svg');
         const initialResources = await page.evaluate(() => performance.getEntriesByType('resource').map(({ name }) => name));
         assert.equal(initialResources.some((url) => url.includes('/data/history.json')), false, `${viewport.name} must defer history data`);
         assert.equal(initialResources.some((url) => /chart/i.test(url)), false, `${viewport.name} must not request a chart dependency`);
@@ -4408,3 +4409,66 @@ test('empty minimum history never presents a failed check as an accepted cutoff'
     } finally { await browser.close(); }
   }
 });
+
+
+test('optional icons never block validated price interactions', { timeout: 60_000 }, async (context) => {
+  const config = await resolveBrowser(context, 'optional icon isolation');
+  if (!config) return;
+  const server = await startServer();
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  const browser = await config.browserType.launch(config.launchOptions);
+  try {
+    for (const mode of ['pending', 'failed', 'malformed']) {
+      const page = await browser.newPage();
+      const errors = [];
+      page.on('pageerror', error => errors.push(error.message));
+      let releaseIcons;
+      const held = new Promise(resolve => { releaseIcons = resolve; });
+      let requested = false;
+      await page.route('https://**/*', route => route.abort());
+      await page.route('**/vendor/lucide-subset.js?v=*', async route => {
+        requested = true;
+        if (mode === 'failed') return route.abort();
+        if (mode === 'malformed') return route.fulfill({ contentType: 'text/javascript', body: 'export {' });
+        await held;
+        return route.continue();
+      });
+      try {
+        await page.goto(baseUrl + '/', { waitUntil: 'commit' });
+        await page.waitForFunction(() => document.querySelector('#searchInput')?.disabled === false);
+        assert.equal(requested, true, mode + ': icon delivery was intercepted');
+        await page.locator('#searchInput').fill('美国');
+        await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length === 1);
+        const marketId = await page.locator('#priceRows tr').getAttribute('data-market-id');
+        await page.locator('button[data-sort="country"]').click();
+        await page.locator('#priceRows .country-history-button').click();
+        await page.waitForSelector('#historyDialog[open]');
+        await page.locator('#closeHistory').click();
+        await page.locator('#publishedDateButton').click();
+        await page.waitForSelector('#publishedDateDialog[open]');
+        await page.locator('#closePublishedDate').click();
+        await page.locator('#minimumHistoryButton').click();
+        await page.waitForSelector('#minimumHistoryDialog[open]');
+        await page.waitForFunction(() => document.querySelector('#minimumHistoryEvents').textContent.trim().length > 0);
+        await page.locator('#closeMinimumHistory').click();
+        if (mode === 'pending') {
+          assert.equal(await page.locator('.search-field svg').count(), 0);
+          releaseIcons();
+          await page.waitForSelector('.search-field svg');
+          assert.equal(await page.locator('#searchInput').inputValue(), '美国');
+          assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), 1);
+          assert.equal(await page.locator('#priceRows tr').getAttribute('data-market-id'), marketId);
+          assert.equal(await page.locator('#rankHeaderLabel > [aria-hidden="true"]').textContent(), '序号');
+        }
+        assert.deepEqual(errors, [], mode + ': no uncaught optional-icon error');
+      } finally {
+        releaseIcons();
+        await page.close();
+      }
+    }
+  } finally {
+    await browser.close();
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+

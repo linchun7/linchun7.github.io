@@ -908,7 +908,7 @@ def render(data: dict, template: str) -> str:
         'REVISION': data['revision'],
         'PAGE_REVISION': page_revision,
         'COUNT': str(len(priced_markets)),
-        'RESULT_COUNT': str(len(priced_markets)),
+        'RESULT_COUNT': str(len(data['markets'])),
                 'CURRENCY_COUNT': str(len({market.get('currency') for market in priced_markets if market.get('currency')})),
         'PLAN_COUNT': str(len(plans)),
         'PLAN_COUNT_STYLE': str(len(plans)),
