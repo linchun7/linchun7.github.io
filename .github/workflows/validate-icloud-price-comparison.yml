@@ -167,32 +167,3 @@ jobs:
         env:
           PLAYWRIGHT_BROWSER: ${{ matrix.browser }}
         run: node --test test/ui-smoke.test.mjs test/static-descending-url-state.test.mjs
-
-  prepare-reviewed-name-projection:
-    name: 临时生成已审核中文展示投影
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    defaults:
-      run:
-        working-directory: tools/icloud_price_comparison
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version: 22
-      - run: corepack enable && pnpm install --frozen-lockfile --ignore-scripts
-      - run: pnpm render:static && pnpm assets:update
-      - name: 输出可复核的静态投影
-        run: |
-          node --input-type=module <<'NODE'
-          import { readFileSync } from 'node:fs';
-          for (const path of ['index.html', 'data/minimum-history.json']) {
-            const encoded = readFileSync(path).toString('base64');
-            console.log('ZH_PROJECTION_BEGIN ' + path);
-            for (let i = 0; i < encoded.length; i += 8000) console.log('ZH_PROJECTION_CHUNK ' + encoded.slice(i,i+8000));
-            console.log('ZH_PROJECTION_END ' + path);
-          }
-          NODE

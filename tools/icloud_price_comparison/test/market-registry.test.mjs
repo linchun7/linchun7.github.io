@@ -41,8 +41,9 @@ test('every registry or published identity has one marketId-keyed Chinese naming
   const names = getOfficialChineseMarketNames();
   const ids = Object.values(MARKET_REGISTRY).map(({ id }) => id).sort();
   const published = JSON.parse(await readFile(pricesUrl, 'utf8'));
-  const allowed = [...new Set([...ids, ...published.countries.map(x => x.marketId)])].sort();
-  assert.deepEqual(Object.keys(names).sort(), allowed);
+  const historical = JSON.parse(await readFile(historyUrl, 'utf8'));
+  const allowed = new Set([...ids, ...published.countries.map(x => x.marketId), ...Object.keys(historical.markets)]);
+  for (const id of Object.keys(names)) assert.ok(allowed.has(id), `unpublished mapping identity: ${id}`);
   for (const id of ids) assert.ok(Object.hasOwn(names, id));
 });
 

@@ -164,9 +164,6 @@ test('reviewed Chinese page names are sticky history, independent from marketId 
   const displayNames = JSON.parse(await readFile(new URL('../scripts/country-names.zh.json', import.meta.url), 'utf8'));
   assert.equal(displayNames.cg, '刚果共和国', 'explicit human-reviewed binding now exists');
   assert.equal(displayNames.mu, '毛里求斯', 'explicit human-reviewed binding now exists');
-  const fixtureMapping = { example: null };
-  compareMarketNameSets(['既有名称'], ['既有名称', '新名称']);
-  assert.equal(fixtureMapping.example, null, 'label review cannot create an identity binding');
   const futureName = '尚未复核测试地区';
   assert.equal(names.includes(futureName), false);
   assert.deepEqual(compareMarketNameSets(names, [...names, futureName]), { added: [futureName], removed: [] });

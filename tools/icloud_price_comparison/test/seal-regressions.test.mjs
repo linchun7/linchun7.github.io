@@ -56,7 +56,8 @@ test('seal: real CLI exit codes and summary distinguish unchanged, changed, HTTP
   const root = new URL('../', import.meta.url);
   const baseline = JSON.parse(await readFile(new URL('scripts/apple-zh-reviewed-markets.json', root), 'utf8'));
   const mapping = JSON.parse(await readFile(new URL('scripts/country-names.zh.json', root), 'utf8'));
-  const boundNames = Object.values(mapping).filter(name => typeof name === 'string');
+  const published = JSON.parse(await readFile(new URL('data/prices.json', root), 'utf8'));
+  const boundNames = published.countries.map(market => market.nameZh).filter(name => baseline.markets.includes(name));
   const protectedPaths = ['scripts/apple-zh-reviewed-markets.json', 'scripts/country-names.zh.json', 'data/prices.json', 'data/history.json', 'data/run-log.json'];
   const before = await Promise.all(protectedPaths.map((path) => readFile(new URL(path, root), 'utf8')));
   const directory = await mkdtemp(join(tmpdir(), 'icloud-seal-cli-'));
@@ -64,6 +65,7 @@ test('seal: real CLI exit codes and summary distinguish unchanged, changed, HTTP
     const cases = [
       { title: 'unchanged', names: boundNames, code: 0, summary: /未发现新的中文地区名称/ },
       { title: 'removed-only', names: boundNames.slice(1), code: 0, summary: /不告警/ },
+      { title: 'reviewed-but-unapplied', names: [...boundNames, '莫尔多瓦'], code: 1, summary: /尚未显示的官方中文名称：莫尔多瓦/ },
       { title: 'changed', names: [...boundNames.slice(1), '新增测试岛'], code: 1, summary: /新增测试岛/ },
       { title: 'http-unavailable', http: 503, code: 1, summary: /不可用/ },
       { title: 'partial-unavailable', names: ['', ...boundNames.slice(1)], code: 1, summary: /不可用/ },
