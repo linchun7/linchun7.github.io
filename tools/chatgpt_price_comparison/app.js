@@ -761,6 +761,7 @@
       return Date.parse(value);
     };
     const checked = value.checked_at === null ? null : timestamp(value.checked_at);
+    if (checked !== null && checked > Date.now() + 300000) throw Error('最低价历史时间晚于当前时间');
     const first = value.first_observed_at === null ? null : timestamp(value.first_observed_at);
     const checkpoint = value.checkpoint === null ? null : timestamp(value.checkpoint.at);
     if (first !== null && (checked === null || first > checked)) throw Error('历史起点晚于检查时间');

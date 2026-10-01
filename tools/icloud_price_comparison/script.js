@@ -26,7 +26,7 @@ const URL_STATE_REGIONS = new Set(VALID_REGIONS);
 const initialUrlState = new URLSearchParams(location.search);
 const initialQuery = boundedSearchQuery(initialUrlState.get('q') ?? '');
 const sanitizedInitialUrl = createSanitizedStateUrl();
-if (sanitizedInitialUrl.href !== location.href) history.replaceState(null, '', sanitizedInitialUrl);
+replaceUrlState(sanitizedInitialUrl);
 const initialSortKey = initialUrlState.get('sort') === 'country' ? 'country' : 'tier';
 const initialSortDirection = initialUrlState.get('dir') === 'desc' ? 'desc' : 'asc';
 
@@ -1200,6 +1200,15 @@ function syncActiveHistoryCountry() {
 }
 
 
+function replaceUrlState(url) {
+  if (url.href === location.href) return;
+  try {
+    history.replaceState(null, '', url);
+  } catch (error) {
+    console.warn(`地址同步失败：${error.message}`);
+  }
+}
+
 function updateUrlState() {
   const url = serializePriceStateUrl(location.href, {
     sortTier: state.sortTier,
@@ -1207,7 +1216,7 @@ function updateUrlState() {
     sortDirection: state.sortDirection,
     region: state.region
   });
-  history.replaceState(null, '', url);
+  replaceUrlState(url);
 }
 
 function renderMobileTierButtons() {

@@ -4471,3 +4471,63 @@ test('optional icons never block validated price interactions', { timeout: 60_00
     await new Promise(resolve => server.close(resolve));
   }
 });
+
+test('URL synchronization is deduplicated and cannot interrupt table interactions', { timeout: 30_000 }, async (context) => {
+  const config = await resolveBrowser(context, 'resilient URL synchronization');
+  if (!config) return;
+  const data = await readFixture('prices.json');
+  const region = data.countries[0].region;
+  const server = await startServer();
+  const browser = await config.browserType.launch(config.launchOptions);
+  const page = await browser.newPage();
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  try {
+    await page.route('https://**/*', route => route.abort());
+    await page.addInitScript(() => {
+      const original = history.replaceState.bind(history);
+      globalThis.__urlWrites = 0;
+      globalThis.__rejectUrlWrites = false;
+      history.replaceState = (...args) => {
+        globalThis.__urlWrites++;
+        if (globalThis.__rejectUrlWrites) throw new DOMException('Simulated browser quota', 'SecurityError');
+        return original(...args);
+      };
+    });
+    await page.goto(`http://127.0.0.1:${server.address().port}/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#searchInput')?.disabled === false);
+    await page.evaluate(() => {
+      globalThis.__urlWrites = 0;
+      const input = document.querySelector('#searchInput');
+      for (let i = 0; i < 150; i++) {
+        input.value = i % 2 ? '美' : '美国';
+        input.dispatchEvent(new Event('input'));
+      }
+      input.value = '美国';
+      input.dispatchEvent(new Event('input'));
+    });
+    await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length === 1);
+    assert.equal(await page.evaluate(() => globalThis.__urlWrites), 0, 'search never rewrites an unchanged URL');
+    await page.locator('button[data-sort="country"]').click();
+    assert.equal(new URL(page.url()).searchParams.get('sort'), 'country', 'genuine sort changes still update the URL');
+    const acceptedUrl = page.url();
+    await page.evaluate(() => { globalThis.__rejectUrlWrites = true; });
+    await page.locator('button[data-sort="country"]').click();
+    assert.equal(await page.locator('button[data-sort="country"]').evaluate(button => button.closest('th').getAttribute('aria-sort')), 'descending');
+    assert.equal(page.url(), acceptedUrl, 'rejected URL writes do not undo working sort state');
+    await page.locator('#searchInput').fill('');
+    await page.locator('#regionSelect').selectOption(region);
+    await page.waitForFunction(count => document.querySelectorAll('#priceRows tr[data-market-id]').length === count,
+      data.countries.filter(country => country.region === region).length);
+    assert.equal(await page.locator('#regionSelect').inputValue(), region);
+    assert.deepEqual(errors, [], 'optional URL synchronization errors are contained');
+    await page.evaluate(() => { globalThis.__rejectUrlWrites = false; });
+    await page.locator('#regionSelect').selectOption('all');
+    assert.equal(new URL(page.url()).searchParams.get('region'), null);
+    assert.equal(new URL(page.url()).searchParams.get('dir'), 'desc', 'later URL sync captures current working state');
+  } finally {
+    await page.close();
+    await browser.close();
+    await new Promise(resolve => server.close(resolve));
+  }
+});
