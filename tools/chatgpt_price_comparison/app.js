@@ -238,6 +238,21 @@
       validateHistorySnapshot(change.after);
       if (canonical(change.before) === canonical(change.after)) throw Error('历史记录无变化');
     }
+    for (const market of value.markets) {
+      if (!Object.hasOwn(market, 'history_baseline')) continue;
+      const baseline = market.history_baseline;
+      if (!baseline || typeof baseline !== 'object' || Array.isArray(baseline)
+        || Object.keys(baseline).sort().join(',') !== 'at,snapshot') throw Error('历史基线格式错误');
+      let at = baseline.at === null ? -Infinity : Date.parse(baseline.at);
+      if (baseline.at !== null && (typeof baseline.at !== 'string' || !Number.isFinite(at) || at > generatedAt || (market.last_verified_at && at > Date.parse(market.last_verified_at)))) throw Error('历史基线时间错误');
+      validateHistorySnapshot(baseline.snapshot);
+      let snapshot = baseline.snapshot;
+      for (const change of value.changes.filter(entry => entry.code === market.code)) {
+        if (Date.parse(change.at) < at || historySnapshotIdentity(snapshot) !== historySnapshotIdentity(change.before)) throw Error('历史基线不连续');
+        at = Date.parse(change.at); snapshot = change.after;
+      }
+      if (!market.offers.length || historySnapshotIdentity(snapshot) !== historySnapshotIdentity(semantic(market))) throw Error('历史基线与现价不一致');
+    }
     return value;
   }
 
@@ -625,19 +640,29 @@
     const matches = snapshot.offers.filter((offer) => planIdentity(offer.label) === identity);
     return matches.length === 1 ? matches[0] : null;
   }
+  function historySnapshotIdentity(snapshot) {
+    const identities = snapshot.offers.map(offer => planIdentity(offer.label));
+    if (new Set(identities).size !== identities.length) return canonical(snapshot);
+    return canonical({currency: snapshot.currency, offers: snapshot.offers.map((offer,index) => ({
+      label: identities[index], amounts: offer.amounts
+    })).sort((a,b) => a.label.localeCompare(b.label, 'en'))});
+  }
   function historyEvents(market) {
     const changes = state.data.changes.filter((c) => c.code === market.code).sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
     const events = [];
-    if (changes.length) { events.push({ at: changes[0].at, snapshot: changes[0].before }); for (const c of changes) events.push({ at: c.at, snapshot: c.after }); }
+    if (market.history_baseline) events.push(market.history_baseline);
+    else if (changes.length) events.push({at: null, snapshot: changes[0].before});
+    for (const change of changes) events.push({at: change.at, snapshot: change.after});
     const current = semantic(market);
-    const currentAt = market.last_verified_at || state.data.generated_at;
-    if (!events.length || canonical(events.at(-1).snapshot) !== canonical(current)) events.push({ at: currentAt, snapshot: current });
+    if (!events.length) events.push({at: null, snapshot: current});
+    else if (historySnapshotIdentity(events.at(-1).snapshot) !== historySnapshotIdentity(current)) events.push({at: market.last_verified_at || null, snapshot: current});
     return events;
   }
   function compactHistory(events, plan) {
     const out = []; let key = null;
     for (const event of events) {
       const offer = snapshotOffer(event.snapshot, plan), next = `${event.snapshot.currency}|${offer ? offer.amounts.join('/') : '--'}`;
+      if (!out.length && !offer) continue; // A new plan starts at its first observed offer.
       if (next === key) continue; out.push(event); key = next;
     }
     return out;
@@ -666,7 +691,7 @@
     el.historyRows.replaceChildren();
     for (const event of [...events].reverse()) {
       const tr = document.createElement('tr'), when = document.createElement('td'), currency = document.createElement('td'), price = document.createElement('td');
-      when.textContent = dateTime(event.at); currency.textContent = event.snapshot.currency;
+      when.textContent = event.at ? dateTime(event.at) : '时间未记录'; currency.textContent = event.snapshot.currency;
       const oldOffer = snapshotOffer(event.snapshot, state.historyPlan); price.textContent = oldOffer?.amounts?.length ? `${oldOffer.amounts.join(' / ')} ${event.snapshot.currency}` : '—';
       tr.append(when, currency, price); el.historyRows.append(tr);
     }
@@ -707,7 +732,7 @@
   function minimumHistoryCauseLabel(event) {
     const e = event.evidence;
     if (event.cause === 'unknown' && e?.prices_changed === false && e?.scope_changed === false
-      && e?.fx_changed === true && e?.gap === true) return '汇率变化 · 记录有缺口';
+      && e?.fx_changed === true && e?.gap === true) return '汇率等因素';
     return MINIMUM_CAUSE_LABELS[event.cause] || '原因未确定';
   }
 
@@ -884,7 +909,7 @@
       );
       const change = minimumHistoryNode('strong', `${minimumWinnerSummary(event.from)} → ${minimumWinnerSummary(event.to)}`, 'minimum-history-change');
       const cause = minimumHistoryNode('span', minimumHistoryCauseLabel(event), 'minimum-history-cause');
-      if (cause.textContent === '汇率变化 · 记录有缺口') cause.title = '前后标价未变、汇率有变；期间记录不连续，无法完整归因';
+      if (cause.textContent === '汇率等因素') cause.title = '前后标价未变、汇率有变；期间记录不连续，无法完整归因';
       item.append(meta, change, cause); list.append(item);
     }
     document.querySelector('#minimumHistoryMore').hidden = series.length <= minimumHistoryUi.limit;

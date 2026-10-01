@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
+import { identity, offerFor, plansFor } from './browser-oracle.mjs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, firefox, webkit } from 'playwright';
@@ -52,6 +54,40 @@ try {
   assert.match(await page.locator('#minimumHistoryEvents').textContent(), /暂无最低价变更记录|→/);
   assert.equal(await page.locator('#minimumHistoryNote').isHidden(), false);
   await page.locator('#closeMinimumHistory').click();
+
+
+  const priceData = JSON.parse(await readFile(resolve(projectDir, 'data/prices.json'), 'utf8'));
+  const us = priceData.markets.find(market => market.code === 'us');
+  assert.ok(us?.history_baseline, 'US country history must retain an observed baseline');
+  const countryEvents = [us.history_baseline, ...priceData.changes.filter(change => change.code === 'us')
+    .map(change => ({at: change.at, snapshot: change.after}))];
+  await page.locator('#priceRows tr[data-market-id="us"] .country-history-button').click();
+  await page.waitForSelector('#historyDialog[open]');
+  for (const wanted of ['ChatGPT Plus', 'ChatGPT Pro 5x', 'ChatGPT Pro 500']) {
+    const currentOffer = us.offers.find(offer => identity(offer.label) === identity(wanted));
+    if (!currentOffer) continue;
+    const representative = plansFor(priceData).find(plan => identity(plan) === identity(wanted));
+    assert.ok(representative, 'global display representative must exist for a current plan');
+    await page.locator('#historyPlanControl button[data-plan=' + JSON.stringify(representative) + ']').click();
+    const expected = [];
+    let previousKey = null;
+    for (const event of countryEvents) {
+      const offer = offerFor(event.snapshot, wanted);
+      if (!expected.length && !offer) continue;
+      const key = event.snapshot.currency + '|' + (offer ? offer.amounts.join('/') : '--');
+      if (key !== previousKey) expected.push(event);
+      previousKey = key;
+    }
+    const expectedTime = await page.evaluate(at => at === null ? '时间未记录' : new Date(at).toLocaleString('zh-CN', {
+      timeZone:'Asia/Shanghai',hour12:false,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'
+    }), expected[0].at);
+    const rows = page.locator('#historyRows tr');
+    assert.equal(await rows.count(), expected.length);
+    assert.equal(await rows.last().locator('td').first().textContent(), expectedTime);
+    assert.notEqual(await rows.last().locator('td').nth(2).textContent(), '—', 'leading absence is not an observed price');
+    assert.equal(await page.locator('#historyEventCount').textContent(), Math.max(0, expected.length - 1) + ' 次');
+  }
+  await page.locator('#closeHistory').click();
 
   await page.setViewportSize({ width: 641, height: 844 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
