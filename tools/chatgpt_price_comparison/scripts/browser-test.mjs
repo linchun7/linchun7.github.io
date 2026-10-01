@@ -156,6 +156,23 @@ try {
   assert.equal(await evaluate('document.querySelector("#minimumHistoryRetry").hidden'),true,'committed minimum history loads without entering the isolated error state');
   assert.match(await evaluate('document.querySelector("#minimumHistoryEvents").textContent'),/暂无最低价变更记录|→/,'minimum history renders an auditable timeline or explicit empty state');
   assert.equal(await evaluate('document.querySelector("#minimumHistoryNote").hidden'),false,'minimum history displays its scope note');
+  const badHistory = JSON.parse(await readFile(path.join(root,'tools/chatgpt_price_comparison/data/minimum-history.json'),'utf8'));
+  const futureHistoryTime = new Date(Date.parse(expected.generated_at)+86400e3).toISOString();
+  if (badHistory.events.length) badHistory.events.at(-1).at = futureHistoryTime;
+  else badHistory.gaps = [{from:expected.generated_at,to:futureHistoryTime}];
+  await evaluate(`{
+    globalThis.__originalHistoryFetch = globalThis.fetch;
+    const bad = ${JSON.stringify(badHistory)};
+    globalThis.fetch = (input,init) => new URL(input.url || input,location.href).pathname.endsWith('/minimum-history.json')
+      ? Promise.resolve(new Response(JSON.stringify(bad),{status:200,headers:{'content-type':'application/json'}}))
+      : globalThis.__originalHistoryFetch(input,init);
+    document.querySelector('#minimumHistoryRetry').click();
+  }`);
+  await until(()=>evaluate(`!document.querySelector('#minimumHistoryRetry').hidden && document.querySelector('#minimumHistoryStatus').textContent.includes('暂时无法读取')`),'future history is rejected in isolation');
+  assert.ok(await evaluate('document.querySelectorAll("#priceRows tr[data-market-id]").length>0'),'bad history never removes current prices');
+  await evaluate(`{globalThis.fetch=globalThis.__originalHistoryFetch;delete globalThis.__originalHistoryFetch;document.querySelector('#minimumHistoryRetry').click();}`);
+  await until(()=>evaluate(`document.querySelector('#minimumHistoryRetry').hidden && !document.querySelector('#minimumHistoryNote').hidden`),'valid history recovers after retry');
+
   await evaluate('document.querySelector("#closeMinimumHistory").click()');
 
   assert.equal(await evaluate('document.activeElement?.id'), 'minimumHistoryButton', 'minimum history restores focus synchronously');

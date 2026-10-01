@@ -193,9 +193,16 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /validate-data-artifact\.mjs"[\s\S]*?--archive icloud-price-data\.tar[\s\S]*?tar --extract[\s\S]*?--no-same-owner --no-same-permissions[\s\S]*?--data-dir unpacked\/tools\/icloud_price_comparison\/data/);
   assert.doesNotMatch(workflow, /tar -tf icloud-price-data\.tar|find unpacked\/tools\/icloud_price_comparison\/data/);
   assert.match(workflow, /validated_data=.*unpacked\/tools\/icloud_price_comparison\/data[\s\S]*?rm -rf tools\/icloud_price_comparison\/data[\s\S]*?cp -a "\$validated_data" tools\/icloud_price_comparison\/data/);
-  assert.match(workflow, /git add --all tools\/icloud_price_comparison\/data/);
+  assert.match(workflow, /stage-price-publication\.mjs/);
   assert.match(workflow, /generation-base-index\.html[\s\S]*?validate-static-page-update\.mjs[\s\S]*?tools\/icloud_price_comparison\/index\.html/);
-  assert.match(workflow, /git add --all tools\/icloud_price_comparison\/data tools\/icloud_price_comparison\/index\.html/);
+  const stagingSource = await readFile(new URL('../scripts/stage-price-publication.mjs', import.meta.url), 'utf8');
+  assert.match(stagingSource, /git\('add', '--all', '--force', '--', DATA, INDEX\)/);
+  assert.match(stagingSource, /git\('write-tree'\)/);
+  assert.match(stagingSource, /git\('cat-file','blob'/);
+  assert.match(stagingSource, /STAGED_ARTIFACT_BYTES_CHANGED/);
+  assert.match(stagingSource, /validateExtractedDataArtifact\(stagedData\)/);
+  assert.ok(workflow.indexOf('stage-price-publication.mjs') < workflow.indexOf('git commit -m "chore: update iCloud prices"'));
+  assert.match(workflow, /git diff --cached --quiet/);
   assert.doesNotMatch(workflow, /cp -a .*data\/\." tools\/icloud_price_comparison\/data\//, 'publisher must replace the complete validated data directory');
   assert.match(workflow, /GITHUB_TOKEN:\s*\$\{\{ github\.token \}\}[\s\S]*?push origin HEAD:main/);
   assert.match(verifier, /https:\/\/www\.linchun\.com\.cn\/tools\/icloud_price_comparison\/data\/prices\.json/);

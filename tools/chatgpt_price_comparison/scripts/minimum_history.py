@@ -223,12 +223,17 @@ def validate_history(value: dict) -> dict:
     if len(value['gaps']) > 20000 or len(value['events']) > 20000:
         raise ValueError('minimum history too large')
 
+    checked = epoch(value['checked_at']) if value['checked_at'] is not None else None
+    first = epoch(value['first_observed_at']) if value['first_observed_at'] is not None else None
+    if first is not None and (checked is None or first > checked):
+        raise ValueError('minimum history first observation exceeds checked time')
+
     previous_gap = float('-inf')
     for gap in value['gaps']:
         if not isinstance(gap, dict) or set(gap) != {'from','to'}:
             raise ValueError('invalid minimum history gap')
         start, end = epoch(gap['from']), epoch(gap['to'])
-        if start >= end or start < previous_gap:
+        if start >= end or start < previous_gap or checked is None or end > checked:
             raise ValueError('invalid minimum history gap chronology')
         previous_gap = end
 
@@ -240,7 +245,7 @@ def validate_history(value: dict) -> dict:
         if not isinstance(event, dict) or set(event) != keys or not PLAN.fullmatch(event.get('plan','')):
             raise ValueError('invalid minimum history event')
         at = epoch(event['at'])
-        if at < last_at or (event['at'], event['plan']) in seen_event_keys:
+        if checked is None or at > checked or at < last_at or (event['at'], event['plan']) in seen_event_keys:
             raise ValueError('invalid minimum history event chronology')
         seen_event_keys.add((event['at'], event['plan']))
         if event['previous_at'] is not None and epoch(event['previous_at']) >= at:
@@ -261,6 +266,8 @@ def validate_history(value: dict) -> dict:
         else:
             if previous is None or event['previous_at'] is None or winner_ids(previous['to']) != winner_ids(event['from']) or winner_ids(event['from']) == winner_ids(event['to']):
                 raise ValueError('invalid minimum history event chain')
+            if epoch(event['previous_at']) < epoch(previous['at']):
+                raise ValueError('minimum history previous observation predates its event chain')
             if event['cause'] != cause_for(evidence):
                 raise ValueError('invalid minimum history cause')
         latest[event['plan']] = event
@@ -270,10 +277,15 @@ def validate_history(value: dict) -> dict:
     if checkpoint is not None:
         if not isinstance(checkpoint, dict) or set(checkpoint) != {'at','revision','fx','plans'}:
             raise ValueError('invalid minimum history checkpoint')
-        epoch(checkpoint['at'])
+        checkpoint_at = epoch(checkpoint['at'])
+        if checked is None or checkpoint_at > checked or first is None or first > checkpoint_at:
+            raise ValueError('minimum history checkpoint exceeds observation bounds')
+        if last_at > checkpoint_at or previous_gap > checkpoint_at:
+            raise ValueError('minimum history event or completed gap exceeds checkpoint')
         if not SHA.fullmatch(checkpoint.get('revision','')) or not isinstance(checkpoint['fx'], dict) or set(checkpoint['fx']) != {'updated_at','rates'}:
             raise ValueError('invalid minimum history checkpoint metadata')
-        epoch(checkpoint['fx']['updated_at'])
+        if epoch(checkpoint['fx']['updated_at']) > checkpoint_at + 300:
+            raise ValueError('minimum history checkpoint FX timestamp is in the future')
         rates = checkpoint['fx']['rates']
         if not isinstance(rates, dict) or not rates or any(not CURRENCY.fullmatch(k) or not isinstance(v,str) or Decimal(v) <= 0 for k,v in rates.items()):
             raise ValueError('invalid minimum history FX checkpoint')
@@ -294,6 +306,8 @@ def validate_history(value: dict) -> dict:
                 raise ValueError('unordered minimum history checkpoint')
             if winner_ids(latest.get(plan['id'], {'to': []})['to']) != winner_ids(plan['winners']):
                 raise ValueError('minimum history checkpoint does not match event chain')
+    if checkpoint is None and (value['events'] or value['gaps']):
+        raise ValueError('minimum history events require a checkpoint')
     if (value['observations'] == 0) != (checkpoint is None):
         raise ValueError('invalid minimum history observation state')
     if (checkpoint is None) != (value['first_observed_at'] is None):

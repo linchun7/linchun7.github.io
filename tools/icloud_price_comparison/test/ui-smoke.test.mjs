@@ -4220,3 +4220,31 @@ test('country history retains removal and restoration even at the same price', {
     }
   } finally { await browser.close(); }
 });
+
+test('static prices recover after clock correction while JSON stays offline', {timeout:30000}, async context => {
+  const config = await resolveBrowser(context,'offline clock recovery');
+  if (!config) return;
+  const data = await readFixture('prices.json');
+  const server = await startServer();
+  const browser = await config.browserType.launch(config.launchOptions);
+  try {
+    const page = await browser.newPage();
+    await page.addInitScript(now => {Date.now=()=>now;},Date.parse(data.generatedAt)-3600000);
+    await page.route('**/data/prices.json*',route=>route.abort());
+    await page.route('https://**/*',route=>route.abort());
+    await page.goto('http://127.0.0.1:'+server.address().port+'/',{waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>document.querySelector('#updatedAt').textContent.includes('数据时间异常'));
+    await page.waitForFunction(()=>document.querySelector('#priceWorkspace').getAttribute('aria-busy')==='false');
+    await page.evaluate(now=>{Date.now=()=>now;window.dispatchEvent(new Event('pageshow'));},Date.parse(data.generatedAt)+3600000);
+    await page.waitForFunction(()=>document.querySelector('#updatedAt').textContent.includes('更新于'));
+    assert.equal(await page.locator('.minimum-card').count(),data.tiers.length);
+    assert.ok(await page.locator('.minimum-badge').count()>0);
+    assert.equal(await page.locator('#priceRows tr[data-market-id] > td:first-child').first().textContent(),'1');
+    assert.equal(await page.locator('#searchInput').isDisabled(),true,'offline snapshot does not fabricate JSON hydration');
+    await page.locator('#retryButton').click();
+    await page.waitForFunction(()=>!document.querySelector('#retryButton').hidden);
+    assert.match(await page.locator('#updatedAt').textContent(),/更新于/);
+    assert.doesNotMatch(await page.locator('#updatedAt').textContent(),/时间异常/);
+    assert.equal(await page.locator('.minimum-card').count(),data.tiers.length);
+  } finally {await browser.close();}
+});

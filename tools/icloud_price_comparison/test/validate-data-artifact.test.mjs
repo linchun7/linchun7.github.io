@@ -399,6 +399,16 @@ test('rejects semantically invalid run-log evidence', async (t) => {
     ['Apple parser status', (run) => { run.source.appleParserStatus = ''; }],
     ['FX stale type', (run) => { run.source.exchangeRatesStale = 'false'; }],
     ['FX timestamp', (run) => { run.source.exchangeRatesFetchedAtUtc = '2020-01-01T00:00:00.000Z'; }],
+    ['stale future FX', (run) => {
+      run.source.exchangeRatesStale = true;
+      run.source.exchangeRatesFallbackReason = 'request-failed';
+      run.source.exchangeRatesFetchedAtUtc = '2099-01-01T00:00:00.000Z';
+    }],
+    ['stale malformed FX time', (run) => {
+      run.source.exchangeRatesStale = true;
+      run.source.exchangeRatesFallbackReason = 'request-failed';
+      run.source.exchangeRatesFetchedAtUtc = 'invalid';
+    }],
     ['FX source mode', (run) => { run.source.exchangeRatesSourceMode = 'debug'; }],
     ['FX fallback coherence', (run) => {
       run.source.exchangeRatesFallbackUsed = true;

@@ -686,7 +686,7 @@ function isValidRunLogSource(source, run, futureLimit) {
     && isValidIsoTimestamp(source.exchangeRatesFetchedAtUtc)
     && fetchedAtMs <= futureLimit
     && fetchedAtMs <= finishedAtMs + MAX_FUTURE_SKEW_MS
-    && finishedAtMs - fetchedAtMs <= MAX_RUN_FX_AGE_MS;
+    && (source.exchangeRatesStale || finishedAtMs - fetchedAtMs <= MAX_RUN_FX_AGE_MS);
 }
 
 function isValidRunLogCounts(counts) {
