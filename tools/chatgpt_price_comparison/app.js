@@ -755,6 +755,39 @@
       && /^\d+\.\d{2}$/.test(row.cny || '');
   }
 
+  function validateMinimumHistoryTimes(value) {
+    const timestamp = value => {
+      if (typeof value !== 'string' || !Number.isFinite(Date.parse(value))) throw Error('最低价历史时间错误');
+      return Date.parse(value);
+    };
+    const checked = value.checked_at === null ? null : timestamp(value.checked_at);
+    const first = value.first_observed_at === null ? null : timestamp(value.first_observed_at);
+    const checkpoint = value.checkpoint === null ? null : timestamp(value.checkpoint.at);
+    if (first !== null && (checked === null || first > checked)) throw Error('历史起点晚于检查时间');
+    if (checkpoint !== null && (checked === null || checkpoint > checked || first === null || first > checkpoint)) throw Error('历史检查点时间错误');
+    if (checkpoint === null && (value.events.length || value.gaps.length || first !== null)) throw Error('历史缺少检查点');
+    if ((value.observations === 0) !== (checkpoint === null)) throw Error('历史观察次数错误');
+    if (checkpoint !== null && timestamp(value.checkpoint.fx.updated_at) > checkpoint + 300000) throw Error('历史汇率时间异常');
+    let last = -Infinity;
+    for (const gap of value.gaps) {
+      if (!gap || Object.keys(gap).sort().join(',') !== 'from,to') throw Error('历史缺口格式错误');
+      const start = timestamp(gap.from), end = timestamp(gap.to);
+      if (start >= end || start < last || checked === null || end > checked || checkpoint === null || end > checkpoint) throw Error('历史缺口时间错误');
+      last = end;
+    }
+    last = -Infinity;
+    const plans = new Map(), keys = new Set();
+    for (const event of value.events) {
+      const at = timestamp(event.at), key = event.plan + '|' + event.at;
+      if (checked === null || checkpoint === null || at > checked || at > checkpoint || at < last || keys.has(key)) throw Error('历史事件时间错误');
+      const previous = event.previous_at === null ? null : timestamp(event.previous_at);
+      if (previous !== null && (previous >= at || (plans.has(event.plan) && previous < plans.get(event.plan)))) throw Error('历史前序时间错误');
+      plans.set(event.plan, at); keys.add(key); last = at;
+    }
+    if (value.events.length && value.events[0].at !== value.first_observed_at) throw Error('历史起点不一致');
+    if (checkpoint !== null && !value.pending_gap && value.checked_at !== value.checkpoint.at) throw Error('历史检查点未同步');
+  }
+
   function validateMinimumHistory(value) {
     const keys = 'checked_at,checkpoint,events,excluded_versions,first_observed_at,gaps,observations,pending_gap,project_since,schema';
     if (!value || typeof value !== 'object' || Array.isArray(value)
@@ -795,6 +828,7 @@
         throw Error('最低价历史检查点错误');
       }
     }
+    validateMinimumHistoryTimes(value);
     return value;
   }
 

@@ -117,6 +117,40 @@ class MinimumHistoryTests(unittest.TestCase):
                 self.assertFalse(history['pending_gap'])
                 self.assertTrue(h.assert_matches(history, current))
 
+    def test_history_rejects_timestamps_outside_its_observation_bounds(self):
+        data=fixture()
+        baseline=h.advance_history(h.empty_history(),data)
+        cases=[]
+        future=copy.deepcopy(baseline)
+        future['events'][-1]['at']=p.stamp(NOW+86400)
+        cases.append(future)
+        gap=copy.deepcopy(baseline)
+        gap['gaps']=[{'from':p.stamp(NOW-1),'to':p.stamp(NOW+86400)}]
+        cases.append(gap)
+        checkpoint=copy.deepcopy(baseline)
+        checkpoint['pending_gap']=True
+        checkpoint['checkpoint']['at']=p.stamp(NOW+3600)
+        cases.append(checkpoint)
+        backwards=copy.deepcopy(baseline)
+        backwards['pending_gap']=True
+        backwards['checked_at']=p.stamp(NOW-1)
+        cases.append(backwards)
+        no_checkpoint=copy.deepcopy(baseline)
+        no_checkpoint.update(checkpoint=None,observations=0,first_observed_at=None,pending_gap=True)
+        cases.append(no_checkpoint)
+        for index,value in enumerate(cases):
+            with self.subTest(index=index):
+                with self.assertRaises(ValueError):
+                    h.validate_history(value)
+        self.assertTrue(h.assert_matches(baseline,data))
+
+    def test_candidate_check_rejects_future_events_without_changing_prices(self):
+        data=fixture()
+        ledger=h.advance_history(h.empty_history(),data)
+        ledger['events'][-1]['at']=p.stamp(NOW+86400)
+        with self.assertRaises(ValueError):
+            h.assert_matches(ledger,data)
+
     def test_committed_history_matches_prices(self):
         data=json.loads((p.ROOT/'data/prices.json').read_text(encoding='utf-8'))
         history=json.loads((p.ROOT/'data/minimum-history.json').read_text(encoding='utf-8'))

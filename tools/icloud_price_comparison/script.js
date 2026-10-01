@@ -109,6 +109,7 @@ let freshnessBoundaryTimer = null;
 let freshnessRefreshPromise = null;
 let analyticsScheduled = false;
 let staticSnapshotDomDowngraded = false;
+let staticFallbackPresentation = null;
 const staticSnapshotMeta = document.querySelector('meta[name="icloud-price-snapshot"]');
 const staticSnapshotGeneratedAt = staticSnapshotMeta?.content ?? null;
 const staticSnapshotFxStale = staticSnapshotMeta?.dataset.fxStale === 'true';
@@ -1338,7 +1339,7 @@ function scheduleBackToTableUpdate() {
   });
 }
 
-// Static first paint must obey the same age limits even if JSON never loads.
+// Future-clock protection is reversible even while the JSON request remains offline.
 function applyStaticSnapshotFreshness() {
   if (state.data || !hasStaticSnapshot) return null;
   const freshness = classifyPriceFreshness({
@@ -1348,7 +1349,27 @@ function applyStaticSnapshotFreshness() {
   state.dataFreshness = freshness;
   state.minimumCuesEnabled = freshness.status === 'fresh';
   state.minimumCuesReason = freshness.reason;
+  if (freshness.status === 'fresh' && staticFallbackPresentation) {
+    for (const [key, saved] of Object.entries(staticFallbackPresentation)) {
+      const target = elements[key];
+      if (!target) continue;
+      target.replaceChildren(...[...saved.childNodes].map(node => node.cloneNode(true)));
+      target.hidden = saved.hidden;
+    }
+    staticFallbackPresentation = null;
+    staticSnapshotDomDowngraded = false;
+    elements.dataStatus.classList.remove('is-error', 'is-stale');
+    setLoadStatus(state.loading ? '正在检查最新价格…' : '暂时无法获取更新，当前显示最近一次可用价格', {error: !state.loading});
+    // The restored HTML is readable; controls still wait for validated JSON.
+    setFiltersDisabled(true);
+  }
   if (freshness.status !== 'fresh') {
+    if (!staticFallbackPresentation) {
+      staticFallbackPresentation = Object.fromEntries(
+        ['minimumSummary', 'priceRows', 'updatedAt', 'rankHeaderLabel', 'rankingScopeNote', 'overviewNote']
+          .filter(key => elements[key]).map(key => [key, elements[key].cloneNode(true)])
+      );
+    }
     staticSnapshotDomDowngraded = true;
     document.querySelectorAll('.minimum-badge').forEach((badge) => badge.remove());
     document.querySelectorAll('.is-minimum, .rank-top').forEach((element) => element.classList.remove('is-minimum', 'rank-top'));
@@ -1444,6 +1465,7 @@ function applyPriceData(data, { origin = 'network' } = {}) {
   if (snapshotChanged) resetHistoryForPriceSnapshot();
   clearFreshnessBoundary();
   state.data = data;
+  staticFallbackPresentation = null;
   state.dataOrigin = origin;
   if (!state.data.tiers.some(({ id }) => id === state.sortTier)) {
     state.sortTier = state.data.tiers.find(({ id }) => id === DEFAULT_SORT_TIER)?.id || state.data.tiers[0].id;
@@ -1470,6 +1492,7 @@ function hydrateStaticPriceData(data) {
   const freshness = classifyPriceFreshness(data);
   if (freshness.status === 'unusable') throw new Error(`价格数据不可用：${freshness.reason}`);
   state.data = data;
+  staticFallbackPresentation = null;
   state.dataOrigin = 'static-network';
   state.dataFreshness = freshness;
   if (!state.data.tiers.some(({ id }) => id === state.sortTier)) {

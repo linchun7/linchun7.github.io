@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
-import { fork } from 'node:child_process';
+import { fork, execFileSync } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtemp, mkdir, copyFile, readFile, readdir, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, copyFile, cp, readFile, readdir, writeFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import test from 'node:test';
 import { load } from 'cheerio';
+import {stagePricePublication} from '../scripts/stage-price-publication.mjs';
 import { parseApplePrices } from '../scripts/parse-prices.mjs';
 import { createPublishedMarketResolver, resolveMarket } from '../scripts/market-registry.mjs';
 import { main, createNetworkBudget, validateAppleMarketRenameReview, getExchangeRates, fetchResource } from '../scripts/update-prices.mjs';
@@ -60,7 +61,7 @@ async function allBytes(directory) {
   }
   return entries;
 }
-async function run(t, paths, htmls, now) {
+async function run(t, paths, htmls, now, {fxUnavailable = false} = {}) {
   t.mock.timers.setTime(new Date(now).getTime());
   let appleRequests = 0;
   const original = globalThis.fetch;
@@ -71,6 +72,7 @@ async function run(t, paths, htmls, now) {
       const html = htmls[Math.min(appleRequests++, htmls.length - 1)];
       return new Response(html);
     }
+    if (fxUnavailable) return new Response(JSON.stringify({result:'error','error-type':'quota-reached'}));
     const rates = { USD: 1, CNY: 7.2 };
     return new Response(JSON.stringify({ result: 'success', base_code: 'USD', time_last_update_unix: Date.now() / 1000, rates, conversion_rates: rates }));
   };
@@ -309,5 +311,71 @@ test('seal: an unfamiliar heading cannot hide a pricing fragment from both produ
         await validateExtractedDataArtifact(dataDir);
       });
     }
+  }
+});
+
+test('full publication boundary accepts indefinitely retained FX without inventing history', async t => {
+  t.mock.timers.enable({apis:['Date'], now:new Date('2026-04-10T12:00:00Z')});
+  for (const days of [2,8,365,3650]) {
+    const {paths,dataDir} = await fixture(t);
+    const html = sourceHtml(canonicalCountries(), '2026-04-09');
+    const first = await run(t,paths,[html],'2026-04-10T12:00:00Z');
+    const ledger = JSON.parse(await readFile(path.join(dataDir,'minimum-history.json'),'utf8'));
+    const later = new Date(Date.parse(first.prices.generatedAt) + days*86400000).toISOString();
+    const result = await run(t,paths,[html],later,{fxUnavailable:true});
+    assert.equal(result.prices.fx.stale,true);
+    assert.equal(result.prices.fx.fetchedAt,first.prices.fx.fetchedAt);
+    for (const [index,country] of result.prices.countries.entries()) {
+      assert.deepEqual(country.plans,first.prices.countries[index].plans);
+    }
+    const after = JSON.parse(await readFile(path.join(dataDir,'minimum-history.json'),'utf8'));
+    assert.deepEqual(after.events,ledger.events);
+    assert.equal(after.pendingGap,true);
+  }
+});
+
+test('publication stages the exact tested bytes despite repository Git rules', async t => {
+  t.mock.timers.enable({apis:['Date'],now:new Date('2026-04-10T12:00:00Z')});
+  for (const attributes of [false,true]) {
+    const {root,dataDir,paths} = await fixture(t);
+    const first = await run(t,paths,[sourceHtml(canonicalCountries(),'2026-04-09')],'2026-04-10T12:00:00Z');
+    const oldSnapshots = await readdir(paths.snapshotsDir);
+    const shell = await readFile(new URL('../index.html',import.meta.url),'utf8');
+    const firstIndex = renderSeoProjection(replaceStaticFragments(shell,renderStaticFragments(first.prices,first.history)),first.prices);
+    const repoRoot = path.join(root,'repo');
+    const project = path.join(repoRoot,'tools/icloud_price_comparison');
+    await mkdir(project,{recursive:true});
+    await cp(dataDir,path.join(project,'data'),{recursive:true});
+    await writeFile(path.join(project,'index.html'),firstIndex);
+    const git = (...args) => execFileSync('git',args,{cwd:repoRoot,maxBuffer:64*1024*1024,stdio:['pipe','pipe','pipe']}).toString().trim();
+    git('init','-b','main'); git('config','user.name','Fixture'); git('config','user.email','fixture@example.invalid');
+    git('add','--all'); git('commit','-m','baseline');
+    await writeFile(path.join(repoRoot,'.gitignore'),'*.json\n');
+    if (attributes) await writeFile(path.join(repoRoot,'.gitattributes'),'*.json working-tree-encoding=ISO-8859-1\n');
+    git('add','.gitignore');
+    if (attributes) git('add','.gitattributes');
+    git('commit','-m','unrelated repository Git rules');
+    const before = git('rev-parse','HEAD');
+    const candidate = await run(t,paths,[sourceHtml(canonicalCountries(),'2026-04-10')],'2026-04-11T12:00:00Z');
+    const validatedIndex = path.join(root,'candidate.html'), baseIndex = path.join(root,'base.html');
+    await writeFile(baseIndex,firstIndex);
+    await writeFile(validatedIndex,renderSeoProjection(replaceStaticFragments(shell,renderStaticFragments(candidate.prices,candidate.history)),candidate.prices));
+    await rm(path.join(project,'data'),{recursive:true,force:true});
+    await cp(dataDir,path.join(project,'data'),{recursive:true});
+    await copyFile(validatedIndex,path.join(project,'index.html'));
+    const newSnapshot = (await readdir(paths.snapshotsDir)).find(name => name.endsWith('.json') && !oldSnapshots.includes(name));
+    assert.ok(newSnapshot);
+    const relative = 'tools/icloud_price_comparison/data/apple-snapshots/'+newSnapshot;
+    git('add','--all','tools/icloud_price_comparison/data','tools/icloud_price_comparison/index.html');
+    assert.equal(git('ls-files',relative),'','old staging silently omits an ignored new snapshot');
+    const operation = () => stagePricePublication({repoRoot,validatedData:dataDir,validatedIndex,baseIndex});
+    if (attributes) {
+      await assert.rejects(operation,/STAGED_ARTIFACT_BYTES_CHANGED/);
+    } else {
+      const result = await operation();
+      assert.equal(git('ls-files',relative),relative);
+      assert.match(result.tree,/^[a-f0-9]{40}$/);
+    }
+    assert.equal(git('rev-parse','HEAD'),before,'verification never commits or pushes by itself');
   }
 });
