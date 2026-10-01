@@ -37,10 +37,13 @@ test('registry resolves current known markets and generates deterministic identi
   assert.match(first.id, /^apple-new-apple-market-[a-f0-9]{8}$/);
 });
 
-test('every registry identity has one marketId-keyed Chinese naming authority record', () => {
+test('every registry or published identity has one marketId-keyed Chinese naming authority record', async () => {
   const names = getOfficialChineseMarketNames();
   const ids = Object.values(MARKET_REGISTRY).map(({ id }) => id).sort();
-  assert.deepEqual(Object.keys(names).sort(), ids);
+  const published = JSON.parse(await readFile(pricesUrl, 'utf8'));
+  const allowed = [...new Set([...ids, ...published.countries.map(x => x.marketId)])].sort();
+  assert.deepEqual(Object.keys(names).sort(), allowed);
+  for (const id of ids) assert.ok(Object.hasOwn(names, id));
 });
 
 test('pending Chinese names fall back to Apple English without blocking identity attachment', () => {
