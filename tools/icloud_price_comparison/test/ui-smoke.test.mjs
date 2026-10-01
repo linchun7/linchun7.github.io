@@ -4196,6 +4196,7 @@ test('country history retains removal and restoration even at the same price', {
   try {
     for (const difference of [0, 0.25]) {
       const history = structuredClone(baseHistory);
+      history.updatedAt = data.generatedAt;
       const currentPlans = Object.fromEntries(data.tiers.map(item => [item.id, country.plans[item.id].price]));
       const missing = {...currentPlans}; delete missing[tier.id];
       const earlier = {...currentPlans, [tier.id]: currentPlans[tier.id] + difference};

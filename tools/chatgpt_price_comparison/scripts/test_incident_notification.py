@@ -73,6 +73,8 @@ else:
             ({'GENERATE':'failure','GENERATE_STAGE':'候选或浏览器验收'},'候选或浏览器验收'),
             ({'PUBLISH':'failure','PUBLISH_STAGE':'Pages 部署'},'Pages 部署'),
             ({'VERIFY':'failure'},'线上生产验证'),
+            ({'VERIFY':'cancelled'},'线上生产验证'),
+            ({'SHOULD_RUN':'false','EXISTING_VERIFY':'skipped'},'线上生产验证'),
         ]:
             with self.subTest(label=label):
                 self.assertIn(label, self.run_notification(**environment)[0]['body'])

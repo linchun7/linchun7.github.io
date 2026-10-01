@@ -450,7 +450,7 @@ jobs:
             elif [[ "$SHOULD_RUN" == true && "$PUBLISH" != success ]]; then
               stage="${PUBLISH_STAGE:-环境准备}"
               advice='检查工件、并发提交或 Pages 状态；并发保护拒绝旧候选时从当前 main 新运行，勿强推覆盖。'
-            elif [[ "$VERIFY" == failure || "$EXISTING_VERIFY" == failure ]]; then
+            elif [[ "$SHOULD_RUN" == true && "$VERIFY" != success ]] || [[ "$SHOULD_RUN" != true && "$EXISTING_VERIFY" != success ]]; then
               stage='线上生产验证'
               advice='检查 Pages 构建和线上 JSON、HTML、资源版本是否一致；未确认上线前不能关闭告警。'
             fi

@@ -953,7 +953,7 @@ def source_summary(markets: list[dict], fx: dict | None = None) -> str:
     if details:
         text += '；示例 ' + ', '.join(details[:5])
     if fx is not None:
-        text += '；汇率' + ('沿用，源日期未改变' if fx.get('fallback') else '来源核验成功')
+        text += '；汇率' + ('不可用' if fx.get('unavailable') else '沿用，源日期未改变' if fx.get('fallback') else '来源核验成功')
     return clean(text)[:700]
 
 
@@ -1019,13 +1019,13 @@ def run(output: Path, now: float | None = None) -> dict:
         source_confirmed = 0
     required_currencies = {m.get('currency') for m in markets if m.get('offers') and m.get('currency')}
     fx = collect_fx(now, old.get('fx') if old else None, fx_getter, required_currencies)
+    report_source_summary(markets, fx if fx is not None else {'unavailable': True})
     if fx is None:
         raise ValueError('no usable FX snapshot; existing publication left untouched')
     if retained_source and fx.get('fallback'):
         raise ValueError('no newly verified FX snapshot for retained prices; existing publication left untouched')
     if retained_source and any(currency not in fx['rates'] for currency in required_currencies):
         raise ValueError('incomplete FX snapshot for retained prices; existing publication left untouched')
-    report_source_summary(markets, fx)
     for market in markets:
         for offer in market['offers']:
             for price in offer['amounts']:

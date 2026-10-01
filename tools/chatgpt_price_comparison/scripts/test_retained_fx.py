@@ -79,6 +79,23 @@ class RetainedFxTests(unittest.TestCase):
             self.assertEqual(recorded['checkpoint'], history['checkpoint'])
             self.assertTrue(recorded['pending_gap'])
             self.assertEqual(json.loads((root/'data/prices.json').read_text()), old)
+            # Simulate atomic publication, then a genuine source recovery.
+            for name in ['prices.json', 'minimum-history.json']:
+                (root/'data'/name).write_bytes((root/'candidate'/name).read_bytes())
+            recovered_fx = dict(fx, updated_at=p.stamp(NOW+7200))
+            def recovered(item, prior, now, getter, **kwargs):
+                market = copy.deepcopy(prior)
+                market.update(status='verified', last_checked_at=p.stamp(now), last_verified_at=p.stamp(now))
+                for key in ['error', 'error_detail', 'pending']:
+                    market.pop(key, None)
+                return market
+            with patch.object(p,'ROOT',root), patch.object(p,'observe',side_effect=recovered), patch.object(p,'collect_fx',return_value=recovered_fx):
+                recovered_data = p.run(root/'recovered', NOW+7200)
+            recovered_history = json.loads((root/'recovered/minimum-history.json').read_text())
+            self.assertTrue(all(m['status'] == 'verified' for m in recovered_data['markets']))
+            self.assertEqual(recovered_data['changes'], old['changes'])
+            self.assertFalse(recovered_history['pending_gap'])
+            self.assertEqual(recovered_history['events'][:len(history['events'])], history['events'])
 
     def test_source_and_fx_failure_leave_production_untouched(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -90,6 +107,46 @@ class RetainedFxTests(unittest.TestCase):
                     p.run(root/'candidate', NOW+3600)
             self.assertFalse((root/'candidate').exists())
             self.assertEqual(json.loads((root/'data/prices.json').read_text()), old)
+
+    def test_retained_batch_preserves_prior_change_pending_and_unavailable(self):
+        old=data_fixture()
+        current=old['markets'][0]
+        before=p.semantic(current)
+        before['offers'][0]['amounts']=['7']
+        current['history_baseline']={'at':p.stamp(NOW-86400),'snapshot':before}
+        old['changes']=[{'code':'us','at':p.stamp(NOW-60),'before':before,'after':p.semantic(current)}]
+        pending=copy.deepcopy(current)
+        pending.update(code='jp',name='日本',source_url=p.url_for('jp'),status='pending',
+                       pending={'fingerprint':'b'*64,'since':p.stamp(NOW-60),'reason':'plan_added'})
+        pending.pop('history_baseline')
+        unavailable={'code':'de','name':'德国','source_url':p.url_for('de'),
+                     'last_checked_at':p.stamp(NOW),'status':'unavailable','offers':[]}
+        old['markets'].extend([pending,unavailable])
+        revise(old)
+        p.validate(old,NOW)
+        retained=p.retained_batch(old,old['markets'],{'us','jp','de'},NOW+3600)
+        self.assertEqual(retained[0]['history_baseline'],current['history_baseline'])
+        self.assertEqual(retained[1]['pending'],pending['pending'])
+        self.assertEqual(retained[2]['offers'],[])
+        self.assertEqual(retained[2]['status'],'unavailable')
+        result=copy.deepcopy(old)
+        result.update(markets=retained,generated_at=p.stamp(NOW+3600))
+        revise(result)
+        p.validate(result,NOW+3600)
+        self.assertEqual(result['changes'],old['changes'])
+
+    def test_corrupt_baseline_is_rejected_before_fetch(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)
+            old, _, _=self.baseline(root)
+            old['revision']='0'*64
+            (root/'data/prices.json').write_text(json.dumps(old))
+            with patch.object(p,'ROOT',root), patch.object(p,'observe') as observe, patch.object(p,'collect_fx') as collect:
+                with self.assertRaises(ValueError):
+                    p.run(root/'candidate', NOW+3600)
+                observe.assert_not_called()
+                collect.assert_not_called()
+            self.assertFalse((root/'candidate').exists())
 
     def test_missing_or_changed_baseline_cannot_enter_fx_only_path(self):
         data = data_fixture()
