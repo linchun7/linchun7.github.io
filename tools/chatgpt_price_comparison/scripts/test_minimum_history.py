@@ -341,7 +341,7 @@ const match = source.match(/  function minimumHistoryCauseLabel\(event\) \{[\s\S
 assert.ok(match);
 const label = runInNewContext('(' + match[0].trim() + ')', { MINIMUM_CAUSE_LABELS: {unknown:'原因未能确定',fx:'汇率变化'} });
 const evidence = {prices_changed:false,scope_changed:false,fx_changed:true,gap:true};
-assert.equal(label({cause:'unknown',evidence}), '汇率有变·缺口');
+assert.equal(label({cause:'unknown',evidence}), '汇率等因素');
 for (const [key,value] of [['prices_changed',true],['scope_changed',true],['fx_changed',false],['fx_changed',null],['prices_changed','false']]) {
   assert.equal(label({cause:'unknown',evidence:{...evidence,[key]:value}}), '记录缺口');
 }

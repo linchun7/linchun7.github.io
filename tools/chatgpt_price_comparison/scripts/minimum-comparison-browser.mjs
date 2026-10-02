@@ -13,7 +13,7 @@ export async function assertMinimumComparison(page, projectDir) {
   await page.locator('#minimumHistoryButton').click();
   const row = page.locator('.minimum-history-event').filter({hasText:'瑞士 ¥669.57 → 泰国 ¥668.11'});
   assert.equal(await row.count(), 1, 'one single-line comparison for the actual event');
-  assert.equal(await row.locator('.minimum-history-cause').textContent(), '汇率有变·缺口');
+  assert.equal(await row.locator('.minimum-history-cause').textContent(), '汇率等因素');
   assert.equal(await row.locator('.minimum-history-cause').isVisible(), true, 'gap is visible without hovering');
   const geometry = await row.evaluate(item => {
     const dialog = document.querySelector('#minimumHistoryDialog').getBoundingClientRect();
