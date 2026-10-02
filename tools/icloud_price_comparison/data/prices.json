@@ -1,6 +1,6 @@
 {
   "schemaVersion": 4,
-  "generatedAt": "2026-10-01T05:40:13.656Z",
+  "generatedAt": "2026-10-02T00:06:08.670Z",
   "source": {
     "name": "Apple Support",
     "url": "https://support.apple.com/en-us/108047",
@@ -9,21 +9,21 @@
     "parserStatus": "Both DOM association paths agreed"
   },
   "run": {
-    "startedAtUtc": "2026-10-01T05:40:12.802Z",
-    "finishedAtUtc": "2026-10-01T05:40:13.656Z",
-    "observedAtBeijing": "2026-10-01",
-    "observedAtUtc": "2026-10-01T05:40:13.656Z",
+    "startedAtUtc": "2026-10-02T00:06:08.084Z",
+    "finishedAtUtc": "2026-10-02T00:06:08.670Z",
+    "observedAtBeijing": "2026-10-02",
+    "observedAtUtc": "2026-10-02T00:06:08.670Z",
     "countries": 157,
     "pricePoints": 785
   },
   "fx": {
-    "comparisonFingerprint": "cabd7a0b738391047152769273df6fb922955964b80f57548dc91516dac84345",
+    "comparisonFingerprint": "7ae4b4874a096f2d71a00dc8cf9a6cbf09c2d79c9c1aac97183b5db172711b2c",
     "sourceUrl": "https://v6.exchangerate-api.com/v6/latest/USD",
     "sourceMode": "api-key",
     "fallbackUsed": false,
     "fallbackReason": null,
     "base": "USD",
-    "fetchedAt": "2026-10-01T00:00:01.000Z",
+    "fetchedAt": "2026-10-02T00:00:01.000Z",
     "stale": false,
     "derivedCurrency": "CNY"
   },
@@ -75,19 +75,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -114,19 +114,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -153,19 +153,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -192,19 +192,19 @@
         "2TB": {
           "price": 10.99,
           "formattedPrice": "$10.99",
-          "cnyPrice": 73.82,
+          "cnyPrice": 73.79,
           "cnyRank": 16
         },
         "6TB": {
           "price": 32.99,
           "formattedPrice": "$32.99",
-          "cnyPrice": 221.59,
+          "cnyPrice": 221.51,
           "cnyRank": 17
         },
         "12TB": {
           "price": 64.99,
           "formattedPrice": "$64.99",
-          "cnyPrice": 436.53,
+          "cnyPrice": 436.38,
           "cnyRank": 15
         }
       },
@@ -225,25 +225,25 @@
         "200GB": {
           "price": 3.49,
           "formattedPrice": "$3.49",
-          "cnyPrice": 23.44,
+          "cnyPrice": 23.43,
           "cnyRank": 33
         },
         "2TB": {
           "price": 11.99,
           "formattedPrice": "$11.99",
-          "cnyPrice": 80.54,
-          "cnyRank": 34
+          "cnyPrice": 80.51,
+          "cnyRank": 33
         },
         "6TB": {
           "price": 34.99,
           "formattedPrice": "$34.99",
-          "cnyPrice": 235.02,
+          "cnyPrice": 234.94,
           "cnyRank": 31
         },
         "12TB": {
           "price": 69.99,
           "formattedPrice": "$69.99",
-          "cnyPrice": 470.12,
+          "cnyPrice": 469.95,
           "cnyRank": 30
         }
       },
@@ -270,19 +270,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -309,19 +309,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -348,19 +348,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -375,31 +375,31 @@
         "50GB": {
           "price": 5.9,
           "formattedPrice": "R$ 5.90",
-          "cnyPrice": 7.62,
+          "cnyPrice": 7.63,
           "cnyRank": 31
         },
         "200GB": {
           "price": 19.9,
           "formattedPrice": "R$ 19.90",
-          "cnyPrice": 25.72,
+          "cnyPrice": 25.75,
           "cnyRank": 41
         },
         "2TB": {
           "price": 66.9,
           "formattedPrice": "R$ 66.90",
-          "cnyPrice": 86.46,
-          "cnyRank": 39
+          "cnyPrice": 86.57,
+          "cnyRank": 41
         },
         "6TB": {
           "price": 199.9,
           "formattedPrice": "R$ 199.90",
-          "cnyPrice": 258.34,
+          "cnyPrice": 258.68,
           "cnyRank": 38
         },
         "12TB": {
           "price": 399.9,
           "formattedPrice": "R$ 399.90",
-          "cnyPrice": 516.81,
+          "cnyPrice": 517.49,
           "cnyRank": 38
         }
       },
@@ -414,31 +414,31 @@
         "50GB": {
           "price": 1.29,
           "formattedPrice": "$1.29",
-          "cnyPrice": 6.1,
-          "cnyRank": 7
+          "cnyPrice": 6.09,
+          "cnyRank": 8
         },
         "200GB": {
           "price": 3.99,
           "formattedPrice": "$3.99",
-          "cnyPrice": 18.87,
+          "cnyPrice": 18.83,
           "cnyRank": 4
         },
         "2TB": {
           "price": 12.99,
           "formattedPrice": "$12.99",
-          "cnyPrice": 61.42,
+          "cnyPrice": 61.29,
           "cnyRank": 4
         },
         "6TB": {
           "price": 39.99,
           "formattedPrice": "$39.99",
-          "cnyPrice": 189.09,
+          "cnyPrice": 188.68,
           "cnyRank": 2
         },
         "12TB": {
           "price": 79.99,
           "formattedPrice": "$79.99",
-          "cnyPrice": 378.24,
+          "cnyPrice": 377.42,
           "cnyRank": 4
         }
       },
@@ -465,19 +465,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -499,25 +499,25 @@
           "price": 3290,
           "formattedPrice": "$3290",
           "cnyPrice": 22.7,
-          "cnyRank": 23
+          "cnyRank": 25
         },
         "2TB": {
           "price": 10990,
           "formattedPrice": "$10990",
-          "cnyPrice": 75.83,
-          "cnyRank": 24
+          "cnyPrice": 75.82,
+          "cnyRank": 26
         },
         "6TB": {
           "price": 32990,
           "formattedPrice": "$32990",
-          "cnyPrice": 227.63,
-          "cnyRank": 21
+          "cnyPrice": 227.6,
+          "cnyRank": 23
         },
         "12TB": {
           "price": 64990,
           "formattedPrice": "$64990",
-          "cnyPrice": 448.43,
-          "cnyRank": 19
+          "cnyPrice": 448.37,
+          "cnyRank": 20
         }
       },
       "marketId": "cl",
@@ -531,31 +531,31 @@
         "50GB": {
           "price": 3900,
           "formattedPrice": "$3900",
-          "cnyPrice": 7.86,
+          "cnyPrice": 7.92,
           "cnyRank": 36
         },
         "200GB": {
           "price": 12900,
           "formattedPrice": "$12900",
-          "cnyPrice": 25.99,
-          "cnyRank": 42
+          "cnyPrice": 26.18,
+          "cnyRank": 45
         },
         "2TB": {
           "price": 44900,
           "formattedPrice": "$44900",
-          "cnyPrice": 90.46,
-          "cnyRank": 44
+          "cnyPrice": 91.13,
+          "cnyRank": 45
         },
         "6TB": {
           "price": 129900,
           "formattedPrice": "$129900",
-          "cnyPrice": 261.71,
-          "cnyRank": 40
+          "cnyPrice": 263.65,
+          "cnyRank": 41
         },
         "12TB": {
           "price": 269900,
           "formattedPrice": "$269900",
-          "cnyPrice": 543.76,
+          "cnyPrice": 547.81,
           "cnyRank": 42
         }
       },
@@ -582,19 +582,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -621,19 +621,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -660,19 +660,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -699,19 +699,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -738,19 +738,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -777,19 +777,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -816,19 +816,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -855,19 +855,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -894,19 +894,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -933,19 +933,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -960,31 +960,31 @@
         "50GB": {
           "price": 17,
           "formattedPrice": "$17",
-          "cnyPrice": 6.31,
+          "cnyPrice": 6.24,
           "cnyRank": 9
         },
         "200GB": {
           "price": 49,
           "formattedPrice": "$49",
-          "cnyPrice": 18.19,
+          "cnyPrice": 17.98,
           "cnyRank": 3
         },
         "2TB": {
           "price": 179,
           "formattedPrice": "$179",
-          "cnyPrice": 66.45,
+          "cnyPrice": 65.67,
           "cnyRank": 6
         },
         "6TB": {
           "price": 499,
           "formattedPrice": "$499",
-          "cnyPrice": 185.25,
+          "cnyPrice": 183.07,
           "cnyRank": 1
         },
         "12TB": {
           "price": 999,
           "formattedPrice": "$999",
-          "cnyPrice": 370.88,
+          "cnyPrice": 366.52,
           "cnyRank": 2
         }
       },
@@ -1011,19 +1011,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -1050,19 +1050,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -1089,19 +1089,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -1128,19 +1128,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -1155,31 +1155,31 @@
         "50GB": {
           "price": 3.9,
           "formattedPrice": "S/.3.90",
-          "cnyPrice": 7.61,
-          "cnyRank": 29
+          "cnyPrice": 7.59,
+          "cnyRank": 30
         },
         "200GB": {
           "price": 12.9,
           "formattedPrice": "S/.12.90",
-          "cnyPrice": 25.17,
+          "cnyPrice": 25.1,
           "cnyRank": 39
         },
         "2TB": {
           "price": 42.9,
           "formattedPrice": "S/.42.90",
-          "cnyPrice": 83.71,
+          "cnyPrice": 83.49,
           "cnyRank": 38
         },
         "6TB": {
           "price": 129.9,
           "formattedPrice": "S/.129.90",
-          "cnyPrice": 253.46,
+          "cnyPrice": 252.8,
           "cnyRank": 37
         },
         "12TB": {
           "price": 259.9,
           "formattedPrice": "S/.259.90",
-          "cnyPrice": 507.11,
+          "cnyPrice": 505.79,
           "cnyRank": 37
         }
       },
@@ -1206,19 +1206,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -1245,19 +1245,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -1284,19 +1284,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -1317,25 +1317,25 @@
         "200GB": {
           "price": 3.49,
           "formattedPrice": "$3.49",
-          "cnyPrice": 23.44,
+          "cnyPrice": 23.43,
           "cnyRank": 33
         },
         "2TB": {
           "price": 11.99,
           "formattedPrice": "$11.99",
-          "cnyPrice": 80.54,
-          "cnyRank": 34
+          "cnyPrice": 80.51,
+          "cnyRank": 33
         },
         "6TB": {
           "price": 34.99,
           "formattedPrice": "$34.99",
-          "cnyPrice": 235.02,
+          "cnyPrice": 234.94,
           "cnyRank": 31
         },
         "12TB": {
           "price": 69.99,
           "formattedPrice": "$69.99",
-          "cnyPrice": 470.12,
+          "cnyPrice": 469.95,
           "cnyRank": 30
         }
       },
@@ -1362,19 +1362,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -1401,19 +1401,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -1440,19 +1440,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -1479,19 +1479,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -1518,19 +1518,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -1557,19 +1557,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -1596,19 +1596,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -1635,19 +1635,19 @@
         "2TB": {
           "price": 11.99,
           "formattedPrice": "$11.99",
-          "cnyPrice": 80.54,
-          "cnyRank": 34
+          "cnyPrice": 80.51,
+          "cnyRank": 33
         },
         "6TB": {
           "price": 34.99,
           "formattedPrice": "$34.99",
-          "cnyPrice": 235.02,
+          "cnyPrice": 234.94,
           "cnyRank": 31
         },
         "12TB": {
           "price": 69.99,
           "formattedPrice": "$69.99",
-          "cnyPrice": 470.12,
+          "cnyPrice": 469.95,
           "cnyRank": 30
         }
       },
@@ -1674,19 +1674,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -1713,19 +1713,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -1746,25 +1746,25 @@
         "200GB": {
           "price": 3.49,
           "formattedPrice": "$3.49",
-          "cnyPrice": 23.44,
+          "cnyPrice": 23.43,
           "cnyRank": 33
         },
         "2TB": {
           "price": 11.99,
           "formattedPrice": "$11.99",
-          "cnyPrice": 80.54,
-          "cnyRank": 34
+          "cnyPrice": 80.51,
+          "cnyRank": 33
         },
         "6TB": {
           "price": 34.99,
           "formattedPrice": "$34.99",
-          "cnyPrice": 235.02,
+          "cnyPrice": 234.94,
           "cnyRank": 31
         },
         "12TB": {
           "price": 69.99,
           "formattedPrice": "$69.99",
-          "cnyPrice": 470.12,
+          "cnyPrice": 469.95,
           "cnyRank": 30
         }
       },
@@ -1785,25 +1785,25 @@
         "200GB": {
           "price": 3.49,
           "formattedPrice": "$3.49",
-          "cnyPrice": 23.44,
+          "cnyPrice": 23.43,
           "cnyRank": 33
         },
         "2TB": {
           "price": 11.99,
           "formattedPrice": "$11.99",
-          "cnyPrice": 80.54,
-          "cnyRank": 34
+          "cnyPrice": 80.51,
+          "cnyRank": 33
         },
         "6TB": {
           "price": 34.99,
           "formattedPrice": "$34.99",
-          "cnyPrice": 235.02,
+          "cnyPrice": 234.94,
           "cnyRank": 31
         },
         "12TB": {
           "price": 69.99,
           "formattedPrice": "$69.99",
-          "cnyPrice": 470.12,
+          "cnyPrice": 469.95,
           "cnyRank": 30
         }
       },
@@ -1830,19 +1830,19 @@
         "2TB": {
           "price": 10.99,
           "formattedPrice": "$10.99",
-          "cnyPrice": 73.82,
+          "cnyPrice": 73.79,
           "cnyRank": 16
         },
         "6TB": {
           "price": 32.99,
           "formattedPrice": "$32.99",
-          "cnyPrice": 221.59,
+          "cnyPrice": 221.51,
           "cnyRank": 17
         },
         "12TB": {
           "price": 64.99,
           "formattedPrice": "$64.99",
-          "cnyPrice": 436.53,
+          "cnyPrice": 436.38,
           "cnyRank": 15
         }
       },
@@ -1863,25 +1863,25 @@
         "200GB": {
           "price": 3.49,
           "formattedPrice": "$3.49",
-          "cnyPrice": 23.44,
+          "cnyPrice": 23.43,
           "cnyRank": 33
         },
         "2TB": {
           "price": 11.99,
           "formattedPrice": "$11.99",
-          "cnyPrice": 80.54,
-          "cnyRank": 34
+          "cnyPrice": 80.51,
+          "cnyRank": 33
         },
         "6TB": {
           "price": 34.99,
           "formattedPrice": "$34.99",
-          "cnyPrice": 235.02,
+          "cnyPrice": 234.94,
           "cnyRank": 31
         },
         "12TB": {
           "price": 69.99,
           "formattedPrice": "$69.99",
-          "cnyPrice": 470.12,
+          "cnyPrice": 469.95,
           "cnyRank": 30
         }
       },
@@ -1902,25 +1902,25 @@
         "200GB": {
           "price": 3.49,
           "formattedPrice": "$3.49",
-          "cnyPrice": 23.44,
+          "cnyPrice": 23.43,
           "cnyRank": 33
         },
         "2TB": {
           "price": 11.99,
           "formattedPrice": "$11.99",
-          "cnyPrice": 80.54,
-          "cnyRank": 34
+          "cnyPrice": 80.51,
+          "cnyRank": 33
         },
         "6TB": {
           "price": 34.99,
           "formattedPrice": "$34.99",
-          "cnyPrice": 235.02,
+          "cnyPrice": 234.94,
           "cnyRank": 31
         },
         "12TB": {
           "price": 69.99,
           "formattedPrice": "$69.99",
-          "cnyPrice": 470.12,
+          "cnyPrice": 469.95,
           "cnyRank": 30
         }
       },
@@ -1947,19 +1947,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -1986,19 +1986,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -2013,31 +2013,31 @@
         "50GB": {
           "price": 1.99,
           "formattedPrice": "1.99 лв",
-          "cnyPrice": 7.75,
+          "cnyPrice": 7.7,
           "cnyRank": 33
         },
         "200GB": {
           "price": 5.99,
           "formattedPrice": "5.99 лв",
-          "cnyPrice": 23.33,
-          "cnyRank": 32
+          "cnyPrice": 23.18,
+          "cnyRank": 30
         },
         "2TB": {
           "price": 20.99,
           "formattedPrice": "20.99 лв",
-          "cnyPrice": 81.77,
-          "cnyRank": 36
+          "cnyPrice": 81.21,
+          "cnyRank": 37
         },
         "6TB": {
           "price": 64.99,
           "formattedPrice": "64.99 лв",
-          "cnyPrice": 253.16,
+          "cnyPrice": 251.44,
           "cnyRank": 36
         },
         "12TB": {
           "price": 129.99,
           "formattedPrice": "129.99 лв",
-          "cnyPrice": 506.37,
+          "cnyPrice": 502.93,
           "cnyRank": 36
         }
       },
@@ -2064,19 +2064,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -2097,25 +2097,25 @@
         "200GB": {
           "price": 3.49,
           "formattedPrice": "$3.49",
-          "cnyPrice": 23.44,
+          "cnyPrice": 23.43,
           "cnyRank": 33
         },
         "2TB": {
           "price": 11.99,
           "formattedPrice": "$11.99",
-          "cnyPrice": 80.54,
-          "cnyRank": 34
+          "cnyPrice": 80.51,
+          "cnyRank": 33
         },
         "6TB": {
           "price": 34.99,
           "formattedPrice": "$34.99",
-          "cnyPrice": 235.02,
+          "cnyPrice": 234.94,
           "cnyRank": 31
         },
         "12TB": {
           "price": 69.99,
           "formattedPrice": "$69.99",
-          "cnyPrice": 470.12,
+          "cnyPrice": 469.95,
           "cnyRank": 30
         }
       },
@@ -2142,19 +2142,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -2181,19 +2181,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -2214,25 +2214,25 @@
         "200GB": {
           "price": 3.49,
           "formattedPrice": "$3.49",
-          "cnyPrice": 23.44,
+          "cnyPrice": 23.43,
           "cnyRank": 33
         },
         "2TB": {
           "price": 11.99,
           "formattedPrice": "$11.99",
-          "cnyPrice": 80.54,
-          "cnyRank": 34
+          "cnyPrice": 80.51,
+          "cnyRank": 33
         },
         "6TB": {
           "price": 34.99,
           "formattedPrice": "$34.99",
-          "cnyPrice": 235.02,
+          "cnyPrice": 234.94,
           "cnyRank": 31
         },
         "12TB": {
           "price": 69.99,
           "formattedPrice": "$69.99",
-          "cnyPrice": 470.12,
+          "cnyPrice": 469.95,
           "cnyRank": 30
         }
       },
@@ -2247,32 +2247,32 @@
         "50GB": {
           "price": 0.99,
           "formattedPrice": "0.99 €",
-          "cnyPrice": 7.54,
+          "cnyPrice": 7.49,
           "cnyRank": 28
         },
         "200GB": {
           "price": 2.99,
           "formattedPrice": "2.99 €",
-          "cnyPrice": 22.78,
-          "cnyRank": 26
+          "cnyPrice": 22.63,
+          "cnyRank": 24
         },
         "2TB": {
           "price": 9.99,
           "formattedPrice": "9.99 €",
-          "cnyPrice": 76.11,
-          "cnyRank": 25
+          "cnyPrice": 75.6,
+          "cnyRank": 23
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "29.99 €",
-          "cnyPrice": 228.47,
-          "cnyRank": 23
+          "cnyPrice": 226.95,
+          "cnyRank": 21
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "59.99 €",
-          "cnyPrice": 457.01,
-          "cnyRank": 23
+          "cnyPrice": 453.97,
+          "cnyRank": 22
         }
       },
       "marketId": "hr",
@@ -2286,31 +2286,31 @@
         "50GB": {
           "price": 25,
           "formattedPrice": "25 Kč",
-          "cnyPrice": 7.79,
-          "cnyRank": 35
+          "cnyPrice": 7.73,
+          "cnyRank": 34
         },
         "200GB": {
           "price": 79,
           "formattedPrice": "79 Kč",
-          "cnyPrice": 24.63,
+          "cnyPrice": 24.42,
           "cnyRank": 37
         },
         "2TB": {
           "price": 249,
           "formattedPrice": "249 Kč",
-          "cnyPrice": 77.63,
-          "cnyRank": 30
+          "cnyPrice": 76.98,
+          "cnyRank": 28
         },
         "6TB": {
           "price": 749,
           "formattedPrice": "749 Kč",
-          "cnyPrice": 233.5,
-          "cnyRank": 29
+          "cnyPrice": 231.54,
+          "cnyRank": 26
         },
         "12TB": {
           "price": 1490,
           "formattedPrice": "1490 Kč",
-          "cnyPrice": 464.51,
+          "cnyPrice": 460.62,
           "cnyRank": 25
         }
       },
@@ -2337,19 +2337,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -2364,32 +2364,32 @@
         "50GB": {
           "price": 9,
           "formattedPrice": "9 kr",
-          "cnyPrice": 9.18,
+          "cnyPrice": 9.12,
           "cnyRank": 45
         },
         "200GB": {
           "price": 25,
           "formattedPrice": "25 kr",
-          "cnyPrice": 25.5,
+          "cnyPrice": 25.34,
           "cnyRank": 40
         },
         "2TB": {
           "price": 89,
           "formattedPrice": "89 kr",
-          "cnyPrice": 90.77,
-          "cnyRank": 45
+          "cnyPrice": 90.21,
+          "cnyRank": 44
         },
         "6TB": {
           "price": 269,
           "formattedPrice": "269 kr",
-          "cnyPrice": 274.34,
+          "cnyPrice": 272.65,
           "cnyRank": 44
         },
         "12TB": {
           "price": 549,
           "formattedPrice": "549 kr",
-          "cnyPrice": 559.89,
-          "cnyRank": 45
+          "cnyPrice": 556.45,
+          "cnyRank": 44
         }
       },
       "marketId": "dk",
@@ -2403,31 +2403,31 @@
         "50GB": {
           "price": 49.99,
           "formattedPrice": "E£49.99",
-          "cnyPrice": 6.46,
+          "cnyPrice": 6.42,
           "cnyRank": 14
         },
         "200GB": {
           "price": 179.99,
           "formattedPrice": "E£179.99",
-          "cnyPrice": 23.26,
+          "cnyPrice": 23.12,
           "cnyRank": 29
         },
         "2TB": {
           "price": 599.99,
           "formattedPrice": "E£599.99",
-          "cnyPrice": 77.54,
+          "cnyPrice": 77.06,
           "cnyRank": 29
         },
         "6TB": {
           "price": 1799.99,
           "formattedPrice": "E£1799.99",
-          "cnyPrice": 232.62,
+          "cnyPrice": 231.19,
           "cnyRank": 25
         },
         "12TB": {
           "price": 3599.99,
           "formattedPrice": "E£3599.99",
-          "cnyPrice": 465.25,
+          "cnyPrice": 462.39,
           "cnyRank": 26
         }
       },
@@ -2454,19 +2454,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -2481,32 +2481,32 @@
         "50GB": {
           "price": 0.99,
           "formattedPrice": "0.99 €",
-          "cnyPrice": 7.54,
+          "cnyPrice": 7.49,
           "cnyRank": 28
         },
         "200GB": {
           "price": 2.99,
           "formattedPrice": "2.99 €",
-          "cnyPrice": 22.78,
-          "cnyRank": 26
+          "cnyPrice": 22.63,
+          "cnyRank": 24
         },
         "2TB": {
           "price": 9.99,
           "formattedPrice": "9.99 €",
-          "cnyPrice": 76.11,
-          "cnyRank": 25
+          "cnyPrice": 75.6,
+          "cnyRank": 23
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "29.99 €",
-          "cnyPrice": 228.47,
-          "cnyRank": 23
+          "cnyPrice": 226.95,
+          "cnyRank": 21
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "59.99 €",
-          "cnyPrice": 457.01,
-          "cnyRank": 23
+          "cnyPrice": 453.97,
+          "cnyRank": 22
         }
       },
       "marketId": "euro-zone",
@@ -2532,19 +2532,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -2571,19 +2571,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -2604,25 +2604,25 @@
         "200GB": {
           "price": 3.49,
           "formattedPrice": "$3.49",
-          "cnyPrice": 23.44,
+          "cnyPrice": 23.43,
           "cnyRank": 33
         },
         "2TB": {
           "price": 11.99,
           "formattedPrice": "$11.99",
-          "cnyPrice": 80.54,
-          "cnyRank": 34
+          "cnyPrice": 80.51,
+          "cnyRank": 33
         },
         "6TB": {
           "price": 34.99,
           "formattedPrice": "$34.99",
-          "cnyPrice": 235.02,
+          "cnyPrice": 234.94,
           "cnyRank": 31
         },
         "12TB": {
           "price": 69.99,
           "formattedPrice": "$69.99",
-          "cnyPrice": 470.12,
+          "cnyPrice": 469.95,
           "cnyRank": 30
         }
       },
@@ -2643,25 +2643,25 @@
         "200GB": {
           "price": 3.49,
           "formattedPrice": "$3.49",
-          "cnyPrice": 23.44,
+          "cnyPrice": 23.43,
           "cnyRank": 33
         },
         "2TB": {
           "price": 11.99,
           "formattedPrice": "$11.99",
-          "cnyPrice": 80.54,
-          "cnyRank": 34
+          "cnyPrice": 80.51,
+          "cnyRank": 33
         },
         "6TB": {
           "price": 34.99,
           "formattedPrice": "$34.99",
-          "cnyPrice": 235.02,
+          "cnyPrice": 234.94,
           "cnyRank": 31
         },
         "12TB": {
           "price": 69.99,
           "formattedPrice": "$69.99",
-          "cnyPrice": 470.12,
+          "cnyPrice": 469.95,
           "cnyRank": 30
         }
       },
@@ -2688,19 +2688,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -2715,32 +2715,32 @@
         "50GB": {
           "price": 399,
           "formattedPrice": "399 Ft",
-          "cnyPrice": 8.3,
+          "cnyPrice": 8.19,
           "cnyRank": 40
         },
         "200GB": {
           "price": 1290,
           "formattedPrice": "1290 Ft",
-          "cnyPrice": 26.82,
-          "cnyRank": 47
+          "cnyPrice": 26.49,
+          "cnyRank": 46
         },
         "2TB": {
           "price": 4490,
           "formattedPrice": "4490 Ft",
-          "cnyPrice": 93.35,
+          "cnyPrice": 92.21,
           "cnyRank": 46
         },
         "6TB": {
           "price": 12990,
           "formattedPrice": "12990 Ft",
-          "cnyPrice": 270.06,
+          "cnyPrice": 266.76,
           "cnyRank": 43
         },
         "12TB": {
           "price": 26990,
           "formattedPrice": "26990 Ft",
-          "cnyPrice": 561.11,
-          "cnyRank": 46
+          "cnyPrice": 554.27,
+          "cnyRank": 43
         }
       },
       "marketId": "hu",
@@ -2760,25 +2760,25 @@
         "200GB": {
           "price": 3.69,
           "formattedPrice": "$3.69",
-          "cnyPrice": 24.79,
+          "cnyPrice": 24.78,
           "cnyRank": 38
         },
         "2TB": {
           "price": 11.99,
           "formattedPrice": "$11.99",
-          "cnyPrice": 80.54,
-          "cnyRank": 34
+          "cnyPrice": 80.51,
+          "cnyRank": 33
         },
         "6TB": {
           "price": 34.99,
           "formattedPrice": "$34.99",
-          "cnyPrice": 235.02,
+          "cnyPrice": 234.94,
           "cnyRank": 31
         },
         "12TB": {
           "price": 69.99,
           "formattedPrice": "$69.99",
-          "cnyPrice": 470.12,
+          "cnyPrice": 469.95,
           "cnyRank": 30
         }
       },
@@ -2805,19 +2805,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -2832,31 +2832,31 @@
         "50GB": {
           "price": 3.9,
           "formattedPrice": "₪3.90",
-          "cnyPrice": 8.53,
+          "cnyPrice": 8.51,
           "cnyRank": 42
         },
         "200GB": {
           "price": 11.9,
           "formattedPrice": "₪11.90",
-          "cnyPrice": 26.04,
+          "cnyPrice": 25.97,
           "cnyRank": 43
         },
         "2TB": {
           "price": 39.9,
           "formattedPrice": "₪39.90",
-          "cnyPrice": 87.31,
+          "cnyPrice": 87.09,
           "cnyRank": 42
         },
         "6TB": {
           "price": 119.9,
           "formattedPrice": "₪119.90",
-          "cnyPrice": 262.36,
-          "cnyRank": 41
+          "cnyPrice": 261.71,
+          "cnyRank": 40
         },
         "12TB": {
           "price": 239.9,
           "formattedPrice": "₪239.90",
-          "cnyPrice": 524.93,
+          "cnyPrice": 523.64,
           "cnyRank": 40
         }
       },
@@ -2883,19 +2883,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -2916,25 +2916,25 @@
         "200GB": {
           "price": 3.49,
           "formattedPrice": "$3.49",
-          "cnyPrice": 23.44,
+          "cnyPrice": 23.43,
           "cnyRank": 33
         },
         "2TB": {
           "price": 11.99,
           "formattedPrice": "$11.99",
-          "cnyPrice": 80.54,
-          "cnyRank": 34
+          "cnyPrice": 80.51,
+          "cnyRank": 33
         },
         "6TB": {
           "price": 34.99,
           "formattedPrice": "$34.99",
-          "cnyPrice": 235.02,
+          "cnyPrice": 234.94,
           "cnyRank": 31
         },
         "12TB": {
           "price": 69.99,
           "formattedPrice": "$69.99",
-          "cnyPrice": 470.12,
+          "cnyPrice": 469.95,
           "cnyRank": 30
         }
       },
@@ -2961,19 +2961,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -3000,19 +3000,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -3039,19 +3039,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -3078,19 +3078,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -3117,19 +3117,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -3156,19 +3156,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -3195,19 +3195,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -3234,19 +3234,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -3273,19 +3273,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -3306,25 +3306,25 @@
         "200GB": {
           "price": 3.49,
           "formattedPrice": "$3.49",
-          "cnyPrice": 23.44,
+          "cnyPrice": 23.43,
           "cnyRank": 33
         },
         "2TB": {
           "price": 11.99,
           "formattedPrice": "$11.99",
-          "cnyPrice": 80.54,
-          "cnyRank": 34
+          "cnyPrice": 80.51,
+          "cnyRank": 33
         },
         "6TB": {
           "price": 34.99,
           "formattedPrice": "$34.99",
-          "cnyPrice": 235.02,
+          "cnyPrice": 234.94,
           "cnyRank": 31
         },
         "12TB": {
           "price": 69.99,
           "formattedPrice": "$69.99",
-          "cnyPrice": 470.12,
+          "cnyPrice": 469.95,
           "cnyRank": 30
         }
       },
@@ -3345,25 +3345,25 @@
         "200GB": {
           "price": 3.49,
           "formattedPrice": "$3.49",
-          "cnyPrice": 23.44,
+          "cnyPrice": 23.43,
           "cnyRank": 33
         },
         "2TB": {
           "price": 11.99,
           "formattedPrice": "$11.99",
-          "cnyPrice": 80.54,
-          "cnyRank": 34
+          "cnyPrice": 80.51,
+          "cnyRank": 33
         },
         "6TB": {
           "price": 34.99,
           "formattedPrice": "$34.99",
-          "cnyPrice": 235.02,
+          "cnyPrice": 234.94,
           "cnyRank": 31
         },
         "12TB": {
           "price": 69.99,
           "formattedPrice": "$69.99",
-          "cnyPrice": 470.12,
+          "cnyPrice": 469.95,
           "cnyRank": 30
         }
       },
@@ -3390,19 +3390,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -3429,19 +3429,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -3468,19 +3468,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -3507,19 +3507,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -3546,19 +3546,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -3579,25 +3579,25 @@
         "200GB": {
           "price": 4500,
           "formattedPrice": "₦4500",
-          "cnyPrice": 22.75,
-          "cnyRank": 24
+          "cnyPrice": 22.76,
+          "cnyRank": 26
         },
         "2TB": {
           "price": 14900,
           "formattedPrice": "₦14900",
-          "cnyPrice": 75.33,
-          "cnyRank": 21
+          "cnyPrice": 75.36,
+          "cnyRank": 22
         },
         "6TB": {
           "price": 39900,
           "formattedPrice": "₦39900",
-          "cnyPrice": 201.71,
+          "cnyPrice": 201.79,
           "cnyRank": 6
         },
         "12TB": {
           "price": 66900,
           "formattedPrice": "₦66900",
-          "cnyPrice": 338.21,
+          "cnyPrice": 338.34,
           "cnyRank": 1
         }
       },
@@ -3624,19 +3624,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -3651,32 +3651,32 @@
         "50GB": {
           "price": 12,
           "formattedPrice": "12 kr",
-          "cnyPrice": 8.39,
+          "cnyPrice": 8.37,
           "cnyRank": 41
         },
         "200GB": {
           "price": 39,
           "formattedPrice": "39 kr",
-          "cnyPrice": 27.26,
+          "cnyPrice": 27.19,
           "cnyRank": 48
         },
         "2TB": {
           "price": 129,
           "formattedPrice": "129 kr",
-          "cnyPrice": 90.15,
+          "cnyPrice": 89.95,
           "cnyRank": 43
         },
         "6TB": {
           "price": 399,
           "formattedPrice": "399 kr",
-          "cnyPrice": 278.84,
+          "cnyPrice": 278.21,
           "cnyRank": 45
         },
         "12TB": {
           "price": 799,
           "formattedPrice": "799 kr",
-          "cnyPrice": 558.38,
-          "cnyRank": 43
+          "cnyPrice": 557.11,
+          "cnyRank": 45
         }
       },
       "marketId": "no",
@@ -3702,19 +3702,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -3729,31 +3729,31 @@
         "50GB": {
           "price": 4.99,
           "formattedPrice": "4.99 zł",
-          "cnyPrice": 8.71,
+          "cnyPrice": 8.63,
           "cnyRank": 43
         },
         "200GB": {
           "price": 14.99,
           "formattedPrice": "14.99 zł",
-          "cnyPrice": 26.15,
-          "cnyRank": 44
+          "cnyPrice": 25.91,
+          "cnyRank": 42
         },
         "2TB": {
           "price": 49.99,
           "formattedPrice": "49.99 zł",
-          "cnyPrice": 87.21,
-          "cnyRank": 41
+          "cnyPrice": 86.41,
+          "cnyRank": 40
         },
         "6TB": {
           "price": 149.99,
           "formattedPrice": "149.99 zł",
-          "cnyPrice": 261.67,
+          "cnyPrice": 259.27,
           "cnyRank": 39
         },
         "12TB": {
           "price": 299.99,
           "formattedPrice": "299.99 zł",
-          "cnyPrice": 523.35,
+          "cnyPrice": 518.55,
           "cnyRank": 39
         }
       },
@@ -3774,25 +3774,25 @@
         "200GB": {
           "price": 10.99,
           "formattedPrice": "10.99﷼",
-          "cnyPrice": 20.28,
+          "cnyPrice": 20.27,
           "cnyRank": 11
         },
         "2TB": {
           "price": 36.99,
           "formattedPrice": "36.99﷼",
-          "cnyPrice": 68.26,
+          "cnyPrice": 68.23,
           "cnyRank": 10
         },
         "6TB": {
           "price": 109.99,
           "formattedPrice": "109.99﷼",
-          "cnyPrice": 202.96,
+          "cnyPrice": 202.9,
           "cnyRank": 7
         },
         "12TB": {
           "price": 219.99,
           "formattedPrice": "219.99﷼",
-          "cnyPrice": 405.95,
+          "cnyPrice": 405.81,
           "cnyRank": 8
         }
       },
@@ -3813,25 +3813,25 @@
         "200GB": {
           "price": 3.49,
           "formattedPrice": "$3.49",
-          "cnyPrice": 23.44,
+          "cnyPrice": 23.43,
           "cnyRank": 33
         },
         "2TB": {
           "price": 11.99,
           "formattedPrice": "$11.99",
-          "cnyPrice": 80.54,
-          "cnyRank": 34
+          "cnyPrice": 80.51,
+          "cnyRank": 33
         },
         "6TB": {
           "price": 34.99,
           "formattedPrice": "$34.99",
-          "cnyPrice": 235.02,
+          "cnyPrice": 234.94,
           "cnyRank": 31
         },
         "12TB": {
           "price": 69.99,
           "formattedPrice": "$69.99",
-          "cnyPrice": 470.12,
+          "cnyPrice": 469.95,
           "cnyRank": 30
         }
       },
@@ -3846,31 +3846,31 @@
         "50GB": {
           "price": 4.99,
           "formattedPrice": "4.99 lei",
-          "cnyPrice": 7.21,
-          "cnyRank": 25
+          "cnyPrice": 7.14,
+          "cnyRank": 24
         },
         "200GB": {
           "price": 14.99,
           "formattedPrice": "14.99 lei",
-          "cnyPrice": 21.66,
+          "cnyPrice": 21.45,
           "cnyRank": 16
         },
         "2TB": {
           "price": 49.99,
           "formattedPrice": "49.99 lei",
-          "cnyPrice": 72.22,
+          "cnyPrice": 71.52,
           "cnyRank": 13
         },
         "6TB": {
           "price": 149.99,
           "formattedPrice": "149.99 lei",
-          "cnyPrice": 216.69,
-          "cnyRank": 14
+          "cnyPrice": 214.6,
+          "cnyRank": 13
         },
         "12TB": {
           "price": 299.99,
           "formattedPrice": "299.99 lei",
-          "cnyPrice": 433.39,
+          "cnyPrice": 429.21,
           "cnyRank": 12
         }
       },
@@ -3885,32 +3885,32 @@
         "50GB": {
           "price": 59,
           "formattedPrice": "59 p.",
-          "cnyPrice": 4.72,
+          "cnyPrice": 4.75,
           "cnyRank": 1
         },
         "200GB": {
           "price": 149,
           "formattedPrice": "149 p.",
-          "cnyPrice": 11.91,
+          "cnyPrice": 11.99,
           "cnyRank": 1
         },
         "2TB": {
           "price": 599,
           "formattedPrice": "599 p.",
-          "cnyPrice": 47.89,
+          "cnyPrice": 48.21,
           "cnyRank": 1
         },
         "6TB": {
           "price": 3490,
           "formattedPrice": "3490 p.",
-          "cnyPrice": 279.03,
+          "cnyPrice": 280.87,
           "cnyRank": 46
         },
         "12TB": {
           "price": 6990,
           "formattedPrice": "6990 p.",
-          "cnyPrice": 558.87,
-          "cnyRank": 44
+          "cnyPrice": 562.54,
+          "cnyRank": 46
         }
       },
       "marketId": "ru",
@@ -3936,19 +3936,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -3975,19 +3975,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -4002,32 +4002,32 @@
         "50GB": {
           "price": 3.99,
           "formattedPrice": "3.99﷼",
-          "cnyPrice": 7.15,
-          "cnyRank": 24
+          "cnyPrice": 7.14,
+          "cnyRank": 25
         },
         "200GB": {
           "price": 12.99,
           "formattedPrice": "12.99﷼",
-          "cnyPrice": 23.27,
-          "cnyRank": 30
+          "cnyPrice": 23.26,
+          "cnyRank": 32
         },
         "2TB": {
           "price": 44.99,
           "formattedPrice": "44.99﷼",
-          "cnyPrice": 80.58,
-          "cnyRank": 35
+          "cnyPrice": 80.56,
+          "cnyRank": 34
         },
         "6TB": {
           "price": 129.99,
           "formattedPrice": "129.99﷼",
-          "cnyPrice": 232.83,
-          "cnyRank": 27
+          "cnyPrice": 232.75,
+          "cnyRank": 28
         },
         "12TB": {
           "price": 269.99,
           "formattedPrice": "269.99﷼",
-          "cnyPrice": 483.6,
-          "cnyRank": 33
+          "cnyPrice": 483.43,
+          "cnyRank": 32
         }
       },
       "marketId": "sa",
@@ -4047,25 +4047,25 @@
         "200GB": {
           "price": 3.49,
           "formattedPrice": "$3.49",
-          "cnyPrice": 23.44,
+          "cnyPrice": 23.43,
           "cnyRank": 33
         },
         "2TB": {
           "price": 11.99,
           "formattedPrice": "$11.99",
-          "cnyPrice": 80.54,
-          "cnyRank": 34
+          "cnyPrice": 80.51,
+          "cnyRank": 33
         },
         "6TB": {
           "price": 34.99,
           "formattedPrice": "$34.99",
-          "cnyPrice": 235.02,
+          "cnyPrice": 234.94,
           "cnyRank": 31
         },
         "12TB": {
           "price": 69.99,
           "formattedPrice": "$69.99",
-          "cnyPrice": 470.12,
+          "cnyPrice": 469.95,
           "cnyRank": 30
         }
       },
@@ -4092,19 +4092,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -4131,19 +4131,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -4170,19 +4170,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -4197,32 +4197,32 @@
         "50GB": {
           "price": 14.99,
           "formattedPrice": "R14.99",
-          "cnyPrice": 6.13,
-          "cnyRank": 8
+          "cnyPrice": 6.04,
+          "cnyRank": 7
         },
         "200GB": {
           "price": 59.99,
           "formattedPrice": "R59.99",
-          "cnyPrice": 24.55,
-          "cnyRank": 36
+          "cnyPrice": 24.17,
+          "cnyRank": 35
         },
         "2TB": {
           "price": 199.99,
           "formattedPrice": "R199.99",
-          "cnyPrice": 81.83,
-          "cnyRank": 37
+          "cnyPrice": 80.57,
+          "cnyRank": 35
         },
         "6TB": {
           "price": 599.99,
           "formattedPrice": "R599.99",
-          "cnyPrice": 245.5,
-          "cnyRank": 35
+          "cnyPrice": 241.73,
+          "cnyRank": 34
         },
         "12TB": {
           "price": 1199.99,
           "formattedPrice": "R1199.99",
-          "cnyPrice": 491,
-          "cnyRank": 35
+          "cnyPrice": 483.45,
+          "cnyRank": 33
         }
       },
       "marketId": "za",
@@ -4236,31 +4236,31 @@
         "50GB": {
           "price": 12,
           "formattedPrice": "12 kr",
-          "cnyPrice": 8.06,
-          "cnyRank": 39
+          "cnyPrice": 8.02,
+          "cnyRank": 38
         },
         "200GB": {
           "price": 39,
           "formattedPrice": "39 kr",
-          "cnyPrice": 26.19,
-          "cnyRank": 45
+          "cnyPrice": 26.07,
+          "cnyRank": 44
         },
         "2TB": {
           "price": 129,
           "formattedPrice": "129 kr",
-          "cnyPrice": 86.62,
-          "cnyRank": 40
+          "cnyPrice": 86.23,
+          "cnyRank": 39
         },
         "6TB": {
           "price": 399,
           "formattedPrice": "399 kr",
-          "cnyPrice": 267.9,
+          "cnyPrice": 266.71,
           "cnyRank": 42
         },
         "12TB": {
           "price": 799,
           "formattedPrice": "799 kr",
-          "cnyPrice": 536.48,
+          "cnyPrice": 534.09,
           "cnyRank": 41
         }
       },
@@ -4275,32 +4275,32 @@
         "50GB": {
           "price": 1,
           "formattedPrice": "CHF 1",
-          "cnyPrice": 8.04,
-          "cnyRank": 38
+          "cnyPrice": 8.07,
+          "cnyRank": 39
         },
         "200GB": {
           "price": 3,
           "formattedPrice": "CHF 3",
-          "cnyPrice": 24.12,
-          "cnyRank": 35
+          "cnyPrice": 24.21,
+          "cnyRank": 36
         },
         "2TB": {
           "price": 10,
           "formattedPrice": "CHF 10",
-          "cnyPrice": 80.41,
-          "cnyRank": 33
+          "cnyPrice": 80.69,
+          "cnyRank": 36
         },
         "6TB": {
           "price": 30,
           "formattedPrice": "CHF 30",
-          "cnyPrice": 241.24,
-          "cnyRank": 34
+          "cnyPrice": 242.08,
+          "cnyRank": 35
         },
         "12TB": {
           "price": 60,
           "formattedPrice": "CHF 60",
-          "cnyPrice": 482.48,
-          "cnyRank": 32
+          "cnyPrice": 484.17,
+          "cnyRank": 34
         }
       },
       "marketId": "ch",
@@ -4320,26 +4320,26 @@
         "200GB": {
           "price": 8900,
           "formattedPrice": "8900 TSh",
-          "cnyPrice": 22.57,
-          "cnyRank": 21
+          "cnyPrice": 22.56,
+          "cnyRank": 22
         },
         "2TB": {
           "price": 29900,
           "formattedPrice": "29900 TSh",
-          "cnyPrice": 75.83,
-          "cnyRank": 23
+          "cnyPrice": 75.81,
+          "cnyRank": 25
         },
         "6TB": {
           "price": 89900,
           "formattedPrice": "89900 TSh",
-          "cnyPrice": 227.99,
-          "cnyRank": 22
+          "cnyPrice": 227.93,
+          "cnyRank": 24
         },
         "12TB": {
           "price": 179900,
           "formattedPrice": "179900 TSh",
-          "cnyPrice": 456.23,
-          "cnyRank": 22
+          "cnyPrice": 456.11,
+          "cnyRank": 24
         }
       },
       "marketId": "tz",
@@ -4365,19 +4365,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -4392,31 +4392,31 @@
         "50GB": {
           "price": 49.99,
           "formattedPrice": "49.99 TL",
-          "cnyPrice": 6.85,
+          "cnyPrice": 6.83,
           "cnyRank": 20
         },
         "200GB": {
           "price": 169.99,
           "formattedPrice": "169.99 TL",
-          "cnyPrice": 23.28,
+          "cnyPrice": 23.24,
           "cnyRank": 31
         },
         "2TB": {
           "price": 549.99,
           "formattedPrice": "549.99 TL",
-          "cnyPrice": 75.32,
+          "cnyPrice": 75.19,
           "cnyRank": 20
         },
         "6TB": {
           "price": 1699.99,
           "formattedPrice": "1699.99 TL",
-          "cnyPrice": 232.8,
-          "cnyRank": 26
+          "cnyPrice": 232.39,
+          "cnyRank": 27
         },
         "12TB": {
           "price": 3399.99,
           "formattedPrice": "3399.99 TL",
-          "cnyPrice": 465.61,
+          "cnyPrice": 464.79,
           "cnyRank": 27
         }
       },
@@ -4437,25 +4437,25 @@
         "200GB": {
           "price": 3.49,
           "formattedPrice": "$3.49",
-          "cnyPrice": 23.44,
+          "cnyPrice": 23.43,
           "cnyRank": 33
         },
         "2TB": {
           "price": 11.99,
           "formattedPrice": "$11.99",
-          "cnyPrice": 80.54,
-          "cnyRank": 34
+          "cnyPrice": 80.51,
+          "cnyRank": 33
         },
         "6TB": {
           "price": 34.99,
           "formattedPrice": "$34.99",
-          "cnyPrice": 235.02,
+          "cnyPrice": 234.94,
           "cnyRank": 31
         },
         "12TB": {
           "price": 69.99,
           "formattedPrice": "$69.99",
-          "cnyPrice": 470.12,
+          "cnyPrice": 469.95,
           "cnyRank": 30
         }
       },
@@ -4482,19 +4482,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -4515,25 +4515,25 @@
         "200GB": {
           "price": 11.99,
           "formattedPrice": "AED 11.99",
-          "cnyPrice": 21.93,
+          "cnyPrice": 21.92,
           "cnyRank": 18
         },
         "2TB": {
           "price": 39.99,
           "formattedPrice": "AED 39.99",
-          "cnyPrice": 73.14,
+          "cnyPrice": 73.12,
           "cnyRank": 14
         },
         "6TB": {
           "price": 119.99,
           "formattedPrice": "AED 119.99",
-          "cnyPrice": 219.46,
+          "cnyPrice": 219.38,
           "cnyRank": 16
         },
         "12TB": {
           "price": 239.99,
           "formattedPrice": "AED 239.99",
-          "cnyPrice": 438.94,
+          "cnyPrice": 438.78,
           "cnyRank": 16
         }
       },
@@ -4548,32 +4548,32 @@
         "50GB": {
           "price": 0.99,
           "formattedPrice": "£0.99",
-          "cnyPrice": 8.82,
+          "cnyPrice": 8.78,
           "cnyRank": 44
         },
         "200GB": {
           "price": 2.99,
           "formattedPrice": "£2.99",
-          "cnyPrice": 26.64,
-          "cnyRank": 46
+          "cnyPrice": 26.51,
+          "cnyRank": 47
         },
         "2TB": {
           "price": 8.99,
           "formattedPrice": "£8.99",
-          "cnyPrice": 80.1,
+          "cnyPrice": 79.72,
           "cnyRank": 32
         },
         "6TB": {
           "price": 26.99,
           "formattedPrice": "£26.99",
-          "cnyPrice": 240.47,
+          "cnyPrice": 239.34,
           "cnyRank": 33
         },
         "12TB": {
           "price": 54.99,
           "formattedPrice": "£54.99",
-          "cnyPrice": 489.94,
-          "cnyRank": 34
+          "cnyPrice": 487.63,
+          "cnyRank": 35
         }
       },
       "marketId": "gb",
@@ -4599,19 +4599,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -4632,25 +4632,25 @@
         "200GB": {
           "price": 3.49,
           "formattedPrice": "$3.49",
-          "cnyPrice": 23.44,
+          "cnyPrice": 23.43,
           "cnyRank": 33
         },
         "2TB": {
           "price": 11.99,
           "formattedPrice": "$11.99",
-          "cnyPrice": 80.54,
-          "cnyRank": 34
+          "cnyPrice": 80.51,
+          "cnyRank": 33
         },
         "6TB": {
           "price": 34.99,
           "formattedPrice": "$34.99",
-          "cnyPrice": 235.02,
+          "cnyPrice": 234.94,
           "cnyRank": 31
         },
         "12TB": {
           "price": 69.99,
           "formattedPrice": "$69.99",
-          "cnyPrice": 470.12,
+          "cnyPrice": 469.95,
           "cnyRank": 30
         }
       },
@@ -4671,25 +4671,25 @@
         "200GB": {
           "price": 3.49,
           "formattedPrice": "$3.49",
-          "cnyPrice": 23.44,
+          "cnyPrice": 23.43,
           "cnyRank": 33
         },
         "2TB": {
           "price": 11.99,
           "formattedPrice": "$11.99",
-          "cnyPrice": 80.54,
-          "cnyRank": 34
+          "cnyPrice": 80.51,
+          "cnyRank": 33
         },
         "6TB": {
           "price": 34.99,
           "formattedPrice": "$34.99",
-          "cnyPrice": 235.02,
+          "cnyPrice": 234.94,
           "cnyRank": 31
         },
         "12TB": {
           "price": 69.99,
           "formattedPrice": "$69.99",
-          "cnyPrice": 470.12,
+          "cnyPrice": 469.95,
           "cnyRank": 30
         }
       },
@@ -4704,31 +4704,31 @@
         "50GB": {
           "price": 1.49,
           "formattedPrice": "$1.49",
-          "cnyPrice": 6.96,
+          "cnyPrice": 6.93,
           "cnyRank": 22
         },
         "200GB": {
           "price": 4.49,
           "formattedPrice": "$4.49",
-          "cnyPrice": 20.98,
+          "cnyPrice": 20.89,
           "cnyRank": 13
         },
         "2TB": {
           "price": 14.99,
           "formattedPrice": "$14.99",
-          "cnyPrice": 70.03,
+          "cnyPrice": 69.75,
           "cnyRank": 12
         },
         "6TB": {
           "price": 44.99,
           "formattedPrice": "$44.99",
-          "cnyPrice": 210.19,
+          "cnyPrice": 209.35,
           "cnyRank": 10
         },
         "12TB": {
           "price": 89.99,
           "formattedPrice": "$89.99",
-          "cnyPrice": 420.43,
+          "cnyPrice": 418.74,
           "cnyRank": 10
         }
       },
@@ -4755,19 +4755,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -4794,19 +4794,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -4833,19 +4833,19 @@
         "2TB": {
           "price": 10.99,
           "formattedPrice": "$10.99",
-          "cnyPrice": 73.82,
+          "cnyPrice": 73.79,
           "cnyRank": 16
         },
         "6TB": {
           "price": 32.99,
           "formattedPrice": "$32.99",
-          "cnyPrice": 221.59,
+          "cnyPrice": 221.51,
           "cnyRank": 17
         },
         "12TB": {
           "price": 64.99,
           "formattedPrice": "$64.99",
-          "cnyPrice": 436.53,
+          "cnyPrice": 436.38,
           "cnyRank": 15
         }
       },
@@ -4911,19 +4911,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -4944,25 +4944,25 @@
         "200GB": {
           "price": 23,
           "formattedPrice": "HK$ 23",
-          "cnyPrice": 19.69,
+          "cnyPrice": 19.68,
           "cnyRank": 8
         },
         "2TB": {
           "price": 78,
           "formattedPrice": "HK$ 78",
-          "cnyPrice": 66.77,
+          "cnyPrice": 66.75,
           "cnyRank": 7
         },
         "6TB": {
           "price": 238,
           "formattedPrice": "HK$ 238",
-          "cnyPrice": 203.73,
+          "cnyPrice": 203.66,
           "cnyRank": 8
         },
         "12TB": {
           "price": 468,
           "formattedPrice": "HK$ 468",
-          "cnyPrice": 400.61,
+          "cnyPrice": 400.48,
           "cnyRank": 6
         }
       },
@@ -4977,31 +4977,31 @@
         "50GB": {
           "price": 75,
           "formattedPrice": "Rs 75",
-          "cnyPrice": 5.25,
+          "cnyPrice": 5.23,
           "cnyRank": 3
         },
         "200GB": {
           "price": 219,
           "formattedPrice": "Rs 219",
-          "cnyPrice": 15.32,
+          "cnyPrice": 15.26,
           "cnyRank": 2
         },
         "2TB": {
           "price": 749,
           "formattedPrice": "Rs 749",
-          "cnyPrice": 52.4,
+          "cnyPrice": 52.2,
           "cnyRank": 2
         },
         "6TB": {
           "price": 2999,
           "formattedPrice": "Rs 2999",
-          "cnyPrice": 209.8,
+          "cnyPrice": 209.01,
           "cnyRank": 9
         },
         "12TB": {
           "price": 5900,
           "formattedPrice": "Rs 5900",
-          "cnyPrice": 412.74,
+          "cnyPrice": 411.18,
           "cnyRank": 9
         }
       },
@@ -5016,32 +5016,32 @@
         "50GB": {
           "price": 15000,
           "formattedPrice": "Rp 15000",
-          "cnyPrice": 5.63,
+          "cnyPrice": 5.6,
           "cnyRank": 5
         },
         "200GB": {
           "price": 59000,
           "formattedPrice": "Rp 59000",
-          "cnyPrice": 22.13,
-          "cnyRank": 20
+          "cnyPrice": 22.04,
+          "cnyRank": 19
         },
         "2TB": {
           "price": 199000,
           "formattedPrice": "Rp 199000",
-          "cnyPrice": 74.64,
+          "cnyPrice": 74.35,
           "cnyRank": 18
         },
         "6TB": {
           "price": 599000,
           "formattedPrice": "Rp 599000",
-          "cnyPrice": 224.67,
+          "cnyPrice": 223.78,
           "cnyRank": 18
         },
         "12TB": {
           "price": 1199000,
           "formattedPrice": "Rp 1199000",
-          "cnyPrice": 449.72,
-          "cnyRank": 20
+          "cnyPrice": 447.94,
+          "cnyRank": 19
         }
       },
       "marketId": "id",
@@ -5055,31 +5055,31 @@
         "50GB": {
           "price": 180,
           "formattedPrice": "¥180",
-          "cnyPrice": 7.68,
+          "cnyPrice": 7.65,
           "cnyRank": 32
         },
         "200GB": {
           "price": 540,
           "formattedPrice": "¥540",
-          "cnyPrice": 23.05,
+          "cnyPrice": 22.96,
           "cnyRank": 27
         },
         "2TB": {
           "price": 1800,
           "formattedPrice": "¥1800",
-          "cnyPrice": 76.84,
+          "cnyPrice": 76.54,
           "cnyRank": 27
         },
         "6TB": {
           "price": 5500,
           "formattedPrice": "¥5500",
-          "cnyPrice": 234.8,
+          "cnyPrice": 233.86,
           "cnyRank": 30
         },
         "12TB": {
           "price": 11000,
           "formattedPrice": "¥11000",
-          "cnyPrice": 469.61,
+          "cnyPrice": 467.73,
           "cnyRank": 29
         }
       },
@@ -5094,32 +5094,32 @@
         "50GB": {
           "price": 499,
           "formattedPrice": "₸499",
-          "cnyPrice": 7.62,
-          "cnyRank": 30
+          "cnyPrice": 7.57,
+          "cnyRank": 29
         },
         "200GB": {
           "price": 1490,
           "formattedPrice": "₸1490",
-          "cnyPrice": 22.75,
-          "cnyRank": 25
+          "cnyPrice": 22.61,
+          "cnyRank": 23
         },
         "2TB": {
           "price": 4990,
           "formattedPrice": "₸4990",
-          "cnyPrice": 76.19,
-          "cnyRank": 26
+          "cnyPrice": 75.7,
+          "cnyRank": 24
         },
         "6TB": {
           "price": 14990,
           "formattedPrice": "₸14990",
-          "cnyPrice": 228.87,
-          "cnyRank": 24
+          "cnyPrice": 227.42,
+          "cnyRank": 22
         },
         "12TB": {
           "price": 29990,
           "formattedPrice": "₸29990",
-          "cnyPrice": 457.9,
-          "cnyRank": 24
+          "cnyPrice": 454.99,
+          "cnyRank": 23
         }
       },
       "marketId": "kz",
@@ -5145,19 +5145,19 @@
         "2TB": {
           "price": 10.99,
           "formattedPrice": "$10.99",
-          "cnyPrice": 73.82,
+          "cnyPrice": 73.79,
           "cnyRank": 16
         },
         "6TB": {
           "price": 32.99,
           "formattedPrice": "$32.99",
-          "cnyPrice": 221.59,
+          "cnyPrice": 221.51,
           "cnyRank": 17
         },
         "12TB": {
           "price": 64.99,
           "formattedPrice": "$64.99",
-          "cnyPrice": 436.53,
+          "cnyPrice": 436.38,
           "cnyRank": 15
         }
       },
@@ -5178,25 +5178,25 @@
         "200GB": {
           "price": 3.29,
           "formattedPrice": "$3.29",
-          "cnyPrice": 22.1,
-          "cnyRank": 19
+          "cnyPrice": 22.09,
+          "cnyRank": 20
         },
         "2TB": {
           "price": 10.99,
           "formattedPrice": "$10.99",
-          "cnyPrice": 73.82,
+          "cnyPrice": 73.79,
           "cnyRank": 16
         },
         "6TB": {
           "price": 32.99,
           "formattedPrice": "$32.99",
-          "cnyPrice": 221.59,
+          "cnyPrice": 221.51,
           "cnyRank": 17
         },
         "12TB": {
           "price": 64.99,
           "formattedPrice": "$64.99",
-          "cnyPrice": 436.53,
+          "cnyPrice": 436.38,
           "cnyRank": 15
         }
       },
@@ -5223,19 +5223,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -5250,31 +5250,31 @@
         "50GB": {
           "price": 3.9,
           "formattedPrice": "RM3.90",
-          "cnyPrice": 6.42,
+          "cnyPrice": 6.41,
           "cnyRank": 13
         },
         "200GB": {
           "price": 11.9,
           "formattedPrice": "RM11.90",
-          "cnyPrice": 19.6,
+          "cnyPrice": 19.56,
           "cnyRank": 7
         },
         "2TB": {
           "price": 44.9,
           "formattedPrice": "RM44.90",
-          "cnyPrice": 73.95,
+          "cnyPrice": 73.8,
           "cnyRank": 17
         },
         "6TB": {
           "price": 129.9,
           "formattedPrice": "RM129.90",
-          "cnyPrice": 213.93,
+          "cnyPrice": 213.52,
           "cnyRank": 12
         },
         "12TB": {
           "price": 269.9,
           "formattedPrice": "RM269.90",
-          "cnyPrice": 444.5,
+          "cnyPrice": 443.64,
           "cnyRank": 17
         }
       },
@@ -5301,19 +5301,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -5340,19 +5340,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -5379,19 +5379,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -5418,19 +5418,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -5457,19 +5457,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -5490,25 +5490,25 @@
         "200GB": {
           "price": 3.49,
           "formattedPrice": "$3.49",
-          "cnyPrice": 23.44,
+          "cnyPrice": 23.43,
           "cnyRank": 33
         },
         "2TB": {
           "price": 11.99,
           "formattedPrice": "$11.99",
-          "cnyPrice": 80.54,
-          "cnyRank": 34
+          "cnyPrice": 80.51,
+          "cnyRank": 33
         },
         "6TB": {
           "price": 34.99,
           "formattedPrice": "$34.99",
-          "cnyPrice": 235.02,
+          "cnyPrice": 234.94,
           "cnyRank": 31
         },
         "12TB": {
           "price": 69.99,
           "formattedPrice": "$69.99",
-          "cnyPrice": 470.12,
+          "cnyPrice": 469.95,
           "cnyRank": 30
         }
       },
@@ -5523,31 +5523,31 @@
         "50GB": {
           "price": 1.99,
           "formattedPrice": "$1.99",
-          "cnyPrice": 7.53,
+          "cnyPrice": 7.49,
           "cnyRank": 27
         },
         "200GB": {
           "price": 5.99,
           "formattedPrice": "$5.99",
-          "cnyPrice": 22.68,
-          "cnyRank": 22
+          "cnyPrice": 22.54,
+          "cnyRank": 21
         },
         "2TB": {
           "price": 19.99,
           "formattedPrice": "$19.99",
-          "cnyPrice": 75.68,
-          "cnyRank": 22
+          "cnyPrice": 75.22,
+          "cnyRank": 21
         },
         "6TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 227.11,
+          "cnyPrice": 225.73,
           "cnyRank": 20
         },
         "12TB": {
           "price": 119.99,
           "formattedPrice": "$119.99",
-          "cnyPrice": 454.27,
+          "cnyPrice": 451.49,
           "cnyRank": 21
         }
       },
@@ -5568,25 +5568,25 @@
         "200GB": {
           "price": 800,
           "formattedPrice": "Rs800",
-          "cnyPrice": 19.4,
+          "cnyPrice": 19.39,
           "cnyRank": 6
         },
         "2TB": {
           "price": 2500,
           "formattedPrice": "Rs2500",
-          "cnyPrice": 60.64,
+          "cnyPrice": 60.6,
           "cnyRank": 3
         },
         "6TB": {
           "price": 8900,
           "formattedPrice": "Rs8900",
-          "cnyPrice": 215.87,
-          "cnyRank": 13
+          "cnyPrice": 215.75,
+          "cnyRank": 14
         },
         "12TB": {
           "price": 17900,
           "formattedPrice": "Rs17900",
-          "cnyPrice": 434.17,
+          "cnyPrice": 433.92,
           "cnyRank": 13
         }
       },
@@ -5613,19 +5613,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -5652,19 +5652,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -5680,30 +5680,30 @@
           "price": 59,
           "formattedPrice": "₱59",
           "cnyPrice": 6.31,
-          "cnyRank": 10
+          "cnyRank": 11
         },
         "200GB": {
           "price": 199,
           "formattedPrice": "₱199",
-          "cnyPrice": 21.3,
+          "cnyPrice": 21.27,
           "cnyRank": 15
         },
         "2TB": {
           "price": 699,
           "formattedPrice": "₱699",
-          "cnyPrice": 74.82,
+          "cnyPrice": 74.7,
           "cnyRank": 19
         },
         "6TB": {
           "price": 1990,
           "formattedPrice": "₱1990",
-          "cnyPrice": 212.99,
+          "cnyPrice": 212.67,
           "cnyRank": 11
         },
         "12TB": {
           "price": 3990,
           "formattedPrice": "₱3990",
-          "cnyPrice": 427.06,
+          "cnyPrice": 426.41,
           "cnyRank": 11
         }
       },
@@ -5718,31 +5718,31 @@
         "50GB": {
           "price": 1100,
           "formattedPrice": "₩1100",
-          "cnyPrice": 5.45,
+          "cnyPrice": 5.43,
           "cnyRank": 4
         },
         "200GB": {
           "price": 4400,
           "formattedPrice": "₩4400",
-          "cnyPrice": 21.8,
+          "cnyPrice": 21.73,
           "cnyRank": 17
         },
         "2TB": {
           "price": 14000,
           "formattedPrice": "₩14000",
-          "cnyPrice": 69.37,
+          "cnyPrice": 69.14,
           "cnyRank": 11
         },
         "6TB": {
           "price": 44000,
           "formattedPrice": "₩44000",
-          "cnyPrice": 218.02,
+          "cnyPrice": 217.28,
           "cnyRank": 15
         },
         "12TB": {
           "price": 88000,
           "formattedPrice": "₩88000",
-          "cnyPrice": 436.04,
+          "cnyPrice": 434.56,
           "cnyRank": 14
         }
       },
@@ -5757,31 +5757,31 @@
         "50GB": {
           "price": 1.48,
           "formattedPrice": "S$ 1.48",
-          "cnyPrice": 7.78,
-          "cnyRank": 34
+          "cnyPrice": 7.76,
+          "cnyRank": 35
         },
         "200GB": {
           "price": 3.98,
           "formattedPrice": "S$ 3.98",
-          "cnyPrice": 20.92,
+          "cnyPrice": 20.87,
           "cnyRank": 12
         },
         "2TB": {
           "price": 13.98,
           "formattedPrice": "S$ 13.98",
-          "cnyPrice": 73.49,
+          "cnyPrice": 73.31,
           "cnyRank": 15
         },
         "6TB": {
           "price": 42.98,
           "formattedPrice": "S$ 42.98",
-          "cnyPrice": 225.95,
+          "cnyPrice": 225.39,
           "cnyRank": 19
         },
         "12TB": {
           "price": 84.98,
           "formattedPrice": "S$ 84.98",
-          "cnyPrice": 446.74,
+          "cnyPrice": 445.65,
           "cnyRank": 18
         }
       },
@@ -5808,19 +5808,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -5847,19 +5847,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -5874,31 +5874,31 @@
         "50GB": {
           "price": 30,
           "formattedPrice": "NT$ 30",
-          "cnyPrice": 6.32,
-          "cnyRank": 11
+          "cnyPrice": 6.3,
+          "cnyRank": 10
         },
         "200GB": {
           "price": 90,
           "formattedPrice": "NT$ 90",
-          "cnyPrice": 18.95,
+          "cnyPrice": 18.9,
           "cnyRank": 5
         },
         "2TB": {
           "price": 300,
           "formattedPrice": "NT$ 300",
-          "cnyPrice": 63.17,
+          "cnyPrice": 62.99,
           "cnyRank": 5
         },
         "6TB": {
           "price": 900,
           "formattedPrice": "NT$ 900",
-          "cnyPrice": 189.5,
+          "cnyPrice": 188.97,
           "cnyRank": 3
         },
         "12TB": {
           "price": 1790,
           "formattedPrice": "NT$ 1790",
-          "cnyPrice": 376.89,
+          "cnyPrice": 375.85,
           "cnyRank": 3
         }
       },
@@ -5925,19 +5925,19 @@
         "2TB": {
           "price": 10.99,
           "formattedPrice": "$10.99",
-          "cnyPrice": 73.82,
+          "cnyPrice": 73.79,
           "cnyRank": 16
         },
         "6TB": {
           "price": 32.99,
           "formattedPrice": "$32.99",
-          "cnyPrice": 221.59,
+          "cnyPrice": 221.51,
           "cnyRank": 17
         },
         "12TB": {
           "price": 64.99,
           "formattedPrice": "$64.99",
-          "cnyPrice": 436.53,
+          "cnyPrice": 436.38,
           "cnyRank": 15
         }
       },
@@ -5952,31 +5952,31 @@
         "50GB": {
           "price": 35,
           "formattedPrice": "฿35",
-          "cnyPrice": 7,
+          "cnyPrice": 6.98,
           "cnyRank": 23
         },
         "200GB": {
           "price": 99,
           "formattedPrice": "฿99",
-          "cnyPrice": 19.8,
+          "cnyPrice": 19.75,
           "cnyRank": 9
         },
         "2TB": {
           "price": 399,
           "formattedPrice": "฿399",
-          "cnyPrice": 79.81,
+          "cnyPrice": 79.58,
           "cnyRank": 31
         },
         "6TB": {
           "price": 1190,
           "formattedPrice": "฿1190",
-          "cnyPrice": 238.04,
+          "cnyPrice": 237.36,
           "cnyRank": 32
         },
         "12TB": {
           "price": 2390,
           "formattedPrice": "฿2390",
-          "cnyPrice": 478.07,
+          "cnyPrice": 476.71,
           "cnyRank": 31
         }
       },
@@ -6003,19 +6003,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -6042,19 +6042,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -6081,19 +6081,19 @@
         "2TB": {
           "price": 10.99,
           "formattedPrice": "$10.99",
-          "cnyPrice": 73.82,
+          "cnyPrice": 73.79,
           "cnyRank": 16
         },
         "6TB": {
           "price": 32.99,
           "formattedPrice": "$32.99",
-          "cnyPrice": 221.59,
+          "cnyPrice": 221.51,
           "cnyRank": 17
         },
         "12TB": {
           "price": 64.99,
           "formattedPrice": "$64.99",
-          "cnyPrice": 436.53,
+          "cnyPrice": 436.38,
           "cnyRank": 15
         }
       },
@@ -6120,19 +6120,19 @@
         "2TB": {
           "price": 9.99,
           "formattedPrice": "$9.99",
-          "cnyPrice": 67.1,
+          "cnyPrice": 67.08,
           "cnyRank": 8
         },
         "6TB": {
           "price": 29.99,
           "formattedPrice": "$29.99",
-          "cnyPrice": 201.44,
+          "cnyPrice": 201.37,
           "cnyRank": 5
         },
         "12TB": {
           "price": 59.99,
           "formattedPrice": "$59.99",
-          "cnyPrice": 402.95,
+          "cnyPrice": 402.81,
           "cnyRank": 7
         }
       },
@@ -6147,7 +6147,7 @@
         "50GB": {
           "price": 25000,
           "formattedPrice": "₫25000",
-          "cnyPrice": 6.48,
+          "cnyPrice": 6.47,
           "cnyRank": 15
         },
         "200GB": {
@@ -6159,19 +6159,19 @@
         "2TB": {
           "price": 299000,
           "formattedPrice": "₫299000",
-          "cnyPrice": 77.45,
-          "cnyRank": 28
+          "cnyPrice": 77.42,
+          "cnyRank": 30
         },
         "6TB": {
           "price": 899000,
           "formattedPrice": "₫899000",
-          "cnyPrice": 232.87,
-          "cnyRank": 28
+          "cnyPrice": 232.78,
+          "cnyRank": 29
         },
         "12TB": {
           "price": 1799000,
           "formattedPrice": "₫1799000",
-          "cnyPrice": 466.01,
+          "cnyPrice": 465.82,
           "cnyRank": 28
         }
       },
