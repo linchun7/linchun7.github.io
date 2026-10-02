@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
+import { assertMinimumComparison } from './minimum-comparison-browser.mjs';
 import { identity, offerFor, plansFor } from './browser-oracle.mjs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -54,6 +55,8 @@ try {
   assert.match(await page.locator('#minimumHistoryEvents').textContent(), /暂无最低价变更记录|→/);
   assert.equal(await page.locator('#minimumHistoryNote').isHidden(), false);
   await page.locator('#closeMinimumHistory').click();
+
+  await assertMinimumComparison(page, projectDir);
 
 
 

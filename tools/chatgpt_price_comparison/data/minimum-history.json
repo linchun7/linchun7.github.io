@@ -203,7 +203,67 @@
         "fx_changed": true,
         "gap": false
       },
-      "source_revision": "8b78629d960b335c8779f6481e8290f39d07fcc2a22c84c28f6272bf6b3e608a"
+      "source_revision": "8b78629d960b335c8779f6481e8290f39d07fcc2a22c84c28f6272bf6b3e608a",
+      "comparison": {
+        "at": "2026-09-29T01:06:08Z",
+        "source_revision": "8b78629d960b335c8779f6481e8290f39d07fcc2a22c84c28f6272bf6b3e608a",
+        "source_commit": "a4aeca96d7fd15dde9a0f3e2e9db7c5e01c202e0",
+        "fx": {
+          "updated_at": "2026-09-29T00:02:31Z",
+          "rates": {
+            "CNY": "6.721579",
+            "THB": "33.590728",
+            "USD": "1"
+          }
+        },
+        "from": [
+          {
+            "code": "ar",
+            "name": "阿根廷",
+            "currency": "USD",
+            "local": "100",
+            "cny": "672.16"
+          },
+          {
+            "code": "kw",
+            "name": "科威特",
+            "currency": "USD",
+            "local": "100",
+            "cny": "672.16"
+          },
+          {
+            "code": "lk",
+            "name": "斯里兰卡",
+            "currency": "USD",
+            "local": "100",
+            "cny": "672.16"
+          },
+          {
+            "code": "ma",
+            "name": "摩洛哥",
+            "currency": "USD",
+            "local": "100",
+            "cny": "672.16"
+          },
+          {
+            "code": "us",
+            "name": "美国",
+            "currency": "USD",
+            "local": "100",
+            "cny": "672.16"
+          }
+        ],
+        "to": [
+          {
+            "code": "th",
+            "name": "泰国",
+            "currency": "THB",
+            "local": "3350",
+            "cny": "670.34"
+          }
+        ],
+        "missing": []
+      }
     },
     {
       "plan": "ChatGPT Pro 5x",
@@ -235,7 +295,40 @@
         "fx_changed": true,
         "gap": true
       },
-      "source_revision": "9d3ac41abeb805ce0398b3762f93b742b027183160bfea72de49a5dc1808b9b4"
+      "source_revision": "9d3ac41abeb805ce0398b3762f93b742b027183160bfea72de49a5dc1808b9b4",
+      "comparison": {
+        "at": "2026-09-30T23:34:48Z",
+        "source_revision": "9d3ac41abeb805ce0398b3762f93b742b027183160bfea72de49a5dc1808b9b4",
+        "source_commit": "6008bab40c6e577fb1ecef327ccd0569953197e4",
+        "fx": {
+          "updated_at": "2026-09-30T00:02:31Z",
+          "rates": {
+            "CHF": "0.83425",
+            "CNY": "6.717859",
+            "THB": "33.573288",
+            "USD": "1"
+          }
+        },
+        "from": [
+          {
+            "code": "th",
+            "name": "泰国",
+            "currency": "THB",
+            "local": "3350",
+            "cny": "670.32"
+          }
+        ],
+        "to": [
+          {
+            "code": "ch",
+            "name": "瑞士",
+            "currency": "CHF",
+            "local": "83",
+            "cny": "668.36"
+          }
+        ],
+        "missing": []
+      }
     },
     {
       "plan": "ChatGPT Pro 500",
@@ -259,7 +352,31 @@
         "fx_changed": true,
         "gap": true
       },
-      "source_revision": "9d3ac41abeb805ce0398b3762f93b742b027183160bfea72de49a5dc1808b9b4"
+      "source_revision": "9d3ac41abeb805ce0398b3762f93b742b027183160bfea72de49a5dc1808b9b4",
+      "comparison": {
+        "at": "2026-09-30T23:34:48Z",
+        "source_revision": "9d3ac41abeb805ce0398b3762f93b742b027183160bfea72de49a5dc1808b9b4",
+        "source_commit": "6008bab40c6e577fb1ecef327ccd0569953197e4",
+        "fx": {
+          "updated_at": "2026-09-30T00:02:31Z",
+          "rates": {
+            "CNY": "6.717859",
+            "THB": "33.573288",
+            "USD": "1"
+          }
+        },
+        "from": [],
+        "to": [
+          {
+            "code": "th",
+            "name": "泰国",
+            "currency": "THB",
+            "local": "16490",
+            "cny": "3299.57"
+          }
+        ],
+        "missing": []
+      }
     },
     {
       "plan": "ChatGPT Pro 5x",
@@ -291,7 +408,40 @@
         "fx_changed": true,
         "gap": true
       },
-      "source_revision": "05efba4b3909181a8dd34afc0b9960710cbb1bade0085427faca0320acab38ab"
+      "source_revision": "05efba4b3909181a8dd34afc0b9960710cbb1bade0085427faca0320acab38ab",
+      "comparison": {
+        "at": "2026-10-02T05:21:39Z",
+        "source_revision": "05efba4b3909181a8dd34afc0b9960710cbb1bade0085427faca0320acab38ab",
+        "source_commit": "0af744b3636cd11ed319cb9d38f8245aa8d19244",
+        "fx": {
+          "updated_at": "2026-10-02T00:02:31Z",
+          "rates": {
+            "CHF": "0.832335",
+            "CNY": "6.714553",
+            "THB": "33.667593",
+            "USD": "1"
+          }
+        },
+        "from": [
+          {
+            "code": "ch",
+            "name": "瑞士",
+            "currency": "CHF",
+            "local": "83",
+            "cny": "669.57"
+          }
+        ],
+        "to": [
+          {
+            "code": "th",
+            "name": "泰国",
+            "currency": "THB",
+            "local": "3350",
+            "cny": "668.11"
+          }
+        ],
+        "missing": []
+      }
     }
   ],
   "checkpoint": {

@@ -57,3 +57,9 @@ node tools/chatgpt_price_comparison/scripts/browser-test.mjs
 如确需提前接受已核验新增套餐：先独立双抓官方证据，再按 `reviewed-changes.json` 的精确市场、旧/新指纹、pending 起点、证据 run 和不超过 48 小时有效期填写。只支持 `plan_added`，无全局 force；正式更新仍重抓并执行全部门禁，任何不匹配回到默认等待。
 
 仅保留本说明与第三方归属；过程、阶段报告及具体验收结果写 PR / Actions。页面与 OpenAI、Apple 无关联。[第三方资源许可](THIRD_PARTY_NOTICES.md) · [汇率服务条款](https://www.exchangerate-api.com/docs/free) · [OpenAI 网页多币种说明](https://help.openai.com/en/articles/10421635-multicurrency-billing)
+
+### 最低价历史的同期比较
+
+最低价历史仍仅记录赢家地区集合变化；仅人民币金额变化不会新增换榜事件。事件原有 from 保留上一可靠快照的冠军价，to 保留本次冠军价，作为跨期事实。新增可选 comparison 保存事件同次可靠快照内的旧赢家与新赢家价格、实际汇率、观察时间和数据 revision；Git 回填另存精确来源 commit。页面箭头仅显示这份同期证据，旧赢家当次缺价或旧事件未保存同期证据时直接标注，不借用最新价格。
+
+scripts/enrich_minimum_comparisons.py --write 仅从完整 Git 第一父链中精确匹配事件时间与 source_revision 的可靠 prices.json 回填；保留原事件、归因、缺口与检查点。重复迁移不改变已有证据。--report <path> 可导出逐事件来源和无法回填原因。此命令只生成历史与对应 HTML，不抓取 Apple、不修改市场价格、不运行测试。
