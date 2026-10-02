@@ -743,7 +743,7 @@
     const e = event.evidence;
     if (event.kind === 'initial' && !event.comparison) return '同期证据未记录';
     if (event.cause === 'unknown' && e?.prices_changed === false && e?.scope_changed === false
-      && e?.fx_changed === true && e?.gap === true) return '汇率有变·缺口';
+      && e?.fx_changed === true && e?.gap === true) return '汇率等因素';
     if (event.cause === 'unknown' && e?.gap === true) return '记录缺口';
     return MINIMUM_CAUSE_LABELS[event.cause] || '原因未确定';
   }
