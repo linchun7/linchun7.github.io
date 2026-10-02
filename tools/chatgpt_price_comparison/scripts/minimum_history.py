@@ -8,7 +8,7 @@ import json
 import re
 import subprocess
 from datetime import datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 
 import plan_identity as plan_ids
@@ -209,6 +209,148 @@ def _valid_winners(rows) -> bool:
     return True
 
 
+def comparison_for(event: dict, data: dict, source_commit=None) -> dict:
+    """Use only the reliable observation that actually produced this event."""
+    snapshot = build_snapshot(data)
+    if snapshot is None or data['generated_at'] != event['at'] or data['revision'] != event['source_revision']:
+        raise ValueError('comparison requires the exact reliable event snapshot')
+    plan = next((p for p in snapshot['plans'] if p['id'] == plan_ids.plan_identity(event['plan'])), None)
+    if canonical(plan['winners'] if plan else []) != canonical(event['to']):
+        raise ValueError('comparison winners do not match the event snapshot')
+    markets = {market['code']: market for market in data['markets']}
+    before, missing = [], []
+    for old in event['from']:
+        market = markets.get(old['code'])
+        value = min_offer(market, plan_ids.plan_identity(event['plan'])) if market else None
+        if value is None:
+            missing.append({'code': old['code'], 'name': old['name']})
+        else:
+            local, cny = value
+            before.append({'code': old['code'], 'name': market['name'],
+                           'currency': market['currency'], 'local': local, 'cny': cny})
+    after = copy.deepcopy(event['to'])
+    currencies = {'USD', 'CNY', *(row['currency'] for row in before + after)}
+    comparison = {
+        'at': event['at'], 'source_revision': event['source_revision'], 'source_commit': source_commit,
+        'fx': {'updated_at': data['fx']['updated_at'],
+               'rates': {code: data['fx']['rates'][code] for code in sorted(currencies)}},
+        'from': before, 'to': after, 'missing': missing,
+    }
+    validate_comparison(event, comparison)
+    return comparison
+
+
+def validate_comparison(event: dict, comparison: dict) -> None:
+    keys = {'at', 'source_revision', 'source_commit', 'fx', 'from', 'to', 'missing'}
+    if not isinstance(comparison, dict) or set(comparison) != keys:
+        raise ValueError('invalid same-observation comparison')
+    if comparison['at'] != event['at'] or comparison['source_revision'] != event['source_revision']:
+        raise ValueError('comparison does not reference its event snapshot')
+    commit = comparison['source_commit']
+    if commit is not None and (not isinstance(commit, str) or not re.fullmatch(r'[a-f0-9]{40}', commit)):
+        raise ValueError('invalid comparison source commit')
+    if not _valid_winners(comparison['from']) or not _valid_winners(comparison['to']):
+        raise ValueError('invalid comparison prices')
+    if comparison['to'] and any(row['cny'] != comparison['to'][0]['cny'] for row in comparison['to']):
+        raise ValueError('comparison winners are not tied at the minimum')
+    if canonical(comparison['to']) != canonical(event['to']):
+        raise ValueError('comparison changes event winners')
+    missing = comparison['missing']
+    if not isinstance(missing, list) or len(missing) > 250:
+        raise ValueError('invalid missing comparison prices')
+    old_names = {row['code']: row['name'] for row in event['from']}
+    if any(not isinstance(row, dict) or set(row) != {'code', 'name'}
+           or row.get('code') not in old_names or row.get('name') != old_names[row['code']] for row in missing):
+        raise ValueError('invalid missing comparison market')
+    present_ids, missing_ids = winner_ids(comparison['from']), winner_ids(missing)
+    if missing_ids != sorted(set(missing_ids)) or set(present_ids) & set(missing_ids) or sorted(present_ids + missing_ids) != winner_ids(event['from']):
+        raise ValueError('comparison does not cover previous winners')
+    fx = comparison['fx']
+    if not isinstance(fx, dict) or set(fx) != {'updated_at', 'rates'}:
+        raise ValueError('invalid comparison FX')
+    if not -300 <= epoch(event['at']) - epoch(fx['updated_at']) <= FRESH:
+        raise ValueError('comparison FX is not fresh at its observation')
+    rates = fx['rates']
+    rows = comparison['from'] + comparison['to']
+    required = {'USD', 'CNY', *(row['currency'] for row in rows)}
+    if not isinstance(rates, dict) or set(rates) != required:
+        raise ValueError('comparison FX currencies do not match its prices')
+    if any(not isinstance(rate, str) or len(rate) > 40 or not re.fullmatch(r'[0-9]+(?:\.[0-9]{1,12})?', rate)
+           or Decimal(rate) <= 0 for rate in rates.values()) or Decimal(rates['USD']) != 1:
+        raise ValueError('invalid comparison FX rates')
+    for row in rows:
+        cny = Decimal(row['local']) / Decimal(rates[row['currency']]) * Decimal(rates['CNY'])
+        if format(cny.quantize(Decimal('.01'), rounding=ROUND_HALF_UP), '.2f') != row['cny']:
+            raise ValueError('comparison price does not use its stored FX')
+
+
+def enrich_history(history: dict, observations: list[tuple[str, dict]]) -> tuple[dict, dict]:
+    """Add evidence without changing historical winners, dates, causes or gaps."""
+    result = copy.deepcopy(validate_history(history))
+    exact, rejected = {}, {}
+    for commit, data in observations:
+        if not isinstance(commit, str) or not re.fullmatch(r'[a-f0-9]{40}', commit):
+            raise ValueError('invalid historical evidence commit')
+        if build_snapshot(data) is not None:
+            exact.setdefault((data['generated_at'], data['revision']), []).append((commit, data))
+        else:
+            rejected.setdefault((data['generated_at'], data['revision']), []).append(commit)
+    records = []
+    for event in result['events']:
+        comparison = event.get('comparison')
+        reason = None
+        if comparison is None:
+            candidates = exact.get((event['at'], event['source_revision']), [])
+            evidence = [(commit, comparison_for(event, data, commit)) for commit, data in candidates]
+            signatures = {canonical({k: v for k, v in item.items() if k != 'source_commit'}) for _, item in evidence}
+            if len(signatures) == 1:
+                comparison = evidence[0][1]
+                event['comparison'] = comparison
+            else:
+                if evidence:
+                    reason = 'conflicting_exact_snapshots'
+                else:
+                    reason = 'exact_snapshot_unreliable' if rejected.get((event['at'], event['source_revision'])) else 'exact_reliable_snapshot_missing'
+        records.append({
+            'plan': event['plan'], 'at': event['at'], 'source_revision': event['source_revision'],
+            'source_commit': comparison['source_commit'] if comparison else None,
+            'candidate_commits': rejected.get((event['at'], event['source_revision']), []),
+            'status': ('partial' if comparison['missing'] else 'complete') if comparison else 'missing',
+            'reason': 'market_or_plan_absent_at_event' if comparison and comparison['missing'] else reason,
+            'missing': comparison['missing'] if comparison else copy.deepcopy(event['from']),
+        })
+    validate_history(result)
+    report = {'total_events': len(records),
+              'complete': sum(row['status'] == 'complete' for row in records),
+              'partial': sum(row['status'] == 'partial' for row in records),
+              'missing': sum(row['status'] == 'missing' for row in records), 'events': records}
+    return result, report
+
+
+def enrich_history_from_git(history: dict, ref='HEAD', project_dir=ROOT):
+    repo = project_dir.parents[1]
+    if not re.fullmatch(r'[A-Za-z0-9_./-]+', ref) or ref.startswith('-'):
+        raise ValueError('invalid Git ref')
+    def git(*args):
+        return subprocess.check_output(['git', *args], cwd=repo, text=True, encoding='utf-8', stderr=subprocess.DEVNULL)
+    if git('rev-parse', '--is-shallow-repository').strip() != 'false':
+        raise ValueError('comparison enrichment requires full Git history')
+    wanted = {(event['at'], event['source_revision']) for event in history['events'] if 'comparison' not in event}
+    observations, unreadable = [], []
+    for sha in git('log', '--first-parent', '--reverse', '--format=%H', ref, '--', PRICE_PATH).splitlines():
+        if not git('ls-tree', '--name-only', sha, '--', PRICE_PATH).strip():
+            continue
+        try:
+            data = json.loads(git('show', f'{sha}:{PRICE_PATH}'))
+            if (data['generated_at'], data['revision']) in wanted:
+                observations.append((sha, data))
+        except (ValueError, KeyError, TypeError, subprocess.CalledProcessError):
+            unreadable.append(sha)
+    result, report = enrich_history(history, observations)
+    report['unreadable_commits'] = unreadable
+    return result, report
+
+
 def validate_history(value: dict) -> dict:
     top = {'schema','project_since','first_observed_at','checked_at','observations','excluded_versions','pending_gap','gaps','events','checkpoint'}
     if not isinstance(value, dict) or set(value) != top or value.get('schema') != 1 or value.get('project_since') != PROJECT_SINCE:
@@ -242,7 +384,7 @@ def validate_history(value: dict) -> dict:
     seen_event_keys = set()
     for event in value['events']:
         keys = {'plan','at','previous_at','kind','cause','from','to','evidence','source_revision'}
-        if not isinstance(event, dict) or set(event) != keys or not PLAN.fullmatch(event.get('plan','')):
+        if not isinstance(event, dict) or set(event) not in (keys, keys | {'comparison'}) or not PLAN.fullmatch(event.get('plan','')):
             raise ValueError('invalid minimum history event')
         at = epoch(event['at'])
         if checked is None or at > checked or at < last_at or (event['at'], event['plan']) in seen_event_keys:
@@ -259,6 +401,8 @@ def validate_history(value: dict) -> dict:
             raise ValueError('invalid minimum history evidence')
         if any(not isinstance(evidence[k], bool) for k in ('prices_changed','scope_changed','gap')) or evidence['fx_changed'] not in (True, False, None):
             raise ValueError('invalid minimum history evidence values')
+        if 'comparison' in event:
+            validate_comparison(event, event['comparison'])
         previous = latest.get(event['plan'])
         if event['kind'] == 'initial':
             if previous is not None or event['from'] or not event['to'] or event['cause'] != 'initial' or event['previous_at'] is not None:
@@ -361,7 +505,7 @@ def advance_history(history: dict | None, data: dict) -> dict:
             'fx_changed': fx_changed,
             'gap': result['pending_gap'],
         }
-        result['events'].append({
+        event = {
             'plan': plan_id,
             'at': current['at'],
             'previous_at': None if initial else last['at'],
@@ -371,7 +515,9 @@ def advance_history(history: dict | None, data: dict) -> dict:
             'to': copy.deepcopy(new_winners),
             'evidence': evidence,
             'source_revision': current['revision'],
-        })
+        }
+        event['comparison'] = comparison_for(event, data)
+        result['events'].append(event)
     result['first_observed_at'] = result['first_observed_at'] or current['at']
     result['checked_at'] = current['at']
     result['checkpoint'] = current
@@ -398,7 +544,7 @@ def backfill_history(ref='HEAD', project_dir=ROOT):
     if not re.fullmatch(r'[A-Za-z0-9_./-]+', ref) or ref.startswith('-'):
         raise ValueError('invalid Git ref')
     def git(*args):
-        return subprocess.check_output(['git', *args], cwd=repo, text=True, stderr=subprocess.DEVNULL)
+        return subprocess.check_output(['git', *args], cwd=repo, text=True, encoding='utf-8', stderr=subprocess.DEVNULL)
     if git('rev-parse','--is-shallow-repository').strip() != 'false':
         raise ValueError('backfill requires full Git history')
     shas = [line for line in git('log','--first-parent','--reverse','--format=%H',ref,'--',PRICE_PATH).splitlines() if line]

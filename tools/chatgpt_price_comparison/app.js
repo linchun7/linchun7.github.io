@@ -741,8 +741,10 @@
 
   function minimumHistoryCauseLabel(event) {
     const e = event.evidence;
+    if (event.kind === 'initial' && !event.comparison) return '同期证据未记录';
     if (event.cause === 'unknown' && e?.prices_changed === false && e?.scope_changed === false
-      && e?.fx_changed === true && e?.gap === true) return '汇率等因素';
+      && e?.fx_changed === true && e?.gap === true) return '汇率有变·缺口';
+    if (event.cause === 'unknown' && e?.gap === true) return '记录缺口';
     return MINIMUM_CAUSE_LABELS[event.cause] || '原因未确定';
   }
 
@@ -797,6 +799,50 @@
     if (checkpoint !== null && !value.pending_gap && value.checked_at !== value.checkpoint.at) throw Error('历史检查点未同步');
   }
 
+
+  function validateMinimumComparison(event) {
+    if (!Object.hasOwn(event, 'comparison')) return;
+    const c = event.comparison;
+    if (!c || Object.keys(c).sort().join(',') !== 'at,from,fx,missing,source_commit,source_revision,to'
+      || c.at !== event.at || c.source_revision !== event.source_revision
+      || (c.source_commit !== null && !/^[a-f0-9]{40}$/.test(c.source_commit || ''))
+      || !Array.isArray(c.from) || c.from.length > 250 || !c.from.every(validMinimumWinner)
+      || !Array.isArray(c.to) || canonical(c.to) !== canonical(event.to)
+      || !Array.isArray(c.missing) || c.missing.length > 250) throw Error('同期比较证据错误');
+    if (c.to.some(row => row.cny !== c.to[0].cny)) throw Error('同期最低价不一致');
+    const old = new Map(event.from.map(row => [row.code, row.name]));
+    const codes = c.from.map(row => row.code);
+    for (const row of c.missing) {
+      if (!row || Object.keys(row).sort().join(',') !== 'code,name' || old.get(row.code) !== row.name) throw Error('同期缺价证据错误');
+      codes.push(row.code);
+    }
+    if (new Set(codes).size !== codes.length
+      || canonical([...codes].sort()) !== canonical([...old.keys()].sort())) throw Error('同期比较地区错误');
+    const fx = c.fx;
+    if (!fx || Object.keys(fx).sort().join(',') !== 'rates,updated_at'
+      || !Number.isFinite(Date.parse(fx.updated_at))
+      || Date.parse(event.at) - Date.parse(fx.updated_at) < -300000
+      || Date.parse(event.at) - Date.parse(fx.updated_at) > 36 * 3600000
+      || !fx.rates || typeof fx.rates !== 'object') throw Error('同期汇率证据错误');
+    const rows = [...c.from, ...c.to];
+    const currencies = [...new Set(['USD', 'CNY', ...rows.map(row => row.currency)])].sort();
+    if (canonical(Object.keys(fx.rates).sort()) !== canonical(currencies)
+      || currencies.some(code => typeof fx.rates[code] !== 'string' || fx.rates[code].length > 40
+        || !/^[0-9]+(?:\.[0-9]{1,12})?$/.test(fx.rates[code]) || Number(fx.rates[code]) <= 0)
+      || Number(fx.rates.USD) !== 1) throw Error('同期汇率币种错误');
+    const fraction = value => {
+      const [whole, decimals = ''] = value.split('.');
+      return [BigInt(whole + decimals), 10n ** BigInt(decimals.length)];
+    };
+    const [cnyN, cnyD] = fraction(fx.rates.CNY);
+    for (const row of rows) {
+      const [localN, localD] = fraction(row.local), [rateN, rateD] = fraction(fx.rates[row.currency]);
+      const n = localN * rateD * cnyN, d = localD * rateN * cnyD;
+      const cents = (2n * n * 100n + d) / (2n * d);
+      if (cents !== BigInt(row.cny.replace('.', ''))) throw Error('同期价格与汇率不一致');
+    }
+  }
+
   function validateMinimumHistory(value) {
     const keys = 'checked_at,checkpoint,events,excluded_versions,first_observed_at,gaps,observations,pending_gap,project_since,schema';
     if (!value || typeof value !== 'object' || Array.isArray(value)
@@ -813,7 +859,7 @@
     }
     for (const event of value.events) {
       if (!event || typeof event !== 'object' || Array.isArray(event)
-        || Object.keys(event).sort().join(',') !== 'at,cause,evidence,from,kind,plan,previous_at,source_revision,to'
+        || Object.keys(event).filter(key => key !== 'comparison').sort().join(',') !== 'at,cause,evidence,from,kind,plan,previous_at,source_revision,to'
         || typeof event.plan !== 'string' || !/^ChatGPT [^\x00-\x1f\x7f<>]{1,70}$/.test(event.plan)
         || !Number.isFinite(Date.parse(event.at))
         || (event.previous_at != null && !Number.isFinite(Date.parse(event.previous_at)))
@@ -825,6 +871,7 @@
         || !event.evidence || typeof event.evidence !== 'object') {
         throw Error('最低价历史事件错误');
       }
+      validateMinimumComparison(event);
       const evidence = event.evidence;
       if (Object.keys(evidence).sort().join(',') !== 'fx_changed,gap,prices_changed,scope_changed'
         || !['gap', 'prices_changed', 'scope_changed'].every(key => typeof evidence[key] === 'boolean')
@@ -893,7 +940,7 @@
     const more = minimumHistoryNode('button', '显示更多', 'minimum-history-button');
     more.type = 'button'; more.id = 'minimumHistoryMore'; more.hidden = true;
     more.addEventListener('click', () => { minimumHistoryUi.limit += 20; renderMinimumHistory(); });
-    const note = minimumHistoryNode('p', '人民币价格按当时汇率折算，仅展示网站可核验到的最低价赢家变化。', 'minimum-history-note');
+    const note = minimumHistoryNode('p', '箭头两端按换榜时同一快照、同一汇率比较；缺少同期证据会明确标注。仅记录最低价地区变化。', 'minimum-history-note');
     note.id = 'minimumHistoryNote'; note.hidden = true;
     const retry = minimumHistoryNode('button', '重新读取历史', 'minimum-history-button');
     retry.type = 'button'; retry.id = 'minimumHistoryRetry'; retry.hidden = true;
@@ -913,6 +960,16 @@
     if (!rows.length) return '暂无';
     const values = rows.map((row) => `${row.name} ¥${Number(row.cny).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
     return values.length > 3 ? `${values.slice(0, 3).join('、')}等 ${values.length} 个地区并列` : values.join('、');
+  }
+
+
+  function minimumEventSummary(event) {
+    const current = new Map((event.comparison?.from || []).map(row => [row.code, row]));
+    const previous = event.from.map(row => current.has(row.code)
+      ? minimumWinnerSummary([current.get(row.code)])
+      : row.name + '（同期价' + (event.comparison ? '缺失' : '未记录') + '）');
+    const from = previous.length > 3 ? previous.slice(0, 3).join('、') + '等 ' + previous.length + ' 个地区' : previous.join('、');
+    return (from || '暂无') + ' → ' + minimumWinnerSummary(event.comparison?.to || event.to);
   }
 
   function renderMinimumHistoryStatus() {
@@ -969,9 +1026,9 @@
         minimumHistoryNode('span', dateTime(event.at), 'minimum-history-date'),
         minimumHistoryNode('span', shortPlan(displayPlan(planIdentity(event.plan))), 'minimum-history-plan')
       );
-      const change = minimumHistoryNode('strong', `${minimumWinnerSummary(event.from)} → ${minimumWinnerSummary(event.to)}`, 'minimum-history-change');
+      const change = minimumHistoryNode('strong', minimumEventSummary(event), 'minimum-history-change');
       const cause = minimumHistoryNode('span', minimumHistoryCauseLabel(event), 'minimum-history-cause');
-      if (cause.textContent === '汇率等因素') cause.title = '前后标价未变、汇率有变；期间记录不连续，无法完整归因';
+      if (event.evidence.gap) cause.title = '期间记录不连续，无法完整归因；箭头金额使用换榜时的同期证据';
       item.append(meta, change, cause); list.append(item);
     }
     document.querySelector('#minimumHistoryMore').hidden = series.length <= minimumHistoryUi.limit;
