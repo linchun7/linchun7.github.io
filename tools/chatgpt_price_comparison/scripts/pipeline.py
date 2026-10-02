@@ -240,6 +240,43 @@ def parse_amount(display: str, currency: str) -> str:
     return format(value.normalize(), 'f')
 
 
+def purchase_pairs(items: object) -> tuple[list[list[str]], str]:
+    """Decode only Apple's observed legacy or direct purchase-item shapes."""
+    if not isinstance(items, list) or not items or any(not isinstance(item, dict) for item in items):
+        raise ValueError('invalid purchase annotation structure')
+    pairs, shapes = [], set()
+    for item in items:
+        kind = item.get('$kind')
+        if kind == 'textPair':
+            if 'textPairs' in item:
+                raise ValueError('ambiguous purchase pair structure')
+            shapes.add('direct')
+            pairs.append([item.get('leadingText'), item.get('trailingText')])
+        elif kind == 'AnnotationItem':
+            if 'leadingText' in item or 'trailingText' in item or not isinstance(item.get('textPairs'), list):
+                raise ValueError('invalid purchase pair structure')
+            shapes.add('legacy')
+            pairs.extend(item['textPairs'])
+        elif kind == 'button':
+            # The official purchase list ends with Apple's Learn More action.
+            if any(key in item for key in ('textPairs', 'leadingText', 'trailingText')):
+                raise ValueError('ambiguous purchase button structure')
+        else:
+            raise ValueError('unknown purchase item structure')
+    if len(shapes) != 1 or not pairs or len(pairs) > 40:
+        raise ValueError('missing or ambiguous purchase pairs')
+    if any(not isinstance(pair, list) or len(pair) != 2 or
+           any(not isinstance(value, str) or not clean(value) for value in pair) for pair in pairs):
+        raise ValueError('invalid purchase pair structure')
+    return pairs, shapes.pop()
+
+
+def purchase_pair_semantics(pairs: list[list[str]], currency: str) -> list[tuple[str, str]]:
+    # Sorting keeps duplicate multiplicity; only spacing/number presentation is
+    # normalized. Labels, amounts and storefront currency remain authoritative.
+    return sorted((clean(label), parse_amount(display, currency)) for label, display in pairs)
+
+
 def parse_store(text: str, code: str) -> dict:
     nodes = list(Document(text).root.walk())
     scripts = {n.attrs.get('id'): n.text() for n in nodes if n.tag == 'script'}
@@ -274,34 +311,31 @@ def parse_store(text: str, code: str) -> dict:
     elif len(titled) > 1:
         raise ValueError('missing or ambiguous purchase annotation')
     else:
-        # Title text is presentation metadata and may be renamed/localized.
-        # Fall back only when exactly one annotation has both purchase
-        # representations and at least one ChatGPT-looking pair.
+        # Title text may be renamed/localized. Select exactly one complete,
+        # recognized purchase structure containing a ChatGPT label.
         structural = []
         for node in annotations:
-            items = node.get('items')
-            items_v3 = node.get('items_V3')
-            if not isinstance(items, list) or not isinstance(items_v3, list):
+            try:
+                candidate, _ = purchase_pairs(node.get('items'))
+            except ValueError:
                 continue
-            pairs = [
-                pair for item in items if isinstance(item, dict)
-                for pair in item.get('textPairs', []) if isinstance(pair, list) and len(pair) == 2
-            ]
-            if any(isinstance(pair[0], str) and PLAN.fullmatch(clean(pair[0])) for pair in pairs):
+            if any(PLAN.fullmatch(clean(pair[0])) for pair in candidate):
                 structural.append(node)
         if len(structural) != 1:
             raise ValueError('missing or ambiguous purchase annotation')
         annotation = structural[0]
-    items = annotation.get('items', [])
-    items_v3 = annotation.get('items_V3', [])
-    if not isinstance(items, list) or not isinstance(items_v3, list) or any(not isinstance(item, dict) for item in items + items_v3):
-        raise ValueError('invalid purchase annotation structure')
-    if any(not isinstance(item.get('textPairs', []), list) for item in items):
-        raise ValueError('invalid purchase pair structure')
-    pairs = [pair for item in items for pair in item.get('textPairs', [])]
-    v3 = [[item.get('leadingText'), item.get('trailingText')] for item in items_v3 if item.get('$kind') == 'textPair']
-    if not pairs or pairs != v3:
-        raise ValueError('structured representations disagree')
+    pairs, shape = purchase_pairs(annotation.get('items'))
+    primary = purchase_pair_semantics(pairs, currency)
+    if 'items_V3' in annotation:
+        v3, v3_shape = purchase_pairs(annotation['items_V3'])
+        if v3_shape != 'direct' or primary != purchase_pair_semantics(v3, currency):
+            raise ValueError('structured representations disagree')
+    elif shape != 'direct':
+        raise ValueError('missing legacy purchase cross-check')
+    # On 2026-10-02 Apple moved textPair entries into items and omitted
+    # items_V3 (US/JP/TR source fixtures). Accept that explicit schema only:
+    # a present but empty/malformed second representation still fails closed,
+    # and the complete direct list must agree with the visible DOM below.
     # Cross-check visible price pairs, never search review/description prose for prices.
     visible = []
     for node in nodes:

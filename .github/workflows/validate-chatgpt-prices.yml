@@ -21,6 +21,8 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
+      - name: Focused official App Store schema regressions
+        run: python3 -m unittest discover -s tools/chatgpt_price_comparison/scripts -p 'test_appstore_schema.py' -v
       - name: Unit tests and deterministic browser fixture
         run: |
           python3 -m unittest discover -s tools/chatgpt_price_comparison/scripts -p 'test_*.py' -v
@@ -202,3 +204,75 @@ jobs:
           BASE_SHA: ${{ github.sha }}
         shell: bash
         run: bash tools/chatgpt_price_comparison/scripts/recheck-production.sh
+
+  live-source:
+    name: Verify live App Store sources without publishing
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Capture official source evidence
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, sys
+          from pathlib import Path
+          sys.path.insert(0, 'tools/chatgpt_price_comparison/scripts')
+          import pipeline as p
+          output = Path(os.environ['RUNNER_TEMP']) / 'chatgpt-source-evidence'
+          output.mkdir()
+          for code in ('us', 'jp', 'tr'):
+              url = p.url_for(code) + '?l=en-US'
+              text = p.fetch(url)
+              (output / (code + '.html')).write_text(text, encoding='utf-8')
+              nodes = list(p.Document(text).root.walk())
+              script = next(n.text() for n in nodes if n.tag == 'script' and n.attrs.get('id') == 'serialized-server-data')
+              annotations = [n for n in p.walk_json(json.loads(script)) if n.get('$kind') == 'Annotation' and 'Purchases' in n.get('title', '')]
+              record = {'source_url': url, 'captured_at': p.stamp(), 'raw_sha256': hashlib.sha256(text.encode()).hexdigest(), 'annotations': annotations}
+              (output / (code + '.json')).write_text(json.dumps(record, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+              print(json.dumps(record, ensure_ascii=False))
+          PY
+      - name: Verify all configured live markets and stage a publication candidate
+        env:
+          CANDIDATE: ${{ runner.temp }}/chatgpt-source-evidence/candidate
+        run: |
+          python3 tools/chatgpt_price_comparison/scripts/pipeline.py --output "$CANDIDATE"
+          python3 tools/chatgpt_price_comparison/scripts/pipeline.py --check "$CANDIDATE"
+          python3 - <<'PY'
+          import json, os, sys
+          from pathlib import Path
+          sys.path.insert(0, 'tools/chatgpt_price_comparison/scripts')
+          import pipeline as p
+          baseline = json.loads((p.ROOT / 'data/prices.json').read_text())
+          candidate = json.loads((Path(os.environ['CANDIDATE']) / 'prices.json').read_text())
+          config = json.loads((p.ROOT / 'markets.json').read_text())
+          expected = {m['code'] for m in config}
+          assert len(expected) == 59 and {m['code'] for m in candidate['markets']} == expected
+          assert all(m['status'] == 'verified' for m in candidate['markets']), p.source_summary(candidate['markets'])
+          assert all(m['last_verified_at'] == candidate['generated_at'] for m in candidate['markets'])
+          assert not candidate['fx']['fallback']
+          previous = {m['code']: m for m in baseline['markets']}
+          for market in candidate['markets']:
+              assert market['history_baseline'] == previous[market['code']]['history_baseline']
+          summary = {
+              'verified_markets': len(candidate['markets']),
+              'generated_at': candidate['generated_at'],
+              'fx_updated_at': candidate['fx']['updated_at'],
+              'data_revision': candidate['revision'],
+              'price_date_label': p.price_date_label(candidate),
+              'prior_changes_preserved': all(change in candidate['changes'] for change in baseline['changes']),
+          }
+          assert summary['prior_changes_preserved']
+          print(json.dumps(summary, ensure_ascii=False, indent=2))
+          (Path(os.environ['CANDIDATE']) / 'validation-summary.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2) + '\n')
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: chatgpt-source-evidence-${{ github.run_id }}
+          path: ${{ runner.temp }}/chatgpt-source-evidence/
+          if-no-files-found: error
+          retention-days: 7

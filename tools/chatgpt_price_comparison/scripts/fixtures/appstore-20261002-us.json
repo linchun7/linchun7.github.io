@@ -1,0 +1,113 @@
+{
+  "source_url": "https://apps.apple.com/us/app/chatgpt/id6448311069?l=en-US",
+  "captured_at": "2026-10-02T05:00:32Z",
+  "raw_sha256": "c501e3e9b7665fc7ee1a09b36e3c20174edd78f77a4a37635ab3de2b614427d0",
+  "evidence_run": "https://github.com/linchun7/linchun7.github.io/actions/runs/36967015820",
+  "minimization": "Keep official identity/currency metadata, the complete purchase Annotation (including Learn More), and verbatim visible text-pair divs; omit reviews, descriptions, assets and unrelated server data.",
+  "canonical_link": "<link rel=\"canonical\" href=\"https://apps.apple.com/us/app/chatgpt/id6448311069\">",
+  "application": {
+    "name": "ChatGPT",
+    "offers": {
+      "@type": "Offer",
+      "price": 0,
+      "priceCurrency": "USD"
+    },
+    "author": {
+      "@type": "Organization",
+      "name": "OpenAI OpCo, LLC",
+      "url": "https://apps.apple.com/us/developer/openai-opco-llc/id1684349733"
+    }
+  },
+  "annotation": {
+    "$kind": "Annotation",
+    "title": "In-App Purchases",
+    "summary": "Yes",
+    "items": [
+      {
+        "$kind": "textPair",
+        "leadingText": "ChatGPT Plus",
+        "trailingText": "$19.99"
+      },
+      {
+        "$kind": "textPair",
+        "leadingText": "ChatGPT Go",
+        "trailingText": "$8.00"
+      },
+      {
+        "$kind": "textPair",
+        "leadingText": "100 Credits",
+        "trailingText": "$4.00"
+      },
+      {
+        "$kind": "textPair",
+        "leadingText": "ChatGPT Pro 100",
+        "trailingText": "$100.00"
+      },
+      {
+        "$kind": "textPair",
+        "leadingText": "ChatGPT Pro 200",
+        "trailingText": "$200.00"
+      },
+      {
+        "$kind": "textPair",
+        "leadingText": "ChatGPT Plus",
+        "trailingText": "$200.00"
+      },
+      {
+        "$kind": "textPair",
+        "leadingText": "ChatGPT Pro 500",
+        "trailingText": "$500.00"
+      },
+      {
+        "$kind": "textPair",
+        "leadingText": "500 Credits",
+        "trailingText": "$20.00"
+      },
+      {
+        "$kind": "textPair",
+        "leadingText": "1000 Credits",
+        "trailingText": "$40.00"
+      },
+      {
+        "$kind": "button",
+        "action": {
+          "title": "Learn More",
+          "presentationStyle": [],
+          "actionMetrics": {
+            "$kind": "ActionMetrics",
+            "data": [],
+            "custom": {}
+          },
+          "$kind": "flowAction",
+          "actionClass": "FlowAction",
+          "page": "article",
+          "pageUrl": "https://apps.apple.com/us/iphone/story/id1436214772",
+          "pageData": null,
+          "presentationContext": "infer",
+          "animationBehavior": "infer",
+          "origin": "inapp",
+          "destination": {
+            "storefront": "us",
+            "language": "en-US",
+            "id": "1436214772",
+            "platform": "iphone",
+            "$kind": "RoutableArticlePageIntent"
+          }
+        },
+        "style": "infer"
+      }
+    ],
+    "shouldAlwaysPresentExpanded": false
+  },
+  "visible_html": [
+    "<div class=\"text-pair svelte-1gyt6l2\"><span>ChatGPT Plus</span> <span>$19.99</span> </div>",
+    "<div class=\"text-pair svelte-1gyt6l2\"><span>ChatGPT Go</span> <span>$8.00</span> </div>",
+    "<div class=\"text-pair svelte-1gyt6l2\"><span>100 Credits</span> <span>$4.00</span> </div>",
+    "<div class=\"text-pair svelte-1gyt6l2\"><span>ChatGPT Pro 100</span> <span>$100.00</span> </div>",
+    "<div class=\"text-pair svelte-1gyt6l2\"><span>ChatGPT Pro 200</span> <span>$200.00</span> </div>",
+    "<div class=\"text-pair svelte-1gyt6l2\"><span>ChatGPT Plus</span> <span>$200.00</span> </div>",
+    "<div class=\"text-pair svelte-1gyt6l2\"><span>ChatGPT Pro 500</span> <span>$500.00</span> </div>",
+    "<div class=\"text-pair svelte-1gyt6l2\"><span>500 Credits</span> <span>$20.00</span> </div>",
+    "<div class=\"text-pair svelte-1gyt6l2\"><span>1000 Credits</span> <span>$40.00</span> </div>"
+  ]
+}
