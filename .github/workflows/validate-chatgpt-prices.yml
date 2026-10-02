@@ -202,3 +202,41 @@ jobs:
           BASE_SHA: ${{ github.sha }}
         shell: bash
         run: bash tools/chatgpt_price_comparison/scripts/recheck-production.sh
+
+  live-source:
+    name: Verify live App Store sources without publishing
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Capture official source evidence
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, sys
+          from pathlib import Path
+          sys.path.insert(0, 'tools/chatgpt_price_comparison/scripts')
+          import pipeline as p
+          output = Path(os.environ['RUNNER_TEMP']) / 'chatgpt-source-evidence'
+          output.mkdir()
+          for code in ('us', 'jp', 'tr'):
+              url = p.url_for(code) + '?l=en-US'
+              text = p.fetch(url)
+              (output / (code + '.html')).write_text(text, encoding='utf-8')
+              nodes = list(p.Document(text).root.walk())
+              script = next(n.text() for n in nodes if n.tag == 'script' and n.attrs.get('id') == 'serialized-server-data')
+              annotations = [n for n in p.walk_json(json.loads(script)) if n.get('$kind') == 'Annotation' and 'Purchases' in n.get('title', '')]
+              record = {'source_url': url, 'captured_at': p.stamp(), 'raw_sha256': hashlib.sha256(text.encode()).hexdigest(), 'annotations': annotations}
+              (output / (code + '.json')).write_text(json.dumps(record, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+              print(json.dumps(record, ensure_ascii=False))
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: chatgpt-source-evidence-${{ github.run_id }}
+          path: ${{ runner.temp }}/chatgpt-source-evidence/
+          if-no-files-found: error
+          retention-days: 7
