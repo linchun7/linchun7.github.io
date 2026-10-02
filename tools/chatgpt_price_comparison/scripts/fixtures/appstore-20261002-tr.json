@@ -1,0 +1,95 @@
+{
+  "source_url": "https://apps.apple.com/tr/app/chatgpt/id6448311069?l=en-US",
+  "captured_at": "2026-10-02T05:00:33Z",
+  "raw_sha256": "a110e2efc601a6e7672870e1a1314814a5633e7b5e59b59f1130fa24ebf31981",
+  "evidence_run": "https://github.com/linchun7/linchun7.github.io/actions/runs/36967015820",
+  "minimization": "Keep official identity/currency metadata, the complete purchase Annotation (including Learn More), and verbatim visible text-pair divs; omit reviews, descriptions, assets and unrelated server data.",
+  "canonical_link": "<link rel=\"canonical\" href=\"https://apps.apple.com/tr/app/chatgpt/id6448311069\">",
+  "application": {
+    "name": "ChatGPT",
+    "offers": {
+      "@type": "Offer",
+      "price": 0,
+      "priceCurrency": "TRY"
+    },
+    "author": {
+      "@type": "Organization",
+      "name": "OpenAI OpCo, LLC",
+      "url": "https://apps.apple.com/tr/developer/openai-opco-llc/id1684349733"
+    }
+  },
+  "annotation": {
+    "$kind": "Annotation",
+    "title": "In-App Purchases",
+    "summary": "Yes",
+    "items": [
+      {
+        "$kind": "textPair",
+        "leadingText": "ChatGPT Plus",
+        "trailingText": "₺999,99"
+      },
+      {
+        "$kind": "textPair",
+        "leadingText": "ChatGPT Go",
+        "trailingText": "₺249,99"
+      },
+      {
+        "$kind": "textPair",
+        "leadingText": "ChatGPT Pro 100",
+        "trailingText": "₺5.299,99"
+      },
+      {
+        "$kind": "textPair",
+        "leadingText": "ChatGPT Pro 200",
+        "trailingText": "₺9.999,99"
+      },
+      {
+        "$kind": "textPair",
+        "leadingText": "ChatGPT Plus",
+        "trailingText": "₺9.999,99"
+      },
+      {
+        "$kind": "textPair",
+        "leadingText": "ChatGPT Pro 500",
+        "trailingText": "₺26.499,00"
+      },
+      {
+        "$kind": "button",
+        "action": {
+          "title": "Learn More",
+          "presentationStyle": [],
+          "actionMetrics": {
+            "$kind": "ActionMetrics",
+            "data": [],
+            "custom": {}
+          },
+          "$kind": "flowAction",
+          "actionClass": "FlowAction",
+          "page": "article",
+          "pageUrl": "https://apps.apple.com/tr/iphone/story/id1436214772",
+          "pageData": null,
+          "presentationContext": "infer",
+          "animationBehavior": "infer",
+          "origin": "inapp",
+          "destination": {
+            "storefront": "tr",
+            "language": "en-GB",
+            "id": "1436214772",
+            "platform": "iphone",
+            "$kind": "RoutableArticlePageIntent"
+          }
+        },
+        "style": "infer"
+      }
+    ],
+    "shouldAlwaysPresentExpanded": false
+  },
+  "visible_html": [
+    "<div class=\"text-pair svelte-1gyt6l2\"><span>ChatGPT Plus</span> <span>₺999,99</span> </div>",
+    "<div class=\"text-pair svelte-1gyt6l2\"><span>ChatGPT Go</span> <span>₺249,99</span> </div>",
+    "<div class=\"text-pair svelte-1gyt6l2\"><span>ChatGPT Pro 100</span> <span>₺5.299,99</span> </div>",
+    "<div class=\"text-pair svelte-1gyt6l2\"><span>ChatGPT Pro 200</span> <span>₺9.999,99</span> </div>",
+    "<div class=\"text-pair svelte-1gyt6l2\"><span>ChatGPT Plus</span> <span>₺9.999,99</span> </div>",
+    "<div class=\"text-pair svelte-1gyt6l2\"><span>ChatGPT Pro 500</span> <span>₺26.499,00</span> </div>"
+  ]
+}

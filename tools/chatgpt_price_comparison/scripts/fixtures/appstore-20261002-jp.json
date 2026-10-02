@@ -1,0 +1,95 @@
+{
+  "source_url": "https://apps.apple.com/jp/app/chatgpt/id6448311069?l=en-US",
+  "captured_at": "2026-10-02T05:00:32Z",
+  "raw_sha256": "0cadf077e96e053a97479f05282fd9ad2eac0a84fc44f821f50bef0b0e1f65ef",
+  "evidence_run": "https://github.com/linchun7/linchun7.github.io/actions/runs/36967015820",
+  "minimization": "Keep official identity/currency metadata, the complete purchase Annotation (including Learn More), and verbatim visible text-pair divs; omit reviews, descriptions, assets and unrelated server data.",
+  "canonical_link": "<link rel=\"canonical\" href=\"https://apps.apple.com/jp/app/chatgpt/id6448311069\">",
+  "application": {
+    "name": "ChatGPT",
+    "offers": {
+      "@type": "Offer",
+      "price": 0,
+      "priceCurrency": "JPY"
+    },
+    "author": {
+      "@type": "Organization",
+      "name": "OpenAI OpCo, LLC",
+      "url": "https://apps.apple.com/jp/developer/openai-opco-llc/id1684349733?l=en-US"
+    }
+  },
+  "annotation": {
+    "$kind": "Annotation",
+    "title": "In-App Purchases",
+    "summary": "Yes",
+    "items": [
+      {
+        "$kind": "textPair",
+        "leadingText": "ChatGPT Plus",
+        "trailingText": "¥3,000"
+      },
+      {
+        "$kind": "textPair",
+        "leadingText": "ChatGPT Go",
+        "trailingText": "¥1,400"
+      },
+      {
+        "$kind": "textPair",
+        "leadingText": "ChatGPT Pro 100",
+        "trailingText": "¥16,800"
+      },
+      {
+        "$kind": "textPair",
+        "leadingText": "ChatGPT Pro 200",
+        "trailingText": "¥30,000"
+      },
+      {
+        "$kind": "textPair",
+        "leadingText": "ChatGPT Plus",
+        "trailingText": "¥30,000"
+      },
+      {
+        "$kind": "textPair",
+        "leadingText": "ChatGPT Pro 500",
+        "trailingText": "¥84,000"
+      },
+      {
+        "$kind": "button",
+        "action": {
+          "title": "Learn More",
+          "presentationStyle": [],
+          "actionMetrics": {
+            "$kind": "ActionMetrics",
+            "data": [],
+            "custom": {}
+          },
+          "$kind": "flowAction",
+          "actionClass": "FlowAction",
+          "page": "article",
+          "pageUrl": "https://apps.apple.com/jp/iphone/story/id1436214772?l=en-US",
+          "pageData": null,
+          "presentationContext": "infer",
+          "animationBehavior": "infer",
+          "origin": "inapp",
+          "destination": {
+            "storefront": "jp",
+            "language": "en-US",
+            "id": "1436214772",
+            "platform": "iphone",
+            "$kind": "RoutableArticlePageIntent"
+          }
+        },
+        "style": "infer"
+      }
+    ],
+    "shouldAlwaysPresentExpanded": false
+  },
+  "visible_html": [
+    "<div class=\"text-pair svelte-1gyt6l2\"><span>ChatGPT Plus</span> <span>¥3,000</span> </div>",
+    "<div class=\"text-pair svelte-1gyt6l2\"><span>ChatGPT Go</span> <span>¥1,400</span> </div>",
+    "<div class=\"text-pair svelte-1gyt6l2\"><span>ChatGPT Pro 100</span> <span>¥16,800</span> </div>",
+    "<div class=\"text-pair svelte-1gyt6l2\"><span>ChatGPT Pro 200</span> <span>¥30,000</span> </div>",
+    "<div class=\"text-pair svelte-1gyt6l2\"><span>ChatGPT Plus</span> <span>¥30,000</span> </div>",
+    "<div class=\"text-pair svelte-1gyt6l2\"><span>ChatGPT Pro 500</span> <span>¥84,000</span> </div>"
+  ]
+}
