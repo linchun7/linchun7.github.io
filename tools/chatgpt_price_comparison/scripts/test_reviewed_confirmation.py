@@ -100,11 +100,15 @@ class ReviewedConfirmationTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'duplicate'):
                 review.load(path)
 
-    def test_repository_review_manifest_is_bounded_and_configured(self):
+    def test_repository_review_manifest_is_optional_and_current_if_present(self):
+        path = p.ROOT / 'reviewed-changes.json'
+        if not path.exists():
+            self.assertIsNone(review.load(path, {'us'}))
+            return
         config = json.loads((p.ROOT / 'markets.json').read_text())
-        batch = review.load(p.ROOT / 'reviewed-changes.json', {item['code'] for item in config})
-        self.assertIsNotNone(batch)
+        batch = review.load(path, {item['code'] for item in config})
         self.assertLessEqual(review.timestamp(batch['expires_at']) - review.timestamp(batch['reviewed_at']), 48 * 3600)
+        self.assertGreater(review.timestamp(batch['expires_at']), time.time())
 
 
 if __name__ == '__main__':
