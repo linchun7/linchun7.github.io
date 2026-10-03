@@ -30,7 +30,7 @@
 ## 维护入口
 
 - `scripts/pipeline.py`：采集、汇率、校验和静态生成
-- `scripts/change_policy.py`：变更确认与隔离；`reviewed-changes.json`：精确人工提前批准
+- `scripts/change_policy.py`：变更确认与隔离；`reviewed-changes.json`：仅在有效期内临时存在的精确人工提前批准
 - `scripts/minimum_history.py`：最低价账本与 Git 证据恢复
 - `scripts/daily_run_guard.py`、`scripts/verify-production.mjs`：幂等判断及线上验收
 - `index.template.html`、`app.js`、`style.css`：页面源；`data/prices.json`、`data/minimum-history.json`、`index.html`：整组生成产物，不手工改价
@@ -54,7 +54,7 @@ node tools/chatgpt_price_comparison/scripts/browser-test.mjs
 
 先读失败 run 的首个失败步骤及 Issue，区分来源失败、pending、汇率失败、工件错误、分支竞争与部署失败。来源短暂失败不需要删历史或隐藏旧价；pending 需要持续确认，不应直接改成 verified。最低价账本异常仅在需要时读取完整 Git 证据恢复，无法可靠恢复则停止，不能清空账本过关。
 
-如确需提前接受已核验新增套餐：先独立双抓官方证据，再按 `reviewed-changes.json` 的精确市场、旧/新指纹、pending 起点、证据 run 和不超过 48 小时有效期填写。只支持 `plan_added`，无全局 force；正式更新仍重抓并执行全部门禁，任何不匹配回到默认等待。
+如确需提前接受已核验新增套餐：先独立双抓官方证据，再临时创建 `reviewed-changes.json`，按精确市场、旧/新指纹、pending 起点、证据 run 和不超过 48 小时有效期填写；批准过期或完成后删除该文件。只支持 `plan_added`，无全局 force；正式更新仍重抓并执行全部门禁，任何不匹配回到默认等待。
 
 仅保留本说明与第三方归属；过程、阶段报告及具体验收结果写 PR / Actions。页面与 OpenAI、Apple 无关联。[第三方资源许可](THIRD_PARTY_NOTICES.md) · [汇率服务条款](https://www.exchangerate-api.com/docs/free) · [OpenAI 网页多币种说明](https://help.openai.com/en/articles/10421635-multicurrency-billing)
 
