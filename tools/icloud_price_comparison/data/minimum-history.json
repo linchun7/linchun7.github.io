@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "projectSince": "2024-12-08",
   "firstObservedAt": "2026-07-30T01:01:10.212Z",
-  "checkedAt": "2026-10-07T00:06:27.364Z",
-  "observations": 129,
+  "checkedAt": "2026-10-07T05:45:24.619Z",
+  "observations": 130,
   "excludedVersions": 3,
   "pendingGap": false,
   "gaps": [
@@ -213,8 +213,8 @@
     }
   ],
   "checkpoint": {
-    "at": "2026-10-07T00:06:27.364Z",
-    "fingerprint": "213aa24f3e70985678b35f853bda9d51f231404fa2c2804f5c849d3a5b35b6bf",
+    "at": "2026-10-07T05:45:24.619Z",
+    "fingerprint": "aab2d55ab62f91ca37d5322348ac9712b1cfcf3340ebd815c4c297b6d7172ad9",
     "sourceCommit": null,
     "basis": "stored-ranks",
     "tiers": [
