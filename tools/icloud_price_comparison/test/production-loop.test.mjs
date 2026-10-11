@@ -334,6 +334,41 @@ test('full publication boundary accepts indefinitely retained FX without inventi
   }
 });
 
+test('confirmed market removal remains publishable with retained FX and dense surviving ranks', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-04-10T12:00:00Z') });
+  const { paths, dataDir } = await fixture(t);
+  const countries = canonicalCountries();
+  countries[0].prices = countries[0].prices.map(price => price / 2);
+  const first = await run(t, paths, [sourceHtml(countries, '2026-04-09')], '2026-04-10T12:00:00Z');
+  const removed = first.prices.countries.find(country => country.country === countries[0].country);
+  assert.ok(removed);
+  assert.ok(Object.values(removed.plans).every(plan => plan.cnyRank === 1));
+  const ledger = JSON.parse(await readFile(path.join(dataDir, 'minimum-history.json'), 'utf8'));
+
+  const html = sourceHtml(countries.slice(1), '2026-04-11');
+  const next = await run(t, paths, [html, html], '2026-04-11T12:00:00Z', { fxUnavailable: true });
+  assert.equal(next.appleRequests, 2, 'removal must still require an independent identical Apple confirmation');
+  assert.equal(next.prices.countries.length, countries.length - 1);
+  assert.equal(next.prices.countries.some(country => country.marketId === removed.marketId), false);
+  assert.equal(next.prices.fx.stale, true);
+  assert.equal(next.prices.fx.fetchedAt, first.prices.fx.fetchedAt);
+  for (const country of next.prices.countries) {
+    const previous = first.prices.countries.find(row => row.marketId === country.marketId);
+    for (const tier of next.prices.tiers) {
+      assert.equal(previous.plans[tier.id].cnyRank, 2);
+      assert.equal(country.plans[tier.id].cnyRank, 1);
+      const { cnyRank: oldRank, ...before } = previous.plans[tier.id];
+      const { cnyRank: newRank, ...after } = country.plans[tier.id];
+      assert.deepEqual(after, before, 'retained conversion evidence must stay unchanged');
+    }
+  }
+  assert.deepEqual(next.history.markets[removed.marketId], first.history.markets[removed.marketId]);
+  const after = JSON.parse(await readFile(path.join(dataDir, 'minimum-history.json'), 'utf8'));
+  assert.deepEqual(after.events, ledger.events, 'retained FX must not invent a new minimum observation');
+  assert.equal(after.pendingGap, true);
+  assert.equal(after.checkedAt, next.prices.generatedAt);
+});
+
 test('publication stages the exact tested bytes despite repository Git rules', async t => {
   t.mock.timers.enable({apis:['Date'],now:new Date('2026-04-10T12:00:00Z')});
   for (const attributes of [false,true]) {

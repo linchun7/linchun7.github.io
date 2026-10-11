@@ -1713,6 +1713,43 @@ test('reuses schema 4 CNY prices and ranks without reranking rounded ties', () =
   }
 });
 
+test('compresses retained rank groups after removals without reranking rounded CNY ties', () => {
+  const previousData = {
+    schemaVersion: 4,
+    countries: [
+      ['a', 1, 1], ['b', 1.00005, 2], ['c', 1.00005, 2],
+      ['d', 1.00006, 3], ['e', 1.00007, 4]
+    ].map(([marketId, price, cnyRank]) => ({
+      marketId, country: marketId, region: 'Americas', currency: 'USD',
+      plans: { '50GB': { price, formattedPrice: String(price), cnyPrice: 7.06, cnyRank } }
+    }))
+  };
+  const original = structuredClone(previousData);
+  for (const [removed, expectedRanks] of [
+    [[], [1, 2, 2, 3, 4]],
+    [['a'], [1, 1, 2, 3]],
+    [['d'], [1, 2, 2, 3]],
+    [['b'], [1, 2, 3, 4]],
+    [['a', 'd', 'e'], [1, 1]]
+  ]) {
+    const survivors = previousData.countries.filter(({ marketId }) => !removed.includes(marketId));
+    const countries = survivors.map(({ plans, ...country }) => ({
+      ...country,
+      plans: Object.fromEntries(Object.entries(plans).map(([tierId, { cnyPrice, cnyRank, ...plan }]) => [tierId, plan]))
+    }));
+    const reused = attachDerivedCnyPrices(countries, {
+      fx: { rates: null, reusePreviousCny: true }, previousData
+    });
+    assert.deepEqual(reused.map(({ plans }) => plans['50GB'].cnyRank), expectedRanks);
+    reused.forEach((country, index) => {
+      const { cnyRank: oldRank, ...before } = survivors[index].plans['50GB'];
+      const { cnyRank: newRank, ...after } = country.plans['50GB'];
+      assert.deepEqual(after, before, 'removals must retain the proven local and CNY prices');
+    });
+  }
+  assert.deepEqual(previousData, original, 'retained rank compression must not mutate the baseline');
+});
+
 test('publishes an explicit FX metadata allowlist, conditionally exposes the comparison fingerprint, and drops every internal field', () => {
   const metadata = publicExchangeRateMetadata({
     sourceUrl: 'https://example.test/rates',

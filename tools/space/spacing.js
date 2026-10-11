@@ -3,7 +3,7 @@
 
     // Only insert U+0020 at Han/ASCII boundaries. URLs and complete backtick
     // code stay intact; punctuation, whitespace and line endings are never normalized.
-    const protectedOrBoundary = /https?:\/\/[^\s<>"`\u3000-\u303f\uff00-\uffef\u2018\u2019\u201c\u201d\u2026]+|(\p{Script=Han})(?=[A-Za-z0-9(\[{])|([A-Za-z0-9)\]}])(?=\p{Script=Han})/gu;
+    const protectedOrBoundary = /[hH][tT][tT][pP][sS]?:\/\/[^\s<>"`\u3000-\u303f\uff00-\uffef\u2018\u2019\u201c\u201d\u2026]+|(\p{Script=Han})(?=[A-Za-z0-9(\[{])|([A-Za-z0-9)\]}])(?=\p{Script=Han})/gu;
     const fenceLine = /^ {0,3}(`{3,})([^`\r\n]*)(?=\r\n|\r|\n|$)/gm;
     const spacePlainText = (text) => text.replace(
         protectedOrBoundary,

@@ -578,7 +578,7 @@ function convertToFullPrecisionCny(price, currency, rates) {
 export function attachDerivedCnyPrices(countries, { fx, previousData = null } = {}) {
   const previousByMarket = new Map((previousData?.countries ?? []).map((country) => [country.marketId, country]));
   if (fx?.reusePreviousCny) {
-    return countries.map((country) => {
+    const reused = countries.map((country) => {
       const previousCountry = country.marketId ? previousByMarket.get(country.marketId) : null;
       if (!previousCountry || previousCountry.currency !== country.currency) {
         throw transientHealthcheckError(
@@ -607,6 +607,14 @@ export function attachDerivedCnyPrices(countries, { fx, previousData = null } = 
         }))
       };
     });
+    // Confirmed removals can leave holes in the retained rank groups. Preserve
+    // their proven ordering and ties; rounded CNY values cannot recreate them.
+    for (const tierId of Object.keys(reused[0]?.plans ?? {})) {
+      const ranks = [...new Set(reused.map((country) => country.plans[tierId].cnyRank))].sort((first, second) => first - second);
+      const denseRanks = new Map(ranks.map((rank, index) => [rank, index + 1]));
+      for (const country of reused) country.plans[tierId].cnyRank = denseRanks.get(country.plans[tierId].cnyRank);
+    }
+    return reused;
   }
   const ranked = countries.map((country) => ({
     ...country,
