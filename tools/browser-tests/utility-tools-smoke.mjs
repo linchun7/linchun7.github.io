@@ -113,7 +113,7 @@ async function testSpaceTool() {
     const { context, page, pageErrors } = await createPage();
     await page.goto(`${baseUrl}/tools/space/`, { waitUntil: 'domcontentloaded' });
 
-    assert.equal(await page.locator('script[src="spacing.js?v=20261011-code-spans"]').count(), 1, 'space tool should use its content-preserving helper');
+    assert.equal(await page.locator('script[src="spacing.js?v=20261011-url-schemes"]').count(), 1, 'space tool should use its content-preserving helper');
     assert.equal(await page.locator('script[src="dist/browser/pangu.min.js"]').count(), 0, 'space UI should not depend on Pangu punctuation normalization');
     // Bound the regression inputs: enough unmatched delimiters to expose rescanning,
     // while keeping the test independent of a microbenchmark or unbounded input.
@@ -148,6 +148,12 @@ async function testSpaceTool() {
         ["中文😀ABC👩‍💻数字123🧑🏽‍🚀完成", "中文😀ABC👩‍💻数字 123🧑🏽‍🚀完成"],
         ["中文  ABC\t第二行 123", "中文  ABC\t第二行 123"],
         ["访问https://example.com/中文ABC?q=测试123，继续ABC", "访问 https://example.com/中文ABC?q=测试123，继续 ABC"],
+        // HTTP(S) schemes are case-insensitive; URL path/query text stays exact.
+        ["访问HTTP://example.com/中文ABC?q=测试123，继续ABC", "访问 HTTP://example.com/中文ABC?q=测试123，继续 ABC"],
+        ["访问HTTPS://example.com/中文ABC?q=测试123，继续ABC", "访问 HTTPS://example.com/中文ABC?q=测试123，继续 ABC"],
+        ["前文ABC HtTpS://example.com/目录ABC?key=中文123&next=路Z，后文XYZ", "前文 ABC HtTpS://example.com/目录ABC?key=中文123&next=路Z，后文 XYZ"],
+        // Scheme matching must not case-fold the ASCII-only boundary classes.
+        ["中文K数字ſ结束", "中文K数字ſ结束"],
         ["中文`ABC中文123`", "中文`ABC中文123`"],
         // Whole backtick runs and complete fences must survive both helper and button paths.
         ["中文``变量ABC``继续123", "中文``变量ABC``继续 123"],
