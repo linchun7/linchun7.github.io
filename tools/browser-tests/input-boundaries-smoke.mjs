@@ -212,12 +212,12 @@ try {
             window.fetch = async () => ({ ok: true, json: () => { window.__bodyReads++; return new Promise(() => {}); } });
         }, withoutAbortController));
     }
-    await check('spacing fails closed when local Pangu is unavailable', 'space', async page => {
+    await check('spacing fails closed when the content-preserving helper is unavailable', 'space', async page => {
         await page.fill('#info', '中文ABC');
         await page.click('#addBtn');
         assert.equal(await page.inputValue('#info'), '中文ABC');
         assert.match(await page.locator('#alertText').textContent(), /组件加载失败/);
-    }, page => page.route('**/tools/space/dist/browser/pangu.min.js', route => route.abort()));
+    }, page => page.route('**/tools/space/spacing.js', route => route.abort()));
     await check('spacing clipboard denial falls back without losing input or focus', 'space', async page => {
         await page.fill('#info', '中文 ABC');
         await page.evaluate(() => {

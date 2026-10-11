@@ -113,11 +113,44 @@ async function testSpaceTool() {
     const { context, page, pageErrors } = await createPage();
     await page.goto(`${baseUrl}/tools/space/`, { waitUntil: 'domcontentloaded' });
 
-    assert.equal(await page.locator('script[src="dist/browser/pangu.min.js"]').count(), 1, 'space tool should use local Pangu');
-    await page.fill('#info', '中文ABC\n第二行123');
-    await page.click('#addBtn');
-    assert.equal(await page.inputValue('#info'), '中文 ABC\n第二行 123');
-    assert.match(await page.locator('#alertText').textContent(), /已处理/);
+    assert.equal(await page.locator('script[src="spacing.js"]').count(), 1, 'space tool should use its content-preserving helper');
+    assert.equal(await page.locator('script[src="dist/browser/pangu.min.js"]').count(), 0, 'space UI should not depend on Pangu punctuation normalization');
+    const cases = [
+        ["", ""],
+        [" \t \r\n\r ", " \t \r\n\r "],
+        ["中A文B字1汉2", "中 A 文 B 字 1 汉 2"],
+        ["中文`ABC中文123", "中文`ABC 中文 123"],
+        ["王·小明", "王·小明"],
+        ["中文( A )与[ B ]再{ C }", "中文 ( A ) 与 [ B ] 再 { C }"],
+        ["中文ABC\r\n\r\n第二行123\r段落Z\n结束", "中文 ABC\r\n\r\n第二行 123\r段落 Z\n结束"],
+        ["A中B文12号3C", "A 中 B 文 12 号 3C"],
+        ["中文😀ABC👩‍💻数字123🧑🏽‍🚀完成", "中文😀ABC👩‍💻数字 123🧑🏽‍🚀完成"],
+        ["中文  ABC\t第二行 123", "中文  ABC\t第二行 123"],
+        ["访问https://example.com/中文ABC?q=测试123，继续ABC", "访问 https://example.com/中文ABC?q=测试123，继续 ABC"],
+        ["中文`ABC中文123`", "中文`ABC中文123`"],
+        ["中文\" A \":B,中文!数字1", "中文\" A \":B,中文!数字 1"],
+        ["𠀀A中B", "𠀀 A 中 B"],
+        ["中文(https://example.com/中文ABC)，继续123", "中文 (https://example.com/中文ABC)，继续 123"]
+    ];
+    for (const [input, expected] of cases) {
+        // A textarea normalizes CR/CRLF to LF. Check the pure helper first so
+        // exact original line endings remain part of the content contract.
+        const output = await page.evaluate((text) => window.spaceTextPreservingContent(text), input);
+        assert.equal(output, expected, `helper content preservation: ${JSON.stringify(input)}`);
+        assert.equal(
+            await page.evaluate((text) => window.spaceTextPreservingContent(text), output),
+            output,
+            'repeated spacing should be idempotent'
+        );
+
+        await page.fill('#info', input);
+        await page.click('#addBtn');
+        const textareaExpected = expected.replace(/\r\n?/g, '\n');
+        assert.equal(await page.inputValue('#info'), textareaExpected, `space UI: ${JSON.stringify(input)}`);
+        await page.click('#addBtn');
+        assert.equal(await page.inputValue('#info'), textareaExpected, 'repeated button clicks should not add spaces');
+        assert.match(await page.locator('#alertText').textContent(), input ? /已处理/ : /无内容/);
+    }
     assert.equal(pageErrors.length, 0, `space tool page errors: ${pageErrors.map(String).join('; ')}`);
     await context.close();
 }

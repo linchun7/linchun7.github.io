@@ -367,11 +367,27 @@ try {
   }
 
   await command('Emulation.setScriptExecutionDisabled',{value:true});
-  await command('Page.reload',{ignoreCache:true});
-  await until(()=>evaluate(`document.querySelectorAll('#priceRows tr[data-market-id]').length>0`),'no-JS static matrix');
-  assert.equal(await evaluate(`document.querySelector('.country-history-button').disabled`),true,'no-JS country history is safely disabled');
-  assert.equal(await evaluate(`document.querySelector('i[data-lucide="search"]')!==null`),true,'no-JS keeps Lucide placeholder in static HTML');
-  assert.equal(await evaluate(`document.querySelector('#refresh')===null`),true,'no-JS has no reload button');
+  for (const width of [390, 960]) {
+    await command('Emulation.setDeviceMetricsOverride',{width,height:844,deviceScaleFactor:1,mobile:true});
+    await command('Page.reload',{ignoreCache:true});
+    await until(()=>evaluate(`document.querySelectorAll('#priceRows tr[data-market-id]').length>0`),'no-JS static matrix');
+    const fallback = await evaluate(`({
+      ready: document.querySelector('#priceWorkspace').classList.contains('price-ui-ready'),
+      overflow: getComputedStyle(document.querySelector('.table-scroll')).overflowX,
+      picker: getComputedStyle(document.querySelector('.mobile-plan-picker')).display,
+      headers: [...document.querySelectorAll('th[data-plan-header]')].filter(cell => getComputedStyle(cell).display !== 'none').map(cell => cell.dataset.plan),
+      rows: [...document.querySelectorAll('#priceRows tr[data-market-id]')].map(row => [...row.querySelectorAll('td[data-plan]')].filter(cell => getComputedStyle(cell).display !== 'none').map(cell => cell.dataset.plan))
+    })`);
+    assert.equal(fallback.ready, false, width + 'px: no-JS never activates enhanced mode');
+    assert.equal(fallback.overflow, 'auto', width + 'px: no-JS full table scrolls internally');
+    assert.equal(fallback.picker, 'none', width + 'px: no-JS does not expose an empty switcher');
+    assert.deepEqual(fallback.headers, plans, width + 'px: no-JS shows every plan header');
+    assert.equal(fallback.rows.length, expected.markets.length, width + 'px: no-JS shows every market');
+    assert.ok(fallback.rows.every(columns => JSON.stringify(columns) === JSON.stringify(plans)), width + 'px: no-JS shows every price column');
+    assert.equal(await evaluate(`document.querySelector('.country-history-button').disabled`),true,'no-JS country history is safely disabled');
+    assert.equal(await evaluate(`document.querySelector('i[data-lucide="search"]')!==null`),true,'no-JS keeps Lucide placeholder in static HTML');
+    assert.equal(await evaluate(`document.querySelector('#refresh')===null`),true,'no-JS has no reload button');
+  }
   console.log(`Browser tests passed (scope=${scope}): prices, ranks, minima, history, dates, mobile data and static fallback${fullUi ? '; complete keyboard, XSS and responsive checks' : ''}.`);
 } catch(error) {
   if (socket?.readyState === 1) console.error('PAGE STATE',await evaluate('({url:location.href,rows:document.querySelectorAll("#priceRows tr").length,dialog:document.querySelector("#historyDialog")?.open,body:document.body?.textContent.slice(0,1200)})'));
