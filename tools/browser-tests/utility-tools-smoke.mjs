@@ -113,7 +113,7 @@ async function testSpaceTool() {
     const { context, page, pageErrors } = await createPage();
     await page.goto(`${baseUrl}/tools/space/`, { waitUntil: 'domcontentloaded' });
 
-    assert.equal(await page.locator('script[src="spacing.js"]').count(), 1, 'space tool should use its content-preserving helper');
+    assert.equal(await page.locator('script[src="spacing.js?v=20261011-code-spans"]').count(), 1, 'space tool should use its content-preserving helper');
     assert.equal(await page.locator('script[src="dist/browser/pangu.min.js"]').count(), 0, 'space UI should not depend on Pangu punctuation normalization');
     const cases = [
         ["", ""],
@@ -128,6 +128,22 @@ async function testSpaceTool() {
         ["中文  ABC\t第二行 123", "中文  ABC\t第二行 123"],
         ["访问https://example.com/中文ABC?q=测试123，继续ABC", "访问 https://example.com/中文ABC?q=测试123，继续 ABC"],
         ["中文`ABC中文123`", "中文`ABC中文123`"],
+        // Whole backtick runs and complete fences must survive both helper and button paths.
+        ["中文``变量ABC``继续123", "中文``变量ABC``继续 123"],
+        ["中文``变量`ABC中文123`尾Z``继续ABC", "中文``变量`ABC中文123`尾Z``继续 ABC"],
+        ["中文```变量``ABC中文123``尾`Z```继续ABC", "中文```变量``ABC中文123``尾`Z```继续 ABC"],
+        ["中文``变量ABC```继续123", "中文``变量 ABC```继续 123"],
+        ["中文``变量ABC", "中文``变量 ABC"],
+        ["中文``未闭合ABC\n`变量ABC`结束123", "中文``未闭合 ABC\n`变量ABC`结束 123"],
+        ["前文ABC\n```js\nconst label = `变量ABC`;\nconst value = 中文123;\n```\n后文XYZ", "前文 ABC\n```js\nconst label = `变量ABC`;\nconst value = 中文123;\n```\n后文 XYZ"],
+        ["前文ABC\n``````js\n```嵌入ABC\n变量ABC\n`````仍在块内123\n````````\n后文XYZ", "前文 ABC\n``````js\n```嵌入ABC\n变量ABC\n`````仍在块内123\n````````\n后文 XYZ"],
+        ["中文ABC\n   ```text\n变量ABC\n  ```` \t\n继续123", "中文 ABC\n   ```text\n变量ABC\n  ```` \t\n继续 123"],
+        ["前文ABC\r\n```js\r\nconst label = `变量ABC`;\r\n变量ABC\r\n```\r\n后文123", "前文 ABC\r\n```js\r\nconst label = `变量ABC`;\r\n变量ABC\r\n```\r\n后文 123"],
+        ["前文ABC\r```js\rconst label = `变量ABC`;\r变量ABC\r```\r后文123", "前文 ABC\r```js\rconst label = `变量ABC`;\r变量ABC\r```\r后文 123"],
+        ["```js\n变量ABC\n```tail\n继续123\n```", "```js\n变量ABC\n```tail\n继续123\n```"],
+        ["```js\n变量ABC\n    ```\n继续123\n```", "```js\n变量ABC\n    ```\n继续123\n```"],
+        ["```js\n变量ABC\n``\n继续123", "```js\n变量 ABC\n``\n继续 123"],
+        ["中文`未闭合ABC\n```js\n变量ABC\n```\n尾Z`中文ABC", "中文`未闭合 ABC\n```js\n变量ABC\n```\n尾 Z`中文 ABC"],
         ["中文\" A \":B,中文!数字1", "中文\" A \":B,中文!数字 1"],
         ["𠀀A中B", "𠀀 A 中 B"],
         ["中文(https://example.com/中文ABC)，继续123", "中文 (https://example.com/中文ABC)，继续 123"]

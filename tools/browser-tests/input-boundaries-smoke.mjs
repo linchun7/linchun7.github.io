@@ -217,7 +217,7 @@ try {
         await page.click('#addBtn');
         assert.equal(await page.inputValue('#info'), '中文ABC');
         assert.match(await page.locator('#alertText').textContent(), /组件加载失败/);
-    }, page => page.route('**/tools/space/spacing.js', route => route.abort()));
+    }, page => page.route('**/tools/space/spacing.js*', route => route.abort()));
     await check('spacing clipboard denial falls back without losing input or focus', 'space', async page => {
         await page.fill('#info', '中文 ABC');
         await page.evaluate(() => {

@@ -82,22 +82,26 @@ def configuration(candidate):
 
 
 class LiveCandidateTests(unittest.TestCase):
-    def test_full_200_plus_one_prunes_exactly_one_and_advances_only_affected_baseline(self):
+    def test_200_201_202_keep_all_changes_and_original_baselines(self):
         baseline = baseline_fixture(200)
-        candidate = candidate_fixture(baseline)
-        before = copy.deepcopy((baseline, candidate))
-        summary = validate_live_candidate(baseline, candidate, configuration(candidate))
-        self.assertTrue(summary['history_transition_validated'])
-        self.assertEqual(summary['pruned_changes'], 1)
-        self.assertEqual(summary['retained_changes'], 200)
-        self.assertEqual(candidate['changes'][:-1], baseline['changes'][1:])
-        self.assertEqual(candidate['markets'][0]['history_baseline'], {
-            'at': baseline['changes'][0]['at'], 'snapshot': baseline['changes'][0]['after']})
-        self.assertEqual(candidate['markets'][1]['history_baseline'], baseline['markets'][1]['history_baseline'])
-        self.assertEqual((baseline, candidate), before, 'validation cannot mutate trusted evidence')
+        original_baselines = {market['code']: copy.deepcopy(market['history_baseline'])
+                              for market in baseline['markets']}
+        for count in [201, 202]:
+            candidate = candidate_fixture(baseline)
+            before = copy.deepcopy((baseline, candidate))
+            summary = validate_live_candidate(baseline, candidate, configuration(candidate))
+            self.assertTrue(summary['history_transition_validated'])
+            self.assertEqual(summary['pruned_changes'], 0)
+            self.assertEqual(summary['retained_changes'], count)
+            self.assertEqual(candidate['changes'][:-1], baseline['changes'])
+            self.assertEqual(candidate['changes'][0], baseline['changes'][0])
+            for market in candidate['markets']:
+                self.assertEqual(market['history_baseline'], original_baselines[market['code']])
+            self.assertEqual((baseline, candidate), before, 'validation cannot mutate trusted evidence')
+            baseline = candidate
 
     def test_unchanged_full_history_keeps_all_changes_and_baselines(self):
-        baseline = baseline_fixture(200)
+        baseline = baseline_fixture(202)
         candidate = candidate_fixture(baseline, change_price=False)
         summary = validate_live_candidate(baseline, candidate, configuration(candidate))
         self.assertEqual(summary['pruned_changes'], 0)
@@ -114,7 +118,7 @@ class LiveCandidateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'exact retained history transition'):
             validate_live_candidate(baseline, candidate, configuration(candidate))
 
-    def test_individually_valid_extra_pruning_is_rejected(self):
+    def test_individually_valid_deletion_and_baseline_advance_is_rejected(self):
         baseline = baseline_fixture(200)
         candidate = candidate_fixture(baseline)
         removed = candidate['changes'].pop(0)
@@ -133,7 +137,7 @@ class LiveCandidateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'exact history transition: gb'):
             validate_live_candidate(baseline, candidate, configuration(candidate))
 
-    def test_unchanged_history_cannot_be_pruned_without_new_events(self):
+    def test_unchanged_history_cannot_be_deleted_without_new_events(self):
         baseline = baseline_fixture(200)
         candidate = candidate_fixture(baseline, change_price=False)
         removed = candidate['changes'].pop(0)
@@ -149,6 +153,17 @@ class LiveCandidateTests(unittest.TestCase):
         candidate['changes'][10]['before']['offers'][0]['amounts'] = ['999']
         revise(candidate)
         with self.assertRaisesRegex(ValueError, 'discontinuous'):
+            validate_live_candidate(baseline, candidate, configuration(candidate))
+
+    def test_self_consistent_tampered_old_snapshot_is_rejected(self):
+        baseline = baseline_fixture(202)
+        candidate = candidate_fixture(baseline)
+        altered = candidate['changes'][10]['after']
+        altered['offers'][0]['amounts'] = ['999']
+        candidate['changes'][11]['before'] = copy.deepcopy(altered)
+        revise(candidate)
+        p.validate(candidate)  # Revision and chain alone cannot authenticate old evidence.
+        with self.assertRaisesRegex(ValueError, 'exact retained history transition'):
             validate_live_candidate(baseline, candidate, configuration(candidate))
 
     def test_missing_country_baseline_is_not_accepted_as_legacy_candidate(self):
@@ -197,7 +212,7 @@ class LiveCandidateTests(unittest.TestCase):
         self.assertEqual(summary['retained_changes'], 0)
         self.assertEqual(current['history_baseline'], market['history_baseline'])
 
-    def test_two_markets_advance_only_to_their_own_pruned_events(self):
+    def test_two_markets_append_without_evicting_each_others_earliest_events(self):
         baseline = baseline_fixture()
         template = baseline['markets'][0]
         previous = {market['code']: copy.deepcopy(market) for market in baseline['markets']}
@@ -227,12 +242,15 @@ class LiveCandidateTests(unittest.TestCase):
         revise(candidate)
         p.validate(candidate)
         summary = validate_live_candidate(baseline, candidate, configuration(candidate))
-        self.assertEqual(summary['pruned_changes'], 2)
-        for market, removed in zip(candidate['markets'], baseline['changes'][:2]):
-            self.assertEqual(market['code'], removed['code'])
-            self.assertEqual(market['history_baseline'], {'at': removed['at'], 'snapshot': removed['after']})
+        self.assertEqual(summary['pruned_changes'], 0)
+        self.assertEqual(summary['retained_changes'], 202)
+        self.assertEqual(candidate['changes'][:200], baseline['changes'])
+        for market in candidate['markets']:
+            self.assertEqual(market['history_baseline'], previous[market['code']]['history_baseline'])
+            first = next(change for change in candidate['changes'] if change['code'] == market['code'])
+            self.assertEqual(first, next(change for change in baseline['changes'] if change['code'] == market['code']))
 
-    def test_configured_removal_scopes_history_before_retention(self):
+    def test_configured_removal_is_the_only_allowed_history_scope_reduction(self):
         baseline = baseline_fixture(2)
         old_gb = copy.deepcopy(baseline['markets'][1])
         current_gb = observed(old_gb, 81, 3, 'gb', '英国')
@@ -268,7 +286,7 @@ class LiveCandidateTests(unittest.TestCase):
         candidate['markets'].reverse()
         revise(candidate)
         p.validate(candidate)
-        self.assertEqual(validate_live_candidate(baseline, candidate, config)['pruned_changes'], 1)
+        self.assertEqual(validate_live_candidate(baseline, candidate, config)['pruned_changes'], 0)
 
     def test_degraded_source_old_verification_and_fallback_fx_still_fail(self):
         baseline = baseline_fixture()

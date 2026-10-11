@@ -103,15 +103,14 @@ function verificationUrl(base, attempt) {
   return url;
 }
 
-async function getText(fetchImpl, base, maxBytes, signal, attempt) {
-  const requestUrl = verificationUrl(base, attempt);
+async function getText(fetchImpl, base, maxBytes, signal, attempt, diagnostic) {
+  const requestUrl = diagnostic ? verificationUrl(base, attempt) : new URL(base);
   const response = await fetchImpl(requestUrl, {
     signal,
-    cache: 'no-store',
+    ...(diagnostic ? { cache: 'no-store' } : {}),
     redirect: 'error',
     headers: {
-      'cache-control': 'no-cache',
-      pragma: 'no-cache',
+      ...(diagnostic ? { 'cache-control': 'no-cache', pragma: 'no-cache' } : {}),
       'user-agent': 'ChatGPTPriceVerifier/1.0'
     }
   });
@@ -123,6 +122,43 @@ async function getText(fetchImpl, base, maxBytes, signal, attempt) {
     }
   }
   return limitedText(response, maxBytes);
+}
+
+async function verifyResponse(expected, {
+  expectedMinimumHistory, expectedPageRevision, expectedAssets, fetchImpl, signal, attempt, diagnostic
+}) {
+  const [jsonText, minimumText, html] = await Promise.all([
+    getText(fetchImpl, PRICES_URL, MAX_JSON, signal, attempt, diagnostic),
+    getText(fetchImpl, MINIMUM_HISTORY_URL, MAX_JSON, signal, attempt, diagnostic),
+    getText(fetchImpl, INDEX_URL, MAX_HTML, signal, attempt, diagnostic)
+  ]);
+  const actual = JSON.parse(jsonText);
+  const actualMinimumHistory = JSON.parse(minimumText);
+  validateSnapshot(actual);
+  validateMinimumHistory(actualMinimumHistory, actual);
+  if (actual.revision !== expected.revision) throw new Error('production revision is not expected revision');
+  if (canonical(actualMinimumHistory) !== canonical(expectedMinimumHistory)) throw new Error('production minimum history is not expected history');
+  const revisionMeta = `<meta name="chatgpt-data-revision" content="${expected.revision}">`;
+  if (!html.includes(revisionMeta)) throw new Error('production HTML data revision meta does not match expected revision');
+  if (pageRevisionOf(html) !== expectedPageRevision) {
+    throw new Error('production HTML page revision does not match expected build');
+  }
+  const liveAssets = assetVersionsOf(html);
+  if (canonical(liveAssets) !== canonical(expectedAssets)) {
+    throw new Error('production HTML asset versions do not match expected build');
+  }
+  const assetEntries = Object.entries(expectedAssets);
+  const assetTexts = await Promise.all(assetEntries.map(([name, version]) =>
+    getText(fetchImpl, assetUrl(name, version), MAX_ASSET, signal, attempt, diagnostic)
+  ));
+  for (let i = 0; i < assetEntries.length; i += 1) {
+    const [name, version] = assetEntries[i];
+    const actualVersion = createHash('sha256').update(assetTexts[i]).digest('hex').slice(0, 12);
+    if (actualVersion !== version) {
+      throw new Error('production asset content does not match version: ' + name);
+    }
+  }
+  return actual.revision;
 }
 
 export async function verifyOnce(expected, {
@@ -141,38 +177,13 @@ export async function verifyOnce(expected, {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), requestTimeoutMs);
   try {
-    const [jsonText, minimumText, html] = await Promise.all([
-      getText(fetchImpl, PRICES_URL, MAX_JSON, controller.signal, attempt),
-      getText(fetchImpl, MINIMUM_HISTORY_URL, MAX_JSON, controller.signal, attempt),
-      getText(fetchImpl, INDEX_URL, MAX_HTML, controller.signal, attempt)
-    ]);
-    const actual = JSON.parse(jsonText);
-    const actualMinimumHistory = JSON.parse(minimumText);
-    validateSnapshot(actual);
-    validateMinimumHistory(actualMinimumHistory, actual);
-    if (actual.revision !== expected.revision) throw new Error('production revision is not expected revision');
-    if (canonical(actualMinimumHistory) !== canonical(expectedMinimumHistory)) throw new Error('production minimum history is not expected history');
-    const revisionMeta = `<meta name="chatgpt-data-revision" content="${expected.revision}">`;
-    if (!html.includes(revisionMeta)) throw new Error('production HTML data revision meta does not match expected revision');
-    if (pageRevisionOf(html) !== expectedPageRevision) {
-      throw new Error('production HTML page revision does not match expected build');
-    }
-    const liveAssets = assetVersionsOf(html);
-    if (canonical(liveAssets) !== canonical(expectedAssets)) {
-      throw new Error('production HTML asset versions do not match expected build');
-    }
-    const assetEntries = Object.entries(expectedAssets);
-    const assetTexts = await Promise.all(assetEntries.map(([name, version]) =>
-      getText(fetchImpl, assetUrl(name, version), MAX_ASSET, controller.signal, attempt)
-    ));
-    for (let i = 0; i < assetEntries.length; i += 1) {
-      const [name, version] = assetEntries[i];
-      const actualVersion = createHash('sha256').update(assetTexts[i]).digest('hex').slice(0, 12);
-      if (actualVersion !== version) {
-        throw new Error('production asset content does not match version: ' + name);
-      }
-    }
-    return actual.revision;
+    const options = {
+      expectedMinimumHistory, expectedPageRevision, expectedAssets, fetchImpl,
+      signal: controller.signal, attempt
+    };
+    // Cache-bypassing probes diagnose deployment lag; only ordinary URLs can prove acceptance.
+    await verifyResponse(expected, { ...options, diagnostic: true });
+    return await verifyResponse(expected, { ...options, diagnostic: false });
   } finally {
     controller.abort();
     clearTimeout(timer);
@@ -199,7 +210,7 @@ export async function verifyWithRetry(expected, {
     attempt += 1;
     try {
       const revision = await verifyOnce(expected, { expectedMinimumHistory, expectedPageRevision, expectedAssets, fetchImpl, requestTimeoutMs, attempt });
-      console.log('Verified live JSON and HTML revision:', revision, 'attempt:', attempt);
+      console.log('Verified canonical JSON, history, HTML and versioned assets revision:', revision, 'attempt:', attempt);
       return { revision, attempt };
     } catch (error) {
       lastReason = error?.name === 'AbortError' ? 'request-timeout' : String(error?.message || error).replace(/[\r\n]+/g, ' ').slice(0, 160);

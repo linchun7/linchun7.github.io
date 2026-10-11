@@ -105,7 +105,7 @@ def history_semantic(market: dict) -> dict:
     """Normalize only known aliases for price-history change detection.
 
     Raw Apple labels stay in prices.json and stored snapshots.  This projection
-    exists solely to avoid consuming history capacity for a label-only rename.
+    exists solely to avoid recording a price event for a label-only rename.
     Ambiguous duplicate aliases remain distinguishable and therefore recordable.
     """
     offers = {}
@@ -548,11 +548,8 @@ def history_snapshot_identity(snapshot: dict) -> str:
     return canonical(history_semantic(market))
 
 
-def update_country_history(previous: dict, markets: list, changes: list, limit: int = 200) -> list:
-    """Retain a timestamp bound to a real snapshot, not a moving verification clock."""
-    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 200:
-        raise ValueError('invalid country history retention limit')
-    by_code = {market['code']: market for market in markets}
+def update_country_history(previous: dict, markets: list, changes: list) -> list:
+    """Keep every accepted change and its original observed country baseline."""
     for market in markets:
         if 'history_baseline' in market or not market.get('offers'):
             continue
@@ -573,12 +570,7 @@ def update_country_history(previous: dict, markets: list, changes: list, limit: 
             source = old if old and old.get('offers') else market
             baseline = {'at': source.get('last_verified_at'), 'snapshot': semantic(source)}
         market['history_baseline'] = baseline
-    for change in changes[:-limit]:
-        if change['code'] in by_code:
-            by_code[change['code']]['history_baseline'] = {
-                'at': change['at'], 'snapshot': copy.deepcopy(change['after'])
-            }
-    return changes[-limit:]
+    return changes
 
 
 def validate_country_history_baselines(data: dict) -> None:
@@ -675,8 +667,8 @@ def validate(data: dict, now: float | None = None) -> None:
         if not 1 < Decimal(fx['rates']['CNY']) < 30:
             raise ValueError('invalid CNY rate')
     changes = data['changes']
-    if not isinstance(changes, list) or len(changes) > 200:
-        raise ValueError('history exceeds retention budget')
+    if not isinstance(changes, list):
+        raise ValueError('invalid history list')
     previous_at = float('-inf')
     for change in changes:
         if not isinstance(change, dict) or set(change) != {'at', 'code', 'before', 'after'}:

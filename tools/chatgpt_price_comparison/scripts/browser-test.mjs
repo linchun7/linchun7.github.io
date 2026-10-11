@@ -239,6 +239,25 @@ try {
     const historyLocal=await evaluate(`document.querySelector('#historyLocalPrice').textContent`);
     for(const amount of sampleOffer.amounts) assert.ok(historyLocal.includes(amount.display),'history preserves every same-label public amount');
   }
+  if (process.env.BROWSER_STATE_FIXTURE === 'long_history') {
+    const changes = expected.changes.filter(change => change.code === sampleMarket.code);
+    assert.equal(changes.length, 202, 'fixture crosses the former global 200-event cap');
+    assert.equal(await evaluate('document.querySelectorAll("#historyRows tr").length'), 203, 'all changes and original baseline are rendered');
+    assert.equal(await evaluate('document.querySelector("#historyEventCount").textContent'), '202 次');
+    const earliest = sampleMarket.history_baseline;
+    assert.ok(earliest?.at, 'long history keeps the original observation time');
+    const earliestDate = await evaluate(`new Date(${JSON.stringify(earliest.at)}).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai',hour12:false,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})`);
+    assert.equal(await evaluate('document.querySelector("#historyRows tr:last-child td").textContent'), earliestDate, 'earliest observation remains available after more than 200 changes');
+    assert.equal(await evaluate('document.querySelector("#historyRows tr:last-child td:nth-child(3)").textContent'), '17 USD', 'earliest price is not replaced by a later baseline');
+    assert.equal(await evaluate(`(() => {
+      const scroll = document.querySelector('#historyDialog .history-table-scroll');
+      const earliest = document.querySelector('#historyRows tr:last-child');
+      earliest.scrollIntoView({block:'end'});
+      const row = earliest.getBoundingClientRect();
+      const viewport = scroll.getBoundingClientRect();
+      return row.top >= Math.max(viewport.top, 0) && row.bottom <= Math.min(viewport.bottom, innerHeight);
+    })()`), true, 'earliest row can be scrolled into view');
+  }
   const sampleVerifiedDate = await evaluate(`new Date(${JSON.stringify(sampleMarket.last_verified_at)}).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai',hour12:false,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})`);
   assert.ok(await evaluate(`document.querySelector('#historySubtitle').textContent.includes(${JSON.stringify('价格更新于 ' + sampleVerifiedDate)})`), 'history exposes the actual market observation date');
   if (fullUi) for (const key of ['Enter', ' ']) {
@@ -249,7 +268,7 @@ try {
     await pressKey('Tab');
     assert.equal(await evaluate('document.querySelector("#historyDialog").contains(document.activeElement)'), true, 'Tab after a plan change remains inside the modal');
   }
-  assert.equal(await evaluate(`document.querySelector('.history-current div:nth-child(3) span').textContent`),'近期变更次数','history count is scoped to retained events');
+  assert.equal(await evaluate(`document.querySelector('.history-current div:nth-child(3) span').textContent`),'变更次数','history count is scoped to retained events');
   await evaluate(`document.querySelector('#closeHistory').click()`);
 
   if (process.env.BROWSER_STATE_FIXTURE === 'retired_plan') {

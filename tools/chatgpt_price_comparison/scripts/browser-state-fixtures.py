@@ -7,7 +7,7 @@ import time
 import minimum_history
 import pipeline as p
 from test_pipeline import data_fixture, revise
-MODES = ('verified','pending','mixed','aliases','stale_fx','expired_fx','retired_plan')
+MODES = ('verified','pending','mixed','aliases','stale_fx','expired_fx','retired_plan','long_history')
 def fixture_data(mode):
     if mode not in MODES: raise ValueError(mode)
     now = int(time.time())
@@ -61,6 +61,29 @@ def fixture_data(mode):
     elif mode == 'expired_fx':
         data['fx']['updated_at'] = p.stamp(now-p.EXPIRE-60)
         data['fx']['fallback'] = True
+    if mode == 'long_history':
+        template = data['markets'][0]
+        observed_at = now - 203 * 60
+        def plus_observation(amount, at):
+            market = copy.deepcopy(template)
+            market.pop('history_baseline', None)
+            market['last_checked_at'] = market['last_verified_at'] = p.stamp(at)
+            plus = next(offer for offer in market['offers'] if offer['label'] == 'ChatGPT Plus')
+            plus['amounts'] = [{'amount':str(amount),'display':'$'+str(amount)+'.00'}]
+            market['fingerprint'] = p.digest(p.semantic(market))
+            return market
+        initial = plus_observation(17, observed_at)
+        p.update_country_history({}, [initial], [])
+        current = initial
+        changes = []
+        for offset in range(1, 203):
+            following = plus_observation(17 + offset, observed_at + offset * 60)
+            changes.append({'at':following['last_verified_at'],'code':following['code'],
+                            'before':p.semantic(current),'after':p.semantic(following)})
+            current = following
+        current['last_checked_at'] = current['last_verified_at'] = p.stamp(now)
+        data['markets'][0] = current
+        data['changes'] = p.update_country_history({initial['code']:initial}, data['markets'], changes)
     for market in data['markets']:
         for offer in market['offers']:
             for amount in offer['amounts']: amount['cny'] = p.converted(market,amount['amount'],data['fx'],now)

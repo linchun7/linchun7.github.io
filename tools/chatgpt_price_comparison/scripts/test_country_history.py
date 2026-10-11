@@ -46,18 +46,37 @@ class CountryHistoryTests(unittest.TestCase):
         self.assertEqual(kept[0]['at'],p.stamp(START+3600))
         p.validate_country_history_baselines(data([current],kept))
 
-    def test_pruning_advances_only_affected_market_boundaries(self):
+    def test_200_201_202_changes_keep_original_baselines_across_countries(self):
         us0,gb0,ca0=market(),market('gb','80'),market('ca','5')
-        for m in [us0,gb0,ca0]: p.update_country_history({},[m],[])
-        us1,gb1,us2,us3=market(amount='21',offset=1),market('gb','81',offset=2),market(amount='22',offset=3),market(amount='23',offset=4)
-        changes=[change(us0,us1,1),change(gb0,gb1,2),change(us1,us2,3),change(us2,us3,4)]
-        markets=[us3,gb1,copy.deepcopy(ca0)]
-        kept=p.update_country_history({'us':us0,'gb':gb0,'ca':ca0},markets,changes,limit=2)
-        self.assertEqual(kept,changes[2:])
-        self.assertEqual(us3['history_baseline'],{'at':p.stamp(START+1),'snapshot':p.semantic(us1)})
-        self.assertEqual(gb1['history_baseline'],{'at':p.stamp(START+2),'snapshot':p.semantic(gb1)})
-        self.assertEqual(markets[2]['history_baseline'],ca0['history_baseline'])
+        original={'us':us0,'gb':gb0,'ca':ca0}
+        for m in original.values(): p.update_country_history({},[m],[])
+        us1=market(amount='21',offset=1)
+        changes=[change(us0,us1,1)]
+        gb=gb0
+        for index in range(1,200):
+            following=market('gb',str(80+index),offset=index+1)
+            changes.append(change(gb,following,index+1))
+            gb=following
+        markets=[us1,gb,copy.deepcopy(ca0)]
+        kept=p.update_country_history(original,markets,changes)
+        self.assertEqual(len(kept),200)
+        self.assertEqual(kept,changes)
         p.validate_country_history_baselines(data(markets,kept))
+
+        for code,following,offset in [
+            ('gb',market('gb','280',offset=201),201),
+            ('us',market(amount='22',offset=202),202),
+        ]:
+            previous={m['code']:m for m in markets}
+            changes=kept+[change(previous[code],following,offset)]
+            markets=[following if m['code']==code else copy.deepcopy(m) for m in markets]
+            kept=p.update_country_history(previous,markets,changes)
+            self.assertEqual(len(kept),offset)
+            self.assertEqual(kept,changes)
+            self.assertEqual(kept[0],change(us0,us1,1), 'other countries cannot evict the earliest US event')
+            for m in markets:
+                self.assertEqual(m['history_baseline'],original[m['code']]['history_baseline'])
+            p.validate_country_history_baselines(data(markets,kept))
 
     def test_missing_legacy_time_is_unknown_not_current_verification(self):
         old=market(); current=market(amount='22',offset=3600)
