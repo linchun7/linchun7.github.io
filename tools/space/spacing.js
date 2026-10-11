@@ -4,29 +4,57 @@
     // Only insert U+0020 at Han/ASCII boundaries. URLs and complete backtick
     // code stay intact; punctuation, whitespace and line endings are never normalized.
     const protectedOrBoundary = /https?:\/\/[^\s<>"`\u3000-\u303f\uff00-\uffef\u2018\u2019\u201c\u201d\u2026]+|(\p{Script=Han})(?=[A-Za-z0-9(\[{])|([A-Za-z0-9)\]}])(?=\p{Script=Han})/gu;
-    // Closing fences may be longer; shorter runs inside the block are content.
-    const fencedCode = /^ {0,3}(`{3,})[^`\r\n]*(?:\r\n|\r|\n)[\s\S]*?^ {0,3}\1`*[ \t]*(?=\r\n|\r|\n|$)/gm;
-    // Inline delimiters must be whole runs of exactly the same length.
-    const inlineCode = /(?<!`)(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)/g;
-
+    const fenceLine = /^ {0,3}(`{3,})([^`\r\n]*)(?=\r\n|\r|\n|$)/gm;
     const spacePlainText = (text) => text.replace(
         protectedOrBoundary,
         (match, hanBoundary, asciiBoundary) => (hanBoundary || asciiBoundary) ? `${match} ` : match
     );
 
-    function preserveMatches(text, pattern, format) {
-        let end = 0;
-        let output = '';
-        for (const match of text.matchAll(pattern)) {
-            output += format(text.slice(end, match.index)) + match[0];
-            end = match.index + match[0].length;
+    function spaceOutsideInlineCode(text) {
+        const runs = Array.from(text.matchAll(/`+/g));
+        const nextSameLength = new Array(runs.length);
+        const nextByLength = new Map();
+        // Index the next whole run of each length once, rather than searching
+        // the remaining text again for every unmatched opening delimiter.
+        for (let i = runs.length - 1; i >= 0; i--) {
+            const length = runs[i][0].length;
+            nextSameLength[i] = nextByLength.get(length);
+            nextByLength.set(length, i);
         }
-        return output + format(text.slice(end));
+
+        const parts = [];
+        let end = 0;
+        for (let i = 0; i < runs.length; i++) {
+            const closing = nextSameLength[i];
+            if (closing === undefined) continue;
+            const finish = runs[closing].index + runs[closing][0].length;
+            parts.push(spacePlainText(text.slice(end, runs[i].index)), text.slice(runs[i].index, finish));
+            end = finish;
+            i = closing;
+        }
+        parts.push(spacePlainText(text.slice(end)));
+        return parts.join('');
     }
 
-    // Protect blocks first, so their template literals cannot pair with prose backticks.
-    // Unclosed delimiters are ordinary text and keep the existing spacing behavior.
-    window.spaceTextPreservingContent = (text) => preserveMatches(text, fencedCode,
-        (outsideFence) => preserveMatches(outsideFence, inlineCode, spacePlainText)
-    );
+    // Protect complete blocks first, so their template literals cannot pair
+    // with prose backticks. A closing fence may be longer than its opener.
+    window.spaceTextPreservingContent = (text) => {
+        const parts = [];
+        let opening;
+        let end = 0;
+        for (const line of text.matchAll(fenceLine)) {
+            if (!opening) {
+                opening = line;
+                continue;
+            }
+            if (line[1].length < opening[1].length || !/^[ \t]*$/.test(line[2])) continue;
+            const finish = line.index + line[0].length;
+            parts.push(spaceOutsideInlineCode(text.slice(end, opening.index)), text.slice(opening.index, finish));
+            end = finish;
+            opening = undefined;
+        }
+        // Unclosed delimiters are ordinary text and retain the existing spacing behavior.
+        parts.push(spaceOutsideInlineCode(text.slice(end)));
+        return parts.join('');
+    };
 })();

@@ -115,6 +115,23 @@ async function testSpaceTool() {
 
     assert.equal(await page.locator('script[src="spacing.js?v=20261011-code-spans"]').count(), 1, 'space tool should use its content-preserving helper');
     assert.equal(await page.locator('script[src="dist/browser/pangu.min.js"]').count(), 0, 'space UI should not depend on Pangu punctuation normalization');
+    // Bound the regression inputs: enough unmatched delimiters to expose rescanning,
+    // while keeping the test independent of a microbenchmark or unbounded input.
+    const unmatchedFenceInput = '```js\n'.repeat(30000);
+    const unmatchedInlineRuns = Array.from({ length: 600 }, (_, index) => '`'.repeat(index + 1));
+    const spaceWithDeadline = async (text) => {
+        let timeout;
+        try {
+            return await Promise.race([
+                page.evaluate((value) => window.spaceTextPreservingContent(value), text),
+                new Promise((_, reject) => {
+                    timeout = setTimeout(() => reject(new Error('spacing helper exceeded its 10s deadline')), 10000);
+                })
+            ]);
+        } finally {
+            clearTimeout(timeout);
+        }
+    };
     const cases = [
         ["", ""],
         [" \t \r\n\r ", " \t \r\n\r "],
@@ -146,24 +163,30 @@ async function testSpaceTool() {
         ["中文`未闭合ABC\n```js\n变量ABC\n```\n尾Z`中文ABC", "中文`未闭合 ABC\n```js\n变量ABC\n```\n尾 Z`中文 ABC"],
         ["中文\" A \":B,中文!数字1", "中文\" A \":B,中文!数字 1"],
         ["𠀀A中B", "𠀀 A 中 B"],
-        ["中文(https://example.com/中文ABC)，继续123", "中文 (https://example.com/中文ABC)，继续 123"]
+        ["中文(https://example.com/中文ABC)，继续123", "中文 (https://example.com/中文ABC)，继续 123"],
+        [`${unmatchedFenceInput}中文ABC`, `${unmatchedFenceInput}中文 ABC`],
+        [
+            unmatchedInlineRuns.map((run) => `x${run}变量ABC`).join('\n'),
+            unmatchedInlineRuns.map((run) => `x${run}变量 ABC`).join('\n')
+        ]
     ];
     for (const [input, expected] of cases) {
         // A textarea normalizes CR/CRLF to LF. Check the pure helper first so
         // exact original line endings remain part of the content contract.
-        const output = await page.evaluate((text) => window.spaceTextPreservingContent(text), input);
-        assert.equal(output, expected, `helper content preservation: ${JSON.stringify(input)}`);
+        const description = input.length > 1000 ? `${input.length}-character delimiter regression` : JSON.stringify(input);
+        const output = await spaceWithDeadline(input);
+        assert.equal(output, expected, `helper content preservation: ${description}`);
         assert.equal(
-            await page.evaluate((text) => window.spaceTextPreservingContent(text), output),
+            await spaceWithDeadline(output),
             output,
             'repeated spacing should be idempotent'
         );
 
         await page.fill('#info', input);
-        await page.click('#addBtn');
+        await page.click('#addBtn', { timeout: 10000 });
         const textareaExpected = expected.replace(/\r\n?/g, '\n');
-        assert.equal(await page.inputValue('#info'), textareaExpected, `space UI: ${JSON.stringify(input)}`);
-        await page.click('#addBtn');
+        assert.equal(await page.inputValue('#info'), textareaExpected, `space UI: ${description}`);
+        await page.click('#addBtn', { timeout: 10000 });
         assert.equal(await page.inputValue('#info'), textareaExpected, 'repeated button clicks should not add spaces');
         assert.match(await page.locator('#alertText').textContent(), input ? /已处理/ : /无内容/);
     }
