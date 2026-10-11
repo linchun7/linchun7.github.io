@@ -1,8 +1,8 @@
 """Strict live-source candidate checks against configured markets and prior history.
 
-A valid update may append observed changes and prune only the oldest global
-prefix beyond the production retention budget. Rebuild that exact transition
-from the trusted baseline instead of requiring an unbounded append-only log.
+A valid update keeps every accepted change for configured markets and appends
+new observations. Rebuild that exact transition from the trusted baseline;
+removing configured markets is the only allowed history scope reduction.
 """
 from __future__ import annotations
 
@@ -41,7 +41,6 @@ def validate_live_candidate(baseline: dict, candidate: dict, config: list) -> di
                 'at': candidate['generated_at'], 'code': market['code'],
                 'before': p.semantic(before), 'after': p.semantic(market),
             })
-    unpruned_count = len(changes)
     expected_changes = p.update_country_history(previous, markets, changes)
     if candidate['changes'] != expected_changes:
         raise ValueError('candidate changes do not match exact retained history transition')
@@ -58,6 +57,6 @@ def validate_live_candidate(baseline: dict, candidate: dict, config: list) -> di
         'price_date_label': p.price_date_label(candidate),
         'history_transition_validated': True,
         'retained_changes': len(expected_changes),
-        'pruned_changes': unpruned_count - len(expected_changes),
+        'pruned_changes': 0,
         'new_markets': sorted(set(configured) - set(previous)),
     }

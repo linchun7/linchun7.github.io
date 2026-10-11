@@ -224,7 +224,7 @@
       }
     }
 
-    if (!Array.isArray(value.changes) || value.changes.length > 200) throw Error('历史格式错误');
+    if (!Array.isArray(value.changes)) throw Error('历史格式错误');
     let previousChangeAt = -Infinity;
     for (const change of value.changes) {
       if (!change || typeof change !== 'object' || Array.isArray(change)
