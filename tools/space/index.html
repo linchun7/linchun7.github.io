@@ -9,7 +9,7 @@
     <link rel="shortcut icon" href="/images/favicon.ico">
     <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
     <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
-    <script data-cfasync="false" src="dist/browser/pangu.min.js"></script>
+    <script data-cfasync="false" src="spacing.js"></script>
     <style>
         :root {
             color-scheme: light;
@@ -106,7 +106,7 @@
             <div class="section-heading">
                 <div>
                     <h1 id="tool-title">文本处理</h1>
-                    <p>保留原有段落与换行，只补充需要的中英文间距。</p>
+                    <p>保留原有字符、空格与换行，只补充需要的中英文间距。</p>
                 </div>
                 <div class="button-row">
                     <button class="primary-button" type="button" id="addBtn">加空格</button>
@@ -123,7 +123,7 @@
             </div>
         </section>
 
-        <p class="calculator-note">处理由 Pangu.js 完成；不会上传或保存输入内容。</p>
+        <p class="calculator-note">仅补齐相邻汉字与英文字母、数字或英文括号间的空格；不会上传或保存输入内容。</p>
     </main>
 
     <footer class="page-footer">
@@ -181,12 +181,12 @@
                     textarea.focus();
                     return;
                 }
-                if (typeof window.pangu?.spacing !== 'function') {
+                if (typeof window.spaceTextPreservingContent !== 'function') {
                     setStatus('排版组件加载失败');
                     textarea.focus();
                     return;
                 }
-                textarea.value = window.pangu.spacing(textarea.value);
+                textarea.value = window.spaceTextPreservingContent(textarea.value);
                 updateCount();
                 setStatus('已处理');
                 textarea.focus();

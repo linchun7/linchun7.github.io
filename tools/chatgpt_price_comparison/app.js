@@ -1124,6 +1124,7 @@
     backButton();
     el.searchInput.disabled = false;
     if (el.minimumHistoryButton) el.minimumHistoryButton.disabled = false;
+    el.priceWorkspace.classList.add('price-ui-ready');
     void loadIcons();
     freshnessSignature = timeDependentSignature();
     setInterval(refreshTimeDependentUi, 30_000);

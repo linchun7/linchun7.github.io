@@ -360,13 +360,13 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
   .filters { width: 100%; }
   .search-field input { height: 44px; font-size: 16px; }
   .search-field svg { top: 13px; }
-  .mobile-plan-picker { display: block; }
-  .table-scroll { overflow: visible; }
-  .price-table { width: 100%; min-width: 0; table-layout: fixed; }
+  .workspace.price-ui-ready .mobile-plan-picker { display: block; }
+  .workspace.price-ui-ready .table-scroll { overflow: visible; }
+  .workspace.price-ui-ready .price-table { width: 100%; min-width: 0; table-layout: fixed; }
   .price-table th:first-child, .price-table td:first-child { display: none; }
-  .price-table [data-plan]:not(.is-active-plan), .price-table [data-plan-header]:not(.is-active-plan) { display: none; }
-  .price-table th:nth-child(2), .price-table td:nth-child(2) { width: 46%; }
-  .price-table th[data-plan-header].is-active-plan, .price-table td[data-plan].is-active-plan { width: auto; }
+  .workspace.price-ui-ready .price-table [data-plan]:not(.is-active-plan), .workspace.price-ui-ready .price-table [data-plan-header]:not(.is-active-plan) { display: none; }
+  .workspace.price-ui-ready .price-table th:nth-child(2), .workspace.price-ui-ready .price-table td:nth-child(2) { width: 46%; }
+  .workspace.price-ui-ready .price-table th[data-plan-header].is-active-plan, .workspace.price-ui-ready .price-table td[data-plan].is-active-plan { width: auto; }
   .price-table td[data-plan].is-active-plan { padding-right: 18px !important; }
   .price-table tbody tr { height: 70px; }
   .country-history-button {
@@ -453,7 +453,7 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
   .history-current > div:last-child { grid-column: 1 / -1; }
   .history-toolbar, .history-list { padding-left: 16px; padding-right: 16px; }
 
-  .price-table th:nth-child(2), .price-table td:nth-child(2) { width: 47%; padding-left: 18px; }
+  .workspace.price-ui-ready .price-table th:nth-child(2), .workspace.price-ui-ready .price-table td:nth-child(2) { width: 47%; padding-left: 18px; }
   .price-table th, .price-table td { padding-inline: 9px; }
   .price-table th button { margin-inline: -9px; padding-inline: 9px; }
   .country-name { font-size: 14px; }

@@ -152,6 +152,15 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("automatic_skip_ok=true", self.text)
         self.assertNotIn("SHOULD_RUN\" != true ]] ||", self.text)
 
+    def test_live_source_uses_configured_coverage_and_exact_history_replay(self):
+        validate = (ROOT / '.github/workflows/validate-chatgpt-prices.yml').read_text(encoding='utf-8')
+        live = validate[validate.index("\n  live-source:"):]
+        self.assertIn('from live_candidate import validate_live_candidate', live)
+        self.assertIn('summary = validate_live_candidate(baseline, candidate, config)', live)
+        self.assertNotIn('len(expected) == 59', live)
+        self.assertNotIn("previous[market['code']]['history_baseline']", live)
+        self.assertNotIn("all(change in candidate['changes']", live)
+
     def test_only_main_can_publish(self):
         self.assertIn("github.ref == 'refs/heads/main'", self.text)
         self.assertNotIn("feat/chatgpt-price-comparison", self.text)

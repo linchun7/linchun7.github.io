@@ -10,7 +10,7 @@ const cases = [
   { tool: 'financial_calculator', scripts: ['script.js?'] },
   { tool: 'renovation_calculator', scripts: ['script.js?'] },
   { tool: 'pinyin', scripts: ['https://cdn.jsdelivr.net/npm/pinyin-pro@', 'app.js?'] },
-  { tool: 'space', scripts: ['dist/browser/pangu.min.js'], inline: "const textarea = document.getElementById('info')" },
+  { tool: 'space', scripts: ['spacing.js'], inline: "const textarea = document.getElementById('info')" },
   { tool: 'rmb_converter', scripts: ['dist/nzh.min.js'], inline: "const input = document.getElementById('inputmoney')" }
 ];
 for (const entry of cases) {

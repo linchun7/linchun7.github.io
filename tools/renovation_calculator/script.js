@@ -14,8 +14,34 @@ const warningMessages = {
     serviceFeeTooLarge: '当前月手续费率偏高，请确认是否准确'
 };
 
+// 把已校验 Number 的十进制表示转为精确比例；支持普通小数和科学计数法。
+function decimalFraction(value) {
+    const [significand, exponent = '0'] = Math.abs(value).toString().split('e');
+    const [whole, fraction = ''] = significand.split('.');
+    const coefficient = BigInt(whole + fraction);
+    const scale = fraction.length - Number(exponent);
+    return scale >= 0
+        ? { numerator: coefficient, denominator: 10n ** BigInt(scale) }
+        : { numerator: coefficient * 10n ** BigInt(-scale), denominator: 1n };
+}
+
+// 金额按金融 half-up 取到分：恰好半分向绝对值较大的方向舍入。
+// 先对十进制操作数精确相乘/相除，再取分，避免浮点乘法先丢失半分边界。
+function roundMoney(left, right = 1, divisor = 1) {
+    const value = left * right / divisor;
+    if (!Number.isFinite(value)) return value;
+
+    const leftFraction = decimalFraction(left);
+    const rightFraction = decimalFraction(right);
+    const numerator = leftFraction.numerator * rightFraction.numerator * 100n;
+    const denominator = leftFraction.denominator * rightFraction.denominator * BigInt(divisor);
+    const cents = numerator / denominator;
+    const roundedCents = cents + (numerator % denominator * 2n >= denominator ? 1n : 0n);
+    return Math.sign(value) * Number(roundedCents) / 100;
+}
+
 const numberUtils = {
-    toFixed2: (num) => Math.round((num + Number.EPSILON) * 100) / 100,
+    toFixed2: (num) => roundMoney(num),
     formatMoney: (amount) => new Intl.NumberFormat('zh-CN', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
@@ -254,7 +280,7 @@ function renderTable(schedule, totals, apr) {
 
 function generateSchedule(inputs) {
     const schedule = [];
-    const monthlyFee = numberUtils.toFixed2(inputs.loanAmount * inputs.serviceFeeRate / 100);
+    const monthlyFee = roundMoney(inputs.loanAmount, inputs.serviceFeeRate, 100);
     let totalPaidPrincipal = 0;
 
     for (let month = 1; month <= inputs.loanTerm; month++) {
@@ -262,7 +288,7 @@ function generateSchedule(inputs) {
         // 按累计目标分摊本金，而不是固定四舍五入后的“月本金”，避免长周期尾期出现负本金。
         const targetPaidPrincipal = month === inputs.loanTerm
             ? inputs.loanAmount
-            : numberUtils.toFixed2(inputs.loanAmount * month / inputs.loanTerm);
+            : roundMoney(inputs.loanAmount, month, inputs.loanTerm);
         const principal = Math.max(0, numberUtils.toFixed2(targetPaidPrincipal - totalPaidPrincipal));
         const payment = numberUtils.toFixed2(principal + monthlyFee);
 

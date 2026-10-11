@@ -212,12 +212,79 @@ try {
     }
   }
 
-  const noJs = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 390, height: 844 } });
-  const noJsPage = await noJs.newPage();
-  await noJsPage.goto(url, { waitUntil: 'domcontentloaded' });
-  assert.ok(await noJsPage.locator('#priceRows tr[data-market-id]').count() > 0);
-  assert.equal(await noJsPage.locator('.country-history-button').first().isDisabled(), true);
-  await noJs.close();
+  // Both script-free and missing-app delivery retain every static plan column.
+  const staticPlans = plansFor(priceData);
+  for (const width of [390, 960]) for (const mode of ['no-js', 'app-404']) {
+    const fallback = await browser.newContext({
+      javaScriptEnabled: mode !== 'no-js', viewport: { width, height: 844 }
+    });
+    const fallbackPage = await fallback.newPage();
+    let missingAppRequests = 0;
+    if (mode === 'app-404') await fallbackPage.route('**/app.js?v=*', route => {
+      missingAppRequests += 1;
+      return route.fulfill({ status: 404, contentType: 'text/javascript', body: '' });
+    });
+    try {
+      await fallbackPage.goto(url, { waitUntil: 'load' });
+      const label = `${browserName}/${mode}/${width}px`;
+      const projection = await fallbackPage.evaluate(() => {
+        const workspace = document.querySelector('#priceWorkspace');
+        const scroll = workspace.querySelector('.table-scroll');
+        return {
+          ready: workspace.classList.contains('price-ui-ready'),
+          overflowX: getComputedStyle(scroll).overflowX,
+          bodyFits: document.documentElement.scrollWidth <= innerWidth + 1,
+          pickerDisplay: getComputedStyle(workspace.querySelector('.mobile-plan-picker')).display,
+          headers: [...workspace.querySelectorAll('th[data-plan-header]')].map(cell => ({
+            plan: cell.dataset.plan, display: getComputedStyle(cell).display,
+            width: cell.getBoundingClientRect().width
+          })),
+          rows: [...workspace.querySelectorAll('#priceRows tr[data-market-id]')].map(row => ({
+            code: row.dataset.marketId, disabled: row.querySelector('.country-history-button').disabled,
+            rank: row.querySelector('.mobile-rank').textContent.trim(),
+            rankVisible: getComputedStyle(row.querySelector('.mobile-rank')).display !== 'none',
+            cells: [...row.querySelectorAll('td[data-plan]')].map(cell => ({
+              plan: cell.dataset.plan, display: getComputedStyle(cell).display,
+              width: cell.getBoundingClientRect().width,
+              local: [...cell.querySelectorAll('.price-local')].map(node => node.textContent),
+              cny: [...cell.querySelectorAll('.price-amount')].map(node => node.textContent)
+            }))
+          }))
+        };
+      });
+      assert.equal(projection.ready, false, label + ': unstarted app keeps static mode');
+      assert.equal(projection.pickerDisplay, 'none', label + ': unavailable switcher stays hidden');
+      assert.equal(projection.overflowX, 'auto', label + ': complete table scrolls internally');
+      assert.equal(projection.bodyFits, true, label + ': page shell fits the viewport');
+      assert.deepEqual(projection.headers.map(header => header.plan), staticPlans, label + ': all plan headers survive');
+      assert.ok(projection.headers.every(header => header.display === 'table-cell' && header.width >= 170), label + ': all headers have readable widths');
+      assert.equal(projection.rows.length, priceData.markets.length, label + ': all markets survive');
+      for (const row of projection.rows) {
+        const market = priceData.markets.find(candidate => candidate.code === row.code);
+        assert.ok(market && row.disabled, label + ': static country controls are disabled');
+        assert.ok(row.rankVisible && row.rank.length > 0, label + ': static ranking remains readable');
+        assert.deepEqual(row.cells.map(cell => cell.plan), staticPlans, label + ': all plan cells survive');
+        for (const cell of row.cells) {
+          assert.ok(cell.display === 'table-cell' && cell.width >= 170, label + ': every price column is visible');
+          const offer = offerFor(market, cell.plan);
+          const amount = offer?.amounts.reduce((lowest, value) => Number(value.amount) < Number(lowest.amount) ? value : lowest);
+          assert.deepEqual(cell.local, amount ? [amount.display] : [], label + ': plan-local source price is unchanged');
+          assert.deepEqual(cell.cny.map(value => value === '—' ? null : Number(value.replaceAll(',', ''))),
+            amount ? [amount.cny == null ? null : Number(amount.cny)] : [], label + ': CNY projection is unchanged');
+        }
+      }
+      const lastHeader = fallbackPage.locator('th[data-plan-header]').last();
+      await lastHeader.scrollIntoViewIfNeeded();
+      assert.equal(await lastHeader.evaluate(cell => {
+        const bounds = cell.getBoundingClientRect();
+        const scroll = cell.closest('.table-scroll').getBoundingClientRect();
+        return bounds.left >= scroll.left - 1 && bounds.right <= scroll.right + 1;
+      }), true, label + ': last plan can be reached by horizontal scrolling');
+      if (mode === 'app-404') assert.equal(missingAppRequests, 1, label + ': real app 404 was exercised');
+    } finally {
+      await fallback.close();
+    }
+  }
 
   console.log(`Cross-browser smoke passed: ${browserName}`);
 } finally {
