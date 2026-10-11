@@ -119,19 +119,23 @@ async function testSpaceTool() {
     // while keeping the test independent of a microbenchmark or unbounded input.
     const unmatchedFenceInput = '```js\n'.repeat(30000);
     const unmatchedInlineRuns = Array.from({ length: 600 }, (_, index) => '`'.repeat(index + 1));
-    const spaceWithDeadline = async (text) => {
+    const withSpacingDeadline = async (operation, label) => {
         let timeout;
         try {
             return await Promise.race([
-                page.evaluate((value) => window.spaceTextPreservingContent(value), text),
+                operation(),
                 new Promise((_, reject) => {
-                    timeout = setTimeout(() => reject(new Error('spacing helper exceeded its 10s deadline')), 10000);
+                    timeout = setTimeout(() => reject(new Error(`${label} exceeded its 10s deadline`)), 10000);
                 })
             ]);
         } finally {
             clearTimeout(timeout);
         }
     };
+    const spaceWithDeadline = (text) => withSpacingDeadline(
+        () => page.evaluate((value) => window.spaceTextPreservingContent(value), text),
+        `spacing helper (${text.length} characters)`
+    );
     const cases = [
         ["", ""],
         [" \t \r\n\r ", " \t \r\n\r "],
@@ -160,6 +164,9 @@ async function testSpaceTool() {
         ["```js\n变量ABC\n```tail\n继续123\n```", "```js\n变量ABC\n```tail\n继续123\n```"],
         ["```js\n变量ABC\n    ```\n继续123\n```", "```js\n变量ABC\n    ```\n继续123\n```"],
         ["```js\n变量ABC\n``\n继续123", "```js\n变量 ABC\n``\n继续 123"],
+        // An unclosable longer opener must not hide a later complete shorter fence.
+        ["````js\n```js\n变量ABC\n```tail\n继续123\n```", "````js\n```js\n变量ABC\n```tail\n继续123\n```"],
+        ["````js\n前文ABC\n```js\n变量ABC\n```\n后文123", "````js\n前文 ABC\n```js\n变量ABC\n```\n后文 123"],
         ["中文`未闭合ABC\n```js\n变量ABC\n```\n尾Z`中文ABC", "中文`未闭合 ABC\n```js\n变量ABC\n```\n尾 Z`中文 ABC"],
         ["中文\" A \":B,中文!数字1", "中文\" A \":B,中文!数字 1"],
         ["𠀀A中B", "𠀀 A 中 B"],
@@ -182,7 +189,17 @@ async function testSpaceTool() {
             'repeated spacing should be idempotent'
         );
 
-        await page.fill('#info', input);
+        if (input.length > 1000) {
+            // Avoid Playwright's costly select/insert path for 30,000 textarea lines.
+            // The real input handler and add button still run on the large fixture.
+            await withSpacingDeadline(() => page.evaluate((value) => {
+                const textarea = document.getElementById('info');
+                textarea.value = value;
+                textarea.dispatchEvent(new Event('input', { bubbles: true }));
+            }, input), `${description} fixture`);
+        } else {
+            await page.fill('#info', input);
+        }
         await page.click('#addBtn', { timeout: 10000 });
         const textareaExpected = expected.replace(/\r\n?/g, '\n');
         assert.equal(await page.inputValue('#info'), textareaExpected, `space UI: ${description}`);

@@ -39,11 +39,25 @@
     // Protect complete blocks first, so their template literals cannot pair
     // with prose backticks. A closing fence may be longer than its opener.
     window.spaceTextPreservingContent = (text) => {
+        const lines = Array.from(text.matchAll(fenceLine));
+        const laterMaxClosingLength = new Array(lines.length);
+        let maxClosingLength = 0;
+        // Skip unclosable openers without rescanning the remaining text.
+        for (let i = lines.length - 1; i >= 0; i--) {
+            laterMaxClosingLength[i] = maxClosingLength;
+            if (/^[ \t]*$/.test(lines[i][2])) {
+                maxClosingLength = Math.max(maxClosingLength, lines[i][1].length);
+            }
+        }
+
         const parts = [];
         let opening;
         let end = 0;
-        for (const line of text.matchAll(fenceLine)) {
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
             if (!opening) {
+                const afterLine = text[line.index + line[0].length];
+                if (laterMaxClosingLength[i] < line[1].length || (afterLine !== '\r' && afterLine !== '\n')) continue;
                 opening = line;
                 continue;
             }
