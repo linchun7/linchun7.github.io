@@ -52,7 +52,9 @@ const state = {
   historyPromise: null,
   historyReturnFocus: null,
   historyReturnCountry: null,
+  historyFocusSession: 0,
   publishedDateReturnFocus: null,
+  publishedDateFocusSession: 0,
   renderFrame: null,
   scrollFrame: null,
   minimumHighlightTimer: null
@@ -1143,10 +1145,12 @@ function renderPublishedDateHistory() {
 }
 
 function openPublishedDateHistory() {
+  state.publishedDateFocusSession += 1;
   state.publishedDateReturnFocus = elements.publishedDateButton;
   void ensureHistoryLoaded();
   renderPublishedDateHistory();
   state.publishedDateReturnFocus?.focus({ preventScroll: true });
+  elements.resetPublishedDateBackdrop?.();
   elements.publishedDateDialog.showModal();
   refreshIcons();
 }
@@ -1182,6 +1186,7 @@ function openHistory(country, returnFocus = null) {
     : [...elements.priceRows.querySelectorAll('tr[data-market-id]')]
       .find(row => row.dataset.marketId === country.marketId)?.querySelector('.country-history-button') ?? null;
   state.historyReturnCountry = country.marketId;
+  state.historyFocusSession += 1;
   state.historyTier = state.sortTier;
   elements.historyTitle.textContent = country.nameZh || country.country;
   renderHistorySubtitle(country, record);
@@ -1190,6 +1195,7 @@ function openHistory(country, returnFocus = null) {
   // Row cells and programmatic clicks need not focus the semantic trigger.
   // Prime native dialog restoration without scrolling the price table.
   state.historyReturnFocus?.focus({ preventScroll: true });
+  elements.resetHistoryBackdrop?.();
   elements.historyDialog.showModal();
   refreshIcons();
 }
@@ -1535,14 +1541,80 @@ function trapDialogFocus(dialog, event) {
   }
 }
 
-function restoreDialogFocusAfterClose(dialog, restore) {
+function usableDialogFocusTarget(element) {
+  if (!(element instanceof HTMLElement) || !element.isConnected
+    || element.matches(':disabled') || element.closest('[hidden], [inert]')) return false;
+  const style = getComputedStyle(element);
+  return style.display !== 'none' && style.visibility !== 'hidden' && element.getClientRects().length > 0;
+}
+
+function focusDialogTarget(candidates, fallback) {
+  for (const target of [...candidates, fallback]) {
+    if (!usableDialogFocusTarget(target)) continue;
+    target.focus({ preventScroll: true });
+    if (document.activeElement === target) return;
+  }
+}
+
+function dialogReturnFocusWasMoved(dialog) {
+  if (document.querySelector('dialog[open]')) return true;
+  const active = document.activeElement;
+  return active !== document.body && active !== document.documentElement
+    && !dialog.contains(active) && usableDialogFocusTarget(active);
+}
+
+function bindDialogBackdropDismiss(dialog, close) {
+  let pointerGesture = null;
+  const reset = () => { pointerGesture = null; };
+  const outside = event => {
+    if (event.target !== dialog) return false;
+    const bounds = dialog.getBoundingClientRect();
+    return event.clientX < bounds.left || event.clientX > bounds.right
+      || event.clientY < bounds.top || event.clientY > bounds.bottom;
+  };
+  dialog.addEventListener('pointerdown', event => {
+    pointerGesture = event.isPrimary && event.button === 0
+      ? { pointerId: event.pointerId, startedOutside: outside(event), endedOutside: false }
+      : null;
+  });
+  dialog.addEventListener('pointerup', event => {
+    if (!pointerGesture || pointerGesture.pointerId !== event.pointerId) { reset(); return; }
+    // Click can target the down/up common ancestor and floor its coordinates.
+    // Use the matched pointerup's actual position and current dialog bounds.
+    pointerGesture.endedOutside = event.isPrimary && event.button === 0 && outside(event);
+  });
+  dialog.addEventListener('pointercancel', reset);
+  // Native HTML dragging can suppress pointer cancellation/up in the UA.
+  dialog.addEventListener('dragstart', reset);
+  dialog.addEventListener('dragend', reset);
+  dialog.addEventListener('click', event => {
+    const gesture = pointerGesture;
+    reset();
+    // A touch gesture may produce a compatibility click with a different ID.
+    // Identity is established by the paired primary pointerdown/pointerup.
+    if (gesture?.startedOutside && gesture.endedOutside
+      && event.target === dialog && event.detail > 0) close();
+  });
+  dialog.addEventListener('close', () => {
+    if (!dialog.open) reset();
+  });
+  // A new opening must not inherit a held pointer gesture from an old session.
+  return reset;
+}
+
+function handoffMinimumHistoryFocus(control, unavailable, allowFilter = true) {
+  const dialog = minimumHistoryUi.dialog;
+  if (!unavailable || !dialog?.open || document.activeElement !== control) return;
+  const filter = dialog.querySelector('select');
+  focusDialogTarget([allowFilter && filter !== control ? filter : null,
+    dialog.querySelector('#closeMinimumHistory')], null);
+}
+
+function restoreDialogFocusAfterClose(dialog, restore, isCurrent = () => true) {
   requestAnimationFrame(() => {
     // Native close or a subsequent user action may already have moved focus.
     // Never steal it from another control or a newly opened dialog.
-    if (document.querySelector('dialog[open]')) return;
-    const active = document.activeElement;
-    if (active?.isConnected && active !== document.body && active !== document.documentElement
-      && !dialog.contains(active)) return;
+    if (!isCurrent() || dialogReturnFocusWasMoved(dialog)) return;
     restore();
   });
 }
@@ -1560,7 +1632,9 @@ function bindEvents() {
     if (event.detail === 0) delete document.documentElement.dataset.countryHistoryPointer;
   }, { capture: true });
   document.addEventListener('keydown', (event) => {
-    if (['Shift', 'Control', 'Alt', 'Meta'].includes(event.key)) return;
+    // Escape dismisses the dialog without changing the latest input mode.
+    if (['Shift', 'Control', 'Alt', 'Meta', 'Escape'].includes(event.key)) return;
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
     delete document.documentElement.dataset.countryHistoryPointer;
   }, { capture: true });
   // A device-clock change need not produce a lifecycle event. Guard current
@@ -1596,17 +1670,15 @@ function bindEvents() {
     elements.workspace.focus({ preventScroll: true });
   });
   document.querySelector('#closeHistory').addEventListener('click', () => elements.historyDialog.close());
-  elements.historyDialog.addEventListener('click', (event) => {
-    if (event.target === elements.historyDialog) elements.historyDialog.close();
-  });
+  elements.resetHistoryBackdrop = bindDialogBackdropDismiss(elements.historyDialog, () => elements.historyDialog.close());
   elements.historyDialog.addEventListener('keydown', (event) => trapDialogFocus(elements.historyDialog, event));
   elements.publishedDateButton.addEventListener('click', openPublishedDateHistory);
   elements.closePublishedDate.addEventListener('click', () => elements.publishedDateDialog.close());
-  elements.publishedDateDialog.addEventListener('click', (event) => {
-    if (event.target === elements.publishedDateDialog) elements.publishedDateDialog.close();
-  });
+  elements.resetPublishedDateBackdrop = bindDialogBackdropDismiss(elements.publishedDateDialog, () => elements.publishedDateDialog.close());
   elements.publishedDateDialog.addEventListener('keydown', (event) => trapDialogFocus(elements.publishedDateDialog, event));
   elements.historyDialog.addEventListener('close', () => {
+    if (elements.historyDialog.open || (!state.historyReturnFocus && !state.historyReturnCountry)) return;
+    const session = state.historyFocusSession;
     const returnFocus = state.historyReturnFocus;
     const returnCountry = state.historyReturnCountry;
     state.historyReturnFocus = null;
@@ -1615,20 +1687,18 @@ function bindEvents() {
       const currentButton = returnCountry
         ? [...elements.priceRows.querySelectorAll('tr[data-market-id]')].find((row) => row.dataset.marketId === returnCountry)?.querySelector('.country-history-button')
         : null;
-      if (returnFocus?.isConnected) returnFocus.focus();
-      else if (currentButton) currentButton.focus();
-      else elements.workspace.focus();
-    });
+      focusDialogTarget([returnFocus, currentButton], elements.workspace);
+    }, () => session === state.historyFocusSession);
   });
   elements.publishedDateDialog.addEventListener('close', () => {
+    if (elements.publishedDateDialog.open || !state.publishedDateReturnFocus) return;
+    const session = state.publishedDateFocusSession;
     const returnFocus = state.publishedDateReturnFocus;
     state.publishedDateReturnFocus = null;
     restoreDialogFocusAfterClose(elements.publishedDateDialog, () => {
       const currentButton = document.querySelector('#publishedDateButton');
-      if (returnFocus?.isConnected) returnFocus.focus();
-      else if (currentButton) currentButton.focus();
-      else elements.workspace.focus();
-    });
+      focusDialogTarget([returnFocus, currentButton], elements.workspace);
+    }, () => session === state.publishedDateFocusSession);
   });
   addEventListener('scroll', scheduleBackToTableUpdate, { passive: true });
   addEventListener('resize', () => {
@@ -1684,6 +1754,9 @@ if (elements.retryButton) elements.retryButton.textContent = '刷新页面';
 // A corrected device clock can restore the same page snapshot. These events
 // never fetch prices, discover a new version, or impose an expiry deadline.
 function recheckSnapshotClock() {
+  // An open, later history can cross the clock boundary while this snapshot remains valid.
+  if (minimumHistoryUi.dialog?.open && minimumHistoryUi.data
+    && minimumHistoryTimeUsable(minimumHistoryUi.data) !== minimumHistoryUi.renderedTimeUsable) renderMinimumHistory();
   const freshness = classifyPriceFreshness({ generatedAt: staticSnapshotGeneratedAt });
   if (freshness.status === state.dataFreshness?.status) return;
   if (freshness.status === 'unusable' && state.data) {
@@ -1699,7 +1772,7 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('pageshow', recheckSnapshotClock);
 
 // A dedicated history button leaves the existing minimum-card navigation intact.
-const minimumHistoryUi = { data: null, promise: null, status: 'idle', dialog: null, filterTier: 'all', limit: 20 };
+const minimumHistoryUi = { data: null, promise: null, status: 'idle', dialog: null, filterTier: 'all', limit: 20, returnFocus: null, focusSession: 0, renderedTimeUsable: null };
 
 function minimumHistoryNode(tag, text = '', className = '') {
   const node = document.createElement(tag);
@@ -1757,8 +1830,16 @@ function ensureMinimumHistoryDialog() {
   content.append(status, list, more, note, retry);
   dialog.append(header, content);
   dialog.addEventListener('keydown', (event) => trapDialogFocus(dialog, event));
-  dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
-  dialog.addEventListener('close', () => document.querySelector('#minimumHistoryButton')?.focus({ preventScroll: true }));
+  minimumHistoryUi.resetBackdrop = bindDialogBackdropDismiss(dialog, () => dialog.close());
+  dialog.addEventListener('close', () => {
+    if (dialog.open || !minimumHistoryUi.returnFocus) return;
+    const returnFocus = minimumHistoryUi.returnFocus;
+    const session = minimumHistoryUi.focusSession;
+    minimumHistoryUi.returnFocus = null;
+    restoreDialogFocusAfterClose(dialog, () => {
+      focusDialogTarget([returnFocus, document.querySelector('#minimumHistoryButton')], elements.workspace);
+    }, () => session === minimumHistoryUi.focusSession);
+  });
   document.body.append(dialog);
   minimumHistoryUi.dialog = dialog;
   return dialog;
@@ -1791,24 +1872,45 @@ function minimumHistoryTierIds(history) {
   ));
 }
 
+function minimumHistoryTimeUsable(history, nowMs = Date.now()) {
+  // Accepted structure already bounds every event/checkpoint by checkedAt.
+  return !history || history.checkedAt === null
+    || Date.parse(history.checkedAt) <= nowMs + MAX_PRICE_FUTURE_SKEW_MS;
+}
+
 function renderMinimumHistoryStatus() {
-  const h = minimumHistoryUi.data;
+  const timeUsable = minimumHistoryTimeUsable(minimumHistoryUi.data);
+  const h = timeUsable ? minimumHistoryUi.data : null;
   const status = document.querySelector('#minimumHistoryStatus');
   const parts = [];
   const recordedAt = h?.checkpoint?.at;
   if (recordedAt) parts.push(`记录截至 ${formatBeijingDateTime(recordedAt)}`);
   if (minimumHistoryUi.status === 'loading' && !h) parts.push('正在读取…');
-  if (minimumHistoryUi.status === 'error') parts.push(h ? '暂无法刷新' : '暂无法读取');
+  if (!timeUsable) parts.push('记录时间异常');
+  else if (minimumHistoryUi.status === 'error') parts.push(h ? '暂无法刷新' : '暂无法读取');
   status.textContent = parts.join(' · ');
   status.hidden = !parts.length;
   const retry = document.querySelector('#minimumHistoryRetry');
+  handoffMinimumHistoryFocus(retry, minimumHistoryUi.status !== 'error', Boolean(h));
   retry.hidden = minimumHistoryUi.status !== 'error';
   retry.disabled = minimumHistoryUi.status === 'loading';
 }
 
 function renderMinimumHistory() {
-  const h = minimumHistoryUi.data;
-  if (!h || !minimumHistoryUi.dialog?.open) return;
+  if (!minimumHistoryUi.dialog?.open) return;
+  const timeUsable = minimumHistoryTimeUsable(minimumHistoryUi.data);
+  minimumHistoryUi.renderedTimeUsable = timeUsable;
+  renderMinimumHistoryStatus();
+  const h = timeUsable ? minimumHistoryUi.data : null;
+  if (!h) {
+    document.querySelector('#minimumHistoryEvents').replaceChildren();
+    handoffMinimumHistoryFocus(document.querySelector('#minimumHistoryToolbar select'), true, false);
+    handoffMinimumHistoryFocus(document.querySelector('#minimumHistoryMore'), true, false);
+    document.querySelector('#minimumHistoryToolbar').hidden = true;
+    document.querySelector('#minimumHistoryMore').hidden = true;
+    document.querySelector('#minimumHistoryNote').hidden = true;
+    return;
+  }
 
   const allTiers = minimumHistoryTierIds(h);
   if (minimumHistoryUi.filterTier !== 'all' && !allTiers.includes(minimumHistoryUi.filterTier)) {
@@ -1838,8 +1940,6 @@ function renderMinimumHistory() {
       || canonicalTierDefinition(first.tier).capacityGb - canonicalTierDefinition(second.tier).capacityGb
     ));
 
-  renderMinimumHistoryStatus();
-
   const list = document.querySelector('#minimumHistoryEvents');
   list.replaceChildren();
   if (!series.length) list.append(minimumHistoryNode('p', h.checkpoint ? '暂无最低价变更记录。' : '暂无可核验记录。', 'minimum-history-empty'));
@@ -1864,7 +1964,9 @@ function renderMinimumHistory() {
     list.append(item);
   }
 
-  document.querySelector('#minimumHistoryMore').hidden = series.length <= minimumHistoryUi.limit;
+  const more = document.querySelector('#minimumHistoryMore');
+  handoffMinimumHistoryFocus(more, series.length <= minimumHistoryUi.limit);
+  more.hidden = series.length <= minimumHistoryUi.limit;
   document.querySelector('#minimumHistoryNote').hidden = false;
 }
 
@@ -1910,9 +2012,17 @@ function openMinimumHistory() {
   const dialog = ensureMinimumHistoryDialog();
   minimumHistoryUi.filterTier = 'all';
   minimumHistoryUi.limit = 20;
+  minimumHistoryUi.focusSession += 1;
+  minimumHistoryUi.returnFocus = document.querySelector('#minimumHistoryButton');
+  focusDialogTarget([minimumHistoryUi.returnFocus], null);
+  minimumHistoryUi.resetBackdrop?.();
   dialog.showModal();
-  if (minimumHistoryUi.data) renderMinimumHistory();
-  if (!minimumHistoryUi.data || (state.data && minimumHistoryUi.data.checkedAt !== state.data.generatedAt)) void loadMinimumHistory();
+  renderMinimumHistory();
+  // A later accepted history is already sufficient for this page snapshot.
+  // Keep the existing retry for an unobserved/older history, never for clock rollback.
+  if (!minimumHistoryUi.data || (minimumHistoryTimeUsable(minimumHistoryUi.data) && state.data
+    && (minimumHistoryUi.data.checkedAt === null
+      || Date.parse(minimumHistoryUi.data.checkedAt) < Date.parse(state.data.generatedAt)))) void loadMinimumHistory();
 }
 const minimumHistoryButton = document.querySelector('#minimumHistoryButton');
 if (minimumHistoryButton) {

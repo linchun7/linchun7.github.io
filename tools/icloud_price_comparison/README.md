@@ -2,40 +2,38 @@
 
 [打开价格页](https://www.linchun.com.cn/tools/icloud_price_comparison/) · [维护与排障](OPERATIONS.md)
 
-比较 Apple 各地区 iCloud+ 当地月费及人民币参考价。价格、币种、容量和发布日期以 [Apple 英文价格页](https://support.apple.com/en-us/108047) 为准；中文名称只使用人工核对的 [Apple 简体中文价格页](https://support.apple.com/zh-cn/108047) 原文，不自行翻译或自动猜配；来源缺失或对应关系不确定时保留英文。人民币金额仅供比较，税费、付款资格和最终结算以 Apple 为准。
+比较 Apple 各地区 iCloud+ 当地月费及人民币参考价。价格、币种、容量和发布日期以 [Apple 英文价格页](https://support.apple.com/en-us/108047) 为准；中文名称仅用人工核对的 [Apple 简体中文价格页](https://support.apple.com/zh-cn/108047) 原文，不自行翻译或猜配，缺失或不确定时保留英文。税费、付款资格和最终结算以 Apple 为准。
 
-## 展示规则
+## 使用与数据
 
-- 默认按 200GB 人民币价格升序；该容量不存在时使用首个容量。价格排名使用生成器给出的全球排名，筛选不重排名；国家排序显示当前列表序号。
-- 最近通过校验的价格、人民币折算、排名、最低价与历史不设展示期限。更新失败仍显示旧数据，价格核验日期和汇率源日期保持真实。独立确认市场下架且其余标价、币种不变时，可沿用人民币值并压紧原排名分组，不按四舍五入金额重排。
-- 非法、损坏或明显未来的数据仍被拒绝。静态 HTML 和安全转义的紧凑内嵌 JSON 由同一份价格产物生成；通过校验后直接启用搜索、排序及筛选，启动不请求 prices.json。国家、发布日期和最低价历史按需读取。坏内嵌数据保留只读静态表；刷新按钮重新加载整页。页面仅在可见/恢复时本地复核系统时钟异常，不自动刷新价格、不因数据年龄禁用价格。
-- 搜索经 NFKC 规范化，支持 marketId、中英文名称、地区和完整币种代码。URL 只保存容量、排序和地区筛选，不保存搜索词；无变化时不重复写入地址栏，浏览器拒绝地址同步也不阻塞表格交互。价格不写浏览器持久缓存。
-- 图标异步加载，加载缓慢或失败不阻塞搜索、排序及历史交互。
-- 国家价格历史与最低价历史独立；容量下架、恢复及证据缺口不合并为虚假涨跌。已读取历史在刷新失败时保留并显示真实截止时间；不同步的历史不用于推算当前涨跌。
+- 默认按 200GB 人民币价升序，不存在则取首个容量。价格用生成器的全球排名，筛选不重排名；国家排序显示当前列表序号。最近通过校验的价格、人民币值、排名、最低价与历史不设展示期限，失败保留旧值和真实价格核验/汇率源日期。
+- 静态表格与安全转义的紧凑内嵌 JSON 来自同一价格产物；校验后启用交互，启动不请求 prices.json。坏内嵌数据保留只读静态表，明显未来的价格暂不作为当前价；刷新按钮重新加载整页。国家、发布日期及最低价历史按需读取，发布日期从历史投影，图标异步加载。
+- 搜索经 NFKC 规范化，支持 marketId、中英文名称、地区和完整币种代码。URL 只保存容量、排序及地区筛选，不存搜索词；地址同步失败不阻塞交互。页面不轮询新价、不因年龄禁用价格，应用不持久缓存价格。
+- 国家历史与最低价历史独立；容量下架/恢复和证据缺口不造虚假涨跌，不同步的历史不推算当前涨跌。已验证最低价历史的检查时间覆盖页面快照时重复打开复用；刷新失败保留记录及真实截止时间，拒绝检查时间或检查点倒退。
+- 交互及页面可见/恢复时仅本地复核系统时钟。打开的最低价历史独立复核时间；时钟回拨使记录明显处于未来时暂隐藏事件，纠正后恢复同一记录，不重新抓取。
+- 历史关闭后回到可用的原触发按钮或对应替代按钮，均不可用时回到表格工作区；旧关闭事件不抢走后来设置的焦点。鼠标/触摸只抑制国家历史按钮回焦轮廓，Tab、Enter 或无指针辅助激活恢复键盘提示，Escape 保留最近输入方式。
 
 ## 数据与代码入口
 
-- `data/prices.json`：已核验当前价格与全球排名
-- `data/history.json`、`data/minimum-history.json`：原币价格/发布日期历史、最低价变化账本
-- `data/apple-snapshots/`：规范化 Apple JSON 证据；格式见[快照说明](data/apple-snapshots/README.md)
+- `data/prices.json`：已核验当前价格及全球排名
+- `data/history.json`、`data/minimum-history.json`：原币价格/发布日期历史、最低价账本
+- `data/apple-snapshots/`：规范化 Apple JSON 证据，见[快照说明](data/apple-snapshots/README.md)
 - `data/run-log.json`：最近 90 次成功运行
-- `scripts/update-prices.mjs`、`data-contract.js`：生成入口与共享数据契约
-- `scripts/market-registry.mjs`、`scripts/country-names.zh.json`：稳定市场身份及人工中文映射
-- `scripts/static-page.mjs`、`scripts/render-static-page.mjs`：静态页面生成源
+- `scripts/update-prices.mjs`、`data-contract.js`：生成入口及共享数据契约
+- `scripts/market-registry.mjs`、`scripts/country-names.zh.json`：稳定身份及人工中文映射
+- `scripts/static-page.mjs`、`scripts/render-static-page.mjs`：静态生成源
 
-`index.html` 是生成产物。除 `ICLOUD_STATIC_*` 区域外，`seoProjection()` 还维护 markers 外的 SEO Projection；不要直接改生成结果。修改 JS/CSS 后需同步内容哈希资源版本。
+`index.html` 为生成产物。`seoProjection()` 维护 `ICLOUD_STATIC_*` markers 外的 SEO Projection，不直接改生成结果；JS/CSS 变化用内容哈希更新资源版本。关键契约、生成器或发布规则变化需同步本说明及 OPERATIONS。
 
-## 自动更新与验证
+## 更新与验证
 
-GitHub Actions 执行测试和发布：
+- [更新价格](../../.github/workflows/update-icloud-prices.yml)：Cloudflare 主触发约北京时间 08:05，GitHub 08:10 兜底；手动选择 main
+- [完整验证](../../.github/workflows/validate-icloud-price-comparison.yml)：核心、工件、全部快照、依赖安全及锁定 Playwright 的 Chromium/Firefox/WebKit；main 代码提交再验线上数据、页面和资源哈希
+- [中文名称监测](../../.github/workflows/monitor-icloud-zh-markets.yml)：提醒人工核对，不自动绑定身份
 
-- [更新价格](../../.github/workflows/update-icloud-prices.yml)：Cloudflare 主触发约北京时间 08:05，GitHub 08:10 兜底；手动运行选择 main
-- [完整验证](../../.github/workflows/validate-icloud-price-comparison.yml)：核心、工件、全部快照、依赖安全及 Chromium / Firefox / WebKit；main 代码提交随后复验实际线上数据、页面和资源哈希
-- [中文名称监测](../../.github/workflows/monitor-icloud-zh-markets.yml)：只提醒需要人工复核的名称，不自动绑定中英文市场
+自动入口只有当日完整生产成功证明才跳过，手动不跳过。上游失败保留已发布数据；汇率降级不发健康心跳，也不跳过自动重试。Cloudflare 触发、DNS 和安全头需查看控制面，不能由仓库文字证明。
 
-自动入口只有取得当日完整生产成功证明才跳过；手动更新不跳过。上游失败保留已发布数据；汇率降级不会发送健康心跳，也不会跳过后续自动重试。Cloudflare 实际触发、DNS 和安全头需单独查看控制面，不能由仓库文字证明。
-
-运行环境：Node.js >=22.1.0、pnpm 10.14.0；依赖以 package/lockfile 为准。CI 使用以下入口（项目目录内）：
+运行环境 Node.js >=22.1.0、pnpm 10.14.0，依赖以 package/lockfile 为准。项目目录内的验证入口：
 
 ```sh
 pnpm install --frozen-lockfile --ignore-scripts
@@ -46,16 +44,10 @@ pnpm test:browsers
 pnpm audit --audit-level low
 ```
 
-定向生成/检查：`pnpm render:static`、`pnpm render:static:check`、`pnpm assets:update`、`pnpm assets:check`。浏览器矩阵使用锁定 Playwright；日更也使用其配套 Chromium。
-
-`pnpm check:live` 是只读在线诊断；`pnpm update:data` 会写数据，不能代替只读排障。修改关键数据或发布规则时，同步维护本说明与 OPERATIONS，不追加阶段报告。验收细节保留在 PR 和 Actions。
+定向生成/检查：`pnpm render:static`、`pnpm render:static:check`、`pnpm assets:update`、`pnpm assets:check`。日更使用锁定 Playwright 配套 Chromium。`pnpm check:live` 为只读在线诊断，`pnpm update:data` 会写数据，不用于试探排障。
 
 ## 来源、隐私与许可
 
-汇率来自 ExchangeRate-API，认证源不可用时尝试[开放源](https://open.er-api.com/v6/latest/USD)。页面加载 GA4 和 Cloudflare Web Analytics；加载前清理搜索词及非法 URL 参数，GA4 可能写统计 Cookie。应用自身不持久化价格。
+汇率来自 ExchangeRate-API，认证源不可用时尝试[开放源](https://open.er-api.com/v6/latest/USD)。页面加载 GA4 和 Cloudflare Web Analytics；加载前清理搜索词及非法 URL 参数，GA4 可能写统计 Cookie。
 
 本工具与 Apple Inc. 无关联。自有代码见 [LICENSE](LICENSE)，第三方归属见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
-
-### 历史弹窗焦点提示
-
-关闭国家/地区历史弹窗后，焦点仍返回原国家按钮，保留键盘导航位置。鼠标或触摸操作不显示回焦时继承的蓝色轮廓；切换到 Tab、Enter、Escape 等键盘操作或无指针的辅助技术激活后恢复原有 `:focus-visible` 提示。样式仅作用于国家历史按钮，其他控件的焦点提示及弹窗回焦逻辑保持不变。浏览器回归同时覆盖鼠标、触摸、重复开闭和键盘切换；验收以 GitHub Actions 三浏览器结果为准。

@@ -30,7 +30,7 @@ a { color: var(--accent-dark); text-decoration: none; }
 a:hover { color: var(--accent); }
 button:focus-visible, a:focus-visible, input:focus-visible, .workspace:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* Only country controls in pointer mode suppress the inherited modal ring.
-   A keyboard event immediately restores the normal :focus-visible treatment. */
+   Keyboard navigation/activation restores :focus-visible; Escape preserves the mode. */
 html[data-country-history-pointer] .country-history-button:focus-visible { outline: none; }
 [hidden] { display: none !important; }
 
