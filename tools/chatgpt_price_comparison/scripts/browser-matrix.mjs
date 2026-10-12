@@ -541,8 +541,13 @@ async function assertHistoryHeaderReachability(browser) {
       await page.route('**/data/minimum-history.json*', route => route.fulfill({ json: history }));
       await page.goto(url, { waitUntil: 'domcontentloaded' });
       await page.waitForFunction(() => !document.querySelector('#minimumHistoryButton').disabled);
+      await page.locator('#minimumHistoryButton').evaluate(node => node.scrollIntoView({ block: 'start', inline: 'nearest' }));
       await openLongHistory();
+      const backgroundY = await page.evaluate(() => scrollY);
       const geometry = await measureAtEnd();
+      const largestRecordHeight = await page.evaluate(() => Math.max(...[...document.querySelectorAll('#minimumHistoryEvents .minimum-history-event')].map(node => node.getBoundingClientRect().height)));
+      const contentSpace = geometry.clientHeight - geometry.header.height;
+      if (largestRecordHeight > contentSpace + 1) failures.push(label + ': short viewport cannot show a whole record below the header');
       if (!geometry.bodyFits) failures.push(label + ': body overflows');
       if (geometry.scrollTop < 500) failures.push(label + ': fixture did not exercise long-history scrolling');
       // Check usable outcomes, without requiring a particular positioning/CSS strategy.
@@ -588,8 +593,11 @@ async function assertHistoryHeaderReachability(browser) {
       }
       await page.keyboard.press('Enter');
       await page.waitForFunction(() => !document.querySelector('#minimumHistoryDialog').open && document.activeElement?.id === 'minimumHistoryButton');
+      const keyboardReturnY = await page.evaluate(() => scrollY);
+      if (Math.abs(keyboardReturnY - backgroundY) > 1) failures.push(label + ': keyboard close shifts background page scroll');
       // A true touch/mouse close at its current position must not be rescued by locator auto-scrolling.
       await openLongHistory();
+      const pointerBackgroundY = await page.evaluate(() => scrollY);
       const pointerGeometry = await measureAtEnd();
       let pointerClose = false;
       if (pointerGeometry.close.visible && pointerGeometry.close.hit) {
@@ -602,7 +610,10 @@ async function assertHistoryHeaderReachability(browser) {
         await page.keyboard.press('Escape');
         await page.waitForFunction(() => !document.querySelector('#minimumHistoryDialog').open);
       }
-      diagnostics.push({ width, height, geometry, obscured, emptyWorks, tabClose, pointerGeometry, pointerClose });
+      const pointerReturnY = await page.evaluate(() => scrollY);
+      if (Math.abs(pointerReturnY - pointerBackgroundY) > 1) failures.push(label + ': pointer close shifts background page scroll');
+      diagnostics.push({ width, height, geometry, contentSpace, largestRecordHeight, obscured, emptyWorks, tabClose,
+        backgroundY, keyboardReturnY, pointerGeometry, pointerClose, pointerBackgroundY, pointerReturnY });
     } finally { await context.close(); }
   }
   console.log(browserName + ': bounded long-history reachability diagnostics\n' + JSON.stringify(diagnostics, null, 2));
