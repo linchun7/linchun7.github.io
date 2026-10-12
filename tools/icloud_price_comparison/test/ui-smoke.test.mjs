@@ -177,6 +177,104 @@ async function findChrome() {
   return null;
 }
 
+const cspDiagnosticState = new WeakMap();
+
+async function installCspDiagnostics(page) {
+  const state = { consoleErrors: [], violations: [], pageErrors: [] };
+  cspDiagnosticState.set(page, state);
+  page.on('pageerror', error => {
+    const record = { message: error.message, stack: error.stack };
+    state.pageErrors.push(record);
+    console.log('[csp-pageerror]', JSON.stringify({ browser: BROWSER_UNDER_TEST, url: page.url(), ...record }));
+  });
+  page.on('console', message => {
+    const record = { text: message.text(), location: message.location() };
+    if (message.type() === 'error') {
+      state.consoleErrors.push(record);
+      console.log('[csp-console-error]', JSON.stringify({ browser: BROWSER_UNDER_TEST, url: page.url(), ...record }));
+    } else if (record.text.startsWith('[csp-violation] ')) {
+      const violation = JSON.parse(record.text.slice('[csp-violation] '.length));
+      state.violations.push(violation);
+      console.log('[csp-policy-event]', JSON.stringify({ browser: BROWSER_UNDER_TEST, url: page.url(), ...violation }));
+    }
+  });
+  await page.addInitScript(() => {
+    addEventListener('securitypolicyviolation', event => {
+      console.log('[csp-violation] ' + JSON.stringify({
+        effectiveDirective: event.effectiveDirective,
+        violatedDirective: event.violatedDirective,
+        blockedURI: event.blockedURI,
+        sourceFile: event.sourceFile,
+        lineNumber: event.lineNumber,
+        columnNumber: event.columnNumber,
+        sample: event.sample,
+        disposition: event.disposition,
+        originalPolicy: event.originalPolicy
+      }));
+    });
+  });
+}
+
+for (const inputType of ['search', 'text']) {
+  for (const method of ['fill', 'pressSequentially']) {
+    for (const value of ['us', '美国']) {
+      test(`CSP input diagnostic: ${inputType} ${method} ${value}`, { timeout: 30000 }, async context => {
+        const config = await resolveBrowser(context, 'strict CSP input diagnostic');
+        if (!config) return;
+        const server = await startServer();
+        const browser = await config.browserType.launch(config.launchOptions);
+        const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+        const state = cspDiagnosticState.get(page);
+        const url = `http://127.0.0.1:${server.address().port}/__csp_input_probe__`;
+        const policy = "default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'";
+        const html = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${policy}"><title>CSP input probe</title></head><body><label for="probe">Probe</label><input id="probe" type="${inputType}" autocomplete="off"></body></html>`;
+        const stages = [];
+        const snapshot = async stage => {
+          // Drain rendering and queued policy events without suppressing them.
+          await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+          const dom = await page.evaluate(() => ({
+            value: document.querySelector('#probe')?.value,
+            policy: document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.content,
+            styles: [...document.querySelectorAll('style, [style]')].map(element => ({
+              tag: element.tagName, id: element.id, style: element.getAttribute('style'),
+              text: element.tagName === 'STYLE' ? element.textContent : null
+            }))
+          }));
+          const record = {
+            browser: BROWSER_UNDER_TEST, version: browser.version(),
+            inputType, method, value, stage, dom,
+            consoleErrors: structuredClone(state.consoleErrors),
+            violations: structuredClone(state.violations),
+            pageErrors: structuredClone(state.pageErrors)
+          };
+          stages.push(record);
+          console.log('[csp-input-stage]', JSON.stringify(record));
+        };
+        try {
+          await page.route(url, route => route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: html }));
+          await page.goto(url, { waitUntil: 'domcontentloaded' });
+          await snapshot('loaded');
+          const input = page.locator('#probe');
+          await input.focus();
+          await snapshot('focused');
+          if (method === 'fill') await input.fill(value);
+          else await input.pressSequentially(value);
+          await snapshot('entered');
+          await input.blur();
+          await snapshot('blurred');
+          assert.equal(await input.inputValue(), value);
+          assert.equal(stages.at(-1).dom.policy, policy, 'diagnostic must preserve strict CSP');
+          assert.deepEqual(state.pageErrors, [], 'minimal input must not emit page errors');
+          assert.deepEqual(state.consoleErrors, [], 'minimal input must not emit console errors');
+          assert.deepEqual(state.violations, [], 'minimal input must not violate strict CSP');
+        } finally {
+          await browser.close();
+        }
+      });
+    }
+  }
+}
+
 async function resolveBrowser(context, purpose) {
   if (BROWSER_UNDER_TEST !== 'chromium') {
     const browserType = BROWSER_UNDER_TEST === 'firefox' ? firefox : webkit;
@@ -243,6 +341,7 @@ function sharedBrowserType(browserType) {
         },
         async newPage(options) {
           const page = await sharedBrowser.newPage(options);
+          await installCspDiagnostics(page);
           pages.add(page);
           page.once('close', () => pages.delete(page));
           return page;
