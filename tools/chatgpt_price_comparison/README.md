@@ -25,6 +25,7 @@
 - 覆盖不足丢弃整轮尝试价格。仅配置兼容完整旧基线且取得完整新汇率时整批重算，不混用部分新价；汇率也失败则保留原发布版本。
 - 采集预算 240 秒，末尾 45 秒留给汇率。响应体按 64 KiB 分块，在块间及 EOF 后检查预算，超时不接受内容，非 chunked 响应的有效 Content-Length 用于完整性核验；单次 socket 阻塞空闲超时至多 15 秒。这不是整个 HTTP 请求的硬截止，响应头及 chunked framing 仍可能延迟检查。身份、格式、覆盖、时间及跨文件门禁不能放宽。
 - prepare 固定最新 main，生成/测试 job 只读；发布 job 重验工件，原子提交 prices、minimum-history、index 三文件。main 前进即停止，不强推。
+- 生成与 `--check` 均按 UTF-8 实际字节核验：`prices.json`、`minimum-history.json` 各上限 2,000,000 字节，`index.html` 上限 4,000,000 字节；超限停止发布并保留现网版本，不自动裁剪历史。
 - 发布后等待 Pages，核验 canonical JSON、HTML build revision 和资源实际哈希。后继项目部署接管时旧验证标记 superseded，不当作恢复；`scripts/recheck-production.sh` 统一复核接管。
 - 故障/降级维护同一条 Issue，保留首个失败步骤、原因样例和运行链接，真实恢复验证后才关闭。YAML 改变后从 main 新建运行，不重跑旧定义。
 
