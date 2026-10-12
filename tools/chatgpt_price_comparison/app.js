@@ -43,8 +43,10 @@
     : value && typeof value === 'object'
       ? `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(',')}}`
       : JSON.stringify(value);
-  const age = (value) => Date.now() - Date.parse(value);
-  const usable = (value) => Number.isFinite(age(value)) && age(value) >= -300e3;
+  const usable = (value) => {
+    const timestamp = Date.parse(value);
+    return Number.isFinite(timestamp) && timestamp <= Date.now() + 300_000;
+  };
   const comparable = (market) => market.offers.length > 0 && usable(market.last_verified_at);
   const shortPlan = (label) => label.replace(/^ChatGPT\s+/, '');
   const planIdentity = (label) => PLAN_ALIASES.get(label) || label;
@@ -512,11 +514,16 @@
   function sortedMarkets() {
     const query = state.query.normalize('NFKC').trim().toLowerCase();
     const markets = state.data.markets.filter((m) => !query || `${m.name} ${m.code} ${m.currency || ''}`.normalize('NFKC').toLowerCase().includes(query));
+    // Resolve each market once, rather than scanning offers and parsing dates
+    // twice for every comparison performed by Array.sort.
+    const values = state.sortKey === 'plan'
+      ? new Map(markets.map(market => [market, minCny(market, state.sortPlan)]))
+      : null;
     markets.sort((a, b) => {
       if (state.sortKey === 'country') {
         const cmp = a.name.localeCompare(b.name, 'zh-CN'); return state.sortDirection === 'asc' ? cmp : -cmp;
       }
-      const av = minCny(a, state.sortPlan), bv = minCny(b, state.sortPlan);
+      const av = values.get(a), bv = values.get(b);
       if (!Number.isFinite(av) && !Number.isFinite(bv)) return a.code.localeCompare(b.code, 'en');
       if (!Number.isFinite(av)) return 1;
       if (!Number.isFinite(bv)) return -1;
@@ -569,9 +576,16 @@
     return td;
   }
 
-  function renderTable() {
+  function renderTable({ updateHeaders = true } = {}) {
+    // Interactions can follow a local clock correction without a visibility event.
+    const nextSignature = timeDependentSignature();
+    if (nextSignature !== freshnessSignature) {
+      freshnessSignature = nextSignature;
+      calculateMinimums(); renderMinimums(); renderFreshness();
+      if (state.activeMarket) renderHistory();
+    }
     calculateRanks();
-    renderHeaders();
+    if (updateHeaders) renderHeaders();
     const markets = sortedMarkets();
     const frag = document.createDocumentFragment();
 
@@ -628,6 +642,9 @@
   }
   function focusMinimum(plan, marketId) {
     state.query = ''; el.searchInput.value = ''; setPlanSort(plan, true);
+    const currentMinimum = state.minimums.get(plan);
+    if (!currentMinimum?.markets.length) return;
+    marketId = currentMinimum.markets[0].code;
     const row = [...el.priceRows.querySelectorAll('tr[data-market-id]')].find((r) => r.dataset.marketId === marketId);
     if (!row) return;
     if (state.highlightTimer) clearTimeout(state.highlightTimer);
@@ -699,6 +716,8 @@
     }
   }
   function openHistory(market, returnFocus) {
+    refreshTimeDependentUi();
+    returnFocus = [...el.priceRows.querySelectorAll('tr[data-market-id]')].find(row => row.dataset.marketId === market.code)?.querySelector('.country-history-button') || returnFocus;
     state.activeMarket = market; state.historyReturnFocus = returnFocus; state.historyPlan = state.activePlan;
     el.historyTitle.textContent = market.name; el.historySubtitle.textContent = `${market.code.toUpperCase()} · ${market.currency || '—'} · 价格更新于 ${dateTime(market.last_verified_at)}`;
     renderHistoryPlans(); renderHistory(); el.historyDialog.showModal();
@@ -1035,6 +1054,36 @@
     document.querySelector('#minimumHistoryNote').hidden = false;
   }
 
+  async function readMinimumHistoryResponse(response) {
+    const maximumBytes = 2_000_000;
+    const declared = response.headers.get('content-length');
+    if (/^\d+$/.test(declared ?? '') && Number(declared) > maximumBytes) {
+      await response.body?.cancel().catch(() => {});
+      throw Error('最低价历史过大');
+    }
+    if (!response.body?.getReader) throw Error('最低价历史响应不可读取');
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8', { fatal: true });
+    let receivedBytes = 0;
+    const text = [];
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        receivedBytes += value.byteLength;
+        if (receivedBytes > maximumBytes) throw Error('最低价历史过大');
+        text.push(decoder.decode(value, { stream: true }));
+      }
+      text.push(decoder.decode());
+      return JSON.parse(text.join(''));
+    } catch (error) {
+      await reader.cancel().catch(() => {});
+      throw error;
+    } finally {
+      reader.releaseLock();
+    }
+  }
+
   async function loadMinimumHistory() {
     if (minimumHistoryUi.promise) return minimumHistoryUi.promise;
     minimumHistoryUi.status = 'loading';
@@ -1048,11 +1097,7 @@
         url.searchParams.set('revision', state.data?.revision || 'current');
         const response = await fetch(url, { cache: 'no-store', credentials: 'omit', redirect: 'error', signal: controller.signal });
         if (!response.ok || !/application\/json/i.test(response.headers.get('content-type') || '')) throw Error('最低价历史不可用');
-        const declared = Number(response.headers.get('content-length') || 0);
-        if (declared > 2_000_000) throw Error('最低价历史过大');
-        const text = await response.text();
-        if (text.length > 2_000_000) throw Error('最低价历史过大');
-        const value = validateMinimumHistory(JSON.parse(text));
+        const value = validateMinimumHistory(await readMinimumHistoryResponse(response));
         const previous = minimumHistoryUi.data?.checked_at;
         if (previous && (!value.checked_at || Date.parse(value.checked_at) < Date.parse(previous))) {
           throw new Error('History response would roll back accepted records');
@@ -1091,7 +1136,7 @@
     el.backToTableButton.classList.toggle('is-visible', visible); el.backToTableButton.setAttribute('aria-hidden', String(!visible)); el.backToTableButton.tabIndex = visible ? 0 : -1;
   }
   function bind() {
-    el.searchInput.addEventListener('input', () => { state.query = el.searchInput.value.normalize('NFKC').slice(0, 80); renderTable(); });
+    el.searchInput.addEventListener('input', () => { state.query = el.searchInput.value.normalize('NFKC').slice(0, 80); renderTable({ updateHeaders: false }); });
     el.minimumHistoryButton?.addEventListener('click', openMinimumHistory);
     el.closeHistory.addEventListener('click', closeHistory);
     el.historyDialog.addEventListener('close', () => {
@@ -1114,6 +1159,7 @@
     state.activePlan = defaultPlan;
     state.sortPlan = defaultPlan;
     state.historyPlan = defaultPlan;
+    freshnessSignature = timeDependentSignature();
     calculateMinimums();
     renderMinimums();
     renderStats();
@@ -1126,8 +1172,7 @@
     if (el.minimumHistoryButton) el.minimumHistoryButton.disabled = false;
     el.priceWorkspace.classList.add('price-ui-ready');
     void loadIcons();
-    freshnessSignature = timeDependentSignature();
-    setInterval(refreshTimeDependentUi, 30_000);
+    // No background polling: interactions and tab return recheck clock validity.
     document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshTimeDependentUi(); });
   }
   start().catch((error) => { console.error(error); el.freshnessWarning.hidden = false; el.freshnessWarning.textContent = '交互功能未能启动，当前仍显示静态价格'; });
