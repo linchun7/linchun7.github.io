@@ -139,6 +139,9 @@ jobs:
     name: 浏览器测试 (${{ matrix.browser }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --shm-size=1gb
     strategy:
       fail-fast: false
       matrix:
@@ -146,6 +149,7 @@ jobs:
     defaults:
       run:
         working-directory: tools/icloud_price_comparison
+        shell: bash
     steps:
       - name: 检出仓库
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -161,8 +165,6 @@ jobs:
           pnpm --version
       - name: 安装项目依赖
         run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: 安装 ${{ matrix.browser }}
-        run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
       - name: 运行 ${{ matrix.browser }} 测试
         env:
           PLAYWRIGHT_BROWSER: ${{ matrix.browser }}

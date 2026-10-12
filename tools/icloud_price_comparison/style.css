@@ -372,7 +372,7 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
 .country-history-button:disabled .history-affordance { display: none; }
 .country-history-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 /* Only country controls in pointer mode suppress the inherited modal ring.
-   A keyboard event immediately restores the normal :focus-visible treatment. */
+   Keyboard navigation/activation restores :focus-visible; Escape preserves the mode. */
 html[data-country-history-pointer] .country-history-button:focus-visible { outline: none; }
 .country-name { display: block; overflow: hidden; color: var(--ink); font-size: 15px; font-weight: 680; line-height: 1.18; text-overflow: ellipsis; }
 .country-name-en { display: block; margin-top: 3px; overflow: hidden; color: var(--muted); font-size: 12px; line-height: 1.2; text-overflow: ellipsis; }

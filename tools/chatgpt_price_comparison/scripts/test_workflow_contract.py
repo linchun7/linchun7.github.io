@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import re
 import unittest
 from pathlib import Path
 
@@ -94,6 +96,32 @@ class WorkflowContractTests(unittest.TestCase):
         for relative in ("app.js", "index.template.html", "scripts/pipeline.py", "scripts/browser-matrix.mjs"):
             project_file = (ROOT / "tools" / "chatgpt_price_comparison" / relative).read_text(encoding="utf-8")
             self.assertNotIn("icloud_price_comparison", project_file)
+
+    def test_browser_matrix_uses_matching_preinstalled_official_image(self):
+        project = ROOT / "tools" / "chatgpt_price_comparison"
+        validate = (ROOT / ".github" / "workflows" / "validate-chatgpt-prices.yml").read_text(encoding="utf-8")
+        browser = validate.split("\n  browser-matrix:\n", 1)[1].split("\n  production-smoke:\n", 1)[0]
+        package = json.loads((project / "package.json").read_text(encoding="utf-8"))
+        version = package["devDependencies"]["playwright"]
+        self.assertRegex(version, r"^\d+\.\d+\.\d+$")
+        image = re.search(r"^\s+image: (mcr\.microsoft\.com/playwright:v(\d+\.\d+\.\d+)-noble)\s*$", browser, re.MULTILINE)
+        self.assertIsNotNone(image, "browser matrix must use the version-pinned official Playwright Noble image")
+        self.assertEqual(image.group(2), version, "update the browser image together with the locked Playwright dependency")
+        self.assertIn("playwright@" + version, (project / "pnpm-lock.yaml").read_text(encoding="utf-8"))
+        self.assertIn("options: --shm-size=1gb", browser)
+        self.assertNotIn("--ipc=host", browser)
+        self.assertIn("shell: bash", browser)
+        self.assertIn("timeout-minutes: 15", browser)
+        self.assertIn("node-version: 22", browser)
+        self.assertIn("python-version: '3.11'", browser)
+        self.assertIn("uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97", browser)
+        self.assertIn("pnpm install --frozen-lockfile --ignore-scripts", browser)
+        self.assertIn("pnpm audit --audit-level low", browser)
+        self.assertNotIn("playwright install", browser)
+        self.assertNotIn("contents: write", browser)
+        self.assertNotIn("secrets.", browser)
+        self.assertIn("browser: [chromium, firefox, webkit]", browser)
+        self.assertIn("run: pnpm test:browser-matrix", browser)
 
     def test_minimum_history_is_candidate_validated_and_published_atomically(self):
         self.assertIn("minimum-history.json", self.text)

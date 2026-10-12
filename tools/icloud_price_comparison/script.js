@@ -1560,7 +1560,8 @@ function bindEvents() {
     if (event.detail === 0) delete document.documentElement.dataset.countryHistoryPointer;
   }, { capture: true });
   document.addEventListener('keydown', (event) => {
-    if (['Shift', 'Control', 'Alt', 'Meta'].includes(event.key)) return;
+    // Escape dismisses the dialog without changing the latest input mode.
+    if (['Shift', 'Control', 'Alt', 'Meta', 'Escape'].includes(event.key)) return;
     delete document.documentElement.dataset.countryHistoryPointer;
   }, { capture: true });
   // A device-clock change need not produce a lifecycle event. Guard current
@@ -1791,14 +1792,22 @@ function minimumHistoryTierIds(history) {
   ));
 }
 
+function minimumHistoryTimeUsable(history, nowMs = Date.now()) {
+  // Accepted structure already bounds every event/checkpoint by checkedAt.
+  return !history || history.checkedAt === null
+    || Date.parse(history.checkedAt) <= nowMs + MAX_PRICE_FUTURE_SKEW_MS;
+}
+
 function renderMinimumHistoryStatus() {
-  const h = minimumHistoryUi.data;
+  const timeUsable = minimumHistoryTimeUsable(minimumHistoryUi.data);
+  const h = timeUsable ? minimumHistoryUi.data : null;
   const status = document.querySelector('#minimumHistoryStatus');
   const parts = [];
   const recordedAt = h?.checkpoint?.at;
   if (recordedAt) parts.push(`记录截至 ${formatBeijingDateTime(recordedAt)}`);
   if (minimumHistoryUi.status === 'loading' && !h) parts.push('正在读取…');
-  if (minimumHistoryUi.status === 'error') parts.push(h ? '暂无法刷新' : '暂无法读取');
+  if (!timeUsable) parts.push('记录时间异常');
+  else if (minimumHistoryUi.status === 'error') parts.push(h ? '暂无法刷新' : '暂无法读取');
   status.textContent = parts.join(' · ');
   status.hidden = !parts.length;
   const retry = document.querySelector('#minimumHistoryRetry');
@@ -1807,8 +1816,16 @@ function renderMinimumHistoryStatus() {
 }
 
 function renderMinimumHistory() {
-  const h = minimumHistoryUi.data;
-  if (!h || !minimumHistoryUi.dialog?.open) return;
+  if (!minimumHistoryUi.dialog?.open) return;
+  renderMinimumHistoryStatus();
+  const h = minimumHistoryTimeUsable(minimumHistoryUi.data) ? minimumHistoryUi.data : null;
+  if (!h) {
+    document.querySelector('#minimumHistoryEvents').replaceChildren();
+    document.querySelector('#minimumHistoryToolbar').hidden = true;
+    document.querySelector('#minimumHistoryMore').hidden = true;
+    document.querySelector('#minimumHistoryNote').hidden = true;
+    return;
+  }
 
   const allTiers = minimumHistoryTierIds(h);
   if (minimumHistoryUi.filterTier !== 'all' && !allTiers.includes(minimumHistoryUi.filterTier)) {
@@ -1837,8 +1854,6 @@ function renderMinimumHistory() {
       Date.parse(second.at) - Date.parse(first.at)
       || canonicalTierDefinition(first.tier).capacityGb - canonicalTierDefinition(second.tier).capacityGb
     ));
-
-  renderMinimumHistoryStatus();
 
   const list = document.querySelector('#minimumHistoryEvents');
   list.replaceChildren();
@@ -1911,8 +1926,12 @@ function openMinimumHistory() {
   minimumHistoryUi.filterTier = 'all';
   minimumHistoryUi.limit = 20;
   dialog.showModal();
-  if (minimumHistoryUi.data) renderMinimumHistory();
-  if (!minimumHistoryUi.data || (state.data && minimumHistoryUi.data.checkedAt !== state.data.generatedAt)) void loadMinimumHistory();
+  renderMinimumHistory();
+  // A later accepted history is already sufficient for this page snapshot.
+  // Keep the existing retry for an unobserved/older history, never for clock rollback.
+  if (!minimumHistoryUi.data || (minimumHistoryTimeUsable(minimumHistoryUi.data) && state.data
+    && (minimumHistoryUi.data.checkedAt === null
+      || Date.parse(minimumHistoryUi.data.checkedAt) < Date.parse(state.data.generatedAt)))) void loadMinimumHistory();
 }
 const minimumHistoryButton = document.querySelector('#minimumHistoryButton');
 if (minimumHistoryButton) {

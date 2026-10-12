@@ -373,6 +373,12 @@ test('ships static prices and one embedded snapshot without a main-data network 
   assert.doesNotMatch(moduleSource, /__icloudInitialPriceRequest|__icloudInitialQuery|initialPriceRequest|finishInitialRequest/, 'the module must not retain a bootstrap bridge');
   assert.match(moduleSource, /MAX_RESPONSE_BYTES[\s\S]*?'history\.json': 8 \* 1024 \* 1024/);
   assert.match(html, /<script id="icloud-price-data" type="application\/json">/);
+  const embeddedAt = html.indexOf('<script id="icloud-price-data"');
+  for (const entry of ['<link rel="stylesheet"', '<link rel="modulepreload" href="script.js',
+    '<link rel="modulepreload" href="data-contract.js', '<link rel="modulepreload" href="data-model.js', moduleScript]) {
+    assert.ok(html.indexOf(entry) >= 0 && html.indexOf(entry) < embeddedAt,
+      'critical styles/modules must be discoverable before the embedded snapshot');
+  }
   assert.doesNotMatch(moduleSource, /fetchJson\('prices\.json'|loadPrices\(|refreshPrices\(/, 'there is no second main snapshot fetch path');
   assert.match(moduleSource, /TextDecoder\('utf-8', \{ fatal: true \}\)/, 'network JSON must use strict UTF-8 decoding');
   assert.match(moduleSource, /fetch\(`\.\/data\/\$\{fileName\}`, \{[\s\S]*?redirect:\s*'error'/, 'optional history JSON requests must reject redirects');
@@ -3582,6 +3588,80 @@ test('country history retains removal and restoration even at the same price', {
   } finally { await browser.close(); }
 });
 
+
+test('minimum history reuses accepted same/newer checks and locally protects a rolled-back clock', { timeout: 60000 }, async context => {
+  const { advanceMinimumHistory, emptyMinimumHistory } = await import('../scripts/minimum-history.mjs');
+  for (const mode of ['unchecked', 'older', 'same', 'newer']) {
+    const session = await snapshotSession(context, 'minimum-history request reuse');
+    if (!session) return;
+    const { page, browser, data, url, mainRequests, errors } = session;
+    const generatedAt = Date.parse(data.generatedAt);
+    const observed = structuredClone(data);
+    setPayloadGeneratedAt(observed, new Date(generatedAt + (mode === 'newer' ? 600000 : 0)).toISOString());
+    observed.fx.fetchedAt = observed.generatedAt;
+    const history = ['unchecked', 'older'].includes(mode)
+      ? emptyMinimumHistory()
+      : advanceMinimumHistory(emptyMinimumHistory(), observed);
+    if (mode === 'older') history.checkedAt = new Date(generatedAt - 60000).toISOString();
+    await page.addInitScript(() => {
+      const originalFetch = globalThis.fetch;
+      globalThis.__minimumHistoryFetches = 0;
+      globalThis.fetch = (input, init) => {
+        if (new URL(input.url || input, location.href).pathname.endsWith('/minimum-history.json')) {
+          globalThis.__minimumHistoryFetches++;
+        }
+        return originalFetch(input, init);
+      };
+    });
+    await page.route('**/data/minimum-history.json*', route => route.fulfill({ json: history }));
+    const calls = () => page.evaluate(() => globalThis.__minimumHistoryFetches);
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded' });
+      await waitForSnapshot(page);
+      assert.equal(await calls(), 0, mode + ': startup leaves history on demand');
+      await page.locator('#minimumHistoryButton').click();
+      await page.waitForFunction(() => !document.querySelector('#minimumHistoryRetry').disabled
+        && !document.querySelector('#minimumHistoryNote').hidden);
+      const records = await page.locator('#minimumHistoryEvents').textContent();
+      const cutoff = await page.locator('#minimumHistoryStatus').textContent();
+      assert.equal(await calls(), 1);
+      await page.locator('#closeMinimumHistory').click();
+      await page.locator('#minimumHistoryButton').click();
+      await page.waitForFunction(() => !document.querySelector('#minimumHistoryRetry').disabled);
+      const expectedCalls = ['unchecked', 'older'].includes(mode) ? 2 : 1;
+      assert.equal(await calls(), expectedCalls, mode + ': only unchecked/older history is read again');
+      assert.equal(await page.locator('#minimumHistoryEvents').textContent(), records);
+      assert.equal(await page.locator('#minimumHistoryStatus').textContent(), cutoff);
+      if (mode === 'newer') {
+        await page.context().setOffline(true);
+        for (let reopen = 0; reopen < 2; reopen++) {
+          await page.locator('#closeMinimumHistory').click();
+          await page.locator('#minimumHistoryButton').click();
+          assert.equal(await calls(), 1, 'offline reopen reuses the accepted later history');
+          assert.equal(await page.locator('#minimumHistoryStatus').textContent(), cutoff);
+        }
+        await page.locator('#closeMinimumHistory').click();
+        await page.evaluate(now => { Date.now = () => now; }, generatedAt + 60000);
+        await page.locator('#minimumHistoryButton').click();
+        assert.equal(await page.locator('#minimumHistoryEvents').textContent(), '');
+        assert.equal(await page.locator('#minimumHistoryStatus').textContent(), '记录时间异常');
+        for (const id of ['minimumHistoryToolbar', 'minimumHistoryMore', 'minimumHistoryNote']) {
+          assert.equal(await page.locator('#' + id).isHidden(), true, id + ': future evidence is hidden');
+        }
+        assert.equal(await calls(), 1, 'clock rollback is local and does not download history');
+        await page.locator('#closeMinimumHistory').click();
+        await page.evaluate(now => { Date.now = () => now; }, generatedAt + 3600000);
+        await page.locator('#minimumHistoryButton').click();
+        assert.equal(await page.locator('#minimumHistoryEvents').textContent(), records);
+        assert.equal(await page.locator('#minimumHistoryStatus').textContent(), cutoff);
+        assert.equal(await calls(), 1, 'corrected clock restores the same accepted records offline');
+      }
+      assert.deepEqual(mainRequests, []);
+      assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
+  }
+});
+
 // Initial-future and later-future clocks are covered in the local-only clock-safety matrix.
 
 test('accepted minimum history survives pending, failed and older refreshes', { timeout: 60000 }, async (context) => {
@@ -4327,13 +4407,15 @@ async function assertCountryHistoryFocus(page, { touch = false, outlineOffset })
       && document.activeElement?.matches('.country-history-button'));
     await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   };
-  const assertRing = async visible => {
+  const assertRing = async (visible, scenario) => {
     const result = await trigger.evaluate(button => {
       const style = getComputedStyle(button);
       return { focused: document.activeElement === button, style: style.outlineStyle,
-        width: style.outlineWidth, offset: style.outlineOffset };
+        width: style.outlineWidth, offset: style.outlineOffset,
+        pointerMode: document.documentElement.hasAttribute('data-country-history-pointer') };
     });
     assert.equal(result.focused, true, 'closing history retains semantic trigger focus');
+    assert.equal(result.pointerMode, !visible, scenario || 'latest input mode is preserved');
     if (visible) {
       assert.equal(result.style, 'solid', 'keyboard focus remains visibly outlined');
       assert.equal(result.width, '2px');
@@ -4352,6 +4434,17 @@ async function assertCountryHistoryFocus(page, { touch = false, outlineOffset })
     await activate(close);
     await settled();
     await assertRing(false);
+
+    // The reported regression: Escape must not turn a pointer-only
+    // history session into keyboard navigation, even after repeated opens.
+    await activate(trigger);
+    await page.waitForSelector('#historyDialog[open]');
+    await page.keyboard.press('Escape');
+    await settled();
+    await assertRing(false, 'pointer open + Escape remains pointer mode');
+    await page.keyboard.press('Shift');
+    await page.keyboard.press('Escape');
+    await assertRing(false, 'modifiers and dismissal do not start keyboard navigation');
   }
 
   // Delegated non-focusable price-cell entry also restores the semantic button.
@@ -4361,8 +4454,28 @@ async function assertCountryHistoryFocus(page, { touch = false, outlineOffset })
   await settled();
   await assertRing(false);
 
-  // The current control must regain its indicator as soon as keyboard use
-  // starts, including after an earlier pointer-only session.
+  // Direct activation from the retained pointer focus is a real keyboard
+  // action; a preceding Tab is not required to restore its indicator.
+  for (const key of ['Enter', 'Space']) {
+    await activate(trigger);
+    await page.waitForSelector('#historyDialog[open]');
+    await page.keyboard.press('Escape');
+    await settled();
+    await assertRing(false);
+    await page.keyboard.press(key);
+    await page.waitForSelector('#historyDialog[open]');
+    await page.keyboard.press('Escape');
+    await settled();
+    await assertRing(true, key + ' activation + Escape remains keyboard mode');
+  }
+
+  // Tab and Shift+Tab restore the current control's visible indicator
+  // after an earlier pointer-only session.
+  await activate(trigger);
+  await page.waitForSelector('#historyDialog[open]');
+  await page.keyboard.press('Escape');
+  await settled();
+  await assertRing(false);
   await page.keyboard.press('Tab');
   await page.keyboard.press('Shift+Tab');
   await assertRing(true);
@@ -4378,6 +4491,30 @@ async function assertCountryHistoryFocus(page, { touch = false, outlineOffset })
   await page.keyboard.press('Escape');
   await settled();
   await assertRing(true);
+
+  // The most recent navigation/activation wins, not just the opener.
+  // A pointer interaction inside a keyboard-opened dialog switches back.
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#historyDialog[open]');
+  await activate(page.locator('#historyTitle'));
+  assert.equal(await page.locator('#historyDialog').evaluate(dialog => dialog.open), true);
+  await page.keyboard.press('Escape');
+  await settled();
+  await assertRing(false, 'keyboard open + pointer interaction + Escape remains pointer mode');
+
+  // Pointer -> keyboard -> pointer -> Escape follows the last pointer,
+  // while a further Tab before Escape restores keyboard presentation.
+  for (const resumeKeyboard of [false, true]) {
+    await activate(trigger);
+    await page.waitForSelector('#historyDialog[open]');
+    await page.keyboard.press('Tab');
+    await activate(page.locator('#historyTitle'));
+    assert.equal(await page.locator('#historyDialog').evaluate(dialog => dialog.open), true);
+    if (resumeKeyboard) await page.keyboard.press('Tab');
+    await page.keyboard.press('Escape');
+    await settled();
+    await assertRing(resumeKeyboard, 'mixed input follows the latest real navigation/activation');
+  }
 
   // Keyboard activation of the close button must keep a visible return ring.
   await page.keyboard.press('Enter');
@@ -4396,11 +4533,33 @@ async function assertCountryHistoryFocus(page, { touch = false, outlineOffset })
   // Assistive/synthetic activation may have no pointerdown or keydown. Start
   // from text-input focus, which provides a visible native focus baseline.
   await page.locator('#searchInput').focus();
+  assert.equal(await page.locator('#searchInput').evaluate(input => getComputedStyle(input).outlineStyle),
+    'solid', 'pointer suppression leaves other controls visibly focusable');
+  await trigger.evaluate(button => button.click());
+  await page.waitForSelector('#historyDialog[open]');
+  await page.keyboard.press('Escape');
+  await settled();
+  await assertRing(true, 'detail=0 activation + Escape remains keyboard/assistive mode');
+
+  // A detail=0 close clears pointer suppression and retains real focus;
+  // it cannot by itself guarantee the browser's native :focus-visible.
+  await activate(trigger);
+  await page.waitForSelector('#historyDialog[open]');
+  await close.evaluate(button => button.click());
+  await settled();
+  assert.deepEqual(await trigger.evaluate(button => ({
+    focused: document.activeElement === button,
+    pointerMode: document.documentElement.hasAttribute('data-country-history-pointer')
+  })), { focused: true, pointerMode: false }, 'detail=0 close clears pointer mode and retains trigger focus');
+
+  // With a visible text-input baseline, assistive open and close preserve
+  // the native indicator as in the existing accessibility regression.
+  await page.locator('#searchInput').focus();
   await trigger.evaluate(button => button.click());
   await page.waitForSelector('#historyDialog[open]');
   await close.evaluate(button => button.click());
   await settled();
-  await assertRing(true);
+  await assertRing(true, 'detail=0 open and close preserve the native visible baseline');
 
   if (!touch) {
     // Click the actual backdrop outside the dialog rectangle, not a rounded
