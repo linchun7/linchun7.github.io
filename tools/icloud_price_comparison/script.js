@@ -231,6 +231,7 @@ async function readBoundedJsonResponse(response, fileName) {
   if (!maximumBytes) throw new Error(`不支持的数据文件：${fileName}`);
   const declaredLength = response.headers.get('content-length');
   if (/^\d+$/.test(declaredLength ?? '') && Number(declaredLength) > maximumBytes) {
+    await response.body?.cancel().catch(() => {});
     throw new Error(`${fileName} 超过允许大小`);
   }
 
@@ -238,15 +239,21 @@ async function readBoundedJsonResponse(response, fileName) {
   let receivedBytes = 0;
   if (response.body?.getReader) {
     const reader = response.body.getReader();
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      receivedBytes += value.byteLength;
-      if (receivedBytes > maximumBytes) {
-        await reader.cancel().catch(() => {});
-        throw new Error(`${fileName} 超过允许大小`);
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        receivedBytes += value.byteLength;
+        if (receivedBytes > maximumBytes) {
+          throw new Error(`${fileName} 超过允许大小`);
+        }
+        chunks.push(value);
       }
-      chunks.push(value);
+    } catch (error) {
+      await reader.cancel().catch(() => {});
+      throw error;
+    } finally {
+      reader.releaseLock();
     }
   } else {
     const value = new Uint8Array(await response.arrayBuffer());
@@ -338,6 +345,7 @@ async function fetchJson(fileName, { forceRefresh = false } = {}) {
     if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
     return validatePayload(fileName, await readBoundedJsonResponse(response, fileName));
   } finally {
+    controller.abort();
     clearTimeout(timeout);
   }
 }
@@ -2000,6 +2008,7 @@ async function loadMinimumHistory() {
       minimumHistoryUi.status = 'error';
       if (minimumHistoryUi.data) renderMinimumHistory();
     } finally {
+      controller.abort();
       clearTimeout(timer);
       minimumHistoryUi.promise = null;
       renderMinimumHistoryStatus();

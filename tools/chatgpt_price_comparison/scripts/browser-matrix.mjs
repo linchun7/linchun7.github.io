@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { installHistoryInteractionProbe, assertHistoryInteractionStress } from './history-interaction-stress.mjs';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
@@ -362,7 +363,7 @@ async function assertDailyTableGeometry(browser) {
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => document.querySelector('#priceWorkspace').classList.contains('price-ui-ready'));
-    for (const width of [320, 390, 1100, 1101, 1266, 1280, 1440]) {
+    for (const width of [320, 390, 1100, 1101, 1266, 1280, 1282, 1283, 1297, 1298, 1300, 1440, 1101, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       await page.evaluate(() => {
         window.scrollTo(0, 0);
@@ -378,6 +379,8 @@ async function assertDailyTableGeometry(browser) {
             className: node.className, text: node.textContent, client: node.clientWidth, scroll: node.scrollWidth }));
         return { bodyFits: document.documentElement.scrollWidth <= innerWidth + 1,
           columnsFit: scroll.scrollWidth <= scroll.clientWidth + 1,
+          clientWidth: scroll.clientWidth, scrollWidth: scroll.scrollWidth,
+          documentWidth: document.documentElement.clientWidth, tableFits: scroll.classList.contains('table-fits'),
           overflowX: getComputedStyle(scroll).overflowX, clipped,
           planHeaders: [...document.querySelectorAll('th[data-plan-header]')].filter(visible).map(node => node.dataset.plan),
           selectedPlan: document.querySelector('#mobilePlanControl [aria-pressed="true"]')?.dataset.plan };
@@ -411,6 +414,67 @@ async function assertDailyTableGeometry(browser) {
       }
       diagnostics.push({ width, before, after });
     }
+    // Repeated desktop resize must not shift the reader's vertical position.
+    const resizeDiagnostics = [];
+    for (const width of [1101, 1440, 1280, 1440]) {
+      const beforeY = await page.evaluate(() => scrollY);
+      await page.setViewportSize({ width, height: 900 });
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      const result = await page.evaluate(() => {
+        const scroll = document.querySelector('.table-scroll');
+        return { y: scrollY, x: scroll.scrollLeft, overflowX: getComputedStyle(scroll).overflowX,
+          fits: scroll.scrollWidth <= scroll.clientWidth + 1,
+          tableFits: scroll.classList.contains('table-fits'),
+          bodyFits: document.documentElement.scrollWidth <= innerWidth + 1 };
+      });
+      if (Math.abs(result.y - beforeY) > 1) failures.push(width + 'px: desktop resize shifts page scroll');
+      if (!result.bodyFits) failures.push(width + 'px: desktop resize causes body overflow');
+      if (result.tableFits && result.overflowX !== 'visible') failures.push(width + 'px: fit class does not restore window sticky');
+      if (!result.tableFits && result.overflowX !== 'auto') failures.push(width + 'px: oversized table lost horizontal scrolling');
+      resizeDiagnostics.push({ width, beforeY, after: result });
+    }
+    // A wider future plan set must retain fixed readable columns and internal access.
+    await page.evaluate(() => {
+      const header = document.querySelector('.price-table thead tr');
+      const template = header.querySelector('th[data-plan-header]:last-child');
+      for (let index = 0; index < 3; index++) {
+        const copy = template.cloneNode(true);
+        copy.dataset.plan = 'future-' + index;
+        header.append(copy);
+      }
+      for (const row of document.querySelectorAll('#priceRows tr[data-market-id]')) {
+        const template = row.querySelector('td[data-plan]:last-child');
+        for (let index = 0; index < 3; index++) {
+          const copy = template.cloneNode(true);
+          copy.dataset.plan = 'future-' + index;
+          row.append(copy);
+        }
+      }
+      document.querySelector('.price-table').style.setProperty('--table-min-width',
+        String(48 + 220 + header.querySelectorAll('th[data-plan-header]').length * 190) + 'px');
+    });
+    await page.setViewportSize({ width: 1439, height: 900 });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const future = await page.evaluate(() => {
+      const scroll = document.querySelector('.table-scroll');
+      return { tableFits: scroll.classList.contains('table-fits'), overflowX: getComputedStyle(scroll).overflowX,
+        bodyFits: document.documentElement.scrollWidth <= innerWidth + 1,
+        minColumnWidth: Math.min(...[...document.querySelectorAll('td[data-plan]')].map(node => node.getBoundingClientRect().width)),
+        clipped: [...document.querySelectorAll('#priceRows .price-local, #priceRows .price-amount')]
+          .filter(node => node.scrollWidth > node.clientWidth + 1).length };
+    });
+    if (future.tableFits || future.overflowX !== 'auto' || !future.bodyFits || future.minColumnWidth < 189 || future.clipped) {
+      failures.push('future plan expansion loses fixed readable horizontal access ' + JSON.stringify(future));
+    }
+    await page.locator('th[data-plan-header]').last().scrollIntoViewIfNeeded();
+    const lastPlanReachable = await page.locator('th[data-plan-header]').last().evaluate(node => {
+      const bounds = node.getBoundingClientRect(), frame = node.closest('.table-scroll').getBoundingClientRect();
+      return bounds.left >= frame.left - 1 && bounds.right <= frame.right + 1;
+    });
+    if (!lastPlanReachable) failures.push('future last plan cannot be reached by horizontal scrolling');
+    console.log(browserName + ': resize/future geometry\n' + JSON.stringify({ resizeDiagnostics, future, lastPlanReachable }, null, 2));
+
     console.log(`${browserName}: daily table geometry diagnostics\n${JSON.stringify(diagnostics, null, 2)}`);
     assert.deepEqual(failures, [], `${browserName}: daily table geometry\n${JSON.stringify(diagnostics, null, 2)}`);
   } finally {
@@ -1088,6 +1152,31 @@ async function assertNativeHistoryCloseLifecycle(page, { triggerSelector, dialog
       assert.equal(await retryPage.evaluate(() => document.activeElement?.id), 'minimumHistoryPlanFilter', 'ordinary select navigation/typeahead stays focused');
       await retryPage.keyboard.press('Escape');
     } finally { if (release) release(false); await isolated.close(); }
+  }
+
+  for (const touch of [false, true]) {
+    const isolated = await browser.newContext({ viewport: { width: touch ? 390 : 1280, height: 900 }, hasTouch: touch });
+    try {
+      const stressPage = await isolated.newPage();
+      const errors = [];
+      stressPage.on('pageerror', error => errors.push(error.message));
+      await installHistoryInteractionProbe(stressPage, 'app.js');
+      await stressPage.addInitScript(now => { Date.now = () => now; }, Date.parse(priceData.generated_at) + 3600000);
+      await stressPage.route('https://**/*', route => route.abort());
+      const minimum = JSON.parse(await readFile(resolve(projectDir, 'data/minimum-history.json'), 'utf8'));
+      assert.ok(minimum.checkpoint, 'stress reuse requires an accepted minimum-history checkpoint');
+      minimum.checked_at = priceData.generated_at;
+      minimum.checkpoint.at = priceData.generated_at;
+      await stressPage.route('**/data/minimum-history.json*', route => route.fulfill({ json: minimum }));
+      await stressPage.goto(url, { waitUntil: 'domcontentloaded' });
+      await stressPage.waitForFunction(() => !document.querySelector('#minimumHistoryButton').disabled);
+      const summary = await assertHistoryInteractionStress(stressPage, [
+        { trigger: '.country-history-button:not(:disabled)', dialog: '#historyDialog', close: '#closeHistory', country: true },
+        { trigger: '#minimumHistoryButton', dialog: '#minimumHistoryDialog', close: '#closeMinimumHistory' }
+      ], { touch });
+      assert.deepEqual(errors, [], 'no uncaught errors through repeated interrupted dialog sessions');
+      console.log('Bounded history interaction stress:', browserName, JSON.stringify(summary));
+    } finally { await isolated.close(); }
   }
 
   console.log(`Cross-browser smoke passed: ${browserName}`);
