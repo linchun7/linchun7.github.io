@@ -143,6 +143,169 @@ try {
         await page.click('#calculate1');
         assert.equal(await page.locator('#result1').evaluate(el => el.classList.contains('result-error')), true);
     });
+    await check('financial compound summaries and details preserve tiny rates', 'financial_calculator', async page => {
+        await page.click('#tab4');
+        await page.selectOption('#compoundingFrequency', 'annually');
+        const cases = [
+            { principal: '1e16', rate: '1e-14', periods: '1', interest: '1.00', perPeriod: '1.00' },
+            { principal: '1e16', rate: '-1e-14', periods: '1', interest: '-1.00', perPeriod: '-1.00' },
+            { principal: '1e15', rate: '1e-14', periods: '1000', interest: '100.00', perPeriod: '0.10' },
+            { principal: '1000', rate: '5', periods: '2', interest: '102.50', future: '1,102.50' },
+            { principal: '1000', rate: '-50', periods: '3', interest: '-875.00', future: '125.00', perPeriod: '-125.00' },
+            { principal: '1000', rate: '0', periods: '3', interest: '0.00', future: '1,000.00', perPeriod: '0.00' }
+        ];
+        for (const input of cases) {
+            await page.fill('#principal3', input.principal);
+            await page.fill('#annualRate3', input.rate);
+            await page.fill('#depositPeriod', input.periods);
+            await page.click('#calculate4');
+            assert.equal(await page.locator('#result4').evaluate(el => el.classList.contains('result-error')), false, JSON.stringify(input));
+            const summary = /本息总计：(.+) 元；利息总计：(.+) 元/.exec(await page.locator('#result4').textContent());
+            assert.ok(summary, 'compound summary is present');
+            assert.equal(summary[2], input.interest, JSON.stringify(input));
+            if (input.future) assert.equal(summary[1], input.future);
+            const rows = page.locator('#result4-table tbody tr');
+            assert.equal(await rows.count(), Number(input.periods));
+            const last = await rows.last().locator('td').allTextContents();
+            assert.equal(last[3], summary[2], 'last cumulative interest matches the summary exactly');
+            assert.equal(last[4], summary[1], 'last balance matches the summary exactly');
+            if (input.perPeriod) assert.equal(last[2], input.perPeriod);
+        }
+    });
+    await check('financial tiny rates still accrue over very large exact periods', 'financial_calculator', async page => {
+        await page.click('#tab4');
+        await page.selectOption('#compoundingFrequency', 'annually');
+        await page.fill('#principal3', '10000');
+        await page.fill('#depositPeriod', '1000000000000000');
+        for (const [rate, future, interest] of [
+            ['1e-14', '11,051.71', '1,051.71'],
+            ['-1e-14', '9,048.37', '-951.63'],
+            ['0', '10,000.00', '0.00']
+        ]) {
+            await page.fill('#annualRate3', rate);
+            await page.click('#calculate4');
+            assert.equal(await page.locator('#result4').evaluate(el => el.classList.contains('result-error')), false);
+            assert.equal(await page.locator('#result4').textContent(), `本息总计：${future} 元；利息总计：${interest} 元`);
+            assert.equal(await page.locator('#result4-table tbody tr').count(), 0);
+            assert.match(await page.locator('#result4-table').textContent(), /明细最多展示 2000 期/);
+        }
+    });
+    await check('financial simple interest rejects scaled subnormal rates and recovers at zero', 'financial_calculator', async page => {
+        await page.click('#tab2');
+        await page.selectOption('#rateType2', '360');
+        for (const rate of ['1e-307', '-1e-307', '2.2250738585072286e-308']) {
+            await page.fill('#principal2', '1000');
+            await page.fill('#days2', '360');
+            await page.fill('#annualRate2', '5');
+            await page.click('#calculate2');
+            assert.equal(await page.locator('#result2').textContent(), '利息收益：50.00 元');
+            assert.equal(await page.locator('#result2').evaluate(el => el.classList.contains('result-error')), false);
+
+            await page.fill('#principal2', '1.7e308');
+            await page.fill('#days2', '9000000000000000');
+            await page.fill('#annualRate2', rate);
+            await page.click('#calculate2');
+            assert.equal(await page.locator('#result2').evaluate(el => el.classList.contains('result-error')), true, rate);
+            assert.match(await page.locator('#result2').textContent(), /低于可计算精度/);
+
+            await page.fill('#annualRate2', '0');
+            await page.click('#calculate2');
+            assert.equal(await page.locator('#result2').evaluate(el => el.classList.contains('result-error')), false);
+            assert.equal(await page.locator('#result2').textContent(), '利息收益：0.00 元');
+        }
+    });
+    await check('financial rejects unsupported rate precision and clears previous details', 'financial_calculator', async page => {
+        await page.click('#tab4');
+        await page.selectOption('#compoundingFrequency', 'annually');
+        for (const rate of [
+            '1e-322', '-1e-322', '1e-324', '-1e-324',
+            '3e-322', '-3e-322', '1e-307', '-1e-307'
+        ]) {
+            // Establish old details before each precision failure.
+            await page.fill('#principal3', '1000');
+            await page.fill('#depositPeriod', '2');
+            await page.fill('#annualRate3', '5');
+            await page.click('#calculate4');
+            assert.equal(await page.locator('#result4').evaluate(el => el.classList.contains('result-error')), false);
+            assert.equal(await page.locator('#result4-table tbody tr').count(), 2);
+
+            await page.fill('#principal3', '1e308');
+            await page.fill('#depositPeriod', '9000000000000000');
+            await page.fill('#annualRate3', rate);
+            await page.click('#calculate4');
+            assert.equal(await page.locator('#result4').evaluate(el => el.classList.contains('result-error')), true, rate);
+            assert.match(await page.locator('#result4').textContent(), /低于可计算精度/);
+            assert.equal(await page.locator('#result4-table').evaluate(el => el.childElementCount), 0);
+            assert.equal((await page.locator('#result4-table').textContent()).trim(), '');
+        }
+
+        // True zero mantissas remain valid, including recovery after rejection.
+        for (const rate of ['0', '-0', '0e3']) {
+            await page.fill('#principal3', '1000');
+            await page.fill('#depositPeriod', '2');
+            await page.fill('#annualRate3', rate);
+            await page.click('#calculate4');
+            assert.equal(await page.locator('#result4').evaluate(el => el.classList.contains('result-error')), false, rate);
+            assert.match(await page.locator('#result4').textContent(), /^本息总计：1,000\.00 元；利息总计：-?0\.00 元$/);
+            assert.equal(await page.locator('#result4-table tbody tr').count(), 2);
+            const last = await page.locator('#result4-table tbody tr').last().locator('td').allTextContents();
+            assert.match(last[2], /^-?0\.00$/);
+            assert.match(last[3], /^-?0\.00$/);
+            assert.equal(last[4], '1,000.00');
+        }
+    });
+    await check('financial compound scaling stays finite and rejects genuine overflow', 'financial_calculator', async page => {
+        await page.click('#tab4');
+        await page.selectOption('#compoundingFrequency', 'annually');
+        // The growth factor alone overflows, but the principal-scaled result fits.
+        await page.fill('#principal3', '1e-200');
+        await page.fill('#annualRate3', '100');
+        await page.fill('#depositPeriod', '1500');
+        await page.click('#calculate4');
+        assert.equal(await page.locator('#result4').evaluate(el => el.classList.contains('result-error')), false);
+        const summary = /本息总计：(.+) 元；利息总计：(.+) 元/.exec(await page.locator('#result4').textContent());
+        assert.ok(summary);
+        assert.ok(Number.isFinite(Number(summary[1].replaceAll(',', ''))));
+        assert.ok(Number(summary[1].replaceAll(',', '')) > 1e250);
+        const last = await page.locator('#result4-table tbody tr').last().locator('td').allTextContents();
+        assert.equal(last[3], summary[2]);
+        assert.equal(last[4], summary[1]);
+
+        await page.fill('#principal3', '1e308');
+        await page.fill('#annualRate3', '100');
+        await page.fill('#depositPeriod', '2');
+        await page.click('#calculate4');
+        assert.equal(await page.locator('#result4').evaluate(el => el.classList.contains('result-error')), true);
+        assert.match(await page.locator('#result4').textContent(), /过大或无效/);
+        assert.equal(await page.locator('#result4-table tbody tr').count(), 0);
+    });
+    await check('financial CAGR annualizes finite extremes without ratio overflow or underflow', 'financial_calculator', async page => {
+        await page.click('#tab3');
+        await page.selectOption('#rateType3', '365');
+        await page.fill('#startDate', '2000-01-01');
+        await page.fill('#endDate', '3000-01-01');
+        for (const [start, end, expected] of [
+            ['1e200', '1e-200', '-60.16%'],
+            ['1e-200', '1e200', '151.03%']
+        ]) {
+            await page.fill('#startNetValue', start);
+            await page.fill('#endNetValue', end);
+            await page.click('#calculate3');
+            assert.equal(await page.locator('#result3').evaluate(el => el.classList.contains('result-error')), false);
+            assert.ok((await page.locator('#result3').textContent()).includes(expected));
+        }
+        await page.fill('#startDate', '2026-01-01');
+        await page.fill('#endDate', '2027-01-01');
+        await page.fill('#startNetValue', '1');
+        await page.fill('#endNetValue', '1.1');
+        await page.click('#calculate3');
+        assert.match(await page.locator('#result3').textContent(), /10\.00%/);
+        await page.fill('#endDate', '2026-01-02');
+        await page.fill('#startNetValue', '1e-200');
+        await page.fill('#endNetValue', '1e200');
+        await page.click('#calculate3');
+        assert.equal(await page.locator('#result3').evaluate(el => el.classList.contains('result-error')), true);
+    });
     await check('financial supports total-loss CAGR and keyboard tab navigation', 'financial_calculator', async page => {
         await page.click('#tab3');
         await page.fill('#startDate', '2026-01-01');

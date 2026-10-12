@@ -113,11 +113,16 @@ async function testSpaceTool() {
     const { context, page, pageErrors } = await createPage();
     await page.goto(`${baseUrl}/tools/space/`, { waitUntil: 'domcontentloaded' });
 
-    assert.equal(await page.locator('script[src="spacing.js?v=20261011-url-schemes"]').count(), 1, 'space tool should use its content-preserving helper');
+    assert.equal(await page.locator('script[src="spacing.js?v=20261012-url-parentheses"]').count(), 1, 'space tool should use its content-preserving helper');
     assert.equal(await page.locator('script[src="dist/browser/pangu.min.js"]').count(), 0, 'space UI should not depend on Pangu punctuation normalization');
     // Bound the regression inputs: enough unmatched delimiters to expose rescanning,
     // while keeping the test independent of a microbenchmark or unbounded input.
     const unmatchedFenceInput = '```js\n'.repeat(30000);
+    const nestedUrl = `https://example.com/${'（'.repeat(20000)}中文ABC，测试DEF${'）'.repeat(20000)}`;
+    const unclosedUrl = `https://example.com/${'（'.repeat(20000)}中文ABC，正文DEF。\n继续XYZ`;
+    const unclosedUrlExpected = `https://example.com/${'（'.repeat(20000)}中文 ABC，正文 DEF。\n继续 XYZ`;
+    const repeatedUnclosedUrls = 'https://example.com/目录（中文ABC，正文DEF。\n'.repeat(3000);
+    const repeatedUnclosedUrlsExpected = 'https://example.com/目录（中文 ABC，正文 DEF。\n'.repeat(3000);
     const unmatchedInlineRuns = Array.from({ length: 600 }, (_, index) => '`'.repeat(index + 1));
     const withSpacingDeadline = async (operation, label) => {
         let timeout;
@@ -152,6 +157,31 @@ async function testSpaceTool() {
         ["访问HTTP://example.com/中文ABC?q=测试123，继续ABC", "访问 HTTP://example.com/中文ABC?q=测试123，继续 ABC"],
         ["访问HTTPS://example.com/中文ABC?q=测试123，继续ABC", "访问 HTTPS://example.com/中文ABC?q=测试123，继续 ABC"],
         ["前文ABC HtTpS://example.com/目录ABC?key=中文123&next=路Z，后文XYZ", "前文 ABC HtTpS://example.com/目录ABC?key=中文123&next=路Z，后文 XYZ"],
+        // Fullwidth parentheses are legitimate URL path/query characters.
+        ["<https://example.com/目录（中文ABC）>", "<https://example.com/目录（中文ABC）>"],
+        ["https://example.com/目录（中文ABC）", "https://example.com/目录（中文ABC）"],
+        ["访问https://example.com/目录（中文ABC），继续ABC", "访问 https://example.com/目录（中文ABC），继续 ABC"],
+        ["访问HTTPS://example.com/目录（中文ABC）?q=测试（123ABC），继续ABC", "访问 HTTPS://example.com/目录（中文ABC）?q=测试（123ABC），继续 ABC"],
+        ["前文ABC <HtTpS://example.com/目录（中文ABC）> 后文XYZ", "前文 ABC <HtTpS://example.com/目录（中文ABC）> 后文 XYZ"],
+        ["<https://example.com/目录，中文ABC>", "<https://example.com/目录，中文ABC>"],
+        ["访问https://example.com/目录（中文ABC）；后文XYZ。结束123", "访问 https://example.com/目录（中文ABC）；后文 XYZ。结束 123"],
+        ["https://example.com/目录（中文ABC（测试DEF））", "https://example.com/目录（中文ABC（测试DEF））"],
+        ["https://example.com/目录（中文ABC，测试DEF）", "https://example.com/目录（中文ABC，测试DEF）"],
+        ["访问HTTP://example.com/目录（中文ABC（测试DEF，内文GHI））?q=（结束123），后文XYZ。正文DEF", "访问 HTTP://example.com/目录（中文ABC（测试DEF，内文GHI））?q=（结束123），后文 XYZ。正文 DEF"],
+        ["https://example.com/目录（中文ABC，测试DEF。甲GHI；乙JKL）/尾段XYZ；正文DEF", "https://example.com/目录（中文ABC，测试DEF。甲GHI；乙JKL）/尾段XYZ；正文 DEF"],
+        ["<https://example.com/目录（中文ABC（测试DEF，甲GHI））>", "<https://example.com/目录（中文ABC（测试DEF，甲GHI））>"],
+        // Unclosed parentheses are prose, including a closed inner pair.
+        ["https://example.com/目录（中文ABC，正文DEF。继续XYZ", "https://example.com/目录（中文 ABC，正文 DEF。继续 XYZ"],
+        ["https://example.com/目录（中文ABC（测试DEF），正文GHI", "https://example.com/目录（中文 ABC（测试 DEF），正文 GHI"],
+        ["https://example.com/目录（中文ABC\n正文DEF）继续XYZ", "https://example.com/目录（中文 ABC\n正文 DEF）继续 XYZ"],
+        // A sentence's enclosing parenthesis is outside the bare URL target.
+        ["中文（https://example.com/目录ABC）继续XYZ", "中文（https://example.com/目录ABC）继续 XYZ"],
+        ["中文（https://example.com/目录（中文ABC））继续XYZ", "中文（https://example.com/目录（中文ABC））继续 XYZ"],
+        ["https://example.com/目录（中文ABC）/后续XYZ，正文DEF", "https://example.com/目录（中文ABC）/后续XYZ，正文 DEF"],
+        ["https://example.com/目录（中文ABC）（测试123）", "https://example.com/目录（中文ABC）（测试123）"],
+        // Percent-encoded controls already worked and must remain byte-identical.
+        ["https://example.com/目录%EF%BC%88中文ABC%EF%BC%89", "https://example.com/目录%EF%BC%88中文ABC%EF%BC%89"],
+        ["<https://example.com/%E7%9B%AE%E5%BD%95%EF%BC%88%E4%B8%AD%E6%96%87ABC%EF%BC%89>", "<https://example.com/%E7%9B%AE%E5%BD%95%EF%BC%88%E4%B8%AD%E6%96%87ABC%EF%BC%89>"],
         // Scheme matching must not case-fold the ASCII-only boundary classes.
         ["中文K数字ſ结束", "中文K数字ſ结束"],
         ["中文`ABC中文123`", "中文`ABC中文123`"],
@@ -177,6 +207,9 @@ async function testSpaceTool() {
         ["中文\" A \":B,中文!数字1", "中文\" A \":B,中文!数字 1"],
         ["𠀀A中B", "𠀀 A 中 B"],
         ["中文(https://example.com/中文ABC)，继续123", "中文 (https://example.com/中文ABC)，继续 123"],
+        [nestedUrl, nestedUrl],
+        [unclosedUrl, unclosedUrlExpected],
+        [repeatedUnclosedUrls, repeatedUnclosedUrlsExpected],
         [`${unmatchedFenceInput}中文ABC`, `${unmatchedFenceInput}中文 ABC`],
         [
             unmatchedInlineRuns.map((run) => `x${run}变量ABC`).join('\n'),

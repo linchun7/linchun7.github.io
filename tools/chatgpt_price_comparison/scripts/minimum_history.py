@@ -9,6 +9,7 @@ import re
 import subprocess
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
+from fractions import Fraction
 from pathlib import Path
 
 import plan_identity as plan_ids
@@ -178,6 +179,26 @@ def projection(snapshot: dict) -> dict:
             'winners': [{key: value for key, value in row.items() if key != 'name'} for row in plan['winners']],
         } for plan in snapshot['plans']],
     }
+
+
+def plan_fx_changed(previous: dict | None, current: dict, old_plan: dict | None, new_plan: dict | None) -> bool | None:
+    """Compare only this plan's exact local-currency-to-CNY factors.
+
+    Checkpoints retain their original global FX evidence for auditability.
+    Missing legacy rates cannot establish a factor change; they are unknown.
+    """
+    if previous is None or old_plan is None or new_plan is None:
+        return None
+    currencies = {currency for plan in (old_plan, new_plan) for _, currency in plan['scope']}
+    old_rates, new_rates = previous['fx']['rates'], current['fx']['rates']
+    required = currencies | {'CNY'}
+    if not required <= old_rates.keys() or not required <= new_rates.keys():
+        return None
+    # Fraction(Decimal(...)) preserves exact decimal ratios, so a common
+    # rescaling of CNY and a local currency does not look like an FX change.
+    before = {code: Fraction(Decimal(old_rates[code])) for code in required}
+    after = {code: Fraction(Decimal(new_rates[code])) for code in required}
+    return any(before['CNY'] / before[code] != after['CNY'] / after[code] for code in currencies)
 
 
 def cause_for(evidence: dict) -> str:
@@ -490,7 +511,6 @@ def advance_history(history: dict | None, data: dict) -> dict:
     before = {plan['id']: plan for plan in (last['plans'] if last else [])}
     after = {plan['id']: plan for plan in current['plans']}
     seen = {event['plan'] for event in result['events']}
-    fx_changed = None if last is None else canonical(last['fx']['rates']) != canonical(current['fx']['rates'])
 
     for plan_id in sorted(set(before) | set(after), key=lambda value: (PLAN_ORDER.index(value) if value in PLAN_ORDER else len(PLAN_ORDER), value)):
         old_plan, new_plan = before.get(plan_id), after.get(plan_id)
@@ -502,7 +522,7 @@ def advance_history(history: dict | None, data: dict) -> dict:
         evidence = {
             'prices_changed': bool(old_plan and new_plan and canonical(old_plan['prices']) != canonical(new_plan['prices'])),
             'scope_changed': old_plan is None or new_plan is None or canonical(old_plan['scope']) != canonical(new_plan['scope']),
-            'fx_changed': fx_changed,
+            'fx_changed': plan_fx_changed(last, current, old_plan, new_plan),
             'gap': result['pending_gap'],
         }
         event = {

@@ -422,6 +422,171 @@ async function testMyIpSameExit() {
     await context.close();
 }
 
+async function testMyIpSummaryUsesAllSuccessfulSources() {
+    const commonIp = '8.8.8.8';
+    const otherIp = '1.1.1.1';
+    const { context, page, pageErrors } = await createPage({ disableRtc: true });
+
+    await routeDomesticPool(page, commonIp);
+    await routeCommonInternational(page, commonIp, null, otherIp);
+    await page.goto(`${baseUrl}/tools/myip/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#summary-status')?.textContent === '已分流');
+
+    assert.equal(await page.locator('#domestic-ipv4').textContent(), commonIp);
+    assert.equal(await page.locator('#international-ipv4').textContent(), commonIp, 'summary warning must not change the preferred source');
+    assert.equal(await page.locator('#international-ipv6').textContent(), '未检测到');
+    assert.equal(await page.locator('#source-firstparty-status').textContent(), '采用');
+    assert.equal(await page.locator('#source-ipsb-status').textContent(), '一致');
+    assert.equal(await page.locator('#source-ipify4-status').textContent(), '一致');
+    assert.equal(await page.locator('#source-backup-status').textContent(), '其他出口');
+    assert.match(await page.locator('#international-detail').textContent(), /发现 2 个不同出口/);
+    assert.match(await page.locator('#summary-main').textContent(), /同协议来源.*不同出口/);
+    assert.match(await page.locator('#summary-detail').textContent(), /来源优先级/);
+    assert.match(await page.locator('#summary-status').getAttribute('class'), /status-warning/);
+    assert.equal(pageErrors.length, 0, `myip all-source summary errors: ${pageErrors.map(String).join('; ')}`);
+    await context.close();
+}
+
+async function testMyIpSummaryKeepsProtocolFamiliesSeparate() {
+    const commonIpv4 = '8.8.8.8';
+    const preferredIpv6 = '2606:4700:4700::1111';
+    const otherIpv6 = '2001:4860:4860::8888';
+    const { context, page, pageErrors } = await createPage();
+
+    await routeDomesticPool(page, commonIpv4);
+    await routeCommonInternational(page, commonIpv4, preferredIpv6);
+    await page.goto(`${baseUrl}/tools/myip/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#summary-status')?.textContent === '同一出口');
+    assert.equal(await page.locator('#international-ipv6').textContent(), preferredIpv6, 'a different protocol family is not source disagreement');
+
+    await routeFirstParty(page, { ...firstPartyPayload(commonIpv4), originalIpv6: preferredIpv6 });
+    await routeJson(page, '**/api6.ipify.org/**', { ip: otherIpv6 });
+    await page.click('#retry-all');
+    await page.waitForFunction(() => document.querySelector('#summary-status')?.textContent === '已分流');
+    assert.equal(await page.locator('#domestic-ipv4').textContent(), commonIpv4);
+    assert.equal(await page.locator('#international-ipv4').textContent(), commonIpv4);
+    assert.equal(await page.locator('#international-ipv6').textContent(), preferredIpv6);
+    assert.equal(await page.locator('#source-ipify6-status').textContent(), '其他出口');
+    assert.match(await page.locator('#summary-main').textContent(), /同协议来源.*不同出口/, 'IPv6 disagreement must remain visible even without a domestic IPv6 observation');
+    assert.equal(pageErrors.length, 0, `myip protocol-family summary errors: ${pageErrors.map(String).join('; ')}`);
+    await context.close();
+}
+
+async function testMyIpSummaryHandlesMissingSourcesAndDomesticReference() {
+    const commonIp = '8.8.8.8';
+    const { context, page, pageErrors } = await createPage({ disableRtc: true });
+
+    await routeDomesticPool(page, commonIp);
+    await routeCommonInternational(page, commonIp);
+    await page.route('**/api.ip.sb/**', (route) => route.abort());
+    await page.route('**/ipwho.is/**', (route) => route.abort());
+    await page.goto(`${baseUrl}/tools/myip/`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#summary-status')?.textContent === '同一出口');
+    assert.match(await page.locator('#international-detail').textContent(), /2 个来源一致/);
+    assert.equal(await page.locator('#source-backup-status').textContent(), '未响应', 'a failed source is not a different exit');
+
+    await abortDomesticPool(page);
+    await routeJson(page, '**/ipwho.is/**', { success: true, ip: '1.1.1.1' });
+    await page.click('#retry-all');
+    await page.waitForFunction(() => document.querySelector('#summary-status')?.textContent === '部分结果');
+    assert.equal(await page.locator('#domestic-status').textContent(), '参考');
+    assert.equal(await page.locator('#summary-main').textContent(), '国际 IP 已获取，国内未确认');
+    assert.match(await page.locator('#summary-detail').textContent(), /国际同协议来源.*不同出口.*国内路径仍未确认/);
+
+    await page.route('**/myip.cfw3.workers.dev/v1/ip', (route) => route.abort());
+    await page.route('**/api.ipify.org/**', (route) => route.abort());
+    await page.route('**/ipwho.is/**', (route) => route.abort());
+    await routeDomesticPool(page, commonIp);
+    await page.click('#retry-all');
+    await page.waitForFunction(() => document.querySelector('#summary-main')?.textContent === '国内 IP 已获取，国际未确认');
+    assert.equal(await page.locator('#summary-status').textContent(), '部分结果');
+    assert.equal(await page.locator('#summary-detail').textContent(), '', 'new runs must clear the previous source-disagreement explanation');
+    assert.equal(await page.locator('#international-ipv4').textContent(), '未检测到');
+    assert.equal(pageErrors.length, 0, `myip missing-source summary errors: ${pageErrors.map(String).join('; ')}`);
+    await context.close();
+}
+
+async function testMyIpRetryIgnoresOlderSuccessfulResults() {
+    const { context, page, pageErrors } = await createPage({ disableRtc: true });
+    const deferred = () => {
+        let resolve;
+        const promise = new Promise((done) => { resolve = done; });
+        return { promise, resolve };
+    };
+    const withRequestDeadline = async (promise, label) => {
+        let timer;
+        try {
+            await Promise.race([
+                promise,
+                new Promise((_, reject) => {
+                    timer = setTimeout(() => reject(new Error(`${label} exceeded its 10s request deadline`)), 10000);
+                })
+            ]);
+        } finally {
+            clearTimeout(timer);
+        }
+    };
+    const releases = [deferred(), deferred()];
+    const observed = [deferred(), deferred()];
+    const completed = [deferred(), deferred()];
+    const endpointRuns = new Map();
+    const pendingCounts = [0, 0];
+    const completedCounts = [0, 0];
+    const patterns = [
+        '**/myip.ipip.net/json**',
+        '**/myip.cfw3.workers.dev/v1/ip',
+        '**/api.ip.sb/**',
+        '**/api.ipify.org/**',
+        '**/api6.ipify.org/**',
+        '**/ipwho.is/**'
+    ];
+    const holdResult = async (route) => {
+        const host = new URL(route.request().url()).hostname;
+        const run = endpointRuns.get(host) || 0;
+        endpointRuns.set(host, run + 1);
+        assert.ok(run < releases.length, `unexpected extra request to ${host}`);
+        pendingCounts[run] += 1;
+        if (pendingCounts[run] === patterns.length) observed[run].resolve();
+        const { primaryIp, backupIp } = await releases[run].promise;
+        let payload;
+        if (host === 'myip.ipip.net') payload = { ret: 'ok', data: { ip: primaryIp, location: [] } };
+        else if (host === 'myip.cfw3.workers.dev') payload = firstPartyPayload(primaryIp);
+        else if (host === 'ipwho.is') payload = { success: true, ip: backupIp };
+        else if (host === 'api6.ipify.org') payload = { ip: 'not-an-ip' };
+        else payload = { ip: primaryIp };
+        await route.fulfill({ status: 200, contentType: 'application/json; charset=utf-8', body: JSON.stringify(payload) });
+        completedCounts[run] += 1;
+        if (completedCounts[run] === patterns.length) completed[run].resolve();
+    };
+    for (const pattern of patterns) await page.route(pattern, holdResult);
+
+    try {
+        await page.goto(`${baseUrl}/tools/myip/`, { waitUntil: 'domcontentloaded' });
+        await withRequestDeadline(observed[0].promise, 'older request batch');
+        await page.click('#retry-all');
+        await withRequestDeadline(observed[1].promise, 'newer request batch');
+        releases[1].resolve({ primaryIp: '9.9.9.9', backupIp: '9.9.9.9' });
+        await withRequestDeadline(completed[1].promise, 'newer responses');
+        await page.waitForFunction(() => document.querySelector('#summary-status')?.textContent === '同一出口');
+        assert.equal(await page.locator('#international-ipv4').textContent(), '9.9.9.9');
+
+        // The abandoned older run reports a conflict after the newer run is final.
+        releases[0].resolve({ primaryIp: '8.8.8.8', backupIp: '1.1.1.1' });
+        await withRequestDeadline(completed[0].promise, 'older responses');
+        await page.waitForLoadState('networkidle');
+        assert.equal(await page.locator('#domestic-ipv4').textContent(), '9.9.9.9');
+        assert.equal(await page.locator('#international-ipv4').textContent(), '9.9.9.9');
+        assert.equal(await page.locator('#summary-status').textContent(), '同一出口');
+        assert.equal(await page.locator('#summary-detail').textContent(), '');
+        assert.equal(await page.locator('#source-backup-status').textContent(), '一致');
+        assert.match(await page.locator('#source-backup-detail').textContent(), /9\.9\.9\.9/);
+        assert.equal(pageErrors.length, 0, `myip stale-run page errors: ${pageErrors.map(String).join('; ')}`);
+    } finally {
+        for (const release of releases) release.resolve({ primaryIp: '9.9.9.9', backupIp: '9.9.9.9' });
+        await context.close();
+    }
+}
+
 async function testMyIp() {
     const source = await readFile(new URL('../myip/app.js', import.meta.url), 'utf8');
     assert.doesNotMatch(source, /createElement\(['"]script|whois\.pconline\.com\.cn|pv\.sohu\.com|r\.inews\.qq\.com/);
@@ -434,6 +599,10 @@ async function testMyIp() {
     await testMyIpAlwaysShowsSafeReferenceWhenDomesticPoolAndStunFail();
     await testMyIpNormalizesEquivalentIpv4Text();
     await testMyIpSameExit();
+    await testMyIpSummaryUsesAllSuccessfulSources();
+    await testMyIpSummaryKeepsProtocolFamiliesSeparate();
+    await testMyIpSummaryHandlesMissingSourcesAndDomesticReference();
+    await testMyIpRetryIgnoresOlderSuccessfulResults();
 }
 
 async function testFinance() {

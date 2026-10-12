@@ -459,25 +459,36 @@ export async function verifyProductionDeployment(expectedArtifact, {
         && publicPayloadFingerprint(observed.prices) === expectedFingerprint
         && observed.prices.generatedAt === expected.prices.generatedAt
         && observed.prices.run.finishedAtUtc === expected.prices.run.finishedAtUtc;
+      let expectedAcceptanceError = null;
       if (pricesMatch && artifactHashesMatch(observed, expected)) {
-        const acceptance = await verifyCanonicalAcceptance(expected, expectedStaticAssets, {
-          fetchImpl,
-          productionPricesUrl,
-          productionHistoryUrl,
-          productionRunLogUrl,
-          productionMinimumHistoryUrl,
-          productionIndexUrl,
-          productionAssetBaseUrl,
-          signal: controller.signal,
-          runId,
-          attempt: attempts
-        });
-        const result = { status: 'deployed', attempts, elapsedMs: now() - startedAt, expectedGeneratedAt: expected.prices.generatedAt, observedGeneratedAt: acceptance.observed.prices.generatedAt, resources: resultResources(expectedStaticAssets) };
-        log(`真实生产部署验证通过：canonical URL，第 ${attempts} 次检查；generatedAt=${acceptance.observed.prices.generatedAt}`);
-        return result;
+        try {
+          const acceptance = await verifyCanonicalAcceptance(expected, expectedStaticAssets, {
+            fetchImpl,
+            productionPricesUrl,
+            productionHistoryUrl,
+            productionRunLogUrl,
+            productionMinimumHistoryUrl,
+            productionIndexUrl,
+            productionAssetBaseUrl,
+            signal: controller.signal,
+            runId,
+            attempt: attempts
+          });
+          const result = { status: 'deployed', attempts, elapsedMs: now() - startedAt, expectedGeneratedAt: expected.prices.generatedAt, observedGeneratedAt: acceptance.observed.prices.generatedAt, resources: resultResources(expectedStaticAssets) };
+          log(`真实生产部署验证通过：canonical URL，第 ${attempts} 次检查；generatedAt=${acceptance.observed.prices.generatedAt}`);
+          return result;
+        } catch (error) {
+          // A later code-only deployment may retain all four data files unchanged.
+          // Preserve this failure unless the current main proves a complete replacement.
+          if (!expectedStaticAssets || error?.name === 'AbortError') throw error;
+          expectedAcceptanceError = error;
+        }
       }
 
-      if (Date.parse(observed.prices.generatedAt) > Date.parse(expected.prices.generatedAt)) {
+      const observedTime = Date.parse(observed.prices.generatedAt);
+      const expectedTime = Date.parse(expected.prices.generatedAt);
+      const newerData = observedTime > expectedTime;
+      if (newerData || (observedTime === expectedTime && expectedAcceptanceError)) {
         const currentMainCandidate = await getCurrentMainArtifact();
         if (currentMainCandidate) {
           let currentMain;
@@ -496,6 +507,19 @@ export async function verifyProductionDeployment(expectedArtifact, {
                 error.reason = 'current-main-assets-unavailable';
                 throw error;
               }
+              try {
+                currentMainStaticAssets = createStaticAssetManifest(
+                  currentMainStaticAssets.indexHtml,
+                  Object.fromEntries(CORE_STATIC_ASSETS.map(({ path: assetPath }) => [
+                    assetPath, currentMainStaticAssets.assets?.[assetPath]?.bytes
+                  ])),
+                  'current main static assets'
+                );
+                assertStaticPageMatches(currentMainStaticAssets.indexHtml, currentMain.prices, currentMain.history);
+              } catch (error) {
+                error.reason = `current-main-assets-invalid:${String(error.message).slice(0, 140).replace(/[\r\n]+/g, ' ')}`;
+                throw error;
+              }
             }
             const acceptance = await verifyCanonicalAcceptance(currentMain, currentMainStaticAssets, {
               fetchImpl,
@@ -509,8 +533,12 @@ export async function verifyProductionDeployment(expectedArtifact, {
               runId,
               attempt: attempts
             });
-            const result = { status: 'superseded', attempts, elapsedMs: now() - startedAt, expectedGeneratedAt: expected.prices.generatedAt, observedGeneratedAt: acceptance.observed.prices.generatedAt, resources: resultResources(currentMainStaticAssets ?? expectedStaticAssets) };
-            log(`真实生产部署验证通过：canonical URL 已是更新提交版本，第 ${attempts} 次检查；generatedAt=${acceptance.observed.prices.generatedAt}`);
+            const sameTarget = artifactExactlyMatches(currentMain, expected) && expectedStaticAssets
+              && CORE_STATIC_ASSETS.every(({ path: assetPath }) => (
+                currentMainStaticAssets.assets[assetPath].hash === expectedStaticAssets.assets[assetPath].hash
+              ));
+            const result = { status: sameTarget ? 'deployed' : 'superseded', attempts, elapsedMs: now() - startedAt, expectedGeneratedAt: expected.prices.generatedAt, observedGeneratedAt: acceptance.observed.prices.generatedAt, resources: resultResources(currentMainStaticAssets ?? expectedStaticAssets) };
+            log(`真实生产部署验证通过：canonical URL 已由当前 main 完整证明，第 ${attempts} 次检查；generatedAt=${acceptance.observed.prices.generatedAt}`);
             return result;
           }
           if (observed.hashes.prices === currentMain.hashes.prices) {
@@ -519,13 +547,17 @@ export async function verifyProductionDeployment(expectedArtifact, {
             else if (observed.hashes.minimumHistory !== currentMain.hashes.minimumHistory) lastReason = 'minimum-history-not-deployed';
             else lastReason = 'newer-version-unproven';
           } else lastReason = 'newer-version-unproven';
-        } else {
+        } else if (newerData) {
           lastReason = 'newer-version-unproven';
-        }
+        } else if (!pricesMatch) lastReason = 'prices-not-deployed';
+        else if (observed.hashes.history !== expected.hashes.history) lastReason = 'history-not-deployed';
+        else if (observed.hashes.runLog !== expected.hashes.runLog) lastReason = 'run-log-not-deployed';
+        else lastReason = 'minimum-history-not-deployed';
       } else if (!pricesMatch) lastReason = 'prices-not-deployed';
       else if (observed.hashes.history !== expected.hashes.history) lastReason = 'history-not-deployed';
       else if (observed.hashes.runLog !== expected.hashes.runLog) lastReason = 'run-log-not-deployed';
       else lastReason = 'minimum-history-not-deployed';
+      if (expectedAcceptanceError) throw expectedAcceptanceError;
     } catch (error) {
       lastReason = error.reason ?? (error?.name === 'AbortError'
         ? 'request-timeout'

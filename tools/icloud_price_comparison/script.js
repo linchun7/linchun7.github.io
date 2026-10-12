@@ -393,6 +393,12 @@ function staticDomMatchesPayload(data) {
   return rows.every((row) => {
     const country = countries.get(row.dataset.marketId);
     if (!country) return false;
+    const displayName = country.nameZh || country.country;
+    const secondaryName = country.nameZh && country.nameZh !== country.country
+      ? `${country.country} · ${country.currency}`
+      : country.currency;
+    if (row.querySelector('.country-name')?.textContent !== displayName
+      || row.querySelector('.country-name-en')?.textContent !== secondaryName) return false;
     if (row.dataset.cnyRanks !== data.tiers.map(({ id }) => country.plans[id].cnyRank).join(',')) return false;
     const cells = [...row.querySelectorAll('.price-cell')];
     return cells.length === data.tiers.length && cells.every((cell) => {
@@ -1713,6 +1719,11 @@ async function initialize({ forceRefresh = false } = {}) {
       }
       console.warn(`网络价格刷新失败，继续显示现有数据：${error.message}`);
       if (state.data !== fallbackData) applyPriceData(fallbackData, { origin: state.dataOrigin ?? 'network' });
+      else {
+        // A direct Retry can recover from a corrected clock without a lifecycle event.
+        applyCurrentPriceFreshness();
+        normalizeCurrentPriceFreshnessUi();
+      }
       setLoadStatus('', { retry: true });
       setFiltersDisabled(false);
     } else if (hasStaticSnapshot) {

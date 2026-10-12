@@ -2065,6 +2065,8 @@ test('restores all controls after loaded snapshots recover from unusable clocks'
   const browserConfig = await resolveBrowser(context, 'loaded snapshot clock recovery');
   if (!browserConfig) return;
   const fixture = await readFixture('prices.json');
+  const rankingCountry = fixture.countries.find(country => Object.values(country.plans).some(plan => plan.cnyRank === 1));
+  assert.ok(rankingCountry, 'clock recovery fixture must include a genuine minimum-price country');
   const generatedAt = Date.parse(fixture.generatedAt);
   const server = await startServer();
   const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
@@ -2072,7 +2074,8 @@ test('restores all controls after loaded snapshots recover from unusable clocks'
     for (const scenario of [
       { badAgeHours: -1, recoveredAgeHours: 1, offline: false },
       { badAgeHours: -1, recoveredAgeHours: 37, offline: false },
-      { badAgeHours: -1, recoveredAgeHours: 1, offline: true }
+      { badAgeHours: -1, recoveredAgeHours: 1, offline: true },
+      { badAgeHours: -1, recoveredAgeHours: 1, offline: true, retryRecovery: true }
     ]) {
       const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
       let failRefresh = false;
@@ -2091,26 +2094,45 @@ test('restores all controls after loaded snapshots recover from unusable clocks'
       try {
         await page.goto(`http://127.0.0.1:${server.address().port}/`, { waitUntil: 'domcontentloaded' });
         await page.waitForFunction(() => !document.querySelector('#searchInput').disabled && document.querySelector('#loadStatus').hidden);
-        await page.locator('#searchInput').fill(fixture.countries[0].country);
-        await page.locator('#regionSelect').selectOption(fixture.countries[0].region);
+        await page.locator('#searchInput').fill(rankingCountry.country);
+        await page.locator('#regionSelect').selectOption(rankingCountry.region);
         await page.locator('.country-history-button').first().click();
         await page.waitForFunction(() => document.querySelectorAll('#historyRows tr').length > 0);
         await page.locator('#closeHistory').click();
         const loadedHistoryCalls = historyCalls;
+        const loadedMinimumBadges = await page.locator('.minimum-badge').count();
+        assert.ok(loadedMinimumBadges > 0, 'the accepted filtered view must have genuine minimum badges to restore');
+        const loadedRank = await page.locator('#priceRows tr[data-market-id] > td:first-child').first().textContent();
         failRefresh = true;
         await page.evaluate(now => { Date.now = () => now; window.dispatchEvent(new Event('pageshow')); }, generatedAt + scenario.badAgeHours * 3600000);
         await page.waitForFunction(() => document.querySelector('#searchInput').disabled && !document.querySelector('#retryButton').hidden && document.querySelector('#priceWorkspace').getAttribute('aria-busy') === 'false');
+        assert.equal(await page.locator('.minimum-badge').count(), 0, 'future-clock downgrade must remove previously visible minimum badges');
+        if (scenario.retryRecovery) {
+          await page.locator('#retryButton').click();
+          await page.waitForFunction(() => document.querySelector('#searchInput').disabled && !document.querySelector('#retryButton').hidden && document.querySelector('#priceWorkspace').getAttribute('aria-busy') === 'false');
+          assert.equal(await page.locator('#priceRows tr[data-market-id] > td:first-child').first().textContent(), '—', 'Retry before correction must preserve future-clock protection');
+          assert.equal(await page.locator('.minimum-card').count(), 0);
+          assert.equal(await page.locator('.minimum-badge').count(), 0, 'Retry before clock correction must keep minimum badges suppressed');
+        }
         const callsBeforeCorrection = priceCalls;
         failRefresh = scenario.offline;
-        await page.evaluate(now => { Date.now = () => now; window.dispatchEvent(new Event('pageshow')); }, generatedAt + scenario.recoveredAgeHours * 3600000);
+        if (scenario.retryRecovery) {
+          await page.evaluate(now => { Date.now = () => now; }, generatedAt + scenario.recoveredAgeHours * 3600000);
+          assert.match(await page.locator('#updatedAt').textContent(), /数据时间异常/, 'clock change alone must not fabricate a lifecycle recovery');
+          await page.locator('#retryButton').click();
+        } else {
+          await page.evaluate(now => { Date.now = () => now; window.dispatchEvent(new Event('pageshow')); }, generatedAt + scenario.recoveredAgeHours * 3600000);
+        }
         await page.waitForFunction(() => document.querySelector('#updatedAt').textContent.includes('更新于') && document.querySelector('#priceWorkspace').getAttribute('aria-busy') === 'false');
         for (const selector of ['#searchInput', '#regionSelect', '#publishedDateButton', '#backToTableButton', 'button[data-sort="country"]', 'button[data-sort-tier]', '.country-history-button']) {
           assert.equal(await page.locator(selector).first().isEnabled(), true, `${JSON.stringify(scenario)}: ${selector} must recover`);
         }
         assert.equal(priceCalls, callsBeforeCorrection + 1, 'clock correction must complete one guarded refresh');
-        assert.equal(await page.locator('#searchInput').inputValue(), fixture.countries[0].country);
-        assert.equal(await page.locator('#regionSelect').inputValue(), fixture.countries[0].region);
+        assert.equal(await page.locator('#searchInput').inputValue(), rankingCountry.country);
+        assert.equal(await page.locator('#regionSelect').inputValue(), rankingCountry.region);
         assert.equal(await page.locator('.minimum-card').count(), fixture.tiers.length);
+        assert.equal(await page.locator('#priceRows tr[data-market-id] > td:first-child').first().textContent(), loadedRank, 'recovered ranking must be restored');
+        assert.equal(await page.locator('.minimum-badge').count(), loadedMinimumBadges, 'recovered minimum cues must match the accepted filtered view');
         assert.equal(await page.locator('#loadStatus').isVisible(), scenario.offline);
         assert.doesNotMatch(await page.locator('#loadStatusText').textContent(), /价格已经较久没有更新|数据时间异常/);
         assert.equal(await page.locator('.cache-warning').count(), 0);
@@ -4529,5 +4551,52 @@ test('URL synchronization is deduplicated and cannot interrupt table interaction
     await page.close();
     await browser.close();
     await new Promise(resolve => server.close(resolve));
+  }
+});
+
+test('same-generatedAt label changes rebuild static table labels before enabling history', { timeout: 60_000 }, async (context) => {
+  const config = await resolveBrowser(context, 'same-generation visible label reconciliation');
+  if (!config) return;
+  const original = await readFixture('prices.json');
+  const country = original.countries.find(entry => entry.nameZh && entry.nameZh !== entry.country);
+  assert.ok(country, 'fixture must contain a translated visible label');
+  const server = await startServer();
+  const browser = await config.browserType.launch(config.launchOptions);
+  try {
+    for (const nameZh of [`复核${country.nameZh}`, country.country]) {
+      const payload = structuredClone(original);
+      const current = payload.countries.find(entry => entry.marketId === country.marketId);
+      current.nameZh = nameZh;
+      assert.equal(payload.generatedAt, original.generatedAt);
+      assert.deepEqual(current.plans, country.plans, 'only the name label may change');
+      const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+      let historyCalls = 0;
+      await page.addInitScript(now => { Date.now = () => now; }, Date.parse(original.generatedAt) + 3600000);
+      await page.route('https://**/*', route => route.abort());
+      await page.route('**/data/prices.json*', route => route.fulfill({ json: payload }));
+      await page.route('**/data/history.json*', route => {
+        historyCalls += 1;
+        return route.fulfill({ status: 503, contentType: 'application/json', body: '{}' });
+      });
+      try {
+        await page.goto(`http://127.0.0.1:${server.address().port}/`, { waitUntil: 'domcontentloaded' });
+        await page.waitForFunction(() => document.querySelector('.workspace.price-ui-ready') && document.querySelector('#loadStatus').hidden);
+        const row = page.locator(`#priceRows tr[data-market-id="${country.marketId}"]`);
+        const expectedSecondary = nameZh !== country.country ? `${country.country} · ${country.currency}` : country.currency;
+        assert.equal(await row.locator('.country-name').textContent(), nameZh, 'table must not retain the earlier static label');
+        assert.equal(await row.locator('.country-name-en').textContent(), expectedSecondary, 'secondary visible label must match the accepted snapshot');
+        assert.equal(historyCalls, 0, 'label reconciliation must keep history lazy');
+        await row.locator('.country-history-button').click();
+        assert.equal(await page.locator('#historyTitle').textContent(), nameZh, 'dialog and table must use the same accepted name');
+        await page.locator('#closeHistory').click();
+        await page.locator('#searchInput').fill(nameZh);
+        await page.waitForFunction(marketId => document.querySelectorAll('#priceRows tr[data-market-id]').length === 1 && document.querySelector('#priceRows tr[data-market-id]')?.dataset.marketId === marketId, country.marketId);
+        assert.equal(await row.locator('.country-name').textContent(), nameZh, 'search rerender must retain the same visible label');
+      } finally {
+        await page.close();
+      }
+    }
+  } finally {
+    await browser.close();
   }
 });
