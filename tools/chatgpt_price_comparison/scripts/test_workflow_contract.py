@@ -122,6 +122,8 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertNotIn("secrets.", browser)
         self.assertIn("browser: [chromium, firefox, webkit]", browser)
         self.assertIn("run: pnpm test:browser-matrix", browser)
+        self.assertIn("env:\n          PLAYWRIGHT_BROWSER: ${{ matrix.browser }}\n          HOME: /root\n        run: pnpm test:browser-matrix", browser)
+        self.assertEqual(browser.count("HOME: /root"), 1)
 
     def test_minimum_history_is_candidate_validated_and_published_atomically(self):
         self.assertIn("minimum-history.json", self.text)

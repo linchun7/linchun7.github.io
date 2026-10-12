@@ -122,6 +122,7 @@ jobs:
       - name: Run ${{ matrix.browser }} smoke
         env:
           PLAYWRIGHT_BROWSER: ${{ matrix.browser }}
+          HOME: /root
         run: pnpm test:browser-matrix
 
 

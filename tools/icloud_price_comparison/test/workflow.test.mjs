@@ -364,6 +364,8 @@ test('keeps pull-request validation read-only, complete, and SHA-pinned', async 
   assert.match(browserJob, /timeout-minutes: 15/);
   assert.match(browserJob, /node-version: 22/);
   assert.match(browserJob, /pnpm install --frozen-lockfile --ignore-scripts/);
+  assert.ok(browserJob.includes('env:\n          PLAYWRIGHT_BROWSER: ${{ matrix.browser }}\n          HOME: /root\n        run: node --test test/ui-smoke.test.mjs test/static-descending-url-state.test.mjs'));
+  assert.equal((browserJob.match(/HOME: \/root/g) ?? []).length, 1);
   assert.match(ciWorkflow, /run: pnpm test:core/);
   assert.match(ciWorkflow, /run: pnpm validate:artifact/);
   assert.match(ciWorkflow, /schedule:[\s\S]*?cron:\s*['"]5 22 \* \* 0['"]/);

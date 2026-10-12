@@ -168,6 +168,7 @@ jobs:
       - name: 运行 ${{ matrix.browser }} 测试
         env:
           PLAYWRIGHT_BROWSER: ${{ matrix.browser }}
+          HOME: /root
         run: node --test test/ui-smoke.test.mjs test/static-descending-url-state.test.mjs
 
   production:
