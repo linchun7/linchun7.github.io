@@ -1231,6 +1231,17 @@
         || Date.parse(minimumHistoryUi.data.checked_at) < Date.parse(state.data.generated_at)))) void loadMinimumHistory();
   }
 
+  function updateTableScrollMode() {
+    const scroller = el.priceWorkspace.querySelector('.table-scroll');
+    if (!scroller) return;
+    // Measure the fixed-width table in its original horizontal-scroll layout.
+    // Removal, measurement and restoration are synchronous, before the next paint.
+    scroller.classList.remove('table-fits');
+    if (!el.priceWorkspace.classList.contains('price-ui-ready')
+      || matchMedia('(max-width: 1100px)').matches) return;
+    if (scroller.scrollWidth <= scroller.clientWidth + 1) scroller.classList.add('table-fits');
+  }
+
   function backButton() {
     const rect = el.priceWorkspace.getBoundingClientRect(), visible = rect.top < -120 && rect.bottom > 120;
     el.backToTableButton.classList.toggle('is-visible', visible); el.backToTableButton.setAttribute('aria-hidden', String(!visible)); el.backToTableButton.tabIndex = visible ? 0 : -1;
@@ -1261,7 +1272,7 @@
     el.resetHistoryBackdrop = bindDialogBackdropDismiss(el.historyDialog, closeHistory);
     el.backToTableButton.addEventListener('click', () => { el.priceWorkspace.scrollIntoView({ behavior: 'smooth', block: 'start' }); el.priceWorkspace.focus({ preventScroll: true }); });
     addEventListener('scroll', () => { if (!state.scrollFrame) state.scrollFrame = requestAnimationFrame(() => { state.scrollFrame = null; backButton(); }); }, { passive: true });
-    addEventListener('resize', backButton, { passive: true });
+    addEventListener('resize', () => { updateTableScrollMode(); backButton(); }, { passive: true });
   }
 
   async function start() {
@@ -1286,6 +1297,7 @@
     el.searchInput.disabled = false;
     if (el.minimumHistoryButton) el.minimumHistoryButton.disabled = false;
     el.priceWorkspace.classList.add('price-ui-ready');
+    updateTableScrollMode();
     void loadIcons();
     // No background polling: interactions and tab return recheck clock validity.
     document.addEventListener('visibilitychange', () => {

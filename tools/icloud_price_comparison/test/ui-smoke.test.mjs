@@ -1,3 +1,4 @@
+import { installHistoryInteractionProbe, assertHistoryInteractionStress } from './helpers/history-interaction-stress.mjs';
 import assert from 'node:assert/strict';
 import { access, readFile, stat } from 'node:fs/promises';
 import http from 'node:http';
@@ -5066,3 +5067,33 @@ test('keyboard retry hands off focus during pending, failed and successful minim
     await page.keyboard.press('Escape');
   } finally { if (release) release(false); await browser.close(); }
 });
+
+for (const touch of [false, true]) {
+  test('bounded history interaction stress retains focus and settles live resources for ' + (touch ? 'touch' : 'mouse'),
+    { timeout: 120000 }, async context => {
+      const session = await snapshotSession(context, 'bounded history interaction stress',
+        { width: touch ? 390 : 1280, hasTouch: touch });
+      if (!session) return;
+      const { page, browser, data, url, errors, mainRequests } = session;
+      try {
+        await installHistoryInteractionProbe(page, 'script.js');
+        const history = await readFixture('history.json');
+        const minimum = await readFixture('minimum-history.json');
+        assert.ok(minimum.checkpoint, 'stress reuse requires an accepted minimum-history checkpoint');
+        minimum.checkedAt = data.generatedAt;
+        minimum.checkpoint.at = data.generatedAt;
+        await page.route('**/data/history.json*', route => route.fulfill({ json: history }));
+        await page.route('**/data/minimum-history.json*', route => route.fulfill({ json: minimum }));
+        await page.goto(url, { waitUntil: 'domcontentloaded' });
+        await waitForSnapshot(page);
+        const summary = await assertHistoryInteractionStress(page, [
+          { trigger: '.country-history-button:not(:disabled)', dialog: '#historyDialog', close: '#closeHistory', country: true },
+          { trigger: '#publishedDateButton', dialog: '#publishedDateDialog', close: '#closePublishedDate' },
+          { trigger: '#minimumHistoryButton', dialog: '#minimumHistoryDialog', close: '#closeMinimumHistory' }
+        ], { touch });
+        assert.deepEqual(mainRequests, [], 'stress never requests a new price version');
+        assert.deepEqual(errors, [], 'no uncaught errors through repeated interrupted dialog sessions');
+        console.log('Bounded history interaction stress:', BROWSER_UNDER_TEST, JSON.stringify(summary));
+      } finally { await browser.close(); }
+    });
+}
