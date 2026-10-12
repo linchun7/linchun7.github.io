@@ -354,10 +354,75 @@ async function assertMinimumHistoryReuse(browser, priceData) {
   }
 }
 
+async function assertDailyTableGeometry(browser) {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await context.newPage();
+  const diagnostics = [];
+  const failures = [];
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#priceWorkspace').classList.contains('price-ui-ready'));
+    for (const width of [320, 390, 1100, 1101, 1266, 1280, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.evaluate(() => {
+        window.scrollTo(0, 0);
+        document.querySelector('.table-scroll').scrollLeft = 0;
+      });
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      const before = await page.evaluate(() => {
+        const scroll = document.querySelector('.table-scroll');
+        const visible = node => node.getClientRects().length > 0;
+        const clipped = [...document.querySelectorAll('#priceRows .price-amount, #priceRows .price-local, #priceRows .country-name')]
+          .filter(visible).filter(node => node.scrollWidth > node.clientWidth + 1)
+          .map(node => ({ market: node.closest('tr').dataset.marketId, plan: node.closest('[data-plan]')?.dataset.plan,
+            className: node.className, text: node.textContent, client: node.clientWidth, scroll: node.scrollWidth }));
+        return { bodyFits: document.documentElement.scrollWidth <= innerWidth + 1,
+          columnsFit: scroll.scrollWidth <= scroll.clientWidth + 1,
+          overflowX: getComputedStyle(scroll).overflowX, clipped,
+          planHeaders: [...document.querySelectorAll('th[data-plan-header]')].filter(visible).map(node => node.dataset.plan),
+          selectedPlan: document.querySelector('#mobilePlanControl [aria-pressed="true"]')?.dataset.plan };
+      });
+      if (!before.bodyFits) failures.push(`${width}px: page overflows horizontally`);
+      if (before.clipped.length) failures.push(`${width}px: clipped daily readouts ${JSON.stringify(before.clipped)}`);
+      if (width <= 1100 && (before.planHeaders.length !== 1 || before.planHeaders[0] !== before.selectedPlan)) {
+        failures.push(`${width}px: mobile table must keep exactly the selected plan`);
+      }
+      await page.evaluate(() => {
+        const row = document.querySelectorAll('#priceRows tr[data-market-id]')[19];
+        if (!row) throw Error('Daily table needs at least 20 current rows');
+        window.scrollTo(0, row.getBoundingClientRect().top + scrollY - 100);
+      });
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      const after = await page.evaluate(() => {
+        const headers = [...document.querySelectorAll('th[data-plan-header]')].filter(node => node.getClientRects().length > 0);
+        return { windowY: scrollY, headers: headers.map(node => {
+          const rect = node.getBoundingClientRect();
+          const point = document.elementFromPoint(rect.left + rect.width / 2, Math.max(0, rect.top) + rect.height / 2);
+          return { plan: node.dataset.plan, top: rect.top, bottom: rect.bottom, unobscured: point === node || node.contains(point) };
+        }) };
+      });
+      // Horizontal scrolling remains available where the fixed readable columns do not fit.
+      // When no horizontal scroll is needed, ordinary page scrolling must preserve the header.
+      if (width <= 1100 || before.columnsFit) {
+        if (after.windowY < 500) failures.push(`${width}px: test did not reach the middle of the table`);
+        if (!after.headers.length || after.headers.some(header => Math.abs(header.top) > 1 || !header.unobscured)) {
+          failures.push(`${width}px: plan header lost during window scrolling ${JSON.stringify(after)}`);
+        }
+      }
+      diagnostics.push({ width, before, after });
+    }
+    console.log(`${browserName}: daily table geometry diagnostics\n${JSON.stringify(diagnostics, null, 2)}`);
+    assert.deepEqual(failures, [], `${browserName}: daily table geometry\n${JSON.stringify(diagnostics, null, 2)}`);
+  } finally {
+    await context.close();
+  }
+}
+
 let browser;
 try {
   await waitForServer();
   browser = await browserType.launch({ headless: true });
+  await assertDailyTableGeometry(browser);
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => document.querySelector('#minimumHistoryButton')?.disabled === false);
