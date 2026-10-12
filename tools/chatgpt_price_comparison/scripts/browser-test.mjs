@@ -88,8 +88,14 @@ try {
     globalThis.__chatgptTestIntervals = [];
     const originalSetInterval = globalThis.setInterval.bind(globalThis);
     globalThis.setInterval = (callback, milliseconds, ...args) => {
-      if (milliseconds === 30000 && typeof callback === 'function') globalThis.__chatgptTestIntervals.push(() => callback(...args));
+      globalThis.__chatgptTestIntervals.push(milliseconds);
       return originalSetInterval(callback, milliseconds, ...args);
+    };
+    globalThis.__chatgptVisibilityListeners = 0;
+    const originalAddEventListener = document.addEventListener.bind(document);
+    document.addEventListener = (type, ...args) => {
+      if (type === 'visibilitychange') globalThis.__chatgptVisibilityListeners += 1;
+      return originalAddEventListener(type, ...args);
     };
   ` });
   await command('Page.navigate',{url});
@@ -107,9 +113,19 @@ try {
       button.click();
     }`);
   }
-  async function assertRanks(plan) {
+  async function assertRanks(plan, expectedDirection = null) {
     const oracle = comparisonFor(expected, plan, testNow);
     const actual = await evaluate(`[...document.querySelectorAll('#priceRows tr[data-market-id]')].map(row => ({ code: row.dataset.marketId, rank: row.querySelector('td:first-child').textContent, accessible: row.querySelector('.mobile-rank-sr').textContent }))`);
+    const direction = await evaluate(`[...document.querySelectorAll('th[data-plan-header]')].find(header => header.dataset.plan === ${JSON.stringify(plan)}).getAttribute('aria-sort')`);
+    if (expectedDirection) assert.equal(direction, expectedDirection, `${plan}: sort click changes direction`);
+    const ordered = [...oracle.rows].sort((a, b) => {
+      if (a.cents == null && b.cents == null) return a.market.code.localeCompare(b.market.code, 'en');
+      if (a.cents == null) return 1;
+      if (b.cents == null) return -1;
+      if (a.cents === b.cents) return a.market.code.localeCompare(b.market.code, 'en');
+      return direction === 'ascending' ? a.cents - b.cents : b.cents - a.cents;
+    });
+    assert.deepEqual(actual.map(row => row.code), ordered.map(row => row.market.code), `${plan}: exact ${direction} order, ties and unavailable prices`);
     assert.equal(actual.length, expected.markets.length, 'every market remains visible');
     assert.equal(new Set(actual.map(row => row.code)).size, actual.length, 'no duplicate market rows');
     for (const row of actual) {
@@ -155,6 +171,14 @@ try {
   await until(() => evaluate('document.querySelector(".search-field svg")!==null && document.querySelector("button[data-sort=country] svg")!==null'), 'optional Lucide search and sort icons render');
   assert.equal(await evaluate('document.querySelector("#refresh")===null && document.querySelector("#plan")===null && document.querySelector("#status")===null'),true,'legacy reload and filters removed');
   assert.equal(await evaluate('document.querySelector("#minimumHistoryButton").disabled'),false,'minimum history action becomes interactive');
+  for (const plan of plans) {
+    await evaluate(`document.querySelector('button[data-sort="country"]').click()`);
+    await clickPlan(plan); await assertRanks(plan, 'ascending');
+    await clickPlan(plan); await assertRanks(plan, 'descending');
+  }
+  await evaluate(`document.querySelector('button[data-sort="country"]').click()`);
+  await clickPlan(defaultPlan);
+
   await evaluate('document.querySelector("#minimumHistoryButton").click()');
   await until(()=>evaluate('document.querySelector("#minimumHistoryDialog")?.open===true'),'minimum history dialog');
   await until(()=>evaluate(`document.querySelector("#minimumHistoryEvents").textContent.trim().length>0 || !document.querySelector("#minimumHistoryRetry").hidden`),'minimum history load');
@@ -164,6 +188,7 @@ try {
   const acceptedHistoryText = await evaluate('document.querySelector("#minimumHistoryEvents").textContent');
   const acceptedHistoryDate = await evaluate('document.querySelector("#minimumHistoryStatus").textContent');
   const badHistory = JSON.parse(await readFile(path.join(root,'tools/chatgpt_price_comparison/data/minimum-history.json'),'utf8'));
+  const validHistoryJson = JSON.stringify(badHistory);
   if (badHistory.checkpoint) assert.match(acceptedHistoryDate, /记录截至/);
   else {
     assert.equal(acceptedHistoryDate, '', 'a failed/degraded check without accepted evidence is not a record cutoff');
@@ -194,6 +219,115 @@ try {
   await until(()=>evaluate(`document.querySelector('#minimumHistoryStatus').textContent.includes('暂无法刷新') && !document.querySelector('#minimumHistoryRetry').disabled`), 'network failure preserves history');
   assert.equal(await evaluate('document.querySelector("#minimumHistoryEvents").textContent'), acceptedHistoryText);
   assert.ok(await evaluate('document.querySelectorAll("#priceRows tr[data-market-id]").length>0'),'bad history never removes current prices');
+  if (fullUi) {
+    for (const mode of ['oversized-stream', 'oversized-declared', 'invalid-utf8']) {
+      await evaluate(`{
+        globalThis.__historyStreamCancelled = false;
+        globalThis.__historyReadAttempts = 0;
+        const mode = ${JSON.stringify(mode)};
+        globalThis.fetch = (input, init) => {
+          if (!new URL(input.url || input, location.href).pathname.endsWith('/minimum-history.json')) return globalThis.__originalHistoryFetch(input, init);
+          const stream = new ReadableStream({
+            pull(controller) {
+              globalThis.__historyReadAttempts += 1;
+              controller.enqueue(mode === 'invalid-utf8' ? new Uint8Array([0xff]) : new Uint8Array(1_000_001).fill(32));
+              if (globalThis.__historyReadAttempts > 4) controller.close();
+            },
+            cancel() { globalThis.__historyStreamCancelled = true; }
+          }, { highWaterMark: 0 });
+          return Promise.resolve(new Response(stream, {headers: {'content-type': 'application/json', ...(mode === 'oversized-declared' ? {'content-length':'2000001'} : {})}}));
+        };
+        document.querySelector('#minimumHistoryRetry').click();
+      }`);
+      await until(() => evaluate(`globalThis.__historyStreamCancelled && !document.querySelector('#minimumHistoryRetry').disabled`), mode + ' cancels unread body');
+      assert.ok(await evaluate('globalThis.__historyReadAttempts <= 2'), mode + ': stops reading before draining oversized body');
+      assert.equal(await evaluate('document.querySelector("#minimumHistoryEvents").textContent'), acceptedHistoryText, mode + ': preserves accepted history');
+    }
+  }
+  if (fullUi) {
+    // Exercise failures after a prefix was consumed and the next read is pending.
+    // The timeout case invokes the application's registered 8000ms callback;
+    // it tests abort wiring, not eight seconds of elapsed time or real networking.
+    const tableBeforeStreamFailures = await evaluate('document.querySelector("#priceRows").innerHTML');
+    for (const mode of ['mid-read-error', 'mid-read-timeout']) {
+      await evaluate(`{
+        const mode = ${JSON.stringify(mode)};
+        globalThis.__historyPendingReads = 0;
+        globalThis.__historyFailureFetches = 0;
+        globalThis.__historyAbortSeen = false;
+        globalThis.__historyDeadlineCallback = null;
+        globalThis.__historyFailRead = null;
+        globalThis.fetch = (input, init) => {
+          if (!new URL(input.url || input, location.href).pathname.endsWith('/minimum-history.json')) return globalThis.__originalHistoryFetch(input, init);
+          globalThis.__historyFailureFetches += 1;
+          const stream = new ReadableStream({
+            start(controller) {
+              globalThis.__historyFailRead = () => controller.error(new Error('connection lost after prefix'));
+              init.signal.addEventListener('abort', () => {
+                globalThis.__historyAbortSeen = true;
+                controller.error(new DOMException('Mock response aborted', 'AbortError'));
+              }, {once: true});
+            },
+            pull(controller) {
+              globalThis.__historyPendingReads += 1;
+              if (globalThis.__historyPendingReads === 1) controller.enqueue(new TextEncoder().encode('{"schema":1,'));
+              // No enqueue/close on the second pull: reader.read() stays pending.
+            }
+          }, {highWaterMark: 0});
+          return Promise.resolve(new Response(stream, {headers: {'content-type':'application/json'}}));
+        };
+        const originalTimeout = globalThis.setTimeout;
+        if (mode === 'mid-read-timeout') globalThis.setTimeout = (callback, milliseconds, ...args) => {
+          if (milliseconds === 8000) {
+            if (globalThis.__historyDeadlineCallback) throw Error('Duplicate history deadline');
+            globalThis.__historyDeadlineCallback = () => callback(...args);
+            // Keep a real clearable timer handle without racing slow CDP calls.
+            return originalTimeout(() => {}, 2_147_483_647);
+          }
+          return originalTimeout(callback, milliseconds, ...args);
+        };
+        try { document.querySelector('#minimumHistoryRetry').click(); }
+        finally { globalThis.setTimeout = originalTimeout; }
+      }`);
+      await until(() => evaluate('globalThis.__historyPendingReads === 2'), mode + ': prefix consumed before pending read');
+      assert.equal(await evaluate('globalThis.__historyFailureFetches'), 1, mode + ': one in-flight request');
+      assert.equal(await evaluate('document.querySelector("#minimumHistoryRetry").disabled'), true, mode + ': pending read retains loading state');
+      assert.equal(await evaluate('document.querySelector("#minimumHistoryEvents").textContent'), acceptedHistoryText, mode + ': pending read preserves accepted history');
+      if (mode === 'mid-read-timeout') {
+        assert.equal(await evaluate('typeof globalThis.__historyDeadlineCallback'), 'function', 'history registers its 8000ms abort deadline');
+        await evaluate('globalThis.__historyDeadlineCallback()');
+      } else await evaluate('globalThis.__historyFailRead()');
+      await until(() => evaluate(`!document.querySelector('#minimumHistoryRetry').hidden && !document.querySelector('#minimumHistoryRetry').disabled && document.querySelector('#minimumHistoryStatus').textContent.includes('暂无法刷新')`), mode + ': failed read releases loading state');
+      assert.equal(await evaluate('globalThis.__historyAbortSeen'), mode === 'mid-read-timeout', mode + ': abort signal follows only the deadline path');
+      assert.equal(await evaluate('document.querySelector("#minimumHistoryEvents").textContent'), acceptedHistoryText, mode + ': failure preserves accepted history');
+      assert.equal(await evaluate('document.querySelector("#minimumHistoryStatus").textContent'), [acceptedHistoryDate, '暂无法刷新'].filter(Boolean).join(' · '), mode + ': failure preserves exact cutoff');
+      assert.equal(await evaluate('document.querySelector("#priceRows").innerHTML'), tableBeforeStreamFailures, mode + ': history failure leaves current table intact');
+      await evaluate(`{
+        globalThis.fetch = (input, init) => {
+          if (!new URL(input.url || input, location.href).pathname.endsWith('/minimum-history.json')) return globalThis.__originalHistoryFetch(input, init);
+          globalThis.__historyFailureFetches += 1;
+          return Promise.resolve(new Response(${JSON.stringify(validHistoryJson)}, {headers: {'content-type':'application/json'}}));
+        };
+        document.querySelector('#minimumHistoryRetry').click();
+      }`);
+      await until(() => evaluate(`globalThis.__historyFailureFetches === 2 && document.querySelector('#minimumHistoryRetry').hidden && !document.querySelector('#minimumHistoryRetry').disabled`), mode + ': a fresh retry succeeds after failed promise');
+      assert.equal(await evaluate('document.querySelector("#minimumHistoryEvents").textContent'), acceptedHistoryText, mode + ': retry restores accepted history');
+      assert.equal(await evaluate('document.querySelector("#minimumHistoryStatus").textContent'), acceptedHistoryDate, mode + ': retry clears error without changing cutoff');
+      assert.equal(await evaluate('document.querySelector("#priceRows").innerHTML'), tableBeforeStreamFailures, mode + ': recovery leaves current table intact');
+    }
+    await evaluate(`delete globalThis.__historyPendingReads; delete globalThis.__historyFailureFetches; delete globalThis.__historyAbortSeen; delete globalThis.__historyDeadlineCallback; delete globalThis.__historyFailRead;`);
+    await evaluate(`{
+      const bytes = new TextEncoder().encode(${JSON.stringify(validHistoryJson)});
+      const nonAscii = bytes.findIndex(value => value >= 128);
+      const split = nonAscii >= 0 ? nonAscii + 1 : Math.floor(bytes.length / 2);
+      globalThis.fetch = (input, init) => new URL(input.url || input, location.href).pathname.endsWith('/minimum-history.json')
+        ? Promise.resolve(new Response(new ReadableStream({start(controller) {controller.enqueue(bytes.slice(0, split)); controller.enqueue(bytes.slice(split)); controller.close();}}), {headers:{'content-type':'application/json'}}))
+        : globalThis.__originalHistoryFetch(input, init);
+      document.querySelector('#minimumHistoryRetry').click();
+    }`);
+    await until(() => evaluate(`document.querySelector('#minimumHistoryRetry').hidden && !document.querySelector('#minimumHistoryRetry').disabled`), 'valid streamed UTF-8 recovers after rejected history');
+    assert.equal(await evaluate('document.querySelector("#minimumHistoryEvents").textContent'), acceptedHistoryText, 'split multibyte response preserves history');
+  }
   await evaluate(`{globalThis.fetch=globalThis.__originalHistoryFetch;delete globalThis.__originalHistoryFetch;document.querySelector('#minimumHistoryRetry').click();}`);
   await until(()=>evaluate(`document.querySelector('#minimumHistoryRetry').hidden && !document.querySelector('#minimumHistoryRetry').disabled && !document.querySelector('#minimumHistoryNote').hidden`),'valid history recovers after retry');
 
@@ -214,8 +348,23 @@ try {
   assert.equal(await evaluate(`document.querySelector('#rankHeaderLabel .visually-hidden').textContent`),'全球参考排名','ranking label follows the global comparison wording');
   await assertRanks(defaultPlan);
 
+  await evaluate(`document.querySelector('button[data-sort="country"]').click();
+    globalThis.__countrySearchHeaders = [...document.querySelectorAll('.price-table thead th, .price-table thead button')];
+    document.querySelector('#searchInput').focus();
+    document.querySelector('#searchInput').value=${JSON.stringify(sampleMarket.name)};
+    document.querySelector('#searchInput').dispatchEvent(new Event('input'));
+  `);
+  assert.equal(await evaluate(`globalThis.__countrySearchHeaders.every((node, index) => node === document.querySelectorAll('.price-table thead th, .price-table thead button')[index])`), true, 'country-mode search retains headers and buttons');
+  assert.equal(await evaluate(`document.querySelector('#rankHeaderLabel > [aria-hidden="true"]').textContent`), '序号', 'country-mode search preserves sequence header');
+  assert.equal(await evaluate('document.activeElement.id'), 'searchInput', 'country-mode search preserves focus');
+  await evaluate(`delete globalThis.__countrySearchHeaders; document.querySelector('#searchInput').value='';document.querySelector('#searchInput').dispatchEvent(new Event('input'));`);
+  await clickPlan(defaultPlan);
+  await evaluate(`globalThis.__chatgptHeaderNodes = [...document.querySelectorAll('.price-table thead th')]; document.querySelector('#searchInput').focus();`);
   await evaluate(`document.querySelector('#searchInput').value=${JSON.stringify(sampleMarket.name)};document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);
   await until(()=>evaluate('document.querySelectorAll("#priceRows tr[data-market-id]").length===1'),'sample market filter');
+  assert.equal(await evaluate(`globalThis.__chatgptHeaderNodes.every((node, index) => node === document.querySelectorAll('.price-table thead th')[index])`), true, 'search retains existing table headers');
+  assert.equal(await evaluate('document.activeElement.id'), 'searchInput', 'search retains input focus');
+  await evaluate('delete globalThis.__chatgptHeaderNodes');
   assert.ok(await evaluate(`document.querySelector('#priceRows').textContent.includes(${JSON.stringify(sampleMarket.name)})`));
   assert.equal(await evaluate(`document.querySelector('#priceRows tr[data-market-id="${sampleMarket.code}"] td:nth-child(2) a')===null`),true,'country is not an App Store link');
   if(sampleOffer?.amounts.length) {
@@ -283,7 +432,8 @@ try {
   }
 
   await evaluate(`document.querySelector('#searchInput').value='';document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);
-  assert.equal(await evaluate('globalThis.__chatgptTestIntervals.length'), 1, 'one freshness refresh interval is registered');
+  assert.equal(await evaluate('globalThis.__chatgptTestIntervals.length'), 0, 'static snapshot registers no periodic refresh');
+  assert.equal(await evaluate('globalThis.__chatgptVisibilityListeners'), 1, 'tab return retains clock-validity recovery without polling');
   const observationTimes = [Date.parse(expected.generated_at), Date.parse(expected.fx?.updated_at || ''), ...expected.markets.filter(market => market.offers.length).map(market => Date.parse(market.last_verified_at))].filter(Number.isFinite);
   const latestObservation = Math.max(...observationTimes);
   const retainedUi = await evaluate(`JSON.stringify({
@@ -294,7 +444,7 @@ try {
   })`);
   await evaluate(`globalThis.__chatgptBeforeAgeTest = Date.now`);
   for (const days of [2, 8, 365, 3650]) {
-    await evaluate(`{ Date.now = () => ${latestObservation + days * 86400e3}; globalThis.__chatgptTestIntervals.forEach(callback => callback()); }`);
+    await evaluate(`{ Date.now = () => ${latestObservation + days * 86400e3}; document.dispatchEvent(new Event('visibilitychange')); }`);
     assert.equal(await evaluate(`JSON.stringify({
       table: document.querySelector('#priceRows').innerHTML,
       minimums: document.querySelector('#minimumSummary').innerHTML,
@@ -307,6 +457,24 @@ try {
     assert.ok(await evaluate(`document.querySelector('#historySubtitle').textContent.includes('价格更新于')`));
     await evaluate(`document.querySelector('#closeHistory').click()`);
   }
+  // Search/sort must reconcile cards, badges and ranks even without a tab switch.
+  await evaluate(`{
+    Date.now = () => ${Math.min(...observationTimes) - 600_000};
+    document.querySelector('#searchInput').dispatchEvent(new Event('input'));
+  }`);
+  assert.equal(await evaluate(`[...document.querySelectorAll('.minimum-card')].every(card => card.disabled)`), true, 'search reconciles minimum cards after a clock change');
+  assert.equal(await evaluate('document.querySelectorAll(".minimum-badge").length'), 0, 'search removes invalid minimum badges');
+  assert.equal(await evaluate(`[...document.querySelectorAll('#priceRows tr[data-market-id] td:first-child')].every(cell => cell.textContent === '—')`), true, 'search reconciles ranks with cards');
+  await evaluate('Date.now = globalThis.__chatgptBeforeAgeTest');
+  await clickPlan(defaultPlan);
+  await assertRanks(defaultPlan); await assertMinimums();
+  // A corrected local clock must still restore comparison eligibility on tab return.
+  await evaluate(`{
+    Date.now = () => ${Math.min(...observationTimes) - 600_000};
+    document.dispatchEvent(new Event('visibilitychange'));
+  }`);
+  assert.equal(await evaluate(`[...document.querySelectorAll('#priceRows tr[data-market-id] td:first-child')].every(cell => cell.textContent === '—')`), true, 'future observations are not ranked after a backwards clock change');
+  assert.equal(await evaluate(`[...document.querySelectorAll('.minimum-card')].every(card => card.disabled)`), true, 'future observations cannot be minimum winners');
   await evaluate(`{ Date.now = globalThis.__chatgptBeforeAgeTest; delete globalThis.__chatgptBeforeAgeTest; document.dispatchEvent(new Event('visibilitychange')); }`);
   await assertRanks(defaultPlan); await assertMinimums();
 

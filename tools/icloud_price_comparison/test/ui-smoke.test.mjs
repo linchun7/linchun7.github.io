@@ -95,6 +95,68 @@ function rerankPriceFixture(data) {
   return data;
 }
 
+
+// Fixture injection is at the document boundary. No test serves prices.json to
+// the application: every accepted main snapshot travels with its static HTML.
+function replaceEmbeddedEnvelope(html, envelope) {
+  const encoded = JSON.stringify(envelope).replace(/</g, '\\u003c');
+  return html.replace(/(<script\b[^>]*\bid="icloud-price-data"[^>]*>)[\s\S]*?(<\/script>)/, (_, open, close) => open + encoded + close);
+}
+
+async function snapshotHtml(prices, history = null) {
+  const shell = await readFile(path.join(PROJECT_DIR, 'index.html'), 'utf8');
+  return replaceStaticFragments(shell, renderStaticFragments(prices, history ?? await readFixture('history.json')));
+}
+
+// Keep existing fixture callbacks readable while moving their transport from
+// JSON responses to generated documents. Failure cases use explicit raw HTML
+// injection below, rather than pretending an optional network response exists.
+async function installEmbeddedPriceFixture(page, fixture) {
+  await page.route(url => url.pathname === '/', async documentRoute => {
+    let payload;
+    await fixture({
+      fulfill: async response => {
+        assert.ok(!response.status || response.status === 200, 'embedded fixture must be an accepted payload');
+        payload = response.json ?? JSON.parse(response.body);
+      },
+      continue: async () => { payload = await readFixture('prices.json'); }
+    });
+    assert.ok(payload, 'fixture callback must provide an embedded payload');
+    await documentRoute.fulfill({ contentType: 'text/html', body: await snapshotHtml(payload) });
+  });
+}
+
+async function snapshotSession(context, purpose, { width = 390 } = {}) {
+  const config = await resolveBrowser(context, purpose);
+  if (!config) return null;
+  const server = await startServer();
+  const browser = await config.browserType.launch(config.launchOptions);
+  const page = await browser.newPage({ viewport: { width, height: 844 } });
+  const data = await readFixture('prices.json');
+  const url = `http://127.0.0.1:${server.address().port}/`;
+  const errors = [];
+  const mainRequests = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('request', request => {
+    if (new URL(request.url()).pathname.endsWith('/data/prices.json')) mainRequests.push(request.url());
+  });
+  await page.route('https://**/*', route => route.abort());
+  await page.route('**/data/prices.json*', route => route.abort());
+  await page.addInitScript(now => { Date.now = () => now; }, Date.parse(data.generatedAt) + 3600000);
+  return { page, browser, data, url, errors, mainRequests };
+}
+
+async function waitForAcceptedCountryHistory(page) {
+  await page.waitForFunction(() => document.querySelectorAll('#historyRows tr').length > 0
+    && !/正在读取|暂无法读取/.test(document.querySelector('#historySubtitle').textContent));
+}
+
+async function waitForSnapshot(page) {
+  await page.waitForFunction(() => document.querySelector('.workspace.price-ui-ready')
+    && document.querySelector('#searchInput')?.disabled === false
+    && document.querySelector('#loadStatus')?.hidden === true);
+}
+
 async function findChrome() {
   const candidates = [
     process.env.CHROME_PATH,
@@ -199,8 +261,8 @@ async function createServer() {
   const server = http.createServer(async (request, response) => {
     try {
       const pathname = decodeURIComponent(new URL(request.url, 'http://127.0.0.1').pathname);
-      if (pathname === '/data/prices.json' && request.headers['x-icloud-test-price-response'] === 'redirect') {
-        response.writeHead(302, { location: '/data/history.json' }).end();
+      if (pathname === '/data/history.json' && request.headers['x-icloud-test-history-response'] === 'redirect') {
+        response.writeHead(302, { location: '/__history_redirect_target' }).end();
         return;
       }
       const publicRoot = pathname.startsWith('/images/') ? REPOSITORY_DIR : PROJECT_DIR;
@@ -241,221 +303,50 @@ after(async () => {
   await Promise.allSettled(cleanup);
 });
 
-for (const scenario of [
-  { name: 'stale', ageHours: 37, unusable: false },
-  { name: 'expired', ageHours: 169, unusable: false },
-  { name: 'year-old', ageHours: 365 * 24, unusable: false },
-  { name: 'future', ageHours: -1, unusable: true }
-]) {
-  test(`static fallback preserves accepted prices unless time is invalid: ${scenario.name}`, { timeout: 30_000 }, async (context) => {
-    const started = performance.now();
-    const deadline = AbortSignal.any([context.signal, AbortSignal.timeout(25_000)]);
-    const remaining = () => Math.max(1, 25_000 - (performance.now() - started));
-    let phase = 'setup';
-    const stage = async (name, operation, {limit = 8000, dispose} = {}) => {
-      phase = name;
-      console.log(`[freshness:${scenario.name}] start ${name} +${Math.round(performance.now() - started)}ms`);
-      const result = await runBrowserStage(name, operation, {signal: deadline, timeoutMs: Math.min(limit, remaining()), dispose});
-      console.log(`[freshness:${scenario.name}] done ${name} +${Math.round(performance.now() - started)}ms`);
-      return result;
-    };
-    let server;
-    let browser;
-    let owned;
-    let page;
-    const pageErrors = [];
-    const pending = new Set();
-    const blockedHosts = new Set();
-    const abort = () => {
-      console.error(`[freshness:${scenario.name}] cancelled during ${phase}`);
-      if (owned) void owned.close().catch(error => console.error('UI cancellation cleanup failed:', error.message));
-    };
-    deadline.addEventListener('abort', abort, {once: true});
+
+for (const ageHours of [1, 37, 169, 365 * 24, 3650 * 24]) {
+  test(`embedded snapshots remain interactive with absolute dates at ${ageHours}h`, { timeout: 30000 }, async context => {
+    const session = await snapshotSession(context, 'offline embedded snapshot');
+    if (!session) return;
+    const { page, browser, data, url, errors, mainRequests } = session;
     try {
-      const browserConfig = await stage('resolve browser', () => resolveBrowser(context, 'static fallback freshness'));
-      if (!browserConfig) return;
-      server = await stage('start server', () => startServer());
-      browser = await stage('launch browser', signal => browserConfig.browserType.launch({
-        ...browserConfig.launchOptions, timeout: Math.min(15_000, remaining()), signal
-      }), {limit: 15_000});
-      console.log(`[freshness:${scenario.name}] browser=${browser.version()} executable=${browserConfig.launchOptions.executablePath ?? 'pinned Playwright'} node=${process.version} runner=${process.env.ImageOS ?? 'local'}`);
-      const data = await stage('read fixture', () => readFixture('prices.json'));
-      owned = await stage('create context', () => browser.newContext({viewport: {width: 390, height: 844}}), {dispose: value => value.close()});
-      page = await stage('create page', () => owned.newPage(), {dispose: value => value.close()});
-      page.setDefaultTimeout(8000);
-      page.on('pageerror', error => { if (pageErrors.length < 5) pageErrors.push(error.message.slice(0, 300)); });
-      page.on('request', request => pending.add(new URL(request.url()).pathname));
-      for (const event of ['requestfinished', 'requestfailed']) page.on(event, request => pending.delete(new URL(request.url()).pathname));
-      const origin = `http://127.0.0.1:${server.address().port}`;
-      await stage('install deterministic routes', async () => {
-        await page.addInitScript(now => { Date.now = () => now; }, Date.parse(data.generatedAt) + scenario.ageHours * 3600000);
-        // These are offline-fallback tests: no analytics or other external request is relevant.
-        await page.route('**/*', route => {
-          const target = new URL(route.request().url());
-          if (target.origin === origin) return route.continue();
-          blockedHosts.add(target.hostname);
-          return route.abort();
-        });
-        await page.route('**/data/prices.json*', route => route.abort());
-      });
-      await stage('navigate local page', signal => page.goto(origin + '/', {waitUntil: 'domcontentloaded', timeout: Math.min(8000, remaining()), signal}));
-      await stage('wait for error state', signal => page.waitForFunction(
-        () => document.querySelector('#retryButton')?.hidden === false,
-        undefined, {timeout: Math.min(8000, remaining()), signal}
-      ));
-      if (scenario.name === 'stale') {
-        await stage('verify external isolation', async () => {
-          assert.equal(await page.evaluate(async () => {
-            try { await fetch('https://www.googletagmanager.com/__offline_test'); return false; }
-            catch { return true; }
-          }), true);
-          assert.ok(blockedHosts.has('www.googletagmanager.com'));
-        });
-      }
-      phase = 'assert safety cues';
+      await page.addInitScript(now => { Date.now = () => now; }, Date.parse(data.generatedAt) + ageHours * 3600000);
+      await page.goto(url, { waitUntil: 'domcontentloaded' });
+      await waitForSnapshot(page);
+      const dates = await page.locator('#updatedAt, #fxStatus, #applePublishedDate').allTextContents();
+      assert.match(dates[0], /更新于.*\d{4}/);
       assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), data.countries.length);
-      assert.equal(await page.locator('#minimumSummary .minimum-card').count(), scenario.unusable ? 0 : data.tiers.length);
-      assert.equal(await page.locator('.minimum-badge, .is-minimum, .rank-top').count() > 0, !scenario.unusable);
-      if (scenario.unusable) {
-        assert.ok((await page.locator('#priceRows tr[data-market-id] > td:first-child').allTextContents()).every(text => text === '—'));
-        assert.ok((await page.locator('.mobile-rank').allTextContents()).every(text => text === '—'));
-        assert.ok((await page.locator('.mobile-rank-sr').allTextContents()).every(text => text === '排名暂不可用'));
-      } else {
-        assert.match(await page.locator('#updatedAt').textContent(), /更新于/);
-        assert.equal(await page.locator('#priceRows tr[data-market-id] > td:first-child').first().textContent(), '1');
+      assert.equal(await page.locator('#minimumSummary .minimum-card').count(), data.tiers.length);
+      assert.equal(await page.locator('#priceRows tr[data-market-id] > td:first-child').first().textContent(), '1');
+      assert.equal(await page.locator('.cache-warning, .freshness-warning').count(), 0);
+      // The complete document/modules have arrived; losing every later network
+      // resource must not disable search, sorting, minimum navigation or tiers.
+      await page.context().setOffline(true);
+      await page.locator('#searchInput').fill('美国');
+      await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length === 1);
+      assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), 1);
+      await page.locator('button[data-sort="country"]').click();
+      await page.locator('#searchInput').fill('');
+      await page.locator('#mobileTierControl button').last().click();
+      assert.equal(await page.locator('#mobileTierControl button').last().getAttribute('aria-pressed'), 'true');
+      for (const days of [2, 8, 365, 3650]) {
+        await page.evaluate(now => {
+          Date.now = () => now;
+          document.dispatchEvent(new Event('visibilitychange'));
+          window.dispatchEvent(new Event('pageshow'));
+        }, Date.parse(data.generatedAt) + days * 86400000);
+        assert.deepEqual(await page.locator('#updatedAt, #fxStatus, #applePublishedDate').allTextContents(), dates);
+        assert.equal(await page.locator('#searchInput').isEnabled(), true);
+        assert.equal(await page.locator('.minimum-card').count(), data.tiers.length);
+        assert.equal(await page.locator('.cache-warning, .freshness-warning').count(), 0);
       }
-    } catch (error) {
-      console.error(`[freshness:${scenario.name}] failed stage=${phase} elapsed=${Math.round(performance.now() - started)}ms errors=${JSON.stringify(pageErrors)} pending=${JSON.stringify([...pending])}`);
-      throw error;
-    } finally {
-      deadline.removeEventListener('abort', abort);
-      await runBrowserStage('freshness cleanup', async () => {
-        if (owned) await owned.close();
-        if (browser) await browser.close();
-        if (server) await new Promise(resolve => server.close(resolve));
-      }, {timeoutMs: 3000});
-    }
+      assert.deepEqual(mainRequests, [], 'startup, offline interactions and lifecycle events never fetch a second price snapshot');
+      assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
   });
 }
 
-test('static fallback preserves dates and minimums indefinitely with retry warnings singular', { timeout: 30_000 }, async (context) => {
-  const browserConfig = await resolveBrowser(context, 'offline static lifecycle');
-  if (!browserConfig) return;
-  const server = await startServer();
-  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
-  const data = await readFixture('prices.json');
-  try {
-    const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-    await page.addInitScript(now => {
-      window.__staticTestNow = now;
-      Date.now = () => window.__staticTestNow;
-    }, Date.parse(data.generatedAt) + 3600000);
-    await page.route('**/data/prices.json', route => route.abort());
-    await page.route('**/googletagmanager.com/**', route => route.abort());
-    await page.goto(`http://127.0.0.1:${server.address().port}/`, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
-    assert.equal(await page.locator('#minimumSummary .minimum-card').count(), data.tiers.length);
-    for (let attempt = 0; attempt < 2; attempt++) {
-      await page.click('#retryButton');
-      await page.waitForFunction(() => !document.getElementById('retryButton').hidden);
-    }
-    assert.equal(await page.locator('.cache-warning').count(), 0);
-    assert.equal(await page.locator('#loadStatus .spinner').isVisible(), false);
-    const priceDate = await page.locator('#updatedAt').textContent();
-    const fxDate = await page.locator('#fxStatus').textContent();
-    for (const days of [2, 8, 365, 3650]) {
-      await page.evaluate(now => { window.__staticTestNow = now; window.dispatchEvent(new Event('pageshow')); }, Date.parse(data.generatedAt) + days * 86400_000);
-      assert.equal(await page.locator('#minimumSummary .minimum-card').count(), data.tiers.length);
-      assert.equal(await page.locator('#priceRows tr[data-market-id] > td:first-child').first().textContent(), '1');
-      assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), data.countries.length);
-      assert.equal(await page.locator('#updatedAt').textContent(), priceDate);
-      assert.equal(await page.locator('#fxStatus').textContent(), fxDate);
-    }
-  } finally {
-    await browser.close();
-    await new Promise(resolve => server.close(resolve));
-  }
-});
-
-for (const ageHours of [-1]) {
-  test(`static fallback restores safety cues after clock correction from ${ageHours}h`, { timeout: 30_000 }, async (context) => {
-    const browserConfig = await resolveBrowser(context, 'static fallback recovery');
-    if (!browserConfig) return;
-    const server = await startServer();
-    const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
-    const data = await readFixture('prices.json');
-    try {
-      const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-      page.setDefaultTimeout(10000);
-      let recovered = false;
-      await page.addInitScript(now => {
-        window.__staticTestNow = now;
-        Date.now = () => window.__staticTestNow;
-      }, Date.parse(data.generatedAt) + ageHours * 3600000);
-      await page.route('**/data/prices.json', route => recovered ? route.continue() : route.abort());
-      await page.route('**/googletagmanager.com/**', route => route.abort());
-      await page.goto(`http://127.0.0.1:${server.address().port}/`, { waitUntil: 'domcontentloaded' });
-      await page.waitForFunction(() => document.querySelector('#loadStatus')?.classList.contains('is-error'));
-      assert.equal(await page.locator('#minimumSummary .minimum-card').count(), 0);
-      recovered = true;
-      await page.evaluate(now => {
-        window.__staticTestNow = now;
-        window.dispatchEvent(new Event('pageshow'));
-        document.dispatchEvent(new Event('visibilitychange'));
-      }, Date.parse(data.generatedAt) + 3600000);
-      await page.click('#retryButton');
-      await page.waitForFunction(() => !document.getElementById('searchInput').disabled);
-      assert.equal(await page.locator('#minimumSummary .minimum-card').count(), data.tiers.length);
-      assert.equal(await page.locator('#priceRows tr[data-market-id] > td:first-child').first().textContent(), '1');
-      assert.equal(await page.locator('.mobile-rank').first().textContent(), '1');
-      assert.ok(await page.locator('.minimum-badge').count() > 0);
-      assert.ok(await page.locator('.is-minimum').count() > 0);
-      assert.equal(await page.locator('.data-status').evaluate(el => el.classList.contains('is-error')), false);
-    } finally {
-      await browser.close();
-      await new Promise(resolve => server.close(resolve));
-    }
-  });
-}
-
-test('does not replace an already loaded snapshot with an older network response', { timeout: 30_000 }, async (context) => {
-  const browserConfig = await resolveBrowser(context, 'monotonic snapshot recovery');
-  if (!browserConfig) return;
-  const server = await startServer();
-  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
-  const old = await readFixture('prices.json');
-  const current = structuredClone(old);
-  const next = structuredClone(old);
-  setPayloadGeneratedAt(current, new Date(Date.parse(old.generatedAt) + 3600000).toISOString());
-  setPayloadGeneratedAt(next, new Date(Date.parse(old.generatedAt) + 7200000).toISOString());
-  try {
-    const page = await browser.newPage();
-    page.setDefaultTimeout(10000);
-    await page.addInitScript(now => { Date.now = () => now; }, Date.parse(next.generatedAt) + 3600000);
-    let request = 0;
-    await page.route('**/data/prices.json', route => route.fulfill({ json: [current, old, next][Math.min(request++, 2)] }));
-    await page.route('**/googletagmanager.com/**', route => route.abort());
-    await page.goto(`http://127.0.0.1:${server.address().port}/`, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(() => !document.getElementById('searchInput').disabled);
-    const before = await page.locator('#updatedAt').textContent();
-    await page.locator('#retryButton').dispatchEvent('click');
-    await page.waitForFunction(() => document.querySelector('.workspace').getAttribute('aria-busy') === 'false');
-    assert.equal(request, 2);
-    assert.ok((await page.locator('#updatedAt').textContent()).includes(before), 'a stale response cannot roll back the accepted snapshot');
-    assert.equal(await page.locator('#searchInput').isDisabled(), false);
-    assert.equal(await page.locator('#minimumSummary .minimum-card').count(), old.tiers.length);
-    await page.click('#retryButton');
-    await page.waitForFunction(() => document.getElementById('loadStatus').hidden);
-    assert.equal(request, 3);
-    assert.notEqual(await page.locator('#updatedAt').textContent(), before, 'a genuinely newer snapshot still replaces the current one');
-    assert.equal(await page.locator('.cache-warning').count(), 0);
-  } finally {
-    await browser.close();
-    await new Promise(resolve => server.close(resolve));
-  }
-});
-
-test('shows static prices immediately and refreshes them without blocking first paint', async () => {
+test('ships static prices and one embedded snapshot without a main-data network path', async () => {
   const [html, moduleSource, styleSource] = await Promise.all([
     readFile(path.join(PROJECT_DIR, 'index.html'), 'utf8'),
     readFile(path.join(PROJECT_DIR, 'script.js'), 'utf8'),
@@ -480,15 +371,18 @@ test('shows static prices immediately and refreshes them without blocking first 
   assert.match(html, /汇率来源：[\s\S]*?ExchangeRate-API/);
   assert.match(html, /data-cfasync="false" type="module"/, 'Rocket Loader must not rewrite the module entry point');
   assert.doesNotMatch(moduleSource, /__icloudInitialPriceRequest|__icloudInitialQuery|initialPriceRequest|finishInitialRequest/, 'the module must not retain a bootstrap bridge');
-  assert.match(moduleSource, /MAX_RESPONSE_BYTES[\s\S]*?'prices\.json': 1024 \* 1024[\s\S]*?'history\.json': 8 \* 1024 \* 1024/);
+  assert.match(moduleSource, /MAX_RESPONSE_BYTES[\s\S]*?'history\.json': 8 \* 1024 \* 1024/);
+  assert.match(html, /<script id="icloud-price-data" type="application\/json">/);
+  assert.doesNotMatch(moduleSource, /fetchJson\('prices\.json'|loadPrices\(|refreshPrices\(/, 'there is no second main snapshot fetch path');
   assert.match(moduleSource, /TextDecoder\('utf-8', \{ fatal: true \}\)/, 'network JSON must use strict UTF-8 decoding');
-  assert.match(moduleSource, /fetch\(url,[\s\S]*?redirect:\s*'error'/, 'all later data requests must reject redirects');
+  assert.match(moduleSource, /fetch\(`\.\/data\/\$\{fileName\}`, \{[\s\S]*?redirect:\s*'error'/, 'optional history JSON requests must reject redirects');
+  assert.match(moduleSource, /fetch\(new URL\('\.\/data\/minimum-history\.json', import\.meta\.url\), \{[^}]*redirect:\s*'error'/, 'minimum history JSON requests must reject redirects');
   assert.doesNotMatch(moduleSource, /PRICE_FRESH_MAX_AGE_MS|PRICE_HARD_MAX_AGE_MS/);
   assert.match(moduleSource, /MAX_PRICE_FUTURE_SKEW_MS/, 'future timestamp checks remain');
   assert.doesNotMatch(moduleSource, /setInterval\(/, 'freshness lifecycle must not poll or expire accepted snapshots');
   assert.match(moduleSource, /document\.addEventListener\('visibilitychange'/);
   assert.match(moduleSource, /window\.addEventListener\('pageshow'/);
-  assert.match(moduleSource, /fileName === 'prices\.json' \? 'no-cache' : 'default'/, 'ordinary prices requests must revalidate while preserving HTTP caching');
+  assert.match(moduleSource, /location\.reload\(/, 'manual recovery reloads the document');
   assert.match(moduleSource, /const ANALYTICS_ID = 'G-K2S9L4CHNP'/, 'the approved GA4 measurement ID must remain configured');
   assert.match(moduleSource, /page_location:\s*analyticsUrl\.href/, 'GA4 must receive only the sanitized page location');
   assert.match(moduleSource, /allow_google_signals:\s*false/, 'Google Signals must remain disabled');
@@ -740,57 +634,30 @@ test('shows a usable explanation when JavaScript is disabled', { timeout: 30_000
   }
 });
 
-test('reconciles a non-default static tier before network hydration completes', { timeout: 30_000 }, async (context) => {
-  const browserConfig = await resolveBrowser(context, 'the non-default tier hydration regression');
-  if (!browserConfig) return;
-  const validData = await readFixture('prices.json');
+
+test('reconciles a non-default tier directly from the embedded snapshot', { timeout: 30000 }, async context => {
+  const session = await snapshotSession(context, 'non-default embedded tier', { width: 1024 });
+  if (!session) return;
+  const { page, browser, data, url, mainRequests } = session;
   const tierId = '6TB';
-  const tier = validData.tiers.find(({ id }) => id === tierId);
-  assert.ok(tier);
-  const expectedOrder = [...validData.countries].sort((first, second) => (
-    first.plans[tierId].cnyRank - second.plans[tierId].cnyRank
-    || first.marketId.localeCompare(second.marketId, 'en')
-  ));
-  const server = await startServer();
-  const { port } = server.address();
-  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
-  const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
-  let releaseRequest;
-  let markRequestStarted;
-  const requestReleased = new Promise((resolve) => { releaseRequest = resolve; });
-  const requestStarted = new Promise((resolve) => { markRequestStarted = resolve; });
-  await page.route('https://**/*', (route) => route.abort());
-  await page.route('**/data/prices.json*', async (route) => {
-    markRequestStarted();
-    await requestReleased;
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(validData) });
-  });
+  const tier = data.tiers.find(({ id }) => id === tierId);
+  const ordered = [...data.countries].sort((a, b) => a.plans[tierId].cnyRank - b.plans[tierId].cnyRank || a.marketId.localeCompare(b.marketId, 'en'));
   try {
-    await page.goto(`http://127.0.0.1:${port}/?tier=${tierId}`, { waitUntil: 'domcontentloaded' });
-    await requestStarted;
-    assert.equal(await page.locator('#loadStatus').isVisible(), true, 'the network snapshot must still be pending');
-    assert.equal(new URL(page.url()).search, `?tier=${tierId}`);
+    await page.goto(url + '?tier=' + tierId, { waitUntil: 'domcontentloaded' });
+    await waitForSnapshot(page);
+    assert.equal(new URL(page.url()).search, '?tier=' + tierId);
     assert.equal(await page.locator(`th[data-tier="${tierId}"]`).getAttribute('aria-sort'), 'ascending');
     assert.equal(await page.locator('th[data-tier="200GB"]').getAttribute('aria-sort'), 'none');
-    assert.equal(await page.locator(`.price-cell[data-tier="${tierId}"].is-active-tier.is-sorted`).count(), validData.countries.length);
+    assert.equal(await page.locator(`.price-cell[data-tier="${tierId}"].is-active-tier.is-sorted`).count(), data.countries.length);
     assert.equal(await page.locator('.price-cell[data-tier="200GB"].is-active-tier').count(), 0);
-    assert.equal(await page.locator('#priceRows tr[data-market-id]').first().getAttribute('data-market-id'), expectedOrder[0].marketId);
-    assert.equal(await page.locator('#priceRows tr[data-market-id]').first().locator('td').first().textContent(), String(expectedOrder[0].plans[tierId].cnyRank));
-    assert.equal(await page.locator('#resultSummary').textContent(), `${validData.countries.length} 个地区 · ${tier.label} 从低到高`);
-
-    releaseRequest();
-    await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
-    assert.equal(new URL(page.url()).search, `?tier=${tierId}`);
-    assert.equal(await page.locator(`th[data-tier="${tierId}"]`).getAttribute('aria-sort'), 'ascending');
-    assert.equal(await page.locator('#priceRows tr[data-market-id]').first().getAttribute('data-market-id'), expectedOrder[0].marketId);
-  } finally {
-    releaseRequest?.();
-    await page.close();
-    await browser.close();
-  }
+    assert.equal(await page.locator('#priceRows tr').first().getAttribute('data-market-id'), ordered[0].marketId);
+    assert.equal(await page.locator('#priceRows tr').first().locator('td').first().textContent(), String(ordered[0].plans[tierId].cnyRank));
+    assert.equal(await page.locator('#resultSummary').textContent(), `${data.countries.length} 个地区 · ${tier.label} 从低到高`);
+    assert.deepEqual(mainRequests, []);
+  } finally { await browser.close(); }
 });
 
-test('keeps accepted static FX and minimums when the network refresh fails', { timeout: 30_000 }, async (context) => {
+test('keeps accepted static FX and minimums without any main-data request', { timeout: 30_000 }, async (context) => {
   const browserConfig = await resolveBrowser(context, 'the stale-FX static fallback test');
   if (!browserConfig) return;
   const [shell, current] = await Promise.all([
@@ -807,11 +674,11 @@ test('keeps accepted static FX and minimums when the network refresh fails', { t
   const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await page.route(`http://127.0.0.1:${port}/`, (route) => route.fulfill({ status: 200, contentType: 'text/html', body: html }));
-  await page.route('**/data/prices.json*', (route) => route.fulfill({ status: 503, body: '{}' }));
+  await page.route('**/data/prices.json*', route => route.abort());
   await page.route('https://**/*', (route) => route.abort());
   try {
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
+    await waitForSnapshot(page);
     assert.equal(await page.locator('.minimum-card').count(), payload.tiers.length);
     assert.ok(await page.locator('.minimum-badge, .is-minimum, .rank-top').count() > 0);
     assert.match(await page.locator('#fxStatus').innerText(), /汇率更新/);
@@ -862,34 +729,10 @@ test('renders current prices, sorting, and country history in a real browser', {
         }
         return route.abort();
       });
-      let releasePriceRequest;
-      const priceRequestReleased = new Promise((resolve) => {
-        releasePriceRequest = resolve;
-      });
-      await page.route('**/data/prices.json*', async (route) => {
-        await priceRequestReleased;
-        await route.continue();
-      });
-
+      const releasePriceRequest = () => {};
       try {
         await page.goto(`${baseUrl}/`, { waitUntil: 'domcontentloaded' });
-        assert.equal(await page.locator('#loadStatus').isVisible(), true, `${viewport.name} shows one compact progress indicator`);
-        assert.equal(await page.locator('#updatedAt .cache-warning').count(), 0);
-        assert.equal(await page.locator('.workspace').getAttribute('aria-busy'), 'true');
-        assert.equal(await page.locator('#searchInput').isDisabled(), true);
-        assert.equal(await page.locator('#regionSelect').isDisabled(), true);
-        assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), expectedData.countries.length, `${viewport.name} must show static prices before network hydration`);
-        assert.equal(new URL(page.url()).search, '?tier=200GB');
-        assert.equal(await page.locator('th[data-tier="200GB"]').getAttribute('aria-sort'), 'ascending');
-        assert.equal(await page.locator('.price-cell[data-tier="200GB"].is-active-tier.is-sorted').count(), expectedData.countries.length);
-        if (viewport.name === 'narrow-mobile') {
-          assert.equal(await page.locator('.spinner').first().evaluate((element) => getComputedStyle(element).animationName), 'none');
-        }
-        if (viewport.name === 'desktop') {
-          await page.waitForTimeout(1_600);
-          assert.equal(await page.locator('#loadStatusText').textContent(), '正在读取…');
-        }
-        releasePriceRequest();
+        await waitForSnapshot(page);
         await page.waitForFunction(
           (count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count,
           expectedData.countries.length
@@ -898,6 +741,7 @@ test('renders current prices, sorting, and country history in a real browser', {
         assert.equal(await page.locator('th[data-tier-placeholder]').count(), 0, `${viewport.name} price header placeholders must be replaced after data validation`);
         await page.waitForSelector('.search-field svg');
         const initialResources = await page.evaluate(() => performance.getEntriesByType('resource').map(({ name }) => name));
+        assert.equal(initialResources.some((url) => url.includes('/data/prices.json')), false, 'main prices require no second request');
         assert.equal(initialResources.some((url) => url.includes('/data/history.json')), false, `${viewport.name} must defer history data`);
         assert.equal(initialResources.some((url) => /chart/i.test(url)), false, `${viewport.name} must not request a chart dependency`);
         assert.equal(initialResources.some((url) => url.includes('/vendor/lucide.min.js')), false, `${viewport.name} must not load the full Lucide bundle`);
@@ -1144,7 +988,7 @@ test('renders current prices, sorting, and country history in a real browser', {
         }
         await page.waitForFunction(() => document.querySelector('#historyDialog')?.open === true);
         if (expectedRecord) {
-          await page.waitForFunction(() => document.querySelectorAll('#historyRows tr').length > 0);
+          await waitForAcceptedCountryHistory(page);
         }
         assert.equal(await page.locator('#historyDialog thead th').count(), 3, `${viewport.name} history table must use one selected-tier column`);
         assert.equal((await page.locator('#historyDialog .dialog-eyebrow').textContent()).trim(), '价格历史');
@@ -1359,7 +1203,7 @@ test('shows only real selected-tier price changes and labels Apple publication p
     const historyButton = page.locator('#priceRows tr[data-market-id="id"] .country-history-button');
     await historyButton.click();
     await page.waitForFunction(() => document.querySelector('#historyDialog')?.open === true);
-    await page.waitForFunction(() => document.querySelectorAll('#historyRows tr').length > 0);
+    await waitForAcceptedCountryHistory(page);
 
     await page.locator('#historyTierControl button[data-tier="50GB"]').click();
     assert.equal(await page.locator('#historyEventCount').textContent(), '0 次');
@@ -1483,7 +1327,7 @@ test('adapts table and history controls to a different tier count', { timeout: 3
   try {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
     await page.route('https://**/*', (route) => route.abort());
-    await page.route('**/data/prices.json*', (route) => route.fulfill({
+    await installEmbeddedPriceFixture(page, (route) => route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(threeTierData)
@@ -1527,7 +1371,7 @@ test('renders every rank-one market without inventing a single winner', { timeou
   const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
   const page = await browser.newPage({ viewport: { width: 1365, height: 900 } });
   await page.route('https://**/*', (route) => route.abort());
-  await page.route('**/data/prices.json*', (route) => route.fulfill({
+  await installEmbeddedPriceFixture(page, (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
     body: JSON.stringify(data)
@@ -1545,59 +1389,7 @@ test('renders every rank-one market without inventing a single winner', { timeou
   }
 });
 
-test('shows an actionable error and recovers after a temporary price-data outage', { timeout: 30_000 }, async (context) => {
-  const browserConfig = await resolveBrowser(context, 'the UI error-state test');
-  if (!browserConfig) return;
-  const expectedData = await readFixture('prices.json');
-  const server = await startServer();
-  const { port } = server.address();
-  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
-  let attempts = 0;
-  try {
-    const page = await browser.newPage({ viewport: { width: 1365, height: 900 } });
-    await page.route('https://**/*', (route) => route.abort());
-    await page.route('**/data/prices.json*', async (route) => {
-      attempts += 1;
-      if (attempts === 1) {
-        await route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"temporary outage"}' });
-        return;
-      }
-      await route.continue();
-    });
-    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
-    assert.equal(await page.locator('#loadStatus').isVisible(), true);
-    assert.equal(await page.locator('.workspace').getAttribute('aria-busy'), 'false');
-    assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), expectedData.countries.length, 'static table rows must remain readable');
-    assert.equal(await page.locator('#minimumSummary .minimum-card').count(), expectedData.tiers.length, 'static minimum cards must remain readable');
-    assert.equal(await page.locator('#retryButton').isEnabled(), true);
-    assert.equal(await page.locator('#searchInput').isEnabled(), false);
-    assert.equal(await page.locator('#regionSelect').isEnabled(), false);
-    assert.equal(await page.locator('button[data-sort]').first().isEnabled(), false);
-    assert.equal(await page.locator('button[data-sort-tier]').first().isEnabled(), false);
-    assert.equal(await page.locator('#minimumSummary .minimum-card').first().isEnabled(), false);
-    assert.equal(await page.locator('#priceRows .country-history-button').first().isEnabled(), false);
-    assert.equal(await page.locator('#publishedDateButton').isEnabled(), false);
-    assert.equal(await page.locator('#loadStatusText').textContent(), '');
-    assert.equal(await page.locator('#retryButton').textContent(), '重试');
-    await page.locator('#retryButton').click();
-    await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
-    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, expectedData.countries.length);
-    assert.equal(await page.locator('#loadStatus').isVisible(), false);
-    assert.equal(await page.locator('#searchInput').isEnabled(), true);
-    assert.equal(await page.locator('#regionSelect').isEnabled(), true);
-    assert.equal(await page.locator('button[data-sort]').first().isEnabled(), true);
-    assert.equal(await page.locator('button[data-sort-tier]').first().isEnabled(), true);
-    assert.equal(await page.locator('#minimumSummary .minimum-card').first().isEnabled(), true);
-    assert.equal(await page.locator('#priceRows .country-history-button').first().isEnabled(), true);
-    assert.equal(await page.locator('#publishedDateButton').isEnabled(), true);
-    assert.equal(await page.locator('.data-status').evaluate((element) => element.classList.contains('is-error')), false);
-    assert.equal(attempts, 2);
-  } finally {
-    await browser.close();
-    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
-  }
-});
+// Malformed/missing embedded snapshots and whole-page recovery are covered below.
 
 test('keeps current prices usable when optional history data is unavailable or malformed', { timeout: 30_000 }, async (context) => {
   const browserConfig = await resolveBrowser(context, 'the history fallback test');
@@ -1679,93 +1471,71 @@ test('keeps current prices usable when optional history data is unavailable or m
   }
 });
 
-test('rejects malformed price payloads and recovers without a full-page refresh', { timeout: 30_000 }, async (context) => {
-  const browserConfig = await resolveBrowser(context, 'the malformed-data UI test');
-  if (!browserConfig) return;
-  const validData = await readFixture('prices.json');
-  const corruptions = [
-    ['duplicate country', (data) => data.countries.push(structuredClone(data.countries[0]))],
-    ['missing derived CNY price', (data) => { delete data.countries[0].plans[data.tiers[0].id].cnyPrice; }],
-    ['forbidden raw FX rates', (data) => { data.fx.rates = { USD: 1, CNY: 7 }; }],
-    ['invalid generated timestamp', (data) => { data.generatedAt = '2026-02-30T00:00:00.000Z'; }],
-    ['invalid FX timestamp', (data) => { data.fx.fetchedAt = '2026-02-30'; }],
-    ['invalid Apple publication date', (data) => { data.source.publishedDate = 'February 30, 2026'; }],
-    ['missing region', (data) => { data.countries[0].region = ''; }],
-    ['unknown region', (data) => { data.countries[0].region = 'Unknown Region'; }],
-    ['empty formatted price', (data) => { data.countries[0].plans[data.tiers[0].id].formattedPrice = '   '; }]
-  ];
-  const server = await startServer();
-  const { port } = server.address();
-  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
-  try {
-    for (const [label, corrupt] of corruptions) {
-      const page = await browser.newPage({ viewport: { width: 1365, height: 900 } });
-      let serveValidData = false;
-      const malformed = structuredClone(validData);
-      corrupt(malformed);
-      await page.route('https://**/*', (route) => route.abort());
-      await page.route('**/data/prices.json*', (route) => {
-        if (serveValidData) return route.continue();
-        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(malformed) });
-      });
-      try {
-        await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-        await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
-        assert.equal(await page.locator('#loadStatusText').textContent(), '', label);
-        assert.equal(await page.locator('#searchInput').isEnabled(), false, label);
-        serveValidData = true;
-        await page.locator('#retryButton').click();
-        await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
-        await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, validData.countries.length);
-        assert.equal(await page.locator('#loadStatus').isVisible(), false, `${label} should recover after retry`);
-      } finally {
-        await page.close();
-      }
-    }
-  } finally {
-    await browser.close();
-    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
-  }
-});
 
-test('rebuilds tier headers and filters after a successful retry with changed tiers', { timeout: 30_000 }, async (context) => {
-  const browserConfig = await resolveBrowser(context, 'the changed-tier retry test');
-  if (!browserConfig) return;
-  const fullData = await readFixture('prices.json');
-  const reducedData = structuredClone(fullData);
-  const removedTier = reducedData.tiers.pop();
-  for (const country of reducedData.countries) delete country.plans[removedTier.id];
-  reducedData.run.pricePoints = reducedData.countries.length * reducedData.tiers.length;
-  const server = await startServer();
-  const { port } = server.address();
-  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
-  let priceCalls = 0;
-  try {
-    const page = await browser.newPage({ viewport: { width: 1365, height: 900 } });
-    await page.route('https://**/*', (route) => route.abort());
-    await page.route('**/data/prices.json*', (route) => {
-      priceCalls += 1;
-      const body = JSON.stringify(priceCalls === 1 ? fullData : reducedData);
-      return route.fulfill({ status: 200, contentType: 'application/json', body });
-    });
+test('rejects damaged embedded snapshots without a network fallback and recovers by reloading', { timeout: 90000 }, async context => {
+  const config = await resolveBrowser(context, 'embedded corruption matrix');
+  if (!config) return;
+  const data = await readFixture('prices.json');
+  const shell = await readFile(path.join(PROJECT_DIR, 'index.html'), 'utf8');
+  const corruptions = [
+    ['missing snapshot', html => html.replace(/<script\b[^>]*\bid="icloud-price-data"[^>]*>[\s\S]*?<\/script>/, '')],
+    ['duplicate snapshot', html => html.replace(/(<script\b[^>]*\bid="icloud-price-data"[^>]*>[\s\S]*?<\/script>)/, '$1$1')],
+    ['wrong snapshot type', html => html.replace('id="icloud-price-data" type="application/json"', 'id="icloud-price-data" type="text/plain"')],
+    ['oversized snapshot', html => html.replace(/(<script\b[^>]*\bid="icloud-price-data"[^>]*>)[\s\S]*?(<\/script>)/, (_, open, close) => open + ' '.repeat(1024 * 1024 + 1) + close)],
+    ['malformed JSON', html => html.replace(/(<script\b[^>]*\bid="icloud-price-data"[^>]*>)[\s\S]*?(<\/script>)/, '$1{$2')],
+    ...[
+      ['wrong envelope version', envelope => { envelope.schemaVersion = 99; }],
+      ['unexpected envelope field', envelope => { envelope.unexpected = true; }],
+      ['invalid projected publication date', envelope => { envelope.publishedDate = 'February 30, 2026'; }],
+      ['duplicate country', envelope => { envelope.prices.countries.push(structuredClone(envelope.prices.countries[0])); }],
+      ['missing derived CNY price', envelope => { delete envelope.prices.countries[0].plans[data.tiers[0].id].cnyPrice; }],
+      ['forbidden raw FX rates', envelope => { envelope.prices.fx.rates = { USD: 1, CNY: 7 }; }],
+      ['invalid generated timestamp', envelope => { envelope.prices.generatedAt = '2026-02-30T00:00:00.000Z'; }],
+      ['invalid FX timestamp', envelope => { envelope.prices.fx.fetchedAt = '2026-02-30'; }],
+      ['invalid Apple publication date', envelope => { envelope.prices.source.publishedDate = 'February 30, 2026'; }],
+      ['missing region', envelope => { envelope.prices.countries[0].region = ''; }],
+      ['unknown region', envelope => { envelope.prices.countries[0].region = 'Unknown Region'; }],
+      ['empty formatted price', envelope => { envelope.prices.countries[0].plans[data.tiers[0].id].formattedPrice = '   '; }],
+      ['meta snapshot mismatch', envelope => {
+        setPayloadGeneratedAt(envelope.prices, new Date(Date.parse(data.generatedAt) + 60000).toISOString());
+      }]
+    ].map(([label, mutate]) => [label, html => {
+      const envelope = JSON.parse(html.match(/<script\b[^>]*\bid="icloud-price-data"[^>]*>([\s\S]*?)<\/script>/)[1]);
+      mutate(envelope);
+      return replaceEmbeddedEnvelope(html, envelope);
+    }])
+  ];
+  for (const [label, corrupt] of corruptions) {
+    const session = await snapshotSession(context, label);
+    if (!session) return;
+    const { page, browser, url, mainRequests, errors } = session;
+    let documents = 0;
+    await page.route(target => target.pathname === '/', route => route.fulfill({
+      contentType: 'text/html', body: ++documents === 1 ? corrupt(shell) : shell
+    }));
     try {
-      await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-      await page.waitForFunction((count) => document.querySelector('#tierCount')?.textContent === `${count} 档`, fullData.tiers.length);
-      await page.locator('#retryButton').dispatchEvent('click');
-      await page.waitForFunction((count) => document.querySelector('#tierCount')?.textContent === `${count} 档`, reducedData.tiers.length);
-      assert.equal(await page.locator('.price-table thead th').count(), reducedData.tiers.length + 2);
-      assert.equal(await page.locator('#priceRows tr[data-market-id]').first().locator('td').count(), reducedData.tiers.length + 2);
-      assert.deepEqual(
-        await page.locator('.price-table thead button[data-sort-tier]').evaluateAll((buttons) => buttons.map((button) => button.dataset.sortTier)),
-        reducedData.tiers.map(({ id }) => id)
-      );
-      assert.equal(await page.locator('#regionSelect option').count(), new Set(reducedData.countries.map(({ region }) => region)).size + 1);
-    } finally {
-      await page.close();
-    }
-  } finally {
-    await browser.close();
-    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+      await page.goto(url, { waitUntil: 'domcontentloaded' });
+      await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
+      assert.equal(await page.locator('.workspace').getAttribute('aria-busy'), 'false', label);
+      assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), data.countries.length, label);
+      assert.equal(await page.locator('.minimum-card').count(), data.tiers.length, label);
+      for (const selector of ['#searchInput', '#regionSelect', 'button[data-sort]', 'button[data-sort-tier]', '.minimum-card', '.country-history-button', '#publishedDateButton']) {
+        assert.equal(await page.locator(selector).first().isEnabled(), false, label + ': ' + selector);
+      }
+      await reviewAssertAllStaticTiers(page, data);
+      assert.match(await page.locator('#retryButton').textContent(), /刷新/);
+      const navigation = page.waitForNavigation({ waitUntil: 'domcontentloaded' });
+      await page.locator('#retryButton').click();
+      await navigation;
+      await waitForSnapshot(page);
+      assert.equal(documents, 2, label + ': recovery must load a new document');
+      assert.equal(await page.locator('#mobileTierControl button').count(), data.tiers.length);
+      assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), data.countries.length);
+      assert.equal(await page.locator('#regionSelect').isEnabled(), true);
+      assert.equal(await page.locator('#publishedDateButton').isEnabled(), true);
+      assert.deepEqual(mainRequests, [], label + ': no hidden prices.json recovery');
+      assert.deepEqual(errors, [], label);
+    } finally { await browser.close(); }
   }
 });
 
@@ -1853,7 +1623,7 @@ test('keeps old and retained-FX snapshots usable and falls back from an invalid 
       const html = replaceStaticFragments(shell, renderStaticFragments(payload));
       await page.route(`http://127.0.0.1:${port}/?tier=not-a-real-tier`, (route) => route.fulfill({ status: 200, contentType: 'text/html', body: html }));
       await page.route('https://**/*', (route) => route.abort());
-      await page.route('**/data/prices.json*', (route) => route.fulfill({
+      await installEmbeddedPriceFixture(page, (route) => route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify(payload)
@@ -1902,308 +1672,118 @@ test('keeps old and retained-FX snapshots usable and falls back from an invalid 
   }
 });
 
-test('keeps long-lived pages usable without age-triggered refreshes and preserves equal snapshots', { timeout: 45_000 }, async (context) => {
-  const browserConfig = await resolveBrowser(context, 'the long-lived freshness lifecycle test');
-  if (!browserConfig) return;
-  const fixture = await readFixture('prices.json');
-  const history = await readFixture('history.json');
-  const referenceNow = Date.parse(fixture.generatedAt) + (8 * 24 * 60 * 60 * 1_000);
-  const original = structuredClone(fixture);
-  setPayloadGeneratedAt(original, new Date(referenceNow - (35 * 60 * 60 * 1_000) - (59 * 60 * 1_000)).toISOString());
-  original.fx.fetchedAt = original.generatedAt;
-  original.fx.stale = false;
-  const refreshed = structuredClone(fixture);
-  setPayloadGeneratedAt(refreshed, new Date(Date.parse(original.generatedAt) + (7 * 24 * 60 * 60 * 1_000)).toISOString());
-  refreshed.fx.fetchedAt = refreshed.generatedAt;
-  refreshed.fx.stale = false;
-  const server = await startServer();
-  const { port } = server.address();
-  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
-  const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
-  const shell = await readFile(path.join(PROJECT_DIR, 'index.html'), 'utf8');
-  const html = replaceStaticFragments(shell, renderStaticFragments(original));
-  let serveRefreshed = false;
-  let priceCalls = 0;
-  let historyCalls = 0;
-  await page.addInitScript((nowMs) => { Date.now = () => nowMs; }, referenceNow);
-  await page.route(`http://127.0.0.1:${port}/`, (route) => route.fulfill({ status: 200, contentType: 'text/html', body: html }));
-  await page.route('https://**/*', (route) => route.abort());
-  await page.route('**/data/prices.json*', (route) => {
-    priceCalls += 1;
-    return route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(serveRefreshed ? refreshed : original)
-    });
-  });
-  await page.route('**/data/history.json*', (route) => {
-    historyCalls += 1;
-    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(history) });
-  });
-  try {
-    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction((count) => document.querySelectorAll('.minimum-badge').length === count, fixture.tiers.length);
-    assert.equal(await page.locator('#overviewTitle').textContent(), '各容量全球最低价');
 
-    await page.locator('#priceRows tr[data-market-id]').first().click();
-    await page.waitForFunction(() => document.querySelector('#historySubtitle')?.textContent.includes('历史数据暂不可用') === false);
-    await page.locator('#closeHistory').click();
-    const historyCallsAfterLoad = historyCalls;
-    assert.ok(historyCallsAfterLoad >= 1);
-
-    const dates = await page.locator('#updatedAt, #fxStatus').allTextContents();
-    const beforeCalls = priceCalls;
-    for (const days of [2, 8, 365, 3650]) {
-      await page.evaluate(now => {
-        Date.now = () => now;
-        document.dispatchEvent(new Event('visibilitychange'));
-        window.dispatchEvent(new Event('pageshow'));
-      }, Date.parse(original.generatedAt) + days * 86400_000);
-      assert.equal(await page.locator('.minimum-card').count(), fixture.tiers.length);
-      assert.ok(await page.locator('.minimum-badge').count() > 0);
-      assert.ok(await page.locator('.rank-top').count() > 0);
-      assert.equal(await page.locator('#searchInput').isEnabled(), true);
-      assert.deepEqual(await page.locator('#updatedAt, #fxStatus').allTextContents(), dates);
-    }
-    assert.equal(priceCalls, beforeCalls, 'elapsed days do not require a new snapshot');
-    await page.locator('#retryButton').dispatchEvent('click');
-    await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
-    assert.equal(historyCalls, historyCallsAfterLoad, 'equal-snapshot retry retains validated history');
-    serveRefreshed = true;
-    await page.locator('#retryButton').dispatchEvent('click');
-    await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
-    assert.ok(priceCalls >= beforeCalls + 2);
-    assert.notDeepEqual(await page.locator('#updatedAt, #fxStatus').allTextContents(), dates);
-
-  } finally {
-    await page.close();
-    await browser.close();
-    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
-  }
-});
-
-test('normalizes transient network warnings after an equal-snapshot retry', { timeout: 45_000 }, async (context) => {
-  const browserConfig = await resolveBrowser(context, 'the equal-snapshot retry normalization test');
-  if (!browserConfig) return;
-  const fixture = await readFixture('prices.json');
-  const history = await readFixture('history.json');
-  const server = await startServer();
-  const { port } = server.address();
-  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
-  try {
-    const scenarios = [
-      {
-        label: 'fresh',
-        nowMs: Date.parse(fixture.generatedAt) + (60 * 60 * 1_000),
-        expectedWarning: null
-      },
-      {
-        label: 'price-stale',
-        nowMs: Date.parse(fixture.generatedAt) + (48 * 60 * 60 * 1_000),
-        expectedWarning: null
-      }
-    ];
-    for (const scenario of scenarios) {
-      const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
-      let priceCalls = 0;
-      let historyCalls = 0;
-      await page.addInitScript((nowMs) => { Date.now = () => nowMs; }, scenario.nowMs);
-      await page.route('https://**/*', (route) => route.abort());
-      await page.route('**/data/prices.json*', (route) => {
-        priceCalls += 1;
-        if (priceCalls === 2) return route.fulfill({ status: 503, contentType: 'application/json', body: '{}' });
-        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(fixture) });
-      });
-      await page.route('**/data/history.json*', (route) => {
-        historyCalls += 1;
-        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(history) });
-      });
-      try {
-        await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-        await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, fixture.countries.length);
-        await page.locator('#priceRows tr[data-market-id]').first().click();
-        await page.waitForFunction(() => document.querySelectorAll('#historyRows tr').length > 0);
-        await page.locator('#closeHistory').click();
-        const loadedHistoryCalls = historyCalls;
-
-        await page.locator('#retryButton').dispatchEvent('click');
-        await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
-        assert.equal(await page.locator('#retryButton').isVisible(), true, scenario.label);
-
-        await page.locator('#retryButton').click();
-        await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
-        assert.equal(await page.locator('.cache-warning').count(), 0, scenario.label);
-        assert.equal(await page.locator('#retryButton').isHidden(), true, scenario.label);
-        assert.equal(await page.locator('#searchInput').isEnabled(), true, scenario.label);
-        assert.equal(await page.locator('#regionSelect').isEnabled(), true, scenario.label);
-        assert.equal(await page.locator('button[data-sort]').first().isEnabled(), true, scenario.label);
-        assert.equal(await page.locator('#publishedDateButton').isEnabled(), true, scenario.label);
-        assert.equal(
-          await page.locator('.data-status').evaluate((element) => element.classList.contains('is-stale')),
-          scenario.expectedWarning !== null,
-          scenario.label
-        );
-        if (scenario.expectedWarning) {
-          assert.match(await page.locator('.freshness-warning').textContent(), scenario.expectedWarning, scenario.label);
-        } else {
-          assert.equal(await page.locator('.freshness-warning').count(), 0, scenario.label);
-        }
-        await page.locator('#priceRows tr[data-market-id]').first().click();
-        await page.waitForFunction(() => document.querySelectorAll('#historyRows tr').length > 0);
-        assert.equal(historyCalls, loadedHistoryCalls, `${scenario.label} equal snapshot must retain loaded history`);
-      } finally {
-        await page.close();
-      }
-    }
-  } finally {
-    await browser.close();
-    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
-  }
-});
-
-test('restores all controls after loaded snapshots recover from unusable clocks', { timeout: 90_000 }, async (context) => {
-  const browserConfig = await resolveBrowser(context, 'loaded snapshot clock recovery');
-  if (!browserConfig) return;
-  const fixture = await readFixture('prices.json');
-  const rankingCountry = fixture.countries.find(country => Object.values(country.plans).some(plan => plan.cnyRank === 1));
-  assert.ok(rankingCountry, 'clock recovery fixture must include a genuine minimum-price country');
-  const generatedAt = Date.parse(fixture.generatedAt);
-  const server = await startServer();
-  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
-  try {
-    for (const scenario of [
-      { badAgeHours: -1, recoveredAgeHours: 1, offline: false },
-      { badAgeHours: -1, recoveredAgeHours: 37, offline: false },
-      { badAgeHours: -1, recoveredAgeHours: 1, offline: true },
-      { badAgeHours: -1, recoveredAgeHours: 1, offline: true, retryRecovery: true }
-    ]) {
-      const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
-      let failRefresh = false;
-      let priceCalls = 0;
-      let historyCalls = 0;
-      await page.addInitScript(now => { Date.now = () => now; }, generatedAt + 3600000);
-      await page.route('https://**/*', route => route.abort());
-      await page.route('**/data/prices.json*', route => {
-        priceCalls += 1;
-        return route.fulfill({ status: failRefresh ? 503 : 200, contentType: 'application/json', body: failRefresh ? '{}' : JSON.stringify(fixture) });
-      });
-      await page.route('**/data/history.json*', route => {
-        historyCalls += 1;
-        return route.continue();
-      });
-      try {
-        await page.goto(`http://127.0.0.1:${server.address().port}/`, { waitUntil: 'domcontentloaded' });
-        await page.waitForFunction(() => !document.querySelector('#searchInput').disabled && document.querySelector('#loadStatus').hidden);
+test('clock safety recovers the same embedded snapshot and accepted history without fetching prices', { timeout: 60000 }, async context => {
+  for (const initiallyFuture of [false, true]) {
+    const session = await snapshotSession(context, 'local-only clock safety', { width: 1024 });
+    if (!session) return;
+    const { page, browser, data, url, mainRequests, errors } = session;
+    const rankingCountry = data.countries.find(country => Object.values(country.plans).some(plan => plan.cnyRank === 1));
+    const generatedAt = Date.parse(data.generatedAt);
+    let historyCalls = 0;
+    await page.route('**/data/history.json*', route => { historyCalls++; return route.continue(); });
+    if (initiallyFuture) await page.addInitScript(now => { Date.now = () => now; }, generatedAt - 3600000);
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded' });
+      if (!initiallyFuture) {
+        await waitForSnapshot(page);
         await page.locator('#searchInput').fill(rankingCountry.country);
         await page.locator('#regionSelect').selectOption(rankingCountry.region);
         await page.locator('.country-history-button').first().click();
-        await page.waitForFunction(() => document.querySelectorAll('#historyRows tr').length > 0);
+        await waitForAcceptedCountryHistory(page);
         await page.locator('#closeHistory').click();
-        const loadedHistoryCalls = historyCalls;
-        const loadedMinimumBadges = await page.locator('.minimum-badge').count();
-        assert.ok(loadedMinimumBadges > 0, 'the accepted filtered view must have genuine minimum badges to restore');
-        const loadedRank = await page.locator('#priceRows tr[data-market-id] > td:first-child').first().textContent();
-        failRefresh = true;
-        await page.evaluate(now => { Date.now = () => now; window.dispatchEvent(new Event('pageshow')); }, generatedAt + scenario.badAgeHours * 3600000);
-        await page.waitForFunction(() => document.querySelector('#searchInput').disabled && !document.querySelector('#retryButton').hidden && document.querySelector('#priceWorkspace').getAttribute('aria-busy') === 'false');
-        assert.equal(await page.locator('.minimum-badge').count(), 0, 'future-clock downgrade must remove previously visible minimum badges');
-        if (scenario.retryRecovery) {
-          await page.locator('#retryButton').click();
-          await page.waitForFunction(() => document.querySelector('#searchInput').disabled && !document.querySelector('#retryButton').hidden && document.querySelector('#priceWorkspace').getAttribute('aria-busy') === 'false');
-          assert.equal(await page.locator('#priceRows tr[data-market-id] > td:first-child').first().textContent(), '—', 'Retry before correction must preserve future-clock protection');
-          assert.equal(await page.locator('.minimum-card').count(), 0);
-          assert.equal(await page.locator('.minimum-badge').count(), 0, 'Retry before clock correction must keep minimum badges suppressed');
-        }
-        const callsBeforeCorrection = priceCalls;
-        failRefresh = scenario.offline;
-        if (scenario.retryRecovery) {
-          await page.evaluate(now => { Date.now = () => now; }, generatedAt + scenario.recoveredAgeHours * 3600000);
-          assert.match(await page.locator('#updatedAt').textContent(), /数据时间异常/, 'clock change alone must not fabricate a lifecycle recovery');
-          await page.locator('#retryButton').click();
-        } else {
-          await page.evaluate(now => { Date.now = () => now; window.dispatchEvent(new Event('pageshow')); }, generatedAt + scenario.recoveredAgeHours * 3600000);
-        }
-        await page.waitForFunction(() => document.querySelector('#updatedAt').textContent.includes('更新于') && document.querySelector('#priceWorkspace').getAttribute('aria-busy') === 'false');
-        for (const selector of ['#searchInput', '#regionSelect', '#publishedDateButton', '#backToTableButton', 'button[data-sort="country"]', 'button[data-sort-tier]', '.country-history-button']) {
-          assert.equal(await page.locator(selector).first().isEnabled(), true, `${JSON.stringify(scenario)}: ${selector} must recover`);
-        }
-        assert.equal(priceCalls, callsBeforeCorrection + 1, 'clock correction must complete one guarded refresh');
+        await page.evaluate(now => { Date.now = () => now; window.dispatchEvent(new Event('pageshow')); }, generatedAt - 3600000);
+      }
+      await page.waitForFunction(() => document.querySelector('#searchInput').disabled
+        && document.querySelector('#priceWorkspace').getAttribute('aria-busy') === 'false');
+      assert.equal(await page.locator('.minimum-card, .minimum-badge, .rank-top').count(), 0);
+      assert.ok((await page.locator('#priceRows tr[data-market-id] > td:first-child').allTextContents()).every(text => text === '—'));
+      const acceptedHistoryCalls = historyCalls;
+      await page.evaluate(now => {
+        Date.now = () => now;
+        window.dispatchEvent(new Event('pageshow'));
+        document.dispatchEvent(new Event('visibilitychange'));
+      }, generatedAt + 37 * 3600000);
+      await waitForSnapshot(page);
+      for (const selector of ['#searchInput', '#regionSelect', '#publishedDateButton', '#backToTableButton', 'button[data-sort="country"]', 'button[data-sort-tier]', '.country-history-button']) {
+        assert.equal(await page.locator(selector).first().isEnabled(), true, selector);
+      }
+      assert.equal(await page.locator('.minimum-card').count(), data.tiers.length);
+      assert.ok(await page.locator('.minimum-badge').count() > 0);
+      if (!initiallyFuture) {
         assert.equal(await page.locator('#searchInput').inputValue(), rankingCountry.country);
         assert.equal(await page.locator('#regionSelect').inputValue(), rankingCountry.region);
-        assert.equal(await page.locator('.minimum-card').count(), fixture.tiers.length);
-        assert.equal(await page.locator('#priceRows tr[data-market-id] > td:first-child').first().textContent(), loadedRank, 'recovered ranking must be restored');
-        assert.equal(await page.locator('.minimum-badge').count(), loadedMinimumBadges, 'recovered minimum cues must match the accepted filtered view');
-        assert.equal(await page.locator('#loadStatus').isVisible(), scenario.offline);
-        assert.doesNotMatch(await page.locator('#loadStatusText').textContent(), /价格已经较久没有更新|数据时间异常/);
-        assert.equal(await page.locator('.cache-warning').count(), 0);
         await page.locator('.country-history-button').first().click();
-        await page.waitForFunction(() => document.querySelectorAll('#historyRows tr').length > 0);
-        assert.equal(historyCalls, loadedHistoryCalls, 'equal-snapshot recovery must preserve previously validated history');
-        await page.locator('#closeHistory').click();
-        await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
-        assert.equal(priceCalls, callsBeforeCorrection + 1, 'an already usable page must not loop refreshes');
-      } finally {
-        await page.close();
+        await waitForAcceptedCountryHistory(page);
+        assert.equal(historyCalls, acceptedHistoryCalls, 'clock recovery preserves accepted optional history');
       }
-    }
-  } finally {
-    await browser.close();
-    await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+      assert.match(await page.locator('#updatedAt').textContent(), /更新于/);
+      assert.equal(await page.locator('.cache-warning, .freshness-warning').count(), 0);
+      assert.deepEqual(mainRequests, []);
+      assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
   }
 });
 
-test('keeps open history and all prices when time passes beyond seven days', { timeout: 30_000 }, async (context) => {
-  const browserConfig = await resolveBrowser(context, 'the expired lifecycle failure test');
-  if (!browserConfig) return;
-  const payload = await readFixture('prices.json');
-  const referenceNow = Date.parse(payload.generatedAt) + (8 * 24 * 60 * 60 * 1_000);
-  setPayloadGeneratedAt(payload, new Date(referenceNow - (7 * 24 * 60 * 60 * 1_000)).toISOString());
-  payload.fx.fetchedAt = payload.generatedAt;
-  payload.fx.stale = false;
-  const server = await startServer();
-  const { port } = server.address();
-  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
-  const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+test('damaged embedded data recovers static clock cues without enabling unvalidated interactions', { timeout: 30000 }, async context => {
+  const session = await snapshotSession(context, 'damaged snapshot clock recovery');
+  if (!session) return;
+  const { page, browser, data, url, mainRequests, errors } = session;
   const shell = await readFile(path.join(PROJECT_DIR, 'index.html'), 'utf8');
-  const html = replaceStaticFragments(shell, renderStaticFragments(payload));
-  let failRefresh = false;
-  await page.addInitScript((nowMs) => { Date.now = () => nowMs; }, referenceNow);
-  await page.route(`http://127.0.0.1:${port}/`, (route) => route.fulfill({ status: 200, contentType: 'text/html', body: html }));
-  await page.route('https://**/*', (route) => route.abort());
-  await page.route('**/data/prices.json*', (route) => (
-    failRefresh
-      ? route.fulfill({ status: 503, contentType: 'application/json', body: '{}' })
-      : route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(payload) })
-  ));
+  const html = shell.replace(/(<script\b[^>]*\bid="icloud-price-data"[^>]*>)[\s\S]*?(<\/script>)/, '$1{$2');
+  await page.route(target => target.pathname === '/', route => route.fulfill({ contentType: 'text/html', body: html }));
+  await page.addInitScript(now => { Date.now = () => now; }, Date.parse(data.generatedAt) - 6 * 60000);
   try {
-    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, payload.countries.length);
-    assert.equal(await page.locator('#overviewTitle').textContent(), '各容量全球最低价', 'exactly seven days remains degraded');
-    await page.locator('#priceRows tr[data-market-id]').first().click();
-    await page.waitForFunction(() => document.querySelector('#historyDialog')?.open === true);
-    failRefresh = true;
-    await page.evaluate((nowMs) => {
-      Date.now = () => nowMs;
-      Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => document.querySelector('#updatedAt').textContent.includes('数据时间异常'));
+    assert.equal(await page.locator('.minimum-card, .minimum-badge, .rank-top').count(), 0);
+    assert.ok((await page.locator('#priceRows tr[data-market-id] > td:first-child').allTextContents()).every(text => text === '—'));
+    await page.evaluate(now => {
+      Date.now = () => now;
+      window.dispatchEvent(new Event('pageshow'));
       document.dispatchEvent(new Event('visibilitychange'));
-    }, Date.parse(payload.generatedAt) + (7 * 24 * 60 * 60 * 1_000) + 1);
-    assert.equal(await page.locator('#historyDialog').evaluate(dialog => dialog.open), true);
-    assert.equal(await page.locator('.country-history-button').first().isEnabled(), true);
-    assert.equal(await page.locator('#searchInput').isEnabled(), true);
-    assert.ok(await page.locator('.minimum-badge').count() > 0);
-    assert.equal(await page.locator('.minimum-card').count(), payload.tiers.length);
-    assert.match(await page.locator('#updatedAt').textContent(), /更新于/);
-    await page.locator('#closeHistory').click();
-    await page.locator('#retryButton').dispatchEvent('click');
-    await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
-    assert.equal(await page.locator('#searchInput').isEnabled(), true);
-    assert.equal(await page.locator('.minimum-card').count(), payload.tiers.length);
+    }, Date.parse(data.generatedAt) + 60000);
+    await page.waitForFunction(() => document.querySelector('#updatedAt').textContent.includes('更新于'));
+    assert.equal(await page.locator('.minimum-card').count(), data.tiers.length);
+    assert.ok(await page.locator('.minimum-badge, .rank-top').count() > 0);
+    assert.equal(await page.locator('#priceRows tr[data-market-id] > td:first-child').first().textContent(), '1');
+    assert.equal(await page.locator('#searchInput').isDisabled(), true);
+    assert.equal(await page.locator('#regionSelect').isDisabled(), true);
+    assert.equal(await page.locator('#publishedDateButton').isDisabled(), true);
+    assert.equal(await page.locator('#loadStatus').isVisible(), true);
+    assert.match(await page.locator('#loadStatusText').textContent(), /刷新/);
+    assert.equal(await page.locator('#retryButton').isVisible(), true);
+    assert.deepEqual(mainRequests, []);
+    assert.deepEqual(errors, []);
+  } finally { await browser.close(); }
+});
 
-  } finally {
-    await page.close();
-    await browser.close();
-    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
-  }
+test('an open history and absolute dates survive years and lifecycle events without background refresh', { timeout: 30000 }, async context => {
+  const session = await snapshotSession(context, 'long-lived embedded page', { width: 1024 });
+  if (!session) return;
+  const { page, browser, data, url, mainRequests } = session;
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await waitForSnapshot(page);
+    await page.locator('.country-history-button').first().click();
+    await waitForAcceptedCountryHistory(page);
+    const rows = await page.locator('#historyRows').textContent();
+    const dates = await page.locator('#updatedAt, #fxStatus, #applePublishedDate').allTextContents();
+    for (const days of [7, 8, 365, 3650]) {
+      await page.evaluate(now => {
+        Date.now = () => now;
+        window.dispatchEvent(new Event('pageshow'));
+        document.dispatchEvent(new Event('visibilitychange'));
+      }, Date.parse(data.generatedAt) + days * 86400000);
+      assert.equal(await page.locator('#historyDialog').evaluate(dialog => dialog.open), true);
+      assert.equal(await page.locator('#historyRows').textContent(), rows);
+      assert.deepEqual(await page.locator('#updatedAt, #fxStatus, #applePublishedDate').allTextContents(), dates);
+      assert.equal(await page.locator('#searchInput').isEnabled(), true);
+      assert.equal(await page.locator('.minimum-card').count(), data.tiers.length);
+      assert.equal(await page.locator('.cache-warning, .freshness-warning').count(), 0);
+    }
+    assert.deepEqual(mainRequests, []);
+  } finally { await browser.close(); }
 });
 
 test('retries only valid but inconsistent history once without cache', { timeout: 45_000 }, async (context) => {
@@ -2226,7 +1806,7 @@ test('retries only valid but inconsistent history once without cache', { timeout
       const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
       let historyCalls = 0;
       await page.route('https://**/*', (route) => route.abort());
-      await page.route('**/data/prices.json*', (route) => route.fulfill({
+      await installEmbeddedPriceFixture(page, (route) => route.fulfill({
         status: 200, contentType: 'application/json', body: JSON.stringify(prices)
       }));
       await page.route('**/data/history.json*', (route) => {
@@ -2258,59 +1838,39 @@ test('retries only valid but inconsistent history once without cache', { timeout
   }
 });
 
-test('ignores stale history responses after a price retry', { timeout: 30_000 }, async (context) => {
-  const browserConfig = await resolveBrowser(context, 'the history-race UI test');
-  if (!browserConfig) return;
-  const validData = await readFixture('prices.json');
-  const validHistory = await readFixture('history.json');
-  const staleHistory = structuredClone(validHistory);
-  const brazilHistory = historyRecordForCountry(staleHistory, validData, 'Brazil');
-  brazilHistory.events = [brazilHistory.events[0]];
-  const server = await startServer();
-  const { port } = server.address();
-  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
-  const page = await browser.newPage({ viewport: { width: 1365, height: 900 } });
-  let priceCalls = 0;
-  let historyCalls = 0;
-  const pageErrors = [];
-  page.on('pageerror', (error) => pageErrors.push(error.message));
-  await page.route('https://**/*', (route) => route.abort());
-  await page.route('**/data/prices.json*', (route) => {
-    priceCalls += 1;
-    return route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(validData)
-    });
-  });
-  await page.route('**/data/history.json*', async (route) => {
-    historyCalls += 1;
-    const requestNumber = historyCalls;
-    await new Promise((resolve) => setTimeout(resolve, requestNumber === 1 ? 1_000 : 20));
-    return route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(requestNumber === 1 ? staleHistory : validHistory)
-    });
-  });
+
+test('late optional history follows the current dialog selection and never reopens a closed dialog', { timeout: 30000 }, async context => {
+  const session = await snapshotSession(context, 'optional history race', { width: 1024 });
+  if (!session) return;
+  const { page, browser, data, url, errors, mainRequests } = session;
+  const history = await readFixture('history.json');
+  let heldRoute;
+  let calls = 0;
+  await page.route('**/data/history.json*', route => { calls++; heldRoute = route; });
+  const [first, second] = data.countries;
   try {
-    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, validData.countries.length);
-    await page.locator('#priceRows tr[data-market-id="br"]').click();
-    await page.waitForFunction(() => document.querySelector('#historyDialog')?.open === true);
-    await page.locator('#retryButton').dispatchEvent('click');
-    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, validData.countries.length);
-    await page.waitForTimeout(1_200);
-    assert.equal(await page.locator('#historyDialog').evaluate((element) => element.open), true);
-    assert.equal(await page.locator('#historyRows tr').count(), historyRecordForCountry(validHistory, validData, 'Brazil').events.length);
-    assert.deepEqual(pageErrors, []);
-    assert.equal(priceCalls, 2);
-    assert.equal(historyCalls, 2);
-  } finally {
-    await page.close();
-    await browser.close();
-    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
-  }
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await waitForSnapshot(page);
+    await page.locator('tr[data-market-id="' + first.marketId + '"] .country-history-button').click();
+    await page.locator('#closeHistory').click();
+    await page.locator('tr[data-market-id="' + second.marketId + '"] .country-history-button').click();
+    assert.equal(await page.locator('#historyTitle').textContent(), second.nameZh || second.country);
+    await page.locator('#closeHistory').click();
+    while (!heldRoute) await page.waitForTimeout(10);
+    const responseReady = page.waitForResponse(response => response.url().includes('/data/history.json'));
+    await heldRoute.fulfill({ json: history });
+    await responseReady;
+    // Await an observable rendering boundary, rather than racing fulfillment.
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    assert.equal(await page.locator('#historyDialog').evaluate(dialog => dialog.open), false);
+    await page.locator('tr[data-market-id="' + second.marketId + '"] .country-history-button').click();
+    await waitForAcceptedCountryHistory(page);
+    assert.equal(await page.locator('#historyTitle').textContent(), second.nameZh || second.country);
+    assert.ok(await page.locator('#historyRows tr').count() > 0);
+    assert.equal(calls, 1, 'changing selection shares one optional history request');
+    assert.deepEqual(mainRequests, []);
+    assert.deepEqual(errors, []);
+  } finally { await browser.close(); }
 });
 
 test('keeps the page and publication history bounded with a single-tier table on narrow screens', { timeout: 30_000 }, async (context) => {
@@ -2323,7 +1883,7 @@ test('keeps the page and publication history bounded with a single-tier table on
   const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
   const page = await browser.newPage({ viewport: { width: 280, height: 844 } });
   await page.route('https://**/*', (route) => route.abort());
-  await page.route('**/data/prices.json*', (route) => route.fulfill({
+  await installEmbeddedPriceFixture(page, (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
     body: JSON.stringify(validData)
@@ -2689,137 +2249,54 @@ test('keeps 100 price and publication history records inside scrollable dialogs'
   }
 });
 
-test('resets a removed region filter after a successful price retry', { timeout: 30_000 }, async (context) => {
-  const browserConfig = await resolveBrowser(context, 'the removed-region retry test');
-  if (!browserConfig) return;
-  const fullData = await readFixture('prices.json');
-  const replacement = structuredClone(fullData);
-  const removedRegion = fullData.countries[0].region;
-  replacement.countries = replacement.countries.filter(({ region }) => region !== removedRegion);
+
+test('manual reload accepts changed tiers and markets while canonicalizing removed URL filters', { timeout: 60000 }, async context => {
+  const data = await readFixture('prices.json');
+  const reduced = structuredClone(data);
+  const removedTier = reduced.tiers.pop();
+  for (const country of reduced.countries) delete country.plans[removedTier.id];
+  reduced.run.pricePoints = reduced.countries.length * reduced.tiers.length;
+  const removedRegion = data.countries[0].region;
+  const replacement = structuredClone(data);
+  replacement.countries = replacement.countries.filter(country => country.region !== removedRegion);
   rerankPriceFixture(replacement);
   replacement.run.countries = replacement.countries.length;
   replacement.run.pricePoints = replacement.countries.length * replacement.tiers.length;
-  const server = await startServer();
-  const { port } = server.address();
-  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
-  let priceCalls = 0;
-  try {
-    const page = await browser.newPage({ viewport: { width: 1365, height: 900 } });
-    const errors = [];
-    page.on('pageerror', (error) => errors.push(error.message));
-    page.on('console', (message) => {
-      if (message.type() === 'error' && !message.text().startsWith('Failed to load resource:')) errors.push(message.text());
-    });
-    await page.route('https://**/*', (route) => route.abort());
-    await page.route('**/data/prices.json*', (route) => {
-      priceCalls += 1;
-      const body = JSON.stringify(priceCalls === 1 ? fullData : replacement);
-      return route.fulfill({ status: 200, contentType: 'application/json', body });
-    });
+  for (const scenario of [
+    { label: 'removed tier', next: reduced, query: '?tier=' + removedTier.id },
+    { label: 'removed region and markets', next: replacement, query: '?region=' + encodeURIComponent(removedRegion) }
+  ]) {
+    const session = await snapshotSession(context, scenario.label, { width: 1024 });
+    if (!session) return;
+    const { page, browser, url, mainRequests, errors } = session;
+    let documents = 0;
+    await page.route(target => target.pathname === '/', async route => route.fulfill({
+      contentType: 'text/html', body: await snapshotHtml(++documents === 1 ? data : scenario.next)
+    }));
     try {
-      await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-      await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, fullData.countries.length);
-      await page.locator('#regionSelect').selectOption(removedRegion);
-      assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), fullData.countries.filter(({ region }) => region === removedRegion).length);
-      await page.locator('#retryButton').dispatchEvent('click');
-      await page.waitForFunction((count) => document.querySelector('#marketCount')?.textContent === `${count} 个地区`, replacement.countries.length);
-      await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, replacement.countries.length);
-      assert.equal(await page.locator('#regionSelect').inputValue(), 'all');
-      assert.equal(priceCalls, 2);
-      assert.deepEqual(errors, []);
-    } finally {
-      await page.close();
-    }
-  } finally {
-    await browser.close();
-    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
-  }
-});
-
-test('rebinds or closes an open history dialog after country replacement', { timeout: 30_000 }, async (context) => {
-  const browserConfig = await resolveBrowser(context, 'the active-country retry test');
-  if (!browserConfig) return;
-  const fullData = await readFixture('prices.json');
-  const fullHistory = await readFixture('history.json');
-  const activeCountry = fullData.countries[0];
-  const changedData = structuredClone(fullData);
-  const changedCountry = changedData.countries.find(({ country }) => country === activeCountry.country);
-  changedCountry.nameZh = `${activeCountry.nameZh} 新版`;
-  changedCountry.region = activeCountry.region === 'Americas' ? 'Asia Pacific' : 'Americas';
-  changedCountry.currency = activeCountry.currency === 'USD' ? 'CNY' : 'USD';
-  for (const tier of changedData.tiers) {
-    const plan = changedCountry.plans[tier.id];
-    plan.price += 1;
-    plan.formattedPrice = `${changedCountry.currency} ${plan.price.toFixed(2)}`;
-  }
-  changedData.run.pricePoints = changedData.countries.length * changedData.tiers.length;
-  const removedData = structuredClone(changedData);
-  removedData.countries = removedData.countries.filter(({ country }) => country !== activeCountry.country);
-  rerankPriceFixture(removedData);
-  removedData.run.countries = removedData.countries.length;
-  removedData.run.pricePoints = removedData.countries.length * removedData.tiers.length;
-  const scenarios = [
-    { label: 'updated country', replacement: changedData, expectedOpen: true, expectedTitle: changedCountry.nameZh },
-    { label: 'removed country', replacement: removedData, expectedOpen: false, expectedTitle: activeCountry.nameZh }
-  ];
-  const server = await startServer();
-  const { port } = server.address();
-  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
-  try {
-    for (const scenario of scenarios) {
-      const page = await browser.newPage({ viewport: { width: 1365, height: 900 } });
-      let priceCalls = 0;
-      let historyCalls = 0;
-      let releaseSecondHistory;
-      const secondHistoryReady = new Promise((resolve) => { releaseSecondHistory = resolve; });
-      const errors = [];
-      page.on('pageerror', (error) => errors.push(error.message));
-      page.on('console', (message) => {
-        if (message.type() === 'error' && !message.text().startsWith('Failed to load resource:')) errors.push(message.text());
-      });
-      await page.route('https://**/*', (route) => route.abort());
-      await page.route('**/data/prices.json*', (route) => {
-        priceCalls += 1;
-        const body = JSON.stringify(priceCalls === 1 ? fullData : scenario.replacement);
-        return route.fulfill({ status: 200, contentType: 'application/json', body });
-      });
-      await page.route('**/data/history.json*', async (route) => {
-        historyCalls += 1;
-        if (!scenario.expectedOpen && historyCalls > 1) await secondHistoryReady;
-        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(fullHistory) });
-      });
-      try {
-        await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-        await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, fullData.countries.length);
-        await page.locator(`#priceRows tr[data-market-id="${activeCountry.marketId}"]`).click();
-        await page.waitForFunction(() => document.querySelector('#historyDialog')?.open === true);
-        await page.locator('#retryButton').dispatchEvent('click');
-        await page.waitForFunction((count) => document.querySelector('#marketCount')?.textContent === `${count} 个地区`, scenario.replacement.countries.length);
-        if (scenario.expectedOpen) {
-          await page.waitForFunction((title) => document.querySelector('#historyTitle')?.textContent === title, scenario.expectedTitle);
-          await page.locator('#closeHistory').click();
-          await page.waitForFunction((marketId) => document.activeElement?.closest('tr[data-market-id]')?.dataset.marketId === marketId, activeCountry.marketId);
-        } else {
-          assert.equal(await page.locator('#historyDialog').evaluate((dialog) => dialog.open), false, scenario.label);
-          await page.waitForFunction(() => document.activeElement?.id === 'priceWorkspace');
-          releaseSecondHistory();
-          await page.waitForTimeout(100);
-          assert.equal(await page.locator('#historyDialog').evaluate((dialog) => dialog.open), false, `${scenario.label} must stay closed after the old history response resolves`);
-        }
-        assert.equal(priceCalls, 2, scenario.label);
-        assert.deepEqual(errors, [], scenario.label);
-      } finally {
-        releaseSecondHistory();
-        await page.close();
+      await page.goto(url + scenario.query, { waitUntil: 'domcontentloaded' });
+      await waitForSnapshot(page);
+      await page.locator('.country-history-button').first().click();
+      assert.equal(await page.locator('#historyDialog').evaluate(dialog => dialog.open), true);
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await waitForSnapshot(page);
+      assert.equal(documents, 2);
+      assert.equal(await page.locator('#historyDialog').evaluate(dialog => dialog.open), false, 'a document reload cannot retain a stale active market');
+      assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), scenario.next.countries.length);
+      assert.equal(await page.locator('.price-table thead th').count(), scenario.next.tiers.length + 2);
+      assert.equal(await page.locator('#priceRows tr').first().locator('td').count(), scenario.next.tiers.length + 2);
+      assert.deepEqual(await page.locator('.price-table thead button[data-sort-tier]').evaluateAll(buttons => buttons.map(button => button.dataset.sortTier)), scenario.next.tiers.map(tier => tier.id));
+      assert.equal(await page.locator('#regionSelect option').count(), new Set(scenario.next.countries.map(country => country.region)).size + 1);
+      if (scenario.next === reduced) assert.equal(new URL(page.url()).searchParams.get('tier'), '200GB');
+      else {
+        assert.equal(await page.locator('#regionSelect').inputValue(), 'all');
+        assert.equal(new URL(page.url()).searchParams.get('region'), null);
       }
-    }
-  } finally {
-    await browser.close();
-    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+      assert.deepEqual(mainRequests, []);
+      assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
   }
 });
-
-
 
 test('keeps the minimum-price overview stable and the desktop table header sticky', { timeout: 30_000 }, async (context) => {
   const browserConfig = await resolveBrowser(context, 'the stable-layout UI test');
@@ -2829,16 +2306,12 @@ test('keeps the minimum-price overview stable and the desktop table header stick
   const { port } = server.address();
   const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-  let releaseRequest;
-  const requestReleased = new Promise((resolve) => { releaseRequest = resolve; });
-  await page.route('https://**/*', (route) => route.abort());
-  await page.route('**/data/prices.json*', async (route) => {
-    await requestReleased;
-    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(validData) });
-  });
+  const releaseRequest = () => {};
+  await page.route('https://**/*', route => route.abort());
   try {
     await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-    assert.equal(await page.locator('#minimumSummary .minimum-card').count(), 5);
+    await waitForSnapshot(page);
+    assert.equal(await page.locator('#minimumSummary .minimum-card').count(), validData.tiers.length);
     assert.equal(await page.locator('h1').count(), 1);
     assert.equal(await page.locator('h1').textContent(), 'iCloud+ \u5168\u7403\u4ef7\u683c\u5bf9\u6bd4');
     assert.equal(await page.locator('#overviewTitle').evaluate((element) => element.tagName), 'H2');
@@ -2925,7 +2398,7 @@ test('canonicalizes URL state with an explicit current tier and resets brand nav
   const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
   const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
   await page.route('https://**/*', (route) => route.abort());
-  await page.route('**/data/prices.json*', (route) => route.fulfill({
+  await installEmbeddedPriceFixture(page, (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
     body: JSON.stringify(validData)
@@ -3036,7 +2509,7 @@ test('restores URL state, removes the floating search bar, and supports table re
   const page = await browser.newPage({ viewport: { width: 1365, height: 760 } });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.route('https://**/*', (route) => route.abort());
-  await page.route('**/data/prices.json*', (route) => route.fulfill({
+  await installEmbeddedPriceFixture(page, (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
     body: JSON.stringify(validData)
@@ -3161,127 +2634,64 @@ test('restores URL state, removes the floating search bar, and supports table re
   }
 });
 
-test('keeps the static table DOM when the network snapshot is unchanged', { timeout: 30_000 }, async (context) => {
-  const browserConfig = await resolveBrowser(context, 'the unchanged-static-snapshot performance test');
-  if (!browserConfig) return;
-  const validData = await readFixture('prices.json');
-  const server = await startServer();
-  const { port } = server.address();
-  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
-  const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
-  let releaseRequest;
-  let requestSeen = false;
-  const requestReleased = new Promise((resolve) => { releaseRequest = resolve; });
-  await page.addInitScript(({ nowMs }) => {
-    Date.now = () => nowMs;
-  }, { nowMs: Date.parse(validData.generatedAt) + 60 * 60 * 1_000 });
-  await page.route('https://**/*', (route) => route.abort());
-  await page.route('**/data/prices.json*', async (route) => {
-    requestSeen = true;
-    await requestReleased;
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(validData)
-    });
-  });
+
+test('embedded hydration retains static nodes, stays independent of data requests, and records startup evidence', { timeout: 30000 }, async context => {
+  const session = await snapshotSession(context, 'static-node and startup evidence', { width: 1024 });
+  if (!session) return;
+  const { page, browser, data, url, mainRequests, errors } = session;
+  let release;
+  const held = new Promise(resolve => { release = resolve; });
+  await page.route('**/script.js?v=*', async route => { await held; await route.continue(); });
   try {
-    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, validData.countries.length);
-    await page.locator('#priceRows tr[data-market-id]').first().evaluate((row) => { row.dataset.renderMarker = 'static'; });
-    releaseRequest();
-    await page.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
-    assert.equal(requestSeen, true, 'the static view must still check for a network update');
-    assert.equal(await page.locator('#priceRows tr[data-render-marker="static"]').count(), 1, 'an identical network snapshot should not rebuild the rendered table');
-  } finally {
-    releaseRequest?.();
-    await page.close();
-    await browser.close();
-    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
-  }
+    await page.goto(url, { waitUntil: 'commit' });
+    await page.waitForSelector('#priceRows tr[data-market-id]');
+    assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), data.countries.length);
+    assert.equal(await page.locator('.minimum-card').count(), data.tiers.length);
+    await page.locator('#priceRows tr[data-market-id]').first().evaluate(row => { row.dataset.renderMarker = 'static'; });
+    const before = await page.locator('#minimumSummary').boundingBox();
+    await page.evaluate(() => { window.__moduleReleasedAt = performance.now(); });
+    release();
+    await waitForSnapshot(page);
+    const evidence = await page.evaluate(() => ({
+      interactiveAfterModuleReleaseMs: performance.now() - window.__moduleReleasedAt,
+      resourceCount: performance.getEntriesByType('resource').length,
+      mainDataRequests: performance.getEntriesByType('resource').filter(entry => /\/data\/prices\.json/.test(entry.name)).length,
+      optionalHistoryRequests: performance.getEntriesByType('resource').filter(entry => /\/data\/(?:history|minimum-history)\.json/.test(entry.name)).length,
+      transferBytes: performance.getEntriesByType('resource').reduce((sum, entry) => sum + entry.transferSize, 0),
+      rows: document.querySelectorAll('#priceRows tr[data-market-id]').length,
+      embeddedBytes: new TextEncoder().encode(document.querySelector('#icloud-price-data').textContent).byteLength
+    }));
+    console.log('[embedded-startup-evidence] ' + JSON.stringify({ browser: BROWSER_UNDER_TEST, ...evidence }));
+    assert.equal(await page.locator('[data-render-marker="static"]').count(), 1, 'identical embedded snapshot must not rebuild static rows');
+    const after = await page.locator('#minimumSummary').boundingBox();
+    assert.ok(before && after && Math.abs(before.height - after.height) <= 2);
+    assert.equal(evidence.mainDataRequests, 0);
+    assert.equal(evidence.optionalHistoryRequests, 0);
+    assert.ok(evidence.embeddedBytes > 0 && evidence.embeddedBytes <= 1024 * 1024);
+    assert.deepEqual(mainRequests, []);
+    assert.deepEqual(errors, []);
+  } finally { release(); await browser.close(); }
 });
 
-test('arbitrates static and network snapshots without a third state layer', { timeout: 30_000 }, async (context) => {
-  const browserConfig = await resolveBrowser(context, 'the two-layer price loading test');
-  if (!browserConfig) return;
-  const fixture = await readFixture('prices.json');
-  const shell = await readFile(path.join(PROJECT_DIR, 'index.html'), 'utf8');
-  const noStaticFragments = renderStaticFragments(fixture);
-  noStaticFragments.META = '';
-  noStaticFragments.TABLE_BODY = `          <tr><td class="loading-cell" colspan="${fixture.tiers.length + 2}">正在检查最新价格…</td></tr>`;
-  const emptyStaticHtml = replaceStaticFragments(shell, noStaticFragments);
-  const server = await startServer();
-  const { port } = server.address();
-  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
-  try {
-    for (const { label, html, response, expectRows, expectEnabled, expectRetry } of [
-      {
-        label: 'older network keeps static',
-        html: shell,
-        response: (() => {
-          const data = structuredClone(fixture);
-          setPayloadGeneratedAt(data, new Date(Date.parse(fixture.generatedAt) - 60 * 60 * 1_000).toISOString());
-          data.fx.fetchedAt = data.generatedAt;
-          return { status: 200, contentType: 'application/json', body: JSON.stringify(data) };
-        })(),
-        expectRows: fixture.countries.length,
-        expectEnabled: false,
-        expectRetry: true
-      },
-      {
-        label: 'newer network replaces static',
-        html: shell,
-        response: (() => {
-          const data = structuredClone(fixture);
-          setPayloadGeneratedAt(data, new Date(Date.parse(fixture.generatedAt) + 60 * 1_000).toISOString());
-          data.fx.fetchedAt = data.generatedAt;
-          return { status: 200, contentType: 'application/json', body: JSON.stringify(data) };
-        })(),
-        expectRows: fixture.countries.length,
-        expectEnabled: true,
-        expectRetry: false
-      },
-      {
-        label: 'network builds a page without static prices',
-        html: emptyStaticHtml,
-        response: { status: 200, contentType: 'application/json', body: JSON.stringify(fixture) },
-        expectRows: fixture.countries.length,
-        expectEnabled: true,
-        expectRetry: false
-      },
-      {
-        label: 'failed network without static prices shows an error',
-        html: emptyStaticHtml,
-        response: { status: 503, contentType: 'application/json', body: '{}' },
-        expectRows: 0,
-        expectEnabled: false,
-        expectRetry: true
-      }
-    ]) {
-      const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
-      await page.route(`http://127.0.0.1:${port}/`, (route) => route.fulfill({ status: 200, contentType: 'text/html', body: html }));
-      await page.route('https://**/*', (route) => route.abort());
-      await page.route('**/data/prices.json*', (route) => route.fulfill(response));
-      try {
-        await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-        if (expectRows > 0) {
-          await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, expectRows);
-        } else {
-          await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
-        }
-        await page.waitForFunction((visible) => document.querySelector('#retryButton')?.hidden === !visible, expectRetry);
-        assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), expectRows, label);
-        assert.equal(await page.locator('#searchInput').isEnabled(), expectEnabled, label);
-        if (label === 'older network keeps static') {
-          assert.equal(await page.locator('#loadStatusText').textContent(), '');
-        }
-      } finally {
-        await page.close();
-      }
-    }
-  } finally {
-    await browser.close();
-    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+test('validated embedded data rebuilds inconsistent static table labels and missing static rows', { timeout: 30000 }, async context => {
+  const data = await readFixture('prices.json');
+  const shell = await snapshotHtml(data);
+  for (const mode of ['label', 'missing rows']) {
+    const session = await snapshotSession(context, 'embedded DOM reconciliation', { width: 1024 });
+    if (!session) return;
+    const { page, browser, url, mainRequests } = session;
+    const html = mode === 'label'
+      ? shell.replace(/(<span class="country-name">)[^<]+/, '$1错误静态标签')
+      : shell.replace(/(<tbody id="priceRows">)[\s\S]*?(<\/tbody>)/, '$1$2');
+    await page.route(target => target.pathname === '/', route => route.fulfill({ contentType: 'text/html', body: html }));
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded' });
+      await waitForSnapshot(page);
+      assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), data.countries.length);
+      assert.doesNotMatch(await page.locator('#priceRows').textContent(), /错误静态标签/);
+      for (const country of data.countries) assert.equal(await page.locator('tr[data-market-id="' + country.marketId + '"] .country-name').textContent(), country.nameZh || country.country);
+      assert.deepEqual(mainRequests, []);
+    } finally { await browser.close(); }
   }
 });
 
@@ -3312,7 +2722,7 @@ test('does not depend on browser storage for static hydration or controls', { ti
     }
     return route.abort();
   });
-  await page.route('**/data/prices.json*', (route) => route.fulfill({
+  await installEmbeddedPriceFixture(page, (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
     body: JSON.stringify(validData)
@@ -3338,86 +2748,30 @@ test('does not depend on browser storage for static hydration or controls', { ti
   }
 });
 
-test('rejects redirected, oversized, and malformed UTF-8 price responses before parsing', { timeout: 30_000 }, async (context) => {
-  const browserConfig = await resolveBrowser(context, 'the bounded network-data test');
-  if (!browserConfig) return;
-  const server = await startServer();
-  const { port } = server.address();
-  const origin = `http://127.0.0.1:${port}`;
-  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
-  const cases = [
-    {
-      name: 'redirected',
-      serverResponse: 'redirect'
-    },
-    {
-      name: 'oversized',
-      fulfill: { status: 200, contentType: 'application/json', body: ' '.repeat((1024 * 1024) + 1) }
-    },
-    {
-      name: 'malformed UTF-8',
-      fulfill: { status: 200, contentType: 'application/json', body: Buffer.from([0xff, 0xfe, 0xfd]) }
-    }
-  ];
-  try {
-    for (const testCase of cases) {
-      const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
-      let redirectTargetRequested = false;
-      page.on('request', (request) => {
-        if (request.url() === `${origin}/data/history.json`) redirectTargetRequested = true;
-      });
-      await page.route('https://**/*', (route) => route.abort());
-      if (testCase.serverResponse) {
-        await page.setExtraHTTPHeaders({ 'x-icloud-test-price-response': testCase.serverResponse });
-      } else {
-        await page.route('**/data/prices.json*', (route) => route.fulfill(testCase.fulfill));
-      }
-      await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
-      await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
-      assert.equal(await page.locator('#searchInput').isEnabled(), false, `${testCase.name} unusable static fallback must keep JS controls disabled`);
-      assert.equal(redirectTargetRequested, false, 'price fetch must not follow redirects');
-      await page.close();
-    }
-  } finally {
-    await browser.close();
-    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
-  }
-});
 
-test('rejects rollback and more-than-five-minute future network data', { timeout: 60_000 }, async (context) => {
-  const browserConfig = await resolveBrowser(context, 'the network freshness boundary test');
-  if (!browserConfig) return;
-  const validData = await readFixture('prices.json');
-  const scenarios = [
-    { label: 'expired network data', generatedAt: new Date(Date.now() - (7 * 24 * 60 * 60 * 1_000) - 60_000).toISOString() },
-    { label: 'future network data', generatedAt: new Date(Date.now() + (6 * 60 * 1_000)).toISOString() }
-  ];
-  const server = await startServer();
-  const { port } = server.address();
-  const browser = await browserConfig.browserType.launch(browserConfig.launchOptions);
-  try {
-    for (const { label, generatedAt } of scenarios) {
-      const payload = structuredClone(validData);
-      setPayloadGeneratedAt(payload, generatedAt);
-      payload.fx.fetchedAt = generatedAt;
-      payload.fx.stale = false;
-      const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
-      await page.route('https://**/*', (route) => route.abort());
-      await page.route('**/data/prices.json*', (route) => route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(payload)
-      }));
-      await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: 'domcontentloaded' });
-      await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
-      assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), validData.countries.length, label);
-      assert.match(await page.locator('#updatedAt').textContent(), /更新于/ , label);
-      assert.equal(await page.locator('#loadStatusText').textContent(), '', label);
-      await page.close();
-    }
-  } finally {
-    await browser.close();
-    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+test('optional history still rejects redirects, oversized bytes and malformed UTF-8', { timeout: 30000 }, async context => {
+  for (const mode of ['redirect', 'oversized', 'invalid UTF-8']) {
+    const session = await snapshotSession(context, 'optional history transport safety');
+    if (!session) return;
+    const { page, browser, url, mainRequests } = session;
+    let redirected = false;
+    page.on('request', request => { if (request.url().includes('/__history_redirect_target')) redirected = true; });
+    if (mode === 'redirect') await page.setExtraHTTPHeaders({ 'x-icloud-test-history-response': 'redirect' });
+    else await page.route('**/data/history.json*', route => route.fulfill({
+      contentType: 'application/json',
+      body: mode === 'oversized' ? ' '.repeat(8 * 1024 * 1024 + 1) : Buffer.from([0xff, 0xfe, 0xfd])
+    }));
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded' });
+      await waitForSnapshot(page);
+      const dates = await page.locator('#updatedAt, #fxStatus, #applePublishedDate').allTextContents();
+      await page.locator('.country-history-button').first().click();
+      await page.waitForFunction(() => document.querySelector('#historySubtitle').textContent.includes('历史暂无法读取'));
+      assert.equal(redirected, false);
+      assert.equal(await page.locator('#searchInput').isEnabled(), true);
+      assert.deepEqual(await page.locator('#updatedAt, #fxStatus, #applePublishedDate').allTextContents(), dates);
+      assert.deepEqual(mainRequests, []);
+    } finally { await browser.close(); }
   }
 });
 
@@ -3613,7 +2967,7 @@ test('keeps mobile ranking visible and UX fallbacks stable', { timeout: 60_000 }
         }
         return route.abort();
       });
-      await page.route('**/data/prices.json*', route => route.fulfill({ json: data }));
+      await installEmbeddedPriceFixture(page, route => route.fulfill({ json: data }));
       try {
         await page.goto('http://127.0.0.1:' + port + '/', { waitUntil: 'domcontentloaded' });
         await page.waitForFunction((count) => document.querySelectorAll('#priceRows tr[data-market-id]').length === count, data.countries.length);
@@ -4065,33 +3419,13 @@ test('review: all mobile static tiers remain accessible without JavaScript', { t
     assert.equal(await page.locator('th[data-tier="200GB"]').getAttribute('aria-sort'), 'ascending');
   } finally { await browser.close(); }
 });
-test('review: mobile network failure preserves every tier and retry enables the picker', { timeout: 30000 }, async (context) => {
-  const env = await reviewOpenPage(context);
-  if (!env) return;
-  const { page, browser, data, url } = env;
-  let attempts = 0;
-  await page.route('**/data/prices.json*', (route) => {
-    attempts += 1;
-    return attempts === 1 ? route.fulfill({ status: 503, body: '{}' }) : route.fulfill({ json: data });
-  });
-  try {
-    await page.goto(url, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
-    assert.equal(await page.locator('.workspace.price-ui-ready').count(), 0);
-    await reviewAssertAllStaticTiers(page, data);
-    await page.locator('#retryButton').click();
-    await page.waitForFunction(() => document.querySelector('.workspace.price-ui-ready'));
-    assert.equal(await page.locator('#mobileTierControl button').count(), data.tiers.length);
-    const selected = await page.locator('#mobileTierControl button[aria-pressed="true"]').getAttribute('data-tier');
-    for (const { id } of data.tiers) assert.equal(await page.locator(`th[data-tier="${id}"]`).isVisible(), id === selected);
-    assert.equal(attempts, 2);
-  } finally { await browser.close(); }
-});
+// Mobile all-tier fallback and picker recovery are included in the corruption matrix.
+
 test('review: keyboard tier activation preserves focus in mobile and history controls', { timeout: 30000 }, async (context) => {
   const env = await reviewOpenPage(context);
   if (!env) return;
   const { page, browser, data, url } = env;
-  await page.route('**/data/prices.json*', (route) => route.fulfill({ json: data }));
+  await installEmbeddedPriceFixture(page, (route) => route.fulfill({ json: data }));
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => document.querySelector('.workspace.price-ui-ready'));
@@ -4123,27 +3457,29 @@ test('review: keyboard tier activation preserves focus in mobile and history con
     assert.equal(await trigger.evaluate((node) => document.activeElement === node), true);
   } finally { await browser.close(); }
 });
-test('review: unsupported valid tier is canonicalized without rebuilding static rows', { timeout: 30000 }, async (context) => {
-  const env = await reviewOpenPage(context);
-  if (!env) return;
-  const { page, browser, data, url } = env;
-  const absentTier = ['100GB', '300GB', '400GB'].find((id) => !data.tiers.some((tier) => tier.id === id));
-  assert.ok(absentTier);
-  const expectedTier = data.tiers.find(({ id }) => id === '200GB')?.id ?? data.tiers[0].id;
+
+test('review: unsupported valid tier is canonicalized without rebuilding static rows', { timeout: 30000 }, async context => {
+  const session = await snapshotSession(context, 'unsupported tier canonicalization');
+  if (!session) return;
+  const { page, browser, data, url } = session;
+  const absentTier = ['100GB', '300GB', '400GB'].find(id => !data.tiers.some(tier => tier.id === id));
+  const expectedTier = data.tiers.find(tier => tier.id === '200GB')?.id ?? data.tiers[0].id;
   let release;
-  const released = new Promise((resolve) => { release = resolve; });
-  await page.route('**/data/prices.json*', async (route) => { await released; await route.fulfill({ json: data }); });
+  const held = new Promise(resolve => { release = resolve; });
+  await page.route('**/script.js?v=*', async route => { await held; await route.continue(); });
   try {
-    await page.goto(`${url}?tier=${absentTier}`, { waitUntil: 'domcontentloaded' });
-    await page.locator('#priceRows tr[data-market-id]').first().evaluate((row) => { row.dataset.reviewStaticMarker = 'retained'; });
+    await page.goto(url + '?tier=' + absentTier, { waitUntil: 'commit' });
+    await page.waitForSelector('#priceRows tr[data-market-id]');
+    await page.locator('#priceRows tr[data-market-id]').first().evaluate(row => { row.dataset.reviewStaticMarker = 'retained'; });
     release();
-    await page.waitForFunction(() => document.querySelector('.workspace.price-ui-ready'));
+    await waitForSnapshot(page);
     assert.equal(new URL(page.url()).searchParams.get('tier'), expectedTier);
-    assert.equal(await page.locator('tr[data-review-static-marker="retained"]').count(), 1);
-    assert.equal(await page.locator(`th[data-tier="${expectedTier}"]`).getAttribute('aria-sort'), 'ascending');
+    assert.equal(await page.locator('[data-review-static-marker="retained"]').count(), 1);
+    assert.equal(await page.locator('th[data-tier="' + expectedTier + '"]').getAttribute('aria-sort'), 'ascending');
     assert.equal(await page.locator('#mobileTierControl button[aria-pressed="true"]').getAttribute('data-tier'), expectedTier);
   } finally { release(); await browser.close(); }
 });
+
 test('review: changed snapshot preserves the last recorded date while history stays deferred', { timeout: 60000 }, async (context) => {
   const config = await resolveBrowser(context, 'the changed publication-date regression');
   if (!config) return;
@@ -4186,14 +3522,15 @@ test('review: changed snapshot preserves the last recorded date while history st
       let priceCalls = 0; let historyCalls = 0;
       await page.addInitScript((nowMs) => { Date.now = () => nowMs; }, Date.parse(nextAt) + 60000);
       await page.route('https://**/*', (route) => route.abort());
-      await page.route('**/data/prices.json*', (route) => { priceCalls += 1; return route.fulfill({ json: priceCalls === 1 ? original : next }); });
+      await installEmbeddedPriceFixture(page, (route) => { priceCalls += 1; return route.fulfill({ json: priceCalls === 1 ? original : next }); });
       await page.route('**/data/history.json*', (route) => { historyCalls += 1; return unavailable ? route.fulfill({ status: 503, body: '{}' }) : route.fulfill({ json: nextHistory }); });
       try {
         await page.goto(url, { waitUntil: 'domcontentloaded' });
         await page.waitForFunction(() => document.querySelector('.workspace.price-ui-ready'));
         assert.equal(await page.locator('#applePublishedDate').textContent(), oldDate);
         assert.equal(historyCalls, 0, 'unchanged initial hydration must defer history');
-        await page.locator('#retryButton').dispatchEvent('click');
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await waitForSnapshot(page);
         await page.waitForFunction((at) => document.querySelector('#updatedAt')?.textContent === `更新于 ${new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Shanghai' }).format(new Date(at))}`, nextAt);
         assert.equal(historyCalls, 0, 'changed prices must not eagerly fetch the history ledger');
         assert.equal(await page.locator('#applePublishedDate').textContent(), oldDate);
@@ -4245,33 +3582,7 @@ test('country history retains removal and restoration even at the same price', {
   } finally { await browser.close(); }
 });
 
-test('static prices recover after clock correction while JSON stays offline', {timeout:30000}, async context => {
-  const config = await resolveBrowser(context,'offline clock recovery');
-  if (!config) return;
-  const data = await readFixture('prices.json');
-  const server = await startServer();
-  const browser = await config.browserType.launch(config.launchOptions);
-  try {
-    const page = await browser.newPage();
-    await page.addInitScript(now => {Date.now=()=>now;},Date.parse(data.generatedAt)-3600000);
-    await page.route('**/data/prices.json*',route=>route.abort());
-    await page.route('https://**/*',route=>route.abort());
-    await page.goto('http://127.0.0.1:'+server.address().port+'/',{waitUntil:'domcontentloaded'});
-    await page.waitForFunction(()=>document.querySelector('#updatedAt').textContent.includes('数据时间异常'));
-    await page.waitForFunction(()=>document.querySelector('#priceWorkspace').getAttribute('aria-busy')==='false');
-    await page.evaluate(now=>{Date.now=()=>now;window.dispatchEvent(new Event('pageshow'));},Date.parse(data.generatedAt)+3600000);
-    await page.waitForFunction(()=>document.querySelector('#updatedAt').textContent.includes('更新于'));
-    assert.equal(await page.locator('.minimum-card').count(),data.tiers.length);
-    assert.ok(await page.locator('.minimum-badge').count()>0);
-    assert.equal(await page.locator('#priceRows tr[data-market-id] > td:first-child').first().textContent(),'1');
-    assert.equal(await page.locator('#searchInput').isDisabled(),true,'offline snapshot does not fabricate JSON hydration');
-    await page.locator('#retryButton').click();
-    await page.waitForFunction(()=>!document.querySelector('#retryButton').hidden);
-    assert.match(await page.locator('#updatedAt').textContent(),/更新于/);
-    assert.doesNotMatch(await page.locator('#updatedAt').textContent(),/时间异常/);
-    assert.equal(await page.locator('.minimum-card').count(),data.tiers.length);
-  } finally {await browser.close();}
-});
+// Initial-future and later-future clocks are covered in the local-only clock-safety matrix.
 
 test('accepted minimum history survives pending, failed and older refreshes', { timeout: 60000 }, async (context) => {
   const history = await readFixture('minimum-history.json');
@@ -4329,54 +3640,39 @@ test('accepted minimum history survives pending, failed and older refreshes', { 
   } finally { await browser.close(); }
 });
 
-test('accepted country and publication histories survive price refresh failures', { timeout: 60000 }, async (context) => {
-  const env = await reviewOpenPage(context);
-  if (!env) return;
-  const { page, browser, data, url } = env;
-  const history = await readFixture('history.json');
-  let current = data; let failHistory = false; let historyCalls = 0;
-  await page.route('**/data/prices.json*', route => route.fulfill({ json: current }));
-  await page.route('**/data/history.json*', route => {
-    historyCalls += 1;
-    return failHistory ? route.fulfill({ status: 503, body: '{}' }) : route.fulfill({ json: history });
-  });
+
+test('accepted country and publication histories remain available across offline reopen and lifecycle events', { timeout: 30000 }, async context => {
+  const session = await snapshotSession(context, 'accepted optional history retention');
+  if (!session) return;
+  const { page, browser, url, mainRequests } = session;
+  let historyCalls = 0;
+  await page.route('**/data/history.json*', route => { historyCalls++; return route.continue(); });
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(() => document.querySelector('.workspace.price-ui-ready'));
-    const marketId = data.countries[0].marketId;
-    await page.locator('tr[data-market-id="' + marketId + '"] .country-history-button').click();
-    await page.waitForFunction(() => !document.querySelector('#historySubtitle').textContent.includes('正在读取'));
+    await waitForSnapshot(page);
+    await page.locator('.country-history-button').first().click();
+    await waitForAcceptedCountryHistory(page);
     const rows = await page.locator('#historyRows').textContent();
-    const published = await page.locator('#applePublishedDate').textContent();
-    await page.locator('#closeHistory').click();
-    current = structuredClone(data);
-    setPayloadGeneratedAt(current, new Date(Date.parse(data.generatedAt) + 30000).toISOString());
-    failHistory = true;
-    await page.locator('#retryButton').dispatchEvent('click');
-    await page.waitForFunction(() => document.querySelector('#loadStatus').hidden);
-    await page.locator('tr[data-market-id="' + marketId + '"] .country-history-button').click();
-    assert.equal(await page.locator('#historyRows').textContent(), rows);
-    assert.equal(historyCalls, 1, 'compatible history needs no new request');
-    await page.locator('#closeHistory').click();
-    const tier = current.tiers[0].id;
-    const plan = current.countries[0].plans[tier];
-    plan.cnyPrice = Number((plan.cnyPrice * (plan.price + 1) / plan.price).toFixed(2));
-    plan.price += 1; plan.formattedPrice = String(plan.price);
-    setPayloadGeneratedAt(current, new Date(Date.parse(data.generatedAt) + 60000).toISOString());
-    rerankPriceFixture(current);
-    await page.locator('#retryButton').dispatchEvent('click');
-    await page.waitForFunction(() => document.querySelector('#loadStatus').hidden);
-    const failureResponse = page.waitForResponse(response => response.url().includes('/data/history.json') && response.status() === 503);
-    await page.locator('tr[data-market-id="' + marketId + '"] .country-history-button').click();
-    await failureResponse;
-    assert.equal(await page.locator('#historyRows').textContent(), rows, 'failed incompatible refresh preserves dated historical rows');
-    assert.equal(await page.locator('#historyLocalPrice .price-trend').count(), 0, 'old records cannot imply a current trend');
-    assert.match(await page.locator('#historySubtitle').textContent(), /记录截至/);
-    assert.equal(await page.locator('#applePublishedDate').textContent(), published);
     await page.locator('#closeHistory').click();
     await page.locator('#publishedDateButton').click();
-    assert.ok(await page.locator('#publishedDateRows tr').count() > 0);
-    assert.doesNotMatch(await page.locator('#publishedDateRows').textContent(), /无法读取/);
+    await page.waitForFunction(() => document.querySelectorAll('#publishedDateRows tr').length > 0);
+    const publicationRows = await page.locator('#publishedDateRows').textContent();
+    const published = await page.locator('#applePublishedDate').textContent();
+    await page.locator('#closePublishedDate').click();
+    const acceptedCalls = historyCalls;
+    await page.context().setOffline(true);
+    await page.evaluate(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+      window.dispatchEvent(new Event('pageshow'));
+    });
+    await page.locator('.country-history-button').first().click();
+    assert.equal(await page.locator('#historyRows').textContent(), rows);
+    await page.locator('#closeHistory').click();
+    await page.locator('#publishedDateButton').click();
+    assert.equal(await page.locator('#publishedDateRows').textContent(), publicationRows);
+    assert.equal(await page.locator('#applePublishedDate').textContent(), published);
+    assert.equal(historyCalls, acceptedCalls);
+    assert.deepEqual(mainRequests, []);
   } finally { await browser.close(); }
 });
 
@@ -4571,9 +3867,16 @@ test('same-generatedAt label changes rebuild static table labels before enabling
       assert.deepEqual(current.plans, country.plans, 'only the name label may change');
       const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
       let historyCalls = 0;
+      const pageErrors = [];
+      page.on('pageerror', error => pageErrors.push(error.message));
       await page.addInitScript(now => { Date.now = () => now; }, Date.parse(original.generatedAt) + 3600000);
       await page.route('https://**/*', route => route.abort());
-      await page.route('**/data/prices.json*', route => route.fulfill({ json: payload }));
+      await page.route(target => target.pathname === '/', async route => {
+        const shell = await readFile(path.join(PROJECT_DIR, 'index.html'), 'utf8');
+        const envelope = JSON.parse(shell.match(/<script\b[^>]*\bid="icloud-price-data"[^>]*>([\s\S]*?)<\/script>/)[1]);
+        envelope.prices = payload;
+        await route.fulfill({ contentType: 'text/html', body: replaceEmbeddedEnvelope(shell, envelope) });
+      });
       await page.route('**/data/history.json*', route => {
         historyCalls += 1;
         return route.fulfill({ status: 503, contentType: 'application/json', body: '{}' });
@@ -4590,7 +3893,21 @@ test('same-generatedAt label changes rebuild static table labels before enabling
         assert.equal(await page.locator('#historyTitle').textContent(), nameZh, 'dialog and table must use the same accepted name');
         await page.locator('#closeHistory').click();
         await page.locator('#searchInput').fill(nameZh);
-        await page.waitForFunction(marketId => document.querySelectorAll('#priceRows tr[data-market-id]').length === 1 && document.querySelector('#priceRows tr[data-market-id]')?.dataset.marketId === marketId, country.marketId);
+        try {
+          await page.waitForFunction(marketId => document.querySelectorAll('#priceRows tr[data-market-id]').length === 1 && document.querySelector('#priceRows tr[data-market-id]')?.dataset.marketId === marketId, country.marketId);
+        } catch (error) {
+          console.error('same-generation search failure', { nameZh, marketId: country.marketId,
+            pageErrors, ui: await page.evaluate(() => ({
+              value: document.querySelector('#searchInput').value,
+              disabled: document.querySelector('#searchInput').disabled,
+              active: document.activeElement?.outerHTML,
+              rows: [...document.querySelectorAll('#priceRows tr[data-market-id]')].map(row => row.dataset.marketId),
+              url: location.href, status: document.querySelector('#loadStatus').textContent,
+              openDialogs: [...document.querySelectorAll('dialog[open]')].map(dialog => dialog.id)
+            }))
+          });
+          throw error;
+        }
         assert.equal(await row.locator('.country-name').textContent(), nameZh, 'search rerender must retain the same visible label');
       } finally {
         await page.close();
@@ -4600,3 +3917,403 @@ test('same-generatedAt label changes rebuild static table labels before enabling
     await browser.close();
   }
 });
+
+
+// PR #184's old first/cache-reload x success/failure scenarios now exercise
+// the remaining async boundary: optional history across local clock recovery.
+// There is no in-document price generation switch or pending main-data fetch.
+for (const lateStage of ['first', 'cache-reload']) {
+  for (const lateOutcome of ['success', '503']) {
+    test('stress async: ' + lateStage + ' history ' + lateOutcome + ' cannot undo embedded clock recovery', { timeout: 45000 }, async context => {
+      const session = await snapshotSession(context, 'optional history and clock race', { width: 1024 });
+      if (!session) return;
+      const { page, browser, data, url, errors, mainRequests } = session;
+      const history = await readFixture('history.json');
+      const inconsistent = structuredClone(history);
+      inconsistent.sourcePublishedDates = inconsistent.sourcePublishedDates.slice(0, 1);
+      let calls = 0;
+      let pending;
+      await page.route('**/data/history.json*', route => {
+        calls++;
+        if (lateStage === 'cache-reload' && calls === 1) return route.fulfill({ json: inconsistent });
+        if (calls === (lateStage === 'first' ? 1 : 2)) { pending = route; return; }
+        return route.fulfill({ json: history });
+      });
+      try {
+        await page.goto(url, { waitUntil: 'domcontentloaded' });
+        await waitForSnapshot(page);
+        const dates = await page.locator('#updatedAt, #fxStatus, #applePublishedDate').allTextContents();
+        const ranks = await page.locator('#priceRows tr[data-market-id] > td:first-child').allTextContents();
+        const badges = await page.locator('.minimum-badge').count();
+        await page.locator('.country-history-button').first().click();
+        for (let i = 0; !pending && i < 500; i++) await page.waitForTimeout(10);
+        assert.ok(pending, 'the requested history stage must actually be pending');
+        await page.evaluate(now => {
+          Date.now = () => now;
+          window.dispatchEvent(new Event('pageshow'));
+        }, Date.parse(data.generatedAt) - 3600000);
+        assert.equal(await page.locator('#searchInput').isDisabled(), true);
+        assert.equal(await page.locator('.minimum-badge').count(), 0);
+        assert.equal(await page.locator('#historyDialog').evaluate(dialog => dialog.open), false);
+        await page.evaluate(now => {
+          Date.now = () => now;
+          window.dispatchEvent(new Event('pageshow'));
+          document.dispatchEvent(new Event('visibilitychange'));
+          window.dispatchEvent(new Event('pageshow'));
+        }, Date.parse(data.generatedAt) + 3600000);
+        await waitForSnapshot(page);
+        const second = data.countries[1];
+        await page.locator('tr[data-market-id="' + second.marketId + '"] .country-history-button').click();
+        const responseReady = page.waitForResponse(response => response.url().includes('/data/history.json'));
+        await pending.fulfill(lateOutcome === '503' ? { status: 503, body: '{}' } : { json: history });
+        pending = null;
+        await responseReady;
+        await page.waitForFunction(() => !document.querySelector('#historySubtitle').textContent.includes('正在读取'));
+        assert.equal(await page.locator('#historyTitle').textContent(), second.nameZh || second.country);
+        assert.equal(await page.locator('#searchInput').isEnabled(), true);
+        assert.equal(await page.locator('.minimum-badge').count(), badges);
+        assert.deepEqual(await page.locator('#priceRows tr[data-market-id] > td:first-child').allTextContents(), ranks);
+        assert.deepEqual(await page.locator('#updatedAt, #fxStatus, #applePublishedDate').allTextContents(), dates);
+        assert.equal(calls, lateStage === 'first' ? 1 : 2, 'clock recovery neither duplicates nor restarts optional history');
+        if (lateOutcome === '503') assert.match(await page.locator('#historySubtitle').textContent(), /暂无法读取/);
+        else assert.doesNotMatch(await page.locator('#historySubtitle').textContent(), /暂无法读取/);
+        assert.deepEqual(mainRequests, []);
+        assert.deepEqual(errors, []);
+      } finally {
+        if (pending) await pending.abort().catch(() => {});
+        await browser.close();
+      }
+    });
+  }
+}
+
+
+
+test('the first hydrated static country button opens history before any table rerender', { timeout: 30000 }, async context => {
+  const session = await snapshotSession(context, 'first-click static history binding', { width: 1024 });
+  if (!session) return;
+  const { page, browser, data, url, mainRequests, errors } = session;
+  let release;
+  const pendingModule = new Promise(resolve => { release = resolve; });
+  await page.route('**/script.js?v=*', async route => { await pendingModule; await route.continue(); });
+  let historyRequests = 0;
+  await page.route('**/data/history.json*', route => { historyRequests++; return route.continue(); });
+  try {
+    await page.goto(url, { waitUntil: 'commit' });
+    await page.waitForSelector('#priceRows tr[data-market-id]');
+    const marketId = await page.locator('#priceRows tr[data-market-id]').first().getAttribute('data-market-id');
+    const expected = data.countries.find(country => country.marketId === marketId);
+    await page.locator('#priceRows tr[data-market-id]').first().evaluate(row => { row.dataset.firstClickStatic = 'retained'; });
+    release();
+    await waitForSnapshot(page);
+    assert.equal(await page.locator('[data-first-click-static="retained"]').count(), 1, 'the initial static row must survive hydration');
+    assert.equal(historyRequests, 0);
+    // No search, sorting, minimum action or filter has rebuilt/bound these rows.
+    const button = page.locator('[data-first-click-static="retained"] .country-history-button');
+    assert.equal(await button.isEnabled(), true);
+    await button.click();
+    await page.waitForFunction(() => document.querySelector('#historyDialog').open);
+    assert.equal(await page.locator('#historyTitle').textContent(), expected.nameZh || expected.country);
+    await waitForAcceptedCountryHistory(page);
+    assert.equal(historyRequests, 1);
+    await page.locator('#closeHistory').click();
+    assert.equal(await button.evaluate(node => node === document.activeElement), true);
+    assert.deepEqual(mainRequests, []);
+    assert.deepEqual(errors, []);
+  } finally { release(); await browser.close(); }
+});
+
+for (const corruption of ['duplicate market row', 'swapped market rows', 'duplicate tier cell', 'reordered tier cells', 'minimum badge pollution']) {
+  test('embedded projection rejects ' + corruption + ' even when counts match', { timeout: 30000 }, async context => {
+    const session = await snapshotSession(context, 'static projection identity', { width: 1024 });
+    if (!session) return;
+    const { page, browser, data, url, mainRequests, errors } = session;
+    let release;
+    const pendingModule = new Promise(resolve => { release = resolve; });
+    await page.route('**/script.js?v=*', async route => { await pendingModule; await route.continue(); });
+    try {
+      await page.goto(url, { waitUntil: 'commit' });
+      await page.waitForSelector('#priceRows tr[data-market-id]');
+      const before = await page.evaluate(mode => {
+        const envelope = document.querySelector('#icloud-price-data').textContent;
+        const rows = [...document.querySelectorAll('#priceRows tr[data-market-id]')];
+        const cells = [...rows[0].querySelectorAll('.price-cell')];
+        if (mode === 'duplicate market row') rows[1].replaceWith(rows[0].cloneNode(true));
+        else if (mode === 'swapped market rows') rows[1].after(rows[0]);
+        else if (mode === 'duplicate tier cell') cells[1].replaceWith(cells[0].cloneNode(true));
+        else if (mode === 'minimum badge pollution') {
+          const cell = document.querySelector('#priceRows .price-cell:not(.is-minimum)');
+          cell.classList.add('is-minimum');
+          const badge = document.createElement('span');
+          badge.className = 'minimum-badge';
+          badge.dataset.adversarialBadge = 'true';
+          badge.textContent = '最低';
+          cell.append(badge);
+        }
+        else for (const cell of [...cells].reverse()) rows[0].append(cell);
+        return {
+          envelope,
+          rowCount: document.querySelectorAll('#priceRows tr[data-market-id]').length,
+          originalMarkets: rows.map(row => row.dataset.marketId),
+          actualMarkets: [...document.querySelectorAll('#priceRows tr[data-market-id]')].map(row => row.dataset.marketId),
+          uniqueMarkets: new Set([...document.querySelectorAll('#priceRows tr[data-market-id]')].map(row => row.dataset.marketId)).size,
+          tiers: [...document.querySelector('#priceRows tr[data-market-id]').querySelectorAll('.price-cell')].map(cell => cell.dataset.tier)
+        };
+      }, corruption);
+      assert.equal(before.rowCount, data.countries.length, 'the adversarial fixture retains the expected row count');
+      if (corruption === 'duplicate market row') assert.equal(before.uniqueMarkets, data.countries.length - 1);
+      else if (corruption === 'swapped market rows') {
+        assert.equal(before.uniqueMarkets, data.countries.length, 'all market identities remain valid and unique');
+        assert.notDeepEqual(before.actualMarkets, before.originalMarkets, 'only the static row ordering is corrupted');
+      }
+      else if (corruption === 'minimum badge pollution') {
+        assert.equal(await page.locator('[data-adversarial-badge="true"]').count(), 1, 'a nonminimum cell now falsely claims a minimum');
+        assert.deepEqual(before.actualMarkets, before.originalMarkets);
+      }
+      else {
+        assert.equal(before.tiers.length, data.tiers.length, 'the adversarial fixture retains the expected cell count');
+        assert.notDeepEqual(before.tiers, data.tiers.map(tier => tier.id));
+      }
+      release();
+      await waitForSnapshot(page);
+      assert.equal(await page.locator('#icloud-price-data').textContent(), before.envelope, 'reconciliation must not rewrite its authority');
+      const marketIds = await page.locator('#priceRows tr[data-market-id]').evaluateAll(rows => rows.map(row => row.dataset.marketId));
+      const defaultTier = data.tiers.find(tier => tier.id === '200GB')?.id ?? data.tiers[0].id;
+      const expected = [...data.countries].sort((a, b) => a.plans[defaultTier].cnyRank - b.plans[defaultTier].cnyRank || a.marketId.localeCompare(b.marketId, 'en'));
+      assert.deepEqual(marketIds, expected.map(country => country.marketId), 'the full unique market projection and order must come from the snapshot');
+      const rowTiers = await page.locator('#priceRows tr[data-market-id]').evaluateAll(rows => rows.map(row => [...row.querySelectorAll('.price-cell')].map(cell => cell.dataset.tier)));
+      assert.deepEqual(rowTiers, expected.map(() => data.tiers.map(tier => tier.id)), 'every row must contain the complete ordered tier projection');
+      const visibleProjection = await page.locator('#priceRows tr[data-market-id]').evaluateAll(rows => rows.map(row => ({
+        marketId: row.dataset.marketId,
+        name: row.querySelector('.country-name').textContent,
+        prices: [...row.querySelectorAll('.price-cell .price-local')].map(cell => cell.textContent),
+        topRank: row.firstElementChild.classList.contains('rank-top'),
+        minimums: [...row.querySelectorAll('.price-cell')].map(cell => ({
+          className: cell.classList.contains('is-minimum'),
+          badges: cell.querySelectorAll('.minimum-badge').length
+        }))
+      })));
+      assert.deepEqual(visibleProjection, expected.map(country => ({
+        marketId: country.marketId,
+        name: country.nameZh || country.country,
+        prices: data.tiers.map(tier => country.plans[tier.id].formattedPrice),
+        topRank: country.plans[defaultTier].cnyRank <= 3,
+        minimums: data.tiers.map(tier => ({
+          className: country.plans[tier.id].cnyRank === 1,
+          badges: country.plans[tier.id].cnyRank === 1 ? 1 : 0
+        }))
+      })));
+      assert.deepEqual(mainRequests, []);
+      assert.deepEqual(errors, []);
+    } finally { release(); await browser.close(); }
+  });
+}
+
+for (const corruption of ['amount', 'navigation target']) {
+  test('minimum cards recover a corrupted static ' + corruption + ' from embedded rank-one prices', { timeout: 30000 }, async context => {
+    const session = await snapshotSession(context, 'minimum card projection', { width: 1024 });
+    if (!session) return;
+    const { page, browser, data, url, mainRequests, errors } = session;
+    const tier = data.tiers[0];
+    const winners = data.countries.filter(country => country.plans[tier.id].cnyRank === 1).sort((a, b) => a.marketId.localeCompare(b.marketId, 'en'));
+    assert.ok(winners.length > 0);
+    const expected = winners[0];
+    const wrongTarget = data.countries.find(country => country.plans[tier.id].cnyRank !== 1);
+    assert.ok(wrongTarget, 'the fixture needs a nonminimum navigation target');
+    let release;
+    const pendingModule = new Promise(resolve => { release = resolve; });
+    await page.route('**/script.js?v=*', async route => { await pendingModule; await route.continue(); });
+    try {
+      await page.goto(url, { waitUntil: 'commit' });
+      await page.waitForSelector('.minimum-card');
+      const untouched = await page.evaluate(({ mode, tierId, wrongId }) => {
+        const card = document.querySelector('.minimum-card[data-tier="' + tierId + '"]');
+        const original = { envelope: document.querySelector('#icloud-price-data').textContent, rows: document.querySelector('#priceRows').innerHTML };
+        if (mode === 'amount') card.querySelector('.minimum-price').textContent = '¥0.01';
+        else card.dataset.marketId = wrongId;
+        return original;
+      }, { mode: corruption, tierId: tier.id, wrongId: wrongTarget.marketId });
+      release();
+      await waitForSnapshot(page);
+      assert.equal(await page.locator('#icloud-price-data').textContent(), untouched.envelope);
+      const card = page.locator('.minimum-card[data-tier="' + tier.id + '"]');
+      assert.equal(await card.locator('.minimum-price').textContent(), '¥' + uiNumberFormatter.format(expected.plans[tier.id].cnyPrice));
+      assert.equal(await card.getAttribute('data-market-id'), expected.marketId);
+      await card.click();
+      await assertMinimumNavigation(page, expected.marketId, tier.id);
+      assert.deepEqual(mainRequests, []);
+      assert.deepEqual(errors, []);
+    } finally { release(); await browser.close(); }
+  });
+}
+
+for (const trigger of ['search', 'country sort', 'tier sort', 'minimum card', 'country history', 'publication history']) {
+  test('a clock rollback is protected on ' + trigger + ' without lifecycle events', { timeout: 30000 }, async context => {
+    const session = await snapshotSession(context, 'interaction-time clock safety', { width: 1024 });
+    if (!session) return;
+    const { page, browser, data, url, mainRequests, errors } = session;
+    let historyRequests = 0;
+    page.on('request', request => { if (/\/data\/(?:history|minimum-history)\.json/.test(new URL(request.url()).pathname)) historyRequests++; });
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded' });
+      await waitForSnapshot(page);
+      assert.ok(await page.locator('.minimum-badge').count() > 0);
+      // Deliberately do not dispatch pageshow, visibilitychange or any reload.
+      await page.evaluate(now => { Date.now = () => now; }, Date.parse(data.generatedAt) - 3600000);
+      if (trigger === 'search') await page.locator('#searchInput').fill('美国');
+      else if (trigger === 'country sort') await page.locator('button[data-sort="country"]').click();
+      else if (trigger === 'tier sort') await page.locator('button[data-sort-tier]:visible').first().click();
+      else if (trigger === 'minimum card') await page.locator('.minimum-card').first().click();
+      else if (trigger === 'country history') await page.locator('.country-history-button').first().click();
+      else await page.locator('#publishedDateButton').click();
+      await page.waitForFunction(() => document.querySelector('#searchInput').disabled);
+      assert.equal(await page.locator('.minimum-card, .minimum-badge, .rank-top, .is-minimum').count(), 0);
+      assert.ok((await page.locator('#priceRows tr[data-market-id] > td:first-child').allTextContents()).every(text => text === '—'));
+      assert.equal(await page.locator('#historyDialog').evaluate(dialog => dialog.open), false);
+      assert.equal(await page.locator('#publishedDateDialog').evaluate(dialog => dialog.open), false);
+      assert.match(await page.locator('#updatedAt').textContent(), /数据时间异常/);
+      assert.equal(historyRequests, 0, 'an unsafe interaction must not start optional history');
+      assert.deepEqual(mainRequests, []);
+      await page.evaluate(now => {
+        Date.now = () => now;
+        window.dispatchEvent(new Event('pageshow'));
+      }, Date.parse(data.generatedAt) + 3600000);
+      await waitForSnapshot(page);
+      assert.equal(await page.locator('.minimum-card').count(), data.tiers.length);
+      assert.ok(await page.locator('.minimum-badge').count() > 0);
+      assert.deepEqual(mainRequests, []);
+      assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
+  });
+}
+
+
+// Force the delayed focus callback to run after the next user action rather
+// than relying on browser/runner timing. This must fail with unconditional
+// requestAnimationFrame focus restoration.
+for (const kind of ['country', 'publication']) {
+  test('closing ' + kind + ' history respects focus moved before its delayed restoration', { timeout: 45000 }, async context => {
+    const session = await snapshotSession(context, kind + ' delayed close focus');
+    if (!session) return;
+    const { page, browser, url, errors } = session;
+    await page.route('**/data/history.json*', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }));
+    const dialogSelector = kind === 'country' ? '#historyDialog' : '#publishedDateDialog';
+    const triggerSelector = kind === 'country' ? '.country-history-button' : '#publishedDateButton';
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded' });
+      await waitForSnapshot(page);
+      for (const nextAction of ['search', 'new dialog', 'normal restore']) {
+        await page.locator(triggerSelector).first().click();
+        assert.equal(await page.locator(dialogSelector).evaluate(dialog => dialog.open), true);
+        await page.evaluate(async selector => {
+          globalThis.__savedCloseRaf = window.requestAnimationFrame;
+          globalThis.__closeRafQueue = [];
+          window.requestAnimationFrame = callback => {
+            globalThis.__closeRafQueue.push(callback);
+            return globalThis.__closeRafQueue.length;
+          };
+          const dialog = document.querySelector(selector);
+          dialog.querySelector('button').focus();
+          const closed = new Promise(resolve => dialog.addEventListener('close', resolve, { once: true }));
+          dialog.close();
+          await closed;
+        }, dialogSelector);
+        await page.waitForFunction(() => globalThis.__closeRafQueue.length > 0, null, { polling: 10 });
+        await page.evaluate(({ nextAction }) => {
+          if (nextAction === 'search') document.querySelector('#searchInput').focus();
+          if (nextAction === 'new dialog') {
+            const dialog = document.createElement('dialog');
+            dialog.id = 'reviewNewFocusDialog';
+            const button = document.createElement('button');
+            button.id = 'reviewNewFocusButton';
+            button.textContent = 'New dialog action';
+            dialog.append(button); document.body.append(dialog);
+            dialog.showModal(); button.focus();
+          }
+          const queued = globalThis.__closeRafQueue;
+          window.requestAnimationFrame = globalThis.__savedCloseRaf;
+          delete globalThis.__savedCloseRaf; delete globalThis.__closeRafQueue;
+          for (const callback of queued) callback(performance.now());
+        }, { nextAction });
+        if (nextAction === 'search') {
+          assert.equal(await page.evaluate(() => document.activeElement?.id), 'searchInput', 'late close callback cannot steal explicitly moved focus');
+          await page.locator('#searchInput').fill('zzzz_no_such_market_zzzz');
+          await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length === 0);
+          await page.locator('#searchInput').fill('');
+          await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length > 0);
+        } else if (nextAction === 'new dialog') {
+          assert.equal(await page.evaluate(() => document.activeElement?.id), 'reviewNewFocusButton', 'old restoration cannot focus behind a newer modal');
+          await page.evaluate(() => { const dialog = document.querySelector('#reviewNewFocusDialog'); dialog.close(); dialog.remove(); });
+        } else {
+          assert.equal(await page.locator(triggerSelector).first().evaluate(button => document.activeElement === button), true, 'ordinary close still restores its trigger');
+        }
+      }
+      assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
+  });
+}
+
+for (const kind of ['country', 'publication']) {
+test(kind + ' history close still restores a replacement trigger when the original is detached', { timeout: 30000 }, async context => {
+  const session = await snapshotSession(context, kind + ' detached history trigger restoration');
+  if (!session) return;
+  const { page, browser, url, errors } = session;
+  await page.route('**/data/history.json*', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }));
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await waitForSnapshot(page);
+    const trigger = page.locator(kind === 'country' ? '.country-history-button' : '#publishedDateButton').first();
+    const marketId = kind === 'country' ? await trigger.evaluate(button => button.closest('tr').dataset.marketId) : null;
+    await trigger.click();
+    await page.evaluate(({ kind, marketId }) => {
+      const row = kind === 'country' ? [...document.querySelectorAll('#priceRows tr[data-market-id]')].find(row => row.dataset.marketId === marketId) : null;
+      const original = kind === 'country' ? row.querySelector('.country-history-button') : document.querySelector('#publishedDateButton');
+      const replacement = original.cloneNode(true);
+      replacement.dataset.focusReplacement = 'true';
+      original.replaceWith(replacement);
+      document.querySelector(kind === 'country' ? '#closeHistory' : '#closePublishedDate').focus();
+      document.querySelector(kind === 'country' ? '#historyDialog' : '#publishedDateDialog').close();
+    }, { kind, marketId });
+    await page.waitForFunction(() => document.activeElement?.dataset.focusReplacement === 'true');
+    assert.deepEqual(errors, []);
+  } finally { await browser.close(); }
+});
+}
+
+
+for (const entry of ['country button', 'country price cell', 'publication button']) {
+  test('history opened through ' + entry + ' returns focus to its semantic trigger, not an older search focus', { timeout: 30000 }, async context => {
+    const session = await snapshotSession(context, entry + ' native focus baseline');
+    if (!session) return;
+    const { page, browser, url, errors } = session;
+    await page.route('**/data/history.json*', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }));
+    const publication = entry === 'publication button';
+    const dialogSelector = publication ? '#publishedDateDialog' : '#historyDialog';
+    const closeSelector = publication ? '#closePublishedDate' : '#closeHistory';
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded' });
+      await waitForSnapshot(page);
+      const target = publication ? page.locator('#publishedDateButton') : page.locator('.country-history-button').first();
+      await page.locator('#searchInput').focus();
+      assert.equal(await page.evaluate(() => document.activeElement?.id), 'searchInput');
+      const scrollBefore = await page.evaluate(() => ({ x: scrollX, y: scrollY }));
+      // HTMLElement.click does not itself focus a button. The price-cell entry
+      // also exercises the delegated, non-focusable row click path.
+      await page.evaluate(entry => {
+        if (entry === 'publication button') document.querySelector('#publishedDateButton').click();
+        else if (entry === 'country price cell') document.querySelector('#priceRows .price-cell').click();
+        else document.querySelector('.country-history-button').click();
+      }, entry);
+      assert.equal(await page.locator(dialogSelector).evaluate(dialog => dialog.open), true);
+      assert.deepEqual(await page.evaluate(() => ({ x: scrollX, y: scrollY })), scrollBefore, 'priming the return target must not scroll the underlying page');
+      await page.locator(closeSelector).click();
+      await page.waitForFunction(selector => !document.querySelector(selector).open, dialogSelector);
+      await page.waitForFunction(publication => {
+        const trigger = document.querySelector(publication ? '#publishedDateButton' : '.country-history-button');
+        return document.activeElement === trigger;
+      }, publication);
+      assert.equal(await target.evaluate(button => document.activeElement === button), true);
+      assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
+  });
+}

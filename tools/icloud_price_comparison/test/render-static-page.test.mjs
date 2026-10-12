@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { load } from 'cheerio';
+import { displayedPublishedDate } from '../data-contract.js';
 import { assertSeoProjectionMatches, renderSeoProjection } from '../scripts/render-static-page.mjs';
 import {
   assertStaticPageMatches,
@@ -9,6 +10,8 @@ import {
   preferredDefaultTier,
   publicPayloadFingerprint,
   renderStaticFragments,
+  serializeEmbeddedJson,
+  staticPageShell,
   replaceStaticFragments
 } from '../scripts/static-page.mjs';
 
@@ -38,6 +41,13 @@ test('committed raw HTML is the deterministic projection of validated prices', a
   assert.equal($('meta[name="icloud-price-snapshot"]').attr('content'), payload.generatedAt);
   assert.equal($('meta[name="icloud-price-snapshot"]').attr('data-fingerprint'), publicPayloadFingerprint(payload));
   assert.equal($('meta[name="icloud-price-snapshot"]').attr('data-fx-stale'), String(payload.fx.stale === true));
+  assert.equal($('#icloud-price-data').length, 1);
+  assert.equal($('#icloud-price-data').attr('type'), 'application/json');
+  assert.deepEqual(JSON.parse($('#icloud-price-data').text()), {
+    schemaVersion: 1,
+    prices: payload,
+    publishedDate: displayedPublishedDate(history, payload.source.publishedDate)
+  });
   assert.equal($('#resultSummary').text(), `${payload.countries.length} 个地区 · ${preferredDefaultTier(payload).label} 从低到高`);
   assert.equal($('#applePublishedDate').text(), '2026/09/15');
   assert.equal(payload.source.publishedDate, 'September 16, 2026', 'raw Apple observation remains preserved');
@@ -148,6 +158,7 @@ test('static renderer rejects missing, duplicate, and hand-edited generated regi
   assert.throws(() => extractStaticFragments(html.replace('<!-- ICLOUD_STATIC_STATUS:END -->', '')), /STATIC_RENDER_MARKER_INVALID:STATUS/);
   assert.throws(() => extractStaticFragments(html.replace('<!-- ICLOUD_STATIC_STATUS:START -->', '<!-- ICLOUD_STATIC_STATUS:START --><!-- ICLOUD_STATIC_STATUS:START -->')), /STATIC_RENDER_MARKER_INVALID:STATUS/);
   assert.throws(() => assertStaticPageMatches(html.replace('United States · USD', 'United States · EUR'), payload, history), /STATIC_RENDER_MISMATCH:TABLE_BODY/);
+  assert.throws(() => assertStaticPageMatches(html.replace('"schemaVersion":1,"prices":', '"schemaVersion":2,"prices":'), payload, history), /STATIC_RENDER_MISMATCH:META/);
   assert.throws(() => assertSeoProjectionMatches(html.replace('<meta name="description"', '<meta name="description-copy"'), payload), /SEO_PROJECTION_TARGET_INVALID:description/);
 });
 
@@ -162,4 +173,34 @@ test('raw product copy avoids engineering-only loading and cache language', asyn
   for (const removed of ['数据来源', '这里记录 Apple 当地月费变化，不记录日常汇率波动。']) {
     assert.ok(!html.includes(removed), `raw HTML must not contain ${removed}`);
   }
+});
+
+test('embedded JSON cannot escape its inert script element', () => {
+  const hostile = { text: '</script><script>alert(1)</script><!--<script>', unicode: '\u2028\u2029' };
+  const serialized = serializeEmbeddedJson(hostile);
+  assert.equal(serialized.includes('<'), false);
+  assert.ok(serialized.includes('\\u003c/script>'));
+  assert.deepEqual(JSON.parse(serialized), hostile);
+  const $ = load(`<script id="icloud-price-data" type="application/json">${serialized}</script><p id="sentinel">safe</p>`);
+  assert.equal($('script').length, 1);
+  assert.equal($('#sentinel').text(), 'safe');
+  assert.deepEqual(JSON.parse($('#icloud-price-data').text()), hostile);
+});
+
+test('embedded snapshot changes remain inside the publication gate generated region', async () => {
+  const [html, payload, history] = await Promise.all([
+    readFile(indexUrl, 'utf8'),
+    readFile(pricesUrl, 'utf8').then(JSON.parse),
+    readFile(historyUrl, 'utf8').then(JSON.parse)
+  ]);
+  const changed = structuredClone(payload);
+  changed.fx.stale = true;
+  changed.fx.fallbackReason = 'request-failed';
+  delete changed.fx.comparisonFingerprint;
+  const rendered = replaceStaticFragments(html, renderStaticFragments(changed, history));
+  assert.equal(staticPageShell(html), staticPageShell(rendered));
+  assert.equal(assertStaticPageMatches(rendered, changed, history), true);
+  assert.throws(() => assertStaticPageMatches(rendered, payload, history), /STATIC_RENDER_MISMATCH:META/);
+  const $ = load(rendered);
+  assert.deepEqual(JSON.parse($('#icloud-price-data').text()).prices, changed);
 });

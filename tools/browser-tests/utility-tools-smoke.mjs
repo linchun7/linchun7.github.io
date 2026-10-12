@@ -113,7 +113,7 @@ async function testSpaceTool() {
     const { context, page, pageErrors } = await createPage();
     await page.goto(`${baseUrl}/tools/space/`, { waitUntil: 'domcontentloaded' });
 
-    assert.equal(await page.locator('script[src="spacing.js?v=20261012-url-parentheses"]').count(), 1, 'space tool should use its content-preserving helper');
+    assert.equal(await page.locator('script[src="spacing.js?v=20261012-url-unicode"]').count(), 1, 'space tool should use its content-preserving helper');
     assert.equal(await page.locator('script[src="dist/browser/pangu.min.js"]').count(), 0, 'space UI should not depend on Pangu punctuation normalization');
     // Bound the regression inputs: enough unmatched delimiters to expose rescanning,
     // while keeping the test independent of a microbenchmark or unbounded input.
@@ -142,6 +142,29 @@ async function testSpaceTool() {
         `spacing helper (${text.length} characters)`
     );
     const cases = [
+        ["https://example.com/Ａ中文ABC", "https://example.com/Ａ中文ABC"],
+        ["https://example.com/１２中文ABC", "https://example.com/１２中文ABC"],
+        ["https://example.com/ｶﾀｶﾅ中文ABC", "https://example.com/ｶﾀｶﾅ中文ABC"],
+        ["https://example.com/￥中文ABC", "https://example.com/￥中文ABC"],
+        ["https://example.com/＄中文ABC", "https://example.com/＄中文ABC"],
+        ["https://example.com/￦中文ABC", "https://example.com/￦中文ABC"],
+        ["访问https://example.com/Ａ中文ABC?q=１２中文ABC，继续ABC", "访问 https://example.com/Ａ中文ABC?q=１２中文ABC，继续 ABC"],
+        ["https://example.com/ｶﾀｶﾅ中文ABC；后文DEF。结束123", "https://example.com/ｶﾀｶﾅ中文ABC；后文 DEF。结束 123"],
+        ["https://example.com/￥中文ABC！正文DEF？继续123", "https://example.com/￥中文ABC！正文 DEF？继续 123"],
+        ["https://example.com/Ａ中文ABC（１２中文DEF（ｶﾀｶﾅ中文GHI，￥中文JKL））/尾段XYZ，正文DEF", "https://example.com/Ａ中文ABC（１２中文DEF（ｶﾀｶﾅ中文GHI，￥中文JKL））/尾段XYZ，正文 DEF"],
+        ["https://example.com/Ａ中文ABC（未闭合DEF，正文GHI", "https://example.com/Ａ中文ABC（未闭合 DEF，正文 GHI"],
+        ["https://example.com/Ａ中文ABC）后文DEF", "https://example.com/Ａ中文ABC）后文 DEF"],
+        ["https://example.com/〇中文ABC", "https://example.com/〇中文ABC"],
+        ["https://example.com/〆中文ABC", "https://example.com/〆中文ABC"],
+        ["https://example.com/〻中文ABC", "https://example.com/〻中文ABC"],
+        ["https://example.com/々中文ABC", "https://example.com/々中文ABC"],
+        ["访问https://example.com/〇中文ABC?q=〆中文DEF，后文GHI", "访问 https://example.com/〇中文ABC?q=〆中文DEF，后文 GHI"],
+        ["https://example.com/〻中文ABC。正文DEF", "https://example.com/〻中文ABC。正文 DEF"],
+        ["https://example.com/〇中文ABC、正文DEF", "https://example.com/〇中文ABC、正文 DEF"],
+        ["https://example.com/〆中文ABC　正文DEF", "https://example.com/〆中文ABC　正文 DEF"],
+        ["https://example.com/〇中文ABC「正文DEF」", "https://example.com/〇中文ABC「正文 DEF」"],
+        ["https://example.com/〆中文ABC【正文DEF】", "https://example.com/〆中文ABC【正文 DEF】"],
+        ["https://example.com/〇中文ABC（〆中文DEF（〻中文GHI，々中文JKL））/尾段XYZ，正文DEF", "https://example.com/〇中文ABC（〆中文DEF（〻中文GHI，々中文JKL））/尾段XYZ，正文 DEF"],
         ["", ""],
         [" \t \r\n\r ", " \t \r\n\r "],
         ["中A文B字1汉2", "中 A 文 B 字 1 汉 2"],

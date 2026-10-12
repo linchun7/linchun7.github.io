@@ -11,6 +11,7 @@ import concurrent.futures
 import copy
 import hashlib
 import html
+from http.client import IncompleteRead
 from html.parser import HTMLParser
 import json
 import os
@@ -397,7 +398,12 @@ def fetch(url: str, *, confirm=False, deadline=float('inf')) -> str:
             with urllib.request.build_opener(RestrictedRedirect()).open(request, timeout=min(15, max(1, deadline-time.monotonic()))) as response:
                 if int(response.headers.get('Age', '0')) > FRESH:
                     raise ValueError('source response is too old')
-                raw = response.read(LIMIT + 1)
+                try:
+                    raw = response.read(LIMIT + 1)
+                except IncompleteRead as exc:
+                    # Discard partial bytes; use the existing bounded retry and
+                    # retained-price/FX fallback paths for interrupted bodies.
+                    raise urllib.error.URLError('incomplete source response') from exc
                 if len(raw) > LIMIT:
                     raise ValueError('response exceeds size budget')
                 return raw.decode('utf-8', errors='strict')

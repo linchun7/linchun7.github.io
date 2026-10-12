@@ -3,6 +3,8 @@ import {
   MINIMUM_CAUSE_LABELS,
   validateMinimumHistoryPayload,
   displayedPublishedDate,
+  isValidPublishedDate,
+  publicationDateKey,
   validatePayload,
   validatePriceHistoryConsistency,
   visiblePublicationEntries
@@ -13,11 +15,9 @@ import { foldPublicationCountryRenames, marketSearchPriority, matchesMarketSearc
 const REQUEST_TIMEOUT_MS = 8_000;
 const ANALYTICS_ID = 'G-K2S9L4CHNP';
 const DEFAULT_SORT_TIER = '200GB';
-const DEFAULT_TIER_COLUMN_COUNT = 5;
 const FIXED_PRICE_TABLE_COLUMN_COUNT = 2;
 const MAX_PRICE_FUTURE_SKEW_MS = 5 * 60 * 1_000;
 const MAX_RESPONSE_BYTES = Object.freeze({
-  'prices.json': 1024 * 1024,
   'history.json': 8 * 1024 * 1024,
   'minimum-history.json': 8 * 1024 * 1024
 });
@@ -43,12 +43,9 @@ const state = {
   historyTier: DEFAULT_SORT_TIER,
   minimumPrices: {},
   minimumCountries: {},
-  dataOrigin: null,
   dataFreshness: null,
   minimumCuesEnabled: true,
-  minimumCuesReason: null,
   eventsBound: false,
-  loading: false,
   historyStatus: 'idle',
   publishedDatePending: false,
   historyRequestId: 0,
@@ -104,13 +101,11 @@ const numberFormatter = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 
 const moneyFormatter = new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const percentFormatter = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 });
 const collator = new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base' });
-let freshnessRefreshPromise = null;
 let analyticsScheduled = false;
 let staticSnapshotDomDowngraded = false;
-let staticFallbackPresentation = null;
+let staticTimePresentation = null;
 const staticSnapshotMeta = document.querySelector('meta[name="icloud-price-snapshot"]');
 const staticSnapshotGeneratedAt = staticSnapshotMeta?.content ?? null;
-const staticSnapshotFxStale = staticSnapshotMeta?.dataset.fxStale === 'true';
 const hasStaticSnapshot = /^\d{4}-\d{2}-\d{2}T/.test(staticSnapshotGeneratedAt ?? '')
   && /^[a-f0-9]{64}$/.test(staticSnapshotMeta?.dataset.fingerprint ?? '');
 
@@ -330,31 +325,41 @@ function formatPublishedDate(value) {
 }
 
 async function fetchJson(fileName, { forceRefresh = false } = {}) {
-  const localUrl = `./data/${fileName}`;
-  const urls = [localUrl];
-
-  let lastError;
-  for (const url of urls) {
-    let timeout = null;
-    try {
-      const controller = new AbortController();
-      timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-      const response = await fetch(url, {
-        cache: forceRefresh ? 'reload' : (fileName === 'prices.json' ? 'no-cache' : 'default'),
-        redirect: 'error',
-        signal: controller.signal
-      });
-      if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-      const payload = validatePayload(fileName, await readBoundedJsonResponse(response, fileName));
-      if (fileName === 'prices.json') validatePriceFreshness(payload);
-      return payload;
-    } catch (error) {
-      lastError = error;
-    } finally {
-      clearTimeout(timeout);
-    }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(`./data/${fileName}`, {
+      cache: forceRefresh ? 'reload' : 'default',
+      redirect: 'error',
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+    return validatePayload(fileName, await readBoundedJsonResponse(response, fileName));
+  } finally {
+    clearTimeout(timeout);
   }
-  throw lastError;
+}
+
+function readEmbeddedSnapshot() {
+  const nodes = document.querySelectorAll('#icloud-price-data');
+  const node = nodes[0];
+  if (nodes.length !== 1 || node.tagName !== 'SCRIPT' || node.type !== 'application/json') {
+    throw new Error('页面价格数据缺失');
+  }
+  const text = node.textContent;
+  if (new TextEncoder().encode(text).byteLength > 1024 * 1024) throw new Error('页面价格数据超过允许大小');
+  const snapshot = JSON.parse(text);
+  if (!snapshot || snapshot.schemaVersion !== 1 || Object.keys(snapshot).sort().join(',') !== 'prices,publishedDate,schemaVersion') {
+    throw new Error('页面价格数据格式无效');
+  }
+  const data = validatePayload('prices.json', snapshot.prices);
+  if (!hasStaticSnapshot || data.generatedAt !== staticSnapshotGeneratedAt) throw new Error('页面价格数据版本不一致');
+  if (typeof snapshot.publishedDate !== 'string' || snapshot.publishedDate.length > 100
+    || !isValidPublishedDate(snapshot.publishedDate)
+    || publicationDateKey(snapshot.publishedDate) > formatBeijingDate(data.generatedAt)) {
+    throw new Error('页面发布日期无效');
+  }
+  return { data, publishedDate: snapshot.publishedDate };
 }
 
 export function classifyPriceFreshness(data, nowMs = Date.now()) {
@@ -372,23 +377,21 @@ function validatePriceFreshness(data) {
   return freshness;
 }
 
-function priceSnapshotsEqual(first, second) {
-  if (first === second) return true;
-  if (!first || !second
-    || first.generatedAt !== second.generatedAt
-    || first.source?.publishedDate !== second.source?.publishedDate
-    || first.fx?.fetchedAt !== second.fx?.fetchedAt) return false;
-  return JSON.stringify(first) === JSON.stringify(second);
-}
-
 function staticDomMatchesPayload(data) {
   if (!hasStaticSnapshot || data.generatedAt !== staticSnapshotGeneratedAt) return false;
   // Safety downgrades remove badges/ranks from static DOM; a recovered snapshot must rebuild them.
   if (staticSnapshotDomDowngraded || !state.minimumCuesEnabled) return false;
   const tierIds = [...document.querySelectorAll('.price-table thead th[data-tier]')].map(({ dataset }) => dataset.tier);
   if (tierIds.length !== data.tiers.length || tierIds.some((id, index) => id !== data.tiers[index].id)) return false;
-  const rows = [...elements.priceRows.querySelectorAll('tr[data-market-id]')];
-  if (rows.length !== data.countries.length) return false;
+  const rows = [...elements.priceRows.querySelectorAll('tr')];
+  if (rows.length !== data.countries.length
+    || new Set(rows.map((row) => row.dataset.marketId)).size !== data.countries.length) return false;
+  const defaultTier = data.tiers.find(({ id }) => id === DEFAULT_SORT_TIER) ?? data.tiers[0];
+  const orderedCountries = [...data.countries].sort((first, second) => (
+    first.plans[defaultTier.id].cnyRank - second.plans[defaultTier.id].cnyRank
+    || first.marketId.localeCompare(second.marketId, 'en')
+  ));
+  if (rows.some((row, index) => row.dataset.marketId !== orderedCountries[index].marketId)) return false;
   const countries = new Map(data.countries.map((country) => [country.marketId, country]));
   return rows.every((row) => {
     const country = countries.get(row.dataset.marketId);
@@ -400,10 +403,22 @@ function staticDomMatchesPayload(data) {
     if (row.querySelector('.country-name')?.textContent !== displayName
       || row.querySelector('.country-name-en')?.textContent !== secondaryName) return false;
     if (row.dataset.cnyRanks !== data.tiers.map(({ id }) => country.plans[id].cnyRank).join(',')) return false;
+    const rank = String(country.plans[defaultTier.id].cnyRank);
+    if (row.cells.length !== data.tiers.length + FIXED_PRICE_TABLE_COLUMN_COUNT
+      || row.cells[0].textContent.trim() !== rank
+      || row.cells[0].classList.contains('rank-top') !== (Number(rank) <= 3)
+      || row.querySelector('.mobile-rank')?.textContent !== rank
+      || row.querySelector('.mobile-rank-sr')?.textContent !== `全球价格排名第 ${rank}`) return false;
     const cells = [...row.querySelectorAll('.price-cell')];
-    return cells.length === data.tiers.length && cells.every((cell) => {
-      const plan = country.plans[cell.dataset.tier];
-      return plan && cell.querySelector('.price-amount')?.textContent === moneyFormatter.format(plan.cnyPrice)
+    return cells.length === data.tiers.length && cells.every((cell, index) => {
+      const tierId = data.tiers[index].id;
+      if (cell.dataset.tier !== tierId) return false;
+      const plan = country.plans[tierId];
+      const isMinimum = plan.cnyRank === 1;
+      return cell.classList.contains('is-minimum') === isMinimum
+        && cell.querySelectorAll('.minimum-badge').length === (isMinimum ? 1 : 0)
+        && (!isMinimum || cell.querySelector('.minimum-badge').textContent === '最低')
+        && cell.querySelector('.price-amount')?.textContent === moneyFormatter.format(plan.cnyPrice)
         && cell.querySelector('.price-local')?.textContent === plan.formattedPrice;
     });
   });
@@ -814,19 +829,6 @@ function updateRankingPresentation({ filtered = Boolean(state.query.trim() || st
   elements.rankHeaderLabel.append(visible, accessible);
 }
 
-function bindStaticControls() {
-  document.querySelectorAll('button[data-sort-tier]').forEach((button) => {
-    if (button.dataset.interactive === 'true') return;
-    button.dataset.interactive = 'true';
-    button.addEventListener('click', () => setTierSort(button.dataset.sortTier));
-  });
-  document.querySelectorAll('.minimum-card[data-tier]').forEach((button) => {
-    if (button.dataset.interactive === 'true') return;
-    button.dataset.interactive = 'true';
-    button.addEventListener('click', () => focusMinimumCountry(button.dataset.tier, button.dataset.marketId));
-  });
-  bindRenderedPriceRows();
-}
 function renderSortHeaders({ refresh = true } = {}) {
   document.querySelectorAll('button[data-sort], button[data-sort-tier]').forEach((button) => {
     const header = button.closest('th');
@@ -1144,6 +1146,7 @@ function openPublishedDateHistory() {
   state.publishedDateReturnFocus = elements.publishedDateButton;
   void ensureHistoryLoaded();
   renderPublishedDateHistory();
+  state.publishedDateReturnFocus?.focus({ preventScroll: true });
   elements.publishedDateDialog.showModal();
   refreshIcons();
 }
@@ -1175,13 +1178,18 @@ function openHistory(country, returnFocus = null) {
   void ensureHistoryLoaded();
   const record = getHistoryRecord(country);
   state.activeCountry = country;
-  state.historyReturnFocus = returnFocus;
+  state.historyReturnFocus = returnFocus?.isConnected ? returnFocus
+    : [...elements.priceRows.querySelectorAll('tr[data-market-id]')]
+      .find(row => row.dataset.marketId === country.marketId)?.querySelector('.country-history-button') ?? null;
   state.historyReturnCountry = country.marketId;
   state.historyTier = state.sortTier;
   elements.historyTitle.textContent = country.nameZh || country.country;
   renderHistorySubtitle(country, record);
   renderHistoryTierButtons();
   renderHistoryContent();
+  // Row cells and programmatic clicks need not focus the semantic trigger.
+  // Prime native dialog restoration without scrolling the price table.
+  state.historyReturnFocus?.focus({ preventScroll: true });
   elements.historyDialog.showModal();
   refreshIcons();
 }
@@ -1368,61 +1376,45 @@ function scheduleBackToTableUpdate() {
   });
 }
 
-// Future-clock protection is reversible even while the JSON request remains offline.
-function applyStaticSnapshotFreshness() {
-  if (state.data || !hasStaticSnapshot) return null;
-  const freshness = classifyPriceFreshness({
-    generatedAt: staticSnapshotGeneratedAt,
-    fx: { stale: staticSnapshotFxStale }
-  });
+// The static table remains readable if its interactive payload is damaged.
+// Only invalid/future timestamps remove current-price cues; age is never a limit.
+function protectStaticSnapshotTime() {
+  const freshness = classifyPriceFreshness({ generatedAt: staticSnapshotGeneratedAt });
   state.dataFreshness = freshness;
-  state.minimumCuesEnabled = freshness.status === 'fresh';
-  state.minimumCuesReason = freshness.reason;
-  if (freshness.status === 'fresh' && staticFallbackPresentation) {
-    for (const [key, saved] of Object.entries(staticFallbackPresentation)) {
-      const target = elements[key];
-      if (!target) continue;
-      target.replaceChildren(...[...saved.childNodes].map(node => node.cloneNode(true)));
-      target.hidden = saved.hidden;
+  if (freshness.status !== 'unusable') {
+    if (staticTimePresentation) {
+      for (const [key, saved] of Object.entries(staticTimePresentation)) {
+        elements[key].replaceChildren(...[...saved.childNodes].map((node) => node.cloneNode(true)));
+        elements[key].hidden = saved.hidden;
+      }
+      staticTimePresentation = null;
+      staticSnapshotDomDowngraded = false;
+      state.minimumCuesEnabled = true;
     }
-    staticFallbackPresentation = null;
-    staticSnapshotDomDowngraded = false;
-    elements.dataStatus.classList.remove('is-error', 'is-stale');
-    setLoadStatus(state.loading ? '正在读取…' : '', {retry: !state.loading});
-    // The restored HTML is readable; controls still wait for validated JSON.
-    setFiltersDisabled(true);
+    // This restores only readable HTML. A damaged embedded payload still leaves
+    // controls disabled and the explicit page-reload error visible.
+    return;
   }
-  if (freshness.status !== 'fresh') {
-    if (!staticFallbackPresentation) {
-      staticFallbackPresentation = Object.fromEntries(
-        ['minimumSummary', 'priceRows', 'updatedAt', 'rankHeaderLabel', 'rankingScopeNote', 'overviewNote']
-          .filter(key => elements[key]).map(key => [key, elements[key].cloneNode(true)])
-      );
-    }
-    staticSnapshotDomDowngraded = true;
-    document.querySelectorAll('.minimum-badge').forEach((badge) => badge.remove());
-    document.querySelectorAll('.is-minimum, .rank-top').forEach((element) => element.classList.remove('is-minimum', 'rank-top'));
-    renderMinimumSummary();
-    updateRankingPresentation({ filtered: false });
-    elements.dataStatus.classList.add('is-stale');
-    if (elements.overviewNote) elements.overviewNote.textContent = elements.minimumSummary.textContent;
+  if (!staticTimePresentation) {
+    staticTimePresentation = Object.fromEntries(
+      ['minimumSummary', 'priceRows', 'updatedAt', 'rankHeaderLabel', 'rankingScopeNote']
+        .filter((key) => elements[key]).map((key) => [key, elements[key].cloneNode(true)])
+    );
   }
-  if (freshness.status === 'unusable') {
-    const message = '数据时间异常，暂不作为当前价格展示。请稍后重试。';
-    elements.dataStatus.classList.add('is-error');
-    elements.updatedAt.textContent = message;
-    elements.priceRows.querySelectorAll('tr[data-market-id] > td:first-child, .mobile-rank').forEach((element) => { element.textContent = '—'; });
-    elements.priceRows.querySelectorAll('.mobile-rank-sr').forEach((element) => { element.textContent = '排名暂不可用'; });
-    if (elements.rankHeaderLabel) elements.rankHeaderLabel.textContent = '排名暂不可用';
-    setLoadStatus(message, { error: true });
-    setFiltersDisabled(true);
-  }
-  return freshness;
+  state.minimumCuesEnabled = false;
+  staticSnapshotDomDowngraded = true;
+  document.querySelectorAll('.minimum-badge').forEach((badge) => badge.remove());
+  document.querySelectorAll('.is-minimum, .rank-top').forEach((element) => element.classList.remove('is-minimum', 'rank-top'));
+  renderMinimumSummary();
+  updateRankingPresentation({ filtered: false });
+  elements.priceRows.querySelectorAll('tr[data-market-id] > td:first-child, .mobile-rank').forEach((element) => { element.textContent = '—'; });
+  elements.priceRows.querySelectorAll('.mobile-rank-sr').forEach((element) => { element.textContent = '排名暂不可用'; });
+  if (elements.rankHeaderLabel) elements.rankHeaderLabel.textContent = '排名暂不可用';
+  elements.updatedAt.textContent = '数据时间异常，暂不作为当前价格展示。';
 }
 
 function normalizeCurrentPriceFreshnessUi() {
   const freshness = state.dataFreshness;
-  state.minimumCuesReason = freshness.reason;
   state.minimumCuesEnabled = freshness.status === 'fresh';
   if (elements.overviewTitle) {
     elements.overviewTitle.textContent = '各容量全球最低价';
@@ -1451,41 +1443,10 @@ function renderCurrentPriceFreshness() {
   renderMinimumHistory();
 }
 
-function applyCurrentPriceFreshness() {
-  const previousFreshness = state.dataFreshness;
-  const freshness = classifyPriceFreshness(state.data);
-  state.dataFreshness = freshness;
-  if (freshness.status === 'unusable') {
-    return freshness;
-  }
-  if (previousFreshness?.status !== freshness.status || previousFreshness?.reason !== freshness.reason) {
-    renderCurrentPriceFreshness();
-  }
-  return freshness;
-}
-
-function resetHistoryForPriceSnapshot(data) {
-  state.historyRequestId += 1;
-  state.historyCompatible = false;
-  if (state.history) {
-    try {
-      validatePriceHistoryConsistency(data, state.history);
-      state.historyCompatible = true;
-    } catch { /* Keep accepted records as history, never as current-price evidence. */ }
-  }
-  state.historyStatus = state.historyCompatible ? 'ready' : 'idle';
-  state.historyPromise = null;
-  state.publishedDatePending = !state.historyCompatible;
-}
-
-function applyPriceData(data, { origin = 'network' } = {}) {
+function applyPriceData(data) {
   const freshness = classifyPriceFreshness(data);
   if (freshness.status === 'unusable') throw new Error(`价格数据不可用：${freshness.reason}`);
-  const snapshotChanged = !priceSnapshotsEqual(state.data, data);
-  if (snapshotChanged) resetHistoryForPriceSnapshot(data);
   state.data = data;
-  staticFallbackPresentation = null;
-  state.dataOrigin = origin;
   if (!state.data.tiers.some(({ id }) => id === state.sortTier)) {
     state.sortTier = state.data.tiers.find(({ id }) => id === DEFAULT_SORT_TIER)?.id || state.data.tiers[0].id;
   }
@@ -1503,15 +1464,12 @@ function applyPriceData(data, { origin = 'network' } = {}) {
   state.dataFreshness = freshness;
   renderCurrentPriceFreshness();
   elements.workspace.classList.add('price-ui-ready');
-  if (elements.historyDialog.open || elements.publishedDateDialog.open) void ensureHistoryLoaded();
 }
 
 function hydrateStaticPriceData(data) {
   const freshness = classifyPriceFreshness(data);
   if (freshness.status === 'unusable') throw new Error(`价格数据不可用：${freshness.reason}`);
   state.data = data;
-  staticFallbackPresentation = null;
-  state.dataOrigin = 'static-network';
   state.dataFreshness = freshness;
   if (!state.data.tiers.some(({ id }) => id === state.sortTier)) {
     state.sortTier = state.data.tiers.find(({ id }) => id === DEFAULT_SORT_TIER)?.id || state.data.tiers[0].id;
@@ -1519,8 +1477,14 @@ function hydrateStaticPriceData(data) {
   state.historyTier = state.sortTier;
   populateFilters();
   bindEvents();
-  bindStaticControls();
+  renderTierHeaders();
   calculateMinimumPrices();
+  // Rebuild this small projection from validated data; do not trust static
+  // card prices or navigation attributes while retaining the larger table.
+  renderMinimumSummary();
+  elements.marketCount.textContent = `${state.data.countries.length} 个地区`;
+  elements.currencyCount.textContent = `${new Set(state.data.countries.map(({ currency }) => currency)).size} 种`;
+  elements.tierCount.textContent = `${state.data.tiers.length} 档`;
   renderMobileTierButtons();
   renderPublishedDateHistory();
   setFiltersDisabled(false);
@@ -1571,9 +1535,39 @@ function trapDialogFocus(dialog, event) {
   }
 }
 
+function restoreDialogFocusAfterClose(dialog, restore) {
+  requestAnimationFrame(() => {
+    // Native close or a subsequent user action may already have moved focus.
+    // Never steal it from another control or a newly opened dialog.
+    if (document.querySelector('dialog[open]')) return;
+    const active = document.activeElement;
+    if (active?.isConnected && active !== document.body && active !== document.documentElement
+      && !dialog.contains(active)) return;
+    restore();
+  });
+}
+
 function bindEvents() {
   if (state.eventsBound) return;
   state.eventsBound = true;
+  // A device-clock change need not produce a lifecycle event. Guard current
+  // price interactions before their handlers, without checking inside render
+  // functions (which the time-safety transition itself calls).
+  const currentPriceControls = [
+    '#searchInput', '#regionSelect', 'button[data-sort]', 'button[data-sort-tier]',
+    '#mobileTierControl button', '.minimum-card', '#priceRows tr[data-market-id]',
+    '#publishedDateButton', '#historyTierControl button'
+  ].join(',');
+  const guardPriceInteraction = (event) => {
+    if (!(event.target instanceof Element) || !event.target.closest(currentPriceControls)) return;
+    recheckSnapshotClock();
+    if (state.dataFreshness?.status !== 'unusable') return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  };
+  for (const type of ['click', 'input', 'change']) {
+    document.addEventListener(type, guardPriceInteraction, { capture: true });
+  }
   elements.searchInput.addEventListener('input', (event) => scheduleQueryRender(event.target.value));
   elements.regionSelect.addEventListener('change', (event) => {
     state.region = event.target.value;
@@ -1604,7 +1598,7 @@ function bindEvents() {
     const returnCountry = state.historyReturnCountry;
     state.historyReturnFocus = null;
     state.historyReturnCountry = null;
-    requestAnimationFrame(() => {
+    restoreDialogFocusAfterClose(elements.historyDialog, () => {
       const currentButton = returnCountry
         ? [...elements.priceRows.querySelectorAll('tr[data-market-id]')].find((row) => row.dataset.marketId === returnCountry)?.querySelector('.country-history-button')
         : null;
@@ -1616,7 +1610,12 @@ function bindEvents() {
   elements.publishedDateDialog.addEventListener('close', () => {
     const returnFocus = state.publishedDateReturnFocus;
     state.publishedDateReturnFocus = null;
-    if (returnFocus?.isConnected) requestAnimationFrame(() => returnFocus.focus());
+    restoreDialogFocusAfterClose(elements.publishedDateDialog, () => {
+      const currentButton = document.querySelector('#publishedDateButton');
+      if (returnFocus?.isConnected) returnFocus.focus();
+      else if (currentButton) currentButton.focus();
+      else elements.workspace.focus();
+    });
   });
   addEventListener('scroll', scheduleBackToTableUpdate, { passive: true });
   addEventListener('resize', () => {
@@ -1626,131 +1625,65 @@ function bindEvents() {
 }
 
 function showLoadError(error) {
-  console.error(error);
+  if (!state.data) reconcileStaticTierState();
+  console.warn(`页面价格交互不可用：${error.message}`);
   elements.dataStatus.classList.add('is-error');
-  elements.updatedAt.textContent = '价格数据暂时无法读取，请稍后重试。';
-  elements.resultSummary.textContent = '暂时无法读取价格';
-  setLoadStatus('价格数据暂时无法读取，请稍后重试。', { error: true });
+  setLoadStatus('页面价格数据无法读取，请刷新页面重试。', { error: true });
   setFiltersDisabled(true);
-  elements.fxStatus.textContent = '';
-  if (elements.minimumSummary) {
-    const unavailable = document.createElement('p');
-    unavailable.className = 'minimum-unavailable';
-    unavailable.textContent = '全球最低价暂不可用';
-    elements.minimumSummary.replaceChildren(unavailable);
-    elements.minimumSummary.setAttribute('aria-busy', 'false');
-  }
-  elements.priceRows.replaceChildren();
-  const row = document.createElement('tr');
-  const cell = createCell('请稍后重试', 'empty-cell');
-  cell.colSpan = (state.data?.tiers?.length || DEFAULT_TIER_COLUMN_COUNT) + FIXED_PRICE_TABLE_COLUMN_COUNT;
-  row.append(cell);
-  elements.priceRows.append(row);
+  protectStaticSnapshotTime();
 }
 
-function showUnusableDataError(reason) {
+function showUnusableDataError() {
   const message = '数据时间异常，暂不作为当前价格展示。请稍后重试。';
   elements.dataStatus.classList.add('is-error');
   if (elements.historyDialog.open) elements.historyDialog.close();
   elements.updatedAt.textContent = message;
   setLoadStatus(message, { error: true });
   state.minimumCuesEnabled = false;
-  state.minimumCuesReason = reason;
   calculateMinimumPrices();
   renderMinimumSummary();
   renderTable();
   setFiltersDisabled(true);
 }
 
-async function refreshPriceFreshnessLifecycle() {
-  if (!state.data) {
-    applyStaticSnapshotFreshness();
-    return;
-  }
-  const wasUnusable = state.dataFreshness.status === 'unusable';
-  const freshness = applyCurrentPriceFreshness();
-  if (freshness.status !== 'unusable' && !wasUnusable) return;
-  if (freshness.status === 'unusable') showUnusableDataError(freshness.reason);
-  // Recovery must normalize controls and warnings through the same guarded refresh as expiry.
-  if (!freshnessRefreshPromise) {
-    freshnessRefreshPromise = initialize({ forceRefresh: true })
-      .finally(() => { freshnessRefreshPromise = null; });
-  }
-  await freshnessRefreshPromise;
-}
-
-async function initialize({ forceRefresh = false } = {}) {
-  if (state.loading) return;
-  state.loading = true;
-  elements.updatedAt.querySelectorAll('.cache-warning').forEach((warning) => warning.remove());
-  setLoadStatus('正在读取…');
-  if (!state.data) setFiltersDisabled(true);
-  elements.dataStatus.classList.remove('is-error');
-
-  const fallbackData = state.data;
-
-
+function initialize() {
   try {
-    const networkData = await fetchJson('prices.json', { forceRefresh });
-    // A cache or delayed deployment must not roll back a snapshot already accepted by this page.
-    if (state.data && Date.parse(networkData.generatedAt) < Date.parse(state.data.generatedAt)) {
-      throw new Error('网络价格数据早于当前已加载快照');
-    }
-    if (!state.data && staticDomMatchesPayload(networkData)) {
-      hydrateStaticPriceData(networkData);
-    } else if (!state.data && hasStaticSnapshot && Date.parse(networkData.generatedAt) < Date.parse(staticSnapshotGeneratedAt)) {
-      throw new Error('网络价格数据早于当前静态页面');
-    } else if (!priceSnapshotsEqual(state.data, networkData)) {
-      applyPriceData(networkData, { origin: 'network' });
-    } else {
-      state.dataOrigin = 'network';
-      applyCurrentPriceFreshness();
-      normalizeCurrentPriceFreshnessUi();
-      setFiltersDisabled(false);
-    }
+    const { data, publishedDate } = readEmbeddedSnapshot();
+    validatePriceFreshness(data);
+    // This date comes from the same history projection as the static page, not
+    // the raw Apple date (which can describe a non-substantive source edit).
+    elements.applePublishedDate.textContent = formatPublishedDate(publishedDate);
+    if (!state.data && staticDomMatchesPayload(data)) hydrateStaticPriceData(data);
+    else applyPriceData(data);
+    staticSnapshotDomDowngraded = false;
+    staticTimePresentation = null;
     setLoadStatus('', { hidden: true });
   } catch (error) {
-    if (fallbackData) {
-      const fallbackFreshness = classifyPriceFreshness(fallbackData);
-      if (fallbackFreshness.status === 'unusable') {
-        state.dataFreshness = fallbackFreshness;
-        showUnusableDataError(fallbackFreshness.reason);
-        return;
-      }
-      console.warn(`网络价格刷新失败，继续显示现有数据：${error.message}`);
-      if (state.data !== fallbackData) applyPriceData(fallbackData, { origin: state.dataOrigin ?? 'network' });
-      else {
-        // A direct Retry can recover from a corrected clock without a lifecycle event.
-        applyCurrentPriceFreshness();
-        normalizeCurrentPriceFreshnessUi();
-      }
-      setLoadStatus('', { retry: true });
-      setFiltersDisabled(false);
-    } else if (hasStaticSnapshot) {
-      console.warn(`网络价格刷新失败，继续显示静态价格：${error.message}`);
-      const staticFreshness = applyStaticSnapshotFreshness();
-      if (staticFreshness.status === 'unusable') return;
-      setLoadStatus('', { retry: true });
-    } else {
-      showLoadError(error);
-    }
+    showLoadError(error);
   } finally {
-      state.loading = false;
     scheduleAnalytics();
   }
 }
-elements.retryButton?.addEventListener('click', () => {
-  elements.retryButton.hidden = true;
-  initialize({ forceRefresh: true });
-});
 
+elements.retryButton?.addEventListener('click', () => location.reload());
+if (elements.retryButton) elements.retryButton.textContent = '刷新页面';
+
+// A corrected device clock can restore the same page snapshot. These events
+// never fetch prices, discover a new version, or impose an expiry deadline.
+function recheckSnapshotClock() {
+  const freshness = classifyPriceFreshness({ generatedAt: staticSnapshotGeneratedAt });
+  if (freshness.status === state.dataFreshness?.status) return;
+  if (freshness.status === 'unusable' && state.data) {
+    state.dataFreshness = freshness;
+    showUnusableDataError();
+  } else {
+    initialize();
+  }
+}
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') void refreshPriceFreshnessLifecycle();
+  if (document.visibilityState === 'visible') recheckSnapshotClock();
 });
-window.addEventListener('pageshow', () => {
-  void refreshPriceFreshnessLifecycle();
-});
-
+window.addEventListener('pageshow', recheckSnapshotClock);
 
 // A dedicated history button leaves the existing minimum-card navigation intact.
 const minimumHistoryUi = { data: null, promise: null, status: 'idle', dialog: null, filterTier: 'all', limit: 20 };
@@ -1974,6 +1907,5 @@ if (minimumHistoryButton) {
   minimumHistoryButton.addEventListener('click', openMinimumHistory);
 }
 
-reconcileStaticTierState();
 initialize();
 void loadIcons();
