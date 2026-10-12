@@ -70,8 +70,9 @@ async function assertCountryHistoryFocus(page, { touch = false, outlineOffset })
     await assertRing(false);
   }
 
-  // Delegated non-focusable price-cell entry also restores the semantic button.
-  await activate(page.locator('#priceRows tr[data-market-id]').first().locator('.price-cell:visible').first());
+  // A click on the country label bubbles to its semantic history button.
+  // Unlike iCloud, this page does not make price cells history triggers.
+  await activate(trigger.locator('.country-name'));
   await page.waitForSelector('#historyDialog[open]');
   await activate(close);
   await settled();
