@@ -58,45 +58,41 @@ async function assertDescendingStaticState(page, data, tierId) {
   assert.equal(await page.locator('.rank-top').count(), 0, 'descending static state must not retain ascending top-three emphasis');
 }
 
-test('reconciles descending tier URL state before hydration and during static fallback', { timeout: 45_000 }, async () => {
+test('reconciles descending tier URL state for embedded data and damaged-snapshot fallback', { timeout: 45_000 }, async () => {
   const data = JSON.parse(await readFile(path.join(PROJECT_DIR, 'data', 'prices.json'), 'utf8'));
+  const html = await readFile(path.join(PROJECT_DIR, 'index.html'), 'utf8');
+  const damagedHtml = html.replace(/(<script id="icloud-price-data" type="application\/json">)[\s\S]*?(<\/script>)/, '$1{broken$2');
+  assert.notEqual(damagedHtml, html, 'fixture must corrupt the generated embedded snapshot');
   const server = await startServer();
   const { port } = server.address();
   let browser;
   try {
     browser = await BROWSER_TYPE.launch({ headless: true });
     for (const tierId of ['200GB', '6TB']) {
-      const pendingPage = await browser.newPage({ viewport: { width: 1024, height: 768 } });
-      pendingPage.setDefaultTimeout(10_000);
-      let releaseRequest;
-      const requestReleased = new Promise((resolve) => { releaseRequest = resolve; });
-      try {
-        await pendingPage.route('https://**/*', (route) => route.abort());
-        await pendingPage.route('**/data/prices.json*', async (route) => {
-          await requestReleased;
-          await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data) });
-        });
-        await pendingPage.goto(`http://127.0.0.1:${port}/?tier=${tierId}&dir=desc`, { waitUntil: 'domcontentloaded' });
-        await pendingPage.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === false);
-        await assertDescendingStaticState(pendingPage, data, tierId);
-        releaseRequest();
-        await pendingPage.waitForFunction(() => document.querySelector('#loadStatus')?.hidden === true);
-        await assertDescendingStaticState(pendingPage, data, tierId);
-      } finally {
-        releaseRequest();
-        await pendingPage.close();
-      }
-
-      const fallbackPage = await browser.newPage({ viewport: { width: 1024, height: 768 } });
-      fallbackPage.setDefaultTimeout(10_000);
-      try {
-        await fallbackPage.route('https://**/*', (route) => route.abort());
-        await fallbackPage.route('**/data/prices.json*', (route) => route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }));
-        await fallbackPage.goto(`http://127.0.0.1:${port}/?tier=${tierId}&dir=desc`, { waitUntil: 'domcontentloaded' });
-        await fallbackPage.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
-        await assertDescendingStaticState(fallbackPage, data, tierId);
-      } finally {
-        await fallbackPage.close();
+      for (const damaged of [false, true]) {
+        const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+        page.setDefaultTimeout(10_000);
+        let priceRequests = 0;
+        try {
+          await page.route('https://**/*', (route) => route.abort());
+          await page.route('**/data/prices.json*', (route) => {
+            priceRequests += 1;
+            return route.abort();
+          });
+          if (damaged) await page.route(`http://127.0.0.1:${port}/?**`, (route) => route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: damagedHtml }));
+          await page.goto(`http://127.0.0.1:${port}/?tier=${tierId}&dir=desc`, { waitUntil: 'domcontentloaded' });
+          if (damaged) {
+            await page.waitForFunction(() => document.querySelector('#retryButton')?.hidden === false);
+            assert.equal(await page.locator('#searchInput').isDisabled(), true);
+          } else {
+            await page.waitForFunction(() => document.querySelector('#searchInput')?.disabled === false);
+            assert.equal(await page.locator('#loadStatus').isHidden(), true);
+          }
+          await assertDescendingStaticState(page, data, tierId);
+          assert.equal(priceRequests, 0, 'startup and fallback must not fetch a second main snapshot');
+        } finally {
+          await page.close();
+        }
       }
     }
   } finally {

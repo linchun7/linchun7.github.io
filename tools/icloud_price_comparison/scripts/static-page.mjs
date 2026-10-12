@@ -31,6 +31,10 @@ export function publicPayloadFingerprint(payload) {
   return createHash('sha256').update(JSON.stringify(canonicalize(payload))).digest('hex');
 }
 
+export function serializeEmbeddedJson(value) {
+  return JSON.stringify(value).replaceAll('<', '\\u003c');
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll('&', '&amp;')
@@ -135,8 +139,16 @@ export function renderStaticFragments(payload, history = null) {
     || first.marketId.localeCompare(second.marketId, 'en')
   ));
   const currencyCount = new Set(payload.countries.map(({ currency }) => currency)).size;
+  const embeddedJson = serializeEmbeddedJson({ schemaVersion: 1, prices: payload, publishedDate: publicPublishedDate });
+  if (Buffer.byteLength(embeddedJson, 'utf8') > 1024 * 1024) throw new Error('STATIC_EMBEDDED_SNAPSHOT_TOO_LARGE');
   return {
-    META: `  <meta name="icloud-price-snapshot" content="${escapeHtml(payload.generatedAt)}" data-fingerprint="${fingerprint}" data-fx-stale="${fxStale}">`,
+    // Keep both projections in the existing generated region so the publication
+    // gate verifies prices.json, readable HTML and interactive data atomically.
+    // Escaping '<' prevents JSON text from closing its inert script element.
+    META: [
+      `  <meta name="icloud-price-snapshot" content="${escapeHtml(payload.generatedAt)}" data-fingerprint="${fingerprint}" data-fx-stale="${fxStale}">`,
+      `  <script id="icloud-price-data" type="application/json">${embeddedJson}</script>`
+    ].join('\n'),
     STATUS: `        <span id="updatedAt" title="北京时间">更新于 ${beijingDateTime(payload.generatedAt)}</span>`,
     WORKSPACE_META: [
       `          <p id="resultSummary" aria-live="polite">${payload.countries.length} 个地区 · ${escapeHtml(defaultTier.label)} 从低到高</p>`,
