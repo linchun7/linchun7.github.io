@@ -3867,6 +3867,8 @@ test('same-generatedAt label changes rebuild static table labels before enabling
       assert.deepEqual(current.plans, country.plans, 'only the name label may change');
       const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
       let historyCalls = 0;
+      const pageErrors = [];
+      page.on('pageerror', error => pageErrors.push(error.message));
       await page.addInitScript(now => { Date.now = () => now; }, Date.parse(original.generatedAt) + 3600000);
       await page.route('https://**/*', route => route.abort());
       await page.route(target => target.pathname === '/', async route => {
@@ -3891,7 +3893,21 @@ test('same-generatedAt label changes rebuild static table labels before enabling
         assert.equal(await page.locator('#historyTitle').textContent(), nameZh, 'dialog and table must use the same accepted name');
         await page.locator('#closeHistory').click();
         await page.locator('#searchInput').fill(nameZh);
-        await page.waitForFunction(marketId => document.querySelectorAll('#priceRows tr[data-market-id]').length === 1 && document.querySelector('#priceRows tr[data-market-id]')?.dataset.marketId === marketId, country.marketId);
+        try {
+          await page.waitForFunction(marketId => document.querySelectorAll('#priceRows tr[data-market-id]').length === 1 && document.querySelector('#priceRows tr[data-market-id]')?.dataset.marketId === marketId, country.marketId);
+        } catch (error) {
+          console.error('same-generation search failure', { nameZh, marketId: country.marketId,
+            pageErrors, ui: await page.evaluate(() => ({
+              value: document.querySelector('#searchInput').value,
+              disabled: document.querySelector('#searchInput').disabled,
+              active: document.activeElement?.outerHTML,
+              rows: [...document.querySelectorAll('#priceRows tr[data-market-id]')].map(row => row.dataset.marketId),
+              url: location.href, status: document.querySelector('#loadStatus').textContent,
+              openDialogs: [...document.querySelectorAll('dialog[open]')].map(dialog => dialog.id)
+            }))
+          });
+          throw error;
+        }
         assert.equal(await row.locator('.country-name').textContent(), nameZh, 'search rerender must retain the same visible label');
       } finally {
         await page.close();
@@ -4169,4 +4185,97 @@ for (const trigger of ['search', 'country sort', 'tier sort', 'minimum card', 'c
       assert.deepEqual(errors, []);
     } finally { await browser.close(); }
   });
+}
+
+
+// Force the delayed focus callback to run after the next user action rather
+// than relying on browser/runner timing. This must fail with unconditional
+// requestAnimationFrame focus restoration.
+for (const kind of ['country', 'publication']) {
+  test('closing ' + kind + ' history respects focus moved before its delayed restoration', { timeout: 45000 }, async context => {
+    const session = await snapshotSession(context, kind + ' delayed close focus');
+    if (!session) return;
+    const { page, browser, url, errors } = session;
+    await page.route('**/data/history.json*', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }));
+    const dialogSelector = kind === 'country' ? '#historyDialog' : '#publishedDateDialog';
+    const triggerSelector = kind === 'country' ? '.country-history-button' : '#publishedDateButton';
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded' });
+      await waitForSnapshot(page);
+      for (const nextAction of ['search', 'new dialog', 'normal restore']) {
+        await page.locator(triggerSelector).first().click();
+        assert.equal(await page.locator(dialogSelector).evaluate(dialog => dialog.open), true);
+        await page.evaluate(async selector => {
+          globalThis.__savedCloseRaf = window.requestAnimationFrame;
+          globalThis.__closeRafQueue = [];
+          window.requestAnimationFrame = callback => {
+            globalThis.__closeRafQueue.push(callback);
+            return globalThis.__closeRafQueue.length;
+          };
+          const dialog = document.querySelector(selector);
+          dialog.querySelector('button').focus();
+          const closed = new Promise(resolve => dialog.addEventListener('close', resolve, { once: true }));
+          dialog.close();
+          await closed;
+        }, dialogSelector);
+        await page.waitForFunction(() => globalThis.__closeRafQueue.length > 0, null, { polling: 10 });
+        await page.evaluate(({ nextAction }) => {
+          if (nextAction === 'search') document.querySelector('#searchInput').focus();
+          if (nextAction === 'new dialog') {
+            const dialog = document.createElement('dialog');
+            dialog.id = 'reviewNewFocusDialog';
+            const button = document.createElement('button');
+            button.id = 'reviewNewFocusButton';
+            button.textContent = 'New dialog action';
+            dialog.append(button); document.body.append(dialog);
+            dialog.showModal(); button.focus();
+          }
+          const queued = globalThis.__closeRafQueue;
+          window.requestAnimationFrame = globalThis.__savedCloseRaf;
+          delete globalThis.__savedCloseRaf; delete globalThis.__closeRafQueue;
+          for (const callback of queued) callback(performance.now());
+        }, { nextAction });
+        if (nextAction === 'search') {
+          assert.equal(await page.evaluate(() => document.activeElement?.id), 'searchInput', 'late close callback cannot steal explicitly moved focus');
+          await page.locator('#searchInput').fill('zzzz_no_such_market_zzzz');
+          await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length === 0);
+          await page.locator('#searchInput').fill('');
+          await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length > 0);
+        } else if (nextAction === 'new dialog') {
+          assert.equal(await page.evaluate(() => document.activeElement?.id), 'reviewNewFocusButton', 'old restoration cannot focus behind a newer modal');
+          await page.evaluate(() => { const dialog = document.querySelector('#reviewNewFocusDialog'); dialog.close(); dialog.remove(); });
+        } else {
+          assert.equal(await page.locator(triggerSelector).first().evaluate(button => document.activeElement === button), true, 'ordinary close still restores its trigger');
+        }
+      }
+      assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
+  });
+}
+
+for (const kind of ['country', 'publication']) {
+test(kind + ' history close still restores a replacement trigger when the original is detached', { timeout: 30000 }, async context => {
+  const session = await snapshotSession(context, kind + ' detached history trigger restoration');
+  if (!session) return;
+  const { page, browser, url, errors } = session;
+  await page.route('**/data/history.json*', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }));
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await waitForSnapshot(page);
+    const trigger = page.locator(kind === 'country' ? '.country-history-button' : '#publishedDateButton').first();
+    const marketId = kind === 'country' ? await trigger.evaluate(button => button.closest('tr').dataset.marketId) : null;
+    await trigger.click();
+    await page.evaluate(({ kind, marketId }) => {
+      const row = kind === 'country' ? [...document.querySelectorAll('#priceRows tr[data-market-id]')].find(row => row.dataset.marketId === marketId) : null;
+      const original = kind === 'country' ? row.querySelector('.country-history-button') : document.querySelector('#publishedDateButton');
+      const replacement = original.cloneNode(true);
+      replacement.dataset.focusReplacement = 'true';
+      original.replaceWith(replacement);
+      document.querySelector(kind === 'country' ? '#closeHistory' : '#closePublishedDate').focus();
+      document.querySelector(kind === 'country' ? '#historyDialog' : '#publishedDateDialog').close();
+    }, { kind, marketId });
+    await page.waitForFunction(() => document.activeElement?.dataset.focusReplacement === 'true');
+    assert.deepEqual(errors, []);
+  } finally { await browser.close(); }
+});
 }

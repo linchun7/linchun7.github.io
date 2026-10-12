@@ -1529,6 +1529,18 @@ function trapDialogFocus(dialog, event) {
   }
 }
 
+function restoreDialogFocusAfterClose(dialog, restore) {
+  requestAnimationFrame(() => {
+    // Native close or a subsequent user action may already have moved focus.
+    // Never steal it from another control or a newly opened dialog.
+    if (document.querySelector('dialog[open]')) return;
+    const active = document.activeElement;
+    if (active?.isConnected && active !== document.body && active !== document.documentElement
+      && !dialog.contains(active)) return;
+    restore();
+  });
+}
+
 function bindEvents() {
   if (state.eventsBound) return;
   state.eventsBound = true;
@@ -1580,7 +1592,7 @@ function bindEvents() {
     const returnCountry = state.historyReturnCountry;
     state.historyReturnFocus = null;
     state.historyReturnCountry = null;
-    requestAnimationFrame(() => {
+    restoreDialogFocusAfterClose(elements.historyDialog, () => {
       const currentButton = returnCountry
         ? [...elements.priceRows.querySelectorAll('tr[data-market-id]')].find((row) => row.dataset.marketId === returnCountry)?.querySelector('.country-history-button')
         : null;
@@ -1592,7 +1604,12 @@ function bindEvents() {
   elements.publishedDateDialog.addEventListener('close', () => {
     const returnFocus = state.publishedDateReturnFocus;
     state.publishedDateReturnFocus = null;
-    if (returnFocus?.isConnected) requestAnimationFrame(() => returnFocus.focus());
+    restoreDialogFocusAfterClose(elements.publishedDateDialog, () => {
+      const currentButton = document.querySelector('#publishedDateButton');
+      if (returnFocus?.isConnected) returnFocus.focus();
+      else if (currentButton) currentButton.focus();
+      else elements.workspace.focus();
+    });
   });
   addEventListener('scroll', scheduleBackToTableUpdate, { passive: true });
   addEventListener('resize', () => {
