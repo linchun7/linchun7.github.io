@@ -115,6 +115,11 @@ async function getText(fetchImpl, base, maxBytes, signal, attempt, diagnostic) {
     }
   });
   if (!response.ok) throw new Error('HTTP_' + response.status);
+  // Match the browser consumer's MIME gate for the on-demand history only.
+  if (base === MINIMUM_HISTORY_URL
+      && !/application\/json/i.test(response.headers.get('content-type') || '')) {
+    throw new Error('production minimum history content type is not application/json');
+  }
   if (response.url) {
     const actual = new URL(response.url);
     if (actual.origin !== requestUrl.origin || actual.pathname !== requestUrl.pathname) {

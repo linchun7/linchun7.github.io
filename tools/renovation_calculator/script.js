@@ -46,7 +46,8 @@ const numberUtils = {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
     }).format(numberUtils.toFixed2(amount)),
-    formatPercent: (value) => numberUtils.toFixed2(value).toFixed(2)
+    formatPercent: (value) => numberUtils.toFixed2(value).toFixed(2),
+    formatFeeRate: (value) => value === null ? '—' : `${numberUtils.formatPercent(value)}%`
 };
 
 const validationUtils = {
@@ -186,7 +187,7 @@ function exportToCSV(schedule, totals) {
             `"¥${numberUtils.formatMoney(row.serviceFee)}"`,
             `"¥${numberUtils.formatMoney(row.remainingPrincipal)}"`,
             `"¥${numberUtils.formatMoney(row.totalPaidPrincipal)}"`,
-            `"${numberUtils.formatPercent(row.annualizedFeeRate)}%"`,
+            `"${numberUtils.formatFeeRate(row.annualizedFeeRate)}"`,
             `"${numberUtils.formatPercent(row.earlyRepaymentAPR)}%"`
         ];
         csvContent += rowData.join(',') + '\n';
@@ -255,7 +256,7 @@ function renderTable(schedule, totals, apr) {
                             <td>￥${numberUtils.formatMoney(row.serviceFee)}</td>
                             <td>￥${numberUtils.formatMoney(row.remainingPrincipal)}</td>
                             <td>￥${numberUtils.formatMoney(row.totalPaidPrincipal)}</td>
-                            <td>${numberUtils.formatPercent(row.annualizedFeeRate)}%</td>
+                            <td>${numberUtils.formatFeeRate(row.annualizedFeeRate)}</td>
                             <td>${numberUtils.formatPercent(row.earlyRepaymentAPR)}%</td>
                         </tr>
                     `).join('')}
@@ -296,7 +297,7 @@ function generateSchedule(inputs) {
         const remainingPrincipal = Math.max(0, numberUtils.toFixed2(inputs.loanAmount - totalPaidPrincipal));
         const annualizedFeeRate = openingPrincipal > 0
             ? monthlyFee * 12 / openingPrincipal * 100
-            : 0;
+            : monthlyFee > 0 ? null : 0;
 
         schedule.push({
             month,
@@ -348,6 +349,13 @@ function generateSchedule(inputs) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    const invalidateResult = () => {
+        window.lastExportData = null;
+        const resultElement = document.getElementById('result');
+        resultElement.innerHTML = '<div class="empty-placeholder">参数已修改，请重新计算。</div>';
+        resultElement.classList.add('show');
+    };
+
     const setupQuickSelectButtons = (container, inputId) => {
         container.addEventListener('click', e => {
             const button = e.target.closest('[data-value]');
@@ -355,13 +363,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const input = document.getElementById(inputId);
             input.value = button.dataset.value;
+            invalidateResult();
 
             container.querySelectorAll('[data-value]').forEach(btn => btn.classList.remove('active'));
             button.classList.add('active');
         });
 
         const input = document.getElementById(inputId);
+        input.addEventListener('change', invalidateResult);
         input.addEventListener('input', () => {
+            invalidateResult();
             const currentValue = input.value;
             container.querySelectorAll('[data-value]').forEach(btn => {
                 btn.classList[btn.dataset.value === currentValue ? 'add' : 'remove']('active');
@@ -391,6 +402,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('calculateBtn').addEventListener('click', () => {
+        window.lastExportData = null;
         const resultElement = document.getElementById('result');
         resultElement.innerHTML = '';
         resultElement.classList.remove('show');
