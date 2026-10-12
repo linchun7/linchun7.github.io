@@ -12,6 +12,8 @@ const browserName = process.env.PLAYWRIGHT_BROWSER || 'chromium';
 const browserType = { chromium, firefox, webkit }[browserName];
 const sourcePath = resolve('tools/space/spacing.js');
 const cases = [
+  ['fullwidth-url-letter', 'https://example.com/Ａ中文ABC', 'https://example.com/Ａ中文ABC'],
+  ['cjk-url-number', 'https://example.com/〇中文ABC', 'https://example.com/〇中文ABC'],
   ['han-ascii', '𠀀A中B', '𠀀 A 中 B'],
   ['case-fold-control', '中文K数字ſ结束', '中文K数字ſ结束'],
   ['uppercase-url', '访问HTTPS://example.com/中文ABC，继续ABC', '访问 HTTPS://example.com/中文ABC，继续 ABC'],
@@ -23,6 +25,10 @@ const cases = [
   ['line-endings', '中文ABC\r\n第二行123\r段落Z', '中文 ABC\r\n第二行 123\r段落 Z']
 ];
 const mutants = [
+  { id: 'unicode-block-mistaken-for-punctuation', witness: 'fullwidth-url-letter',
+    from: String.raw`const bareUrlBoundary = /(?:[\u2018\u2019\u201c\u201d\u2026]|(?=[\u3000-\u303f\uff00-\uffef])\p{P})/u;`,
+    to: String.raw`const bareUrlBoundary = /[\u3000-\u303f\uff00-\uffef\u2018\u2019\u201c\u201d\u2026]/u;`
+  },
   {
     id: 'scheme-becomes-case-sensitive', witness: 'uppercase-url',
     from: String.raw`const urlStart = /<?[hH][tT][tT][pP][sS]?:\/\//g;`,
