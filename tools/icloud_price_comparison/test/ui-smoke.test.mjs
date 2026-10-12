@@ -4746,9 +4746,24 @@ async function assertHistoryDismissalBoundaries(page, { triggerSelector, dialogS
         await page.mouse.down();
         await page.mouse.move(to.x, to.y);
         await page.mouse.up();
+        // WebKit can acknowledge input before dispatching its terminal event.
+        // Wait on this gesture, not elapsed time; cancellation is still diagnosed
+        // by the unchanged pointerup geometry and open-state assertions below.
+        try {
+          await page.waitForFunction(() => {
+            const trace = globalThis.__historyBoundaryTrace;
+            const down = trace.find(event => event.type === 'pointerdown');
+            return down && trace.some(event => event.pointerId === down.pointerId
+              && (event.type === 'pointerup' || event.type === 'pointercancel'));
+          }, null, { timeout: 5000 });
+        } catch (error) {
+          error.message = label + ': drag terminal event was not delivered\n'
+            + JSON.stringify(await diagnostics()) + '\n' + error.message;
+          throw error;
+        }
         const result = await diagnostics();
         const down = result.events.find(event => event.type === 'pointerdown');
-        const up = result.events.find(event => event.type === 'pointerup');
+        const up = result.events.find(event => event.type === 'pointerup' && event.pointerId === down?.pointerId);
         const scenario = (startOutside ? 'outside to ' : 'to outside from ') + endpoint;
         assert.equal(down?.outside, startOutside, label + ': drag start geometry ' + scenario + '\n' + JSON.stringify(result));
         assert.equal(up?.outside, !startOutside, label + ': drag endpoint geometry ' + scenario + '\n' + JSON.stringify(result));
@@ -4780,7 +4795,14 @@ async function assertHistoryDismissalBoundaries(page, { triggerSelector, dialogS
   for (const [scenario, open] of rejected) assert.equal(open, true, label + ': ' + scenario + ' cannot dismiss');
   const current = await geometry();
   await pointClick({ x: current.left / 2, y: current.interior.y }, true);
-  await page.waitForFunction(selector => !document.querySelector(selector).open, dialogSelector);
+  console.log('History backdrop input:', label, JSON.stringify(await diagnostics()));
+  try {
+    await page.waitForFunction(selector => !document.querySelector(selector).open, dialogSelector);
+  } catch (error) {
+    error.message = label + ': real backdrop click did not dismiss\n'
+      + JSON.stringify(await diagnostics()) + '\n' + error.message;
+    throw error;
+  }
   await page.waitForFunction(selector => document.activeElement === document.querySelector(selector), triggerSelector);
   await activate(trigger);
   await page.waitForSelector(dialogSelector + '[open]');
