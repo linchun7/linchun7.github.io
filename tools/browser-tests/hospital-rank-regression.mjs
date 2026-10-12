@@ -55,6 +55,7 @@ try {
         assert.equal(await page.locator('#yearSelect').inputValue(), String(latest.year));
     } finally { await staticContext.close(); }
 
+    for (let attempt = 1; attempt <= 5; attempt += 1) {
     const ctx = await context({ viewport: { width: 390, height: 844 } });
     try {
         const page = await ctx.newPage();
@@ -97,10 +98,44 @@ try {
         await page.locator('#citySelect').selectOption('广州市');
         const ids = new Set(data.hospitals.filter(h => h.city === '广州市' && h.province === '广东省').map(h => h.id));
         const expected = data.years.find(b => b.year === 2023).records.filter(r => ids.has(r.hospitalId)).length;
-        await page.waitForFunction(n => document.querySelectorAll('#hospitalList tr.data-row').length === n, expected);
+        try {
+            await page.waitForFunction(n => document.querySelectorAll('#hospitalList tr.data-row').length === n, expected);
+        } catch (error) {
+            const diagnostic = { label: 'hospital-mobile-guangzhou-filter', browser: name, attempt, expected,
+                expectedIds: data.years.find(b => b.year === 2023).records.filter(r => ids.has(r.hospitalId)).map(r => r.hospitalId),
+                pageErrors: [...errors] };
+            try {
+                diagnostic.actual = await page.evaluate(() => {
+                    const controls = Object.fromEntries(['hospitalSearch', 'yearSelect', 'provinceSelect', 'citySelect'].map(id => {
+                        const node = document.getElementById(id);
+                        return [id, { value: node?.value, disabled: node?.disabled }];
+                    }));
+                    const rows = [...document.querySelectorAll('#hospitalList tr.data-row')];
+                    return { controls, rowCount: rows.length,
+                        rows: rows.map(row => ({ hospitalId: row.dataset.hospitalId, year: row.dataset.year, name: row.querySelector('.hospital-history-button')?.textContent })),
+                        workspaceTitle: document.getElementById('workspaceTitle')?.textContent,
+                        dataStatus: document.getElementById('dataStatus')?.textContent,
+                        resultSummary: document.getElementById('resultSummary')?.textContent,
+                        paginationStatus: document.getElementById('paginationStatus')?.textContent,
+                        emptyMessage: document.querySelector('.empty-message')?.textContent,
+                        errorMessage: document.querySelector('.error-message')?.textContent,
+                        dialogOpen: document.getElementById('historyDialog')?.open,
+                        activeElement: { id: document.activeElement?.id, tagName: document.activeElement?.tagName }
+                    };
+                });
+            } catch (captureError) { diagnostic.captureError = String(captureError); }
+            diagnostic.pageErrors = [...errors];
+            console.error(JSON.stringify(diagnostic));
+            throw error;
+        }
+        const actualIds = await page.locator('#hospitalList tr.data-row').evaluateAll(rows => rows.map(row => row.dataset.hospitalId));
+        const expectedIds = data.years.find(b => b.year === 2023).records.filter(r => ids.has(r.hospitalId)).map(r => r.hospitalId);
+        assert.deepEqual([...actualIds].sort(), [...expectedIds].sort(), 'Guangzhou filter must retain the exact hospital set');
+        console.log(JSON.stringify({ label: 'hospital-mobile-guangzhou-filter', browser: name, attempt, expected, actualIds, status: 'passed' }));
         assert.equal(await page.locator('#hospitalList tr.data-row').count(), expected);
         assert.deepEqual(errors, []);
     } finally { await ctx.close(); }
+    }
 
     for (const [label, mutate] of cases) {
         const ctx = await context();
