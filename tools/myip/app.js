@@ -212,11 +212,19 @@
         renderSummary();
     }
 
+    function observationsForFamily(route, family) {
+        return routeResults[route].observations.filter((item) => item.family === family);
+    }
+
+    function routeHasDifferentExits(route) {
+        return [4, 6].some((family) => new Set(observationsForFamily(route, family).map((item) => item.ip)).size > 1);
+    }
+
     function compareFamily(family) {
-        const domestic = preferredObservation('domestic', family);
-        const international = preferredObservation('international', family);
-        if (!domestic || !international) return null;
-        return { same: domestic.ip === international.ip };
+        const domestic = observationsForFamily('domestic', family);
+        const international = observationsForFamily('international', family);
+        if (!domestic.length || !international.length) return null;
+        return { same: new Set([...domestic, ...international].map((item) => item.ip)).size === 1 };
     }
 
     function renderSummary() {
@@ -235,6 +243,12 @@
 
         setText('summary-detail', '');
         if (domesticOk && internationalOk) {
+            if (routeHasDifferentExits('domestic') || routeHasDifferentExits('international')) {
+                setStatus('summary-status', 'warning', '已分流');
+                setText('summary-main', '成功的同协议来源检测到不同出口');
+                setText('summary-detail', '部分来源返回不同出口，主 IP 按来源优先级显示。');
+                return;
+            }
             const comparisons = [compareFamily(4), compareFamily(6)].filter(Boolean);
             if (comparisons.some((item) => !item.same)) {
                 setStatus('summary-status', 'warning', '已分流');
@@ -252,6 +266,9 @@
         }
 
         setStatus('summary-status', 'warning', '部分结果');
+        if (internationalOk && routeHasDifferentExits('international')) {
+            setText('summary-detail', '国际同协议来源检测到不同出口，国内路径仍未确认。');
+        }
         if (domesticReference && internationalOk) setText('summary-main', '国际 IP 已获取，国内未确认');
         else if (domesticOk && !internationalOk) setText('summary-main', '国内 IP 已获取，国际未确认');
         else if (!domesticOk && internationalOk) setText('summary-main', '国际 IP 已获取，国内未确认');

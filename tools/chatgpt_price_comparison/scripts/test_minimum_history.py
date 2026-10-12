@@ -30,7 +30,173 @@ def fixture(offset=0):
     return data
 
 
+def scoped_fx_fixture(offset=0, *, us_price='20', lk_price='21', jpy='150', cny='7',
+                      future_currencies=('USD', 'USD')):
+    """All configured markets are valid; FutureTier has only two storefronts."""
+    data = fixture(offset)
+    base = copy.deepcopy(data['markets'][0])
+    data['fx']['rates'].update(JPY=jpy, CNY=cny)
+    config = json.loads((p.ROOT / 'markets.json').read_text(encoding='utf-8'))
+    data['markets'] = []
+    for item in config:
+        market = copy.deepcopy(base)
+        currency = 'JPY' if item['code'] == 'jp' else 'USD'
+        if item['code'] in ('us', 'lk'):
+            currency = future_currencies[('us', 'lk').index(item['code'])]
+        market.update(code=item['code'], name=item['name'], source_url=p.url_for(item['code']), currency=currency)
+        plus = {'USD': '30', 'JPY': '4500', 'CNY': '210'}[currency]
+        market['offers'] = [{'label': 'ChatGPT Plus', 'amounts': [{'amount': plus}]}]
+        if item['code'] in ('us', 'lk'):
+            local = us_price if item['code'] == 'us' else lk_price
+            market['offers'].append({'label': 'ChatGPT FutureTier', 'amounts': [{'amount': local}]})
+        data['markets'].append(market)
+    return refresh_scoped_fixture(data)
+
+
+def refresh_scoped_fixture(data):
+    now = p.epoch(data['generated_at'])
+    for market in data['markets']:
+        for offer in market['offers']:
+            for amount in offer['amounts']:
+                local = Decimal(amount['amount'])
+                amount['amount'] = h.decimal_text(amount['amount'])
+                digits = 0 if market['currency'] == 'JPY' else 2
+                amount['display'] = market['currency'] + ' ' + format(local, f'.{digits}f')
+                amount['cny'] = p.converted(market, amount['amount'], data['fx'], now)
+        market['offers'].sort(key=lambda offer: offer['label'])
+        market['fingerprint'] = p.digest(p.semantic(market))
+        market['history_baseline'] = {'at': data['generated_at'], 'snapshot': p.semantic(market)}
+    revise(data)
+    p.validate(data, now)
+    return data
+
+
 class MinimumHistoryTests(unittest.TestCase):
+    def test_plan_local_fx_ignores_other_plans_currency_changes(self):
+        first = scoped_fx_fixture()
+        self.assertEqual(len(first['markets']), 59)
+        history = h.advance_history(h.empty_history(), first)
+        original = copy.deepcopy(history)
+        current = scoped_fx_fixture(86400, us_price='22', jpy='151')
+        updated = h.advance_history(history, current)
+        event = next(event for event in updated['events'] if event['plan'] == 'ChatGPT FutureTier' and event['kind'] == 'change')
+        self.assertEqual(h.winner_ids(event['from']), ['us'])
+        self.assertEqual(h.winner_ids(event['to']), ['lk'])
+        self.assertEqual(event['cause'], 'storefront')
+        self.assertFalse(event['evidence']['fx_changed'])
+        self.assertEqual(set(event['comparison']['fx']['rates']), {'USD', 'CNY'})
+        self.assertEqual(history, original)
+        self.assertEqual(updated['events'][:len(history['events'])], history['events'])
+        self.assertTrue(h.assert_matches(updated, current))
+
+    def test_unrelated_fx_alone_does_not_create_plan_winner_event(self):
+        history = h.advance_history(h.empty_history(), scoped_fx_fixture())
+        current = scoped_fx_fixture(86400, jpy='151')
+        updated = h.advance_history(history, current)
+        self.assertEqual([event for event in updated['events']
+                          if event['plan'] == 'ChatGPT FutureTier' and event['kind'] == 'change'], [])
+        related = [event for event in updated['events']
+                   if event['plan'] == 'ChatGPT Plus' and event['kind'] == 'change']
+        self.assertEqual(len(related), 1)
+        self.assertEqual(related[0]['cause'], 'fx')
+        self.assertTrue(h.assert_matches(updated, current))
+
+    def test_relevant_cny_change_is_mixed_for_usd_plan(self):
+        history = h.advance_history(h.empty_history(), scoped_fx_fixture())
+        current = scoped_fx_fixture(86400, us_price='22', jpy='151', cny='8')
+        updated = h.advance_history(history, current)
+        event = next(event for event in updated['events'] if event['plan'] == 'ChatGPT FutureTier' and event['kind'] == 'change')
+        self.assertEqual(event['cause'], 'mixed')
+        self.assertTrue(event['evidence']['fx_changed'])
+        self.assertTrue(h.assert_matches(updated, current))
+
+    def test_cny_storefront_factor_stays_one_when_raw_cny_rate_changes(self):
+        options = {'future_currencies': ('CNY', 'CNY')}
+        history = h.advance_history(h.empty_history(), scoped_fx_fixture(**options))
+        current = scoped_fx_fixture(86400, us_price='22', cny='8', **options)
+        updated = h.advance_history(history, current)
+        event = next(event for event in updated['events'] if event['plan'] == 'ChatGPT FutureTier' and event['kind'] == 'change')
+        self.assertEqual(event['cause'], 'storefront')
+        self.assertFalse(event['evidence']['fx_changed'])
+        self.assertTrue(h.assert_matches(updated, current))
+
+    def test_relevant_jpy_factor_alone_can_change_the_winner(self):
+        options = {'future_currencies': ('USD', 'JPY'), 'lk_price': '3150'}
+        history = h.advance_history(h.empty_history(), scoped_fx_fixture(**options))
+        current = scoped_fx_fixture(86400, jpy='160', **options)
+        updated = h.advance_history(history, current)
+        event = next(event for event in updated['events'] if event['plan'] == 'ChatGPT FutureTier' and event['kind'] == 'change')
+        self.assertEqual(h.winner_ids(event['to']), ['lk'])
+        self.assertEqual(event['cause'], 'fx')
+        self.assertFalse(event['evidence']['prices_changed'])
+        self.assertTrue(event['evidence']['fx_changed'])
+        self.assertTrue(h.assert_matches(updated, current))
+
+    def test_equal_effective_factors_are_not_fx_changes(self):
+        options = {'future_currencies': ('JPY', 'JPY'), 'lk_price': '3150'}
+        history = h.advance_history(h.empty_history(), scoped_fx_fixture(us_price='3000', **options))
+        current = scoped_fx_fixture(86400, us_price='3300', jpy='300', cny='14', **options)
+        updated = h.advance_history(history, current)
+        event = next(event for event in updated['events'] if event['plan'] == 'ChatGPT FutureTier' and event['kind'] == 'change')
+        self.assertEqual(event['cause'], 'storefront')
+        self.assertFalse(event['evidence']['fx_changed'])
+        self.assertTrue(h.assert_matches(updated, current))
+
+    def test_plan_local_fx_preserves_initial_scope_and_gap_classification(self):
+        first = scoped_fx_fixture()
+        history = h.advance_history(h.empty_history(), first)
+        initial = next(event for event in history['events'] if event['plan'] == 'ChatGPT FutureTier')
+        self.assertEqual(initial['cause'], 'initial')
+        self.assertIsNone(initial['evidence']['fx_changed'])
+        expanded = scoped_fx_fixture(86400, jpy='151')
+        market = next(market for market in expanded['markets'] if market['code'] == 'ca')
+        market['offers'].append({'label': 'ChatGPT FutureTier', 'amounts': [{'amount': '19'}]})
+        refresh_scoped_fixture(expanded)
+        scoped = h.advance_history(history, expanded)
+        event = next(event for event in scoped['events'] if event['plan'] == 'ChatGPT FutureTier' and event['kind'] == 'change')
+        self.assertEqual(event['cause'], 'scope')
+        self.assertTrue(event['evidence']['scope_changed'])
+        self.assertTrue(h.assert_matches(scoped, expanded))
+
+        degraded = scoped_fx_fixture(43200)
+        degraded['fx']['fallback'] = True
+        revise(degraded)
+        gap = h.advance_history(history, degraded)
+        recovered_data = scoped_fx_fixture(86400, us_price='22', jpy='151')
+        recovered = h.advance_history(gap, recovered_data)
+        event = next(event for event in recovered['events'] if event['plan'] == 'ChatGPT FutureTier' and event['kind'] == 'change')
+        self.assertEqual(event['cause'], 'unknown')
+        self.assertTrue(event['evidence']['gap'])
+        self.assertFalse(event['evidence']['fx_changed'])
+        self.assertTrue(h.assert_matches(recovered, recovered_data))
+
+    def test_legacy_events_are_not_reclassified_and_missing_rates_are_unknown(self):
+        first = scoped_fx_fixture()
+        history = h.advance_history(h.empty_history(), first)
+        legacy = h.advance_history(history, scoped_fx_fixture(86400, us_price='22', jpy='151'))
+        # Model the already-persisted global-FX attribution without rewriting it.
+        event = next(event for event in legacy['events'] if event['plan'] == 'ChatGPT FutureTier' and event['kind'] == 'change')
+        event['evidence']['fx_changed'] = True
+        event['cause'] = 'mixed'
+        h.validate_history(legacy)
+        original = copy.deepcopy(legacy)
+        current = scoped_fx_fixture(2 * 86400, jpy='152')
+        updated = h.advance_history(legacy, current)
+        self.assertEqual(legacy, original)
+        self.assertEqual(updated['events'][:len(legacy['events'])], legacy['events'])
+        self.assertEqual(updated['events'][-1]['cause'], 'storefront')
+        self.assertTrue(h.assert_matches(updated, current))
+
+        missing = copy.deepcopy(history)
+        del missing['checkpoint']['fx']['rates']['CNY']
+        h.validate_history(missing)
+        current = scoped_fx_fixture(86400, us_price='22')
+        updated = h.advance_history(missing, current)
+        event = next(event for event in updated['events'] if event['plan'] == 'ChatGPT FutureTier' and event['kind'] == 'change')
+        self.assertEqual(event['cause'], 'unknown')
+        self.assertIsNone(event['evidence']['fx_changed'])
+        self.assertTrue(h.assert_matches(updated, current))
+
     def test_unreadable_git_versions_fail_closed_instead_of_hiding_a_gap(self):
         first = fixture()
         latest = fixture(86400)

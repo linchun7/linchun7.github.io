@@ -130,8 +130,15 @@
         if (endDate <= startDate) throw new Error('终止日期必须晚于起始日期');
 
         const days = (endDate - startDate) / DAY_MS;
-        const growthRatio = endValue / startValue;
-        const annualizedReturn = (Math.pow(growthRatio, annualDays / days) - 1) * 100;
+        // Use log1p near equal values, and log differences for extreme pairs
+        // whose ratio would overflow or lose precision through underflow.
+        const relativeChange = (endValue - startValue) / startValue;
+        const logGrowth = Math.abs(relativeChange) < 0.5
+            ? Math.log1p(relativeChange)
+            : Math.log(endValue) - Math.log(startValue);
+        const annualizedReturn = endValue === 0
+            ? -100
+            : Math.expm1(logGrowth * (annualDays / days)) * 100;
 
         if (!Number.isFinite(annualizedReturn)) throw new Error('计算结果异常，请检查输入');
         return `净值年化收益率（CAGR）：${formatPercent(annualizedReturn)}（持有 ${days} 天）`;
@@ -173,6 +180,24 @@
         row.appendChild(cell);
     }
 
+    function compoundValues(principal, periods, periodicRate) {
+        const logGrowth = periods * Math.log1p(periodicRate);
+        const growth = Math.expm1(logGrowth);
+        let totalInterest = principal * growth;
+        // Adding the separately calculated gain preserves small-rate interest.
+        // For large losses, direct growth avoids subtracting nearly equal sums.
+        let futureValue = logGrowth < -0.5
+            ? principal * Math.exp(logGrowth)
+            : principal + totalInterest;
+        // An intermediate factor can exceed Number's range even when the
+        // principal-scaled balance is representable (and vice versa at zero).
+        if (!Number.isFinite(growth) || (futureValue === 0 && logGrowth < 0)) {
+            futureValue = Math.exp(Math.log(principal) + logGrowth);
+            if (logGrowth > 0) totalInterest = futureValue - principal;
+        }
+        return { futureValue, totalInterest };
+    }
+
     function renderCompoundDetails(principal, periods, periodicRate) {
         const container = $('result4-table');
         clearElement(container);
@@ -197,14 +222,10 @@
         thead.appendChild(headRow);
 
         const tbody = document.createElement('tbody');
-        let balance = principal;
-        let totalInterest = 0;
-
         for (let period = 1; period <= periods; period += 1) {
-            const opening = balance;
+            const opening = compoundValues(principal, period - 1, periodicRate).futureValue;
             const interest = opening * periodicRate;
-            totalInterest += interest;
-            balance += interest;
+            const { futureValue: balance, totalInterest } = compoundValues(principal, period, periodicRate);
 
             const row = document.createElement('tr');
             appendCell(row, String(period));
@@ -231,9 +252,7 @@
         // 360 / 365 天只参与按周、按日复利；其他频率完全忽略该选择。
         const annualDays = config.dayBased ? readAnnualDays('rateType4') : 365;
         const periodicRate = getPeriodicRate(annualRate, frequency, annualDays);
-        const growthFactor = Math.pow(1 + periodicRate, periods);
-        const futureValue = principal * growthFactor;
-        const totalInterest = futureValue - principal;
+        const { futureValue, totalInterest } = compoundValues(principal, periods, periodicRate);
 
         if (!Number.isFinite(futureValue) || !Number.isFinite(totalInterest)) {
             throw new Error('计算结果过大或无效，请缩短存期或调整收益率');

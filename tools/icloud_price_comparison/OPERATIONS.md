@@ -26,7 +26,7 @@
 2. 候选通过 core、锁定 Playwright Chromium、工件和静态投影验证后上传；不重复跑相同 core。
 3. 独立发布 job 重验下载工件。main 仅有其他工具的无关变更时保持工件字节不变并重验；iCloud 相关变更则废弃候选。禁止强推。
 4. `stage-price-publication.mjs` 只强制暂存已测 data/index 路径，从 Git tree 读取原始 blob，核对完整文件集和字节，再深验。忽略规则或属性转码造成差异时必须在 commit/push 前停止。
-5. 等待 Pages 并验证 canonical URL 的数据、HTML 投影和版本化资源；仅完整成功才构成每日幂等/恢复证明。被新部署取代的旧验证不能冒充恢复。
+5. 等待 Pages 并验证 canonical URL 的数据、HTML 投影和版本化资源；仅完整成功才构成每日幂等/恢复证明。可信 main 的完整后继版本可接管旧验证，包括数据不变而静态资源更新；同时间但数据不同、混合资源或缺少可信 main 证据仍拒绝。被新部署取代的旧验证不能冒充恢复。
 
 生成 job 不具备写权限，发布 job 不安装项目依赖。普通 main 代码提交在核心与三浏览器通过后复用同一生产校验器检查实际部署。GITHUB_TOKEN 发布数据提交不会再触发普通 push 验证，因此 updater 必须保留自身的完整验收。手动恢复使用 main 的新 Run workflow；如 YAML 已改变，不重跑旧记录。
 
