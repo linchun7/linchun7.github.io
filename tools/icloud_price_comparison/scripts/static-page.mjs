@@ -231,4 +231,3 @@ export function assertStaticPageMatches(html, payload, history = null) {
   }
   return true;
 }
-

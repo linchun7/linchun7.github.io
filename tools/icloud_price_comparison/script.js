@@ -1886,4 +1886,3 @@ if (minimumHistoryButton) {
 
 initialize();
 void loadIcons();
-

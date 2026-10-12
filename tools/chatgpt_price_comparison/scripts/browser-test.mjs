@@ -584,4 +584,3 @@ try {
   for(const p of pending.values()){clearTimeout(p.timer);p.reject(Error('Browser closed'));}
   await delay(300); await rm(profile,{recursive:true,force:true,maxRetries:3,retryDelay:200});
 }
-

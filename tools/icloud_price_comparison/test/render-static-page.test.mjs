@@ -204,4 +204,3 @@ test('embedded snapshot changes remain inside the publication gate generated reg
   const $ = load(rendered);
   assert.deepEqual(JSON.parse($('#icloud-price-data').text()).prices, changed);
 });
-

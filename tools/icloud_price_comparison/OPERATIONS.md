@@ -72,4 +72,3 @@ HTTP 基线：Referrer-Policy: origin、X-Content-Type-Options: nosniff、X-Fram
 Dependabot 每周一北京时间 10:20（iCloud npm）、11:20（共享浏览器 Playwright）、12:20（Actions）错峰检查，保持独立 PR。npm 精确稳定版本 major/minor/patch 可在严格文件范围及完整测试通过后自动合并；Playwright 必须验证 Chromium/Firefox/WebKit。官方 Action 仅同 major 精确 SHA 向前升级可自动合并；Action major 更新及第三方 Action 需人工复核。
 
 保留 LICENSE、THIRD_PARTY_NOTICES 和 vendor 来源/哈希；不删除规范化价格证据来减少文档。仓库长期说明限 README、本文件、短快照说明及第三方归属，不存阶段报告、测试截图、运行日志副本或交接流水账。当前故障修复证据留在 PR 与 Actions。
-

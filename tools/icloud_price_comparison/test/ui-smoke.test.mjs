@@ -4170,4 +4170,3 @@ for (const trigger of ['search', 'country sort', 'tier sort', 'minimum card', 'c
     } finally { await browser.close(); }
   });
 }
-

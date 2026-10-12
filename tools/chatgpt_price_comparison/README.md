@@ -64,4 +64,3 @@ node tools/chatgpt_price_comparison/scripts/browser-test.mjs
 最低价历史仍仅记录赢家地区集合变化；仅人民币金额变化不会新增换榜事件。事件原有 from 保留上一可靠快照的冠军价，to 保留本次冠军价，作为跨期事实。新增可选 comparison 保存事件同次可靠快照内的旧赢家与新赢家价格、实际汇率、观察时间和数据 revision；Git 回填另存精确来源 commit。页面箭头仅显示这份同期证据，旧赢家当次缺价或旧事件未保存同期证据时直接标注，不借用最新价格。
 
 scripts/enrich_minimum_comparisons.py --write 仅从完整 Git 第一父链中精确匹配事件时间与 source_revision 的可靠 prices.json 回填；保留原事件、归因、缺口与检查点。重复迁移不改变已有证据。--report <path> 可导出逐事件来源和无法回填原因。此命令只生成历史与对应 HTML，不抓取 Apple、不修改市场价格、不运行测试。
-
