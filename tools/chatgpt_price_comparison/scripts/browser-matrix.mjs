@@ -120,11 +120,24 @@ async function assertCountryHistoryFocus(page, { touch = false, outlineOffset })
   await assertRing(true);
 
   if (!touch) {
-    // Clicking dialog padding is the application's existing backdrop close path.
+    // Click the actual backdrop outside the dialog rectangle, not a rounded
+    // border corner (which has different hit testing between browser engines).
     await trigger.click();
     const bounds = await page.locator('#historyDialog').boundingBox();
-    assert.ok(bounds);
-    await page.mouse.click(bounds.x + 2, bounds.y + 2);
+    assert.ok(bounds && bounds.x > 2, 'desktop dialog leaves a clickable backdrop');
+    const point = { x: bounds.x / 2, y: bounds.y + bounds.height / 2 };
+    const viewport = page.viewportSize();
+    assert.ok(viewport && point.x > 0 && point.x < viewport.width
+      && point.y > 0 && point.y < viewport.height, 'backdrop point is inside the viewport');
+    assert.ok(point.x < bounds.x, 'backdrop point is outside the dialog rectangle');
+    await page.evaluate(() => {
+      document.addEventListener('click', event => {
+        globalThis.__historyBackdropTarget = event.target.id;
+      }, { once: true, capture: true });
+    });
+    await page.mouse.click(point.x, point.y);
+    assert.equal(await page.evaluate(() => globalThis.__historyBackdropTarget), 'historyDialog',
+      'native backdrop click must target the history dialog');
     await settled();
     await assertRing(false);
   }
