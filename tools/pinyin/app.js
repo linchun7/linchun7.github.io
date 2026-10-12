@@ -74,22 +74,25 @@
     }
 
     function fallbackCopy(text) {
+        const previousFocus = document.activeElement;
         const textArea = document.createElement('textarea');
         textArea.value = text;
         textArea.setAttribute('readonly', '');
         textArea.style.position = 'fixed';
         textArea.style.opacity = '0';
         document.body.appendChild(textArea);
-        textArea.select();
-        textArea.setSelectionRange(0, text.length);
 
         let copied = false;
         try {
+            textArea.focus({ preventScroll: true });
+            textArea.select();
+            textArea.setSelectionRange(0, text.length);
             copied = document.execCommand('copy');
         } catch {
             copied = false;
         } finally {
             textArea.remove();
+            if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
         }
         return copied;
     }

@@ -4,7 +4,7 @@ import path from 'node:path';
 import {tmpdir} from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {validateExtractedDataArtifact} from './validate-data-artifact.mjs';
-import {assertStaticPageMatches, staticPageShell} from './static-page.mjs';
+import {assertSafeStaticPageUpdate} from './validate-static-page-projection.mjs';
 
 const DATA = 'tools/icloud_price_comparison/data';
 const INDEX = 'tools/icloud_price_comparison/index.html';
@@ -47,8 +47,7 @@ export async function stagePricePublication({repoRoot, validatedData, validatedI
     await validateExtractedDataArtifact(stagedData);
     const prices = JSON.parse(await readFile(path.join(stagedData,'prices.json'),'utf8'));
     const history = JSON.parse(await readFile(path.join(stagedData,'history.json'),'utf8'));
-    assertStaticPageMatches(actualIndex.toString('utf8'), prices, history);
-    if (staticPageShell(base) !== staticPageShell(actualIndex.toString('utf8'))) throw new Error('STATIC_PAGE_SHELL_CHANGED');
+    assertSafeStaticPageUpdate(base, actualIndex.toString('utf8'), prices, history);
     return {tree, files:expectedFiles.length};
   } finally {await rm(directory,{recursive:true,force:true});}
 }

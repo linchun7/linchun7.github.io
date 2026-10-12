@@ -23,6 +23,8 @@
 - `scripts/market-registry.mjs`、`scripts/country-names.zh.json`：稳定身份及人工中文映射
 - `scripts/static-page.mjs`、`scripts/render-static-page.mjs`：静态生成源
 
+发布前的页面与暂存 Git tree 使用同一严格投影门禁：仅允许校验价格生成区域及由该价格确定的六处 SEO/品牌文案变化，容量变化不会放宽 CSP、脚本引用或其他页面内容。生产日期断言跟随已校验历史投影，固定日期语义在临时合成工件中验证。
+
 `index.html` 为生成产物。`seoProjection()` 维护 `ICLOUD_STATIC_*` markers 外的 SEO Projection，不直接改生成结果；JS/CSS 变化用内容哈希更新资源版本。关键契约、生成器或发布规则变化需同步本说明及 OPERATIONS。
 
 ## 更新与验证
@@ -32,6 +34,9 @@
 - [中文名称监测](../../.github/workflows/monitor-icloud-zh-markets.yml)：提醒人工核对，不自动绑定身份
 
 自动入口只有当日完整生产成功证明才跳过，手动不跳过。上游失败保留已发布数据；汇率降级不发健康心跳，也不跳过自动重试。Cloudflare 触发、DNS 和安全头需查看控制面，不能由仓库文字证明。
+
+
+Node 配置使用固定 SHA 的 actions/setup-node v7.1.0，工作流仍显式选择 Node.js 22，pnpm 版本保持不变。
 
 运行环境 Node.js >=22.1.0、pnpm 10.14.0，依赖以 package/lockfile 为准。项目目录内的验证入口：
 

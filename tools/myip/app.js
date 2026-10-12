@@ -204,7 +204,9 @@
             setText('international-ipv4', displayIp('international', 4));
             setText('international-ipv6', displayIp('international', 6));
         }
-        setText(`${route}-detail`, current.detail || '正在获取网络信息…');
+        setText(`${route}-detail`, current.detail || (current.status === 'loading' || current.status === 'idle'
+            ? '正在获取网络信息…'
+            : '来源未提供地区或运营商信息。'));
         if (current.status === 'loading' || current.status === 'idle') setStatus(`${route}-status`, 'loading', '检测中');
         else if (current.status === 'error') setStatus(`${route}-status`, 'warning', '未获取');
         else if (current.status === 'reference') setStatus(`${route}-status`, 'warning', '参考');
