@@ -761,8 +761,9 @@
     dialog.addEventListener('click', event => {
       const gesture = pointerGesture;
       reset();
-      const samePointer = !('pointerId' in event) || event.pointerId === gesture?.pointerId;
-      if (gesture?.startedOutside && gesture.endedOutside && samePointer
+      // A touch gesture may produce a compatibility click with a different ID.
+      // Identity is established by the paired primary pointerdown/pointerup.
+      if (gesture?.startedOutside && gesture.endedOutside
         && event.target === dialog && event.detail > 0) close();
     });
     dialog.addEventListener('close', () => {

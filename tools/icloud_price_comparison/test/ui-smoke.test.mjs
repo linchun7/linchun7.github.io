@@ -4665,15 +4665,19 @@ async function assertHistoryDismissalBoundaries(page, { triggerSelector, dialogS
     const capture = event => {
       const box = dialog.getBoundingClientRect();
       const trace = globalThis.__historyBoundaryTrace;
-      trace.push({ type: event.type, x: event.clientX, y: event.clientY,
-        pointerId: event.pointerId, primary: event.isPrimary, button: event.button, detail: event.detail,
+      const point = event.changedTouches?.[0] || event;
+      trace.push({ type: event.type, x: point.clientX, y: point.clientY,
+        pointerId: event.pointerId ?? null, pointerType: event.pointerType ?? null,
+        eventClass: event.constructor.name, primary: event.isPrimary ?? null,
+        button: event.button ?? null, buttons: event.buttons ?? null, detail: event.detail, trusted: event.isTrusted,
         target: event.target.id || event.target.tagName, ownTarget: event.target === dialog,
         inside: dialog.contains(event.target), open: dialog.open,
-        outside: event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom,
+        outside: point.clientX < box.left || point.clientX > box.right || point.clientY < box.top || point.clientY > box.bottom,
         rect: { left: box.left, right: box.right, top: box.top, bottom: box.bottom } });
       if (trace.length > 20) trace.shift();
     };
-    const types = ['pointerdown', 'pointerup', 'pointercancel', 'click'];
+    const types = ['pointerdown', 'pointerup', 'pointercancel', 'click',
+      'mousedown', 'mousemove', 'mouseup', 'touchend', 'dragstart', 'dragend', 'lostpointercapture'];
     for (const type of types) document.addEventListener(type, capture, true);
     globalThis.__historyBoundaryTraceCleanup = () => {
       for (const type of types) document.removeEventListener(type, capture, true);
@@ -4709,7 +4713,11 @@ async function assertHistoryDismissalBoundaries(page, { triggerSelector, dialogS
         { x: box.left + box.width / 2, y: box.top + inset },
         { x: box.left + box.width / 2, y: box.bottom - inset }
       ]);
-      const border = candidates.find(point => document.elementFromPoint(point.x, point.y) === node);
+      // Retain a real subpixel border target whose integer mouse coordinates
+      // are also inside, so a legacy mouseup can be geometrically verified.
+      const border = candidates.find(point => document.elementFromPoint(point.x, point.y) === node
+        && Math.floor(point.x) >= box.left && Math.floor(point.x) <= box.right
+        && Math.floor(point.y) >= box.top && Math.floor(point.y) <= box.bottom);
       const title = node.querySelector('h2').getBoundingClientRect();
       const interior = { x: title.left + title.width / 2, y: title.top + title.height / 2 };
       return { border, interior, left: box.left,
@@ -4754,19 +4762,30 @@ async function assertHistoryDismissalBoundaries(page, { triggerSelector, dialogS
             const trace = globalThis.__historyBoundaryTrace;
             const down = trace.find(event => event.type === 'pointerdown');
             return down && trace.some(event => event.pointerId === down.pointerId
-              && (event.type === 'pointerup' || event.type === 'pointercancel'));
+              && (event.type === 'pointerup' || event.type === 'pointercancel')
+              || event.trusted && event.type === 'mouseup' && event.button === 0);
           }, null, { timeout: 5000 });
         } catch (error) {
-          error.message = label + ': drag terminal event was not delivered\n'
-            + JSON.stringify(await diagnostics()) + '\n' + error.message;
-          throw error;
+          const result = await diagnostics();
+          console.error('History drag terminal failure:', label, JSON.stringify(result));
+          throw new Error(label + ': matched drag terminal event was not delivered\n'
+            + JSON.stringify(result), { cause: error });
         }
         const result = await diagnostics();
         const down = result.events.find(event => event.type === 'pointerdown');
         const up = result.events.find(event => event.type === 'pointerup' && event.pointerId === down?.pointerId);
         const scenario = (startOutside ? 'outside to ' : 'to outside from ') + endpoint;
         assert.equal(down?.outside, startOutside, label + ': drag start geometry ' + scenario + '\n' + JSON.stringify(result));
-        assert.equal(up?.outside, !startOutside, label + ': drag endpoint geometry ' + scenario + '\n' + JSON.stringify(result));
+        if (up) {
+          assert.equal(up.outside, !startOutside, label + ': drag endpoint geometry ' + scenario + '\n' + JSON.stringify(result));
+        } else {
+          const legacyEnd = result.events.find(event => event.trusted && event.type === 'mouseup' && event.button === 0);
+          assert.ok(legacyEnd, label + ': real drag endpoint was delivered ' + scenario + '\n' + JSON.stringify(result));
+          assert.equal(legacyEnd.inside, true, label + ': real mouseup targets this dialog ' + scenario + '\n' + JSON.stringify(result));
+          assert.equal(legacyEnd.outside, !startOutside,
+            label + ': delivered mouseup endpoint geometry ' + scenario + '\n' + JSON.stringify(result));
+          console.log('History drag without pointerup:', label, scenario, JSON.stringify(result));
+        }
         await assertOpen('dragging ' + scenario + ' does not dismiss');
       }
     }
@@ -4783,8 +4802,9 @@ async function assertHistoryDismissalBoundaries(page, { triggerSelector, dialogS
       : new PointerEvent('click', { bubbles: true, detail, button: 0, pointerId, ...outer }));
     const results = [];
     pointer('pointerdown'); pointer('pointercancel'); click(); results.push(['cancelled', node.open]);
+    pointer('pointerdown'); pointer('pointerup', 71, inner); click();
+    results.push(['inside release with outside click coordinates', node.open]);
     pointer('pointerdown'); pointer('pointerup', 72); click(); results.push(['different pointerup', node.open]);
-    pointer('pointerdown'); pointer('pointerup'); click(1, 72); results.push(['different click pointer', node.open]);
     pointer('pointerdown'); pointer('pointerup');
     pointer('pointerdown', 71, inner); pointer('pointerup', 71, inner); click(); results.push(['new interior gesture', node.open]);
     pointer('pointerdown', 71, { isPrimary: false }); pointer('pointerup', 71, { isPrimary: false });
@@ -4793,15 +4813,35 @@ async function assertHistoryDismissalBoundaries(page, { triggerSelector, dialogS
     return results;
   });
   for (const [scenario, open] of rejected) assert.equal(open, true, label + ': ' + scenario + ' cannot dismiss');
+  // WebKit's real touch path has pointerdown/up ID 2 and compatibility click ID 1.
+  const compatibilityClosed = await dialog.evaluate(node => {
+    const box = node.getBoundingClientRect();
+    const common = { bubbles: true, pointerId: 2, pointerType: 'touch', isPrimary: true,
+      button: 0, clientX: box.left / 2, clientY: box.top + box.height / 2 };
+    node.dispatchEvent(new PointerEvent('pointerdown', common));
+    node.dispatchEvent(new PointerEvent('pointerup', common));
+    node.dispatchEvent(new PointerEvent('click', { ...common, pointerId: 1, pointerType: 'mouse', detail: 1 }));
+    return !node.open;
+  });
+  assert.equal(compatibilityClosed, true, label + ': paired primary gesture accepts compatibility click ID');
+  await page.waitForFunction(selector => document.activeElement === document.querySelector(selector), triggerSelector);
+  await activate(trigger);
+  await page.waitForSelector(dialogSelector + '[open]');
+  if (dialogSelector === '#minimumHistoryDialog') {
+    await page.waitForSelector('#minimumHistoryRetry:not([hidden]):not(:disabled)');
+  } else {
+    await page.waitForFunction(selector => !document.querySelector(selector).textContent.includes('正在读取'), dialogSelector);
+  }
   const current = await geometry();
   await pointClick({ x: current.left / 2, y: current.interior.y }, true);
   console.log('History backdrop input:', label, JSON.stringify(await diagnostics()));
   try {
     await page.waitForFunction(selector => !document.querySelector(selector).open, dialogSelector);
   } catch (error) {
-    error.message = label + ': real backdrop click did not dismiss\n'
-      + JSON.stringify(await diagnostics()) + '\n' + error.message;
-    throw error;
+    const result = await diagnostics();
+    console.error('History backdrop close failure:', label, JSON.stringify(result));
+    throw new Error(label + ': real backdrop click did not dismiss\n'
+      + JSON.stringify(result), { cause: error });
   }
   await page.waitForFunction(selector => document.activeElement === document.querySelector(selector), triggerSelector);
   await activate(trigger);
