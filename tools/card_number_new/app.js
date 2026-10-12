@@ -12,7 +12,7 @@ let downloadMode = 'complete';
 const pageSize = 200;
 const MAX_PATTERN_LENGTH = 100;
 const MAX_RETAINED_RESULTS = 1000000;
-const ASSET_VERSION = '20260818-1';
+const ASSET_VERSION = '7dbd6ddb';
 
 const {
     analyzeCardFeatures,
@@ -149,6 +149,7 @@ function failCalculation(message) {
     setRunning(false);
     downloadMode = results.length > 0 ? 'partial' : 'complete';
     updateResultActions();
+    if (expectedCount === null) ui.expectedCount.textContent = '—';
     setStatus(`计算失败：${message}`, 'error');
     if (results.length === 0) {
         ui.resultContent.innerHTML = '<div class="empty-placeholder error-copy">计算线程发生错误，请重试；如果规则包含大量可变位，可增加固定数字后再计算。</div>';

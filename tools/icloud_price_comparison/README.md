@@ -23,6 +23,8 @@
 - `scripts/market-registry.mjs`、`scripts/country-names.zh.json`：稳定身份及人工中文映射
 - `scripts/static-page.mjs`、`scripts/render-static-page.mjs`：静态生成源
 
+发布前的页面与暂存 Git tree 使用同一严格投影门禁：仅允许校验价格生成区域及由该价格确定的六处 SEO/品牌文案变化，容量变化不会放宽 CSP、脚本引用或其他页面内容。生产日期断言跟随已校验历史投影，固定日期语义在临时合成工件中验证。
+
 `index.html` 为生成产物。`seoProjection()` 维护 `ICLOUD_STATIC_*` markers 外的 SEO Projection，不直接改生成结果；JS/CSS 变化用内容哈希更新资源版本。关键契约、生成器或发布规则变化需同步本说明及 OPERATIONS。
 
 ## 更新与验证
@@ -45,6 +47,9 @@ pnpm audit --audit-level low
 ```
 
 定向生成/检查：`pnpm render:static`、`pnpm render:static:check`、`pnpm assets:update`、`pnpm assets:check`。日更使用锁定 Playwright 配套 Chromium。`pnpm check:live` 为只读在线诊断，`pnpm update:data` 会写数据，不用于试探排障。
+
+
+上传工件使用固定 SHA 的 actions/upload-artifact v7.0.2，沿用原工件名称、保留期和发布范围。
 
 ## 来源、隐私与许可
 

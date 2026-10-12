@@ -6,6 +6,9 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import test from 'node:test';
 import { load } from 'cheerio';
+import { fileURLToPath } from 'node:url';
+import { displayedPublishedDate, publicationDateKey } from '../data-contract.js';
+import { assertPublishedDateProjection } from './helpers/published-date-projection.mjs';
 import {stagePricePublication} from '../scripts/stage-price-publication.mjs';
 import { parseApplePrices } from '../scripts/parse-prices.mjs';
 import { createPublishedMarketResolver, resolveMarket } from '../scripts/market-registry.mjs';
@@ -28,12 +31,12 @@ function canonicalCountries() {
     region, currency: 'USD', prices: TIERS.map(([, , price]) => price)
   })));
 }
-function sourceHtml(countries, publication, table = true) {
+function sourceHtml(countries, publication, table = true, tiers = TIERS) {
   const body = REGIONS.map(([id, region]) => {
     const header = `<h3 id="${id}">${escape(region)}</h3>`;
     const selected = countries.filter((country) => country.region === region);
-    if (!table) return header + selected.map((c) => `<h4 class="gb-header">${escape(c.country)} (${c.currency})</h4><ul>${TIERS.map(([, label], i) => `<li><strong>${label}</strong>: $${c.prices[i].toFixed(2)}</li>`).join('')}</ul>`).join('');
-    return header + `<div><table><thead><tr><th>Country (Currency)</th>${TIERS.map(([, label]) => `<th><p>${label}</p></th>`).join('')}</tr></thead><tbody>${selected.map((c) => `<tr><td><p>${escape(c.country)} (${c.currency})</p></td>${c.prices.map((price) => `<td><p>$${price.toFixed(2)}</p></td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+    if (!table) return header + selected.map((c) => `<h4 class="gb-header">${escape(c.country)} (${c.currency})</h4><ul>${tiers.map(([, label], i) => `<li><strong>${label}</strong>: $${c.prices[i].toFixed(2)}</li>`).join('')}</ul>`).join('');
+    return header + `<div><table><thead><tr><th>Country (Currency)</th>${tiers.map(([, label]) => `<th><p>${label}</p></th>`).join('')}</tr></thead><tbody>${selected.map((c) => `<tr><td><p>${escape(c.country)} (${c.currency})</p></td>${c.prices.map((price) => `<td><p>$${price.toFixed(2)}</p></td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
   }).join('');
   return `<!doctype html><html><body>${body}<p>Published Date: <time datetime="${publication}">${publication}</time></p><!--${'x'.repeat(20000)}--></body></html>`;
 }
@@ -413,4 +416,104 @@ test('publication stages the exact tested bytes despite repository Git rules', a
     }
     assert.equal(git('rev-parse','HEAD'),before,'verification never commits or pushes by itself');
   }
+});
+
+
+test('publication date projection follows later validated observations without pinning production dates', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2027-02-11T12:00:00Z') });
+  const { paths } = await fixture(t);
+  const countries = canonicalCountries();
+  const shell = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  const first = await run(t, paths, [sourceHtml(countries, '2027-02-10')], '2027-02-11T12:00:00Z');
+  const changedCountries = structuredClone(countries);
+  changedCountries[0].prices[0] += 0.10;
+  const changed = await run(t, paths, [sourceHtml(changedCountries, '2027-02-11')], '2027-02-12T12:00:00Z');
+  const dateOnly = await run(t, paths, [sourceHtml(changedCountries, '2027-02-12')], '2027-02-13T12:00:00Z');
+  assert.equal(publicationDateKey(displayedPublishedDate(first.history)), '2027-02-10');
+  assert.equal(publicationDateKey(displayedPublishedDate(changed.history)), '2027-02-11');
+  assert.equal(publicationDateKey(displayedPublishedDate(dateOnly.history)), '2027-02-11');
+  assert.equal(publicationDateKey(dateOnly.prices.source.publishedDate), '2027-02-12');
+  for (const [label, snapshot] of [['initial', first], ['substantive', changed], ['date-only', dateOnly]]) {
+    await t.test(label + ' uses the exact committed-page date assertions', () => {
+      const html = renderSeoProjection(
+        replaceStaticFragments(shell, renderStaticFragments(snapshot.prices, snapshot.history)),
+        snapshot.prices
+      );
+      assertStaticPageMatches(html, snapshot.prices, snapshot.history);
+      assertSeoProjectionMatches(html, snapshot.prices);
+      assertPublishedDateProjection(html, snapshot.prices, snapshot.history);
+    });
+  }
+});
+
+test('publication gates accept a validated tier removal and reject unrelated shell changes', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-04-10T12:00:00Z') });
+  const { root, dataDir, paths } = await fixture(t);
+  const countries = canonicalCountries();
+  const first = await run(t, paths, [sourceHtml(countries, '2026-04-09')], '2026-04-10T12:00:00Z');
+  const shell = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  const firstIndex = renderSeoProjection(replaceStaticFragments(shell, renderStaticFragments(first.prices, first.history)), first.prices);
+  const repoRoot = path.join(root, 'publication-repo');
+  const project = path.join(repoRoot, 'tools/icloud_price_comparison');
+  await mkdir(project, { recursive: true });
+  await cp(dataDir, path.join(project, 'data'), { recursive: true });
+  await writeFile(path.join(project, 'index.html'), firstIndex);
+  const git = (...args) => execFileSync('git', args, { cwd: repoRoot, maxBuffer: 64 * 1024 * 1024, stdio: ['pipe', 'pipe', 'pipe'] }).toString().trim();
+  git('init', '-b', 'main');
+  git('config', 'user.name', 'Fixture');
+  git('config', 'user.email', 'fixture@example.invalid');
+  git('add', '--all');
+  git('commit', '-m', 'synthetic publication baseline');
+  const originalHead = git('rev-parse', 'HEAD');
+
+  const removedIndex = TIERS.findIndex(([id]) => id === '200GB');
+  const nextTiers = TIERS.filter((_, index) => index !== removedIndex);
+  const nextCountries = countries.map(country => ({
+    ...country, prices: country.prices.filter((_, index) => index !== removedIndex)
+  }));
+  const candidate = await run(t, paths,
+    [sourceHtml(nextCountries, '2026-04-10', true, nextTiers)],
+    '2026-04-11T12:00:00Z');
+  assert.equal(candidate.prices.tiers.some(({ id }) => id === '200GB'), false);
+  assert.ok(candidate.appleRequests >= 2, 'tier removal needs independent source confirmation');
+  await validateExtractedDataArtifact(dataDir);
+  const candidateIndex = renderSeoProjection(
+    replaceStaticFragments(shell, renderStaticFragments(candidate.prices, candidate.history)), candidate.prices);
+  const validatedIndex = path.join(root, 'candidate.html');
+  const baseIndex = path.join(root, 'base.html');
+  await writeFile(baseIndex, firstIndex);
+  await rm(path.join(project, 'data'), { recursive: true, force: true });
+  await cp(dataDir, path.join(project, 'data'), { recursive: true });
+  const cli = fileURLToPath(new URL('../scripts/validate-static-page-update.mjs', import.meta.url));
+  const prepare = async html => {
+    await writeFile(validatedIndex, html);
+    await writeFile(path.join(project, 'index.html'), html);
+  };
+  const runCli = () => execFileSync(process.execPath, [cli, baseIndex, validatedIndex, paths.currentDataPath],
+    { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
+  const stage = () => stagePricePublication({ repoRoot, validatedData: dataDir, validatedIndex, baseIndex });
+
+  await prepare(candidateIndex);
+  await t.test('CLI accepts the exact regenerated tier and SEO projection', () => {
+    assert.match(runCli(), /Static page update/);
+  });
+  await t.test('Git tree gate accepts the same validated candidate bytes', async () => {
+    assert.match((await stage()).tree, /^[a-f0-9]{40}$/);
+  });
+  const changes = [
+    ['CSP', html => html.replace("default-src 'self'", "default-src *")],
+    ['script reference', html => html.replace(/src="script\.js\?v=[^"]+"/, 'src="unexpected-script.js"')],
+    ['non-projection copy', html => html.replace('<title>iCloud+ 全球价格对比｜各地区月费与人民币换算价</title>', '<title>Unreviewed title</title>')],
+    ['incorrect SEO', html => html.replace(/(<meta name="description" content=")[^"]*"/, '$1Incorrect projection"')]
+  ];
+  for (const [label, mutate] of changes) {
+    await t.test(label + ' is rejected by both publication gates', async () => {
+      const changed = mutate(candidateIndex);
+      assert.notEqual(changed, candidateIndex, 'fixture must actually change ' + label);
+      await prepare(changed);
+      assert.throws(runCli, error => /STATIC_PAGE_SHELL_CHANGED|SEO_PROJECTION_MISMATCH/.test(String(error.stderr)));
+      await assert.rejects(stage, /STATIC_PAGE_SHELL_CHANGED|SEO_PROJECTION_MISMATCH/);
+    });
+  }
+  assert.equal(git('rev-parse', 'HEAD'), originalHead, 'gate tests never commit a candidate');
 });
