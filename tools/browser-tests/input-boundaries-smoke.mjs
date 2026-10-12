@@ -190,6 +190,43 @@ try {
             assert.match(await page.locator('#result4-table').textContent(), /明细最多展示 2000 期/);
         }
     });
+    await check('financial rejects nonzero rate underflow and clears previous details', 'financial_calculator', async page => {
+        await page.click('#tab4');
+        await page.selectOption('#compoundingFrequency', 'annually');
+        for (const rate of ['1e-322', '-1e-322', '1e-324', '-1e-324']) {
+            // Establish old details before each precision failure.
+            await page.fill('#principal3', '1000');
+            await page.fill('#depositPeriod', '2');
+            await page.fill('#annualRate3', '5');
+            await page.click('#calculate4');
+            assert.equal(await page.locator('#result4').evaluate(el => el.classList.contains('result-error')), false);
+            assert.equal(await page.locator('#result4-table tbody tr').count(), 2);
+
+            await page.fill('#principal3', '1e308');
+            await page.fill('#depositPeriod', '9000000000000000');
+            await page.fill('#annualRate3', rate);
+            await page.click('#calculate4');
+            assert.equal(await page.locator('#result4').evaluate(el => el.classList.contains('result-error')), true, rate);
+            assert.match(await page.locator('#result4').textContent(), /低于可计算精度/);
+            assert.equal(await page.locator('#result4-table').evaluate(el => el.childElementCount), 0);
+            assert.equal((await page.locator('#result4-table').textContent()).trim(), '');
+        }
+
+        // True zero mantissas remain valid, including recovery after rejection.
+        for (const rate of ['0', '-0', '0e3']) {
+            await page.fill('#principal3', '1000');
+            await page.fill('#depositPeriod', '2');
+            await page.fill('#annualRate3', rate);
+            await page.click('#calculate4');
+            assert.equal(await page.locator('#result4').evaluate(el => el.classList.contains('result-error')), false, rate);
+            assert.match(await page.locator('#result4').textContent(), /^本息总计：1,000\.00 元；利息总计：-?0\.00 元$/);
+            assert.equal(await page.locator('#result4-table tbody tr').count(), 2);
+            const last = await page.locator('#result4-table tbody tr').last().locator('td').allTextContents();
+            assert.match(last[2], /^-?0\.00$/);
+            assert.match(last[3], /^-?0\.00$/);
+            assert.equal(last[4], '1,000.00');
+        }
+    });
     await check('financial compound scaling stays finite and rejects genuine overflow', 'financial_calculator', async page => {
         await page.click('#tab4');
         await page.selectOption('#compoundingFrequency', 'annually');

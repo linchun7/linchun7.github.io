@@ -40,6 +40,11 @@
         if (raw === '') throw new Error(`请输入${label}`);
         const value = Number(raw);
         if (!Number.isFinite(value)) throw new Error(`${label}必须是有效数字`);
+        const decimal = /^[+-]?([0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:e[+-]?[0-9]+)?$/i.exec(raw);
+        // Inspect the mantissa only: 0e3 is zero, but 1e-324 lost a nonzero value.
+        if (value === 0 && decimal && /[1-9]/.test(decimal[1])) {
+            throw new Error(`${label}低于可计算精度，请调整参数`);
+        }
         return value;
     }
 
@@ -164,6 +169,9 @@
         const rate = periodicPercent / 100;
         if (!Number.isFinite(rate) || rate <= -1) {
             throw new Error('该名义年利率在当前复利方式下会使单期本金小于等于 0，请调整参数');
+        }
+        if (annualRatePercent !== 0 && rate === 0) {
+            throw new Error('该名义年利率在当前复利方式下低于可计算精度，请调整参数');
         }
         return rate;
     }
