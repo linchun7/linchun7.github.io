@@ -275,6 +275,71 @@ for (const inputType of ['search', 'text']) {
   }
 }
 
+for (const initiallyDisabled of [false, true]) {
+  test(`CSP native select diagnostic: ${initiallyDisabled ? 'disabled' : 'enabled'}`, { timeout: 30000 }, async context => {
+    const config = await resolveBrowser(context, 'strict CSP native select diagnostic');
+    if (!config) return;
+    const server = await startServer();
+    const browser = await config.browserType.launch(config.launchOptions);
+    const page = await browser.newPage({ viewport: { width: 1024, height: 768 } });
+    const state = cspDiagnosticState.get(page);
+    const url = `http://127.0.0.1:${server.address().port}/__csp_select_probe__`;
+    const policy = "default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none'";
+    const html = `<!doctype html>
+<html><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="${policy}">
+<title>CSP native select probe</title></head><body>
+<label for="probe">Probe</label>
+<select id="probe" ${initiallyDisabled ? 'disabled' : ''}>
+<option value="all">All</option><option value="us">US</option>
+</select>
+</body></html>`;
+    const stages = [];
+    const snapshot = async stage => {
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      const dom = await page.evaluate(() => ({
+        value: document.querySelector('#probe')?.value,
+        disabled: document.querySelector('#probe')?.disabled,
+        markup: document.querySelector('#probe')?.outerHTML,
+        policy: document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.content,
+        styles: [...document.querySelectorAll('style, [style]')].map(element => ({
+          tag: element.tagName, id: element.id, style: element.getAttribute('style'),
+          text: element.tagName === 'STYLE' ? element.textContent : null
+        }))
+      }));
+      const record = {
+        browser: BROWSER_UNDER_TEST, version: browser.version(), initiallyDisabled, stage, dom,
+        consoleErrors: structuredClone(state.consoleErrors),
+        violations: structuredClone(state.violations),
+        pageErrors: structuredClone(state.pageErrors)
+      };
+      stages.push(record);
+      console.log('[csp-select-stage]', JSON.stringify(record));
+    };
+    try {
+      await page.route(url, route => route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: html }));
+      await page.goto(url, { waitUntil: 'domcontentloaded' });
+      await snapshot('loaded');
+      const select = page.locator('#probe');
+      if (initiallyDisabled) await select.evaluate(element => { element.disabled = false; });
+      await snapshot('enabled');
+      await select.selectOption('us');
+      await snapshot('selected');
+      await select.blur();
+      await snapshot('blurred');
+      assert.equal(await select.inputValue(), 'us');
+      assert.equal(stages[0].dom.disabled, initiallyDisabled);
+      assert.equal(stages.at(-1).dom.policy, policy, 'diagnostic must preserve strict CSP');
+      assert.deepEqual(stages.at(-1).dom.styles, [], 'minimal fixture must contain no author inline styles');
+      assert.deepEqual(state.pageErrors, [], 'native select must not emit page errors');
+      assert.deepEqual(state.consoleErrors, [], 'native select must not emit console errors');
+      assert.deepEqual(state.violations, [], 'native select must not violate strict CSP');
+    } finally {
+      await browser.close();
+    }
+  });
+}
+
 async function resolveBrowser(context, purpose) {
   if (BROWSER_UNDER_TEST !== 'chromium') {
     const browserType = BROWSER_UNDER_TEST === 'firefox' ? firefox : webkit;
