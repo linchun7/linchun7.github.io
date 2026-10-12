@@ -731,10 +731,15 @@ async function assertHistoryDismissalBoundaries(page, { triggerSelector, dialogS
         try {
           await page.waitForFunction(() => {
             const trace = globalThis.__historyBoundaryTrace;
-            const down = trace.find(event => event.type === 'pointerdown');
-            return down && trace.some(event => event.pointerId === down.pointerId
+            const downIndex = trace.findIndex(event => event.type === 'pointerdown');
+            const down = trace[downIndex];
+            const nativeStart = trace.findIndex((event, index) => index > downIndex
+              && event.trusted && event.type === 'dragstart' && event.ownTarget);
+            return down && (trace.some(event => event.pointerId === down.pointerId
               && (event.type === 'pointerup' || event.type === 'pointercancel')
-              || event.trusted && event.type === 'mouseup' && event.button === 0);
+              || event.trusted && event.type === 'mouseup' && event.button === 0)
+              || nativeStart > downIndex && trace.some((event, index) => index > nativeStart
+                && event.trusted && event.type === 'dragend' && event.ownTarget));
           }, null, { timeout: 5000 });
         } catch (error) {
           const result = await diagnostics();
@@ -751,11 +756,25 @@ async function assertHistoryDismissalBoundaries(page, { triggerSelector, dialogS
           assert.equal(up.outside, !startOutside, label + ': drag endpoint geometry ' + scenario + '\n' + JSON.stringify(result));
         } else {
           const legacyEnd = result.events.find(event => event.trusted && event.type === 'mouseup' && event.button === 0);
-          assert.ok(legacyEnd, label + ': real drag endpoint was delivered ' + scenario + '\n' + JSON.stringify(result));
-          assert.equal(legacyEnd.inside, true, label + ': real mouseup targets this dialog ' + scenario + '\n' + JSON.stringify(result));
-          assert.equal(legacyEnd.outside, !startOutside,
-            label + ': delivered mouseup endpoint geometry ' + scenario + '\n' + JSON.stringify(result));
-          console.log('History drag without pointerup:', label, scenario, JSON.stringify(result));
+          if (legacyEnd) {
+            assert.equal(legacyEnd.inside, true, label + ': real mouseup targets this dialog ' + scenario + '\n' + JSON.stringify(result));
+            assert.equal(legacyEnd.outside, !startOutside,
+              label + ': delivered mouseup endpoint geometry ' + scenario + '\n' + JSON.stringify(result));
+            console.log('History drag without pointerup:', label, scenario, JSON.stringify(result));
+          } else {
+            // Native HTML dragging can own the gesture and suppress pointer/mouse up.
+            // Accept only this trace's trusted, ordered start/end from this dialog.
+            const downIndex = result.events.indexOf(down);
+            const nativeStartIndex = result.events.findIndex((event, index) => index > downIndex
+              && event.trusted && event.type === 'dragstart' && event.ownTarget);
+            const nativeStart = result.events[nativeStartIndex];
+            const nativeEnd = result.events.find((event, index) => index > nativeStartIndex
+              && event.trusted && event.type === 'dragend' && event.ownTarget);
+            assert.ok(nativeStart && nativeEnd, label + ': a real ordered drag endpoint was delivered ' + scenario + '\n' + JSON.stringify(result));
+            assert.equal(nativeStart.outside, startOutside, label + ': native drag start geometry ' + scenario + '\n' + JSON.stringify(result));
+            assert.equal(nativeEnd.outside, !startOutside, label + ': native drag endpoint geometry ' + scenario + '\n' + JSON.stringify(result));
+            console.log('History native drag:', label, scenario, JSON.stringify(result));
+          }
         }
         await assertOpen('dragging ' + scenario + ' does not dismiss');
       }
