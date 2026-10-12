@@ -19,7 +19,6 @@ let hospitalHistoryMap = new Map();
 let hospitalSearchMap = new Map();
 let gradeOrder = new Map();
 let currentPage = 1;
-let lastHistoryTrigger = null;
 
 const sortConfig = {
     column: null,
@@ -420,7 +419,6 @@ function openHistoryDialog(hospitalId, trigger) {
     const history = hospitalHistoryMap.get(hospitalId) || [];
     if (!hospital || !history.length) return;
 
-    lastHistoryTrigger = trigger;
     document.getElementById('historyDialogTitle').textContent = `${hospital.name} · 历年榜单`;
     document.getElementById('historyDialogMeta').textContent = [hospital.province, hospital.city].filter(Boolean).join(' · ');
     body.replaceChildren();
@@ -701,10 +699,6 @@ function bindEvents() {
     document.getElementById('historyDialogClose').addEventListener('click', () => dialog.close());
     dialog.addEventListener('click', event => {
         if (event.target === dialog) dialog.close();
-    });
-    dialog.addEventListener('close', () => {
-        lastHistoryTrigger?.focus({ preventScroll: true });
-        lastHistoryTrigger = null;
     });
 }
 
