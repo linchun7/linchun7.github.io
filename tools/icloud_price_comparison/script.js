@@ -1150,6 +1150,7 @@ function openPublishedDateHistory() {
   void ensureHistoryLoaded();
   renderPublishedDateHistory();
   state.publishedDateReturnFocus?.focus({ preventScroll: true });
+  elements.resetPublishedDateBackdrop?.();
   elements.publishedDateDialog.showModal();
   refreshIcons();
 }
@@ -1194,6 +1195,7 @@ function openHistory(country, returnFocus = null) {
   // Row cells and programmatic clicks need not focus the semantic trigger.
   // Prime native dialog restoration without scrolling the price table.
   state.historyReturnFocus?.focus({ preventScroll: true });
+  elements.resetHistoryBackdrop?.();
   elements.historyDialog.showModal();
   refreshIcons();
 }
@@ -1562,7 +1564,8 @@ function dialogReturnFocusWasMoved(dialog) {
 }
 
 function bindDialogBackdropDismiss(dialog, close) {
-  let pointerStartedOutside = false;
+  let pointerGesture = null;
+  const reset = () => { pointerGesture = null; };
   const outside = event => {
     if (event.target !== dialog) return false;
     const bounds = dialog.getBoundingClientRect();
@@ -1570,17 +1573,29 @@ function bindDialogBackdropDismiss(dialog, close) {
       || event.clientY < bounds.top || event.clientY > bounds.bottom;
   };
   dialog.addEventListener('pointerdown', event => {
-    pointerStartedOutside = event.isPrimary && event.button === 0 && outside(event);
+    pointerGesture = event.isPrimary && event.button === 0
+      ? { pointerId: event.pointerId, startedOutside: outside(event), endedOutside: false }
+      : null;
   });
-  dialog.addEventListener('pointercancel', () => { pointerStartedOutside = false; });
+  dialog.addEventListener('pointerup', event => {
+    if (!pointerGesture || pointerGesture.pointerId !== event.pointerId) { reset(); return; }
+    // Click can target the down/up common ancestor and floor its coordinates.
+    // Use the matched pointerup's actual position and current dialog bounds.
+    pointerGesture.endedOutside = event.isPrimary && event.button === 0 && outside(event);
+  });
+  dialog.addEventListener('pointercancel', reset);
   dialog.addEventListener('click', event => {
-    const dismiss = pointerStartedOutside && outside(event);
-    pointerStartedOutside = false;
-    if (dismiss) close();
+    const gesture = pointerGesture;
+    reset();
+    const samePointer = !('pointerId' in event) || event.pointerId === gesture?.pointerId;
+    if (gesture?.startedOutside && gesture.endedOutside && samePointer
+      && event.target === dialog && event.detail > 0) close();
   });
   dialog.addEventListener('close', () => {
-    if (!dialog.open) pointerStartedOutside = false;
+    if (!dialog.open) reset();
   });
+  // A new opening must not inherit a held pointer gesture from an old session.
+  return reset;
 }
 
 function handoffMinimumHistoryFocus(control, unavailable, allowFilter = true) {
@@ -1651,11 +1666,11 @@ function bindEvents() {
     elements.workspace.focus({ preventScroll: true });
   });
   document.querySelector('#closeHistory').addEventListener('click', () => elements.historyDialog.close());
-  bindDialogBackdropDismiss(elements.historyDialog, () => elements.historyDialog.close());
+  elements.resetHistoryBackdrop = bindDialogBackdropDismiss(elements.historyDialog, () => elements.historyDialog.close());
   elements.historyDialog.addEventListener('keydown', (event) => trapDialogFocus(elements.historyDialog, event));
   elements.publishedDateButton.addEventListener('click', openPublishedDateHistory);
   elements.closePublishedDate.addEventListener('click', () => elements.publishedDateDialog.close());
-  bindDialogBackdropDismiss(elements.publishedDateDialog, () => elements.publishedDateDialog.close());
+  elements.resetPublishedDateBackdrop = bindDialogBackdropDismiss(elements.publishedDateDialog, () => elements.publishedDateDialog.close());
   elements.publishedDateDialog.addEventListener('keydown', (event) => trapDialogFocus(elements.publishedDateDialog, event));
   elements.historyDialog.addEventListener('close', () => {
     if (elements.historyDialog.open || (!state.historyReturnFocus && !state.historyReturnCountry)) return;
@@ -1811,7 +1826,7 @@ function ensureMinimumHistoryDialog() {
   content.append(status, list, more, note, retry);
   dialog.append(header, content);
   dialog.addEventListener('keydown', (event) => trapDialogFocus(dialog, event));
-  bindDialogBackdropDismiss(dialog, () => dialog.close());
+  minimumHistoryUi.resetBackdrop = bindDialogBackdropDismiss(dialog, () => dialog.close());
   dialog.addEventListener('close', () => {
     if (dialog.open || !minimumHistoryUi.returnFocus) return;
     const returnFocus = minimumHistoryUi.returnFocus;
@@ -1996,6 +2011,7 @@ function openMinimumHistory() {
   minimumHistoryUi.focusSession += 1;
   minimumHistoryUi.returnFocus = document.querySelector('#minimumHistoryButton');
   focusDialogTarget([minimumHistoryUi.returnFocus], null);
+  minimumHistoryUi.resetBackdrop?.();
   dialog.showModal();
   renderMinimumHistory();
   // A later accepted history is already sufficient for this page snapshot.

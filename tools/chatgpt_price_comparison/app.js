@@ -738,7 +738,8 @@
   }
 
   function bindDialogBackdropDismiss(dialog, close) {
-    let pointerStartedOutside = false;
+    let pointerGesture = null;
+    const reset = () => { pointerGesture = null; };
     const outside = event => {
       if (event.target !== dialog) return false;
       const bounds = dialog.getBoundingClientRect();
@@ -746,17 +747,29 @@
         || event.clientY < bounds.top || event.clientY > bounds.bottom;
     };
     dialog.addEventListener('pointerdown', event => {
-      pointerStartedOutside = event.isPrimary && event.button === 0 && outside(event);
+      pointerGesture = event.isPrimary && event.button === 0
+        ? { pointerId: event.pointerId, startedOutside: outside(event), endedOutside: false }
+        : null;
     });
-    dialog.addEventListener('pointercancel', () => { pointerStartedOutside = false; });
+    dialog.addEventListener('pointerup', event => {
+      if (!pointerGesture || pointerGesture.pointerId !== event.pointerId) { reset(); return; }
+      // Click can target the down/up common ancestor and floor its coordinates.
+      // Use the matched pointerup's actual position and current dialog bounds.
+      pointerGesture.endedOutside = event.isPrimary && event.button === 0 && outside(event);
+    });
+    dialog.addEventListener('pointercancel', reset);
     dialog.addEventListener('click', event => {
-      const dismiss = pointerStartedOutside && outside(event);
-      pointerStartedOutside = false;
-      if (dismiss) close();
+      const gesture = pointerGesture;
+      reset();
+      const samePointer = !('pointerId' in event) || event.pointerId === gesture?.pointerId;
+      if (gesture?.startedOutside && gesture.endedOutside && samePointer
+        && event.target === dialog && event.detail > 0) close();
     });
     dialog.addEventListener('close', () => {
-      if (!dialog.open) pointerStartedOutside = false;
+      if (!dialog.open) reset();
     });
+    // A new opening must not inherit a held pointer gesture from an old session.
+    return reset;
   }
 
   function handoffMinimumHistoryFocus(control, unavailable, allowFilter = true) {
@@ -774,6 +787,7 @@
     el.historyTitle.textContent = market.name; el.historySubtitle.textContent = `${market.code.toUpperCase()} · ${market.currency || '—'} · 价格更新于 ${dateTime(market.last_verified_at)}`;
     renderHistoryPlans(); renderHistory();
     focusDialogTarget([returnFocus], null);
+    el.resetHistoryBackdrop?.();
     el.historyDialog.showModal();
   }
   function restoreHistoryFocus() {
@@ -996,7 +1010,8 @@
     function restoreFocus() {
       if (dialog.open || !minimumHistoryUi.returnFocusPending) return;
       minimumHistoryUi.returnFocusPending = false;
-      if (!dialogReturnFocusWasMoved(dialog)) focusDialogTarget([el.minimumHistoryButton], el.priceWorkspace);
+      if (!dialogReturnFocusWasMoved(dialog)) focusDialogTarget(
+        [el.minimumHistoryButton, document.querySelector('#minimumHistoryButton')], el.priceWorkspace);
     }
     function closeDialog() {
       if (!dialog.open) return;
@@ -1021,7 +1036,7 @@
 
     content.append(status, list, more, note, retry);
     dialog.append(header, content);
-    bindDialogBackdropDismiss(dialog, closeDialog);
+    minimumHistoryUi.resetBackdrop = bindDialogBackdropDismiss(dialog, closeDialog);
     dialog.addEventListener('cancel', event => { event.preventDefault(); closeDialog(); });
     dialog.addEventListener('close', restoreFocus);
     document.body.append(dialog);
@@ -1202,6 +1217,7 @@
     minimumHistoryUi.limit = 20;
     minimumHistoryUi.returnFocusPending = true;
     focusDialogTarget([el.minimumHistoryButton], null);
+    minimumHistoryUi.resetBackdrop?.();
     dialog.showModal();
     renderMinimumHistory();
     // A later accepted history is already sufficient for this page snapshot.
@@ -1238,7 +1254,7 @@
       if (!el.historyDialog.open && (state.activeMarket || state.historyReturnFocus)) restoreHistoryFocus();
     });
     el.historyDialog.addEventListener('cancel', event => { event.preventDefault(); closeHistory(); });
-    bindDialogBackdropDismiss(el.historyDialog, closeHistory);
+    el.resetHistoryBackdrop = bindDialogBackdropDismiss(el.historyDialog, closeHistory);
     el.backToTableButton.addEventListener('click', () => { el.priceWorkspace.scrollIntoView({ behavior: 'smooth', block: 'start' }); el.priceWorkspace.focus({ preventScroll: true }); });
     addEventListener('scroll', () => { if (!state.scrollFrame) state.scrollFrame = requestAnimationFrame(() => { state.scrollFrame = null; backButton(); }); }, { passive: true });
     addEventListener('resize', backButton, { passive: true });

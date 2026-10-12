@@ -4493,10 +4493,12 @@ async function assertCountryHistoryFocus(page, { touch = false, outlineOffset })
     await settled();
     await assertRing(false);
   }
-  // An ordinary non-shortcut key reveals the keyboard position even when it
-  // does not itself move focus; select typeahead/text input must not be excluded.
+  // Ordinary keys remove the custom suppression; native button focus-visible
+  // need not change for a letter alone. Real Tab/activation visibility is tested below.
   await page.keyboard.press('a');
-  await assertRing(true, 'ordinary keyboard input reveals the current focus');
+  assert.deepEqual(await trigger.evaluate(button => ({ focused: document.activeElement === button,
+    pointerMode: document.documentElement.hasAttribute('data-country-history-pointer') })),
+  { focused: true, pointerMode: false }, 'ordinary input removes custom suppression without moving focus');
 
   // Delegated non-focusable price-cell entry also restores the semantic button.
   await activate(page.locator('#priceRows tr[data-market-id]').first().locator('.price-cell:visible').first());
@@ -4651,63 +4653,133 @@ for (const touch of [false, true]) {
   });
 }
 
-async function assertHistoryDismissalBoundaries(page, { triggerSelector, dialogSelector, closeSelector, touch = false }) {
+async function assertHistoryDismissalBoundaries(page, { triggerSelector, dialogSelector, closeSelector, touch }) {
   const trigger = page.locator(triggerSelector).first();
   const dialog = page.locator(dialogSelector);
   const activate = locator => touch ? locator.tap() : locator.click();
+  const label = dialogSelector + ' [' + (touch ? 'touch' : 'mouse') + ']';
+  const startTrace = () => page.evaluate(selector => {
+    globalThis.__historyBoundaryTraceCleanup?.();
+    const dialog = document.querySelector(selector);
+    globalThis.__historyBoundaryTrace = [];
+    const capture = event => {
+      const box = dialog.getBoundingClientRect();
+      const trace = globalThis.__historyBoundaryTrace;
+      trace.push({ type: event.type, x: event.clientX, y: event.clientY,
+        pointerId: event.pointerId, primary: event.isPrimary, button: event.button, detail: event.detail,
+        target: event.target.id || event.target.tagName, ownTarget: event.target === dialog,
+        inside: dialog.contains(event.target), open: dialog.open,
+        outside: event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom,
+        rect: { left: box.left, right: box.right, top: box.top, bottom: box.bottom } });
+      if (trace.length > 20) trace.shift();
+    };
+    const types = ['pointerdown', 'pointerup', 'pointercancel', 'click'];
+    for (const type of types) document.addEventListener(type, capture, true);
+    globalThis.__historyBoundaryTraceCleanup = () => {
+      for (const type of types) document.removeEventListener(type, capture, true);
+    };
+  }, dialogSelector);
+  const resetTrace = () => page.evaluate(() => { globalThis.__historyBoundaryTrace = []; });
+  const diagnostics = () => page.evaluate(selector => ({
+    open: document.querySelector(selector).open,
+    active: document.activeElement?.id || document.activeElement?.tagName,
+    events: globalThis.__historyBoundaryTrace
+  }), dialogSelector);
+  const assertOpen = async scenario => {
+    const result = await diagnostics();
+    assert.equal(result.open, true, label + ': ' + scenario + '\n' + JSON.stringify(result));
+  };
   const pointClick = async (point, requireDialogTarget = false) => {
-    await page.evaluate(selector => {
-      globalThis.__historyBoundaryClick = null;
-      const dialog = document.querySelector(selector);
-      document.addEventListener('click', event => {
-        globalThis.__historyBoundaryClick = { ownTarget: event.target === dialog, inside: dialog.contains(event.target) };
-      }, { once: true, capture: true });
-    }, dialogSelector);
+    await resetTrace();
     if (touch) await page.touchscreen.tap(point.x, point.y);
     else await page.mouse.click(point.x, point.y);
-    await page.waitForFunction(() => globalThis.__historyBoundaryClick !== null);
-    const hit = await page.evaluate(() => globalThis.__historyBoundaryClick);
-    assert.equal(hit.inside, true, 'real click/tap must target this dialog or its content');
-    if (requireDialogTarget) assert.equal(hit.ownTarget, true, 'real boundary click must target the dialog element');
+    await page.waitForFunction(() => globalThis.__historyBoundaryTrace.some(event => event.type === 'click'));
+    const result = await diagnostics();
+    const hit = result.events.findLast(event => event.type === 'click');
+    assert.ok(hit?.inside, label + ': real click/tap targets this dialog or its content\n' + JSON.stringify(result));
+    if (requireDialogTarget) assert.equal(hit.ownTarget, true,
+      label + ': real boundary click targets the dialog element\n' + JSON.stringify(result));
+  };
+  const geometry = async () => {
+    const result = await dialog.evaluate(node => {
+      const box = node.getBoundingClientRect();
+      const candidates = [0.25, 0.5, 0.75].flatMap(inset => [
+        { x: box.left + inset, y: box.top + box.height / 2 },
+        { x: box.right - inset, y: box.top + box.height / 2 },
+        { x: box.left + box.width / 2, y: box.top + inset },
+        { x: box.left + box.width / 2, y: box.bottom - inset }
+      ]);
+      const border = candidates.find(point => document.elementFromPoint(point.x, point.y) === node);
+      const title = node.querySelector('h2').getBoundingClientRect();
+      const interior = { x: title.left + title.width / 2, y: title.top + title.height / 2 };
+      return { border, interior, left: box.left,
+        interiorHit: node.contains(document.elementFromPoint(interior.x, interior.y)) };
+    });
+    assert.ok(result.left > 2, label + ': dialog leaves a real backdrop hit target');
+    assert.equal(result.interiorHit, true, label + ': title hit is inside the current dialog geometry');
+    if (!touch) assert.ok(result.border, label + ': actual dialog border supplies a verified mouse hit target');
+    return result;
   };
   await activate(trigger);
   await page.waitForSelector(dialogSelector + '[open]');
-  const bounds = await dialog.boundingBox();
-  assert.ok(bounds && bounds.x > 2, 'dialog leaves a real backdrop hit target');
-  const hitTargets = await dialog.evaluate(node => {
-    const box = node.getBoundingClientRect();
-    const candidates = [0.25, 0.5, 0.75].flatMap(inset => [
-      { x: box.left + inset, y: box.top + box.height / 2 },
-      { x: box.right - inset, y: box.top + box.height / 2 },
-      { x: box.left + box.width / 2, y: box.top + inset },
-      { x: box.left + box.width / 2, y: box.bottom - inset }
-    ]);
-    const border = candidates.find(point => document.elementFromPoint(point.x, point.y) === node);
-    const title = node.querySelector('h2').getBoundingClientRect();
-    const interior = { x: title.left + title.width / 2, y: title.top + title.height / 2 };
-    return { border, interior, interiorHit: node.contains(document.elementFromPoint(interior.x, interior.y)) };
-  });
-  if (!touch) assert.ok(hitTargets.border, 'the actual dialog border must supply a verified mouse hit target');
-  assert.equal(hitTargets.interiorHit, true, 'ordinary interior child is inside the dialog');
-  const inner = touch ? hitTargets.interior : hitTargets.border;
-  const outer = { x: bounds.x / 2, y: inner.y };
-  await pointClick(hitTargets.interior);
-  assert.equal(await dialog.evaluate(node => node.open), true, 'clicking ordinary dialog content must not dismiss history');
-  if (!touch) {
-    await pointClick(inner, true);
-    assert.equal(await dialog.evaluate(node => node.open), true, 'clicking the dialog own interior border must not dismiss history');
-    await page.mouse.move(inner.x, inner.y);
-    await page.mouse.down();
-    await page.mouse.move(outer.x, outer.y);
-    await page.mouse.up();
-    assert.equal(await dialog.evaluate(node => node.open), true, 'dragging from inside to outside must not dismiss');
-    await page.mouse.move(outer.x, outer.y);
-    await page.mouse.down();
-    await page.mouse.move(inner.x, inner.y);
-    await page.mouse.up();
-    assert.equal(await dialog.evaluate(node => node.open), true, 'dragging from outside to inside must not dismiss');
+  if (dialogSelector === '#minimumHistoryDialog') {
+    await page.waitForSelector('#minimumHistoryRetry:not([hidden]):not(:disabled)');
+  } else {
+    await page.waitForFunction(selector => !document.querySelector(selector).textContent.includes('正在读取'), dialogSelector);
   }
-  await pointClick(outer, true);
+  await startTrace();
+  await pointClick((await geometry()).interior);
+  await assertOpen('clicking ordinary dialog content does not dismiss');
+  if (!touch) {
+    await pointClick((await geometry()).border, true);
+    await assertOpen('clicking the actual dialog border does not dismiss');
+    // Keep both the reported subpixel-border edge and an ordinary title drag.
+    // Pointerup supplies the true endpoint even when click retargets/rounds.
+    for (const endpoint of ['interior', 'border']) {
+      for (const startOutside of [false, true]) {
+        const current = await geometry();
+        const inner = current[endpoint];
+        const outer = { x: current.left / 2, y: inner.y };
+        const from = startOutside ? outer : inner, to = startOutside ? inner : outer;
+        await resetTrace();
+        await page.mouse.move(from.x, from.y);
+        await page.mouse.down();
+        await page.mouse.move(to.x, to.y);
+        await page.mouse.up();
+        const result = await diagnostics();
+        const down = result.events.find(event => event.type === 'pointerdown');
+        const up = result.events.find(event => event.type === 'pointerup');
+        const scenario = (startOutside ? 'outside to ' : 'to outside from ') + endpoint;
+        assert.equal(down?.outside, startOutside, label + ': drag start geometry ' + scenario + '\n' + JSON.stringify(result));
+        assert.equal(up?.outside, !startOutside, label + ': drag endpoint geometry ' + scenario + '\n' + JSON.stringify(result));
+        await assertOpen('dragging ' + scenario + ' does not dismiss');
+      }
+    }
+  }
+  // These isolated sequences exercise bookkeeping, not device emulation.
+  const rejected = await dialog.evaluate(node => {
+    const box = node.getBoundingClientRect();
+    const outer = { clientX: box.left / 2, clientY: box.top + box.height / 2 };
+    const inner = { clientX: box.left + box.width / 2, clientY: box.top + box.height / 2 };
+    const pointer = (type, pointerId = 71, extra = {}) => node.dispatchEvent(new PointerEvent(type,
+      { bubbles: true, pointerId, pointerType: 'mouse', isPrimary: true, button: 0, ...outer, ...extra }));
+    const click = (detail = 1, pointerId) => node.dispatchEvent(pointerId === undefined
+      ? new MouseEvent('click', { bubbles: true, detail, button: 0, ...outer })
+      : new PointerEvent('click', { bubbles: true, detail, button: 0, pointerId, ...outer }));
+    const results = [];
+    pointer('pointerdown'); pointer('pointercancel'); click(); results.push(['cancelled', node.open]);
+    pointer('pointerdown'); pointer('pointerup', 72); click(); results.push(['different pointerup', node.open]);
+    pointer('pointerdown'); pointer('pointerup'); click(1, 72); results.push(['different click pointer', node.open]);
+    pointer('pointerdown'); pointer('pointerup');
+    pointer('pointerdown', 71, inner); pointer('pointerup', 71, inner); click(); results.push(['new interior gesture', node.open]);
+    pointer('pointerdown', 71, { isPrimary: false }); pointer('pointerup', 71, { isPrimary: false });
+    click(); results.push(['nonprimary gesture', node.open]);
+    pointer('pointerdown'); pointer('pointerup'); click(0); results.push(['detail-zero activation', node.open]);
+    return results;
+  });
+  for (const [scenario, open] of rejected) assert.equal(open, true, label + ': ' + scenario + ' cannot dismiss');
+  const current = await geometry();
+  await pointClick({ x: current.left / 2, y: current.interior.y }, true);
   await page.waitForFunction(selector => !document.querySelector(selector).open, dialogSelector);
   await page.waitForFunction(selector => document.activeElement === document.querySelector(selector), triggerSelector);
   await activate(trigger);
@@ -4717,9 +4789,10 @@ async function assertHistoryDismissalBoundaries(page, { triggerSelector, dialogS
   await page.waitForFunction(selector => !document.querySelector(selector).open, dialogSelector);
   await page.waitForFunction(selector => document.activeElement === document.querySelector(selector), triggerSelector);
   await page.keyboard.press('Tab');
-  assert.equal(await trigger.evaluate(node => document.activeElement === node), false, 'Tab continues after the returned trigger');
+  assert.equal(await trigger.evaluate(node => document.activeElement === node), false, label + ': Tab continues after the returned trigger');
   await page.keyboard.press('Shift+Tab');
-  assert.equal(await trigger.evaluate(node => document.activeElement === node), true, 'Shift+Tab returns to the same navigation position');
+  assert.equal(await trigger.evaluate(node => document.activeElement === node), true, label + ': Shift+Tab returns to the same navigation position');
+  await page.evaluate(() => globalThis.__historyBoundaryTraceCleanup());
 }
 
 async function assertNativeHistoryCloseLifecycle(page, { triggerSelector, dialogSelector, closeSelector }) {
@@ -4760,20 +4833,33 @@ async function assertNativeHistoryCloseLifecycle(page, { triggerSelector, dialog
   await page.evaluate(async ({ selector, triggerSelector }) => {
     const dialog = document.querySelector(selector);
     const oldClosed = new Promise(resolve => dialog.addEventListener('close', resolve, { once: true }));
+    const box = dialog.getBoundingClientRect();
+    const oldPointer = { bubbles: true, pointerId: 71, pointerType: 'mouse', isPrimary: true,
+      button: 0, clientX: box.left / 2, clientY: box.top + box.height / 2 };
+    dialog.dispatchEvent(new PointerEvent('pointerdown', oldPointer));
     dialog.close();
     document.querySelector(triggerSelector).click();
+    dialog.dispatchEvent(new PointerEvent('pointerup', oldPointer));
+    dialog.dispatchEvent(new PointerEvent('click', { ...oldPointer, detail: 1 }));
     await oldClosed;
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   }, { selector: dialogSelector, triggerSelector });
   assert.equal(await page.locator(dialogSelector).evaluate(dialog => dialog.open && dialog.contains(document.activeElement)), true,
-    'an older close does not clear the reopened session or take its focus');
+    dialogSelector + ': an older close or held pointer cannot clear/dismiss the reopened session or take its focus');
   await trigger.evaluate(node => {
     const replacement = node.cloneNode(true);
     replacement.dataset.focusReplacement = 'true';
     node.replaceWith(replacement);
   });
   await page.locator(closeSelector).click();
-  await page.waitForFunction(() => document.activeElement?.dataset.focusReplacement === 'true');
+  await page.waitForFunction(selector => !document.querySelector(selector).open, dialogSelector);
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  const replacementFocus = await page.evaluate(selector => ({
+    replacement: document.activeElement?.dataset.focusReplacement === 'true',
+    active: document.activeElement?.id || document.activeElement?.tagName,
+    open: document.querySelector(selector).open
+  }), dialogSelector);
+  assert.equal(replacementFocus.replacement, true, dialogSelector + ': reopened replacement trigger owns focus\n' + JSON.stringify(replacementFocus));
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForFunction(selector => document.querySelector(selector) && !document.querySelector(selector).disabled, triggerSelector);
   await trigger.click();
