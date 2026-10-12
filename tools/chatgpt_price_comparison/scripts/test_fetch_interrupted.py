@@ -1,5 +1,6 @@
 """Interrupted HTTP bodies must retry whole responses, never accept partial bytes."""
 import copy
+import io
 from http.client import IncompleteRead
 import unittest
 from unittest.mock import MagicMock, Mock, call, patch
@@ -14,7 +15,7 @@ def response(payload=b'complete', error=None):
     value.headers = {}
     value.__enter__.return_value = value
     value.read.return_value = payload
-    value.read.side_effect = error
+    value.read1.side_effect = error if error is not None else io.BytesIO(payload).read1
     return value
 
 
@@ -29,7 +30,9 @@ class InterruptedFetchTests(unittest.TestCase):
         self.assertEqual(opener.open.call_count, 2)
         sleep.assert_called_once_with(1)
         for item in (broken, complete):
-            item.read.assert_called_once_with(p.LIMIT + 1)
+            item.read.assert_not_called()
+            item.read1.assert_any_call(min(64 * 1024, p.LIMIT + 1))
+            self.assertEqual(item.read1.call_count, 1 if item is broken else 2)
             item.__exit__.assert_called_once()
 
     def test_three_interrupted_bodies_exhaust_retry_without_returning_partial(self):
@@ -49,7 +52,7 @@ class InterruptedFetchTests(unittest.TestCase):
     def test_deadline_stops_interrupted_retry_before_another_request(self):
         opener = Mock()
         opener.open.return_value = response(error=IncompleteRead(b'prefix', 10))
-        with patch.object(p.urllib.request, 'build_opener', return_value=opener), patch.object(p.time, 'sleep'), patch.object(p.time, 'monotonic', side_effect=[0, 0, 10]):
+        with patch.object(p.urllib.request, 'build_opener', return_value=opener), patch.object(p.time, 'sleep'), patch.object(p.time, 'monotonic', side_effect=[0, 0, 0, 10]):
             with self.assertRaisesRegex(TimeoutError, 'network run budget exhausted'):
                 p.fetch(p.FX_URL, deadline=10)
         self.assertEqual(opener.open.call_count, 1)
