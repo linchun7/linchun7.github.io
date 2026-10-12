@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { load } from 'cheerio';
+import { assertPublishedDateProjection } from './helpers/published-date-projection.mjs';
 import { displayedPublishedDate } from '../data-contract.js';
 import { assertSeoProjectionMatches, renderSeoProjection } from '../scripts/render-static-page.mjs';
 import {
@@ -49,8 +50,7 @@ test('committed raw HTML is the deterministic projection of validated prices', a
     publishedDate: displayedPublishedDate(history, payload.source.publishedDate)
   });
   assert.equal($('#resultSummary').text(), `${payload.countries.length} 个地区 · ${preferredDefaultTier(payload).label} 从低到高`);
-  assert.equal($('#applePublishedDate').text(), '2026/09/15');
-  assert.equal(payload.source.publishedDate, 'September 16, 2026', 'raw Apple observation remains preserved');
+  assertPublishedDateProjection(html, payload, history);
   assert.equal($('.price-table thead th[aria-sort="ascending"] i[data-lucide="arrow-up"]').length, 1);
   assert.equal($('.price-table thead th[aria-sort="ascending"]').attr('data-tier'), preferredDefaultTier(payload).id);
   assert.equal($(`.price-cell[data-tier="${preferredDefaultTier(payload).id}"].is-active-tier.is-sorted`).length, payload.countries.length);
