@@ -5,7 +5,16 @@ import assert from 'node:assert/strict';
 // input interception and polling must not become apparent application leaks.
 export async function installHistoryInteractionProbe(page, entryFile) {
   await page.addInitScript(entry => {
-    const fromApp = () => String(new Error().stack || '').includes('/' + entry + '?v=');
+    const acceptedSourceFrames = [];
+    const fromApp = () => {
+      // JSC removes URL query/fragment data from Error.stack. Match the exact
+      // origin/path and frame location instead of relying on the asset query.
+      const source = new URL(entry, location.href).href.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const pattern = new RegExp('(?:^|[\\s@(])' + source + '(?:\\?[^\\s)]*)?:\\d+(?::\\d+)?\\)?\\s*$');
+      const frame = String(new Error().stack || '').split('\n').find(line => pattern.test(line));
+      if (frame && acceptedSourceFrames.length < 2 && !acceptedSourceFrames.includes(frame.trim())) acceptedSourceFrames.push(frame.trim());
+      return Boolean(frame);
+    };
     const registrations = Object.create(null);
     const dataRequests = [];
     const timers = new Set();
@@ -59,6 +68,7 @@ export async function installHistoryInteractionProbe(page, entryFile) {
     globalThis.cancelAnimationFrame = function(id) { frames.delete(id); return cancel.call(this, id); };
     globalThis.__historyInteractionProbe = () => ({
       stableListenerRegistrations: { ...registrations },
+      acceptedSourceFrames: [...acceptedSourceFrames],
       dataRequests: [...dataRequests], timers: timers.size, intervals: intervals.size, frames: frames.size
     });
   }, entryFile);
@@ -95,7 +105,7 @@ export async function assertHistoryInteractionStress(page, definitions, { touch 
   }, null, { timeout: 5000, polling: 25 });
   const baseline = await probe();
   assert.ok(Object.keys(baseline.stableListenerRegistrations).some(key => key.startsWith('document:')),
-    'the entry-script probe actually observed application document listeners');
+    'the entry-script probe actually observed application document listeners: ' + JSON.stringify(baseline));
   const rowCount = await page.locator('#priceRows tr[data-market-id]').count();
   const dialogIds = await page.locator('dialog').evaluateAll(nodes => nodes.map(node => node.id).sort());
   for (let round = 0; round < rounds; round++) for (const definition of definitions) {

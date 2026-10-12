@@ -482,10 +482,138 @@ async function assertDailyTableGeometry(browser) {
   }
 }
 
+async function assertHistoryHeaderReachability(browser) {
+  // UI consumer fixture only: repeat an existing change record to stress bounded list
+  // reachability, filtering and pagination. This is not a natural/canonical ledger,
+  // must not be persisted, and does not assert canonical producer acceptance.
+  const history = JSON.parse(await readFile(resolve(projectDir, 'data/minimum-history.json'), 'utf8'));
+  const seed = history.events.find(event => event.kind === 'change');
+  assert.ok(seed, 'header-reachability consumer fixture needs an existing change template');
+  const firstAt = Date.parse(history.first_observed_at), lastAt = Date.parse(history.checkpoint.at);
+  assert.ok(lastAt > firstAt + 30000);
+  history.events = Array.from({ length: 30 }, (_, index) => {
+    const event = structuredClone(seed);
+    delete event.comparison;
+    event.at = new Date(firstAt + Math.floor(index * (lastAt - firstAt) / 31)).toISOString();
+    event.previous_at = index === 0 ? null : new Date(firstAt + Math.floor((index - 1) * (lastAt - firstAt) / 31)).toISOString();
+    return event;
+  });
+  history.first_observed_at = history.events[0].at;
+  const diagnostics = [], failures = [];
+  for (const [width, height] of [[320, 568], [667, 375], [1280, 900]]) {
+    const touch = width < 1101, label = width + 'x' + height;
+    const context = await browser.newContext({ viewport: { width, height }, hasTouch: touch });
+    const page = await context.newPage();
+    const activate = locator => touch ? locator.tap() : locator.click();
+    const settled = () => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const openLongHistory = async () => {
+      await activate(page.locator('#minimumHistoryButton'));
+      await page.waitForFunction(() => document.querySelectorAll('#minimumHistoryEvents .minimum-history-event').length === 20);
+      await activate(page.locator('#minimumHistoryMore'));
+      await page.waitForFunction(() => document.querySelectorAll('#minimumHistoryEvents .minimum-history-event').length === 30);
+    };
+    const measureAtEnd = async () => {
+      await page.evaluate(() => {
+        const dialog = document.querySelector('#minimumHistoryDialog');
+        dialog.scrollTop = dialog.scrollHeight;
+      });
+      await settled();
+      return page.evaluate(() => {
+        const dialog = document.querySelector('#minimumHistoryDialog'), header = dialog.querySelector('.dialog-header');
+        const bounds = dialog.getBoundingClientRect(), title = header.getBoundingClientRect();
+        const control = id => {
+          const node = document.getElementById(id), rect = node.getBoundingClientRect();
+          const x = rect.left + rect.width / 2, y = rect.top + rect.height / 2;
+          const point = document.elementFromPoint(x, y);
+          return { x, y, top: rect.top, bottom: rect.bottom,
+            visible: rect.top >= bounds.top && rect.bottom <= bounds.bottom && rect.left >= bounds.left && rect.right <= bounds.right,
+            hit: point === node || node.contains(point) };
+        };
+        return { scrollTop: dialog.scrollTop, clientHeight: dialog.clientHeight, scrollHeight: dialog.scrollHeight,
+          dialog: { top: bounds.top, bottom: bounds.bottom },
+          header: { top: title.top, bottom: title.bottom, height: title.height },
+          close: control('closeMinimumHistory'), filter: control('minimumHistoryPlanFilter'),
+          bodyFits: document.documentElement.scrollWidth <= innerWidth + 1 };
+      });
+    };
+    try {
+      await page.addInitScript(now => { Date.now = () => now; }, lastAt + 3600000);
+      await page.route('**/data/minimum-history.json*', route => route.fulfill({ json: history }));
+      await page.goto(url, { waitUntil: 'domcontentloaded' });
+      await page.waitForFunction(() => !document.querySelector('#minimumHistoryButton').disabled);
+      await openLongHistory();
+      const geometry = await measureAtEnd();
+      if (!geometry.bodyFits) failures.push(label + ': body overflows');
+      if (geometry.scrollTop < 500) failures.push(label + ': fixture did not exercise long-history scrolling');
+      // Check usable outcomes, without requiring a particular positioning/CSS strategy.
+      if (!geometry.close.visible || !geometry.close.hit || !geometry.filter.visible || !geometry.filter.hit) {
+        failures.push(label + ': header controls are outside the readable dialog after scrolling');
+      }
+      const obscured = [];
+      for (let index = 0; index < 30; index++) {
+        const accessible = await page.evaluate(index => {
+          const dialog = document.querySelector('#minimumHistoryDialog'), header = dialog.querySelector('.dialog-header');
+          const item = document.querySelectorAll('#minimumHistoryEvents .minimum-history-event')[index];
+          const initial = item.getBoundingClientRect(), frame = dialog.getBoundingClientRect();
+          dialog.scrollTop += initial.top - frame.top - header.offsetHeight - 8;
+          return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => {
+            const record = item.getBoundingClientRect(), heading = header.getBoundingClientRect(), box = dialog.getBoundingClientRect();
+            resolve(record.top >= Math.max(box.top, heading.bottom) - 1 && record.bottom <= box.bottom + 1
+              && record.left >= box.left - 1 && record.right <= box.right + 1
+              && item.scrollWidth <= item.clientWidth + 1);
+          })));
+        }, index);
+        if (!accessible) obscured.push(index);
+      }
+      if (obscured.length) failures.push(label + ': records cannot be read in full clear of the header ' + JSON.stringify(obscured));
+      // Exercise filtering and its empty result, then restore the complete bounded fixture.
+      const select = page.locator('#minimumHistoryPlanFilter');
+      const emptyPlan = await select.evaluate((node, eventPlan) => [...node.options].find(option =>
+        option.value !== 'all' && option.value !== eventPlan)?.value, identity(seed.plan));
+      assert.ok(emptyPlan, 'bounded minimum-history fixture has a non-event plan filter');
+      await select.selectOption(emptyPlan);
+      const emptyWorks = await page.locator('#minimumHistoryEvents').evaluate(node =>
+        node.querySelectorAll('.minimum-history-event').length === 0 && node.textContent.includes('暂无最低价变更记录'));
+      if (!emptyWorks) failures.push(label + ': filter empty state is not readable');
+      await select.selectOption('all');
+      await page.waitForFunction(() => document.querySelectorAll('#minimumHistoryEvents .minimum-history-event').length === 20);
+      await activate(page.locator('#minimumHistoryMore'));
+      await page.waitForFunction(() => document.querySelectorAll('#minimumHistoryEvents .minimum-history-event').length === 30);
+      await select.focus();
+      await page.keyboard.press('Tab');
+      const tabClose = await page.evaluate(() => document.activeElement?.id === 'closeMinimumHistory');
+      if (!tabClose) {
+        failures.push(label + ': Tab from the filter cannot reach close');
+        await page.locator('#closeMinimumHistory').focus();
+      }
+      await page.keyboard.press('Enter');
+      await page.waitForFunction(() => !document.querySelector('#minimumHistoryDialog').open && document.activeElement?.id === 'minimumHistoryButton');
+      // A true touch/mouse close at its current position must not be rescued by locator auto-scrolling.
+      await openLongHistory();
+      const pointerGeometry = await measureAtEnd();
+      let pointerClose = false;
+      if (pointerGeometry.close.visible && pointerGeometry.close.hit) {
+        if (touch) await page.touchscreen.tap(pointerGeometry.close.x, pointerGeometry.close.y);
+        else await page.mouse.click(pointerGeometry.close.x, pointerGeometry.close.y);
+        await page.waitForFunction(() => !document.querySelector('#minimumHistoryDialog').open && document.activeElement?.id === 'minimumHistoryButton');
+        pointerClose = true;
+      } else {
+        failures.push(label + ': visible pointer close is unavailable at the end of the timeline');
+        await page.keyboard.press('Escape');
+        await page.waitForFunction(() => !document.querySelector('#minimumHistoryDialog').open);
+      }
+      diagnostics.push({ width, height, geometry, obscured, emptyWorks, tabClose, pointerGeometry, pointerClose });
+    } finally { await context.close(); }
+  }
+  console.log(browserName + ': bounded long-history reachability diagnostics\n' + JSON.stringify(diagnostics, null, 2));
+  assert.deepEqual(failures, [], browserName + ': long-history reachability\n' + JSON.stringify(diagnostics, null, 2));
+}
+
 let browser;
 try {
   await waitForServer();
   browser = await browserType.launch({ headless: true });
+  await assertHistoryHeaderReachability(browser);
   await assertDailyTableGeometry(browser);
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   await page.goto(url, { waitUntil: 'domcontentloaded' });
