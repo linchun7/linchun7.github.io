@@ -3,6 +3,7 @@
 
     const DAY_MS = 24 * 60 * 60 * 1000;
     const MAX_DETAIL_PERIODS = 2000;
+    const MIN_NORMAL_NUMBER = 2 ** -1022;
 
     const $ = (id) => document.getElementById(id);
 
@@ -41,8 +42,10 @@
         const value = Number(raw);
         if (!Number.isFinite(value)) throw new Error(`${label}必须是有效数字`);
         const decimal = /^[+-]?([0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:e[+-]?[0-9]+)?$/i.exec(raw);
-        // Inspect the mantissa only: 0e3 is zero, but 1e-324 lost a nonzero value.
-        if (value === 0 && decimal && /[1-9]/.test(decimal[1])) {
+        // Subnormal values have reduced relative precision. Also detect a
+        // nonzero decimal mantissa lost to zero, while keeping 0e3 valid.
+        if ((value !== 0 && Math.abs(value) < MIN_NORMAL_NUMBER)
+            || (value === 0 && decimal && /[1-9]/.test(decimal[1]))) {
             throw new Error(`${label}低于可计算精度，请调整参数`);
         }
         return value;
@@ -119,7 +122,11 @@
         const annualRate = readFiniteNumber('annualRate2', '单利年化收益率');
         const annualDays = readAnnualDays('rateType2');
 
-        const earnings = principal * (annualRate / 100) * (days / annualDays);
+        const rate = annualRate / 100;
+        if (annualRate !== 0 && Math.abs(rate) < MIN_NORMAL_NUMBER) {
+            throw new Error('该单利年化收益率低于可计算精度，请调整参数');
+        }
+        const earnings = principal * rate * (days / annualDays);
         if (!Number.isFinite(earnings)) throw new Error('计算结果异常，请检查输入');
 
         return `利息收益：${formatNumber(earnings)} 元`;
@@ -170,7 +177,7 @@
         if (!Number.isFinite(rate) || rate <= -1) {
             throw new Error('该名义年利率在当前复利方式下会使单期本金小于等于 0，请调整参数');
         }
-        if (annualRatePercent !== 0 && rate === 0) {
+        if (annualRatePercent !== 0 && Math.abs(rate) < MIN_NORMAL_NUMBER) {
             throw new Error('该名义年利率在当前复利方式下低于可计算精度，请调整参数');
         }
         return rate;

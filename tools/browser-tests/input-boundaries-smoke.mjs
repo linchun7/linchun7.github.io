@@ -190,10 +190,37 @@ try {
             assert.match(await page.locator('#result4-table').textContent(), /明细最多展示 2000 期/);
         }
     });
-    await check('financial rejects nonzero rate underflow and clears previous details', 'financial_calculator', async page => {
+    await check('financial simple interest rejects scaled subnormal rates and recovers at zero', 'financial_calculator', async page => {
+        await page.click('#tab2');
+        await page.selectOption('#rateType2', '360');
+        for (const rate of ['1e-307', '-1e-307', '2.2250738585072286e-308']) {
+            await page.fill('#principal2', '1000');
+            await page.fill('#days2', '360');
+            await page.fill('#annualRate2', '5');
+            await page.click('#calculate2');
+            assert.equal(await page.locator('#result2').textContent(), '利息收益：50.00 元');
+            assert.equal(await page.locator('#result2').evaluate(el => el.classList.contains('result-error')), false);
+
+            await page.fill('#principal2', '1.7e308');
+            await page.fill('#days2', '9000000000000000');
+            await page.fill('#annualRate2', rate);
+            await page.click('#calculate2');
+            assert.equal(await page.locator('#result2').evaluate(el => el.classList.contains('result-error')), true, rate);
+            assert.match(await page.locator('#result2').textContent(), /低于可计算精度/);
+
+            await page.fill('#annualRate2', '0');
+            await page.click('#calculate2');
+            assert.equal(await page.locator('#result2').evaluate(el => el.classList.contains('result-error')), false);
+            assert.equal(await page.locator('#result2').textContent(), '利息收益：0.00 元');
+        }
+    });
+    await check('financial rejects unsupported rate precision and clears previous details', 'financial_calculator', async page => {
         await page.click('#tab4');
         await page.selectOption('#compoundingFrequency', 'annually');
-        for (const rate of ['1e-322', '-1e-322', '1e-324', '-1e-324']) {
+        for (const rate of [
+            '1e-322', '-1e-322', '1e-324', '-1e-324',
+            '3e-322', '-3e-322', '1e-307', '-1e-307'
+        ]) {
             // Establish old details before each precision failure.
             await page.fill('#principal3', '1000');
             await page.fill('#depositPeriod', '2');
