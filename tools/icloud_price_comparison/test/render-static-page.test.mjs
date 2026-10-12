@@ -196,6 +196,7 @@ test('embedded snapshot changes remain inside the publication gate generated reg
   const changed = structuredClone(payload);
   changed.fx.stale = true;
   changed.fx.fallbackReason = 'request-failed';
+  delete changed.fx.comparisonFingerprint;
   const rendered = replaceStaticFragments(html, renderStaticFragments(changed, history));
   assert.equal(staticPageShell(html), staticPageShell(rendered));
   assert.equal(assertStaticPageMatches(rendered, changed, history), true);

@@ -245,6 +245,77 @@ try {
     }
   }
   if (fullUi) {
+    // Exercise failures after a prefix was consumed and the next read is pending.
+    // The timeout case invokes the application's registered 8000ms callback;
+    // it tests abort wiring, not eight seconds of elapsed time or real networking.
+    const tableBeforeStreamFailures = await evaluate('document.querySelector("#priceRows").innerHTML');
+    for (const mode of ['mid-read-error', 'mid-read-timeout']) {
+      await evaluate(`{
+        const mode = ${JSON.stringify(mode)};
+        globalThis.__historyPendingReads = 0;
+        globalThis.__historyFailureFetches = 0;
+        globalThis.__historyAbortSeen = false;
+        globalThis.__historyDeadlineCallback = null;
+        globalThis.__historyFailRead = null;
+        globalThis.fetch = (input, init) => {
+          if (!new URL(input.url || input, location.href).pathname.endsWith('/minimum-history.json')) return globalThis.__originalHistoryFetch(input, init);
+          globalThis.__historyFailureFetches += 1;
+          const stream = new ReadableStream({
+            start(controller) {
+              globalThis.__historyFailRead = () => controller.error(new Error('connection lost after prefix'));
+              init.signal.addEventListener('abort', () => {
+                globalThis.__historyAbortSeen = true;
+                controller.error(new DOMException('Mock response aborted', 'AbortError'));
+              }, {once: true});
+            },
+            pull(controller) {
+              globalThis.__historyPendingReads += 1;
+              if (globalThis.__historyPendingReads === 1) controller.enqueue(new TextEncoder().encode('{"schema":1,'));
+              // No enqueue/close on the second pull: reader.read() stays pending.
+            }
+          }, {highWaterMark: 0});
+          return Promise.resolve(new Response(stream, {headers: {'content-type':'application/json'}}));
+        };
+        const originalTimeout = globalThis.setTimeout;
+        if (mode === 'mid-read-timeout') globalThis.setTimeout = (callback, milliseconds, ...args) => {
+          if (milliseconds === 8000) {
+            if (globalThis.__historyDeadlineCallback) throw Error('Duplicate history deadline');
+            globalThis.__historyDeadlineCallback = () => callback(...args);
+            // Keep a real clearable timer handle without racing slow CDP calls.
+            return originalTimeout(() => {}, 2_147_483_647);
+          }
+          return originalTimeout(callback, milliseconds, ...args);
+        };
+        try { document.querySelector('#minimumHistoryRetry').click(); }
+        finally { globalThis.setTimeout = originalTimeout; }
+      }`);
+      await until(() => evaluate('globalThis.__historyPendingReads === 2'), mode + ': prefix consumed before pending read');
+      assert.equal(await evaluate('globalThis.__historyFailureFetches'), 1, mode + ': one in-flight request');
+      assert.equal(await evaluate('document.querySelector("#minimumHistoryRetry").disabled'), true, mode + ': pending read retains loading state');
+      assert.equal(await evaluate('document.querySelector("#minimumHistoryEvents").textContent'), acceptedHistoryText, mode + ': pending read preserves accepted history');
+      if (mode === 'mid-read-timeout') {
+        assert.equal(await evaluate('typeof globalThis.__historyDeadlineCallback'), 'function', 'history registers its 8000ms abort deadline');
+        await evaluate('globalThis.__historyDeadlineCallback()');
+      } else await evaluate('globalThis.__historyFailRead()');
+      await until(() => evaluate(`!document.querySelector('#minimumHistoryRetry').hidden && !document.querySelector('#minimumHistoryRetry').disabled && document.querySelector('#minimumHistoryStatus').textContent.includes('暂无法刷新')`), mode + ': failed read releases loading state');
+      assert.equal(await evaluate('globalThis.__historyAbortSeen'), mode === 'mid-read-timeout', mode + ': abort signal follows only the deadline path');
+      assert.equal(await evaluate('document.querySelector("#minimumHistoryEvents").textContent'), acceptedHistoryText, mode + ': failure preserves accepted history');
+      assert.equal(await evaluate('document.querySelector("#minimumHistoryStatus").textContent'), [acceptedHistoryDate, '暂无法刷新'].filter(Boolean).join(' · '), mode + ': failure preserves exact cutoff');
+      assert.equal(await evaluate('document.querySelector("#priceRows").innerHTML'), tableBeforeStreamFailures, mode + ': history failure leaves current table intact');
+      await evaluate(`{
+        globalThis.fetch = (input, init) => {
+          if (!new URL(input.url || input, location.href).pathname.endsWith('/minimum-history.json')) return globalThis.__originalHistoryFetch(input, init);
+          globalThis.__historyFailureFetches += 1;
+          return Promise.resolve(new Response(${JSON.stringify(validHistoryJson)}, {headers: {'content-type':'application/json'}}));
+        };
+        document.querySelector('#minimumHistoryRetry').click();
+      }`);
+      await until(() => evaluate(`globalThis.__historyFailureFetches === 2 && document.querySelector('#minimumHistoryRetry').hidden && !document.querySelector('#minimumHistoryRetry').disabled`), mode + ': a fresh retry succeeds after failed promise');
+      assert.equal(await evaluate('document.querySelector("#minimumHistoryEvents").textContent'), acceptedHistoryText, mode + ': retry restores accepted history');
+      assert.equal(await evaluate('document.querySelector("#minimumHistoryStatus").textContent'), acceptedHistoryDate, mode + ': retry clears error without changing cutoff');
+      assert.equal(await evaluate('document.querySelector("#priceRows").innerHTML'), tableBeforeStreamFailures, mode + ': recovery leaves current table intact');
+    }
+    await evaluate(`delete globalThis.__historyPendingReads; delete globalThis.__historyFailureFetches; delete globalThis.__historyAbortSeen; delete globalThis.__historyDeadlineCallback; delete globalThis.__historyFailRead;`);
     await evaluate(`{
       const bytes = new TextEncoder().encode(${JSON.stringify(validHistoryJson)});
       const nonAscii = bytes.findIndex(value => value >= 128);

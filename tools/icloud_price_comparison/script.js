@@ -383,8 +383,15 @@ function staticDomMatchesPayload(data) {
   if (staticSnapshotDomDowngraded || !state.minimumCuesEnabled) return false;
   const tierIds = [...document.querySelectorAll('.price-table thead th[data-tier]')].map(({ dataset }) => dataset.tier);
   if (tierIds.length !== data.tiers.length || tierIds.some((id, index) => id !== data.tiers[index].id)) return false;
-  const rows = [...elements.priceRows.querySelectorAll('tr[data-market-id]')];
-  if (rows.length !== data.countries.length) return false;
+  const rows = [...elements.priceRows.querySelectorAll('tr')];
+  if (rows.length !== data.countries.length
+    || new Set(rows.map((row) => row.dataset.marketId)).size !== data.countries.length) return false;
+  const defaultTier = data.tiers.find(({ id }) => id === DEFAULT_SORT_TIER) ?? data.tiers[0];
+  const orderedCountries = [...data.countries].sort((first, second) => (
+    first.plans[defaultTier.id].cnyRank - second.plans[defaultTier.id].cnyRank
+    || first.marketId.localeCompare(second.marketId, 'en')
+  ));
+  if (rows.some((row, index) => row.dataset.marketId !== orderedCountries[index].marketId)) return false;
   const countries = new Map(data.countries.map((country) => [country.marketId, country]));
   return rows.every((row) => {
     const country = countries.get(row.dataset.marketId);
@@ -396,10 +403,22 @@ function staticDomMatchesPayload(data) {
     if (row.querySelector('.country-name')?.textContent !== displayName
       || row.querySelector('.country-name-en')?.textContent !== secondaryName) return false;
     if (row.dataset.cnyRanks !== data.tiers.map(({ id }) => country.plans[id].cnyRank).join(',')) return false;
+    const rank = String(country.plans[defaultTier.id].cnyRank);
+    if (row.cells.length !== data.tiers.length + FIXED_PRICE_TABLE_COLUMN_COUNT
+      || row.cells[0].textContent.trim() !== rank
+      || row.cells[0].classList.contains('rank-top') !== (Number(rank) <= 3)
+      || row.querySelector('.mobile-rank')?.textContent !== rank
+      || row.querySelector('.mobile-rank-sr')?.textContent !== `全球价格排名第 ${rank}`) return false;
     const cells = [...row.querySelectorAll('.price-cell')];
-    return cells.length === data.tiers.length && cells.every((cell) => {
-      const plan = country.plans[cell.dataset.tier];
-      return plan && cell.querySelector('.price-amount')?.textContent === moneyFormatter.format(plan.cnyPrice)
+    return cells.length === data.tiers.length && cells.every((cell, index) => {
+      const tierId = data.tiers[index].id;
+      if (cell.dataset.tier !== tierId) return false;
+      const plan = country.plans[tierId];
+      const isMinimum = plan.cnyRank === 1;
+      return cell.classList.contains('is-minimum') === isMinimum
+        && cell.querySelectorAll('.minimum-badge').length === (isMinimum ? 1 : 0)
+        && (!isMinimum || cell.querySelector('.minimum-badge').textContent === '最低')
+        && cell.querySelector('.price-amount')?.textContent === moneyFormatter.format(plan.cnyPrice)
         && cell.querySelector('.price-local')?.textContent === plan.formattedPrice;
     });
   });
@@ -810,19 +829,6 @@ function updateRankingPresentation({ filtered = Boolean(state.query.trim() || st
   elements.rankHeaderLabel.append(visible, accessible);
 }
 
-function bindStaticControls() {
-  document.querySelectorAll('button[data-sort-tier]').forEach((button) => {
-    if (button.dataset.interactive === 'true') return;
-    button.dataset.interactive = 'true';
-    button.addEventListener('click', () => setTierSort(button.dataset.sortTier));
-  });
-  document.querySelectorAll('.minimum-card[data-tier]').forEach((button) => {
-    if (button.dataset.interactive === 'true') return;
-    button.dataset.interactive = 'true';
-    button.addEventListener('click', () => focusMinimumCountry(button.dataset.tier, button.dataset.marketId));
-  });
-  bindRenderedPriceRows();
-}
 function renderSortHeaders({ refresh = true } = {}) {
   document.querySelectorAll('button[data-sort], button[data-sort-tier]').forEach((button) => {
     const header = button.closest('th');
@@ -1465,8 +1471,14 @@ function hydrateStaticPriceData(data) {
   state.historyTier = state.sortTier;
   populateFilters();
   bindEvents();
-  bindStaticControls();
+  renderTierHeaders();
   calculateMinimumPrices();
+  // Rebuild this small projection from validated data; do not trust static
+  // card prices or navigation attributes while retaining the larger table.
+  renderMinimumSummary();
+  elements.marketCount.textContent = `${state.data.countries.length} 个地区`;
+  elements.currencyCount.textContent = `${new Set(state.data.countries.map(({ currency }) => currency)).size} 种`;
+  elements.tierCount.textContent = `${state.data.tiers.length} 档`;
   renderMobileTierButtons();
   renderPublishedDateHistory();
   setFiltersDisabled(false);
@@ -1520,6 +1532,24 @@ function trapDialogFocus(dialog, event) {
 function bindEvents() {
   if (state.eventsBound) return;
   state.eventsBound = true;
+  // A device-clock change need not produce a lifecycle event. Guard current
+  // price interactions before their handlers, without checking inside render
+  // functions (which the time-safety transition itself calls).
+  const currentPriceControls = [
+    '#searchInput', '#regionSelect', 'button[data-sort]', 'button[data-sort-tier]',
+    '#mobileTierControl button', '.minimum-card', '#priceRows tr[data-market-id]',
+    '#publishedDateButton', '#historyTierControl button'
+  ].join(',');
+  const guardPriceInteraction = (event) => {
+    if (!(event.target instanceof Element) || !event.target.closest(currentPriceControls)) return;
+    recheckSnapshotClock();
+    if (state.dataFreshness?.status !== 'unusable') return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  };
+  for (const type of ['click', 'input', 'change']) {
+    document.addEventListener(type, guardPriceInteraction, { capture: true });
+  }
   elements.searchInput.addEventListener('input', (event) => scheduleQueryRender(event.target.value));
   elements.regionSelect.addEventListener('change', (event) => {
     state.region = event.target.value;

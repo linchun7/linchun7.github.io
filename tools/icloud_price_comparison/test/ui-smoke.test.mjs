@@ -375,7 +375,8 @@ test('ships static prices and one embedded snapshot without a main-data network 
   assert.match(html, /<script id="icloud-price-data" type="application\/json">/);
   assert.doesNotMatch(moduleSource, /fetchJson\('prices\.json'|loadPrices\(|refreshPrices\(/, 'there is no second main snapshot fetch path');
   assert.match(moduleSource, /TextDecoder\('utf-8', \{ fatal: true \}\)/, 'network JSON must use strict UTF-8 decoding');
-  assert.match(moduleSource, /fetch\(url,[\s\S]*?redirect:\s*'error'/, 'all later data requests must reject redirects');
+  assert.match(moduleSource, /fetch\(`\.\/data\/\$\{fileName\}`, \{[\s\S]*?redirect:\s*'error'/, 'optional history JSON requests must reject redirects');
+  assert.match(moduleSource, /fetch\(new URL\('\.\/data\/minimum-history\.json', import\.meta\.url\), \{[^}]*redirect:\s*'error'/, 'minimum history JSON requests must reject redirects');
   assert.doesNotMatch(moduleSource, /PRICE_FRESH_MAX_AGE_MS|PRICE_HARD_MAX_AGE_MS/);
   assert.match(moduleSource, /MAX_PRICE_FUTURE_SKEW_MS/, 'future timestamp checks remain');
   assert.doesNotMatch(moduleSource, /setInterval\(/, 'freshness lifecycle must not poll or expire accepted snapshots');
@@ -3968,5 +3969,205 @@ for (const lateStage of ['first', 'cache-reload']) {
       }
     });
   }
+}
+
+
+
+test('the first hydrated static country button opens history before any table rerender', { timeout: 30000 }, async context => {
+  const session = await snapshotSession(context, 'first-click static history binding', { width: 1024 });
+  if (!session) return;
+  const { page, browser, data, url, mainRequests, errors } = session;
+  let release;
+  const pendingModule = new Promise(resolve => { release = resolve; });
+  await page.route('**/script.js?v=*', async route => { await pendingModule; await route.continue(); });
+  let historyRequests = 0;
+  await page.route('**/data/history.json*', route => { historyRequests++; return route.continue(); });
+  try {
+    await page.goto(url, { waitUntil: 'commit' });
+    await page.waitForSelector('#priceRows tr[data-market-id]');
+    const marketId = await page.locator('#priceRows tr[data-market-id]').first().getAttribute('data-market-id');
+    const expected = data.countries.find(country => country.marketId === marketId);
+    await page.locator('#priceRows tr[data-market-id]').first().evaluate(row => { row.dataset.firstClickStatic = 'retained'; });
+    release();
+    await waitForSnapshot(page);
+    assert.equal(await page.locator('[data-first-click-static="retained"]').count(), 1, 'the initial static row must survive hydration');
+    assert.equal(historyRequests, 0);
+    // No search, sorting, minimum action or filter has rebuilt/bound these rows.
+    const button = page.locator('[data-first-click-static="retained"] .country-history-button');
+    assert.equal(await button.isEnabled(), true);
+    await button.click();
+    await page.waitForFunction(() => document.querySelector('#historyDialog').open);
+    assert.equal(await page.locator('#historyTitle').textContent(), expected.nameZh || expected.country);
+    await waitForAcceptedCountryHistory(page);
+    assert.equal(historyRequests, 1);
+    await page.locator('#closeHistory').click();
+    assert.equal(await button.evaluate(node => node === document.activeElement), true);
+    assert.deepEqual(mainRequests, []);
+    assert.deepEqual(errors, []);
+  } finally { release(); await browser.close(); }
+});
+
+for (const corruption of ['duplicate market row', 'swapped market rows', 'duplicate tier cell', 'reordered tier cells', 'minimum badge pollution']) {
+  test('embedded projection rejects ' + corruption + ' even when counts match', { timeout: 30000 }, async context => {
+    const session = await snapshotSession(context, 'static projection identity', { width: 1024 });
+    if (!session) return;
+    const { page, browser, data, url, mainRequests, errors } = session;
+    let release;
+    const pendingModule = new Promise(resolve => { release = resolve; });
+    await page.route('**/script.js?v=*', async route => { await pendingModule; await route.continue(); });
+    try {
+      await page.goto(url, { waitUntil: 'commit' });
+      await page.waitForSelector('#priceRows tr[data-market-id]');
+      const before = await page.evaluate(mode => {
+        const envelope = document.querySelector('#icloud-price-data').textContent;
+        const rows = [...document.querySelectorAll('#priceRows tr[data-market-id]')];
+        const cells = [...rows[0].querySelectorAll('.price-cell')];
+        if (mode === 'duplicate market row') rows[1].replaceWith(rows[0].cloneNode(true));
+        else if (mode === 'swapped market rows') rows[1].after(rows[0]);
+        else if (mode === 'duplicate tier cell') cells[1].replaceWith(cells[0].cloneNode(true));
+        else if (mode === 'minimum badge pollution') {
+          const cell = document.querySelector('#priceRows .price-cell:not(.is-minimum)');
+          cell.classList.add('is-minimum');
+          const badge = document.createElement('span');
+          badge.className = 'minimum-badge';
+          badge.dataset.adversarialBadge = 'true';
+          badge.textContent = '最低';
+          cell.append(badge);
+        }
+        else for (const cell of [...cells].reverse()) rows[0].append(cell);
+        return {
+          envelope,
+          rowCount: document.querySelectorAll('#priceRows tr[data-market-id]').length,
+          originalMarkets: rows.map(row => row.dataset.marketId),
+          actualMarkets: [...document.querySelectorAll('#priceRows tr[data-market-id]')].map(row => row.dataset.marketId),
+          uniqueMarkets: new Set([...document.querySelectorAll('#priceRows tr[data-market-id]')].map(row => row.dataset.marketId)).size,
+          tiers: [...document.querySelector('#priceRows tr[data-market-id]').querySelectorAll('.price-cell')].map(cell => cell.dataset.tier)
+        };
+      }, corruption);
+      assert.equal(before.rowCount, data.countries.length, 'the adversarial fixture retains the expected row count');
+      if (corruption === 'duplicate market row') assert.equal(before.uniqueMarkets, data.countries.length - 1);
+      else if (corruption === 'swapped market rows') {
+        assert.equal(before.uniqueMarkets, data.countries.length, 'all market identities remain valid and unique');
+        assert.notDeepEqual(before.actualMarkets, before.originalMarkets, 'only the static row ordering is corrupted');
+      }
+      else if (corruption === 'minimum badge pollution') {
+        assert.equal(await page.locator('[data-adversarial-badge="true"]').count(), 1, 'a nonminimum cell now falsely claims a minimum');
+        assert.deepEqual(before.actualMarkets, before.originalMarkets);
+      }
+      else {
+        assert.equal(before.tiers.length, data.tiers.length, 'the adversarial fixture retains the expected cell count');
+        assert.notDeepEqual(before.tiers, data.tiers.map(tier => tier.id));
+      }
+      release();
+      await waitForSnapshot(page);
+      assert.equal(await page.locator('#icloud-price-data').textContent(), before.envelope, 'reconciliation must not rewrite its authority');
+      const marketIds = await page.locator('#priceRows tr[data-market-id]').evaluateAll(rows => rows.map(row => row.dataset.marketId));
+      const defaultTier = data.tiers.find(tier => tier.id === '200GB')?.id ?? data.tiers[0].id;
+      const expected = [...data.countries].sort((a, b) => a.plans[defaultTier].cnyRank - b.plans[defaultTier].cnyRank || a.marketId.localeCompare(b.marketId, 'en'));
+      assert.deepEqual(marketIds, expected.map(country => country.marketId), 'the full unique market projection and order must come from the snapshot');
+      const rowTiers = await page.locator('#priceRows tr[data-market-id]').evaluateAll(rows => rows.map(row => [...row.querySelectorAll('.price-cell')].map(cell => cell.dataset.tier)));
+      assert.deepEqual(rowTiers, expected.map(() => data.tiers.map(tier => tier.id)), 'every row must contain the complete ordered tier projection');
+      const visibleProjection = await page.locator('#priceRows tr[data-market-id]').evaluateAll(rows => rows.map(row => ({
+        marketId: row.dataset.marketId,
+        name: row.querySelector('.country-name').textContent,
+        prices: [...row.querySelectorAll('.price-cell .price-local')].map(cell => cell.textContent),
+        topRank: row.firstElementChild.classList.contains('rank-top'),
+        minimums: [...row.querySelectorAll('.price-cell')].map(cell => ({
+          className: cell.classList.contains('is-minimum'),
+          badges: cell.querySelectorAll('.minimum-badge').length
+        }))
+      })));
+      assert.deepEqual(visibleProjection, expected.map(country => ({
+        marketId: country.marketId,
+        name: country.nameZh || country.country,
+        prices: data.tiers.map(tier => country.plans[tier.id].formattedPrice),
+        topRank: country.plans[defaultTier].cnyRank <= 3,
+        minimums: data.tiers.map(tier => ({
+          className: country.plans[tier.id].cnyRank === 1,
+          badges: country.plans[tier.id].cnyRank === 1 ? 1 : 0
+        }))
+      })));
+      assert.deepEqual(mainRequests, []);
+      assert.deepEqual(errors, []);
+    } finally { release(); await browser.close(); }
+  });
+}
+
+for (const corruption of ['amount', 'navigation target']) {
+  test('minimum cards recover a corrupted static ' + corruption + ' from embedded rank-one prices', { timeout: 30000 }, async context => {
+    const session = await snapshotSession(context, 'minimum card projection', { width: 1024 });
+    if (!session) return;
+    const { page, browser, data, url, mainRequests, errors } = session;
+    const tier = data.tiers[0];
+    const winners = data.countries.filter(country => country.plans[tier.id].cnyRank === 1).sort((a, b) => a.marketId.localeCompare(b.marketId, 'en'));
+    assert.ok(winners.length > 0);
+    const expected = winners[0];
+    const wrongTarget = data.countries.find(country => country.plans[tier.id].cnyRank !== 1);
+    assert.ok(wrongTarget, 'the fixture needs a nonminimum navigation target');
+    let release;
+    const pendingModule = new Promise(resolve => { release = resolve; });
+    await page.route('**/script.js?v=*', async route => { await pendingModule; await route.continue(); });
+    try {
+      await page.goto(url, { waitUntil: 'commit' });
+      await page.waitForSelector('.minimum-card');
+      const untouched = await page.evaluate(({ mode, tierId, wrongId }) => {
+        const card = document.querySelector('.minimum-card[data-tier="' + tierId + '"]');
+        const original = { envelope: document.querySelector('#icloud-price-data').textContent, rows: document.querySelector('#priceRows').innerHTML };
+        if (mode === 'amount') card.querySelector('.minimum-price').textContent = '¥0.01';
+        else card.dataset.marketId = wrongId;
+        return original;
+      }, { mode: corruption, tierId: tier.id, wrongId: wrongTarget.marketId });
+      release();
+      await waitForSnapshot(page);
+      assert.equal(await page.locator('#icloud-price-data').textContent(), untouched.envelope);
+      const card = page.locator('.minimum-card[data-tier="' + tier.id + '"]');
+      assert.equal(await card.locator('.minimum-price').textContent(), '¥' + uiNumberFormatter.format(expected.plans[tier.id].cnyPrice));
+      assert.equal(await card.getAttribute('data-market-id'), expected.marketId);
+      await card.click();
+      await assertMinimumNavigation(page, expected.marketId, tier.id);
+      assert.deepEqual(mainRequests, []);
+      assert.deepEqual(errors, []);
+    } finally { release(); await browser.close(); }
+  });
+}
+
+for (const trigger of ['search', 'country sort', 'tier sort', 'minimum card', 'country history', 'publication history']) {
+  test('a clock rollback is protected on ' + trigger + ' without lifecycle events', { timeout: 30000 }, async context => {
+    const session = await snapshotSession(context, 'interaction-time clock safety', { width: 1024 });
+    if (!session) return;
+    const { page, browser, data, url, mainRequests, errors } = session;
+    let historyRequests = 0;
+    page.on('request', request => { if (/\/data\/(?:history|minimum-history)\.json/.test(new URL(request.url()).pathname)) historyRequests++; });
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded' });
+      await waitForSnapshot(page);
+      assert.ok(await page.locator('.minimum-badge').count() > 0);
+      // Deliberately do not dispatch pageshow, visibilitychange or any reload.
+      await page.evaluate(now => { Date.now = () => now; }, Date.parse(data.generatedAt) - 3600000);
+      if (trigger === 'search') await page.locator('#searchInput').fill('美国');
+      else if (trigger === 'country sort') await page.locator('button[data-sort="country"]').click();
+      else if (trigger === 'tier sort') await page.locator('button[data-sort-tier]:visible').first().click();
+      else if (trigger === 'minimum card') await page.locator('.minimum-card').first().click();
+      else if (trigger === 'country history') await page.locator('.country-history-button').first().click();
+      else await page.locator('#publishedDateButton').click();
+      await page.waitForFunction(() => document.querySelector('#searchInput').disabled);
+      assert.equal(await page.locator('.minimum-card, .minimum-badge, .rank-top, .is-minimum').count(), 0);
+      assert.ok((await page.locator('#priceRows tr[data-market-id] > td:first-child').allTextContents()).every(text => text === '—'));
+      assert.equal(await page.locator('#historyDialog').evaluate(dialog => dialog.open), false);
+      assert.equal(await page.locator('#publishedDateDialog').evaluate(dialog => dialog.open), false);
+      assert.match(await page.locator('#updatedAt').textContent(), /数据时间异常/);
+      assert.equal(historyRequests, 0, 'an unsafe interaction must not start optional history');
+      assert.deepEqual(mainRequests, []);
+      await page.evaluate(now => {
+        Date.now = () => now;
+        window.dispatchEvent(new Event('pageshow'));
+      }, Date.parse(data.generatedAt) + 3600000);
+      await waitForSnapshot(page);
+      assert.equal(await page.locator('.minimum-card').count(), data.tiers.length);
+      assert.ok(await page.locator('.minimum-badge').count() > 0);
+      assert.deepEqual(mainRequests, []);
+      assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
+  });
 }
 
