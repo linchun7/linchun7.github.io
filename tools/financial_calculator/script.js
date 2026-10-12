@@ -346,6 +346,22 @@
             () => clearElement($('result4-table'))
         ));
 
+        // A result belongs to the exact inputs used to calculate it.
+        // Invalidate only this panel; another tab's result remains independent.
+        for (let panel = 1; panel <= 4; panel += 1) {
+            const invalidate = () => {
+                clearResult(`result${panel}`);
+                if (panel === 4) clearElement($('result4-table'));
+            };
+            document.querySelectorAll(`#content${panel} input`).forEach((input) => {
+                input.addEventListener('input', invalidate);
+                input.addEventListener('change', invalidate);
+            });
+            document.querySelectorAll(`#content${panel} select`).forEach((select) => {
+                select.addEventListener('change', invalidate);
+            });
+        }
+
         $('compoundingFrequency').addEventListener('change', updateFrequencyLabel);
         updateFrequencyLabel();
     }

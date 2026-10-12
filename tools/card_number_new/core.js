@@ -45,7 +45,7 @@
         }
 
         return {
-            value: output.trimEnd(),
+            value: output,
             removedChars: Array.from(new Set(removedChars)),
             truncated,
             normalizedChanged: normalized !== raw,

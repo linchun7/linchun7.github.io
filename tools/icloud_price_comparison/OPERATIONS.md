@@ -20,7 +20,7 @@
 
 1. prepare 拒绝旧工作流并固定最新 main SHA；生成/测试 job 只读，从该版本生成候选，通过 core、锁定 Playwright Chromium、工件和静态投影验证。
 2. 独立发布 job 重验下载工件，不安装项目依赖。main 只有无关工具变更时保持工件字节并重验；iCloud 相关变化须废弃候选，禁止强推。
-3. `stage-price-publication.mjs` 仅暂存已测 data/index 路径，从 Git tree 读取原始 blob，核对完整文件集、字节并深验；忽略规则或属性转码导致差异即在提交前停止。
+3. `stage-price-publication.mjs` 仅暂存已测 data/index 路径，从 Git tree 读取原始 blob，核对完整文件集、字节并深验；忽略规则或属性转码导致差异即在提交前停止。CLI 与暂存门禁共用严格页面投影判断：容量增删只允许对应生成区域及六处确定的 SEO/品牌文案改变，CSP、资源引用及其余 shell 必须逐字保持。发布日期回归以临时完整合成工件测试新日期，不固定生产数据日期。
 4. 等待 Pages，验证 canonical 数据、HTML 投影及资源实际哈希；仅完整成功构成每日幂等/恢复证明。可信 main 完整后继版本可接管旧验证，包括只更新资源；同时间异数据、混合资源或缺可信证据均拒绝，被取代的旧验证不冒充恢复。
 
 GITHUB_TOKEN 发布数据提交不会再触发普通 push 验证，updater 必须保留完整验收；普通 main 代码提交在核心/三浏览器通过后使用同一生产校验器。YAML 改变后从 main 新建 Run workflow，不重跑旧定义。关键契约、生成器和 update/validate workflow 变化须同步两份指南，测试、工件复验和生产验收门禁均保留。
@@ -45,6 +45,9 @@ GITHUB_TOKEN 发布数据提交不会再触发普通 push 验证，updater 必�
 诊断用 `pnpm test:core`、`pnpm validate:artifact`、`pnpm validate:snapshots`，界面问题查看三浏览器结果。不要用 `pnpm update:data` 试探生产；只读在线检查用 `pnpm check:live`。
 
 完整生产成功且汇率未降级才发送健康心跳 /0；沿用旧汇率可发布可靠价格，但不发成功心跳、不因当天较早成功跳过更新。严重数据/测试/发布失败发送 /1；单次 transient 与持续汇率故障由缺失成功心跳的宽限期发现。仅真实验证恢复后关闭故障，中文监测另查结果。
+
+
+下载 Action 升级须通过 artifact-roundtrip；HTTP 429 重试不能替代哈希核对或放宽发布门禁。
 
 ## 回滚与外部配置
 
