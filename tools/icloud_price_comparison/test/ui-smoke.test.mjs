@@ -4600,3 +4600,135 @@ test('same-generatedAt label changes rebuild static table labels before enabling
     await browser.close();
   }
 });
+
+for (const lateStage of ['first', 'cache-reload']) {
+  for (const lateOutcome of ['success', '503']) {
+    test(`stress async: obsolete ${lateStage} history ${lateOutcome} cannot replace accepted new generation`, { timeout: 45000 }, async context => {
+      const config = await resolveBrowser(context, 'history generation stress');
+      if (!config) return;
+      const p1 = await readFixture('prices.json');
+      const h1 = await readFixture('history.json');
+      const p2 = structuredClone(p1);
+      const h2 = structuredClone(h1);
+      const market = p2.countries.find(row => row.marketId === 'br') || p2.countries[0];
+      market.nameZh += ' 新代际';
+      historyRecordForCountry(h2, p2, market.country).nameZh = market.nameZh;
+      validatePriceHistoryConsistency(p1, h1);
+      validatePriceHistoryConsistency(p2, h2);
+      const server = await startServer();
+      const browser = await config.browserType.launch(config.launchOptions);
+      const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+      let prices = 0, histories = 0, oldRoute = null;
+      let oldSeenResolve;
+      const oldSeen = new Promise(resolve => { oldSeenResolve = resolve; });
+      const errors = [];
+      page.on('pageerror', error => errors.push(error.message));
+      await page.addInitScript(now => { Date.now = () => now; }, Date.parse(p1.generatedAt) + 3600000);
+      await page.route('https://**/*', route => route.abort());
+      await page.route('**/data/prices.json*', route => route.fulfill({ json: ++prices === 1 ? p1 : p2 }));
+      await page.route('**/data/history.json*', route => {
+        histories++;
+        if (lateStage === 'cache-reload' && histories === 1) {
+          // Structurally valid H2 does not match P1; force the old generation's reload branch.
+          return route.fulfill({ json: h2 });
+        }
+        if (histories === (lateStage === 'first' ? 1 : 2)) {
+          oldRoute = route;
+          oldSeenResolve();
+          return;
+        }
+        return route.fulfill({ json: h2 });
+      });
+      try {
+        await page.goto(`http://127.0.0.1:${server.address().port}/`, { waitUntil: 'domcontentloaded' });
+        await page.waitForFunction(() => !document.querySelector('#searchInput').disabled && document.querySelector('#loadStatus').hidden);
+        await page.locator(`#priceRows tr[data-market-id="${market.marketId}"]`).click();
+        await Promise.race([oldSeen, new Promise((_, reject) => setTimeout(() => reject(Error('old request was not intercepted')), 5000))]);
+        await page.locator('#retryButton').dispatchEvent('click');
+        await page.waitForFunction(name => document.querySelector('#historyTitle').textContent === name && document.querySelector('#loadStatus').hidden, market.nameZh);
+        await page.waitForFunction(() => document.querySelectorAll('#historyRows tr').length > 0 && !/读取|暂不可用/.test(document.querySelector('#historySubtitle').textContent));
+        const expectedRequests = lateStage === 'first' ? 2 : 3;
+        assert.equal(histories, expectedRequests, 'new snapshot must start its own history request');
+        const accepted = await page.locator('#historySubtitle, #historyRows, #publishedDateRows').allTextContents();
+        const responseDone = page.waitForResponse(response => new URL(response.url()).pathname.endsWith('/data/history.json'));
+        await oldRoute.fulfill(lateOutcome === '503' ? { status: 503, body: '{}' } : { json: h1 });
+        oldRoute = null;
+        await responseDone;
+        await page.waitForLoadState('networkidle');
+        assert.deepEqual(await page.locator('#historySubtitle, #historyRows, #publishedDateRows').allTextContents(), accepted, 'late success/catch/finally must preserve new history');
+        assert.equal(await page.locator('#historyDialog').evaluate(dialog => dialog.open), true);
+        await page.locator('#closeHistory').click();
+        await page.locator(`#priceRows tr[data-market-id="${market.marketId}"]`).click();
+        assert.equal(histories, expectedRequests, 'reopening must reuse accepted new history');
+        assert.deepEqual(errors, []);
+      } finally {
+        if (oldRoute) await oldRoute.abort().catch(() => {});
+        await page.close();
+        await browser.close();
+        await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+      }
+    });
+  }
+}
+
+for (const recoveryTrigger of ['pageshow', 'retry']) {
+  test(`stress async: clock correction by ${recoveryTrigger} while a 503 refresh is still pending`, { timeout: 45000 }, async context => {
+    const config = await resolveBrowser(context, 'pending failure lifecycle stress');
+    if (!config) return;
+    const data = await readFixture('prices.json');
+    const generated = Date.parse(data.generatedAt);
+    const server = await startServer();
+    const browser = await config.browserType.launch(config.launchOptions);
+    const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+    let calls = 0, pending = null;
+    let seenResolve;
+    const seen = new Promise(resolve => { seenResolve = resolve; });
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.addInitScript(now => { Date.now = () => now; }, generated + 3600000);
+    await page.route('https://**/*', route => route.abort());
+    await page.route('**/data/prices.json*', route => {
+      calls++;
+      if (calls === 2) { pending = route; seenResolve(); return; }
+      return route.fulfill({ json: data });
+    });
+    try {
+      await page.goto(`http://127.0.0.1:${server.address().port}/`, { waitUntil: 'domcontentloaded' });
+      await page.waitForFunction(() => !document.querySelector('#searchInput').disabled && document.querySelector('#loadStatus').hidden);
+      const originalBadges = await page.locator('.minimum-badge').count();
+      const originalRanks = await page.locator('#priceRows tr[data-market-id] > td:first-child').allTextContents();
+      assert.ok(originalBadges > 0);
+      await page.evaluate(now => { Date.now = () => now; window.dispatchEvent(new Event('pageshow')); }, generated - 3600000);
+      await Promise.race([seen, new Promise((_, reject) => setTimeout(() => reject(Error('failure refresh not intercepted')), 5000))]);
+      assert.equal(await page.locator('#searchInput').isDisabled(), true);
+      assert.equal(await page.locator('.minimum-badge').count(), 0);
+      await page.evaluate(({ now, trigger }) => {
+        Date.now = () => now;
+        if (trigger === 'pageshow') window.dispatchEvent(new Event('pageshow'));
+        else document.querySelector('#retryButton').dispatchEvent(new Event('click'));
+        // More lifecycle events while loading must not create duplicate requests.
+        window.dispatchEvent(new Event('pageshow'));
+        document.dispatchEvent(new Event('visibilitychange'));
+      }, { now: generated + 3600000, trigger: recoveryTrigger });
+      assert.equal(calls, 2);
+      await pending.fulfill({ status: 503, body: '{}' });
+      pending = null;
+      await page.waitForFunction(() => !document.querySelector('#searchInput').disabled && !document.querySelector('#retryButton').hidden && document.querySelector('#priceWorkspace').getAttribute('aria-busy') === 'false');
+      assert.equal(await page.locator('.minimum-badge').count(), originalBadges);
+      assert.deepEqual(await page.locator('#priceRows tr[data-market-id] > td:first-child').allTextContents(), originalRanks);
+      assert.doesNotMatch(await page.locator('#updatedAt').textContent(), /数据时间异常/);
+      assert.equal(calls, 2, 'pending failure resolves the corrected-clock UI without another request');
+      await page.locator('#retryButton').click();
+      await page.waitForFunction(() => document.querySelector('#loadStatus').hidden);
+      assert.equal(calls, 3);
+      await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
+      assert.equal(calls, 3, 'usable page must not begin a refresh loop');
+      assert.deepEqual(errors, []);
+    } finally {
+      if (pending) await pending.abort().catch(() => {});
+      await page.close();
+      await browser.close();
+      await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    }
+  });
+}

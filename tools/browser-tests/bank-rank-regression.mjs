@@ -199,6 +199,9 @@ try {
         await button.click();
         const direction = await button.locator('..').getAttribute('aria-sort');
         const ids = await page.locator('#bankList tr.data-row').evaluateAll(rows => rows.map(row => row.dataset.bankId));
+        const expectedIds = files[latestFile].map(row => row.bankId);
+        assert.equal(new Set(ids).size, ids.length, `${field} ${direction}: duplicate bank IDs`);
+        assert.deepEqual([...ids].sort(), [...expectedIds].sort(), `${field} ${direction}: sorting must preserve every bank exactly once`);
         const records = ids.map(id => files[latestFile].find(row => row.bankId === id));
         const value = record => field === 'name' ? record.sourceName : field === 'type' ? banks.get(record.bankId).type : record[field];
         for (let i = 1; i < records.length; i += 1) {

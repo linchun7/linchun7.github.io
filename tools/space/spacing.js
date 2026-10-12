@@ -7,7 +7,8 @@
     // URL may contain nested pairs and fullwidth punctuation.
     const urlStart = /<?[hH][tT][tT][pP][sS]?:\/\//g;
     const hardUrlBoundary = /[\s<>"`]/u;
-    const bareUrlBoundary = /[\u3000-\u303f\uff00-\uffef\u2018\u2019\u201c\u201d\u2026]/u;
+    // Unicode blocks contain letters, numbers and currency as well as punctuation.
+    const bareUrlBoundary = /(?:[\u2018\u2019\u201c\u201d\u2026]|(?=[\u3000-\u303f\uff00-\uffef])\p{P})/u;
     const hanAsciiBoundary = /(\p{Script=Han})(?=[A-Za-z0-9(\[{])|([A-Za-z0-9)\]}])(?=\p{Script=Han})/gu;
     const fenceLine = /^ {0,3}(`{3,})([^`\r\n]*)(?=\r\n|\r|\n|$)/gm;
     const spaceBoundaries = (text) => text.replace(hanAsciiBoundary, (match) => `${match} `);

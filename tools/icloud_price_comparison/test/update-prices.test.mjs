@@ -4851,3 +4851,85 @@ test('failure advice reuses existing classification without weakening severity',
   assert.match(failureNextStep({error:{},healthcheckSeverity:'transient'}), /备用任务重试/);
   assert.match(failureNextStep({error:{},healthcheckSeverity:'severe'}), /完整验收/);
 });
+
+test('restores all evidence after each persisted production write fails', async (t) => {
+  for (const failAfter of [1, 2, 3]) {
+    await t.test(`failure after persisted write ${failAfter}`, async () => {
+      const { root, paths } = await createTemporaryProductionPaths();
+      try {
+        const productionPaths = [paths.currentDataPath, paths.historyPath, paths.runLogPath];
+        const data = JSON.parse(await readFile(paths.currentDataPath, 'utf8'));
+        const changed = structuredClone(data);
+        const market = changed.countries.find(({ currency }) => currency === 'USD');
+        const tier = changed.tiers[0].id;
+        market.plans[tier].price += 0.1;
+        market.plans[tier].formattedPrice = `$${market.plans[tier].price.toFixed(2)}`;
+        const before = await Promise.all(productionPaths.map(p => readFile(p)));
+        const snapshotNames = (await readdir(paths.snapshotsDir)).sort();
+        const snapshotBytes = await Promise.all(snapshotNames.map(name => readFile(path.join(paths.snapshotsDir, name))));
+        let writes = 0;
+        await withMockedFetch({
+          html: buildAppleHtml(changed),
+          fxPayload: { result: 'success', base_code: 'USD', time_last_update_unix: recentFxTimestamp(), rates: compatibleExchangeRates(data) }
+        }, () => assert.rejects(main({
+          dryRun: false, paths, stepSummaryPath: null,
+          writeJson: async (filePath, value) => {
+            await writeJsonAtomic(filePath, value);
+            if (++writes === failAfter) throw new Error('injected post-persist write failure');
+          }
+        }), /injected post-persist write failure/));
+        assert.equal(writes, failAfter);
+        assert.deepEqual(await Promise.all(productionPaths.map(p => readFile(p))), before);
+        assert.deepEqual((await readdir(paths.snapshotsDir)).sort(), snapshotNames);
+        assert.deepEqual(await Promise.all(snapshotNames.map(name => readFile(path.join(paths.snapshotsDir, name)))), snapshotBytes);
+        await assert.rejects(readFile(defaultUpdateTransactionPath(paths.currentDataPath)), { code: 'ENOENT' });
+        await assert.rejects(readFile(defaultUpdateLockPath(paths.currentDataPath)), { code: 'ENOENT' });
+      } finally { await rm(root, { recursive: true, force: true }); }
+    });
+  }
+});
+
+test('retries an incomplete rollback before accepting any new network observation', async () => {
+  const { root, paths } = await createTemporaryProductionPaths();
+  const originalFetch = globalThis.fetch;
+  try {
+    const productionPaths = [paths.currentDataPath, paths.historyPath, paths.runLogPath];
+    const originalFiles = await Promise.all(productionPaths.map(async filePath => ({ filePath, existed: true, text: await readFile(filePath, 'utf8') })));
+    const originalSnapshotIndexText = await readFile(paths.snapshotIndexPath, 'utf8');
+    const transactionPath = defaultUpdateTransactionPath(paths.currentDataPath);
+    const createdSnapshot = path.join(paths.snapshotsDir, '2026-08-07-aaaaaaaaaaaa.json');
+    await writeFile(createdSnapshot, 'incomplete candidate', 'utf8');
+    await writeFile(transactionPath, JSON.stringify({ schemaVersion: 1, phase: 'writing', originalFiles, originalSnapshotIndexText, createdSnapshotFiles: [createdSnapshot] }), 'utf8');
+    await writeFile(paths.currentDataPath, '{"partial":true}', 'utf8');
+    await writeFile(paths.runLogPath, '{"partial":true}', 'utf8');
+    await rm(paths.historyPath);
+    await mkdir(paths.historyPath);
+    await writeFile(path.join(paths.historyPath, 'blocker'), 'restore must fail', 'utf8');
+    let fetches = 0;
+    globalThis.fetch = async () => { fetches += 1; throw new Error('must not fetch during failed recovery'); };
+    await assert.rejects(main({ dryRun: false, paths, stepSummaryPath: null }), /Unable to recover an interrupted iCloud price update/);
+    assert.equal(fetches, 0);
+    assert.equal(JSON.parse(await readFile(transactionPath, 'utf8')).phase, 'writing');
+    await assert.rejects(readFile(defaultUpdateLockPath(paths.currentDataPath)), { code: 'ENOENT' });
+    await rm(paths.historyPath, { recursive: true, force: true });
+    let clock = 0;
+    const networkBudget = createNetworkBudget({ budgetMs: 1, now: () => clock, sleep: async () => {}, createTimeoutSignal: () => undefined });
+    let atFirstFetch;
+    globalThis.fetch = async () => {
+      fetches += 1;
+      atFirstFetch = await Promise.all(productionPaths.map(p => readFile(p, 'utf8')));
+      clock = 2;
+      throw new Error('stop after recovery');
+    };
+    await assert.rejects(main({ dryRun: false, paths, stepSummaryPath: null, networkBudget }), /Network deadline exceeded/);
+    assert.equal(fetches, 1);
+    assert.deepEqual(atFirstFetch, originalFiles.map(({ text }) => text));
+    assert.deepEqual(await Promise.all(productionPaths.map(p => readFile(p, 'utf8'))), originalFiles.map(({ text }) => text));
+    assert.equal(await readFile(paths.snapshotIndexPath, 'utf8'), originalSnapshotIndexText);
+    await assert.rejects(readFile(createdSnapshot), { code: 'ENOENT' });
+    await assert.rejects(readFile(transactionPath), { code: 'ENOENT' });
+  } finally {
+    globalThis.fetch = originalFetch;
+    await rm(root, { recursive: true, force: true });
+  }
+});
