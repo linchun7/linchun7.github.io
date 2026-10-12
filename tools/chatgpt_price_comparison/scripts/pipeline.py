@@ -385,6 +385,33 @@ class RestrictedRedirect(urllib.request.HTTPRedirectHandler):
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
+def _read_response_body(response, deadline: float) -> bytes:
+    # read1 yields between body receives; read(n) may wait for many receives.
+    # Headers and chunked framing can still block inside urllib/http.client.
+    expected = response.headers.get('Content-Length')
+    try:
+        expected = int(expected) if expected is not None else None
+    except ValueError:
+        expected = None
+    if (expected is not None and expected < 0) or response.headers.get('Transfer-Encoding', '').lower() == 'chunked':
+        expected = None
+    raw = bytearray()
+    while True:
+        if time.monotonic() >= deadline:
+            raise TimeoutError('network run budget exhausted')
+        chunk = response.read1(min(64 * 1024, LIMIT + 1 - len(raw)))
+        if time.monotonic() >= deadline:
+            raise TimeoutError('network run budget exhausted')
+        if not chunk:
+            # read1 does not raise for EOF before a declared Content-Length.
+            if expected is not None and len(raw) != expected:
+                raise IncompleteRead(b'', expected - len(raw))
+            return bytes(raw)
+        raw.extend(chunk)
+        if len(raw) > LIMIT:
+            raise ValueError('response exceeds size budget')
+
+
 def fetch(url: str, *, confirm=False, deadline=float('inf')) -> str:
     if not (url == FX_URL or re.fullmatch(r'https://apps\.apple\.com/[a-z]{2}/app/chatgpt/id6448311069\?l=en-US', url)):
         raise ValueError('source URL is not allowlisted')
@@ -399,13 +426,11 @@ def fetch(url: str, *, confirm=False, deadline=float('inf')) -> str:
                 if int(response.headers.get('Age', '0')) > FRESH:
                     raise ValueError('source response is too old')
                 try:
-                    raw = response.read(LIMIT + 1)
+                    raw = _read_response_body(response, deadline)
                 except IncompleteRead as exc:
                     # Discard partial bytes; use the existing bounded retry and
                     # retained-price/FX fallback paths for interrupted bodies.
                     raise urllib.error.URLError('incomplete source response') from exc
-                if len(raw) > LIMIT:
-                    raise ValueError('response exceeds size budget')
                 return raw.decode('utf-8', errors='strict')
         except urllib.error.HTTPError as exc:
             if exc.code not in (408, 429, 500, 502, 503, 504) or attempt == 2:
