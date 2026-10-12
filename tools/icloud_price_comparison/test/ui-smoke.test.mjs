@@ -4279,3 +4279,41 @@ test(kind + ' history close still restores a replacement trigger when the origin
   } finally { await browser.close(); }
 });
 }
+
+
+for (const entry of ['country button', 'country price cell', 'publication button']) {
+  test('history opened through ' + entry + ' returns focus to its semantic trigger, not an older search focus', { timeout: 30000 }, async context => {
+    const session = await snapshotSession(context, entry + ' native focus baseline');
+    if (!session) return;
+    const { page, browser, url, errors } = session;
+    await page.route('**/data/history.json*', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }));
+    const publication = entry === 'publication button';
+    const dialogSelector = publication ? '#publishedDateDialog' : '#historyDialog';
+    const closeSelector = publication ? '#closePublishedDate' : '#closeHistory';
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded' });
+      await waitForSnapshot(page);
+      const target = publication ? page.locator('#publishedDateButton') : page.locator('.country-history-button').first();
+      await page.locator('#searchInput').focus();
+      assert.equal(await page.evaluate(() => document.activeElement?.id), 'searchInput');
+      const scrollBefore = await page.evaluate(() => ({ x: scrollX, y: scrollY }));
+      // HTMLElement.click does not itself focus a button. The price-cell entry
+      // also exercises the delegated, non-focusable row click path.
+      await page.evaluate(entry => {
+        if (entry === 'publication button') document.querySelector('#publishedDateButton').click();
+        else if (entry === 'country price cell') document.querySelector('#priceRows .price-cell').click();
+        else document.querySelector('.country-history-button').click();
+      }, entry);
+      assert.equal(await page.locator(dialogSelector).evaluate(dialog => dialog.open), true);
+      assert.deepEqual(await page.evaluate(() => ({ x: scrollX, y: scrollY })), scrollBefore, 'priming the return target must not scroll the underlying page');
+      await page.locator(closeSelector).click();
+      await page.waitForFunction(selector => !document.querySelector(selector).open, dialogSelector);
+      await page.waitForFunction(publication => {
+        const trigger = document.querySelector(publication ? '#publishedDateButton' : '.country-history-button');
+        return document.activeElement === trigger;
+      }, publication);
+      assert.equal(await target.evaluate(button => document.activeElement === button), true);
+      assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
+  });
+}

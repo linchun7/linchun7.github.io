@@ -1146,6 +1146,7 @@ function openPublishedDateHistory() {
   state.publishedDateReturnFocus = elements.publishedDateButton;
   void ensureHistoryLoaded();
   renderPublishedDateHistory();
+  state.publishedDateReturnFocus?.focus({ preventScroll: true });
   elements.publishedDateDialog.showModal();
   refreshIcons();
 }
@@ -1177,13 +1178,18 @@ function openHistory(country, returnFocus = null) {
   void ensureHistoryLoaded();
   const record = getHistoryRecord(country);
   state.activeCountry = country;
-  state.historyReturnFocus = returnFocus;
+  state.historyReturnFocus = returnFocus?.isConnected ? returnFocus
+    : [...elements.priceRows.querySelectorAll('tr[data-market-id]')]
+      .find(row => row.dataset.marketId === country.marketId)?.querySelector('.country-history-button') ?? null;
   state.historyReturnCountry = country.marketId;
   state.historyTier = state.sortTier;
   elements.historyTitle.textContent = country.nameZh || country.country;
   renderHistorySubtitle(country, record);
   renderHistoryTierButtons();
   renderHistoryContent();
+  // Row cells and programmatic clicks need not focus the semantic trigger.
+  // Prime native dialog restoration without scrolling the price table.
+  state.historyReturnFocus?.focus({ preventScroll: true });
   elements.historyDialog.showModal();
   refreshIcons();
 }
