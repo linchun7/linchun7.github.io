@@ -715,12 +715,66 @@
       tr.append(when, currency, price); el.historyRows.append(tr);
     }
   }
+  function usableDialogFocusTarget(element) {
+    if (!(element instanceof HTMLElement) || !element.isConnected
+      || element.matches(':disabled') || element.closest('[hidden], [inert]')) return false;
+    const style = getComputedStyle(element);
+    return style.display !== 'none' && style.visibility !== 'hidden' && element.getClientRects().length > 0;
+  }
+
+  function focusDialogTarget(candidates, fallback) {
+    for (const target of [...candidates, fallback]) {
+      if (!usableDialogFocusTarget(target)) continue;
+      target.focus({ preventScroll: true });
+      if (document.activeElement === target) return;
+    }
+  }
+
+  function dialogReturnFocusWasMoved(dialog) {
+    if (document.querySelector('dialog[open]')) return true;
+    const active = document.activeElement;
+    return active !== document.body && active !== document.documentElement
+      && !dialog.contains(active) && usableDialogFocusTarget(active);
+  }
+
+  function bindDialogBackdropDismiss(dialog, close) {
+    let pointerStartedOutside = false;
+    const outside = event => {
+      if (event.target !== dialog) return false;
+      const bounds = dialog.getBoundingClientRect();
+      return event.clientX < bounds.left || event.clientX > bounds.right
+        || event.clientY < bounds.top || event.clientY > bounds.bottom;
+    };
+    dialog.addEventListener('pointerdown', event => {
+      pointerStartedOutside = event.isPrimary && event.button === 0 && outside(event);
+    });
+    dialog.addEventListener('pointercancel', () => { pointerStartedOutside = false; });
+    dialog.addEventListener('click', event => {
+      const dismiss = pointerStartedOutside && outside(event);
+      pointerStartedOutside = false;
+      if (dismiss) close();
+    });
+    dialog.addEventListener('close', () => {
+      if (!dialog.open) pointerStartedOutside = false;
+    });
+  }
+
+  function handoffMinimumHistoryFocus(control, unavailable, allowFilter = true) {
+    const dialog = minimumHistoryUi.dialog;
+    if (!unavailable || !dialog?.open || document.activeElement !== control) return;
+    const filter = dialog.querySelector('select');
+    focusDialogTarget([allowFilter && filter !== control ? filter : null,
+      dialog.querySelector('#closeMinimumHistory')], null);
+  }
+
   function openHistory(market, returnFocus) {
     refreshTimeDependentUi();
     returnFocus = [...el.priceRows.querySelectorAll('tr[data-market-id]')].find(row => row.dataset.marketId === market.code)?.querySelector('.country-history-button') || returnFocus;
     state.activeMarket = market; state.historyReturnFocus = returnFocus; state.historyPlan = state.activePlan;
     el.historyTitle.textContent = market.name; el.historySubtitle.textContent = `${market.code.toUpperCase()} · ${market.currency || '—'} · 价格更新于 ${dateTime(market.last_verified_at)}`;
-    renderHistoryPlans(); renderHistory(); el.historyDialog.showModal();
+    renderHistoryPlans(); renderHistory();
+    focusDialogTarget([returnFocus], null);
+    el.historyDialog.showModal();
   }
   function restoreHistoryFocus() {
     const marketId = state.activeMarket?.code;
@@ -729,7 +783,7 @@
       .find(row => row.dataset.marketId === marketId)?.querySelector('.country-history-button');
     state.activeMarket = null;
     state.historyReturnFocus = null;
-    (original?.isConnected ? original : current || el.priceWorkspace).focus({ preventScroll: true });
+    if (!dialogReturnFocusWasMoved(el.historyDialog)) focusDialogTarget([original, current], el.priceWorkspace);
   }
   function closeHistory() {
     if (!el.historyDialog.open) return;
@@ -741,7 +795,7 @@
 
 
 
-  const minimumHistoryUi = { data: null, promise: null, status: 'idle', dialog: null, filterPlan: 'all', limit: 20 };
+  const minimumHistoryUi = { data: null, promise: null, status: 'idle', dialog: null, filterPlan: 'all', limit: 20, renderedTimeUsable: null };
   const MINIMUM_CAUSE_LABELS = {
     fx: '汇率变化',
     storefront: 'App Store 标价变化',
@@ -942,7 +996,7 @@
     function restoreFocus() {
       if (dialog.open || !minimumHistoryUi.returnFocusPending) return;
       minimumHistoryUi.returnFocusPending = false;
-      el.minimumHistoryButton?.focus({ preventScroll: true });
+      if (!dialogReturnFocusWasMoved(dialog)) focusDialogTarget([el.minimumHistoryButton], el.priceWorkspace);
     }
     function closeDialog() {
       if (!dialog.open) return;
@@ -967,7 +1021,7 @@
 
     content.append(status, list, more, note, retry);
     dialog.append(header, content);
-    dialog.addEventListener('click', (event) => { if (event.target === dialog) closeDialog(); });
+    bindDialogBackdropDismiss(dialog, closeDialog);
     dialog.addEventListener('cancel', event => { event.preventDefault(); closeDialog(); });
     dialog.addEventListener('close', restoreFocus);
     document.body.append(dialog);
@@ -1010,16 +1064,21 @@
     status.textContent = parts.join(' · ');
     status.hidden = !parts.length;
     const retry = document.querySelector('#minimumHistoryRetry');
+    handoffMinimumHistoryFocus(retry, minimumHistoryUi.status !== 'error', Boolean(h));
     retry.hidden = minimumHistoryUi.status !== 'error';
     retry.disabled = minimumHistoryUi.status === 'loading';
   }
 
   function renderMinimumHistory() {
     if (!minimumHistoryUi.dialog?.open) return;
+    const timeUsable = minimumHistoryTimeUsable(minimumHistoryUi.data);
+    minimumHistoryUi.renderedTimeUsable = timeUsable;
     renderMinimumHistoryStatus();
-    const history = minimumHistoryTimeUsable(minimumHistoryUi.data) ? minimumHistoryUi.data : null;
+    const history = timeUsable ? minimumHistoryUi.data : null;
     if (!history) {
       document.querySelector('#minimumHistoryEvents').replaceChildren();
+      handoffMinimumHistoryFocus(document.querySelector('#minimumHistoryToolbar select'), true, false);
+      handoffMinimumHistoryFocus(document.querySelector('#minimumHistoryMore'), true, false);
       document.querySelector('#minimumHistoryToolbar').hidden = true;
       document.querySelector('#minimumHistoryMore').hidden = true;
       document.querySelector('#minimumHistoryNote').hidden = true;
@@ -1064,7 +1123,9 @@
       if (event.evidence.gap) cause.title = '期间记录不连续，无法完整归因；箭头金额使用换榜时的同期证据';
       item.append(meta, change, cause); list.append(item);
     }
-    document.querySelector('#minimumHistoryMore').hidden = series.length <= minimumHistoryUi.limit;
+    const more = document.querySelector('#minimumHistoryMore');
+    handoffMinimumHistoryFocus(more, series.length <= minimumHistoryUi.limit);
+    more.hidden = series.length <= minimumHistoryUi.limit;
     document.querySelector('#minimumHistoryNote').hidden = false;
   }
 
@@ -1140,6 +1201,7 @@
     minimumHistoryUi.filterPlan = 'all';
     minimumHistoryUi.limit = 20;
     minimumHistoryUi.returnFocusPending = true;
+    focusDialogTarget([el.minimumHistoryButton], null);
     dialog.showModal();
     renderMinimumHistory();
     // A later accepted history is already sufficient for this page snapshot.
@@ -1166,6 +1228,7 @@
     document.addEventListener('keydown', (event) => {
       // Escape dismisses the dialog without changing the latest input mode.
       if (['Shift', 'Control', 'Alt', 'Meta', 'Escape'].includes(event.key)) return;
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
       delete document.documentElement.dataset.countryHistoryPointer;
     }, { capture: true });
     el.searchInput.addEventListener('input', () => { state.query = el.searchInput.value.normalize('NFKC').slice(0, 80); renderTable({ updateHeaders: false }); });
@@ -1175,7 +1238,7 @@
       if (!el.historyDialog.open && (state.activeMarket || state.historyReturnFocus)) restoreHistoryFocus();
     });
     el.historyDialog.addEventListener('cancel', event => { event.preventDefault(); closeHistory(); });
-    el.historyDialog.addEventListener('click', (event) => { if (event.target === el.historyDialog) closeHistory(); });
+    bindDialogBackdropDismiss(el.historyDialog, closeHistory);
     el.backToTableButton.addEventListener('click', () => { el.priceWorkspace.scrollIntoView({ behavior: 'smooth', block: 'start' }); el.priceWorkspace.focus({ preventScroll: true }); });
     addEventListener('scroll', () => { if (!state.scrollFrame) state.scrollFrame = requestAnimationFrame(() => { state.scrollFrame = null; backButton(); }); }, { passive: true });
     addEventListener('resize', backButton, { passive: true });
@@ -1205,7 +1268,13 @@
     el.priceWorkspace.classList.add('price-ui-ready');
     void loadIcons();
     // No background polling: interactions and tab return recheck clock validity.
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshTimeDependentUi(); });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) return;
+      // History can cross the clock boundary independently of the page snapshot.
+      if (minimumHistoryUi.dialog?.open && minimumHistoryUi.data
+        && minimumHistoryTimeUsable(minimumHistoryUi.data) !== minimumHistoryUi.renderedTimeUsable) renderMinimumHistory();
+      refreshTimeDependentUi();
+    });
   }
   start().catch((error) => { console.error(error); el.freshnessWarning.hidden = false; el.freshnessWarning.textContent = '交互功能未能启动，当前仍显示静态价格'; });
 })();

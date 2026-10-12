@@ -83,6 +83,22 @@ async function assertCountryHistoryFocus(page, { touch = false, outlineOffset })
     await assertRing(false, 'modifiers and dismissal do not start keyboard navigation');
   }
 
+  // Browser/system shortcuts alone do not start page keyboard navigation.
+  for (const shortcut of ['Control+c', 'Meta+c', 'Alt+c']) {
+    await activate(trigger);
+    await page.waitForSelector('#historyDialog[open]');
+    await page.keyboard.press(shortcut);
+    assert.equal(await page.evaluate(() => document.documentElement.hasAttribute('data-country-history-pointer')), true,
+      shortcut + ' preserves pointer presentation');
+    await page.keyboard.press('Escape');
+    await settled();
+    await assertRing(false);
+  }
+  // An ordinary non-shortcut key reveals the keyboard position even when it
+  // does not itself move focus; select typeahead/text input must not be excluded.
+  await page.keyboard.press('a');
+  await assertRing(true, 'ordinary keyboard input reveals the current focus');
+
   // A click on the country label bubbles to its semantic history button.
   // Unlike iCloud, this page does not make price cells history triggers.
   await activate(trigger.locator('.country-name'));
@@ -298,6 +314,39 @@ async function assertMinimumHistoryReuse(browser, priceData) {
         assert.equal(await page.locator('#minimumHistoryEvents').textContent(), records);
         assert.equal(await page.locator('#minimumHistoryStatus').textContent(), cutoff);
         assert.equal(await calls(), 1, 'corrected clock restores the same accepted records offline');
+        await page.bringToFront();
+        const priceDate = await page.locator('#updatedAt').textContent();
+        for (const trigger of ["visibilitychange"]) {
+          await page.locator('#minimumHistoryEvents > *').first().evaluate(node => { node.dataset.lifecycleKeep = 'true'; });
+          await page.evaluate(type => {
+            if (type === 'pageshow') window.dispatchEvent(new Event(type));
+            else document.dispatchEvent(new Event(type));
+          }, trigger);
+          assert.equal(await page.locator('[data-lifecycle-keep]').count(), 1, trigger + ': unchanged history validity retains its DOM');
+          await page.evaluate(({ now, type }) => {
+            Date.now = () => now;
+            if (type === 'pageshow') window.dispatchEvent(new Event(type));
+            else document.dispatchEvent(new Event(type));
+          }, { now: generatedAt + 60000, type: trigger });
+          assert.equal(await page.locator('#minimumHistoryDialog').evaluate(dialog => dialog.open), true);
+          assert.equal(await page.locator('#minimumHistoryEvents').textContent(), '');
+          assert.equal(await page.locator('#minimumHistoryStatus').textContent(), '记录时间异常');
+          for (const id of ['minimumHistoryToolbar', 'minimumHistoryMore', 'minimumHistoryNote']) {
+            assert.equal(await page.locator('#' + id).isHidden(), true, trigger + ': future history projection is hidden');
+          }
+          assert.equal(await page.locator('#searchInput').isEnabled(), true, 'the older page snapshot remains time-valid');
+          assert.equal(await page.locator('#updatedAt').textContent(), priceDate);
+          assert.equal(await calls(), 1, trigger + ': rollback does not fetch');
+          await page.evaluate(({ now, type }) => {
+            Date.now = () => now;
+            if (type === 'pageshow') window.dispatchEvent(new Event(type));
+            else document.dispatchEvent(new Event(type));
+          }, { now: generatedAt + 3600000, type: trigger });
+          assert.equal(await page.locator('#minimumHistoryDialog').evaluate(dialog => dialog.open), true);
+          assert.equal(await page.locator('#minimumHistoryEvents').textContent(), records);
+          assert.equal(await page.locator('#minimumHistoryStatus').textContent(), cutoff);
+          assert.equal(await calls(), 1, trigger + ': correction restores the open dialog offline');
+        }
       }
     } finally { await isolated.close(); }
   }
@@ -571,6 +620,232 @@ try {
       await assertCountryHistoryFocus(focusPage, { touch, outlineOffset: '2px' });
       assert.deepEqual(errors, []);
     } finally { await focusContext.close(); }
+  }
+
+async function assertHistoryDismissalBoundaries(page, { triggerSelector, dialogSelector, closeSelector, touch = false }) {
+  const trigger = page.locator(triggerSelector).first();
+  const dialog = page.locator(dialogSelector);
+  const activate = locator => touch ? locator.tap() : locator.click();
+  const pointClick = async (point, requireDialogTarget = false) => {
+    await page.evaluate(selector => {
+      globalThis.__historyBoundaryClick = null;
+      const dialog = document.querySelector(selector);
+      document.addEventListener('click', event => {
+        globalThis.__historyBoundaryClick = { ownTarget: event.target === dialog, inside: dialog.contains(event.target) };
+      }, { once: true, capture: true });
+    }, dialogSelector);
+    if (touch) await page.touchscreen.tap(point.x, point.y);
+    else await page.mouse.click(point.x, point.y);
+    await page.waitForFunction(() => globalThis.__historyBoundaryClick !== null);
+    const hit = await page.evaluate(() => globalThis.__historyBoundaryClick);
+    assert.equal(hit.inside, true, 'real click/tap must target this dialog or its content');
+    if (requireDialogTarget) assert.equal(hit.ownTarget, true, 'real boundary click must target the dialog element');
+  };
+  await activate(trigger);
+  await page.waitForSelector(dialogSelector + '[open]');
+  const bounds = await dialog.boundingBox();
+  assert.ok(bounds && bounds.x > 2, 'dialog leaves a real backdrop hit target');
+  const hitTargets = await dialog.evaluate(node => {
+    const box = node.getBoundingClientRect();
+    const candidates = [0.25, 0.5, 0.75].flatMap(inset => [
+      { x: box.left + inset, y: box.top + box.height / 2 },
+      { x: box.right - inset, y: box.top + box.height / 2 },
+      { x: box.left + box.width / 2, y: box.top + inset },
+      { x: box.left + box.width / 2, y: box.bottom - inset }
+    ]);
+    const border = candidates.find(point => document.elementFromPoint(point.x, point.y) === node);
+    const title = node.querySelector('h2').getBoundingClientRect();
+    const interior = { x: title.left + title.width / 2, y: title.top + title.height / 2 };
+    return { border, interior, interiorHit: node.contains(document.elementFromPoint(interior.x, interior.y)) };
+  });
+  if (!touch) assert.ok(hitTargets.border, 'the actual dialog border must supply a verified mouse hit target');
+  assert.equal(hitTargets.interiorHit, true, 'ordinary interior child is inside the dialog');
+  const inner = touch ? hitTargets.interior : hitTargets.border;
+  const outer = { x: bounds.x / 2, y: inner.y };
+  await pointClick(hitTargets.interior);
+  assert.equal(await dialog.evaluate(node => node.open), true, 'clicking ordinary dialog content must not dismiss history');
+  if (!touch) {
+    await pointClick(inner, true);
+    assert.equal(await dialog.evaluate(node => node.open), true, 'clicking the dialog own interior border must not dismiss history');
+    await page.mouse.move(inner.x, inner.y);
+    await page.mouse.down();
+    await page.mouse.move(outer.x, outer.y);
+    await page.mouse.up();
+    assert.equal(await dialog.evaluate(node => node.open), true, 'dragging from inside to outside must not dismiss');
+    await page.mouse.move(outer.x, outer.y);
+    await page.mouse.down();
+    await page.mouse.move(inner.x, inner.y);
+    await page.mouse.up();
+    assert.equal(await dialog.evaluate(node => node.open), true, 'dragging from outside to inside must not dismiss');
+  }
+  await pointClick(outer, true);
+  await page.waitForFunction(selector => !document.querySelector(selector).open, dialogSelector);
+  await page.waitForFunction(selector => document.activeElement === document.querySelector(selector), triggerSelector);
+  await activate(trigger);
+  await page.waitForSelector(dialogSelector + '[open]');
+  await page.locator(closeSelector).focus();
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(selector => !document.querySelector(selector).open, dialogSelector);
+  await page.waitForFunction(selector => document.activeElement === document.querySelector(selector), triggerSelector);
+  await page.keyboard.press('Tab');
+  assert.equal(await trigger.evaluate(node => document.activeElement === node), false, 'Tab continues after the returned trigger');
+  await page.keyboard.press('Shift+Tab');
+  assert.equal(await trigger.evaluate(node => document.activeElement === node), true, 'Shift+Tab returns to the same navigation position');
+}
+
+async function assertNativeHistoryCloseLifecycle(page, { triggerSelector, dialogSelector, closeSelector }) {
+  const trigger = page.locator(triggerSelector).first();
+  await trigger.click();
+  await page.waitForSelector(dialogSelector + '[open]');
+  await page.evaluate(async selector => {
+    const dialog = document.querySelector(selector);
+    const closed = new Promise(resolve => dialog.addEventListener('close', resolve, { once: true }));
+    dialog.close();
+    document.querySelector('#searchInput').focus();
+    await closed;
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  }, dialogSelector);
+  assert.equal(await page.evaluate(() => document.activeElement?.id), 'searchInput', 'queued close cannot steal a newer search focus');
+
+  await trigger.click();
+  await page.waitForSelector(dialogSelector + '[open]');
+  await page.evaluate(async selector => {
+    const dialog = document.querySelector(selector);
+    const closed = new Promise(resolve => dialog.addEventListener('close', resolve, { once: true }));
+    dialog.close();
+    const newer = document.createElement('dialog');
+    newer.id = 'newerHistoryFocusDialog';
+    const action = document.createElement('button');
+    action.id = 'newerHistoryFocusAction'; action.textContent = 'Newer dialog';
+    newer.append(action); document.body.append(newer); newer.showModal(); action.focus();
+    await closed;
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  }, dialogSelector);
+  assert.equal(await page.evaluate(() => document.activeElement?.id), 'newerHistoryFocusAction', 'old close cannot take focus from a newer modal');
+  await page.evaluate(() => {
+    const newer = document.querySelector('#newerHistoryFocusDialog'); newer.close(); newer.remove();
+  });
+
+  await trigger.click();
+  await page.waitForSelector(dialogSelector + '[open]');
+  await page.evaluate(async ({ selector, triggerSelector }) => {
+    const dialog = document.querySelector(selector);
+    const oldClosed = new Promise(resolve => dialog.addEventListener('close', resolve, { once: true }));
+    dialog.close();
+    document.querySelector(triggerSelector).click();
+    await oldClosed;
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  }, { selector: dialogSelector, triggerSelector });
+  assert.equal(await page.locator(dialogSelector).evaluate(dialog => dialog.open && dialog.contains(document.activeElement)), true,
+    'an older close does not clear the reopened session or take its focus');
+  await trigger.evaluate(node => {
+    const replacement = node.cloneNode(true);
+    replacement.dataset.focusReplacement = 'true';
+    node.replaceWith(replacement);
+  });
+  await page.locator(closeSelector).click();
+  await page.waitForFunction(() => document.activeElement?.dataset.focusReplacement === 'true');
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForFunction(selector => document.querySelector(selector) && !document.querySelector(selector).disabled, triggerSelector);
+  await trigger.click();
+  await page.waitForSelector(dialogSelector + '[open]');
+  await page.evaluate(async ({ triggerSelector, dialogSelector }) => {
+    const dialog = document.querySelector(dialogSelector);
+    const closed = new Promise(resolve => dialog.addEventListener('close', resolve, { once: true }));
+    document.querySelector(triggerSelector).disabled = true;
+    dialog.close();
+    await closed;
+  }, { triggerSelector, dialogSelector });
+  await page.waitForFunction(() => document.activeElement?.id === 'priceWorkspace');
+  await page.reload({ waitUntil: 'domcontentloaded' });
+}
+
+  for (const touch of [false, true]) {
+    const isolated = await browser.newContext({ viewport: { width: touch ? 390 : 1280, height: 900 }, hasTouch: touch });
+    const boundaryPage = await isolated.newPage();
+    const errors = [];
+    boundaryPage.on('pageerror', error => errors.push(error.message));
+    await boundaryPage.route('**/data/minimum-history.json*', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }));
+    try {
+      await boundaryPage.goto(url, { waitUntil: 'domcontentloaded' });
+      await boundaryPage.waitForFunction(() => !document.querySelector('#minimumHistoryButton').disabled);
+      for (const definition of [
+        { triggerSelector: '.country-history-button:not(:disabled)', dialogSelector: '#historyDialog', closeSelector: '#closeHistory' },
+        { triggerSelector: '#minimumHistoryButton', dialogSelector: '#minimumHistoryDialog', closeSelector: '#closeMinimumHistory' }
+      ]) await assertHistoryDismissalBoundaries(boundaryPage, { ...definition, touch });
+      assert.deepEqual(errors, []);
+    } finally { await isolated.close(); }
+  }
+
+  {
+    const isolated = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const lifecyclePage = await isolated.newPage();
+    await lifecyclePage.route('**/data/minimum-history.json*', route => route.fulfill({ status: 503, contentType: 'application/json', body: '{}' }));
+    try {
+      await lifecyclePage.goto(url, { waitUntil: 'domcontentloaded' });
+      for (const definition of [
+        { triggerSelector: '.country-history-button:not(:disabled)', dialogSelector: '#historyDialog', closeSelector: '#closeHistory' },
+        { triggerSelector: '#minimumHistoryButton', dialogSelector: '#minimumHistoryDialog', closeSelector: '#closeMinimumHistory' }
+      ]) {
+        await lifecyclePage.waitForFunction(() => !document.querySelector('#minimumHistoryButton').disabled);
+        await assertNativeHistoryCloseLifecycle(lifecyclePage, definition);
+      }
+    } finally { await isolated.close(); }
+  }
+
+  {
+    const isolated = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const retryPage = await isolated.newPage();
+    const history = JSON.parse(await readFile(resolve(projectDir, 'data/minimum-history.json'), 'utf8'));
+    const seed = history.events.find(event => event.kind === 'change');
+    assert.ok(seed, 'pagination fixture needs one validated change template');
+    const firstAt = Date.parse(history.first_observed_at), lastAt = Date.parse(history.checkpoint.at);
+    assert.ok(lastAt > firstAt + 30000);
+    history.events = Array.from({ length: 30 }, (_, index) => {
+      const event = structuredClone(seed);
+      delete event.comparison;
+      event.at = new Date(firstAt + Math.floor(index * (lastAt - firstAt) / 31)).toISOString();
+      event.previous_at = index === 0 ? null : new Date(firstAt + Math.floor((index - 1) * (lastAt - firstAt) / 31)).toISOString();
+      return event;
+    });
+    history.first_observed_at = history.events[0].at;
+    let calls = 0, release, announcePending;
+    await retryPage.addInitScript(now => { Date.now = () => now; }, lastAt + 3600000);
+    await retryPage.route('**/data/minimum-history.json*', async route => {
+      calls++;
+      if (calls === 1) return route.fulfill({ status: 503, contentType: 'application/json', body: '{}' });
+      const success = await new Promise(resolve => { release = resolve; announcePending?.(); });
+      return route.fulfill(success ? { json: history } : { status: 503, contentType: 'application/json', body: '{}' });
+    });
+    try {
+      await retryPage.goto(url, { waitUntil: 'domcontentloaded' });
+      await retryPage.waitForFunction(() => !document.querySelector('#minimumHistoryButton').disabled);
+      await retryPage.locator('#minimumHistoryButton').click();
+      for (const success of [false, true]) {
+        await retryPage.locator('#minimumHistoryRetry').waitFor({ state: 'visible' });
+        const pending = new Promise(resolve => { announcePending = resolve; });
+        await retryPage.locator('#minimumHistoryRetry').focus();
+        await retryPage.keyboard.press('Enter');
+        await Promise.race([pending, delay(5000).then(() => { throw Error('retry request did not start'); })]);
+        assert.equal(await retryPage.evaluate(() => document.activeElement?.id), 'closeMinimumHistory', 'pending retry hands focus to a usable dialog control');
+        assert.equal(await retryPage.locator('#minimumHistoryRetry').isHidden(), true);
+        assert.equal(await retryPage.locator('#minimumHistoryRetry').isDisabled(), true);
+        await retryPage.locator('#closeMinimumHistory').focus();
+        release(success);
+        if (success) await retryPage.waitForFunction(() => !document.querySelector('#minimumHistoryNote').hidden && !document.querySelector('#minimumHistoryRetry').disabled);
+        else await retryPage.locator('#minimumHistoryRetry').waitFor({ state: 'visible' });
+        assert.equal(await retryPage.evaluate(() => document.activeElement?.id), 'closeMinimumHistory', 'async result keeps the current dialog focus');
+      }
+      await retryPage.locator('#minimumHistoryMore').focus();
+      await retryPage.keyboard.press('Enter');
+      await retryPage.waitForFunction(() => document.querySelectorAll('#minimumHistoryEvents .minimum-history-event').length === 30);
+      assert.equal(await retryPage.locator('#minimumHistoryMore').isHidden(), true);
+      assert.equal(await retryPage.evaluate(() => document.activeElement?.id), 'minimumHistoryPlanFilter', 'last pagination batch transfers focus before hiding More');
+      await retryPage.keyboard.press('ArrowDown');
+      await retryPage.keyboard.press('g');
+      assert.equal(await retryPage.evaluate(() => document.activeElement?.id), 'minimumHistoryPlanFilter', 'ordinary select navigation/typeahead stays focused');
+      await retryPage.keyboard.press('Escape');
+    } finally { if (release) release(false); await isolated.close(); }
   }
 
   console.log(`Cross-browser smoke passed: ${browserName}`);
