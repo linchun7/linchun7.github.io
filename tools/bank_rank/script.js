@@ -12,7 +12,6 @@ let historyByBankId = new Map();
 let searchValuesByBankId = new Map();
 let selectedYear = 0;
 let sortState = { field: 'rank', direction: 'asc' };
-let lastDialogTrigger = null;
 
 const numberFormatter = new Intl.NumberFormat('zh-CN', {
   minimumFractionDigits: 2,
@@ -421,11 +420,10 @@ function formatYearRanges(history) {
   return ranges.join('、');
 }
 
-function openHistory(bankId, trigger) {
+function openHistory(bankId) {
   const bank = getBank(bankId);
   const history = historyByBankId.get(bankId) || [];
   if (!bank || !history.length) return;
-  lastDialogTrigger = trigger;
   const dialog = document.getElementById('historyDialog');
   const body = document.getElementById('historyDialogBody');
   document.getElementById('historyDialogTitle').textContent = `${bank.name} · 历年排名`;
@@ -486,7 +484,7 @@ function openHistory(bankId, trigger) {
 function bindDialog() {
   document.getElementById('bankList').addEventListener('click', event => {
     const button = event.target.closest('.bank-history-button');
-    if (button) openHistory(button.dataset.bankId, button);
+    if (button) openHistory(button.dataset.bankId);
   });
   const dialog = document.getElementById('historyDialog');
   document.getElementById('dialogClose').addEventListener('click', () => dialog.close());
@@ -518,10 +516,6 @@ function bindDialog() {
   dialog.addEventListener('click', event => {
     if (backdropPress && isBackdrop(event)) dialog.close();
     backdropPress = false;
-  });
-  dialog.addEventListener('close', () => {
-    if (lastDialogTrigger?.isConnected) lastDialogTrigger.focus();
-    lastDialogTrigger = null;
   });
 }
 

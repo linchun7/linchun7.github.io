@@ -19,6 +19,7 @@ let hospitalHistoryMap = new Map();
 let hospitalSearchMap = new Map();
 let gradeOrder = new Map();
 let currentPage = 1;
+let hospitalRenderPending = false;
 
 const sortConfig = {
     column: null,
@@ -474,6 +475,7 @@ function openHistoryDialog(hospitalId, trigger) {
 
     if (typeof dialog.showModal === 'function') dialog.showModal();
     else dialog.setAttribute('open', '');
+    body.scrollTop = 0;
 }
 
 function selectedYearBlock() {
@@ -580,7 +582,24 @@ function renderPagination(totalRecords) {
 }
 
 function displayHospitals() {
+    // Keep the native dialog return-focus target connected while it is modal.
+    if (document.getElementById('historyDialog').open) {
+        hospitalRenderPending = true;
+        return;
+    }
+    hospitalRenderPending = false;
     const hospitalList = document.getElementById('hospitalList');
+    // Preserve only focus removed by this synchronous render, including a debounce
+    // that finishes after the dialog has already returned focus to its trigger.
+    const focusedHospitalId = hospitalList.contains(document.activeElement) &&
+        document.activeElement.matches('.hospital-history-button')
+        ? document.activeElement.dataset.hospitalId : null;
+    const restoreRemovedFocus = () => {
+        if (focusedHospitalId === null) return;
+        const replacement = [...hospitalList.querySelectorAll('.hospital-history-button')]
+            .find(button => button.dataset.hospitalId === focusedHospitalId);
+        (replacement || document.getElementById('hospitalSearch')).focus({ preventScroll: true });
+    };
     const records = getFilteredData();
     updateContext(records);
     const pageRange = renderPagination(records.length);
@@ -595,6 +614,7 @@ function displayHospitals() {
         cell.textContent = '没有找到符合条件的医院数据';
         row.appendChild(cell);
         hospitalList.appendChild(row);
+        restoreRemovedFocus();
         return;
     }
 
@@ -618,6 +638,7 @@ function displayHospitals() {
         fragment.appendChild(row);
     });
     hospitalList.appendChild(fragment);
+    restoreRemovedFocus();
 }
 
 function updateSortIndicators() {
@@ -699,6 +720,11 @@ function bindEvents() {
     document.getElementById('historyDialogClose').addEventListener('click', () => dialog.close());
     dialog.addEventListener('click', event => {
         if (event.target === dialog) dialog.close();
+    });
+    dialog.addEventListener('close', () => {
+        // A queued close from an older session must not touch a reopened dialog.
+        if (dialog.open || !hospitalRenderPending) return;
+        displayHospitals();
     });
 }
 

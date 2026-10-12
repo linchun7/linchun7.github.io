@@ -63,7 +63,11 @@ function responseFor(url, {
   else if (pathname.endsWith('/style.css')) body = style;
   else if (pathname.endsWith('/vendor/lucide-subset.js')) body = lucide;
   else body = html;
-  return new Response(body, { status: 200, headers: { 'content-type': 'text/plain' } });
+  const contentType = pathname.endsWith('.json') ? 'application/json; charset=utf-8'
+    : pathname.endsWith('.css') ? 'text/css; charset=utf-8'
+      : pathname.endsWith('.js') ? 'text/javascript; charset=utf-8'
+        : 'text/html; charset=utf-8';
+  return new Response(body, { status: 200, headers: { 'content-type': contentType } });
 }
 
 const requests = [];
@@ -154,6 +158,47 @@ await assert.rejects(
   /asset content does not match version: app/
 );
 
+// The browser requires JSON MIME for its on-demand minimum-history fetch.
+// Correct bytes with an unusable MIME must never count as deployed success.
+for (const phase of ['diagnostic', 'canonical']) {
+  for (const contentType of ['text/plain', 'text/html', null]) {
+    await assert.rejects(
+      verifyOnce(data, {
+        expectedMinimumHistory: minimumHistory,
+        expectedPageRevision: pageRevision,
+        expectedAssets,
+        fetchImpl: async url => {
+          const request = new URL(String(url));
+          const response = responseFor(url);
+          const diagnostic = request.searchParams.has('verify');
+          if (request.pathname.endsWith('/data/minimum-history.json')
+              && diagnostic === (phase === 'diagnostic')) {
+            if (contentType === null) response.headers.delete('content-type');
+            else response.headers.set('content-type', contentType);
+          }
+          return response;
+        },
+        requestTimeoutMs: 1000
+      }),
+      /minimum history content type/,
+      phase + ': rejects history MIME ' + String(contentType)
+    );
+  }
+}
+// responseFor keeps the original bodies and hashes; its JSON charset parameter
+// must remain compatible with the browser's application/json check.
+assert.equal(
+  await verifyOnce(data, {
+    expectedMinimumHistory: minimumHistory,
+    expectedPageRevision: pageRevision,
+    expectedAssets,
+    fetchImpl: async url => responseFor(url),
+    requestTimeoutMs: 1000
+  }),
+  data.revision,
+  'JSON MIME with a charset parameter is accepted'
+);
+
 const bad = structuredClone(data);
 bad.generated_at = '2026-09-24T00:00:01Z';
 assert.throws(() => validateSnapshot(bad), /revision/);
@@ -194,8 +239,9 @@ await assert.rejects(
     expectedAssets,
     fetchImpl: async url => {
       const pathname = new URL(String(url)).pathname;
-      if (pathname.endsWith('/data/prices.json')) return new Response(JSON.stringify(other), { status: 200 });
-      if (pathname.endsWith('/data/minimum-history.json')) return new Response(JSON.stringify(otherMinimumHistory), { status: 200 });
+      if (pathname.endsWith('/data/prices.json') || pathname.endsWith('/data/minimum-history.json')) {
+        return responseFor(url, { prices: other, history: otherMinimumHistory });
+      }
       return responseFor(url);
     },
     requestTimeoutMs: 1000

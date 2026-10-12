@@ -1,6 +1,6 @@
 'use strict';
 
-importScripts('core.js?v=20260818-1');
+importScripts('core.js?v=3006bda7');
 
 self.onmessage = function (event) {
     if (event.data.type !== 'start') return;
