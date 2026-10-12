@@ -33,6 +33,117 @@ async function waitForServer() {
   throw new Error('local static server did not start');
 }
 
+
+async function assertCountryHistoryFocus(page, { touch = false, outlineOffset }) {
+  const trigger = page.locator('.country-history-button:not(:disabled)').first();
+  const close = page.locator('#closeHistory');
+  const activate = locator => touch ? locator.tap() : locator.click();
+  const settled = async () => {
+    await page.waitForFunction(() => !document.querySelector('#historyDialog').open
+      && document.activeElement?.matches('.country-history-button'));
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  };
+  const assertRing = async visible => {
+    const result = await trigger.evaluate(button => {
+      const style = getComputedStyle(button);
+      return { focused: document.activeElement === button, style: style.outlineStyle,
+        width: style.outlineWidth, offset: style.outlineOffset };
+    });
+    assert.equal(result.focused, true, 'closing history retains semantic trigger focus');
+    if (visible) {
+      assert.equal(result.style, 'solid', 'keyboard focus remains visibly outlined');
+      assert.equal(result.width, '2px');
+      assert.equal(result.offset, outlineOffset);
+    } else {
+      assert.equal(result.style, 'none', 'pointer return must not retain the inherited blue ring');
+    }
+  };
+
+  // A text input is deliberately focused first: its native visible focus can
+  // propagate through showModal()/close() even when the next action is a click.
+  await page.locator('#searchInput').focus();
+  for (let cycle = 0; cycle < 3; cycle += 1) {
+    await activate(trigger);
+    await page.waitForSelector('#historyDialog[open]');
+    await activate(close);
+    await settled();
+    await assertRing(false);
+  }
+
+  // A click on the country label bubbles to its semantic history button.
+  // Unlike iCloud, this page does not make price cells history triggers.
+  await activate(trigger.locator('.country-name'));
+  await page.waitForSelector('#historyDialog[open]');
+  await activate(close);
+  await settled();
+  await assertRing(false);
+
+  // The current control must regain its indicator as soon as keyboard use
+  // starts, including after an earlier pointer-only session.
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Shift+Tab');
+  await assertRing(true);
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#historyDialog[open]');
+  await page.keyboard.press('Escape');
+  await settled();
+  await assertRing(true);
+
+  await activate(trigger);
+  await page.keyboard.press('Tab');
+  assert.equal(await page.locator('#historyDialog').evaluate(dialog => dialog.contains(document.activeElement)), true);
+  await page.keyboard.press('Escape');
+  await settled();
+  await assertRing(true);
+
+  // Keyboard activation of the close button must keep a visible return ring.
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('#historyDialog[open]');
+  await close.focus();
+  await page.keyboard.press('Enter');
+  await settled();
+  await assertRing(true);
+
+  // Switching back to pointer input must not leave keyboard styling sticky.
+  await activate(trigger);
+  await activate(close);
+  await settled();
+  await assertRing(false);
+
+  // Assistive/synthetic activation may have no pointerdown or keydown. Start
+  // from text-input focus, which provides a visible native focus baseline.
+  await page.locator('#searchInput').focus();
+  await trigger.evaluate(button => button.click());
+  await page.waitForSelector('#historyDialog[open]');
+  await close.evaluate(button => button.click());
+  await settled();
+  await assertRing(true);
+
+  if (!touch) {
+    // Click the actual backdrop outside the dialog rectangle, not a rounded
+    // border corner (which has different hit testing between browser engines).
+    await trigger.click();
+    const bounds = await page.locator('#historyDialog').boundingBox();
+    assert.ok(bounds && bounds.x > 2, 'desktop dialog leaves a clickable backdrop');
+    const point = { x: bounds.x / 2, y: bounds.y + bounds.height / 2 };
+    const viewport = page.viewportSize();
+    assert.ok(viewport && point.x > 0 && point.x < viewport.width
+      && point.y > 0 && point.y < viewport.height, 'backdrop point is inside the viewport');
+    assert.ok(point.x < bounds.x, 'backdrop point is outside the dialog rectangle');
+    await page.evaluate(() => {
+      document.addEventListener('click', event => {
+        globalThis.__historyBackdropTarget = event.target.id;
+      }, { once: true, capture: true });
+    });
+    await page.mouse.click(point.x, point.y);
+    assert.equal(await page.evaluate(() => globalThis.__historyBackdropTarget), 'historyDialog',
+      'native backdrop click must target the history dialog');
+    await settled();
+    await assertRing(false);
+  }
+
+}
+
 let browser;
 try {
   await waitForServer();
@@ -284,6 +395,22 @@ try {
     } finally {
       await fallback.close();
     }
+  }
+
+
+  for (const touch of [false, true]) {
+    const focusContext = await browser.newContext({
+      viewport: { width: touch ? 390 : 1280, height: 900 }, hasTouch: touch
+    });
+    try {
+      const focusPage = await focusContext.newPage();
+      const errors = [];
+      focusPage.on('pageerror', error => errors.push(error.message));
+      await focusPage.goto(url, { waitUntil: 'domcontentloaded' });
+      await focusPage.waitForFunction(() => document.querySelector('.country-history-button:not(:disabled)'));
+      await assertCountryHistoryFocus(focusPage, { touch, outlineOffset: '2px' });
+      assert.deepEqual(errors, []);
+    } finally { await focusContext.close(); }
   }
 
   console.log(`Cross-browser smoke passed: ${browserName}`);

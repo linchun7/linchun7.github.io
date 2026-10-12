@@ -1550,6 +1550,19 @@ function restoreDialogFocusAfterClose(dialog, restore) {
 function bindEvents() {
   if (state.eventsBound) return;
   state.eventsBound = true;
+  // Native dialog/script restoration may inherit :focus-visible from the
+  // dialog. Track input only to style country triggers; never move/clear focus.
+  document.addEventListener('pointerdown', () => {
+    document.documentElement.dataset.countryHistoryPointer = 'true';
+  }, { capture: true, passive: true });
+  // Assistive activation can dispatch a click without any preceding keydown.
+  document.addEventListener('click', (event) => {
+    if (event.detail === 0) delete document.documentElement.dataset.countryHistoryPointer;
+  }, { capture: true });
+  document.addEventListener('keydown', (event) => {
+    if (['Shift', 'Control', 'Alt', 'Meta'].includes(event.key)) return;
+    delete document.documentElement.dataset.countryHistoryPointer;
+  }, { capture: true });
   // A device-clock change need not produce a lifecycle event. Guard current
   // price interactions before their handlers, without checking inside render
   // functions (which the time-safety transition itself calls).

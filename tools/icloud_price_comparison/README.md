@@ -55,3 +55,7 @@ pnpm audit --audit-level low
 汇率来自 ExchangeRate-API，认证源不可用时尝试[开放源](https://open.er-api.com/v6/latest/USD)。页面加载 GA4 和 Cloudflare Web Analytics；加载前清理搜索词及非法 URL 参数，GA4 可能写统计 Cookie。应用自身不持久化价格。
 
 本工具与 Apple Inc. 无关联。自有代码见 [LICENSE](LICENSE)，第三方归属见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+### 历史弹窗焦点提示
+
+关闭国家/地区历史弹窗后，焦点仍返回原国家按钮，保留键盘导航位置。鼠标或触摸操作不显示回焦时继承的蓝色轮廓；切换到 Tab、Enter、Escape 等键盘操作或无指针的辅助技术激活后恢复原有 `:focus-visible` 提示。样式仅作用于国家历史按钮，其他控件的焦点提示及弹窗回焦逻辑保持不变。浏览器回归同时覆盖鼠标、触摸、重复开闭和键盘切换；验收以 GitHub Actions 三浏览器结果为准。

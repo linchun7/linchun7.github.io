@@ -1136,6 +1136,19 @@
     el.backToTableButton.classList.toggle('is-visible', visible); el.backToTableButton.setAttribute('aria-hidden', String(!visible)); el.backToTableButton.tabIndex = visible ? 0 : -1;
   }
   function bind() {
+    // Native dialog/script restoration may inherit :focus-visible from the
+    // dialog. Track input only to style country triggers; never move/clear focus.
+    document.addEventListener('pointerdown', () => {
+      document.documentElement.dataset.countryHistoryPointer = 'true';
+    }, { capture: true, passive: true });
+    // Assistive activation can dispatch a click without any preceding keydown.
+    document.addEventListener('click', (event) => {
+      if (event.detail === 0) delete document.documentElement.dataset.countryHistoryPointer;
+    }, { capture: true });
+    document.addEventListener('keydown', (event) => {
+      if (['Shift', 'Control', 'Alt', 'Meta'].includes(event.key)) return;
+      delete document.documentElement.dataset.countryHistoryPointer;
+    }, { capture: true });
     el.searchInput.addEventListener('input', () => { state.query = el.searchInput.value.normalize('NFKC').slice(0, 80); renderTable({ updateHeaders: false }); });
     el.minimumHistoryButton?.addEventListener('click', openMinimumHistory);
     el.closeHistory.addEventListener('click', closeHistory);
