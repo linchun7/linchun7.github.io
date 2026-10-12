@@ -731,11 +731,13 @@ async function assertHistoryDismissalBoundaries(page, { triggerSelector, dialogS
         try {
           await page.waitForFunction(() => {
             const trace = globalThis.__historyBoundaryTrace;
-            const downIndex = trace.findIndex(event => event.type === 'pointerdown');
+            const pointerDownIndex = trace.findIndex(event => event.type === 'pointerdown');
+            const downIndex = pointerDownIndex >= 0 ? pointerDownIndex : trace.findIndex(event =>
+              event.trusted && event.type === 'mousedown' && event.button === 0);
             const down = trace[downIndex];
             const nativeStart = trace.findIndex((event, index) => index > downIndex
               && event.trusted && event.type === 'dragstart' && event.ownTarget);
-            return down && (trace.some(event => event.pointerId === down.pointerId
+            return down && (trace.some(event => down.type === 'pointerdown' && event.pointerId === down.pointerId
               && (event.type === 'pointerup' || event.type === 'pointercancel')
               || event.trusted && event.type === 'mouseup' && event.button === 0)
               || nativeStart > downIndex && trace.some((event, index) => index > nativeStart
@@ -748,8 +750,10 @@ async function assertHistoryDismissalBoundaries(page, { triggerSelector, dialogS
             + JSON.stringify(result), { cause: error });
         }
         const result = await diagnostics();
-        const down = result.events.find(event => event.type === 'pointerdown');
-        const up = result.events.find(event => event.type === 'pointerup' && event.pointerId === down?.pointerId);
+        const down = result.events.find(event => event.type === 'pointerdown')
+          || result.events.find(event => event.trusted && event.type === 'mousedown' && event.button === 0);
+        const up = down?.type === 'pointerdown'
+          ? result.events.find(event => event.type === 'pointerup' && event.pointerId === down.pointerId) : null;
         const scenario = (startOutside ? 'outside to ' : 'to outside from ') + endpoint;
         assert.equal(down?.outside, startOutside, label + ': drag start geometry ' + scenario + '\n' + JSON.stringify(result));
         if (up) {
@@ -792,6 +796,12 @@ async function assertHistoryDismissalBoundaries(page, { triggerSelector, dialogS
       : new PointerEvent('click', { bubbles: true, detail, button: 0, pointerId, ...outer }));
     const results = [];
     pointer('pointerdown'); pointer('pointercancel'); click(); results.push(['cancelled', node.open]);
+    for (const type of ['dragstart', 'dragend']) {
+      pointer('pointerdown');
+      node.dispatchEvent(new DragEvent(type, { bubbles: true, ...outer }));
+      pointer('pointerup'); click();
+      results.push([type + ' invalidates an older pointer gesture', node.open]);
+    }
     pointer('pointerdown'); pointer('pointerup', 71, inner); click();
     results.push(['inside release with outside click coordinates', node.open]);
     pointer('pointerdown'); pointer('pointerup', 72); click(); results.push(['different pointerup', node.open]);

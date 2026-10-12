@@ -758,6 +758,9 @@
       pointerGesture.endedOutside = event.isPrimary && event.button === 0 && outside(event);
     });
     dialog.addEventListener('pointercancel', reset);
+    // Native HTML dragging can suppress pointer cancellation/up in the UA.
+    dialog.addEventListener('dragstart', reset);
+    dialog.addEventListener('dragend', reset);
     dialog.addEventListener('click', event => {
       const gesture = pointerGesture;
       reset();
