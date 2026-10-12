@@ -123,9 +123,19 @@ class PendingEvidenceTests(unittest.TestCase):
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 const app = readFileSync(process.argv[1], 'utf8');
-const source = app.slice(app.indexOf('  const STATUS ='), app.indexOf('  const $ ='))
-  + app.slice(app.indexOf('  const canonical ='), app.indexOf('  const age ='))
-  + app.slice(app.indexOf('  function validateHistorySnapshot('), app.indexOf('  async function verifyRevision('))
+// Select complete top-level declarations, independent of neighboring helper names.
+// Fail explicitly if the app's declaration layout changes instead of slicing to -1.
+const declarations = [...app.matchAll(/^  (?:const|let|(?:async )?function) ([A-Za-z_$][\w$]*)(?=\s|[=(])/gm)];
+function declaration(name) {
+  const matches = declarations.filter(match => match[1] === name);
+  if (matches.length !== 1) throw new Error('Expected one app declaration: ' + name);
+  const current = matches[0];
+  const next = declarations.find(match => match.index > current.index);
+  if (!next) throw new Error('Missing app declaration boundary after: ' + name);
+  return app.slice(current.index, next.index);
+}
+const source = ['STATUS', 'canonical', 'validateHistorySnapshot', 'validate']
+  .map(declaration).join('\n')
   + '\nglobalThis.validateSnapshot = validate;';
 const context = {};
 vm.runInNewContext(source, context);
@@ -145,7 +155,9 @@ for (const value of [undefined, 'a'.repeat(64), null, true, 123, 'not-a-hash', '
         market['status'] = 'pending'
         market['pending'] = {'fingerprint': 'b' * 64, 'since': market['last_checked_at']}
         revise(data)
-        subprocess.run(['node', '--input-type=module', '-e', script, str(p.ROOT / 'app.js')], input=json.dumps(data), text=True, check=True, capture_output=True)
+        result = subprocess.run(['node', '--input-type=module', '-e', script, str(p.ROOT / 'app.js')],
+                                input=json.dumps(data), text=True, capture_output=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 
 if __name__ == '__main__':
