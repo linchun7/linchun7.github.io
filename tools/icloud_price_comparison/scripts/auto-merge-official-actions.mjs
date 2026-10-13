@@ -397,13 +397,26 @@ export function latestRequiredWorkflowState(runs, workflowName) {
     || !Number.isSafeInteger(run.run_attempt) || run.run_attempt <= 0
     || !Number.isFinite(Date.parse(run.run_started_at || run.created_at || ''))
   ))) return { ready: false, reason: `${workflowName} has invalid run metadata` };
-  // Reruns retain their run ID; order terminal results by the latest attempt.
-  const latest = matching.sort((left, right) => (
-    Date.parse(right.run_started_at || right.created_at) - Date.parse(left.run_started_at || left.created_at)
-    || right.id - left.id
-    || right.run_attempt - left.run_attempt
-  ))[0];
-  if (latest.conclusion !== 'success') return { ready: false, reason: `${workflowName} concluded ${latest.conclusion || 'without success'}` };
+  const startedAt = (run) => Date.parse(run.run_started_at || run.created_at);
+  // Duplicate snapshots of one run are ordered by attempt, not by run ID.
+  const latestById = new Map();
+  for (const run of matching) {
+    const previous = latestById.get(run.id);
+    if (!previous || run.run_attempt > previous.run_attempt) latestById.set(run.id, run);
+  }
+  if (matching.some((run) => {
+    const latest = latestById.get(run.id);
+    return run.run_attempt === latest.run_attempt
+      ? startedAt(run) !== startedAt(latest) || run.conclusion !== latest.conclusion
+      : startedAt(run) > startedAt(latest);
+  })) return { ready: false, reason: `${workflowName} has inconsistent run metadata` };
+
+  const terminalRuns = [...latestById.values()];
+  const latestStart = Math.max(...terminalRuns.map(startedAt));
+  // GitHub timestamps have second precision. Distinct run IDs cannot order
+  // tied attempts, so every terminal result in the latest group must succeed.
+  const unsuccessful = terminalRuns.find((run) => startedAt(run) === latestStart && run.conclusion !== 'success');
+  if (unsuccessful) return { ready: false, reason: `${workflowName} concluded ${unsuccessful.conclusion || 'without success'}` };
   return { ready: true, reason: `${workflowName} passed` };
 }
 
