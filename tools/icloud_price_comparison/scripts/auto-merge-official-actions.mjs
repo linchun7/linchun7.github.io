@@ -367,20 +367,42 @@ async function readPullRequestWorkflowRuns(repository, token, pullNumber, headBr
     fetchImpl
   );
   invariant(Array.isArray(payload?.workflow_runs), 'Workflow-run response is invalid');
+  invariant(
+    Number.isSafeInteger(payload.total_count)
+      && payload.total_count === payload.workflow_runs.length
+      && payload.workflow_runs.length <= MAX_WORKFLOW_RUNS,
+    'Workflow-run list is incomplete'
+  );
+  invariant(
+    payload.workflow_runs.every((run) => Array.isArray(run?.pull_requests)),
+    'Workflow-run PR associations are invalid'
+  );
   return payload.workflow_runs.filter((run) => {
     if (run?.head_sha !== headSha || run?.event !== 'pull_request') return false;
-    const pullRequests = Array.isArray(run.pull_requests) ? run.pull_requests : [];
-    if (pullRequests.length > 0) return pullRequests.some(({ number }) => Number(number) === pullNumber);
+    if (run.head_repository?.full_name?.toLowerCase() !== repository.toLowerCase()) return false;
+    const pullRequests = run.pull_requests;
+    if (pullRequests.length > 0) return pullRequests.some((pr) => pr?.number === pullNumber);
     return run.head_branch === headBranch;
   });
 }
 
 export function latestRequiredWorkflowState(runs, workflowName) {
-  const latest = runs
-    .filter(({ name }) => name === workflowName)
-    .sort((left, right) => Number(right.id || 0) - Number(left.id || 0))[0];
-  if (!latest) return { ready: false, reason: `waiting for ${workflowName}` };
-  if (latest.status !== 'completed') return { ready: false, reason: `${workflowName} is ${latest.status || 'pending'}` };
+  const matching = runs.filter(({ name }) => name === workflowName);
+  if (matching.length === 0) return { ready: false, reason: `waiting for ${workflowName}` };
+  // A queued rerun can still carry its previous attempt's start time.
+  const active = matching.find(({ status }) => status !== 'completed');
+  if (active) return { ready: false, reason: `${workflowName} is ${active.status || 'pending'}` };
+  if (matching.some((run) => (
+    !Number.isSafeInteger(run.id) || run.id <= 0
+    || !Number.isSafeInteger(run.run_attempt) || run.run_attempt <= 0
+    || !Number.isFinite(Date.parse(run.run_started_at || run.created_at || ''))
+  ))) return { ready: false, reason: `${workflowName} has invalid run metadata` };
+  // Reruns retain their run ID; order terminal results by the latest attempt.
+  const latest = matching.sort((left, right) => (
+    Date.parse(right.run_started_at || right.created_at) - Date.parse(left.run_started_at || left.created_at)
+    || right.id - left.id
+    || right.run_attempt - left.run_attempt
+  ))[0];
   if (latest.conclusion !== 'success') return { ready: false, reason: `${workflowName} concluded ${latest.conclusion || 'without success'}` };
   return { ready: true, reason: `${workflowName} passed` };
 }
@@ -439,31 +461,13 @@ export async function main(env = process.env, fetchImpl = fetch, log = console.l
 
   let summary;
   let commitTitle;
+  let requiredWorkflows;
   if (scope.kind === 'github-actions') {
-    const requiredWorkflows = requiredActionValidationWorkflows(files);
+    requiredWorkflows = requiredActionValidationWorkflows(files);
     invariant(
       requiredWorkflows.includes(validationWorkflow),
       `GitHub Actions update was triggered by unrelated workflow ${validationWorkflow}`
     );
-    const otherRequiredWorkflows = requiredWorkflows.filter((name) => name !== validationWorkflow);
-    if (otherRequiredWorkflows.length > 0) {
-      const workflowRuns = await readPullRequestWorkflowRuns(
-        repository,
-        token,
-        pullNumber,
-        pullRequest.head?.ref,
-        headSha,
-        fetchImpl
-      );
-      for (const workflowName of otherRequiredWorkflows) {
-        const state = latestRequiredWorkflowState(workflowRuns, workflowName);
-        if (!state.ready) {
-          log(`Dependabot PR #${pullNumber} not merged: ${state.reason}.`);
-          return;
-        }
-      }
-    }
-
     const referenceCount = validateChangedFiles(files);
     const actionReferences = collectNewActionReferences(files);
     await verifyActionReferences(actionReferences, runGit);
@@ -471,6 +475,7 @@ export async function main(env = process.env, fetchImpl = fetch, log = console.l
     commitTitle = 'chore: update official GitHub Action (#' + pullNumber + ')';
   } else {
     const profile = scope.npmProfile;
+    requiredWorkflows = [profile.validationWorkflow];
     const packageFileChanged = validateNpmChangedFilesForProfile(files, profile);
     const [basePackage, headPackage] = await Promise.all([
       readJsonAtRef(repository, token, profile.packagePath, baseSha, fetchImpl),
@@ -488,6 +493,35 @@ export async function main(env = process.env, fetchImpl = fetch, log = console.l
       summary = 'one lockfile-only transitive npm dependency update';
     }
     commitTitle = `chore: update ${profile.commitLabel} (#${pullNumber})`;
+  }
+
+  const currentPullRequest = await githubRequest(repository, token, '/pulls/' + pullNumber, {}, fetchImpl);
+  if (currentPullRequest.state !== 'open' || currentPullRequest.head?.sha !== headSha) {
+    log(`Dependabot PR #${pullNumber} changed after validation; ignoring superseded validation.`);
+    return;
+  }
+  validatePullRequestIdentity(currentPullRequest, { repository, defaultBranch, headSha });
+  invariant(currentPullRequest.head?.ref === pullRequest.head?.ref, 'Head branch changed after validation');
+  if (currentPullRequest.base?.sha !== baseSha) {
+    await updatePullRequestBranch(repository, token, pullNumber, headSha, fetchImpl);
+    log(`Updated Dependabot PR #${pullNumber} onto latest ${defaultBranch}; waiting for fresh validation.`);
+    return;
+  }
+
+  const workflowRuns = await readPullRequestWorkflowRuns(
+    repository,
+    token,
+    pullNumber,
+    currentPullRequest.head.ref,
+    headSha,
+    fetchImpl
+  );
+  for (const workflowName of requiredWorkflows) {
+    const state = latestRequiredWorkflowState(workflowRuns, workflowName);
+    if (!state.ready) {
+      log(`Dependabot PR #${pullNumber} not merged: ${state.reason}.`);
+      return;
+    }
   }
 
   const result = await githubRequest(repository, token, '/pulls/' + pullNumber + '/merge', {
