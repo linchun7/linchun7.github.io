@@ -551,3 +551,82 @@ test('updates a base that moves during release verification and waits for fresh 
   assert.deepEqual(JSON.parse(result.updated.options.body), { expected_head_sha: HEAD_SHA });
   assert.match(result.messages.join('\n'), /waiting for fresh validation/);
 });
+
+test('blocks ambiguous terminal results at the latest second regardless of run ID or list order', () => {
+  const name = 'Validate Action artifact roundtrip';
+  const success = workflowRun(name, { id: 101, run_started_at: '2026-10-13T06:00:00Z' });
+  const states = [];
+  for (const conclusion of ['failure', 'cancelled', 'timed_out', 'action_required', 'neutral', 'skipped', null]) {
+    const rerun = workflowRun(name, { id: 100, run_attempt: 2, run_started_at: success.run_started_at, conclusion });
+    for (const runs of [[success, rerun], [rerun, success]]) {
+      states.push(latestRequiredWorkflowState(runs, name).ready);
+    }
+  }
+  assert.deepEqual(states, Array(states.length).fill(false));
+});
+
+test('allows all-success timestamp ties and recovery after an earlier terminal failure', () => {
+  const name = 'Validate Action artifact roundtrip';
+  const failed = workflowRun(name, { id: 100, run_attempt: 2, run_started_at: '2026-10-13T06:00:00Z', conclusion: 'failure' });
+  const success = workflowRun(name, { id: 101, run_started_at: failed.run_started_at });
+  const fresh = workflowRun(name, { id: 99, run_started_at: '2026-10-13T07:00:00Z' });
+  for (const runs of [
+    [success, { ...failed, conclusion: 'success' }],
+    [{ ...failed, run_started_at: '2026-10-13T05:00:00Z' }, success, { ...success, id: 102 }],
+    [failed, success, fresh],
+    [failed, { ...failed, run_attempt: 3, conclusion: 'success' }, success],
+  ]) {
+    for (const order of [runs, [...runs].reverse()]) {
+      assert.equal(latestRequiredWorkflowState(order, name).ready, true);
+    }
+  }
+});
+
+test('rejects contradictory latest-attempt metadata instead of choosing a duplicate by list order', () => {
+  const name = 'Validate Action artifact roundtrip';
+  const success = workflowRun(name, { id: 101, run_started_at: '2026-10-13T06:00:00Z' });
+  const rerun = workflowRun(name, { id: 100, run_attempt: 2, run_started_at: success.run_started_at });
+  const results = [];
+  for (const duplicates of [
+    [rerun, { ...rerun, conclusion: 'failure' }],
+    [rerun, { ...rerun, run_started_at: '2026-10-13T07:00:00Z' }],
+    [{ ...rerun, run_attempt: 1 }, { ...rerun, run_started_at: '2026-10-13T05:00:00Z', conclusion: 'failure' }],
+  ]) {
+    const runs = [success, ...duplicates];
+    for (const order of [runs, [...runs].reverse()]) {
+      results.push(latestRequiredWorkflowState(order, name).ready);
+    }
+  }
+  assert.deepEqual(results, Array(results.length).fill(false));
+});
+
+test('full artifact merge gate blocks tied failures and inconsistent attempts, then permits recovery', async () => {
+  const name = 'Validate Action artifact roundtrip';
+  const file = validWorkflowChange();
+  file.patch = file.patch.replaceAll('actions/checkout', 'actions/upload-artifact');
+  const success = workflowRun(name, { id: 101, run_started_at: '2026-10-13T06:00:00Z' });
+  const failed = workflowRun(name, { id: 100, run_attempt: 2, run_started_at: success.run_started_at, conclusion: 'failure' });
+  const scenarios = [
+    { runs: [success, failed], merged: false },
+    { runs: [success, { ...failed, conclusion: 'cancelled' }], merged: false },
+    { runs: [success, { ...failed, conclusion: null }], merged: false },
+    { runs: [success, failed, { ...failed, conclusion: 'success' }], merged: false },
+    { runs: [success, { ...failed, conclusion: 'success' }], merged: true },
+    { runs: [success, { ...failed, run_started_at: '2026-10-13T05:00:00Z' }], merged: true },
+    { runs: [success, failed, workflowRun(name, { id: 99, run_started_at: '2026-10-13T07:00:00Z' })], merged: true },
+    { runs: [success, failed, { ...failed, run_attempt: 3, conclusion: 'success' }], merged: true },
+  ];
+  const actual = [];
+  const expected = [];
+  for (const trigger of [ICLOUD_WORKFLOW, name]) {
+    for (const scenario of scenarios) {
+      for (const order of [scenario.runs, [...scenario.runs].reverse()]) {
+        const result = await actionGateProbe({ files: [file], trigger, runs: [workflowRun(ICLOUD_WORKFLOW, { id: 200 }), ...order] });
+        assert.equal(result.error, undefined);
+        actual.push(result.merged);
+        expected.push(scenario.merged);
+      }
+    }
+  }
+  assert.deepEqual(actual, expected);
+});
