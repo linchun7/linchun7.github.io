@@ -139,6 +139,27 @@ function env(validationWorkflow) {
   };
 }
 
+function runResponse(pullRequest, name, overrides = {}) {
+  return Response.json({
+    total_count: 1,
+    workflow_runs: [{
+      id: 100,
+      name,
+      run_attempt: 1,
+      created_at: '2026-10-13T04:00:00Z',
+      run_started_at: '2026-10-13T04:00:00Z',
+      head_sha: HEAD_SHA,
+      head_branch: pullRequest.head.ref,
+      head_repository: { full_name: 'owner/repository' },
+      event: 'pull_request',
+      status: 'completed',
+      conclusion: 'success',
+      pull_requests: [{ number: 42 }],
+      ...overrides,
+    }],
+  });
+}
+
 test('accepts only the matching iCloud and static-browser Dependabot npm scopes', () => {
   assert.doesNotThrow(() => validateNpmPullRequest(validIcloudPullRequest(), expectedPullRequest()));
   assert.doesNotThrow(() => validateStaticBrowserNpmPullRequest(validStaticPullRequest(), expectedPullRequest()));
@@ -202,6 +223,7 @@ test('auto-merges one fully validated iCloud major dependency update at the exac
   const fetchImpl = async (url, options) => {
     requests.push({ url, options });
     if (url.endsWith('/pulls/42')) return Response.json(pullRequest);
+    if (url.includes('/actions/runs?')) return runResponse(pullRequest, ICLOUD_WORKFLOW);
     if (url.includes('/pulls/42/files?')) return Response.json(icloudDirectChangedFiles());
     if (url.includes('/contents/' + ICLOUD_PACKAGE_PATH + '?ref=' + BASE_SHA)) return Response.json(asContent(baseIcloudPackage()));
     if (url.includes('/contents/' + ICLOUD_PACKAGE_PATH + '?ref=' + HEAD_SHA)) return Response.json(asContent(singleIcloudUpdate('2.0.0')));
@@ -217,7 +239,7 @@ test('auto-merges one fully validated iCloud major dependency update at the exac
   };
 
   await main(env(ICLOUD_WORKFLOW), fetchImpl, () => {});
-  assert.equal(requests.length, 5);
+  assert.equal(requests.length, 7);
   assert.ok(requests.every(({ options }) => options.headers.Authorization === 'Bearer test-token'));
   assert.ok(requests.every(({ options }) => options.redirect === 'error'));
 });
@@ -228,6 +250,7 @@ test('still accepts a fully validated iCloud lockfile-only transitive update', a
   const fetchImpl = async (url, options) => {
     requests.push({ url, options });
     if (url.endsWith('/pulls/42')) return Response.json(pullRequest);
+    if (url.includes('/actions/runs?')) return runResponse(pullRequest, ICLOUD_WORKFLOW);
     if (url.includes('/pulls/42/files?')) return Response.json(icloudLockOnlyChangedFiles());
     if (url.includes('/contents/' + ICLOUD_PACKAGE_PATH + '?ref=' + BASE_SHA)) return Response.json(asContent(baseIcloudPackage()));
     if (url.includes('/contents/' + ICLOUD_PACKAGE_PATH + '?ref=' + HEAD_SHA)) return Response.json(asContent(baseIcloudPackage()));
@@ -236,7 +259,7 @@ test('still accepts a fully validated iCloud lockfile-only transitive update', a
   };
 
   await main(env(ICLOUD_WORKFLOW), fetchImpl, () => {});
-  assert.equal(requests.length, 5);
+  assert.equal(requests.length, 7);
 });
 
 test('refuses a grouped iCloud PR so one broken dependency cannot block or ride with another', async () => {
@@ -290,6 +313,7 @@ test('auto-merges a Playwright major only after the static three-browser validat
   const fetchImpl = async (url, options) => {
     requests.push({ url, options });
     if (url.endsWith('/pulls/42')) return Response.json(pullRequest);
+    if (url.includes('/actions/runs?')) return runResponse(pullRequest, STATIC_WORKFLOW);
     if (url.includes('/pulls/42/files?')) return Response.json(staticChangedFiles());
     if (url.includes('/contents/' + STATIC_PACKAGE_PATH + '?ref=' + BASE_SHA)) return Response.json(asContent(baseStaticPackage()));
     if (url.includes('/contents/' + STATIC_PACKAGE_PATH + '?ref=' + HEAD_SHA)) return Response.json(asContent(staticPlaywrightUpdate()));
@@ -303,7 +327,7 @@ test('auto-merges a Playwright major only after the static three-browser validat
   };
 
   await main(env(STATIC_WORKFLOW), fetchImpl, () => {});
-  assert.equal(requests.length, 5);
+  assert.equal(requests.length, 7);
 
   const wrongWorkflowFetch = async (url) => {
     if (url.endsWith('/pulls/42')) return Response.json(pullRequest);
@@ -314,3 +338,43 @@ test('auto-merges a Playwright major only after the static three-browser validat
     /cannot be handled by Validate iCloud price comparison/
   );
 });
+
+test('rechecks the latest exact-head npm validation for both approved profiles before merging', async () => {
+  for (const { pullRequest, workflow, files, packagePath, base, head } of [
+    { pullRequest: validIcloudPullRequest(), workflow: ICLOUD_WORKFLOW, files: icloudDirectChangedFiles(), packagePath: ICLOUD_PACKAGE_PATH, base: baseIcloudPackage(), head: singleIcloudUpdate() },
+    { pullRequest: validStaticPullRequest(), workflow: STATIC_WORKFLOW, files: staticChangedFiles(), packagePath: STATIC_PACKAGE_PATH, base: baseStaticPackage(), head: staticPlaywrightUpdate() },
+  ]) {
+    for (const overrides of [
+      { status: 'queued', conclusion: null },
+      { status: 'in_progress', conclusion: null },
+      { conclusion: 'failure' },
+      { conclusion: 'cancelled' },
+      { head_sha: 'e'.repeat(40) },
+      { event: 'push' },
+      { pull_requests: [{ number: 43 }] },
+      { pull_requests: [], head_repository: { full_name: 'foreign/fork' } },
+    ]) {
+      let merged = false;
+      let headRead = false;
+      const messages = [];
+      await main(env(workflow), async (url) => {
+        if (url.endsWith('/pulls/42')) return Response.json({ ...pullRequest, changed_files: files.length });
+        if (url.includes('/pulls/42/files?')) return Response.json(files);
+        if (url.includes('/contents/' + packagePath + '?ref=' + BASE_SHA)) return Response.json(asContent(base));
+        if (url.includes('/contents/' + packagePath + '?ref=' + HEAD_SHA)) {
+          headRead = true;
+          return Response.json(asContent(head));
+        }
+        if (url.includes('/actions/runs?')) {
+          assert.equal(headRead, true, 'npm gate must follow manifest validation');
+          return runResponse(pullRequest, workflow, overrides);
+        }
+        if (url.endsWith('/pulls/42/merge')) { merged = true; return Response.json({ merged: true }); }
+        return Response.json({ message: 'unexpected request' }, { status: 404 });
+      }, (message) => messages.push(message));
+      assert.equal(merged, false, workflow + JSON.stringify(overrides));
+      assert.match(messages.join('\n'), /not merged/);
+    }
+  }
+});
+

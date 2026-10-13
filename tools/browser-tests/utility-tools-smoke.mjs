@@ -113,7 +113,7 @@ async function testSpaceTool() {
     const { context, page, pageErrors } = await createPage();
     await page.goto(`${baseUrl}/tools/space/`, { waitUntil: 'domcontentloaded' });
 
-    assert.equal(await page.locator('script[src="spacing.js?v=20261012-url-unicode"]').count(), 1, 'space tool should use its content-preserving helper');
+    assert.equal(await page.locator('script[src="spacing.js?v=20261013-url-parentheses"]').count(), 1, 'space tool should use its content-preserving helper');
     assert.equal(await page.locator('script[src="dist/browser/pangu.min.js"]').count(), 0, 'space UI should not depend on Pangu punctuation normalization');
     // Bound the regression inputs: enough unmatched delimiters to expose rescanning,
     // while keeping the test independent of a microbenchmark or unbounded input.
@@ -123,6 +123,11 @@ async function testSpaceTool() {
     const unclosedUrlExpected = `https://example.com/${'（'.repeat(20000)}中文 ABC，正文 DEF。\n继续 XYZ`;
     const repeatedUnclosedUrls = 'https://example.com/目录（中文ABC，正文DEF。\n'.repeat(3000);
     const repeatedUnclosedUrlsExpected = 'https://example.com/目录（中文 ABC，正文 DEF。\n'.repeat(3000);
+    const nestedAsciiUrl = `(https://example.com/${'('.repeat(20000)}中文ABC${')'.repeat(20000)})后文DEF`;
+    const nestedAsciiUrlExpected = `(https://example.com/${'('.repeat(20000)}中文ABC${')'.repeat(20000)}) 后文 DEF`;
+    const repeatedOuterUrls = '(https://example.com/a(b)c)后文DEF\n'.repeat(3000);
+    const repeatedOuterUrlsExpected = '(https://example.com/a(b)c) 后文 DEF\n'.repeat(3000);
+    const crossedParenthesisUrl = `https://example.com/${'（('.repeat(10000)}中文ABC${'）)'.repeat(10000)}尾XYZ`;
     const unmatchedInlineRuns = Array.from({ length: 600 }, (_, index) => '`'.repeat(index + 1));
     const withSpacingDeadline = async (operation, label) => {
         let timeout;
@@ -180,6 +185,20 @@ async function testSpaceTool() {
         ["访问HTTP://example.com/中文ABC?q=测试123，继续ABC", "访问 HTTP://example.com/中文ABC?q=测试123，继续 ABC"],
         ["访问HTTPS://example.com/中文ABC?q=测试123，继续ABC", "访问 HTTPS://example.com/中文ABC?q=测试123，继续 ABC"],
         ["前文ABC HtTpS://example.com/目录ABC?key=中文123&next=路Z，后文XYZ", "前文 ABC HtTpS://example.com/目录ABC?key=中文123&next=路Z，后文 XYZ"],
+        // ASCII prose/Markdown closers are outside the bare target; internal pairs stay exact.
+        ["(https://example.com)中文ABC", "(https://example.com) 中文 ABC"],
+        ["中文(https://example.com/中文ABC)后文DEF", "中文 (https://example.com/中文ABC) 后文 DEF"],
+        ["中文[链接](https://example.com/中文ABC)后文DEF", "中文 [链接](https://example.com/中文ABC) 后文 DEF"],
+        ["((HTTPS://example.com/a(b)c))后文DEF", "((HTTPS://example.com/a(b)c)) 后文 DEF"],
+        ["https://example.com/a(b)c", "https://example.com/a(b)c"],
+        ["https://example.com/a(b(c)d)e?x=(中文ABC)", "https://example.com/a(b(c)d)e?x=(中文ABC)"],
+        ["(https://example.com/目录（中文ABC）)后文DEF", "(https://example.com/目录（中文ABC）) 后文 DEF"],
+        ["https://example.com/a（(中文ABC）)d中文XYZ", "https://example.com/a（(中文ABC）)d中文XYZ"],
+        ["(https://example.com/a（(中文ABC）)d中文XYZ)后文DEF", "(https://example.com/a（(中文ABC）)d中文XYZ) 后文 DEF"],
+        ["(https://example.com/a(（中文ABC)）d中文XYZ)后文DEF", "(https://example.com/a(（中文ABC)）d中文XYZ) 后文 DEF"],
+        ["<https://example.com/a)中文ABC>", "<https://example.com/a)中文ABC>"],
+        ["中文`(https://example.com)中文ABC`后文DEF", "中文`(https://example.com)中文ABC`后文 DEF"],
+        ["```text\n(https://example.com)中文ABC\n```\n后文DEF", "```text\n(https://example.com)中文ABC\n```\n后文 DEF"],
         // Fullwidth parentheses are legitimate URL path/query characters.
         ["<https://example.com/目录（中文ABC）>", "<https://example.com/目录（中文ABC）>"],
         ["https://example.com/目录（中文ABC）", "https://example.com/目录（中文ABC）"],
@@ -231,6 +250,9 @@ async function testSpaceTool() {
         ["𠀀A中B", "𠀀 A 中 B"],
         ["中文(https://example.com/中文ABC)，继续123", "中文 (https://example.com/中文ABC)，继续 123"],
         [nestedUrl, nestedUrl],
+        [nestedAsciiUrl, nestedAsciiUrlExpected],
+        [crossedParenthesisUrl, crossedParenthesisUrl],
+        [repeatedOuterUrls, repeatedOuterUrlsExpected],
         [unclosedUrl, unclosedUrlExpected],
         [repeatedUnclosedUrls, repeatedUnclosedUrlsExpected],
         [`${unmatchedFenceInput}中文ABC`, `${unmatchedFenceInput}中文 ABC`],

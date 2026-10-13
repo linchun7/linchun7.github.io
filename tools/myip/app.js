@@ -53,6 +53,7 @@
         if (a === 100 && b >= 64 && b <= 127) return false;
         if (a === 169 && b === 254) return false;
         if (a === 172 && b >= 16 && b <= 31) return false;
+        if (a === 192 && b === 88 && c === 99 && parts[3] === 2) return false;
         if (a === 192 && b === 168) return false;
         if (a === 192 && b === 0 && c === 0) return false;
         if (a === 192 && b === 0 && c === 2) return false;
@@ -69,6 +70,29 @@
         if (text.startsWith('fc') || text.startsWith('fd')) return false;
         if (/^fe[89ab]/.test(text) || text.startsWith('ff')) return false;
         if (text.startsWith('2001:db8:') || text.startsWith('::ffff:')) return false;
+        // Match the exact special-purpose prefixes, independent of compression.
+        // Do not reject adjacent allocations or global exceptions in 2001::/23.
+        const [head, tail = ''] = text.split('::');
+        const leading = head ? head.split(':').map((part) => parseInt(part, 16)) : [];
+        const trailing = tail ? tail.split(':').map((part) => parseInt(part, 16)) : [];
+        const parts = [...leading, ...Array(8 - leading.length - trailing.length).fill(0), ...trailing];
+        if (parts[0] === 0x100 && parts[1] === 0 && parts[2] === 0 && parts[3] === 0) return false; // 100::/64 discard-only
+        if (parts[0] === 0x2001 && parts[1] === 2 && parts[2] === 0) return false; // 2001:2::/48 benchmarking
+        if (parts[0] === 0x3fff && parts[1] < 0x1000) return false; // 3fff::/20 documentation
+        if (parts[0] === 0x64 && parts[1] === 0xff9b && parts[2] === 1) return false; // 64:ff9b:1::/48 local translation
+        if (parts[0] === 0x100 && parts[1] === 0 && parts[2] === 0 && parts[3] === 1) return false; // 100:0:0:1::/64 dummy
+        if (parts[0] === 0x5f00) return false; // 5f00::/16 SRv6 SIDs
+        // 2001::/23 is non-global except for its more-specific allocations.
+        // Keep Teredo's existing N/A policy; allow only the listed global exceptions.
+        if (parts[0] === 0x2001 && parts[1] < 0x200) {
+            const protocolAssignmentAllowed = parts[1] === 0 // 2001::/32 Teredo
+                || (parts[1] === 1 && parts.slice(2, 7).every((part) => part === 0) && parts[7] >= 1 && parts[7] <= 3) // three /128 anycasts
+                || parts[1] === 3 // 2001:3::/32 AMT
+                || (parts[1] === 4 && parts[2] === 0x112) // 2001:4:112::/48 AS112
+                || (parts[1] >= 0x20 && parts[1] < 0x30) // 2001:20::/28 ORCHIDv2
+                || (parts[1] >= 0x30 && parts[1] < 0x40); // 2001:30::/28 DETs
+            if (!protocolAssignmentAllowed) return false;
+        }
         return true;
     }
 

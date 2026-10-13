@@ -36,13 +36,28 @@
 
     function bareUrlEnd(text, start, pairs) {
         let end = start;
+        let asciiParenthesisDepth = 0;
         while (end < text.length) {
             const character = text[end];
             if (hardUrlBoundary.test(character)) break;
+            // A closing prose/Markdown parenthesis cannot belong to this URL.
+            // Balanced ASCII pairs inside its path/query remain byte-identical.
+            if (character === '(') asciiParenthesisDepth += 1;
+            else if (character === ')') {
+                if (asciiParenthesisDepth === 0) break;
+                asciiParenthesisDepth -= 1;
+            }
             if (character === '（') {
                 const closing = pairs.get(end);
                 // Do not hide prose following an unclosed URL parenthesis.
                 if (closing === undefined) break;
+                // A fullwidth group can cross an ASCII pair. Count its ASCII
+                // delimiters while preserving all content in the group. Each
+                // jumped group is disjoint, so this is still a linear scan.
+                for (let i = end + 1; i < closing; i++) {
+                    if (text[i] === '(') asciiParenthesisDepth += 1;
+                    else if (text[i] === ')' && asciiParenthesisDepth > 0) asciiParenthesisDepth -= 1;
+                }
                 end = closing + 1;
             } else {
                 if (bareUrlBoundary.test(character)) break;
