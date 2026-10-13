@@ -551,4 +551,3 @@ test('updates a base that moves during release verification and waits for fresh 
   assert.deepEqual(JSON.parse(result.updated.options.body), { expected_head_sha: HEAD_SHA });
   assert.match(result.messages.join('\n'), /waiting for fresh validation/);
 });
-

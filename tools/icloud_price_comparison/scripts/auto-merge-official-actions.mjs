@@ -552,4 +552,3 @@ if (isDirectRun) {
     process.exitCode = 1;
   });
 }
-
