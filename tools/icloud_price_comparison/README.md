@@ -51,6 +51,9 @@ pnpm audit --audit-level low
 
 定向生成/检查：`pnpm render:static`、`pnpm render:static:check`、`pnpm assets:update`、`pnpm assets:check`。日更使用锁定 Playwright 配套 Chromium。`pnpm check:live` 为只读在线诊断，`pnpm update:data` 会写数据，不用于试探排障。
 
+
+上传工件使用固定 SHA 的 actions/upload-artifact v7.0.2，沿用原工件名称、保留期和发布范围。
+
 ## 来源、隐私与许可
 
 汇率来自 ExchangeRate-API，认证源不可用时尝试[开放源](https://open.er-api.com/v6/latest/USD)。页面加载 GA4 和 Cloudflare Web Analytics；加载前清理搜索词及非法 URL 参数，GA4 可能写统计 Cookie。
