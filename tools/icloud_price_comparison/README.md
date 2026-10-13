@@ -27,6 +27,9 @@
 
 `index.html` 为生成产物。`seoProjection()` 维护 `ICLOUD_STATIC_*` markers 外的 SEO Projection，不直接改生成结果；JS/CSS 变化用内容哈希更新资源版本。关键契约、生成器或发布规则变化需同步本说明及 OPERATIONS。
 
+
+下载工件使用固定 SHA 的 actions/download-artifact v8.0.2，改善限流重试；下载后仍须通过工件完整性与发布校验。
+
 ## 更新与验证
 
 - [更新价格](../../.github/workflows/update-icloud-prices.yml)：Cloudflare 主触发约北京时间 08:05，GitHub 08:10 兜底；手动选择 main
