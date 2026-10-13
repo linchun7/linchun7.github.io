@@ -61,6 +61,9 @@ GITHUB_TOKEN 发布数据提交不会再触发普通 push 验证，updater 必�
 
 HTTP 基线：Referrer-Policy: origin、X-Content-Type-Options: nosniff、X-Frame-Options: DENY；Permissions-Policy 禁用摄像头/麦克风/定位/支付/USB；HSTS max-age=31536000; includeSubDomains; preload。保持 HTTPS、最低 TLS 1.2、有效证书及 DNSSEC 链，控制面变化单独核验。
 
+
+setup-node 同 major 升级保留显式 Node.js 22 与锁定 pnpm；验收核心、工件及三浏览器，网络失败单独诊断。
+
 ## 依赖与归属
 
 Dependabot 每周一北京时间 10:20（iCloud npm）、11:20（共享浏览器 Playwright）、12:20（Actions）错峰检查，保持独立 PR。npm 精确稳定版本 major/minor/patch 在严格文件范围及完整测试通过后可自动合并；Playwright 验证 Chromium/Firefox/WebKit。官方 Action 仅同 major 精确 SHA 向前升级可自动合并，Action major 更新和第三方 Action 人工复核。
