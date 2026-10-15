@@ -270,8 +270,8 @@ export async function main() {
                     const navigate = page[method].bind(page);
                     page[method] = async (...args) => {
                         await drain();
-                        const options = { ...(method === 'goto' ? args[1] : args[0]), waitUntil: 'load' };
-                        const response = method === 'goto' ? await navigate(args[0], options) : await navigate(options);
+                        const navigationOptions = { ...(method === 'goto' ? args[1] : args[0]), waitUntil: 'load' };
+                        const response = method === 'goto' ? await navigate(args[0], navigationOptions) : await navigate(navigationOptions);
                         await drain();
                         if (options.javaScriptEnabled !== false) {
                             await withDeadline(page.evaluate(() => new Promise(resolve =>
