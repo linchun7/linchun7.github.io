@@ -1,4 +1,5 @@
-const DATA = {
+// Canonical build-time corpus. Never imported by a browser page.
+export const CORPUS = {
   en: [
     ["UI and short text", ["Raw", "Draft saved", "Turn off notifications"]],
     ["News headlines", ["Markets rally as inflation cools, but investors remain cautious.", "Court blocks new rule hours before it was due to take effect.", "Wildfire forces thousands to evacuate as winds strengthen overnight."]],
@@ -108,20 +109,3 @@ const DATA = {
     ["Frases largas y complejas", ["Aunque la actualización corrige el error que cerraba inesperadamente la sesión de algunos usuarios, la empresa señala que las cuentas creadas antes de junio todavía podrían tener que verificar el correo de recuperación la próxima vez que inicien sesión.", "Aunque el banco central mantuvo los tipos sin cambios, su comunicado se interpretó como menos restrictivo porque los responsables reconocieron que la debilidad del empleo podría convertirse en un riesgo mayor que la inflación.", "El comité, que había aplazado dos veces la votación después de que varios miembros pidieran más datos, solo aprobó la propuesta cuando la agencia aceptó publicar una revisión en un plazo de seis meses."]]
   ]
 };
-
-const language = document.body.dataset.language;
-const target = document.querySelector("#categoryList");
-const groups = DATA[language] || [];
-let number = 1;
-
-target.innerHTML = groups.map(([title, samples]) => {
-  const items = samples.map((text) => {
-    const n = String(number++).padStart(2, "0");
-    return `<li class="sample-item"><span class="sample-index" aria-hidden="true">${n}</span><p class="sample-text">${escapeHtml(text)}</p></li>`;
-  }).join("");
-  return `<section class="category-section"><header class="category-header"><h2>${escapeHtml(title)}</h2><span class="category-count">3</span></header><ol class="sample-list">${items}</ol></section>`;
-}).join("");
-
-function escapeHtml(value) {
-  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
-}

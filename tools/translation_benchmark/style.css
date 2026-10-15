@@ -25,7 +25,7 @@ a:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius
 .app-header{background:var(--surface);border-bottom:1px solid var(--line)}
 .app-header-inner,.page-main,.page-footer{width:min(1180px,calc(100% - 48px));margin:0 auto}
 .app-header-inner{min-height:66px;display:flex;align-items:center;justify-content:space-between;gap:24px}
-.app-brand{min-width:0;display:flex;align-items:center;gap:11px;color:inherit}
+.app-brand{min-width:0;max-width:100%;display:flex;align-items:center;gap:11px;color:inherit}
 .brand-mark{width:36px;height:36px;flex:0 0 36px;display:grid;place-items:center;color:var(--accent);background:var(--accent-soft);border:1px solid #cfe2fa;border-radius:8px;font-size:17px;font-weight:780}
 .brand-copy{min-width:0}.brand-copy h1{margin:0;overflow:hidden;font-size:19px;line-height:1.2;text-overflow:ellipsis;white-space:nowrap}.brand-copy p{margin:3px 0 0;color:var(--muted);font-size:12px;line-height:1.35}.header-link{color:var(--muted);font-size:12px;white-space:nowrap}
 .page-main{display:grid;gap:14px}.overview{padding-top:14px}.overview-card,.workspace,.language-card,.category-section{background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow)}

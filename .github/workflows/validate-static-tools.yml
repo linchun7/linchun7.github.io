@@ -82,6 +82,11 @@ jobs:
         with:
           node-version: 22
 
+      - name: 验证翻译语料静态生成物
+        run: |
+          node tools/translation_benchmark/scripts/render-pages.mjs --check
+          node --test tools/translation_benchmark/test/*.test.mjs
+
       - name: 运行静态依赖更新器单元测试
         run: node --test tools/vendor/update-static-vendors.test.mjs
 
