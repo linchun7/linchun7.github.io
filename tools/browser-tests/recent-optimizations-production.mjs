@@ -65,6 +65,12 @@ export function pageContract(html, url) {
 export function assertResource(bytes, resource) {
     assert.equal(hash(bytes), resource.hash, 'production bytes differ: ' + resource.path);
 }
+export function trackCapture(allTasks, ownTasks, run) {
+    const task = Promise.resolve().then(run);
+    allTasks.push(task);
+    ownTasks.push(task);
+    return task;
+}
 export function isAnalyticsUrl(value) {
     const hostname = new URL(value).hostname;
     return ['googletagmanager.com', 'google-analytics.com', 'static.cloudflareinsights.com'].some(domain =>
@@ -270,7 +276,7 @@ export async function main() {
             // response.body() returns. Only these two evidenced URLs use an
             // unmodified real HTTP pass-through, never a fixture or replacement
             // implementation. This mode does not prove a native cache path.
-            if (captureUrls.size) await context.route(url => captureUrls.has(url.href), async route => {
+            if (captureUrls.size) await context.route(url => captureUrls.has(url.href), route => trackCapture(networkTasks, ownNetworkTasks, async () => {
                 const request = route.request();
                 const resource = manifest.get(request.url());
                 try {
@@ -293,7 +299,7 @@ export async function main() {
                     networkFailures.push(resource.path + ': real HTTP capture: ' + error.message.split('\n')[0]);
                     await route.abort('failed').catch(() => {});
                 }
-            });
+            }));
             context.on('page', page => {
                 page.setDefaultTimeout(20000);
                 // The reused localhost suites navigate repeatedly in one page.

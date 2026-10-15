@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createHash } from 'node:crypto';
-import { pageContract, assertResource, isAnalyticsUrl, assertRequestsComplete, assertScheduleParity, ORIGIN } from './recent-optimizations-production.mjs';
+import { pageContract, assertResource, isAnalyticsUrl, assertRequestsComplete, assertScheduleParity, trackCapture, ORIGIN } from './recent-optimizations-production.mjs';
 
 const url = ORIGIN + '/tools/example/';
 const html = '<!doctype html><html lang="zh-CN"><head><style>body{color:black}</style><link rel="stylesheet" href="style.css?v=1"></head><body><main><h1>Tool</h1></main><dialog id="historyDialog">History</dialog><script data-cfasync="false" src="app.js?v=1"></script><script data-cfasync="false">window.app=1;</script></body></html>';
@@ -80,4 +80,26 @@ test('only the exact evidenced Cloudflare analytics tag is outside the applicati
         assert.notDeepEqual(pageContract(html.replace('</body>', changed + '</body>'), url), pageContract(html, url));
     }
     assert.throws(() => pageContract(html.replace('</body>', beacon + beacon + '</body>'), url), /duplicated evidenced/);
+});
+
+test('capture waiting includes a delayed final fulfill rejection', async () => {
+    const all = [], own = [];
+    let release;
+    const gate = new Promise(resolve => { release = resolve; });
+    const task = trackCapture(all, own, async () => {
+        await gate;
+        throw new Error('late real-HTTP fulfill rejection');
+    });
+    assert.equal(all[0], task);
+    assert.equal(own[0], task);
+    let settled = false;
+    const waiter = Promise.all(own).then(
+        () => { settled = true; return null; },
+        error => { settled = true; return error; }
+    );
+    await Promise.resolve();
+    assert.equal(settled, false, 'captured header metadata alone cannot finish the route');
+    release();
+    const error = await waiter;
+    assert.match(error.message, /late real-HTTP fulfill rejection/);
 });
