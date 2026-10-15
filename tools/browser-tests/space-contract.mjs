@@ -35,6 +35,29 @@ export async function testSpaceContract(browser, baseUrl) {
         await page.goto(`${baseUrl}/tools/space/`, { waitUntil: 'domcontentloaded' });
         assert.match(await page.locator('.calculator-note').textContent(), /普通文本.*Markdown.*4 秒/);
         assert.equal(await page.locator('#result').getAttribute('readonly'), '');
+        // Diagnostic only: direct upstream behavior is not the candidate acceptance
+        // path. The application contract below still uses its real UI/worker.
+        const markerCases = [
+            { family: 'BACKTICK_CONTENT', marker: '\uE000BACKTICK_CONTENT_0\uE001', trigger: '中文`ABC` ' },
+            { family: 'HTML_TAG_PLACEHOLDER', marker: '\uE002HTML_TAG_PLACEHOLDER_0\uE003', trigger: '中文<span>ABC</span> ' },
+            { family: 'HTML_TAG_MENTION', marker: '\uE004HTML_TAG_MENTION_0\uE005', trigger: '中文<span> ' },
+            { family: 'SINGLE_QUOTE_CJK_PLACEHOLDER', marker: '\uE006SINGLE_QUOTE_CJK_PLACEHOLDER_0\uE007', trigger: "中文 '测试' " },
+            { family: 'COMPOUND_WORD_PLACEHOLDER', marker: '\uE008COMPOUND_WORD_PLACEHOLDER_0\uE009', trigger: 'foo-bar 中文 ' },
+            { family: 'HTTP_URL_PLACEHOLDER', marker: '\uE00AHTTP_URL_PLACEHOLDER_0\uE00B', trigger: '中文 https://example.com/abc ' }
+        ].map(({ family, marker, trigger }) => ({ family, marker, input: trigger + marker }));
+        const markerEvidence = await page.evaluate(({ url, cases }) => new Promise((resolve, reject) => {
+            const source = 'importScripts(' + JSON.stringify(url) + '); onmessage = ({data}) => postMessage(data.map(row => ({...row, result: pangu.spaceText(row.input)})));';
+            const blobUrl = URL.createObjectURL(new Blob([source], { type: 'application/javascript' }));
+            const reference = new Worker(blobUrl);
+            const finish = () => { clearTimeout(timer); reference.terminate(); URL.revokeObjectURL(blobUrl); };
+            const timer = setTimeout(() => { finish(); reject(new Error('upstream marker diagnostic deadline')); }, 7000);
+            reference.onmessage = ({ data }) => { finish(); resolve(data); };
+            reference.onerror = event => { event.preventDefault(); finish(); reject(new Error('upstream marker diagnostic failed')); };
+            reference.postMessage(cases);
+        }), { url: `${baseUrl}/tools/space/dist/browser/pangu.min.js`, cases: markerCases });
+        for (const row of markerEvidence) console.log(JSON.stringify({
+            suite: 'direct-upstream-reserved-marker-diagnostic', ...row, literalPreserved: row.result.includes(row.marker)
+        }));
         // Exact numbered upstream-reserved markers must fail closed. Ordinary
         // private-use glyphs and incomplete/non-numbered lookalikes remain valid.
         for (const literal of [
