@@ -11,6 +11,11 @@ function functionSource(name) {
   assert.ok(match, 'exercise shipped function ' + name);
   return match[0];
 }
+function startupHandlerSource() {
+  const match = source.match(/  start\(\)\.catch\(([^]*?)\);\n\}\)\(\);\s*$/);
+  assert.ok(match, 'exercise shipped startup rejection handler');
+  return /^\w+$/.test(match[1]) ? functionSource(match[1]) + '\n' + match[1] : match[1];
+}
 function harness(data, current = now) {
   const usable = source.match(/  const usable = \(value\) => \{[^]*?\n  \};/);
   assert.ok(usable);
@@ -83,8 +88,8 @@ test('initial future snapshot gets a specific explanation without requiring stat
     class ClockDate extends Date { static now() { return now; } }
     const el = { freshnessWarning: {}, priceRows: { children: Array(rows).fill({}) } };
     const context = { Date: ClockDate, el, console: { error() {} }, value };
-    runInNewContext(functionSource('validate') + '\n' + functionSource('showStartupError') +
-      '\ntry { validate(value); throw Error("future snapshot unexpectedly accepted"); } catch (error) { showStartupError(error); }', context);
+    runInNewContext(functionSource('validate') + '\nconst startupHandler = ' + startupHandlerSource() +
+      ';\ntry { validate(value); throw Error("future snapshot unexpectedly accepted"); } catch (error) { startupHandler(error); }', context);
     assertExplained(el);
     assert.equal(el.priceRows.children.length, rows, 'startup explanation must preserve existing fallback rows');
   }
@@ -92,7 +97,7 @@ test('initial future snapshot gets a specific explanation without requiring stat
 test('ordinary startup failure retains its original generic explanation', () => {
   const el = { freshnessWarning: {} };
   const context = { el, console: { error() {} } };
-  runInNewContext(functionSource('showStartupError') + '\nshowStartupError(Error("fixture network failure"));', context);
+  runInNewContext('const startupHandler = ' + startupHandlerSource() + ';\nstartupHandler(Error("fixture network failure"));', context);
   assert.equal(el.freshnessWarning.hidden, false);
   assert.equal(el.freshnessWarning.textContent, '交互功能未能启动，当前仍显示静态价格');
   assert.doesNotMatch(el.freshnessWarning.textContent, /设备时间/);
