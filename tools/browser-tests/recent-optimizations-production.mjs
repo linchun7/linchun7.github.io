@@ -31,12 +31,22 @@ const one = (html, pattern, label) => {
 // Exact application bytes only. No whitespace normalization, arbitrary script
 // stripping, cache-bypass URLs, alternative hosts, or replacement app responses.
 export function pageContract(html, url) {
-    const local = value => new URL(value, url).origin === ORIGIN;
     const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)];
-    const appScripts = scripts.filter(match => {
-        const src = /\bsrc="([^"]+)"/.exec(match[1])?.[1];
-        return src ? local(src) : /\bdata-cfasync="false"/.test(match[1]);
-    }).map(match => match[0]);
+    // Raw production evidence in run 38679092957 binds this one observed CDN
+    // loader and its matching 24-hex type nonce. No other attributes, scripts,
+    // paths, source bytes or ordering are normalized.
+    const loaderPattern = /^ src="\/cdn-cgi\/scripts\/7d0fa10a\/cloudflare-static\/rocket-loader\.min\.js" data-cf-settings="([a-f0-9]{24})-\|49" defer$/;
+    const loaders = scripts.filter(match => loaderPattern.test(match[1]));
+    assert.ok(loaders.length <= 1, 'duplicated observed Cloudflare loader');
+    const nonce = loaders.length ? loaderPattern.exec(loaders[0][1])[1] : null;
+    if (loaders.length) assert.equal(loaders[0][2], '', 'Cloudflare loader must not contain inline code');
+    const appScripts = scripts.filter(match => match !== loaders[0]).map(match => {
+        if (!nonce) return match[0];
+        const marker = ' type="' + nonce + '-text/javascript"';
+        if (!match[1].includes(marker)) return match[0];
+        assert.ok(!/\bdata-cfasync="false"/.test(match[1]), 'opt-out application script must not be rewritten');
+        return match[0].replace(marker, '');
+    });
     const stylesheets = [...html.matchAll(/<link\b[^>]*\brel="stylesheet"[^>]*>/gi)].map(match => match[0]);
     const dialogs = [...html.matchAll(/<dialog\b[\s\S]*?<\/dialog\s*>/gi)].map(match => match[0]);
     const styles = [...html.matchAll(/<style\b[\s\S]*?<\/style\s*>/gi)].map(match => match[0]);
@@ -49,6 +59,33 @@ export function pageContract(html, url) {
 }
 export function assertResource(bytes, resource) {
     assert.equal(hash(bytes), resource.hash, 'production bytes differ: ' + resource.path);
+}
+export function isAnalyticsUrl(value) {
+    const hostname = new URL(value).hostname;
+    return ['googletagmanager.com', 'google-analytics.com'].some(domain =>
+        hostname === domain || hostname.endsWith('.' + domain));
+}
+export function assertRequestsComplete(records, required, verified) {
+    assert.deepEqual(records.filter(record => record.status !== 'verified'), [], 'each requested application resource must finish verification');
+    assert.deepEqual([...required].filter(url => !verified.has(url)), [], 'this context did not verify every required static application resource');
+}
+export function assertScheduleParity(actual, expected) {
+    const withoutRates = result => ({
+        ...result, apr: undefined,
+        schedule: result.schedule.map(row => ({ ...row, earlyRepaymentAPR: undefined }))
+    });
+    assert.deepEqual(withoutRates(actual), withoutRates(expected), 'every monetary, period and non-APR field must match exactly');
+    let maximumRateDifference = 0;
+    const rate = (value, reference, label) => {
+        assert.ok(Number.isFinite(value) && Number.isFinite(reference), label + ' must be finite');
+        const difference = Math.abs(value - reference);
+        maximumRateDifference = Math.max(maximumRateDifference, difference);
+        assert.ok(difference <= 64 * Number.EPSILON * Math.max(1, Math.abs(value), Math.abs(reference)), label + ' exceeds the observed cross-engine Math.pow precision boundary');
+        assert.equal(value.toFixed(2), reference.toFixed(2), label + ' must retain the exact displayed percentage');
+    };
+    rate(actual.apr, expected.apr, 'full APR');
+    actual.schedule.forEach((row, index) => rate(row.earlyRepaymentAPR, expected.schedule[index].earlyRepaymentAPR, 'early APR ' + row.month));
+    return maximumRateDifference;
 }
 function makeManifest() {
     const manifest = new Map();
@@ -63,11 +100,14 @@ function makeManifest() {
     for (const path of pages) {
         const url = pageUrl(path);
         const html = expectedBytes(path).toString('utf8');
-        manifest.set(url, { path, kind: 'html', contract: pageContract(html, url) });
+        manifest.set(url, { path, kind: 'html', contract: pageContract(html, url), required: [] });
         for (const match of html.matchAll(/<script\b[^>]*\bsrc="([^"]+)"[^>]*>|<link\b[^>]*\brel="stylesheet"[^>]*\bhref="([^"]+)"[^>]*>/gi)) {
             const value = match[1] || match[2];
             const resource = new URL(value, url);
-            if (resource.origin === ORIGIN) addResource(resource.href, match[1] ? 'js' : 'css');
+            if (resource.origin === ORIGIN) {
+                addResource(resource.href, match[1] ? 'js' : 'css');
+                manifest.get(url).required.push(resource.href);
+            }
         }
         if (path.includes('/hospital_rank/')) {
             const version = /data-rankings-version="([^"]+)"/.exec(html)?.[1];
@@ -97,6 +137,14 @@ function proveSnapshot(filePaths) {
     assert.equal(git(['diff', '--name-only', EXPECTED_SHA, 'HEAD', '--', ...filePaths]).toString().trim(), '',
         'acceptance branch must not change production files');
     return main;
+}
+async function withDeadline(promise, milliseconds, label) {
+    let timer;
+    try {
+        return await Promise.race([promise, new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new Error(label + ' deadline')), milliseconds);
+        })]);
+    } finally { clearTimeout(timer); }
 }
 function validateMime(mime, resource) {
     const pattern = {
@@ -160,11 +208,45 @@ export async function main() {
         async newContext(options = {}) {
             const context = await browser.newContext(options);
             const ownNetworkTasks = [];
+            const requests = new Map();
+            const required = new Set();
+            const verified = new Set();
+            let closeChecksDone = false;
             const close = context.close.bind(context);
-            context.close = async () => { await Promise.all(ownNetworkTasks); await close(); };
+            context.close = async () => {
+                if (!closeChecksDone) {
+                    const deadline = Date.now() + 15000;
+                    while ([...requests.values()].some(record => record.status === 'pending') && Date.now() < deadline) {
+                        await new Promise(resolve => setTimeout(resolve, 25));
+                    }
+                    await Promise.all(ownNetworkTasks);
+                    try { assertRequestsComplete([...requests.values()], required, verified); }
+                    catch (error) { networkFailures.push(error.message); }
+                    closeChecksDone = true;
+                }
+                await close();
+            };
             contexts.push(context);
-            await context.route('**/googletagmanager.com/**', route => route.abort());
-            await context.route('**/google-analytics.com/**', route => route.abort());
+            await context.route(url => isAnalyticsUrl(url.href), route => route.abort());
+            context.on('request', request => {
+                const resource = manifest.get(request.url());
+                if (!resource) return;
+                requests.set(request, { url: request.url(), status: 'pending' });
+                if (resource.kind === 'html') {
+                    required.add(request.url());
+                    for (const url of resource.required) {
+                        if (options.javaScriptEnabled === false && manifest.get(url).kind === 'js') continue;
+                        required.add(url);
+                    }
+                }
+            });
+            context.on('requestfailed', request => {
+                const record = requests.get(request);
+                if (record) {
+                    record.status = 'failed';
+                    record.reason = request.failure()?.errorText || 'request failed';
+                }
+            });
             context.on('page', page => {
                 page.setDefaultTimeout(20000);
                 page.on('pageerror', error => pageErrors.push(error.message));
@@ -176,11 +258,20 @@ export async function main() {
                     assert.ok(response.ok(), 'browser HTTP failure: ' + resource.path);
                     assert.equal(response.request().redirectedFrom(), null, 'application redirect is not accepted');
                     validateMime(response.headers()['content-type'], resource);
-                    const bytes = await response.body();
+                    const bytes = await withDeadline(response.body(), 15000, 'browser response body ' + resource.path);
                     if (resource.kind === 'html') assert.deepEqual(pageContract(bytes.toString('utf8'), response.url()), resource.contract, 'browser page differs: ' + resource.path);
                     else assertResource(bytes, resource);
                     observed.add(response.url());
-                })().catch(error => { networkFailures.push(error.message); });
+                    verified.add(response.url());
+                    const record = requests.get(response.request());
+                    assert.ok(record, 'response must correspond to a recorded application request');
+                    assert.notEqual(record.status, 'failed', record.reason || 'application request failed');
+                    record.status = 'verified';
+                })().catch(error => {
+                    const record = requests.get(response.request());
+                    if (record) { record.status = 'failed'; record.reason = error.message; }
+                    networkFailures.push(error.message);
+                });
                 networkTasks.push(task);
                 ownNetworkTasks.push(task);
             });
@@ -221,7 +312,9 @@ export async function main() {
                 await page.click('#calculateBtn');
                 await page.waitForSelector('.summary-card');
                 const expected = core.generateSchedule(vector);
-                assert.deepEqual(await page.evaluate(() => window.lastExportData), expected, 'all production calculation fields must match the exact shipped core');
+                const maximumRateDifference = assertScheduleParity(await page.evaluate(() => window.lastExportData), expected);
+                console.log(JSON.stringify({ suite: 'production-renovation-numerical-evidence', browser: browserName,
+                    vector, maximumRateDifference, monetaryFields: 'exact', displayedRates: 'exact 2 decimals' }));
                 assert.equal(await page.locator('tbody tr').count(), vector.loanTerm + 1);
                 const downloadPromise = page.waitForEvent('download');
                 await page.click('.export-btn');
