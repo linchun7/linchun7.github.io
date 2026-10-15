@@ -105,18 +105,40 @@ function validateMime(mime, resource) {
     }[resource.kind];
     assert.match(mime || '', pattern, 'unexpected production MIME: ' + resource.path);
 }
+function scriptInventory(html) {
+    return [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)].map(match => ({
+        attributes: match[1], src: /\bsrc="([^"]+)"/.exec(match[1])?.[1] || null,
+        bodyBytes: Buffer.byteLength(match[2]), bodyHash: hash(match[2])
+    }));
+}
 async function preflight(manifest) {
+    const failures = [];
     for (const [url, resource] of manifest) {
+      try {
         const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(20000) });
         assert.ok(response.ok, 'ordinary URL HTTP ' + response.status + ': ' + url);
         assert.equal(response.url, url);
         validateMime(response.headers.get('content-type'), resource);
         const bytes = Buffer.from(await response.arrayBuffer());
         assert.ok(bytes.length <= 2_000_000, 'oversized production response');
-        if (resource.kind === 'html') assert.deepEqual(pageContract(bytes.toString('utf8'), url), resource.contract, 'production page differs: ' + resource.path);
-        else assertResource(bytes, resource);
+        if (resource.kind === 'html') {
+            const actualHtml = bytes.toString('utf8');
+            try { assert.deepEqual(pageContract(actualHtml, url), resource.contract, 'production page differs: ' + resource.path); }
+            catch (error) {
+                console.log(JSON.stringify({ suite: 'production-page-diagnostic', url,
+                    expectedScripts: scriptInventory(expectedBytes(resource.path).toString('utf8')),
+                    actualScripts: scriptInventory(actualHtml), status: 'mismatch' }));
+                throw error;
+            }
+        } else assertResource(bytes, resource);
         console.log(JSON.stringify({ suite: 'production-resource-preflight', expectedSha: EXPECTED_SHA, url, kind: resource.kind, bytes: bytes.length, sha256: hash(bytes), status: 'passed' }));
+      } catch (error) {
+        const message = String(error.message);
+        failures.push({ url, message });
+        console.error(JSON.stringify({ suite: 'production-resource-preflight', url, status: 'failed', message }));
+      }
     }
+    return failures;
 }
 
 export async function main() {
@@ -126,7 +148,7 @@ export async function main() {
     assert.equal(process.env.BASE_URL, ORIGIN, 'only the ordinary production origin is allowed');
     const { manifest, filePaths } = makeManifest();
     const startMain = proveSnapshot(filePaths);
-    await preflight(manifest);
+    const preflightFailures = await preflight(manifest);
     const browser = await type.launch({ headless: true });
     const contexts = [];
     const networkTasks = [];
@@ -293,6 +315,7 @@ export async function main() {
             }
         }
         await Promise.all(networkTasks);
+        assert.deepEqual(preflightFailures, [], 'ordinary production preflight mismatches remain acceptance failures');
         assert.deepEqual(networkFailures, [], 'all observed browser application responses must match fixed main bytes');
         assert.deepEqual(pageErrors, [], 'production page errors');
         for (const url of manifest.keys()) assert.ok(observed.has(url), 'browser never loaded required ordinary production resource: ' + url);
