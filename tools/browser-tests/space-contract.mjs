@@ -8,6 +8,7 @@ export async function testSpaceContract(browser, baseUrl) {
     const errors = [];
     const bundleRequests = [];
     const differences = [];
+    let caseIndex = 0;
     page.on('pageerror', error => errors.push(error.message));
     context.on('request', request => {
         if (new URL(request.url()).pathname === '/tools/space/dist/browser/pangu.min.js') bundleRequests.push(request.url());
@@ -19,25 +20,42 @@ export async function testSpaceContract(browser, baseUrl) {
         input.dispatchEvent(new Event('input', { bubbles: true }));
     }, text);
     const process = async (input, expected) => {
+        const index = caseIndex++;
         await setInput(input);
         await page.click('#addBtn');
-        await page.waitForFunction(() => document.getElementById('alertText').textContent === '已处理', null, { timeout: 10000 });
+        await page.waitForFunction(() => { const status = document.getElementById('alertText').textContent; return status && status !== '处理中'; }, null, { timeout: 10000 });
+        const status = await page.locator('#alertText').textContent();
+        if (status !== '已处理') differences.push({ index, length: input.length, input: input.slice(0, 180), status });
         assert.equal(await page.inputValue('#info'), input.replace(/\r\n?/g, '\n'), 'formatting must leave the source intact');
         const actual = await page.inputValue('#result');
         const normalizedExpected = expected.replace(/\r\n?/g, '\n');
-        if (actual !== normalizedExpected) differences.push({ input: input.slice(0, 180), actual: actual.slice(0, 180), expected: normalizedExpected.slice(0, 180) });
+        if (actual !== normalizedExpected) differences.push({ index, length: input.length, input: input.slice(0, 180), actual: actual.slice(0, 180), expected: normalizedExpected.slice(0, 180) });
     };
     try {
         await page.goto(`${baseUrl}/tools/space/`, { waitUntil: 'domcontentloaded' });
         assert.match(await page.locator('.calculator-note').textContent(), /普通文本.*Markdown.*4 秒/);
         assert.equal(await page.locator('#result').getAttribute('readonly'), '');
-        const puaProbe = '中文`ABC` \uE000BACKTICK_CONTENT_0\uE001';
-        await setInput(puaProbe);
-        await page.click('#addBtn');
-        await page.waitForFunction(() => document.getElementById('alertText').textContent === '已处理');
-        assert.equal(await page.inputValue('#info'), puaProbe);
-        console.log(JSON.stringify({ suite: 'upstream-literal-pua-marker-probe', input: puaProbe, result: await page.inputValue('#result') }));
+        // Exact numbered upstream-reserved markers must fail closed. Ordinary
+        // private-use glyphs and incomplete/non-numbered lookalikes remain valid.
+        for (const literal of [
+            '\uE000BACKTICK_CONTENT_0\uE001',
+            '\uE002HTML_TAG_PLACEHOLDER_0\uE003',
+            '\uE004HTML_TAG_MENTION_0\uE005',
+            '\uE006SINGLE_QUOTE_CJK_PLACEHOLDER_0\uE007',
+            '\uE008COMPOUND_WORD_PLACEHOLDER_0\uE009',
+            '\uE00AHTTP_URL_PLACEHOLDER_0\uE00B'
+        ]) {
+            const input = '中文 ABC ' + literal;
+            await setInput(input);
+            await page.click('#addBtn');
+            await page.waitForFunction(() => document.getElementById('alertText').textContent.includes('Pangu 保留标记'));
+            assert.equal(await page.inputValue('#info'), input);
+            assert.equal(await page.inputValue('#result'), '');
+        }
         const cases = [
+            ['中文\uE100字ABC', '中文\uE100字 ABC'],
+            ['中文\uE000字ABC\uE001', '中文\uE000字 ABC\uE001'],
+            ['中文 \uE000BACKTICK_CONTENT_x\uE001', '中文 \uE000BACKTICK_CONTENT_x\uE001'],
             ['访问https://[2001:db8::1]/中文ABC，后文DEF', '访问 https://[2001:db8::1]/中文ABC，后文 DEF'],
             ['HTTP://[::1]:8080/Ａ中文ABC]后文DEF', 'HTTP://[::1]:8080/Ａ中文ABC] 后文 DEF'],
             ['<https://[2001:db8::1]/目录[中文ABC]{尾DEF}>', '<https://[2001:db8::1]/目录[中文ABC]{尾DEF}>'],
