@@ -282,6 +282,7 @@ try {
                 document.getElementById('copySummary2').click();
             });
             assert.equal(await page.evaluate(() => window.__copies.length), 1);
+            assert.ok((await page.evaluate(() => window.__copies[0])).endsWith('计算结果：单利年化收益率：5.00%'), 'pending request preserves clicked snapshot');
             assert.equal(await page.locator('#copyStatus1').textContent(), '正在复制…');
             assert.equal(await page.locator('#copySummary2').isDisabled(), true);
             await page.fill('#interest1', '100');
@@ -300,6 +301,50 @@ try {
             assert.ok((await copied(page, 1)).endsWith('计算结果：单利年化收益率：10.00%'));
         });
     }
+
+
+    for (const outcome of ['resolve', 'reject']) {
+        await check('same-input recalculation rejects old snapshot ' + outcome, async page => {
+            await establish(page, cases[0]);
+            await page.evaluate(() => {
+                navigator.clipboard.writeText = text => {
+                    window.__copies.push(text);
+                    return new Promise((resolve, reject) => { window.__finish = resolve; window.__fail = reject; });
+                };
+                document.getElementById('copySummary1').click();
+            });
+            await page.click('#calculate1');
+            assert.equal(await page.locator('#result1').textContent(), cases[0].result);
+            assert.equal(await page.locator('#copyStatus1').textContent(), '');
+            assert.equal(await page.locator('#copySummary1').isDisabled(), true);
+            await page.evaluate(outcome => {
+                if (outcome === 'resolve') window.__finish();
+                else window.__fail(new Error('old rejection'));
+            }, outcome);
+            await page.waitForFunction(() => !document.getElementById('copySummary1').disabled);
+            assert.equal(await page.locator('#copyStatus1').textContent(), '', 'matching inputs must not revive an older completion');
+            await page.evaluate(() => { navigator.clipboard.writeText = async text => window.__copies.push(text); });
+            assert.ok((await copied(page, 1)).endsWith('计算结果：' + cases[0].result));
+        });
+    }
+
+    await check('failed calculation while pending preserves error and then recovers', async page => {
+        await establish(page, cases[0]);
+        await page.evaluate(() => {
+            navigator.clipboard.writeText = () => new Promise(resolve => { window.__finish = resolve; });
+            document.getElementById('copySummary1').click();
+            document.getElementById('principal1').value = '0';
+        });
+        await page.click('#calculate1');
+        assert.equal(await page.locator('#result1').textContent(), '本金必须大于 0');
+        await page.evaluate(() => window.__finish());
+        assert.equal(await page.locator('#copyStatus1').textContent(), '');
+        assert.equal(await page.locator('#copySummary1').isDisabled(), true);
+        assert.equal(await page.locator('#result1').textContent(), '本金必须大于 0');
+        await page.evaluate(() => { navigator.clipboard.writeText = async text => window.__copies.push(text); });
+        await establish(page, cases[0]);
+        assert.ok((await copied(page, 1)).endsWith('计算结果：' + cases[0].result));
+    });
 
     await check('programmatic no-event edits blocked before and during copy', async page => {
         await establish(page, cases[0]);
@@ -334,6 +379,9 @@ try {
         assert.equal(await page.locator('#copyStatus4').textContent(), '');
         assert.equal(await page.locator('#result4-table').textContent(), '');
         assert.equal(await page.evaluate(() => document.activeElement.id), 'principal3');
+        await page.evaluate(() => { navigator.clipboard.writeText = async text => window.__copies.push(text); });
+        await establish(page, cases[3]);
+        assert.ok((await copied(page, 4)).endsWith('计算结果：' + cases[3].result));
     });
 
     for (const width of [320, 390, 620, 621, 1280]) {
