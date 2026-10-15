@@ -13,7 +13,7 @@
     <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
     <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
     <script data-cfasync="false" src="core.js?v=3006bda7" defer></script>
-    <script data-cfasync="false" src="app.js?v=501c5dcb" defer></script>
+    <script data-cfasync="false" src="app.js?v=778e8a2c" defer></script>
 </head>
 <body>
     <a class="skip-link" href="#main">跳到主要内容</a>
@@ -41,7 +41,7 @@
             <div class="section-heading">
                 <div>
                     <h1 id="rule-title">卡号规则</h1>
-                    <p>支持数字、英文字母和 *。同一字母代表同一数字，每个 * 独立取值，空格不计入位数。</p>
+                    <p>支持数字、英文字母和 *。同一字母代表同一数字，每个 * 独立取值，空格不计入位数。输入保留原样，计算时转换全角字符并忽略其他不支持字符；最多使用前 100 个有效位计算，超出内容保留。</p>
                 </div>
             </div>
 
@@ -54,7 +54,7 @@
             </div>
 
             <div class="input-meta">
-                <span>有效位数：<strong id="validCount">0</strong> 位</span>
+                <span>计算位数：<strong id="validCount">0</strong> 位</span>
                 <span id="lenWarning" class="length-warning" hidden></span>
             </div>
 

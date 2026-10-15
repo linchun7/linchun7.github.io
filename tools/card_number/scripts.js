@@ -157,7 +157,7 @@ function materializeCardNumber(pattern, variableAtPosition, assignment) {
 function startGeneration() {
   if (composing) return;
   const inputField = document.getElementById('inputField');
-  const processedInput = inputField.value.replace(/[^a-zA-Z0-9*]/g, '');
+  const processedInput = normalizeCardRule(inputField.value).replace(/[^a-zA-Z0-9*]/g, '');
   results = [];
   const tooLong = processedInput.length > MAX_PATTERN_LENGTH;
   inputField.setAttribute('aria-invalid', String(tooLong));
@@ -222,28 +222,16 @@ function clearInput() {
   handleInput(); // 更新统计信息
 }
 
-/**
- * 处理用户输入，过滤非法字符并更新统计信息
- */
+// 只归一化计算副本，不改写输入框，以保留原生光标、输入法和撤销/重做记录。
 function normalizeCardRule(value) {
   return value.normalize('NFKC').replace(/[^a-zA-Z0-9*\s]/g, '').replace(/\s+/g, ' ');
 }
 
+/**
+ * 统计计算副本中的有效位数（不包括空格）
+ */
 function handleInput() {
-  const inputField = document.getElementById('inputField');
-  const raw = inputField.value;
-  const inputStr = normalizeCardRule(raw);
-
-  if (inputStr !== raw) {
-    // 分别归一化选区前缀，让全角转换、非法字符删除和空格合并后仍可原位编辑。
-    const start = normalizeCardRule(raw.slice(0, inputField.selectionStart)).length;
-    const end = normalizeCardRule(raw.slice(0, inputField.selectionEnd)).length;
-    const direction = inputField.selectionDirection;
-    inputField.value = inputStr;
-    inputField.setSelectionRange(start, end, direction);
-  }
-
-  // 统计有效位数（不包括空格）
+  const inputStr = normalizeCardRule(document.getElementById('inputField').value);
   const validCount = inputStr.replace(/[^a-zA-Z0-9*]/g, '').length;
   document.getElementById('validCount').textContent = `${validCount}`;
 }
