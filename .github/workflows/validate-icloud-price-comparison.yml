@@ -135,6 +135,15 @@ jobs:
         working-directory: .
         run: git diff --check
 
+
+      - name: 诊断预期静态资源版本
+        if: failure()
+        run: |
+          node --input-type=module <<'NODE'
+          import { computeAssetUpdates } from './scripts/update-asset-versions.mjs';
+          console.log(JSON.stringify({ expectedAssetVersions: (await computeAssetUpdates()).versions }, null, 2));
+          NODE
+
   browser:
     name: 浏览器测试 (${{ matrix.browser }})
     runs-on: ubuntu-latest

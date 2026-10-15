@@ -35,6 +35,8 @@
 
 入口：`scripts/pipeline.py` 采集/汇率/校验/生成，`scripts/change_policy.py` 变更确认，`scripts/minimum_history.py` 账本与 Git 恢复，`scripts/daily_run_guard.py` 每日幂等，`scripts/verify-production.mjs` 线上验收。页面源为 `index.template.html`、`app.js`、`style.css`；`data/prices.json`、`data/minimum-history.json`、`index.html` 是整组生成产物，不手工改价；修改模板后重新生成 HTML。
 
+跨语言契约回归使用同一组人工审阅的合成 golden 样本，分别执行 Python 投影与实际 `app.js` 函数，核对套餐身份、同套餐最低金额、并列最低价、稠密排名、缺汇率及未来时间处理。它验证实现一致性，不证明上游价格真值。
+
 运行环境 Python 3.10+、Node 22、pnpm 10.14.0，浏览器依赖以 package/lockfile 为准；基础开发与离线测试无需额外 API Key。测试在 [GitHub Actions](../../.github/workflows/validate-chatgpt-prices.yml) 执行，保留 Python 离线回归、候选校验、深度 fixture 和锁定 Playwright 的 Chromium/Firefox/WebKit 完整矩阵，main 另验实际部署。
 
 从仓库根目录运行：

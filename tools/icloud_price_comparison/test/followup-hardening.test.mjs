@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { runInNewContext } from 'node:vm';
 
-import { displayedPublishedDate, visiblePublicationEntries } from '../data-contract.js';
+import { displayedPublishedDate, visiblePublicationEntries, validateMinimumHistoryPayload, validatePriceHistoryConsistency } from '../data-contract.js';
 import {
   foldPublicationCountryRenames,
   marketSearchPriority,
@@ -245,4 +245,108 @@ test('minimum history uses a short guarded FX-gap badge without changing raw evi
   assert.equal(label({cause:'fx',evidence}),'汇率变化');
   assert.equal(JSON.stringify(event),before);
   assert.match(source,/minimumHistoryNode\('span', minimumHistoryCauseLabel\(event\), 'minimum-history-cause'\)/);
+});
+
+
+test('four date helpers reuse three fixed formatters without changing date semantics', async () => {
+  const source = await readFile(new URL('../script.js', import.meta.url), 'utf8');
+  const names = ['formatDate', 'formatBeijingDateTime', 'formatBeijingDate', 'formatPublishedDate'];
+  const declarations = ['dateFormatter', 'beijingDateTimeFormatter', 'beijingDateFormatter'].map(name => {
+    const match = source.match(new RegExp('const ' + name + ' = new Intl\\.DateTimeFormat\\([^]*?\\n\\}\\);'));
+    assert.ok(match, name);
+    return match[0];
+  });
+  const functions = names.map(name => {
+    const match = source.match(new RegExp('function ' + name + '\\([^]*?\\n\\}'));
+    assert.ok(match, name);
+    return match[0];
+  });
+  let constructions = 0;
+  class CountedDateTimeFormat extends Intl.DateTimeFormat {
+    constructor(...args) { super(...args); constructions += 1; }
+  }
+  const api = runInNewContext(
+    [...declarations, ...functions, '({ ' + names.join(', ') + ' })'].join('\n'),
+    { Intl: { DateTimeFormat: CountedDateTimeFormat }, Date },
+  );
+  assert.equal(constructions, 3, 'UTC date-only helpers share the same formatter');
+  const utc = new Intl.DateTimeFormat('zh-CN', { year:'numeric', month:'2-digit', day:'2-digit', timeZone:'UTC' });
+  const beijing = new Intl.DateTimeFormat('zh-CN', {
+    year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit',
+    minute:'2-digit', hour12:false, timeZone:'Asia/Shanghai',
+  });
+  for (let repeat = 0; repeat < 25; repeat += 1) {
+    for (const name of names) assert.equal(api[name](null), '--', name);
+    assert.equal(api.formatDate('2026-10-01T23:59:59-07:00'), utc.format(new Date('2026-10-01T00:00:00Z')));
+    assert.throws(() => api.formatDate('invalid'), /Invalid time value/);
+    assert.equal(api.formatBeijingDateTime('2026-10-01T16:00:00Z'), beijing.format(new Date('2026-10-01T16:00:00Z')));
+    assert.equal(api.formatBeijingDateTime('invalid'), '--');
+    assert.equal(api.formatBeijingDate('2026-10-01T15:59:59Z'), '2026-10-01');
+    assert.equal(api.formatBeijingDate('2026-10-01T16:00:00Z'), '2026-10-02');
+    assert.equal(api.formatBeijingDate('invalid'), '--');
+    assert.equal(api.formatPublishedDate('Published date: October 1, 2026'), utc.format(new Date('2026-10-01T00:00:00Z')));
+    assert.equal(api.formatPublishedDate('2026-10-01T23:00:00-07:00'), utc.format(new Date('2026-10-02T06:00:00Z')));
+    assert.equal(api.formatPublishedDate('Published date: unknown'), 'unknown');
+  }
+  assert.equal(constructions, 3, 'repeated renders must not construct more formatters');
+});
+
+test('country and minimum history preserve their deliberately different snapshot acceptance', async () => {
+  const source = await readFile(new URL('../script.js', import.meta.url), 'utf8');
+  const [prices, countryHistory, minimumHistory] = await Promise.all([
+    readFile(new URL('../data/prices.json', import.meta.url), 'utf8').then(JSON.parse),
+    readFile(new URL('../data/history.json', import.meta.url), 'utf8').then(JSON.parse),
+    readFile(new URL('../data/minimum-history.json', import.meta.url), 'utf8').then(JSON.parse),
+  ]);
+  const futureCountry = structuredClone(countryHistory);
+  futureCountry.updatedAt = new Date(Date.parse(prices.generatedAt) + 1).toISOString();
+  const laterMinimum = structuredClone(minimumHistory);
+  laterMinimum.checkedAt = new Date(Math.max(Date.parse(prices.generatedAt), Date.parse(minimumHistory.checkedAt)) + 1000).toISOString();
+  laterMinimum.pendingGap = true;
+  laterMinimum.excludedVersions += 1;
+  assert.equal(validateMinimumHistoryPayload(laterMinimum), laterMinimum);
+  const now = Date.parse(laterMinimum.checkedAt) + 1000;
+  class SnapshotDate extends Date { static now() { return now; } }
+  const state = { data:prices, history:null, historyStatus:'idle', historyRequestId:0, historyPromise:null };
+  const minimumHistoryUi = { data:structuredClone(minimumHistory), status:'ready', promise:null };
+  let countryFetches = 0;
+  let nextMinimum = laterMinimum;
+  const functions = ['ensureHistoryLoaded', 'loadMinimumHistory'].map(name => {
+    const match = source.match(new RegExp('(?:async )?function ' + name + '\\([^]*?\\n\\}'));
+    assert.ok(match, name);
+    return match[0].replaceAll('import.meta.url', 'moduleUrl');
+  });
+  const api = runInNewContext(
+    [...functions, '({ ensureHistoryLoaded, loadMinimumHistory })'].join('\n'), {
+      state, minimumHistoryUi, Date:SnapshotDate, URL, AbortController, setTimeout, clearTimeout,
+      moduleUrl: new URL('../script.js', import.meta.url).href,
+      REQUEST_TIMEOUT_MS:8000, MAX_PRICE_FUTURE_SKEW_MS:300000,
+      validatePriceHistoryConsistency, validateMinimumHistoryPayload,
+      fetchJson:async () => { countryFetches += 1; return futureCountry; },
+      fetch:async () => ({ ok:true, headers:{get:() => 'application/json'}, payload:nextMinimum }),
+      readBoundedJsonResponse:async response => response.payload,
+      refreshOpenHistoryViews:() => {}, renderMinimumHistory:() => {}, renderMinimumHistoryStatus:() => {},
+      console:{warn:() => {}},
+    },
+  );
+  assert.equal(await api.ensureHistoryLoaded(), null);
+  assert.equal(countryFetches, 2, 'incompatible country history gets one forced-refresh retry');
+  assert.equal(state.history, null);
+  assert.equal(state.historyStatus, 'unavailable');
+  await api.loadMinimumHistory();
+  assert.equal(minimumHistoryUi.status, 'ready');
+  assert.equal(minimumHistoryUi.data, laterMinimum, 'later independent minimum evidence is accepted');
+
+  // Structurally valid responses still cannot roll back accepted checked time or checkpoint.
+  for (const checkedAt of [minimumHistory.checkedAt, laterMinimum.checkedAt]) {
+    nextMinimum = {
+      schemaVersion:1, projectSince:minimumHistory.projectSince, firstObservedAt:null, checkedAt,
+      observations:0, excludedVersions:1, pendingGap:true, gaps:[], events:[], checkpoint:null,
+    };
+    assert.equal(validateMinimumHistoryPayload(nextMinimum), nextMinimum);
+    await api.loadMinimumHistory();
+    assert.equal(minimumHistoryUi.status, 'error');
+    assert.equal(minimumHistoryUi.data, laterMinimum, 'failure retains the accepted record');
+    assert.equal(minimumHistoryUi.promise, null);
+  }
 });
