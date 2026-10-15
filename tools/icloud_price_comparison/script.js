@@ -6,9 +6,9 @@ import {
   isValidPublishedDate,
   publicationDateKey,
   validatePayload,
-  validatePriceHistoryConsistency,
+  assertValidatedPriceHistoryConsistency,
   visiblePublicationEntries
-} from './data-contract.js?v=2faecdc5';
+} from './data-contract.js?v=464d21cf';
 let createIcons = null;
 import { foldPublicationCountryRenames, marketSearchPriority, matchesMarketSearch, normalizeMarketSearchText, REGION_LABELS, VALID_REGIONS } from './data-model.js?v=27f94e24';
 
@@ -963,11 +963,12 @@ function ensureHistoryLoaded() {
     .then(async (historyData) => {
       if (requestId !== state.historyRequestId) return null;
       try {
-        validatePriceHistoryConsistency(state.data, historyData);
+        // state.data came from readEmbeddedSnapshot; fetchJson validated history.
+        assertValidatedPriceHistoryConsistency(state.data, historyData);
       } catch {
         historyData = await fetchJson('history.json', { forceRefresh: true });
         if (requestId !== state.historyRequestId) return null;
-        validatePriceHistoryConsistency(state.data, historyData);
+        assertValidatedPriceHistoryConsistency(state.data, historyData);
       }
       if (state.history && Date.parse(historyData.updatedAt) < Date.parse(state.history.updatedAt)) {
         throw new Error('历史响应早于已读取记录');
@@ -1143,7 +1144,6 @@ function openPublishedDateHistory() {
   state.publishedDateReturnFocus?.focus({ preventScroll: true });
   elements.resetPublishedDateBackdrop?.();
   elements.publishedDateDialog.showModal();
-  refreshIcons();
 }
 
 function renderHistorySubtitle(country, record) {
@@ -1188,7 +1188,6 @@ function openHistory(country, returnFocus = null) {
   state.historyReturnFocus?.focus({ preventScroll: true });
   elements.resetHistoryBackdrop?.();
   elements.historyDialog.showModal();
-  refreshIcons();
 }
 
 function syncActiveHistoryCountry() {

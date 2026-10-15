@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { runInNewContext } from 'node:vm';
 
-import { displayedPublishedDate, visiblePublicationEntries, validateMinimumHistoryPayload, validatePriceHistoryConsistency } from '../data-contract.js';
+import { displayedPublishedDate, visiblePublicationEntries, validateMinimumHistoryPayload, validatePayload, assertValidatedPriceHistoryConsistency } from '../data-contract.js';
 import {
   foldPublicationCountryRenames,
   marketSearchPriority,
@@ -322,8 +322,8 @@ test('country and minimum history preserve their deliberately different snapshot
       state, minimumHistoryUi, Date:SnapshotDate, URL, AbortController, setTimeout, clearTimeout,
       moduleUrl: new URL('../script.js', import.meta.url).href,
       REQUEST_TIMEOUT_MS:8000,
-      validatePriceHistoryConsistency, validateMinimumHistoryPayload,
-      fetchJson:async () => { countryFetches += 1; return futureCountry; },
+      assertValidatedPriceHistoryConsistency, validateMinimumHistoryPayload,
+      fetchJson:async () => { countryFetches += 1; return validatePayload('history.json', futureCountry); },
       fetch:async () => ({ ok:true, headers:{get:() => 'application/json'}, payload:nextMinimum }),
       readBoundedJsonResponse:async response => response.payload,
       refreshOpenHistoryViews:() => {}, renderMinimumHistory:() => {}, renderMinimumHistoryStatus:() => {},
@@ -349,5 +349,84 @@ test('country and minimum history preserve their deliberately different snapshot
     assert.equal(minimumHistoryUi.status, 'error');
     assert.equal(minimumHistoryUi.data, laterMinimum, 'failure retains the accepted record');
     assert.equal(minimumHistoryUi.promise, null);
+  }
+});
+
+test('history loading validates each response once and retries only cross-file mismatches', async () => {
+  const source = await readFile(new URL('../script.js', import.meta.url), 'utf8');
+  const [prices, history] = await Promise.all([
+    readFile(new URL('../data/prices.json', import.meta.url), 'utf8').then(JSON.parse),
+    readFile(new URL('../data/history.json', import.meta.url), 'utf8').then(JSON.parse),
+  ]);
+  validatePayload('prices.json', prices);
+  const inconsistent = structuredClone(history);
+  inconsistent.sourcePublishedDates = inconsistent.sourcePublishedDates.slice(0, 1);
+  assert.ok(history.sourcePublishedDates.length > 1);
+  const malformed = structuredClone(history);
+  Object.values(malformed.markets)[0].events[0].currency = 'bad';
+  const legacy = { ...history, schemaVersion: 2 };
+  const functions = ['fetchJson', 'ensureHistoryLoaded'].map(name => {
+    const match = source.match(new RegExp('(?:async )?function ' + name + '\\([^]*?\\n\\}'));
+    assert.ok(match, name);
+    return match[0];
+  });
+  const scenarios = [
+    { responses: [history], caches: ['default'], checks: 1, accepted: true },
+    { responses: [inconsistent, history], caches: ['default', 'reload'], checks: 2, accepted: true },
+    { responses: [inconsistent, inconsistent], caches: ['default', 'reload'], checks: 2 },
+    { responses: [malformed, history], caches: ['default'], checks: 0 },
+    { responses: [legacy, history], caches: ['default'], checks: 0 },
+  ];
+  for (const scenario of scenarios) {
+    const acceptedBefore = structuredClone(history);
+    const state = { data: prices, history: acceptedBefore, historyStatus: 'idle', historyRequestId: 0 };
+    const caches = [];
+    let structureChecks = 0;
+    let relationshipChecks = 0;
+    let historyPasses = 0;
+    let pricePasses = 0;
+    prices.countries[Symbol.iterator] = function* () {
+      pricePasses += 1;
+      yield* Array.prototype.values.call(this);
+    };
+    const api = runInNewContext(
+      [...functions, '({ ensureHistoryLoaded })'].join('\n'), {
+        state, AbortController, setTimeout, clearTimeout, REQUEST_TIMEOUT_MS: 8000,
+        fetch: async (_url, options) => {
+          const payload = structuredClone(scenario.responses[caches.length]);
+          caches.push(options.cache);
+          const events = Object.values(payload.markets)[0].events;
+          events[Symbol.iterator] = function* () {
+            historyPasses += 1;
+            yield* Array.prototype.values.call(this);
+          };
+          return { ok: true, payload };
+        },
+        readBoundedJsonResponse: async response => response.payload,
+        validatePayload: (name, payload) => { structureChecks += 1; return validatePayload(name, payload); },
+        assertValidatedPriceHistoryConsistency: (data, payload) => {
+          relationshipChecks += 1;
+          return assertValidatedPriceHistoryConsistency(data, payload);
+        },
+        refreshOpenHistoryViews: () => {}, console: { warn: () => {} },
+      },
+    );
+    const result = await api.ensureHistoryLoaded();
+    assert.deepEqual(caches, scenario.caches);
+    assert.equal(structureChecks, scenario.caches.length);
+    assert.equal(relationshipChecks, scenario.checks);
+    assert.equal(pricePasses, scenario.accepted ? 1 : 0, 'publication mismatches reject before the country pass; validated prices are never revalidated');
+    if (scenario.accepted) {
+      assert.equal(historyPasses, scenario.caches.length, 'each history event list is structurally traversed once');
+      assert.equal(result, state.history);
+      assert.equal(state.historyStatus, 'ready');
+      await api.ensureHistoryLoaded();
+      assert.deepEqual(caches, scenario.caches, 'accepted history is reused');
+    } else {
+      assert.equal(result, null);
+      assert.equal(state.history, acceptedBefore, 'failure preserves accepted history');
+      assert.equal(state.historyStatus, 'unavailable');
+    }
+    assert.equal(state.historyPromise, null);
   }
 });

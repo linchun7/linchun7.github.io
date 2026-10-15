@@ -52,8 +52,6 @@ PLAN = re.compile(r'ChatGPT [^\x00-\x1f\x7f<>]{1,70}\Z')
 AMOUNT = re.compile(r'(?:0|[1-9][0-9]*)(?:\.[0-9]{1,3})?\Z')
 ZERO_DECIMAL = {'JPY', 'KRW', 'VND', 'CLP', 'PYG', 'UGX', 'RWF', 'XOF', 'XAF'}
 THREE_DECIMAL = {'BHD', 'IQD', 'JOD', 'KWD', 'OMR', 'TND'}
-PLAN_ORDER = plan_ids.PLAN_ORDER
-STATUS_LABEL = {'verified': '已核验', 'retained': '沿用旧价', 'pending': '待复核', 'unavailable': '暂无标价'}
 BEIJING = timezone(timedelta(hours=8))
 
 

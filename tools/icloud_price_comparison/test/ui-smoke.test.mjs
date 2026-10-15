@@ -5154,3 +5154,41 @@ for (const touch of [false, true]) {
       } finally { await browser.close(); }
     });
 }
+
+test('opening either history dialog keeps converted icons without another icon scan', { timeout: 30000 }, async context => {
+  const session = await snapshotSession(context, 'history dialog icon scans', { width: 1024 });
+  if (!session) return;
+  const { page, browser, url, errors } = session;
+  try {
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await waitForSnapshot(page);
+    await page.waitForFunction(() => document.querySelector('#closeHistory svg.lucide-x')
+      && document.querySelector('#closePublishedDate svg.lucide-x'));
+    await page.evaluate(() => {
+      const queryAll = document.querySelectorAll.bind(document);
+      globalThis.__historyIconScans = 0;
+      document.querySelectorAll = selector => {
+        if (selector === 'i[data-lucide]') globalThis.__historyIconScans += 1;
+        return queryAll(selector);
+      };
+    });
+    for (const [trigger, dialog, close] of [
+      ['#publishedDateButton', '#publishedDateDialog', '#closePublishedDate'],
+      ['.country-history-button', '#historyDialog', '#closeHistory'],
+    ]) {
+      for (let repeat = 0; repeat < 2; repeat += 1) {
+        const button = page.locator(trigger).first();
+        await button.click();
+        assert.equal(await page.locator(dialog).evaluate(node => node.open), true);
+        assert.equal(await page.locator(dialog + ' i[data-lucide]').count(), 0);
+        assert.equal(await page.locator(close + ' svg.lucide-x').count(), 1);
+        await page.locator(close).click();
+        await page.waitForFunction(selector => document.activeElement === document.querySelector(selector), trigger);
+      }
+    }
+    assert.equal(await page.evaluate(() => globalThis.__historyIconScans), 0);
+    assert.deepEqual(errors, []);
+  } finally {
+    await browser.close();
+  }
+});
