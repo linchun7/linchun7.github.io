@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import re
 import unittest
 from pathlib import Path
 
@@ -89,8 +91,11 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("PLAYWRIGHT_BROWSER:", validate)
         package = (ROOT / "tools" / "chatgpt_price_comparison" / "package.json").read_text(encoding="utf-8")
         lock = (ROOT / "tools" / "chatgpt_price_comparison" / "pnpm-lock.yaml").read_text(encoding="utf-8")
-        self.assertIn('"playwright": "1.63.0"', package)
-        self.assertIn("playwright@1.63.0", lock)
+        version = json.loads(package)['devDependencies']['playwright']
+        self.assertRegex(version, r'^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$')
+        self.assertRegex(lock, r'(?m)^        specifier: ' + re.escape(version) + r'$')
+        self.assertIn('playwright@' + version + ':', lock)
+        self.assertIn('playwright-core@' + version + ':', lock)
         for relative in ("app.js", "index.template.html", "scripts/pipeline.py", "scripts/browser-matrix.mjs"):
             project_file = (ROOT / "tools" / "chatgpt_price_comparison" / relative).read_text(encoding="utf-8")
             self.assertNotIn("icloud_price_comparison", project_file)
@@ -160,6 +165,19 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertNotIn('len(expected) == 59', live)
         self.assertNotIn("previous[market['code']]['history_baseline']", live)
         self.assertNotIn("all(change in candidate['changes']", live)
+
+    def test_dependency_scope_only_changes_pr_live_validation(self):
+        validate = (ROOT / '.github/workflows/validate-chatgpt-prices.yml').read_text(encoding='utf-8')
+        self.assertIn('validation-scope:', validate)
+        self.assertIn('scripts/validation-scope.mjs', validate)
+        live = validate[validate.index("\n  live-source:"):]
+        self.assertIn('needs: validation-scope', live)
+        self.assertIn("if: ${{ !cancelled() && github.event_name == 'pull_request'", live)
+        self.assertIn("needs.validation-scope.outputs.dependency_only != 'true'", live)
+        before_live = validate[:validate.index("\n  live-source:")]
+        self.assertEqual(before_live.count('dependency_only'), 2)
+        self.assertIn('VERIFY_PNPM_ROUNDTRIP:', before_live)
+        self.assertIn('node --test scripts/test-dependency-policy.mjs', before_live)
 
     def test_only_main_can_publish(self):
         self.assertIn("github.ref == 'refs/heads/main'", self.text)

@@ -3,6 +3,8 @@ import test from 'node:test';
 
 import {
   main,
+  validateChatgptNpmChangedFiles,
+  validateChatgptNpmPullRequest,
   validateNpmChangedFiles,
   validateNpmPullRequest,
   validateRoutineNpmPackageUpdate,
@@ -376,4 +378,108 @@ test('rechecks the latest exact-head npm validation for both approved profiles b
       assert.match(messages.join('\n'), /not merged/);
     }
   }
+});
+
+const CHATGPT_PACKAGE_PATH = 'tools/chatgpt_price_comparison/package.json';
+const CHATGPT_LOCK_PATH = 'tools/chatgpt_price_comparison/pnpm-lock.yaml';
+const CHATGPT_WORKFLOW = 'Validate ChatGPT price comparison';
+
+function baseChatgptPackage() {
+  return {
+    name: 'chatgpt-price-comparison', private: true, type: 'module',
+    packageManager: 'pnpm@10.14.0+sha512.' + 'a'.repeat(128),
+    scripts: { 'test:browser-matrix': 'node scripts/browser-matrix.mjs' },
+    devDependencies: { playwright: '1.63.0' },
+  };
+}
+
+function validChatgptPullRequest() {
+  const pr = validStaticPullRequest();
+  pr.user.type = 'Bot';
+  pr.head.ref = 'dependabot/npm_and_yarn/tools/chatgpt_price_comparison/playwright-1.64.0';
+  return pr;
+}
+
+function chatgptChangedFiles() {
+  return [CHATGPT_PACKAGE_PATH, CHATGPT_LOCK_PATH].map(filename => ({ filename, status: 'modified' }));
+}
+
+async function chatgptGate({
+  pr = validChatgptPullRequest(),
+  head = { ...baseChatgptPackage(), devDependencies: { playwright: '1.64.0' } },
+  files = chatgptChangedFiles(),
+  lock = 'official lock\n',
+  regenerate = async () => 'official lock\n',
+  workflow = CHATGPT_WORKFLOW,
+  runOverrides = {},
+} = {}) {
+  let merged = false;
+  let refreshed = false;
+  const fetchImpl = async (url, options) => {
+    if (url.endsWith('/pulls/42')) return Response.json({ ...pr, changed_files: files.length });
+    if (url.includes('/pulls/42/files?')) return Response.json(files);
+    if (url.includes('/contents/' + CHATGPT_PACKAGE_PATH + '?ref=' + BASE_SHA)) return Response.json(asContent(baseChatgptPackage()));
+    if (url.includes('/contents/' + CHATGPT_PACKAGE_PATH + '?ref=' + HEAD_SHA)) return Response.json(asContent(head));
+    if (url.includes('/contents/' + CHATGPT_LOCK_PATH + '?ref=' + HEAD_SHA)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(lock).toString('base64') });
+    }
+    if (url.includes('/actions/runs?')) return runResponse(pr, CHATGPT_WORKFLOW, runOverrides);
+    if (url.endsWith('/pulls/42/update-branch')) { refreshed = true; return Response.json({}); }
+    if (url.endsWith('/pulls/42/merge')) {
+      assert.equal(JSON.parse(options.body).sha, HEAD_SHA);
+      assert.equal(JSON.parse(options.body).commit_title, 'chore: update ChatGPT browser test dependency (#42)');
+      merged = true; return Response.json({ merged: true });
+    }
+    return Response.json({ message: 'unexpected request' }, { status: 404 });
+  };
+  await main(env(workflow), fetchImpl, () => {}, undefined, regenerate);
+  return { merged, refreshed };
+}
+
+test('ChatGPT has an independent exact manifest+lock boundary and validation workflow', async () => {
+  assert.doesNotThrow(() => validateChatgptNpmPullRequest(validChatgptPullRequest(), expectedPullRequest()));
+  assert.throws(() => validateChatgptNpmPullRequest(validStaticPullRequest(), expectedPullRequest()));
+  assert.equal(validateChatgptNpmChangedFiles(chatgptChangedFiles()), true);
+  assert.throws(() => validateChatgptNpmChangedFiles([{ filename: CHATGPT_LOCK_PATH, status: 'modified' }]));
+  assert.throws(() => validateChatgptNpmChangedFiles([...chatgptChangedFiles(), { filename: '.npmrc', status: 'modified' }]));
+  assert.deepEqual(await chatgptGate(), { merged: true, refreshed: false });
+  await assert.rejects(chatgptGate({ workflow: STATIC_WORKFLOW }), /cannot be handled/);
+});
+
+test('ChatGPT majors, manifest scripts, extra dependencies and forged complete locks never auto-merge', async () => {
+  for (const mutate of [
+    p => { p.devDependencies.playwright = '2.0.0'; },
+    p => { p.scripts['test:browser-matrix'] = 'echo bypass'; },
+    p => { p.devDependencies.extra = '1.0.0'; },
+    p => { p.packageManager = 'pnpm@11.0.0'; },
+  ]) {
+    const head = { ...baseChatgptPackage(), scripts: { ...baseChatgptPackage().scripts }, devDependencies: { playwright: '1.64.0' } };
+    mutate(head);
+    await assert.rejects(chatgptGate({ head }));
+  }
+  for (const addition of ['extra-package', 'scripts: evil', 'registry: evil', 'integrity: forged']) {
+    await assert.rejects(chatgptGate({ lock: 'official lock\n' + addition }), /does not match/);
+  }
+  await assert.rejects(chatgptGate({ regenerate: async () => { throw new Error('registry down'); } }), /registry down/);
+  await assert.rejects(chatgptGate({ files: [{ filename: CHATGPT_LOCK_PATH, status: 'modified' }] }), /outside/);
+});
+
+test('ChatGPT author identity, exact head/base and latest non-success CI remain fail-closed', async () => {
+  for (const mutate of [
+    pr => { pr.user.login = 'dependabot'; },
+    pr => { pr.user.type = 'User'; },
+    pr => { pr.head.repo.full_name = 'fork/repository'; },
+  ]) {
+    const pr = validChatgptPullRequest(); mutate(pr);
+    await assert.rejects(chatgptGate({ pr }));
+  }
+  const moved = validChatgptPullRequest(); moved.head.sha = 'e'.repeat(40);
+  assert.equal((await chatgptGate({ pr: moved })).merged, false);
+  const rebased = validChatgptPullRequest(); rebased.base.sha = 'f'.repeat(40);
+  assert.deepEqual(await chatgptGate({ pr: rebased }), { merged: false, refreshed: true });
+  for (const runOverrides of [
+    { status: 'queued', conclusion: null }, { status: 'in_progress', conclusion: null },
+    { conclusion: 'failure' }, { conclusion: 'cancelled' },
+    { head_sha: 'e'.repeat(40) }, { head_repository: { full_name: 'foreign/repository' } },
+  ]) assert.equal((await chatgptGate({ runOverrides })).merged, false);
 });

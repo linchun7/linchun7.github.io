@@ -84,7 +84,7 @@ test('stages maintenance after production and keeps every dependency update in i
   ]);
 
   assert.match(updateWorkflow, /cron:\s*['"]10 0 \* \* \*['"]/, 'daily GitHub fallback stays at 08:10 Beijing');
-  assert.equal((dependabot.match(/package-ecosystem:\s*npm/g) || []).length, 2);
+  assert.equal((dependabot.match(/package-ecosystem:\s*npm/g) || []).length, 3);
   assert.match(
     dependabot,
     /package-ecosystem: npm[\s\S]*?directory: \/tools\/icloud_price_comparison[\s\S]*?day: monday[\s\S]*?time: ["']10:20["'][\s\S]*?timezone: Asia\/Shanghai[\s\S]*?open-pull-requests-limit:\s*5/
@@ -97,6 +97,8 @@ test('stages maintenance after production and keeps every dependency update in i
     dependabot,
     /package-ecosystem: github-actions[\s\S]*?day: monday[\s\S]*?time: ["']12:20["'][\s\S]*?timezone: Asia\/Shanghai[\s\S]*?open-pull-requests-limit:\s*5[\s\S]*?dependency-name: ["']actions\/\*["']/
   );
+  assert.match(dependabot,
+    /package-ecosystem: npm[\s\S]*?directory: \/tools\/chatgpt_price_comparison[\s\S]*?day: monday[\s\S]*?time: ["']11:40["'][\s\S]*?timezone: Asia\/Shanghai[\s\S]*?dependency-name: playwright/);
   assert.doesNotMatch(dependabot, /^\s+groups:/m, 'grouped dependency PRs would re-couple failure domains');
   assert.doesNotMatch(dependabot, /^\s+ignore:/m, 'npm majors must still be proposed so tested candidates can auto-upgrade');
   assert.match(autoMergeScript, /major update requires manual review/, 'GitHub Actions majors stay manual until production-only Action behavior is covered');
@@ -142,6 +144,7 @@ test('auto-merge is serialized, least-privileged, and routes each dependency sco
   assert.match(workflow, /workflow_run\.name == 'Validate iCloud price comparison'[\s\S]*?dependabot\/github_actions\/[\s\S]*?dependabot\/npm_and_yarn\/tools\/icloud_price_comparison\//);
   assert.match(workflow, /workflow_run\.name == 'Validate static tools'[\s\S]*?dependabot\/github_actions\/[\s\S]*?dependabot\/npm_and_yarn\/tools\/browser-tests\//);
   assert.match(workflow, /workflow_run\.name == 'Validate Action artifact roundtrip'[\s\S]*?upload-artifact[\s\S]*?download-artifact/);
+  assert.match(workflow, /workflow_run\.name == 'Validate ChatGPT price comparison'[\s\S]*?dependabot\/npm_and_yarn\/tools\/chatgpt_price_comparison\//);
   assert.match(workflow, /RUN_BASE_SHA:[\s\S]*?RUN_HEAD_SHA:[\s\S]*?VALIDATION_WORKFLOW:/);
   assert.doesNotMatch(workflow, /pull_request_target|secrets\./);
 });

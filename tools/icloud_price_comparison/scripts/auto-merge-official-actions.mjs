@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { regeneratePlaywrightLock, validatePlaywrightDependencyUpdate } from '../../chatgpt_price_comparison/scripts/dependency-policy.mjs';
 import { resolve } from 'node:path';
 import { isDeepStrictEqual, promisify } from 'node:util';
 import { pathToFileURL } from 'node:url';
@@ -11,6 +12,7 @@ const STABLE_SEMVER_PATTERN = /^(\d+)\.(\d+)\.(\d+)$/;
 const ACTION_BRANCH_PREFIX = 'dependabot/github_actions/';
 const ICLOUD_VALIDATION_WORKFLOW = 'Validate iCloud price comparison';
 const STATIC_VALIDATION_WORKFLOW = 'Validate static tools';
+const CHATGPT_VALIDATION_WORKFLOW = 'Validate ChatGPT price comparison';
 const ACTION_ARTIFACT_VALIDATION_WORKFLOW = 'Validate Action artifact roundtrip';
 const STATIC_VALIDATION_WORKFLOW_PATH = '.github/workflows/validate-static-tools.yml';
 const MAX_CHANGED_FILES = 20;
@@ -28,6 +30,17 @@ const NPM_PROFILES = Object.freeze({
     commitLabel: 'iCloud dependency',
     allowLockOnly: true,
     allowedDependencies: new Set(['cheerio', 'lucide', 'playwright']),
+  }),
+  chatgpt: Object.freeze({
+    id: 'chatgpt',
+    branchPrefix: 'dependabot/npm_and_yarn/tools/chatgpt_price_comparison/',
+    packagePath: 'tools/chatgpt_price_comparison/package.json',
+    lockPath: 'tools/chatgpt_price_comparison/pnpm-lock.yaml',
+    validationWorkflow: CHATGPT_VALIDATION_WORKFLOW,
+    commitLabel: 'ChatGPT browser test dependency',
+    allowLockOnly: false,
+    allowedDependencies: new Set(['playwright']),
+    verifyPlaywrightLock: true,
   }),
   staticBrowserTests: Object.freeze({
     id: 'static-browser-tests',
@@ -77,6 +90,11 @@ export function validateStaticBrowserNpmPullRequest(pr, expected) {
   invariant(pr.head?.ref?.startsWith(NPM_PROFILES.staticBrowserTests.branchPrefix), 'Pull request must be a static browser test npm update');
 }
 
+export function validateChatgptNpmPullRequest(pr, expected) {
+  validateCommonPullRequest(pr, expected);
+  invariant(pr.head?.ref?.startsWith(NPM_PROFILES.chatgpt.branchPrefix), 'Pull request must be a ChatGPT npm update');
+}
+
 function classifyDependabotPullRequest(pr, expected) {
   validatePullRequestIdentity(pr, expected);
   if (pr.head?.ref?.startsWith(ACTION_BRANCH_PREFIX)) {
@@ -91,6 +109,7 @@ function classifyDependabotPullRequest(pr, expected) {
   }
   const npmProfile = npmProfileForBranch(pr.head?.ref);
   if (npmProfile) {
+    if (npmProfile.verifyPlaywrightLock) invariant(pr.user?.type === 'Bot', 'ChatGPT dependency author must be the authenticated Dependabot bot');
     return {
       kind: 'npm',
       triggerWorkflows: new Set([npmProfile.validationWorkflow]),
@@ -209,6 +228,10 @@ export function validateNpmChangedFiles(files) {
 
 export function validateStaticBrowserNpmChangedFiles(files) {
   return validateNpmChangedFilesForProfile(files, NPM_PROFILES.staticBrowserTests);
+}
+
+export function validateChatgptNpmChangedFiles(files) {
+  return validateNpmChangedFilesForProfile(files, NPM_PROFILES.chatgpt);
 }
 
 function parseStableVersion(version, label) {
@@ -339,6 +362,14 @@ async function readPullRequestFiles(repository, token, pullNumber, fetchImpl) {
   return files;
 }
 
+async function readTextAtRef(repository, token, path, ref, fetchImpl) {
+  const payload = await githubRequest(repository, token, '/contents/' + path + '?ref=' + encodeURIComponent(ref), {}, fetchImpl);
+  invariant(payload?.encoding === 'base64' && typeof payload.content === 'string', `Unable to read ${path} at ${ref}`);
+  const text = Buffer.from(payload.content.replace(/\s+/g, ''), 'base64').toString('utf8');
+  invariant(Buffer.byteLength(text, 'utf8') <= 256 * 1024, 'Dependency lockfile is too large');
+  return text;
+}
+
 async function readJsonAtRef(repository, token, path, ref, fetchImpl) {
   const payload = await githubRequest(
     repository,
@@ -425,7 +456,7 @@ export function latestRequiredWorkflowState(runs, workflowName) {
   return { ready: true, reason: `${workflowName} passed` };
 }
 
-export async function main(env = process.env, fetchImpl = fetch, log = console.log, runGit = execFileAsync) {
+export async function main(env = process.env, fetchImpl = fetch, log = console.log, runGit = execFileAsync, regenerateLock = regeneratePlaywrightLock) {
   const {
     DEFAULT_BRANCH: defaultBranch,
     GITHUB_TOKEN: token,
@@ -509,6 +540,10 @@ export async function main(env = process.env, fetchImpl = fetch, log = console.l
       invariant(profile.allowLockOnly, `${profile.id}: lockfile-only updates are not allowed`);
       invariant(changes.length === 0, 'Lockfile-only update unexpectedly changed package.json semantics');
       summary = 'one lockfile-only transitive npm dependency update';
+    }
+    if (profile.verifyPlaywrightLock) {
+      const lock = await readTextAtRef(repository, token, profile.lockPath, headSha, fetchImpl);
+      await validatePlaywrightDependencyUpdate(basePackage, headPackage, lock, regenerateLock);
     }
     commitTitle = `chore: update ${profile.commitLabel} (#${pullNumber})`;
   }
