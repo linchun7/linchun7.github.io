@@ -122,6 +122,7 @@ jobs:
           node --test tools/browser-tests/space-upstream-contract.test.mjs
           node --test tools/browser-tests/space-production.test.mjs
           if [[ "$PLAYWRIGHT_BROWSER" == chromium ]]; then
+            node tools/browser-tests/math-card-audit-verification.mjs
             node tools/browser-tests/space-production.mjs --fixture
           fi
           node --test tools/browser-tests/script-startup-contract-test.mjs
