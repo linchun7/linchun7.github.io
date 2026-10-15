@@ -25,6 +25,8 @@
 
 GITHUB_TOKEN 发布数据提交不会再触发普通 push 验证，updater 必须保留完整验收；普通 main 代码提交在核心/三浏览器通过后使用同一生产校验器。YAML 改变后从 main 新建 Run workflow，不重跑旧定义。关键契约、生成器和 update/validate workflow 变化须同步两份指南，测试、工件复验和生产验收门禁均保留。
 
+文档门禁仅豁免官方 Action 的可信 Dependabot pin-only 升级：PR 作者和事件发送者均为固定账号 ID 的 Dependabot Bot，同仓库 Actions 分支指向默认分支，实际受测合并提交绑定精确 base/head。全部差异只能替换同一个 actions/* 的完整 SHA 与版本注释，同 major 稳定 release 向前；新旧 SHA 都须与官方标签解析结果一致，其余文件、权限、命令、缩进和字节不得变化。身份、完整性、标签解析或网络异常均保留两份指南要求，并输出失败原因；人工 PR、major、回退和不可解析 SHA 不豁免。文档豁免不跳过核心、工件、快照、审计或三浏览器验收，也不扩大自动合并的受信范围或权限。
+
 ## 排障与告警
 
 先看失败 run 的首个失败步骤、错误码和真实价格/汇率时间，不先改 JSON。

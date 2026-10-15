@@ -364,8 +364,13 @@ test('keeps pull-request validation read-only, complete, and SHA-pinned', async 
   assert.match(ciWorkflow, /run: pnpm audit --audit-level low/);
   assert.match(coreJob, /name: 强制关键架构更新同步文档[\s\S]*?if: github\.event_name == 'pull_request'/);
   const docsGate = coreJob.match(/- name: 强制关键架构更新同步文档[\s\S]*?(?=\n      - name: 强制已发布 marketId 永久保留)/)?.[0] ?? '';
-  assert.match(docsGate, /data-model\.js/);
-  assert.doesNotMatch(docsGate, /tools\/icloud_price_comparison\/script\.js/);
+  assert.match(docsGate, /run: node tools\/icloud_price_comparison\/scripts\/validate-documentation-change\.mjs/);
+  assert.match(docsGate, /BASE_SHA: \$\{\{ github\.event\.pull_request\.base\.sha \}\}/);
+  assert.match(docsGate, /HEAD_SHA: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
+  const docsValidator = await readFile(new URL('../scripts/validate-documentation-change.mjs', import.meta.url), 'utf8');
+  assert.match(docsValidator, /data-model\.js/);
+  assert.doesNotMatch(docsValidator, /tools\/icloud_price_comparison\/script\.js/);
+  assert.ok(coreJob.indexOf('node-version: 22') < coreJob.indexOf('name: 强制关键架构更新同步文档'));
   assert.ok(coreJob.includes('name: 强制已发布 marketId 永久保留'));
   assert.ok(coreJob.includes('Published marketId removed from history ledger'));
   assert.ok(coreJob.includes('Published source identity rekeyed'));
