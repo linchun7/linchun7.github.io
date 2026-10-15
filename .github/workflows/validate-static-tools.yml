@@ -82,6 +82,27 @@ jobs:
         with:
           node-version: 22
 
+      # Temporary read-only bootstrap: generation runs only in GitHub Actions.
+      # Remove after transferring the generated text through the GitHub connector.
+      - name: Bootstrap translation HTML in GitHub Actions
+        if: github.event_name == 'pull_request' && github.head_ref == 'optimize/translation-prerender-20261015'
+        run: |
+          node tools/translation_benchmark/scripts/render-pages.mjs --write
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          for (const language of ['en', 'ja', 'ko', 'fr', 'de', 'es']) {
+            console.log('TRANSLATION_GENERATED_JSON ' + JSON.stringify({
+              path: 'tools/translation_benchmark/' + language + '.html',
+              content: readFileSync('tools/translation_benchmark/' + language + '.html', 'utf8')
+            }));
+          }
+          NODE
+
+      - name: 验证翻译语料静态生成物
+        run: |
+          node tools/translation_benchmark/scripts/render-pages.mjs --check
+          node --test tools/translation_benchmark/test/*.test.mjs
+
       - name: 运行静态依赖更新器单元测试
         run: node --test tools/vendor/update-static-vendors.test.mjs
 
