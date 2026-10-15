@@ -287,3 +287,4 @@ try {
 }
 
 await import('./hospital-rank-regression.mjs');
+await import('./hospital-dialog-pointer-regression.mjs');
