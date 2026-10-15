@@ -104,6 +104,20 @@ try {
         assert.equal(await page.inputValue('#inputmoney'), '１２３．４５');
         assert.equal((await page.locator('#result1').textContent()).trim(), '人民币壹佰贰拾叁元肆角伍分');
     });
+    await check('RMB preserves exact large integers and cents in decimal and scientific input', 'rmb_converter', async page => {
+        const prefix = '人民币玖仟零柒万壹仟玖佰玖拾贰亿伍仟肆佰柒拾肆万零玖佰玖拾';
+        const cases = [
+            ['9007199254740992.01', prefix + '贰元零壹分'],
+            ['9007199254740993.01', prefix + '叁元零壹分'],
+            ['9.00719925474099301e15', prefix + '叁元零壹分']
+        ];
+        for (const [raw, expected] of cases) {
+            await page.fill('#inputmoney', raw);
+            assert.equal(await page.inputValue('#inputmoney'), raw);
+            assert.equal(await page.locator('#result1').evaluate(el => el.classList.contains('error')), false);
+            assert.equal((await page.locator('#result1').textContent()).trim(), expected, raw);
+        }
+    });
     await check('RMB clipboard rejection falls back and removes its temporary textarea', 'rmb_converter', async page => {
         await page.fill('#inputmoney', '123.45');
         await page.evaluate(() => {
