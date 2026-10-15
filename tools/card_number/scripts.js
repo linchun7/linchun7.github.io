@@ -157,7 +157,7 @@ function materializeCardNumber(pattern, variableAtPosition, assignment) {
 function startGeneration() {
   if (composing) return;
   const inputField = document.getElementById('inputField');
-  const processedInput = inputField.value.replace(/[^a-zA-Z0-9*]/g, '');
+  const processedInput = normalizeCardRule(inputField.value).replace(/[^a-zA-Z0-9*]/g, '');
   results = [];
   const tooLong = processedInput.length > MAX_PATTERN_LENGTH;
   inputField.setAttribute('aria-invalid', String(tooLong));
@@ -222,21 +222,17 @@ function clearInput() {
   handleInput(); // 更新统计信息
 }
 
+// 只归一化计算副本，不改写输入框，以保留原生光标、输入法和撤销/重做记录。
+function normalizeCardRule(value) {
+  return value.normalize('NFKC').replace(/[^a-zA-Z0-9*\s]/g, '').replace(/\s+/g, ' ');
+}
+
 /**
- * 处理用户输入，过滤非法字符并更新统计信息
+ * 统计计算副本中的有效位数（不包括空格）
  */
 function handleInput() {
-  let inputField = document.getElementById('inputField');
-  let inputStr = inputField.value;
-
-  // 过滤非字母、数字、星号的字符，并将多个空格替换为一个空格
-  inputStr = inputStr.normalize('NFKC').replace(/[^a-zA-Z0-9*\s]/g, '').replace(/\s+/g, ' ');
-
-  // 更新输入框内容
-  inputField.value = inputStr;
-
-  // 统计有效位数（不包括空格）
-  let validCount = inputStr.replace(/[^a-zA-Z0-9*]/g, '').length;
+  const inputStr = normalizeCardRule(document.getElementById('inputField').value);
+  const validCount = inputStr.replace(/[^a-zA-Z0-9*]/g, '').length;
   document.getElementById('validCount').textContent = `${validCount}`;
 }
 

@@ -43,7 +43,7 @@ try {
         assert.match(await page.locator('#count').textContent(), /100/);
         assert.equal(await page.inputValue('#inputField'), '0'.repeat(101));
         await page.fill('#inputField', '７９９２７３９８７１３');
-        assert.equal(await page.inputValue('#inputField'), '79927398713');
+        assert.equal(await page.inputValue('#inputField'), '７９９２７３９８７１３');
         assert.match(await page.locator('#result').textContent(), /7992 7398 713/);
     });
     await check('new card IME does not mutate unfinished input or submit on confirmation Enter', 'card_number_new', async page => {
@@ -57,7 +57,8 @@ try {
         assert.equal(await page.inputValue('#inputField'), 'Ａ');
         assert.equal(await page.locator('#inputField').isDisabled(), false);
         await page.evaluate(() => document.getElementById('inputField').dispatchEvent(new CompositionEvent('compositionend', { bubbles: true })));
-        assert.equal(await page.inputValue('#inputField'), 'A');
+        assert.equal(await page.inputValue('#inputField'), 'Ａ');
+        assert.equal(await page.locator('#validCount').textContent(), '1');
     });
     await check('RMB limits scientific expansion before calling the converter', 'rmb_converter', async page => {
         // Stub the expensive library so this regression is safe even on unfixed code.

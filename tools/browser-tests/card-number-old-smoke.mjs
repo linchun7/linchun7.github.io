@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { checkCardInputRecovery } from './card-input-recovery.mjs';
 import { chromium, firefox, webkit } from 'playwright';
 
 const browserName = process.env.PLAYWRIGHT_BROWSER || 'chromium';
@@ -68,6 +69,7 @@ try {
 
     assert.equal(pageErrors.length, 0, `old card number page errors: ${pageErrors.map(String).join('; ')}`);
     await context.close();
+    await checkCardInputRecovery(browser, baseUrl, browserName);
     console.log(`Old card number smoke tests passed in ${browserName}.`);
 } finally {
     await browser.close();

@@ -27,8 +27,8 @@ try {
     assert.match(await page.locator('.stat-item').nth(1).textContent(), /生成结果/);
 
     await page.fill('#inputField', '７９９２７３９８７１＊?');
-    assert.equal(await page.locator('#inputField').inputValue(), '7992739871*');
-    assert.match(await page.locator('#toast').textContent(), /已删除不支持字符/);
+    assert.equal(await page.locator('#inputField').inputValue(), '７９９２７３９８７１＊?');
+    assert.match(await page.locator('#toast').textContent(), /计算时忽略不支持字符/);
     assert.match(await page.locator('#toast').textContent(), /\?/);
 
     await page.click('#calcBtn');
