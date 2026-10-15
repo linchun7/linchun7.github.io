@@ -31,6 +31,23 @@ test('shared browser and updater contracts accept the committed production paylo
   assert.doesNotThrow(() => validateExistingHistory(history, prices));
 });
 
+test('standalone consistency validation rejects malformed raw inputs and rechecks mutated payloads', async () => {
+  const { prices, history } = await productionFixtures();
+  assert.equal(validatePriceHistoryConsistency(prices, history), history);
+  const malformedPrices = structuredClone(prices);
+  malformedPrices.countries[0].plans[prices.tiers[0].id].formattedPrice = '<unsafe>';
+  assert.throws(() => validatePriceHistoryConsistency(malformedPrices, history), /invalid .* pricing/);
+
+  const malformedHistory = structuredClone(history);
+  const record = Object.values(malformedHistory.markets).find(({ events }) => events.length > 1);
+  assert.ok(record, 'the fixture must contain an older event outside the latest-value relationship check');
+  record.events[0].currency = 'bad';
+  assert.throws(() => validatePriceHistoryConsistency(prices, malformedHistory), /invalid event/);
+  validateHistoryPayload(history);
+  Object.values(history.markets)[0].events[0].plans[prices.tiers[0].id] = -1;
+  assert.throws(() => validatePriceHistoryConsistency(prices, history), /invalid event/);
+});
+
 test('rejects impossible tied CNY ranks at both browser and updater boundaries', async () => {
   const { prices } = await productionFixtures();
   for (const mode of ['collapsed-production-ranks', 'chained-cent-differences']) {

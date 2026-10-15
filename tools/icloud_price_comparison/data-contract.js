@@ -535,6 +535,12 @@ export function validateHistoryPayload(payload) {
 export function validatePriceHistoryConsistency(prices, history) {
   validatePricePayload(prices);
   validateHistoryPayload(history);
+  return assertValidatedPriceHistoryConsistency(prices, history);
+}
+
+// Relationship checks only: callers must have fully validated both payloads.
+// Use validatePriceHistoryConsistency for raw or otherwise unvalidated inputs.
+export function assertValidatedPriceHistoryConsistency(prices, history) {
   if (history.schemaVersion < 4 && history.schemaVersion >= 2 && history.updatedAt !== prices.generatedAt) {
     throw new Error('prices.json and legacy history.json have different update timestamps');
   }
