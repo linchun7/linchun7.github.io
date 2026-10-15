@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { execFile } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
+import { promisify } from 'node:util';
 import { evaluateDocumentationChange, main, parseRawChanges } from '../scripts/validate-documentation-change.mjs';
-import { verifyActionReferences } from '../scripts/auto-merge-official-actions.mjs';
+import { validateChangedFiles, verifyActionReferences } from '../scripts/auto-merge-official-actions.mjs';
 
 const BASE = 'a'.repeat(40);
 const HEAD = 'b'.repeat(40);
@@ -228,4 +231,48 @@ test('CLI compares and reads the tested merge tree, binds its parents, and runs 
   await assert.rejects(main(env, git, async () => JSON.stringify(untrusted), () => {}), /without required documentation update/);
   await assert.rejects(main({ ...env, GITHUB_EVENT_NAME: 'push' }, git, readEvent), /pull_request/);
   await assert.rejects(main({ ...env, HEAD_SHA: 'main' }, git, readEvent), /Exact base\/head\/checkout SHAs/);
+});
+
+const readHistoricalFixture = async () => JSON.parse(await readFile(new URL('./fixtures/dependabot-195-action-pins.json', import.meta.url), 'utf8'));
+
+test('replays all seven actual PR #195 pin-only patches, including real list shorthand and release refs', async () => {
+  const historical = await readHistoricalFixture();
+  assert.equal(historical.files.length, 7);
+  assert.equal(validateChangedFiles(historical.files), 19);
+  assert.equal(historical.files.some(({ filename }) => filename.endsWith('README.md') || filename.endsWith('OPERATIONS.md')), false);
+  // These excerpts preserve the actual patch bytes. Full original Git trees
+  // and live official tags are checked separately on Actions below.
+  const excerpt = (patch, marker) => patch.split('\n').filter((line) => line.startsWith(' ') || line.startsWith(marker)).map((line) => line.slice(1)).join('\n');
+  const files = historical.files.map((file) => ({
+    ...file, oldMode: '100644', newMode: '100644',
+    baseContent: excerpt(file.patch, '-'), headContent: excerpt(file.patch, '+'),
+  }));
+  const result = await evaluateDocumentationChange({
+    repository: historical.reconstructedEvent.repository.full_name,
+    event: historical.reconstructedEvent, baseSha: historical.baseSha, headSha: historical.headSha,
+    checkoutParents: [historical.baseSha, historical.headSha], files,
+  }, {
+    verifyReferences: async (references) => assert.deepEqual(references, historical.references),
+  });
+  assert.equal(result.exempt, true);
+});
+
+test('Actions verifies the actual historical Git merge bytes and both live official release tags read-only', {
+  skip: process.env.GITHUB_ACTIONS !== 'true', timeout: 120_000,
+}, async () => {
+  const historical = await readHistoricalFixture();
+  const runGit = promisify(execFile);
+  await runGit('git', ['fetch', '--no-tags', 'origin', historical.baseSha, historical.headSha, historical.checkoutSha], {
+    encoding: 'utf8', timeout: 30_000, maxBuffer: 1024 * 1024,
+  });
+  const result = await main({
+    BASE_SHA: historical.baseSha, HEAD_SHA: historical.headSha, GITHUB_SHA: historical.checkoutSha,
+    GITHUB_REPOSITORY: historical.reconstructedEvent.repository.full_name,
+    GITHUB_EVENT_NAME: 'pull_request', GITHUB_EVENT_PATH: 'reconstructed-fixture-only',
+  }, runGit, async (path) => {
+    assert.equal(path, 'reconstructed-fixture-only');
+    return JSON.stringify(historical.reconstructedEvent);
+  }, () => {});
+  assert.equal(result.exempt, true, result.reason);
+  assert.deepEqual(result.missingDocs, []);
 });

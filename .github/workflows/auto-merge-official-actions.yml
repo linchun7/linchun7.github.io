@@ -87,7 +87,7 @@ jobs:
               return false;
             }
             return file.patch.split('\n').some((line) => {
-              const content = line.replace(/^[+-]\s*/, '');
+              const content = line.replace(/^[+-]\s*(?:-\s+)?/, '');
               return ['upload-artifact', 'download-artifact'].some((action) => (
                 content.startsWith(`${usesKey} actions/${action}@`)
               ));

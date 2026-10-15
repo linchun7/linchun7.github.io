@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 
 const SHA_PATTERN = /^[a-f0-9]{40}$/;
 const WORKFLOW_PATH_PATTERN = /^\.github\/workflows\/[^/]+\.ya?ml$/;
-const ACTION_LINE_PATTERN = /^([+-])\s*uses:\s*(actions\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*)@([a-f0-9]{40})\s+#\s+(v\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?)\s*$/;
+const ACTION_LINE_PATTERN = /^([+-])\s*(?:-\s+)?uses:\s*(actions\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*)@([a-f0-9]{40})\s+#\s+(v\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?)\s*$/;
 const ACTION_STABLE_SEMVER_PATTERN = /^v(\d+)\.(\d+)\.(\d+)$/;
 const STABLE_SEMVER_PATTERN = /^(\d+)\.(\d+)\.(\d+)$/;
 const ACTION_BRANCH_PREFIX = 'dependabot/github_actions/';
@@ -146,12 +146,16 @@ export function validateChangedFiles(files) {
     for (const line of changedLines) {
       const match = line.match(ACTION_LINE_PATTERN);
       invariant(match, 'Only full-SHA actions/* references may change in ' + file.filename);
-      const reference = { action: match[2], sha: match[3], version: match[4] };
+      const reference = { action: match[2], sha: match[3], version: match[4], listItem: /^[+-]\s*-\s+uses:/.test(line) };
       (match[1] === '-' ? oldReferences : newReferences).push(reference);
     }
 
     invariant(oldReferences.length > 0, 'Workflow update must replace an existing Action reference');
     invariant(oldReferences.length === newReferences.length, 'Action replacements must be one-for-one');
+    invariant(
+      JSON.stringify(oldReferences.map(({ listItem }) => listItem)) === JSON.stringify(newReferences.map(({ listItem }) => listItem)),
+      'Action list-item structure must not change'
+    );
     const oldActions = oldReferences.map(({ action }) => action).sort();
     const newActions = newReferences.map(({ action }) => action).sort();
     invariant(JSON.stringify(oldActions) === JSON.stringify(newActions), 'Action names must not change');
@@ -171,7 +175,7 @@ export function validateChangedFiles(files) {
 
 function changesArtifactTransferAction(files) {
   return files.some(({ patch }) => typeof patch === 'string' && patch.split('\n').some((line) => (
-    /^[+-]\s*uses:\s*actions\/(?:upload-artifact|download-artifact)@/.test(line)
+    /^[+-]\s*(?:-\s+)?uses:\s*actions\/(?:upload-artifact|download-artifact)@/.test(line)
   )));
 }
 
