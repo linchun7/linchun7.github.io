@@ -8,7 +8,7 @@ import {
   validatePayload,
   assertValidatedPriceHistoryConsistency,
   visiblePublicationEntries
-} from './data-contract.js?v=2faecdc5';
+} from './data-contract.js?v=464d21cf';
 let createIcons = null;
 import { foldPublicationCountryRenames, marketSearchPriority, matchesMarketSearch, normalizeMarketSearchText, REGION_LABELS, VALID_REGIONS } from './data-model.js?v=27f94e24';
 
