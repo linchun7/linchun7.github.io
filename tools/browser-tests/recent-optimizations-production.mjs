@@ -224,13 +224,16 @@ export async function main() {
             const verified = new Set();
             let closeChecksDone = false;
             const close = context.close.bind(context);
+            const drain = async () => {
+                const deadline = Date.now() + 15000;
+                while ([...requests.values()].some(record => record.status === 'pending') && Date.now() < deadline) {
+                    await new Promise(resolve => setTimeout(resolve, 25));
+                }
+                await Promise.all(ownNetworkTasks);
+            };
             context.close = async () => {
                 if (!closeChecksDone) {
-                    const deadline = Date.now() + 15000;
-                    while ([...requests.values()].some(record => record.status === 'pending') && Date.now() < deadline) {
-                        await new Promise(resolve => setTimeout(resolve, 25));
-                    }
-                    await Promise.all(ownNetworkTasks);
+                    await drain();
                     try { assertRequestsComplete([...requests.values()], required, verified); }
                     catch (error) { networkFailures.push(error.message.split('\n')[0]); }
                     closeChecksDone = true;
@@ -260,6 +263,20 @@ export async function main() {
             });
             context.on('page', page => {
                 page.setDefaultTimeout(20000);
+                // The reused localhost suites navigate repeatedly in one page.
+                // Production bodies must finish verification before navigating
+                // away; load plus two frames also settles native autofocus.
+                for (const method of ['goto', 'reload', 'goBack', 'goForward']) {
+                    const navigate = page[method].bind(page);
+                    page[method] = async (...args) => {
+                        await drain();
+                        const options = { ...(method === 'goto' ? args[1] : args[0]), waitUntil: 'load' };
+                        const response = method === 'goto' ? await navigate(args[0], options) : await navigate(options);
+                        await drain();
+                        await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+                        return response;
+                    };
+                }
                 page.on('pageerror', error => pageErrors.push(error.message));
             });
             context.on('response', response => {
@@ -292,7 +309,7 @@ export async function main() {
                 })().catch(error => {
                     const record = requests.get(response.request());
                     if (record) { record.status = 'failed'; record.reason = error.message.split('\n')[0]; }
-                    networkFailures.push(error.message.split('\n')[0]);
+                    networkFailures.push(resource.path + ': ' + error.message.split('\n')[0]);
                 });
                 networkTasks.push(task);
                 ownNetworkTasks.push(task);
