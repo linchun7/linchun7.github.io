@@ -114,6 +114,7 @@ jobs:
           node tools/browser-tests/card-number-old-smoke.mjs
           node tools/browser-tests/card-number-new-smoke.mjs
           node tools/browser-tests/pinyin-smoke.mjs
+          node tools/browser-tests/pinyin-bounded-latency.mjs
           node tools/browser-tests/utility-tools-smoke.mjs
           node tools/browser-tests/renovation-rounding-regression.mjs
           node tools/browser-tests/input-boundaries-smoke.mjs
