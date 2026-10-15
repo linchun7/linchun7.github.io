@@ -79,7 +79,7 @@ test('sub-half-cent results keep the existing positive-public-price gate', async
     payload.run.pricePoints = 1;
     assert.equal(payload.countries[0].plans['50GB'].cnyPrice, expected);
     if (expected === 0) {
-      assert.throws(() => validatePricePayload(payload), /invalid.*price/i,
+      assert.throws(() => validatePricePayload(payload), /invalid 50GB pricing for United States/,
         'a rounded zero is still rejected before publication, rather than expanding the data contract');
     } else {
       assert.equal(validatePricePayload(payload), payload);
@@ -109,5 +109,36 @@ test('invalid operands and the pre-existing full-precision overflow boundary fai
     { USD: Number.MIN_VALUE, CNY: Number.MIN_VALUE }
   ]) {
     assert.throws(() => attachDerivedCnyPrices([country()], { fx: { rates } }), /Cannot derive/);
+  }
+});
+
+test('diagnostic: exact large fractional cents survive the public Number boundary', async () => {
+  // Converter operand diagnostics, not claims about a current official price
+  // or provider FX. The public Number schema is retained throughout.
+  const examples = [
+    { local: 0.99, currency: 'USD', rates: { USD: 1, CNY: 90981810653949.4 } },
+    { local: Number.MAX_SAFE_INTEGER, currency: 'JPY', rates: { JPY: 750, CNY: 7.5 } }
+  ];
+  const observed = [];
+  for (const example of examples) {
+    const payload = JSON.parse(await readFile(new URL('../data/prices.json', import.meta.url), 'utf8'));
+    payload.tiers = payload.tiers.filter(tier => tier.id === '50GB');
+    const row = country(example.local, example.currency);
+    row.plans['50GB'].formattedPrice = example.currency + ' ' + example.local;
+    payload.countries = attachDerivedCnyPrices([row], { fx: { rates: example.rates } });
+    payload.run.countries = 1;
+    payload.run.pricePoints = 1;
+    let acceptedByPublicContract = false, rejection = null;
+    try { validatePricePayload(payload); acceptedByPublicContract = true; }
+    catch (error) { rejection = error.message; }
+    observed.push({
+      ...example, expectedExactRoundedCny: '90071992547409.91',
+      actualCanonicalNumber: String(payload.countries[0].plans['50GB'].cnyPrice),
+      acceptedByPublicContract, rejection
+    });
+  }
+  console.log(JSON.stringify({ check: 'large-CNY-Number-boundary', observed }));
+  for (const row of observed) {
+    assert.equal(row.actualCanonicalNumber, row.expectedExactRoundedCny);
   }
 });
