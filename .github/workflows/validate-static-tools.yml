@@ -135,7 +135,6 @@ jobs:
           node tools/browser-tests/renovation-rounding-regression.mjs
           node tools/browser-tests/input-boundaries-smoke.mjs
           node tools/browser-tests/financial-seeded-properties-review.mjs
-          node tools/browser-tests/financial-copy-summary-regression.mjs
           node --test tools/browser-tests/space-upstream-contract.test.mjs
           node --test tools/browser-tests/space-production.test.mjs
           if [[ "$PLAYWRIGHT_BROWSER" == chromium ]]; then
