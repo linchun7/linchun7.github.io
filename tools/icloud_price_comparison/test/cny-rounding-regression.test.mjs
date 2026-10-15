@@ -112,33 +112,33 @@ test('invalid operands and the pre-existing full-precision overflow boundary fai
   }
 });
 
-test('diagnostic: exact large fractional cents survive the public Number boundary', async () => {
-  // Converter operand diagnostics, not claims about a current official price
-  // or provider FX. The public Number schema is retained throughout.
-  const examples = [
+test('unrepresentable exact fractional cents fail before publication, without a numeric cap', () => {
+  // These operand-level boundaries were reproduced against the previous
+  // Number return in Actions. They are not current official price/FX claims.
+  for (const example of [
     { local: 0.99, currency: 'USD', rates: { USD: 1, CNY: 90981810653949.4 } },
     { local: Number.MAX_SAFE_INTEGER, currency: 'JPY', rates: { JPY: 750, CNY: 7.5 } }
-  ];
-  const observed = [];
-  for (const example of examples) {
-    const payload = JSON.parse(await readFile(new URL('../data/prices.json', import.meta.url), 'utf8'));
-    payload.tiers = payload.tiers.filter(tier => tier.id === '50GB');
-    const row = country(example.local, example.currency);
-    row.plans['50GB'].formattedPrice = example.currency + ' ' + example.local;
-    payload.countries = attachDerivedCnyPrices([row], { fx: { rates: example.rates } });
-    payload.run.countries = 1;
-    payload.run.pricePoints = 1;
-    let acceptedByPublicContract = false, rejection = null;
-    try { validatePricePayload(payload); acceptedByPublicContract = true; }
-    catch (error) { rejection = error.message; }
-    observed.push({
-      ...example, expectedExactRoundedCny: '90071992547409.91',
-      actualCanonicalNumber: String(payload.countries[0].plans['50GB'].cnyPrice),
-      acceptedByPublicContract, rejection
-    });
+  ]) {
+    // Exact half-up cents are 90071992547409.91; its Number spelling would be
+    // 90071992547409.9. The new candidate must fail, rather than publish that loss.
+    const input = country(example.local, example.currency);
+    const before = structuredClone(input);
+    assert.throws(() => attachDerivedCnyPrices([input], { fx: { rates: example.rates } }),
+      /CNY cents cannot be represented exactly/);
+    assert.deepEqual(input, before);
   }
-  console.log(JSON.stringify({ check: 'large-CNY-Number-boundary', observed }));
-  for (const row of observed) {
-    assert.equal(row.actualCanonicalNumber, row.expectedExactRoundedCny);
-  }
+});
+
+test('a retained large fractional Number bypasses the new-derivation precision gate', () => {
+  const input = country(Number.MAX_SAFE_INTEGER, 'JPY');
+  const previous = structuredClone(input);
+  previous.plans['50GB'] = {
+    ...previous.plans['50GB'], cnyPrice: 90071992547409.9, cnyRank: 1
+  };
+  const output = attachDerivedCnyPrices([input], {
+    fx: { reusePreviousCny: true, rates: { JPY: 750, CNY: 7.5 } },
+    previousData: { countries: [previous] }
+  });
+  assert.equal(output[0].plans['50GB'].cnyPrice, previous.plans['50GB'].cnyPrice);
+  assert.equal(output[0].plans['50GB'].cnyRank, 1);
 });

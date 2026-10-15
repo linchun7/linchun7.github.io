@@ -587,7 +587,20 @@ function roundDerivedCnyPrice(price, currencyRate, cnyRate) {
     + (numerator % denominator * 2n >= denominator ? 1n : 0n);
   // Parse only the final decimal value. Converting the cent integer first can
   // lose precision or overflow even when the final CNY Number is representable.
-  return Number((cents / 100n).toString() + '.' + (cents % 100n).toString().padStart(2, '0'));
+  const rounded = Number((cents / 100n).toString() + '.' + (cents % 100n).toString().padStart(2, '0'));
+  // The existing public schema stores Numbers. Refuse a new derived value if
+  // its canonical decimal representation would silently lose an exact cent.
+  // Zero still reaches the existing positive-price publication gate.
+  if (cents !== 0n) {
+    if (!Number.isFinite(rounded) || rounded <= 0) {
+      throw new Error('Derived CNY cents cannot be represented exactly as a public Number');
+    }
+    const roundTrip = positiveDecimalFraction(rounded);
+    if (roundTrip.numerator * 100n !== cents * roundTrip.denominator) {
+      throw new Error('Derived CNY cents cannot be represented exactly as a public Number');
+    }
+  }
+  return rounded;
 }
 
 function convertToFullPrecisionCny(price, currency, rates) {
