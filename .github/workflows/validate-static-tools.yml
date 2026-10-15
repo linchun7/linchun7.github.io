@@ -60,6 +60,23 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  search-unicode:
+    if: github.event_name != 'schedule' && !(github.event_name == 'workflow_dispatch' && inputs.run_updates)
+    name: 搜索 Unicode 边界回归
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: 配置 Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: 验证有界 Unicode 搜索规范化
+        run: node --test tools/browser-tests/search-unicode-regression.test.mjs
+
   browser:
     if: github.event_name != 'schedule' && !(github.event_name == 'workflow_dispatch' && inputs.run_updates)
     name: 静态工具浏览器测试 (${{ matrix.browser }})
