@@ -167,7 +167,7 @@ try {
     function values(item, result) {
         const pattern = item.tab === 1 ? /^单利年化收益率：(.+)%$/
             : item.tab === 2 ? /^利息收益：(.+) 元$/
-            : item.tab === 3 ? /^净值年化收益率（CAGR）：(.+)%（持有 (\d+) 天）$/
+            : item.tab === 3 ? /^净值年化收益率：(.+)%（持有 (\d+) 天）$/
             : /^本息总计：(.+) 元；利息总计：(.+) 元$/;
         const match = pattern.exec(result.text);
         assert.ok(match, result.text);
