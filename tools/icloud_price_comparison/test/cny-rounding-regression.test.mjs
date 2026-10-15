@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFile } from 'node:fs/promises';
+import { load } from 'cheerio';
+import { validatePricePayload } from '../data-contract.js';
+import { renderStaticFragments } from '../scripts/static-page.mjs';
 import { attachDerivedCnyPrices } from '../scripts/update-prices.mjs';
 
 const country = (price = 0.99, currency = 'USD') => ({
-  country: 'United States', marketId: 'us', region: 'Americas', currency,
+  country: 'United States', marketId: 'us', nameZh: '美国', region: 'Americas', currency,
   plans: { '50GB': { price, formattedPrice: '$' + price } }
 });
 
@@ -41,4 +45,66 @@ test('retained derived prices are reused verbatim, without recasting old publica
   });
   assert.equal(output[0].plans['50GB'].cnyPrice, 7.42);
   assert.equal(output[0].plans['50GB'].cnyRank, 1);
+});
+
+test('scientific decimal operands and large final values do not round intermediates', () => {
+  const vectors = [
+    { price: 1e7, rate: 1e9, cny: 7.5, expected: 0.08 },
+    { price: 0.01, rate: 1e-7, cny: 7.5, expected: 750000 },
+    { price: 0.01, rate: 3, cny: 7, expected: 0.02 },
+    { price: 1.13, rate: 1, cny: 1.5, expected: 1.7 },
+    { price: 0.29, rate: 1, cny: 1.5, expected: 0.44 },
+    { price: Number.MAX_SAFE_INTEGER, rate: 1, cny: 1, expected: Number.MAX_SAFE_INTEGER }
+  ];
+  for (const vector of vectors) {
+    const input = country(vector.price, 'JPY');
+    const before = structuredClone(input);
+    const fx = Object.freeze({ rates: Object.freeze({ JPY: vector.rate, CNY: vector.cny }) });
+    const output = attachDerivedCnyPrices([input], { fx });
+    assert.equal(output[0].plans['50GB'].cnyPrice, vector.expected, JSON.stringify(vector));
+    assert.deepEqual(input, before, 'source local price and operands are immutable');
+  }
+});
+
+test('sub-half-cent results keep the existing positive-public-price gate', async () => {
+  const production = JSON.parse(await readFile(new URL('../data/prices.json', import.meta.url), 'utf8'));
+  for (const [rate, expected] of [[2.000000000000001, 0], [2, 0.01], [1.999999999999999, 0.01]]) {
+    const payload = structuredClone(production);
+    payload.tiers = payload.tiers.filter(tier => tier.id === '50GB');
+    payload.countries = attachDerivedCnyPrices([country(0.01)], { fx: { rates: { USD: rate, CNY: 1 } } });
+    payload.run.countries = 1;
+    payload.run.pricePoints = 1;
+    assert.equal(payload.countries[0].plans['50GB'].cnyPrice, expected);
+    if (expected === 0) {
+      assert.throws(() => validatePricePayload(payload), /invalid.*price/i,
+        'a rounded zero is still rejected before publication, rather than expanding the data contract');
+    } else {
+      assert.equal(validatePricePayload(payload), payload);
+    }
+  }
+});
+
+test('corrected reference cents reach both readable HTML and embedded browser data', async () => {
+  const payload = JSON.parse(await readFile(new URL('../data/prices.json', import.meta.url), 'utf8'));
+  payload.tiers = payload.tiers.filter(tier => tier.id === '50GB');
+  payload.countries = attachDerivedCnyPrices([country()], { fx: { rates: { USD: 1, CNY: 7.5 } } });
+  payload.run.countries = 1;
+  payload.run.pricePoints = 1;
+  assert.equal(validatePricePayload(payload), payload);
+  const fragments = renderStaticFragments(payload);
+  assert.equal(load(fragments.TABLE_BODY)('.price-amount').text(), '7.43');
+  const embedded = JSON.parse(load(fragments.META)('#icloud-price-data').text());
+  assert.equal(embedded.prices.countries[0].plans['50GB'].cnyPrice, 7.43);
+  assert.equal(validatePricePayload(embedded.prices).countries[0].plans['50GB'].cnyRank, 1);
+});
+
+test('invalid operands and the pre-existing full-precision overflow boundary fail closed', () => {
+  for (const rates of [
+    { USD: 0, CNY: 7.5 }, { USD: -1, CNY: 7.5 },
+    { USD: NaN, CNY: 7.5 }, { USD: Infinity, CNY: 7.5 },
+    { USD: 1, CNY: 0 }, { USD: 1, CNY: Infinity },
+    { USD: Number.MIN_VALUE, CNY: Number.MIN_VALUE }
+  ]) {
+    assert.throws(() => attachDerivedCnyPrices([country()], { fx: { rates } }), /Cannot derive/);
+  }
 });

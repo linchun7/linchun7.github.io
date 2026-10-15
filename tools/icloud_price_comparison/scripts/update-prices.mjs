@@ -564,8 +564,30 @@ export async function getExchangeRates(previousData, {
   });
 }
 
-function roundDerivedCnyPrice(value) {
-  return Number(value.toFixed(2));
+// Canonical decimal spellings of the already validated Number inputs are the
+// monetary operands. Keep their ratios exact until rounding once to CNY cents.
+function positiveDecimalFraction(value) {
+  if (!Number.isFinite(value) || value <= 0) throw new Error('Invalid decimal conversion operand');
+  const [significand, exponent = '0'] = value.toString().split('e');
+  const [whole, fraction = ''] = significand.split('.');
+  const coefficient = BigInt(whole + fraction);
+  const scale = fraction.length - Number(exponent);
+  return scale >= 0
+    ? { numerator: coefficient, denominator: 10n ** BigInt(scale) }
+    : { numerator: coefficient * 10n ** BigInt(-scale), denominator: 1n };
+}
+
+function roundDerivedCnyPrice(price, currencyRate, cnyRate) {
+  const amount = positiveDecimalFraction(price);
+  const localRate = positiveDecimalFraction(currencyRate);
+  const cny = positiveDecimalFraction(cnyRate);
+  const numerator = amount.numerator * localRate.denominator * cny.numerator * 100n;
+  const denominator = amount.denominator * localRate.numerator * cny.denominator;
+  const cents = numerator / denominator
+    + (numerator % denominator * 2n >= denominator ? 1n : 0n);
+  // Parse only the final decimal value. Converting the cent integer first can
+  // lose precision or overflow even when the final CNY Number is representable.
+  return Number((cents / 100n).toString() + '.' + (cents % 100n).toString().padStart(2, '0'));
 }
 
 function convertToFullPrecisionCny(price, currency, rates) {
@@ -628,7 +650,7 @@ export function attachDerivedCnyPrices(countries, { fx, previousData = null } = 
       }
       return [tierId, {
         ...plan,
-        cnyPrice: roundDerivedCnyPrice(fullPrecisionCnyPrice),
+        cnyPrice: roundDerivedCnyPrice(plan.price, fx.rates[country.currency], fx.rates.CNY),
         fullPrecisionCnyPrice
       }];
     }))
