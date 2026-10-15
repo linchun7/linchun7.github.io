@@ -286,6 +286,7 @@ async function assertMinimumHistoryReuse(browser, priceData) {
         && !document.querySelector('#minimumHistoryNote').hidden);
       const records = await page.locator('#minimumHistoryEvents').textContent();
       const cutoff = await page.locator('#minimumHistoryStatus').textContent();
+      const historyVisibility = await page.evaluate(() => Object.fromEntries(['minimumHistoryToolbar', 'minimumHistoryMore', 'minimumHistoryNote'].map(id => [id, document.getElementById(id).hidden])));
       assert.equal(await calls(), 1);
       await page.locator('#closeMinimumHistory').click();
       await page.locator('#minimumHistoryButton').click();
@@ -305,10 +306,10 @@ async function assertMinimumHistoryReuse(browser, priceData) {
         await page.locator('#closeMinimumHistory').click();
         await page.evaluate(now => { Date.now = () => now; }, generatedAt + 60000);
         await page.locator('#minimumHistoryButton').click();
-        assert.equal(await page.locator('#minimumHistoryEvents').textContent(), '');
-        assert.equal(await page.locator('#minimumHistoryStatus').textContent(), '记录时间异常');
+        assert.equal(await page.locator('#minimumHistoryEvents').textContent(), records);
+        assert.equal(await page.locator('#minimumHistoryStatus').textContent(), cutoff);
         for (const id of ['minimumHistoryToolbar', 'minimumHistoryMore', 'minimumHistoryNote']) {
-          assert.equal(await page.locator('#' + id).isHidden(), true, id + ': future evidence is hidden');
+          assert.equal(await page.locator('#' + id).isHidden(), historyVisibility[id], id + ': accepted history remains available');
         }
         assert.equal(await calls(), 1, 'clock rollback is local and does not download history');
         await page.locator('#closeMinimumHistory').click();
@@ -332,10 +333,10 @@ async function assertMinimumHistoryReuse(browser, priceData) {
             else document.dispatchEvent(new Event(type));
           }, { now: generatedAt + 60000, type: trigger });
           assert.equal(await page.locator('#minimumHistoryDialog').evaluate(dialog => dialog.open), true);
-          assert.equal(await page.locator('#minimumHistoryEvents').textContent(), '');
-          assert.equal(await page.locator('#minimumHistoryStatus').textContent(), '记录时间异常');
+          assert.equal(await page.locator('#minimumHistoryEvents').textContent(), records);
+          assert.equal(await page.locator('#minimumHistoryStatus').textContent(), cutoff);
           for (const id of ['minimumHistoryToolbar', 'minimumHistoryMore', 'minimumHistoryNote']) {
-            assert.equal(await page.locator('#' + id).isHidden(), true, trigger + ': future history projection is hidden');
+            assert.equal(await page.locator('#' + id).isHidden(), historyVisibility[id], trigger + ': device clock preserves accepted history');
           }
           assert.equal(await page.locator('#searchInput').isEnabled(), true, 'the older page snapshot remains time-valid');
           assert.equal(await page.locator('#updatedAt').textContent(), priceDate);
@@ -649,13 +650,12 @@ try {
 
 
 
-  // A self-consistent future cutoff must not poison rollback protection.
+  // Package-internal future events must still fail without using the visitor clock.
   const acceptedText = await page.locator('#minimumHistoryEvents').textContent();
   const acceptedCutoff = await page.locator('#minimumHistoryStatus').textContent();
   const futureHistory = JSON.parse(await readFile(resolve(projectDir, 'data/minimum-history.json'), 'utf8'));
   assert.ok(futureHistory.checkpoint, 'future-cutoff regression needs an accepted checkpoint');
-  futureHistory.checked_at = new Date(Date.now() + 86400000).toISOString();
-  futureHistory.checkpoint.at = futureHistory.checked_at;
+  futureHistory.checkpoint.at = new Date(Date.parse(futureHistory.checked_at) + 1).toISOString();
   await page.route('**/data/minimum-history.json*', route => route.fulfill({
     contentType: 'application/json', body: JSON.stringify(futureHistory)
   }));

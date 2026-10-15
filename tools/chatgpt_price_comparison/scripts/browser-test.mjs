@@ -457,30 +457,19 @@ try {
     assert.ok(await evaluate(`document.querySelector('#historySubtitle').textContent.includes('价格更新于')`));
     await evaluate(`document.querySelector('#closeHistory').click()`);
   }
-  // Search/sort must reconcile cards, badges and ranks even without a tab switch.
-  await evaluate(`{
-    Date.now = () => ${Math.min(...observationTimes) - 600_000};
-    document.querySelector('#searchInput').dispatchEvent(new Event('input'));
-  }`);
-  assert.equal(await evaluate(`[...document.querySelectorAll('.minimum-card')].every(card => card.disabled)`), true, 'search reconciles minimum cards after a clock change');
-  assert.equal(await evaluate('document.querySelectorAll(".minimum-badge").length'), 0, 'search removes invalid minimum badges');
-  assert.equal(await evaluate(`[...document.querySelectorAll('#priceRows tr[data-market-id] td:first-child')].every(cell => cell.textContent === '—')`), true, 'search reconciles ranks with cards');
-  assert.equal(await evaluate(`document.querySelector('#freshnessWarning').hidden`), false, 'clock-suppressed comparisons explain the time mismatch');
-  assert.match(await evaluate(`document.querySelector('#freshnessWarning').textContent`), /可能.*设备时间/);
-  await evaluate('Date.now = globalThis.__chatgptBeforeAgeTest');
-  await clickPlan(defaultPlan);
-  await assertRanks(defaultPlan); await assertMinimums();
-  assert.equal(await evaluate(`document.querySelector('#freshnessWarning').hidden`), true, 'corrected clock clears the explanation on interaction');
-  // A corrected local clock must still restore comparison eligibility on tab return.
-  await evaluate(`{
-    Date.now = () => ${Math.min(...observationTimes) - 600_000};
-    document.dispatchEvent(new Event('visibilitychange'));
-  }`);
-  assert.equal(await evaluate(`[...document.querySelectorAll('#priceRows tr[data-market-id] td:first-child')].every(cell => cell.textContent === '—')`), true, 'future observations are not ranked after a backwards clock change');
-  assert.equal(await evaluate(`[...document.querySelectorAll('.minimum-card')].every(card => card.disabled)`), true, 'future observations cannot be minimum winners');
-  await evaluate(`{ Date.now = globalThis.__chatgptBeforeAgeTest; delete globalThis.__chatgptBeforeAgeTest; document.dispatchEvent(new Event('visibilitychange')); }`);
-  await assertRanks(defaultPlan); await assertMinimums();
-  assert.equal(await evaluate(`document.querySelector('#freshnessWarning').hidden`), true, 'corrected clock clears the explanation on tab return');
+  // Visitor wall-clock changes must not change accepted comparison evidence.
+  for (const clock of [Math.min(...observationTimes) - 600_000, latestObservation + 3650 * 86400e3]) {
+    await evaluate(`{ Date.now = () => ${clock}; document.querySelector('#searchInput').dispatchEvent(new Event('input')); document.dispatchEvent(new Event('visibilitychange')); }`);
+    await assertRanks(defaultPlan); await assertMinimums();
+    assert.equal(await evaluate(`document.querySelector('#freshnessWarning').hidden`), true, 'device clock cannot create an availability warning');
+    assert.equal(await evaluate(`JSON.stringify({
+      table: document.querySelector('#priceRows').innerHTML,
+      minimums: document.querySelector('#minimumSummary').innerHTML,
+      priceDate: document.querySelector('#updatedAt').textContent,
+      fxDate: document.querySelector('#fxStatus').textContent
+    })`), retainedUi, 'clock changes preserve prices, ranks, minimums and evidence dates');
+  }
+  await evaluate('Date.now = globalThis.__chatgptBeforeAgeTest; delete globalThis.__chatgptBeforeAgeTest');
 
   if (fullUi) {
   await evaluate(`document.querySelector('#searchInput').value='<img src=x onerror=alert(1)>';document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);
