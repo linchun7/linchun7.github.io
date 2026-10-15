@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "projectSince": "2024-12-08",
   "firstObservedAt": "2026-07-30T01:01:10.212Z",
-  "checkedAt": "2026-10-14T00:06:24.921Z",
-  "observations": 137,
+  "checkedAt": "2026-10-15T00:06:26.326Z",
+  "observations": 138,
   "excludedVersions": 3,
   "pendingGap": false,
   "gaps": [
@@ -213,8 +213,8 @@
     }
   ],
   "checkpoint": {
-    "at": "2026-10-14T00:06:24.921Z",
-    "fingerprint": "db6e56d0ad2639ad402b05ee943c87fb45d33b773e07a2be5d8f75f5efc34e32",
+    "at": "2026-10-15T00:06:26.326Z",
+    "fingerprint": "00eeca6b83c1be6238ea3768bbf278719099b9976e35abdc0a27f64c02ce84cb",
     "sourceCommit": null,
     "basis": "stored-ranks",
     "tiers": [
@@ -223,14 +223,14 @@
         "label": "50 GB",
         "scope": "53ebf84ac1dd1aae737b2396c5014f56f044420938994eebc8b02c5747df89fb",
         "prices": "daa548bfd0a8b0e0e9aefbe59885573fb7b15d8f26864f73ea0fa5b6dd5da4ad",
-        "fx": "fc81ff645e7b6c5ea86acd027748bd861b5236f7d5d4f3f994ae852b1d5fafa8",
+        "fx": "71e6a4339da0b41ab82e8e898eb351ff0eb528f5e3764cd06ceeff14cfda6457",
         "winners": [
           {
             "id": "ru",
             "name": "俄罗斯",
             "currency": "RUB",
             "local": 59,
-            "cny": 4.72
+            "cny": 4.71
           }
         ]
       },
@@ -239,14 +239,14 @@
         "label": "200 GB",
         "scope": "53ebf84ac1dd1aae737b2396c5014f56f044420938994eebc8b02c5747df89fb",
         "prices": "c02dbe4a726c539086e135f6c84923349572e730a4abf9aaa685608ee59e8134",
-        "fx": "fc81ff645e7b6c5ea86acd027748bd861b5236f7d5d4f3f994ae852b1d5fafa8",
+        "fx": "71e6a4339da0b41ab82e8e898eb351ff0eb528f5e3764cd06ceeff14cfda6457",
         "winners": [
           {
             "id": "ru",
             "name": "俄罗斯",
             "currency": "RUB",
             "local": 149,
-            "cny": 11.93
+            "cny": 11.91
           }
         ]
       },
@@ -255,14 +255,14 @@
         "label": "2 TB",
         "scope": "53ebf84ac1dd1aae737b2396c5014f56f044420938994eebc8b02c5747df89fb",
         "prices": "aa1d3ffe890acaa983a3af6adb275a65f2d2286d9a6553e86a2b9e18b965f434",
-        "fx": "fc81ff645e7b6c5ea86acd027748bd861b5236f7d5d4f3f994ae852b1d5fafa8",
+        "fx": "71e6a4339da0b41ab82e8e898eb351ff0eb528f5e3764cd06ceeff14cfda6457",
         "winners": [
           {
             "id": "ru",
             "name": "俄罗斯",
             "currency": "RUB",
             "local": 599,
-            "cny": 47.96
+            "cny": 47.86
           }
         ]
       },
@@ -271,14 +271,14 @@
         "label": "6 TB",
         "scope": "53ebf84ac1dd1aae737b2396c5014f56f044420938994eebc8b02c5747df89fb",
         "prices": "0d8ddb20aaf7b64c6004b4d69e4fa2e537850f3c5b22ef12bdf68a71850dbe8f",
-        "fx": "fc81ff645e7b6c5ea86acd027748bd861b5236f7d5d4f3f994ae852b1d5fafa8",
+        "fx": "71e6a4339da0b41ab82e8e898eb351ff0eb528f5e3764cd06ceeff14cfda6457",
         "winners": [
           {
             "id": "mx",
             "name": "墨西哥",
             "currency": "MXN",
             "local": 499,
-            "cny": 182.22
+            "cny": 181.24
           }
         ]
       },
@@ -287,14 +287,14 @@
         "label": "12 TB",
         "scope": "53ebf84ac1dd1aae737b2396c5014f56f044420938994eebc8b02c5747df89fb",
         "prices": "fb6d0809fd4065ddbd10f6598e75a6ecf84e3340779cdd48344b4e249bdd4ca3",
-        "fx": "fc81ff645e7b6c5ea86acd027748bd861b5236f7d5d4f3f994ae852b1d5fafa8",
+        "fx": "71e6a4339da0b41ab82e8e898eb351ff0eb528f5e3764cd06ceeff14cfda6457",
         "winners": [
           {
             "id": "ng",
             "name": "尼日利亚",
             "currency": "NGN",
             "local": 66900,
-            "cny": 336.94
+            "cny": 336.88
           }
         ]
       }
