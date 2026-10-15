@@ -17,12 +17,15 @@ const warningMessages = {
     serviceFeeTooLarge: '当前月手续费率偏高，请确认是否准确'
 };
 
+// Locale and precision are fixed for every monetary display and CSV cell.
+const moneyFormatter = new Intl.NumberFormat('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+});
+
 const numberUtils = {
     toFixed2: (num) => roundMoney(num),
-    formatMoney: (amount) => new Intl.NumberFormat('zh-CN', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-    }).format(numberUtils.toFixed2(amount)),
+    formatMoney: (amount) => moneyFormatter.format(numberUtils.toFixed2(amount)),
     formatPercent: (value) => numberUtils.toFixed2(value).toFixed(2),
     formatFeeRate: (value) => value === null ? '—' : `${numberUtils.formatPercent(value)}%`
 };

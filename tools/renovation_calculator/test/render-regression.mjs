@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 
 // Fixed pre-cache shipped UI, read from the existing full-history Actions checkout.
 // Keep the numerical core and browser startup identical in both real pages.
@@ -7,21 +8,8 @@ const BASELINE_SHA = '0101f1db88602380c45290449bb4743a35db8333';
 const baselineSource = execFileSync('git', [
     'show', BASELINE_SHA + ':tools/renovation_calculator/script.js'
 ], { encoding: 'utf8' });
-const oldFormatter = `    formatMoney: (amount) => new Intl.NumberFormat('zh-CN', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-    }).format(numberUtils.toFixed2(amount)),`;
-assert.ok(baselineSource.includes(oldFormatter));
-// First collect evidence before changing production. This test-only candidate
-// is exactly the proposed singleton, with the same locale/options/rounding.
-const candidateSource = baselineSource
-    .replace('const numberUtils = {', `const moneyFormatter = new Intl.NumberFormat('zh-CN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-});
-
-const numberUtils = {`)
-    .replace(oldFormatter, '    formatMoney: (amount) => moneyFormatter.format(numberUtils.toFixed2(amount)),');
+// Test the actual shipped UI, never a synthesized or test-only fast path.
+const candidateSource = readFileSync(new URL('../script.js', import.meta.url), 'utf8');
 
 function summary(values) {
     const sorted = [...values].sort((a, b) => a - b);
@@ -48,12 +36,14 @@ export async function runRenderRegression({ browser, browserName, baseUrl }) {
         await page.addInitScript(() => {
             const NativeNumberFormat = Intl.NumberFormat;
             window.__moneyFormatterConstructions = 0;
-            Intl.NumberFormat = new Proxy(NativeNumberFormat, {
+            window.__nativeMoneyNumberFormat = NativeNumberFormat;
+            window.__countedMoneyNumberFormat = new Proxy(NativeNumberFormat, {
                 construct(target, args, newTarget) {
                     window.__moneyFormatterConstructions += 1;
                     return Reflect.construct(target, args, newTarget);
                 }
             });
+            Intl.NumberFormat = window.__countedMoneyNumberFormat;
             const nativeCreate = URL.createObjectURL.bind(URL);
             URL.createObjectURL = blob => {
                 window.__renderCSVBlob = blob;
@@ -129,6 +119,11 @@ export async function runRenderRegression({ browser, browserName, baseUrl }) {
                 }, { operation, repetitions });
             }
 
+            // Constructor counting and timing are separate: do not charge the
+            // repeated baseline for the instrumentation proxy during measurement.
+            for (const page of [before, after]) {
+                await page.evaluate(() => { Intl.NumberFormat = window.__nativeMoneyNumberFormat; });
+            }
             const repetitions = term === 600 ? 1 : 3;
             const metrics = {};
             for (const operation of ['render', 'csv']) {
@@ -145,17 +140,20 @@ export async function runRenderRegression({ browser, browserName, baseUrl }) {
                 }
                 metrics[operation] = { baseline: summary(baseline), cached: summary(cached) };
             }
+            for (const page of [before, after]) {
+                await page.evaluate(() => { Intl.NumberFormat = window.__countedMoneyNumberFormat; });
+            }
             assert.equal(await after.evaluate(() => window.__moneyFormatterConstructions), 1);
             timings.push({ term, repetitionsPerSample: repetitions, metrics });
         }
         assert.deepEqual(errors, []);
         console.log(JSON.stringify({
             check: 'renovation-render-csv-formatting', baseline: BASELINE_SHA,
-            browser: browserName, stage: 'test-only singleton candidate before production change',
+            browser: browserName, stage: 'shipped singleton UI against fixed pre-cache UI',
             pairedRounds: 12, warmupRounds: 3,
             exactOutputCases: [12, 60, 600], candidateFormatterConstructions: 1,
             timings,
-            interpretation: 'Same browser, real pages, alternating order, identical precomputed schedules. Render includes shipped renderTable, DOM insertion and forced layout; CSV uses the complete shipped export handler. Solvers are outside timing. Medians, full samples and min/max report runner variation; no flaky timing threshold.'
+            interpretation: 'Same browser, real pages, alternating order, identical precomputed schedules. Render includes shipped renderTable, DOM insertion and forced layout; CSV uses the complete shipped export handler. Solvers and constructor-counting proxy are outside timing. Medians, full samples and min/max report runner variation; no flaky timing threshold.'
         }, null, 2));
     } finally {
         for (const context of contexts) await context.close();
