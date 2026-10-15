@@ -97,7 +97,7 @@ try {
     groups[0][1][0] = '</p><script>window.injected=true</script>& "\' 日本語';
     await page.route('**/translation-escape-fixture', route => route.fulfill({
       contentType: 'text/html; charset=utf-8',
-      body: '<!doctype html><html lang="en"><body>' + renderCorpus('en', groups) + '</body></html>'
+      body: '<!doctype html><html lang="en"><head><meta charset="UTF-8"></head><body>' + renderCorpus('en', groups) + '</body></html>'
     }));
     await page.goto(baseUrl + '/translation-escape-fixture', { waitUntil: 'load' });
     assert.equal(await page.locator('.category-header h2').first().textContent(), groups[0][0]);
