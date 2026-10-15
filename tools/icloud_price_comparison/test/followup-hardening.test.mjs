@@ -305,8 +305,9 @@ test('country and minimum history preserve their deliberately different snapshot
   laterMinimum.pendingGap = true;
   laterMinimum.excludedVersions += 1;
   assert.equal(validateMinimumHistoryPayload(laterMinimum), laterMinimum);
-  const now = Date.parse(laterMinimum.checkedAt) + 1000;
-  class SnapshotDate extends Date { static now() { return now; } }
+  class SnapshotDate extends Date {
+    static now() { throw new Error('Frontend acceptance must not read the device clock'); }
+  }
   const state = { data:prices, history:null, historyStatus:'idle', historyRequestId:0, historyPromise:null };
   const minimumHistoryUi = { data:structuredClone(minimumHistory), status:'ready', promise:null };
   let countryFetches = 0;
@@ -320,7 +321,7 @@ test('country and minimum history preserve their deliberately different snapshot
     [...functions, '({ ensureHistoryLoaded, loadMinimumHistory })'].join('\n'), {
       state, minimumHistoryUi, Date:SnapshotDate, URL, AbortController, setTimeout, clearTimeout,
       moduleUrl: new URL('../script.js', import.meta.url).href,
-      REQUEST_TIMEOUT_MS:8000, MAX_PRICE_FUTURE_SKEW_MS:300000,
+      REQUEST_TIMEOUT_MS:8000,
       validatePriceHistoryConsistency, validateMinimumHistoryPayload,
       fetchJson:async () => { countryFetches += 1; return futureCountry; },
       fetch:async () => ({ ok:true, headers:{get:() => 'application/json'}, payload:nextMinimum }),

@@ -27,12 +27,12 @@ export function offerFor(market, plan) {
   const matches = market.offers.filter(offer => identity(offer.label) === identity(plan));
   return matches.length === 1 ? matches[0] : null;
 }
-function freshAt(timestamp, now) {
-  const age = now - Date.parse(timestamp);
+function freshAt(timestamp, generatedAt) {
+  const age = Date.parse(generatedAt) - Date.parse(timestamp);
   return Number.isFinite(age) && age >= -300e3;
 }
 export function comparableCents(data, market, plan, now) {
-  if (!freshAt(market.last_verified_at, now) || !data.fx || !freshAt(data.fx.updated_at, now)) return null;
+  if (!freshAt(market.last_verified_at, data.generated_at) || !data.fx || !freshAt(data.fx.updated_at, data.generated_at)) return null;
   const offer = offerFor(market, plan);
   if (!offer) return null;
   const values = offer.amounts.filter(amount => amount.cny != null).map(amount => Number(amount.cny)).filter(Number.isFinite).map(value => Math.round(value * 100));

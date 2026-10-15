@@ -43,11 +43,12 @@ test('price, rank, minimum and displayed dates depend on accepted evidence only'
   assert.ok(actual.fxDate.includes(prices.fx.updated_at));
 });
 test('future or old minimum-history cutoffs are accepted independently of device time', () => {
-  const cutoff = Date.parse(history.checked_at);
-  history.checked_at = new Date(cutoff + 3650 * 86400000).toISOString();
-  history.checkpoint.at = history.checked_at;
-  assert.doesNotThrow(() => execute(['validateMinimumHistoryTimes'], 'validateMinimumHistoryTimes(history);'));
-  assert.equal(execute(['minimumHistoryTimeUsable'], 'minimumHistoryTimeUsable(history);'), true);
+  const shifted = structuredClone(history);
+  const cutoff = Date.parse(shifted.checked_at);
+  shifted.checked_at = new Date(cutoff + 3650 * 86400000).toISOString();
+  shifted.checkpoint.at = shifted.checked_at;
+  assert.doesNotThrow(() => execute(['validateMinimumHistoryTimes'], 'validateMinimumHistoryTimes(history);', { history: shifted }));
+  assert.equal(execute(['minimumHistoryTimeUsable'], 'minimumHistoryTimeUsable(history);', { history: shifted }), true);
 });
 test('invalid formats and impossible package-internal chronology still fail', () => {
   for (const mutate of [
@@ -56,12 +57,12 @@ test('invalid formats and impossible package-internal chronology still fail', ()
     value => { const market = value.markets.find(m => m.offers.length); market.last_verified_at = new Date(Date.parse(market.last_checked_at) + 1).toISOString(); }
   ]) {
     const value = structuredClone(prices); mutate(value);
-    assert.throws(() => execute(validation, 'validate(prices);', { prices: value }));
+    assert.throws(() => execute(validation, 'validate(prices);', { prices: value, Date }), /数据|时间|核验|汇率/);
   }
   const invalid = structuredClone(history);
   invalid.checked_at = 'not-a-date';
-  assert.throws(() => execute(['validateMinimumHistoryTimes'], 'validateMinimumHistoryTimes(history);', { history: invalid }));
+  assert.throws(() => execute(['validateMinimumHistoryTimes'], 'validateMinimumHistoryTimes(history);', { history: invalid, Date }), /历史|时间/);
   const inconsistent = structuredClone(history);
   inconsistent.checkpoint.at = new Date(Date.parse(inconsistent.checked_at) + 1).toISOString();
-  assert.throws(() => execute(['validateMinimumHistoryTimes'], 'validateMinimumHistoryTimes(history);', { history: inconsistent }));
+  assert.throws(() => execute(['validateMinimumHistoryTimes'], 'validateMinimumHistoryTimes(history);', { history: inconsistent, Date }), /历史|时间/);
 });

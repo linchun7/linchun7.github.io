@@ -127,7 +127,7 @@ async function installEmbeddedPriceFixture(page, fixture) {
   });
 }
 
-async function snapshotSession(context, purpose, { width = 390, hasTouch = false } = {}) {
+async function snapshotSession(context, purpose, { width = 390, hasTouch = false, initialDeviceOffsetMs = 3600000 } = {}) {
   const config = await resolveBrowser(context, purpose);
   if (!config) return null;
   const server = await startServer();
@@ -143,7 +143,7 @@ async function snapshotSession(context, purpose, { width = 390, hasTouch = false
   });
   await page.route('https://**/*', route => route.abort());
   await page.route('**/data/prices.json*', route => route.abort());
-  await page.addInitScript(now => { Date.now = () => now; }, Date.parse(data.generatedAt) + 3600000);
+  await page.addInitScript(now => { Date.now = () => now; }, Date.parse(data.generatedAt) + initialDeviceOffsetMs);
   return { page, browser, data, url, errors, mainRequests };
 }
 
@@ -385,7 +385,14 @@ test('ships static prices and one embedded snapshot without a main-data network 
   assert.match(moduleSource, /fetch\(`\.\/data\/\$\{fileName\}`, \{[\s\S]*?redirect:\s*'error'/, 'optional history JSON requests must reject redirects');
   assert.match(moduleSource, /fetch\(new URL\('\.\/data\/minimum-history\.json', import\.meta\.url\), \{[^}]*redirect:\s*'error'/, 'minimum history JSON requests must reject redirects');
   assert.doesNotMatch(moduleSource, /PRICE_FRESH_MAX_AGE_MS|PRICE_HARD_MAX_AGE_MS/);
-  assert.match(moduleSource, /MAX_PRICE_FUTURE_SKEW_MS/, 'future timestamp checks remain');
+  assert.doesNotMatch(moduleSource, /MAX_PRICE_FUTURE_SKEW_MS|future-data|freshness\.ageMs/,
+    'visitor clock offsets must not determine price validity');
+  for (const name of ['classifyPriceFreshness', 'minimumHistoryTimeUsable', 'loadMinimumHistory']) {
+    const implementation = moduleSource.match(new RegExp('(?:export )?(?:async )?function ' + name + '\\([^]*?\\n\\}'));
+    assert.ok(implementation, name);
+    assert.doesNotMatch(implementation[0], /Date\.now\(|nowMs/,
+      name + ': accepted data is independent from the visitor device clock');
+  }
   assert.doesNotMatch(moduleSource, /setInterval\(/, 'freshness lifecycle must not poll or expire accepted snapshots');
   assert.match(moduleSource, /document\.addEventListener\('visibilitychange'/);
   assert.match(moduleSource, /window\.addEventListener\('pageshow'/);
@@ -1499,6 +1506,9 @@ test('rejects damaged embedded snapshots without a network fallback and recovers
       ['forbidden raw FX rates', envelope => { envelope.prices.fx.rates = { USD: 1, CNY: 7 }; }],
       ['invalid generated timestamp', envelope => { envelope.prices.generatedAt = '2026-02-30T00:00:00.000Z'; }],
       ['invalid FX timestamp', envelope => { envelope.prices.fx.fetchedAt = '2026-02-30'; }],
+      ['FX timestamp after package generation', envelope => {
+        envelope.prices.fx.fetchedAt = new Date(Date.parse(envelope.prices.generatedAt) + 6 * 60000).toISOString();
+      }],
       ['invalid Apple publication date', envelope => { envelope.prices.source.publishedDate = 'February 30, 2026'; }],
       ['missing region', envelope => { envelope.prices.countries[0].region = ''; }],
       ['unknown region', envelope => { envelope.prices.countries[0].region = 'Unknown Region'; }],
@@ -1563,7 +1573,7 @@ test('keeps old and retained-FX snapshots usable and falls back from an invalid 
       minimumDegraded: false
     },
     {
-      label: 'future snapshot',
+      label: 'snapshot four minutes later than device clock',
       mutate: (data) => {
         setPayloadGeneratedAt(data, new Date(referenceNow + (4 * 60 * 1_000)).toISOString());
         data.fx.fetchedAt = data.generatedAt;
@@ -1573,9 +1583,9 @@ test('keeps old and retained-FX snapshots usable and falls back from an invalid 
       expectedStale: false
     },
     {
-      label: 'maximum allowed future skew',
+      label: 'snapshot one year later than device clock',
       mutate: (data) => {
-        setPayloadGeneratedAt(data, new Date(referenceNow + (5 * 60 * 1_000)).toISOString());
+        setPayloadGeneratedAt(data, new Date(referenceNow + (365 * 24 * 60 * 60 * 1_000)).toISOString());
         data.fx.fetchedAt = data.generatedAt;
         data.fx.stale = false;
       },
@@ -1680,50 +1690,59 @@ test('keeps old and retained-FX snapshots usable and falls back from an invalid 
 });
 
 
-test('clock safety recovers the same embedded snapshot and accepted history without fetching prices', { timeout: 60000 }, async context => {
-  for (const initiallyFuture of [false, true]) {
-    const session = await snapshotSession(context, 'local-only clock safety', { width: 1024 });
+test('device clock offsets and rollback preserve the embedded snapshot and accepted history without requests', { timeout: 60000 }, async context => {
+  for (const initialOffsetHours of [-3650 * 24, 3650 * 24]) {
+    const session = await snapshotSession(context, 'device-clock independent snapshot',
+      { width: 1024, initialDeviceOffsetMs: initialOffsetHours * 3600000 });
     if (!session) return;
     const { page, browser, data, url, mainRequests, errors } = session;
     const rankingCountry = data.countries.find(country => Object.values(country.plans).some(plan => plan.cnyRank === 1));
     const generatedAt = Date.parse(data.generatedAt);
     let historyCalls = 0;
     await page.route('**/data/history.json*', route => { historyCalls++; return route.continue(); });
-    if (initiallyFuture) await page.addInitScript(now => { Date.now = () => now; }, generatedAt - 3600000);
     try {
       await page.goto(url, { waitUntil: 'domcontentloaded' });
-      if (!initiallyFuture) {
-        await waitForSnapshot(page);
-        await page.locator('#searchInput').fill(rankingCountry.country);
-        await page.locator('#regionSelect').selectOption(rankingCountry.region);
-        await page.locator('.country-history-button').first().click();
-        await waitForAcceptedCountryHistory(page);
-        await page.locator('#closeHistory').click();
-        await page.evaluate(now => { Date.now = () => now; window.dispatchEvent(new Event('pageshow')); }, generatedAt - 3600000);
-      }
-      await page.waitForFunction(() => document.querySelector('#searchInput').disabled
-        && document.querySelector('#priceWorkspace').getAttribute('aria-busy') === 'false');
-      assert.equal(await page.locator('.minimum-card, .minimum-badge, .rank-top').count(), 0);
-      assert.ok((await page.locator('#priceRows tr[data-market-id] > td:first-child').allTextContents()).every(text => text === '—'));
-      const acceptedHistoryCalls = historyCalls;
-      await page.evaluate(now => {
-        Date.now = () => now;
-        window.dispatchEvent(new Event('pageshow'));
-        document.dispatchEvent(new Event('visibilitychange'));
-      }, generatedAt + 37 * 3600000);
+      assert.equal(await page.evaluate(() => Date.now()), generatedAt + initialOffsetHours * 3600000,
+        'the initial device clock offset is installed before the module');
       await waitForSnapshot(page);
+      await page.locator('#searchInput').fill(rankingCountry.country);
+      await page.locator('#regionSelect').selectOption(rankingCountry.region);
+      await page.locator('.country-history-button').first().click();
+      await waitForAcceptedCountryHistory(page);
+      const dates = await page.locator('#updatedAt, #fxStatus, #applePublishedDate').allTextContents();
+      const rows = await page.locator('#priceRows').textContent();
+      const historyRows = await page.locator('#historyRows').textContent();
+      const badges = await page.locator('.minimum-badge').count();
+      const acceptedHistoryCalls = historyCalls;
+      await page.context().setOffline(true);
+      await page.bringToFront();
+      for (const offsetHours of [-3650 * 24, -1, 1, 3650 * 24, -3650 * 24]) {
+        for (const trigger of ['pageshow', 'visibilitychange']) {
+          await page.evaluate(({ now, trigger }) => {
+            Date.now = () => now;
+            if (trigger === 'pageshow') window.dispatchEvent(new Event(trigger));
+            else document.dispatchEvent(new Event(trigger));
+          }, { now: generatedAt + offsetHours * 3600000, trigger });
+          assert.equal(await page.locator('#historyDialog').evaluate(dialog => dialog.open), true);
+          assert.equal(await page.locator('#historyRows').textContent(), historyRows);
+          assert.equal(await page.locator('#priceRows').textContent(), rows);
+          assert.deepEqual(await page.locator('#updatedAt, #fxStatus, #applePublishedDate').allTextContents(), dates);
+          assert.equal(await page.locator('.minimum-card').count(), data.tiers.length);
+          assert.equal(await page.locator('.minimum-badge').count(), badges);
+          assert.equal(await page.locator('#searchInput').inputValue(), rankingCountry.country);
+          assert.equal(await page.locator('#regionSelect').inputValue(), rankingCountry.region);
+          assert.equal(await page.locator('#searchInput').isEnabled(), true);
+          assert.equal(await page.locator('#regionSelect').isEnabled(), true);
+          assert.equal(historyCalls, acceptedHistoryCalls, trigger + ': clock changes reuse accepted history');
+        }
+      }
+      await page.locator('#closeHistory').click();
       for (const selector of ['#searchInput', '#regionSelect', '#publishedDateButton', '#backToTableButton', 'button[data-sort="country"]', 'button[data-sort-tier]', '.country-history-button']) {
         assert.equal(await page.locator(selector).first().isEnabled(), true, selector);
       }
-      assert.equal(await page.locator('.minimum-card').count(), data.tiers.length);
-      assert.ok(await page.locator('.minimum-badge').count() > 0);
-      if (!initiallyFuture) {
-        assert.equal(await page.locator('#searchInput').inputValue(), rankingCountry.country);
-        assert.equal(await page.locator('#regionSelect').inputValue(), rankingCountry.region);
-        await page.locator('.country-history-button').first().click();
-        await waitForAcceptedCountryHistory(page);
-        assert.equal(historyCalls, acceptedHistoryCalls, 'clock recovery preserves accepted optional history');
-      }
+      await page.locator('.country-history-button').first().click();
+      await waitForAcceptedCountryHistory(page);
+      assert.equal(historyCalls, acceptedHistoryCalls, 'offline reopen reuses the same accepted history');
       assert.match(await page.locator('#updatedAt').textContent(), /更新于/);
       assert.equal(await page.locator('.cache-warning, .freshness-warning').count(), 0);
       assert.deepEqual(mainRequests, []);
@@ -1732,34 +1751,38 @@ test('clock safety recovers the same embedded snapshot and accepted history with
   }
 });
 
-test('damaged embedded data recovers static clock cues without enabling unvalidated interactions', { timeout: 30000 }, async context => {
-  const session = await snapshotSession(context, 'damaged snapshot clock recovery');
+test('damaged embedded data keeps static evidence and disabled interactions through device clock changes', { timeout: 30000 }, async context => {
+  const session = await snapshotSession(context, 'damaged snapshot with arbitrary device clock',
+    { initialDeviceOffsetMs: -3650 * 86400000 });
   if (!session) return;
   const { page, browser, data, url, mainRequests, errors } = session;
   const shell = await readFile(path.join(PROJECT_DIR, 'index.html'), 'utf8');
   const html = shell.replace(/(<script\b[^>]*\bid="icloud-price-data"[^>]*>)[\s\S]*?(<\/script>)/, '$1{$2');
   await page.route(target => target.pathname === '/', route => route.fulfill({ contentType: 'text/html', body: html }));
-  await page.addInitScript(now => { Date.now = () => now; }, Date.parse(data.generatedAt) - 6 * 60000);
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded' });
-    await page.waitForFunction(() => document.querySelector('#updatedAt').textContent.includes('数据时间异常'));
-    assert.equal(await page.locator('.minimum-card, .minimum-badge, .rank-top').count(), 0);
-    assert.ok((await page.locator('#priceRows tr[data-market-id] > td:first-child').allTextContents()).every(text => text === '—'));
-    await page.evaluate(now => {
-      Date.now = () => now;
-      window.dispatchEvent(new Event('pageshow'));
-      document.dispatchEvent(new Event('visibilitychange'));
-    }, Date.parse(data.generatedAt) + 60000);
-    await page.waitForFunction(() => document.querySelector('#updatedAt').textContent.includes('更新于'));
-    assert.equal(await page.locator('.minimum-card').count(), data.tiers.length);
-    assert.ok(await page.locator('.minimum-badge, .rank-top').count() > 0);
-    assert.equal(await page.locator('#priceRows tr[data-market-id] > td:first-child').first().textContent(), '1');
-    assert.equal(await page.locator('#searchInput').isDisabled(), true);
-    assert.equal(await page.locator('#regionSelect').isDisabled(), true);
-    assert.equal(await page.locator('#publishedDateButton').isDisabled(), true);
-    assert.equal(await page.locator('#loadStatus').isVisible(), true);
-    assert.match(await page.locator('#loadStatusText').textContent(), /刷新/);
-    assert.equal(await page.locator('#retryButton').isVisible(), true);
+    await page.locator('#retryButton').waitFor({ state: 'visible' });
+    const rows = await page.locator('#priceRows').textContent();
+    const dates = await page.locator('#updatedAt, #fxStatus, #applePublishedDate').allTextContents();
+    const badges = await page.locator('.minimum-badge, .rank-top').count();
+    for (const days of [-3650, 3650, -3650]) {
+      await page.evaluate(now => {
+        Date.now = () => now;
+        window.dispatchEvent(new Event('pageshow'));
+        document.dispatchEvent(new Event('visibilitychange'));
+      }, Date.parse(data.generatedAt) + days * 86400000);
+      assert.deepEqual(await page.locator('#updatedAt, #fxStatus, #applePublishedDate').allTextContents(), dates);
+      assert.equal(await page.locator('#priceRows').textContent(), rows);
+      assert.equal(await page.locator('.minimum-card').count(), data.tiers.length);
+      assert.equal(await page.locator('.minimum-badge, .rank-top').count(), badges);
+      assert.ok(badges > 0, 'readable static evidence does not depend on the device clock');
+      for (const selector of ['#searchInput', '#regionSelect', '#publishedDateButton']) {
+        assert.equal(await page.locator(selector).isDisabled(), true, selector + ': malformed JSON never enables interactions');
+      }
+      assert.equal(await page.locator('#loadStatus').isVisible(), true);
+      assert.match(await page.locator('#loadStatusText').textContent(), /刷新/);
+      assert.equal(await page.locator('#retryButton').isVisible(), true);
+    }
     assert.deepEqual(mainRequests, []);
     assert.deepEqual(errors, []);
   } finally { await browser.close(); }
@@ -3302,7 +3325,7 @@ test('minimum history defaults to one dense timeline, filters optionally, and st
       assert.equal(await page.locator('#minimumHistoryTierFilter').inputValue(),'all','each open returns to the complete timeline');
       await page.evaluate(now => { Date.now = () => now; window.dispatchEvent(new Event('pageshow')); }, Date.parse(history.checkedAt) + 48 * 3600000);
       await page.waitForFunction((count)=>document.querySelectorAll('.minimum-history-event').length===count,allChanges.length);
-      assert.equal(await page.evaluate(()=>document.querySelector('#minimumHistoryDialog').contains(document.activeElement)),true,'history stays usable when current ranking freshness changes');
+      assert.equal(await page.evaluate(()=>document.querySelector('#minimumHistoryDialog').contains(document.activeElement)),true,'history stays usable when the device clock changes');
       await page.keyboard.press('Escape');
       assert.deepEqual(errors,[]);
     } finally {await browser.close();}
@@ -3592,10 +3615,11 @@ test('country history retains removal and restoration even at the same price', {
 });
 
 
-test('minimum history reuses accepted same/newer checks and locally protects a rolled-back clock', { timeout: 60000 }, async context => {
+test('minimum history reuses accepted same/newer checks across arbitrary device clocks', { timeout: 60000 }, async context => {
   const { advanceMinimumHistory, emptyMinimumHistory } = await import('../scripts/minimum-history.mjs');
   for (const mode of ['unchecked', 'older', 'same', 'newer']) {
-    const session = await snapshotSession(context, 'minimum-history request reuse');
+    const session = await snapshotSession(context, 'minimum-history request reuse',
+      { initialDeviceOffsetMs: mode === 'newer' ? -3650 * 86400000 : 3600000 });
     if (!session) return;
     const { page, browser, data, url, mainRequests, errors } = session;
     const generatedAt = Date.parse(data.generatedAt);
@@ -3637,59 +3661,41 @@ test('minimum history reuses accepted same/newer checks and locally protects a r
       assert.equal(await page.locator('#minimumHistoryStatus').textContent(), cutoff);
       if (mode === 'newer') {
         await page.context().setOffline(true);
-        for (let reopen = 0; reopen < 2; reopen++) {
-          await page.locator('#closeMinimumHistory').click();
-          await page.locator('#minimumHistoryButton').click();
-          assert.equal(await calls(), 1, 'offline reopen reuses the accepted later history');
-          assert.equal(await page.locator('#minimumHistoryStatus').textContent(), cutoff);
-        }
-        await page.locator('#closeMinimumHistory').click();
-        await page.evaluate(now => { Date.now = () => now; }, generatedAt + 60000);
-        await page.locator('#minimumHistoryButton').click();
-        assert.equal(await page.locator('#minimumHistoryEvents').textContent(), '');
-        assert.equal(await page.locator('#minimumHistoryStatus').textContent(), '记录时间异常');
-        for (const id of ['minimumHistoryToolbar', 'minimumHistoryMore', 'minimumHistoryNote']) {
-          assert.equal(await page.locator('#' + id).isHidden(), true, id + ': future evidence is hidden');
-        }
-        assert.equal(await calls(), 1, 'clock rollback is local and does not download history');
-        await page.locator('#closeMinimumHistory').click();
-        await page.evaluate(now => { Date.now = () => now; }, generatedAt + 3600000);
-        await page.locator('#minimumHistoryButton').click();
-        assert.equal(await page.locator('#minimumHistoryEvents').textContent(), records);
-        assert.equal(await page.locator('#minimumHistoryStatus').textContent(), cutoff);
-        assert.equal(await calls(), 1, 'corrected clock restores the same accepted records offline');
+        const dates = await page.locator('#updatedAt, #fxStatus, #applePublishedDate').allTextContents();
+        const ranks = await page.locator('#priceRows tr[data-market-id] > td:first-child').allTextContents();
+        const moreHidden = await page.locator('#minimumHistoryMore').isHidden();
         await page.bringToFront();
-        const priceDate = await page.locator('#updatedAt').textContent();
-        for (const trigger of ["visibilitychange", "pageshow"]) {
-          await page.locator('#minimumHistoryEvents > *').first().evaluate(node => { node.dataset.lifecycleKeep = 'true'; });
-          await page.evaluate(type => {
-            if (type === 'pageshow') window.dispatchEvent(new Event(type));
-            else document.dispatchEvent(new Event(type));
-          }, trigger);
-          assert.equal(await page.locator('[data-lifecycle-keep]').count(), 1, trigger + ': unchanged history validity retains its DOM');
-          await page.evaluate(({ now, type }) => {
-            Date.now = () => now;
-            if (type === 'pageshow') window.dispatchEvent(new Event(type));
-            else document.dispatchEvent(new Event(type));
-          }, { now: generatedAt + 60000, type: trigger });
-          assert.equal(await page.locator('#minimumHistoryDialog').evaluate(dialog => dialog.open), true);
-          assert.equal(await page.locator('#minimumHistoryEvents').textContent(), '');
-          assert.equal(await page.locator('#minimumHistoryStatus').textContent(), '记录时间异常');
-          for (const id of ['minimumHistoryToolbar', 'minimumHistoryMore', 'minimumHistoryNote']) {
-            assert.equal(await page.locator('#' + id).isHidden(), true, trigger + ': future history projection is hidden');
-          }
-          assert.equal(await page.locator('#searchInput').isEnabled(), true, 'the older page snapshot remains time-valid');
-          assert.equal(await page.locator('#updatedAt').textContent(), priceDate);
-          assert.equal(await calls(), 1, trigger + ': rollback does not fetch');
-          await page.evaluate(({ now, type }) => {
-            Date.now = () => now;
-            if (type === 'pageshow') window.dispatchEvent(new Event(type));
-            else document.dispatchEvent(new Event(type));
-          }, { now: generatedAt + 3600000, type: trigger });
-          assert.equal(await page.locator('#minimumHistoryDialog').evaluate(dialog => dialog.open), true);
+        for (const days of [-3650, 3650, -3650]) {
+          await page.locator('#closeMinimumHistory').click();
+          await page.evaluate(now => { Date.now = () => now; }, generatedAt + days * 86400000);
+          await page.locator('#minimumHistoryButton').click();
+          assert.equal(await calls(), 1, 'offline reopen reuses accepted later history at every device time');
           assert.equal(await page.locator('#minimumHistoryEvents').textContent(), records);
           assert.equal(await page.locator('#minimumHistoryStatus').textContent(), cutoff);
-          assert.equal(await calls(), 1, trigger + ': correction restores the open dialog offline');
+          assert.equal(await page.locator('#minimumHistoryToolbar').isVisible(), true);
+          assert.equal(await page.locator('#minimumHistoryNote').isVisible(), true);
+          assert.equal(await page.locator('#minimumHistoryMore').isHidden(), moreHidden);
+          await page.locator('#minimumHistoryTierFilter').focus();
+          for (const trigger of ['visibilitychange', 'pageshow']) {
+            await page.locator('#minimumHistoryEvents > *').first().evaluate(node => { node.dataset.lifecycleKeep = 'true'; });
+            await page.evaluate(({ now, type }) => {
+              Date.now = () => now;
+              if (type === 'pageshow') window.dispatchEvent(new Event(type));
+              else document.dispatchEvent(new Event(type));
+            }, { now: generatedAt - days * 86400000, type: trigger });
+            assert.equal(await page.locator('#minimumHistoryDialog').evaluate(dialog => dialog.open), true);
+            assert.equal(await page.locator('[data-lifecycle-keep]').count(), 1, trigger + ': device time cannot replace accepted history DOM');
+            assert.equal(await page.locator('#minimumHistoryEvents').textContent(), records);
+            assert.equal(await page.locator('#minimumHistoryStatus').textContent(), cutoff);
+            assert.equal(await page.locator('#minimumHistoryToolbar').isVisible(), true);
+            assert.equal(await page.locator('#minimumHistoryNote').isVisible(), true);
+            assert.equal(await page.locator('#minimumHistoryTierFilter').evaluate(node => node === document.activeElement), true,
+              trigger + ': lifecycle events preserve keyboard focus');
+            assert.equal(await page.locator('#searchInput').isEnabled(), true);
+            assert.deepEqual(await page.locator('#updatedAt, #fxStatus, #applePublishedDate').allTextContents(), dates);
+            assert.deepEqual(await page.locator('#priceRows tr[data-market-id] > td:first-child').allTextContents(), ranks);
+            assert.equal(await calls(), 1, trigger + ': clock changes never fetch history');
+          }
         }
       }
       assert.deepEqual(mainRequests, []);
@@ -3698,7 +3704,7 @@ test('minimum history reuses accepted same/newer checks and locally protects a r
   }
 });
 
-// Initial-future and later-future clocks are covered in the local-only clock-safety matrix.
+// Initial and later device clock offsets never invalidate an accepted price or history snapshot.
 
 test('accepted minimum history survives pending, failed and older refreshes', { timeout: 60000 }, async (context) => {
   const history = await readFixture('minimum-history.json');
@@ -3723,7 +3729,9 @@ test('accepted minimum history survives pending, failed and older refreshes', { 
       { status: 503, body: '{}' },
       { status: 200, contentType: 'application/json', body: '{' },
       { json: { schemaVersion: 1 } },
-      { json: { ...history, checkedAt: new Date(Date.parse(history.checkedAt) + 86400000).toISOString() } },
+      { json: { ...history, checkedAt: 'not-an-iso-timestamp' } },
+      { json: { ...history, checkpoint: { ...history.checkpoint,
+        at: new Date(Date.parse(history.checkedAt) + 1).toISOString() } } },
       { json: emptyMinimumHistory() }
     ]) {
       defer = true; pendingRoute = null;
@@ -4036,11 +4044,11 @@ test('same-generatedAt label changes rebuild static table labels before enabling
 
 
 // PR #184's old first/cache-reload x success/failure scenarios now exercise
-// the remaining async boundary: optional history across local clock recovery.
+// the remaining async boundary: optional history across arbitrary device clock changes.
 // There is no in-document price generation switch or pending main-data fetch.
 for (const lateStage of ['first', 'cache-reload']) {
   for (const lateOutcome of ['success', '503']) {
-    test('stress async: ' + lateStage + ' history ' + lateOutcome + ' cannot undo embedded clock recovery', { timeout: 45000 }, async context => {
+    test('stress async: ' + lateStage + ' history ' + lateOutcome + ' preserves the snapshot through device clock changes', { timeout: 45000 }, async context => {
       const session = await snapshotSession(context, 'optional history and clock race', { width: 1024 });
       if (!session) return;
       const { page, browser, data, url, errors, mainRequests } = session;
@@ -4068,9 +4076,12 @@ for (const lateStage of ['first', 'cache-reload']) {
           Date.now = () => now;
           window.dispatchEvent(new Event('pageshow'));
         }, Date.parse(data.generatedAt) - 3600000);
-        assert.equal(await page.locator('#searchInput').isDisabled(), true);
-        assert.equal(await page.locator('.minimum-badge').count(), 0);
-        assert.equal(await page.locator('#historyDialog').evaluate(dialog => dialog.open), false);
+        assert.equal(await page.locator('#searchInput').isEnabled(), true);
+        assert.equal(await page.locator('.minimum-badge').count(), badges);
+        assert.equal(await page.locator('#historyDialog').evaluate(dialog => dialog.open), true);
+        assert.deepEqual(await page.locator('#priceRows tr[data-market-id] > td:first-child').allTextContents(), ranks);
+        assert.deepEqual(await page.locator('#updatedAt, #fxStatus, #applePublishedDate').allTextContents(), dates);
+        assert.equal(calls, lateStage === 'first' ? 1 : 2, 'clock rollback leaves the pending request alone');
         await page.evaluate(now => {
           Date.now = () => now;
           window.dispatchEvent(new Event('pageshow'));
@@ -4078,6 +4089,8 @@ for (const lateStage of ['first', 'cache-reload']) {
           window.dispatchEvent(new Event('pageshow'));
         }, Date.parse(data.generatedAt) + 3600000);
         await waitForSnapshot(page);
+        assert.equal(await page.locator('#historyDialog').evaluate(dialog => dialog.open), true);
+        await page.locator('#closeHistory').click();
         const second = data.countries[1];
         await page.locator('tr[data-market-id="' + second.marketId + '"] .country-history-button').click();
         const responseReady = page.waitForResponse(response => response.url().includes('/data/history.json'));
@@ -4090,7 +4103,7 @@ for (const lateStage of ['first', 'cache-reload']) {
         assert.equal(await page.locator('.minimum-badge').count(), badges);
         assert.deepEqual(await page.locator('#priceRows tr[data-market-id] > td:first-child').allTextContents(), ranks);
         assert.deepEqual(await page.locator('#updatedAt, #fxStatus, #applePublishedDate').allTextContents(), dates);
-        assert.equal(calls, lateStage === 'first' ? 1 : 2, 'clock recovery neither duplicates nor restarts optional history');
+        assert.equal(calls, lateStage === 'first' ? 1 : 2, 'device clock changes neither duplicate nor restart optional history');
         if (lateOutcome === '503') assert.match(await page.locator('#historySubtitle').textContent(), /暂无法读取/);
         else assert.doesNotMatch(await page.locator('#historySubtitle').textContent(), /暂无法读取/);
         assert.deepEqual(mainRequests, []);
@@ -4264,8 +4277,8 @@ for (const corruption of ['amount', 'navigation target']) {
 }
 
 for (const trigger of ['search', 'country sort', 'tier sort', 'minimum card', 'country history', 'publication history']) {
-  test('a clock rollback is protected on ' + trigger + ' without lifecycle events', { timeout: 30000 }, async context => {
-    const session = await snapshotSession(context, 'interaction-time clock safety', { width: 1024 });
+  test('device clock rollback preserves ' + trigger + ' without lifecycle events', { timeout: 30000 }, async context => {
+    const session = await snapshotSession(context, 'clock-independent interactions', { width: 1024 });
     if (!session) return;
     const { page, browser, data, url, mainRequests, errors } = session;
     let historyRequests = 0;
@@ -4274,35 +4287,52 @@ for (const trigger of ['search', 'country sort', 'tier sort', 'minimum card', 'c
       await page.goto(url, { waitUntil: 'domcontentloaded' });
       await waitForSnapshot(page);
       assert.ok(await page.locator('.minimum-badge').count() > 0);
-      // Deliberately do not dispatch pageshow, visibilitychange or any reload.
-      await page.evaluate(now => { Date.now = () => now; }, Date.parse(data.generatedAt) - 3600000);
-      if (trigger === 'search') await page.locator('#searchInput').fill('美国');
-      else if (trigger === 'country sort') await page.locator('button[data-sort="country"]').click();
-      else if (trigger === 'tier sort') await page.locator('button[data-sort-tier]:visible').first().click();
-      else if (trigger === 'minimum card') await page.locator('.minimum-card').first().click();
-      else if (trigger === 'country history') await page.locator('.country-history-button').first().click();
-      else await page.locator('#publishedDateButton').click();
-      await page.waitForFunction(() => document.querySelector('#searchInput').disabled);
-      assert.equal(await page.locator('.minimum-card, .minimum-badge, .rank-top, .is-minimum').count(), 0);
-      assert.ok((await page.locator('#priceRows tr[data-market-id] > td:first-child').allTextContents()).every(text => text === '—'));
-      assert.equal(await page.locator('#historyDialog').evaluate(dialog => dialog.open), false);
-      assert.equal(await page.locator('#publishedDateDialog').evaluate(dialog => dialog.open), false);
-      assert.match(await page.locator('#updatedAt').textContent(), /数据时间异常/);
-      assert.equal(historyRequests, 0, 'an unsafe interaction must not start optional history');
-      assert.deepEqual(mainRequests, []);
+      const dates = await page.locator('#updatedAt, #fxStatus, #applePublishedDate').allTextContents();
+      const minimum = page.locator('.minimum-card').first();
+      const minimumTarget = { marketId: await minimum.getAttribute('data-market-id'), tierId: await minimum.getAttribute('data-tier') };
+      // Deliberately leave pageshow/visibilitychange idle: interaction guards also ignore device time.
+      await page.evaluate(now => { Date.now = () => now; }, Date.parse(data.generatedAt) - 3650 * 86400000);
+      if (trigger === 'search') {
+        await page.locator('#searchInput').fill('美国');
+        await page.waitForFunction(() => document.querySelectorAll('#priceRows tr[data-market-id]').length === 1);
+        assert.equal(await page.locator('#searchInput').inputValue(), '美国');
+      } else if (trigger === 'country sort') {
+        await page.locator('button[data-sort="country"]').click();
+        assert.equal(await page.locator('button[data-sort="country"]').locator('xpath=ancestor::th').getAttribute('aria-sort'), 'ascending');
+      } else if (trigger === 'tier sort') {
+        const sort = page.locator('button[data-sort-tier]:visible').first();
+        await sort.click();
+        assert.notEqual(await sort.locator('xpath=ancestor::th').getAttribute('aria-sort'), 'none');
+      } else if (trigger === 'minimum card') {
+        await minimum.click();
+        await assertMinimumNavigation(page, minimumTarget.marketId, minimumTarget.tierId);
+      } else if (trigger === 'country history') {
+        await page.locator('.country-history-button').first().click();
+        await waitForAcceptedCountryHistory(page);
+        assert.equal(await page.locator('#historyDialog').evaluate(dialog => dialog.open), true);
+      } else {
+        await page.locator('#publishedDateButton').click();
+        await page.waitForFunction(() => document.querySelector('#publishedDateRows tr')?.cells.length === 2);
+        assert.equal(await page.locator('#publishedDateDialog').evaluate(dialog => dialog.open), true);
+      }
+      assert.equal(await page.locator('#searchInput').isEnabled(), true);
+      assert.equal(await page.locator('.minimum-card').count(), data.tiers.length);
+      assert.ok((await page.locator('#priceRows tr[data-market-id] > td:first-child').allTextContents()).every(text => text !== '—'));
+      assert.deepEqual(await page.locator('#updatedAt, #fxStatus, #applePublishedDate').allTextContents(), dates);
+      const expectedRequests = ['country history', 'publication history'].includes(trigger) ? 1 : 0;
+      assert.equal(historyRequests, expectedRequests, 'only an explicitly requested uncached history may fetch');
       await page.evaluate(now => {
         Date.now = () => now;
         window.dispatchEvent(new Event('pageshow'));
-      }, Date.parse(data.generatedAt) + 3600000);
+      }, Date.parse(data.generatedAt) + 3650 * 86400000);
       await waitForSnapshot(page);
       assert.equal(await page.locator('.minimum-card').count(), data.tiers.length);
-      assert.ok(await page.locator('.minimum-badge').count() > 0);
+      assert.equal(historyRequests, expectedRequests, 'lifecycle events never add a request');
       assert.deepEqual(mainRequests, []);
       assert.deepEqual(errors, []);
     } finally { await browser.close(); }
   });
 }
-
 
 // Force the delayed focus callback to run after the next user action rather
 // than relying on browser/runner timing. This must fail with unconditional
@@ -5009,22 +5039,49 @@ test('every history close preserves newer focus and the reopened semantic trigge
 });
 
 for (const kind of ['country', 'publication']) {
-  test(kind + ' history returns to the workspace when clock rollback disables its trigger', { timeout: 45000 }, async context => {
-    const session = await snapshotSession(context, 'disabled history return after clock rollback', { width: 1280 });
+  test(kind + ' history preserves focus through clock rollback and handles an unavailable return trigger', { timeout: 45000 }, async context => {
+    const session = await snapshotSession(context, 'history focus independent from device time', { width: 1280 });
     if (!session) return;
-    const { page, browser, data, url, errors } = session;
+    const { page, browser, data, url, errors, mainRequests } = session;
     const selector = kind === 'country' ? '#historyDialog' : '#publishedDateDialog';
+    let historyCalls = 0;
+    await page.route('**/data/history.json*', route => { historyCalls++; return route.continue(); });
     try {
       await page.goto(url, { waitUntil: 'domcontentloaded' });
       await waitForSnapshot(page);
-      await page.locator(kind === 'country' ? '.country-history-button:not(:disabled)' : '#publishedDateButton').first().click();
-      await page.waitForSelector(selector + '[open]');
-      await page.evaluate(now => { Date.now = () => now; window.dispatchEvent(new Event('pageshow')); }, Date.parse(data.generatedAt) - 3600000);
-      await page.waitForFunction(() => [...document.querySelectorAll('.country-history-button, #publishedDateButton')].every(button => button.disabled));
-      if (kind === 'publication') await page.keyboard.press('Escape');
-      await page.waitForFunction(selector => !document.querySelector(selector).open, selector);
-      await page.waitForFunction(() => document.activeElement?.id === 'priceWorkspace');
-      assert.equal(await page.evaluate(() => document.activeElement?.id), 'priceWorkspace', 'a disabled trigger cannot consume focus restoration');
+      for (const unavailable of [false, true]) {
+        const trigger = page.locator(kind === 'country' ? '.country-history-button:not(:disabled)' : '#publishedDateButton').first();
+        await trigger.click();
+        if (kind === 'country') await waitForAcceptedCountryHistory(page);
+        else await page.waitForFunction(() => document.querySelector('#publishedDateRows tr')?.cells.length === 2);
+        await page.waitForSelector(selector + '[open]');
+        const acceptedCalls = historyCalls;
+        await page.locator(kind === 'country' ? '#closeHistory' : '#closePublishedDate').focus();
+        const activeId = await page.evaluate(() => document.activeElement.id);
+        const records = await page.locator(kind === 'country' ? '#historyRows' : '#publishedDateRows').textContent();
+        await page.evaluate(now => {
+          Date.now = () => now;
+          window.dispatchEvent(new Event('pageshow'));
+          document.dispatchEvent(new Event('visibilitychange'));
+        }, Date.parse(data.generatedAt) - 3650 * 86400000);
+        assert.equal(await trigger.isEnabled(), true, 'clock rollback leaves the semantic trigger enabled');
+        assert.equal(await page.locator(selector).evaluate(dialog => dialog.open), true);
+        assert.equal(await page.evaluate(() => document.activeElement.id), activeId, 'clock changes do not move focus');
+        assert.equal(await page.locator(kind === 'country' ? '#historyRows' : '#publishedDateRows').textContent(), records);
+        assert.equal(historyCalls, acceptedCalls, 'clock changes and accepted reopen add no history request');
+        // Preserve fallback coverage for a genuinely unavailable target, independently of time.
+        if (unavailable) await trigger.evaluate(button => { button.disabled = true; });
+        await page.keyboard.press('Escape');
+        await page.waitForFunction(selector => !document.querySelector(selector).open, selector);
+        if (unavailable) {
+          await page.waitForFunction(() => document.activeElement?.id === 'priceWorkspace');
+          assert.equal(await page.evaluate(() => document.activeElement?.id), 'priceWorkspace', 'an unavailable trigger returns focus to the workspace');
+        } else {
+          await page.waitForFunction(button => document.activeElement === button, await trigger.elementHandle());
+          assert.equal(await trigger.evaluate(button => document.activeElement === button), true, 'enabled history trigger regains focus');
+        }
+      }
+      assert.deepEqual(mainRequests, []);
       assert.deepEqual(errors, []);
     } finally { await browser.close(); }
   });
