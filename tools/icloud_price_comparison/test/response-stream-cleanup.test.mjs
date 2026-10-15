@@ -99,7 +99,6 @@ function requestContext(response) {
       readBoundedJsonResponse: readerWithLimits(),
       validatePayload: (_name, value) => value,
       validateMinimumHistoryPayload: value => value,
-      MAX_PRICE_FUTURE_SKEW_MS: 300000,
       minimumHistoryUi: { data: null, promise: null, status: 'idle' },
       renderMinimumHistory: () => {},
       renderMinimumHistoryStatus: () => {},
@@ -129,4 +128,31 @@ test('minimum-history HTTP rejection aborts the unread request before returning'
   await load();
   assert.equal(harness.context.minimumHistoryUi.status, 'error');
   harness.assertClosed();
+});
+
+test('frontend time classification validates timestamps without reading or returning device age', () => {
+  const names = ['classifyPriceFreshness', 'minimumHistoryTimeUsable'];
+  const implementations = names.map(functionSource);
+  class ClocklessDate extends Date {
+    static now() { throw new Error('Frontend classification must not read the device clock'); }
+  }
+  const api = runInNewContext(
+    [...implementations, '({ ' + names.join(', ') + ' })'].join('\n'),
+    { Date: ClocklessDate },
+  );
+  const plain = value => JSON.parse(JSON.stringify(value));
+  for (const generatedAt of ['1900-01-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z', '2099-01-01T00:00:00.000Z']) {
+    assert.deepEqual(plain(api.classifyPriceFreshness({ generatedAt })), { status: 'fresh', reason: null });
+    assert.equal(api.minimumHistoryTimeUsable({ checkedAt: generatedAt }), true);
+    for (const deviceTime of [-Infinity, -8640000000000000, 0, 8640000000000000, Infinity, NaN]) {
+      assert.deepEqual(plain(api.classifyPriceFreshness({ generatedAt }, deviceTime)), { status: 'fresh', reason: null });
+      assert.equal(api.minimumHistoryTimeUsable({ checkedAt: generatedAt }, deviceTime), true);
+    }
+  }
+  for (const generatedAt of [undefined, null, '', 'not-a-time']) {
+    assert.deepEqual(plain(api.classifyPriceFreshness({ generatedAt })), { status: 'unusable', reason: 'invalid-time' });
+  }
+  assert.deepEqual(plain(api.classifyPriceFreshness(null)), { status: 'unusable', reason: 'invalid-time' });
+  for (const history of [undefined, null, { checkedAt: null }]) assert.equal(api.minimumHistoryTimeUsable(history), true);
+  for (const checkedAt of [undefined, '', 'not-a-time']) assert.equal(api.minimumHistoryTimeUsable({ checkedAt }), false);
 });
