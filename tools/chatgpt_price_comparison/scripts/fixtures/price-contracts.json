@@ -1,0 +1,750 @@
+{
+  "description": "Synthetic accepted-price contract. Expected projections are hand-reviewed goldens, not generated from either implementation. No upstream truth claim.",
+  "generated_at": "2026-10-01T00:00:00Z",
+  "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "cases": [
+    {
+      "name": "plan_local_variants_aliases_and_tied_dense_ranks",
+      "fx": {
+        "updated_at": "2026-10-01T00:00:00Z",
+        "fallback": false,
+        "rates": {
+          "USD": "1",
+          "CNY": "7",
+          "JPY": "140",
+          "TRY": "28",
+          "EUR": "2"
+        }
+      },
+      "markets": [
+        {
+          "code": "us",
+          "name": "us",
+          "currency": "USD",
+          "status": "verified",
+          "last_verified_at": "2026-10-01T00:00:00Z",
+          "offers": [
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                {
+                  "amount": "19.99",
+                  "display": "19.99",
+                  "cny": "139.93"
+                },
+                {
+                  "amount": "200",
+                  "display": "200",
+                  "cny": "1400.00"
+                }
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                {
+                  "amount": "100",
+                  "display": "100",
+                  "cny": "700.00"
+                }
+              ]
+            },
+            {
+              "label": "ChatGPT Future X",
+              "amounts": [
+                {
+                  "amount": "9",
+                  "display": "9",
+                  "cny": "63.00"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "jp",
+          "name": "jp",
+          "currency": "JPY",
+          "status": "verified",
+          "last_verified_at": "2026-10-01T00:00:00Z",
+          "offers": [
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                {
+                  "amount": "2800",
+                  "display": "2800",
+                  "cny": "140.00"
+                }
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 100",
+              "amounts": [
+                {
+                  "amount": "14000",
+                  "display": "14000",
+                  "cny": "700.00"
+                }
+              ]
+            },
+            {
+              "label": "ChatGPT Future X",
+              "amounts": [
+                {
+                  "amount": "1000",
+                  "display": "1000",
+                  "cny": "50.00"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "tr",
+          "name": "tr",
+          "currency": "TRY",
+          "status": "verified",
+          "last_verified_at": "2026-10-01T00:00:00Z",
+          "offers": [
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                {
+                  "amount": "560",
+                  "display": "560",
+                  "cny": "140.00"
+                }
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 100",
+              "amounts": [
+                {
+                  "amount": "2800",
+                  "display": "2800",
+                  "cny": "700.00"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "de",
+          "name": "de",
+          "currency": "EUR",
+          "status": "verified",
+          "last_verified_at": "2026-10-01T00:00:00Z",
+          "offers": [
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                {
+                  "amount": "39.98",
+                  "display": "39.98",
+                  "cny": "139.93"
+                }
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 5X",
+              "amounts": [
+                {
+                  "amount": "200",
+                  "display": "200",
+                  "cny": "700.00"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "reliable_history": true,
+      "expected": [
+        {
+          "label": "ChatGPT Plus",
+          "local": [
+            "19.99",
+            "2800",
+            "560",
+            "39.98"
+          ],
+          "cny": [
+            "139.93",
+            "140.00",
+            "140.00",
+            "139.93"
+          ],
+          "ranks": [
+            1,
+            2,
+            2,
+            1
+          ],
+          "minimum": "139.93",
+          "winners": [
+            "de",
+            "us"
+          ]
+        },
+        {
+          "label": "ChatGPT Pro 100",
+          "local": [
+            "100",
+            "14000",
+            "2800",
+            "200"
+          ],
+          "cny": [
+            "700.00",
+            "700.00",
+            "700.00",
+            "700.00"
+          ],
+          "ranks": [
+            1,
+            1,
+            1,
+            1
+          ],
+          "minimum": "700.00",
+          "winners": [
+            "de",
+            "jp",
+            "tr",
+            "us"
+          ]
+        },
+        {
+          "label": "ChatGPT Future X",
+          "local": [
+            "9",
+            "1000",
+            null,
+            null
+          ],
+          "cny": [
+            "63.00",
+            "50.00",
+            null,
+            null
+          ],
+          "ranks": [
+            2,
+            1,
+            null,
+            null
+          ],
+          "minimum": "50.00",
+          "winners": [
+            "jp"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ambiguous_same_market_aliases_fail_closed",
+      "fx": {
+        "updated_at": "2026-10-01T00:00:00Z",
+        "fallback": false,
+        "rates": {
+          "USD": "1",
+          "CNY": "7",
+          "JPY": "140",
+          "TRY": "28",
+          "EUR": "2"
+        }
+      },
+      "markets": [
+        {
+          "code": "us",
+          "name": "us",
+          "currency": "USD",
+          "status": "verified",
+          "last_verified_at": "2026-10-01T00:00:00Z",
+          "offers": [
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                {
+                  "amount": "100",
+                  "display": "100",
+                  "cny": "700.00"
+                }
+              ]
+            },
+            {
+              "label": "ChatGPT Pro 100",
+              "amounts": [
+                {
+                  "amount": "90",
+                  "display": "90",
+                  "cny": "630.00"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "jp",
+          "name": "jp",
+          "currency": "USD",
+          "status": "verified",
+          "last_verified_at": "2026-10-01T00:00:00Z",
+          "offers": [
+            {
+              "label": "ChatGPT Pro 100",
+              "amounts": [
+                {
+                  "amount": "100",
+                  "display": "100",
+                  "cny": "700.00"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "reliable_history": false,
+      "expected": [
+        {
+          "label": "ChatGPT Pro 100",
+          "local": [
+            null,
+            "100"
+          ],
+          "cny": [
+            null,
+            "700.00"
+          ],
+          "ranks": [
+            null,
+            1
+          ],
+          "minimum": "700.00",
+          "winners": [
+            "jp"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "accepted_retained_and_pending_prices_keep_verified_label",
+      "fx": {
+        "updated_at": "2026-10-01T00:00:00Z",
+        "fallback": false,
+        "rates": {
+          "USD": "1",
+          "CNY": "7",
+          "JPY": "140",
+          "TRY": "28",
+          "EUR": "2"
+        }
+      },
+      "markets": [
+        {
+          "code": "us",
+          "name": "us",
+          "currency": "USD",
+          "status": "verified",
+          "last_verified_at": "2026-10-01T00:00:00Z",
+          "offers": [
+            {
+              "label": "ChatGPT Pro 5x",
+              "amounts": [
+                {
+                  "amount": "100",
+                  "display": "100",
+                  "cny": "700.00"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "jp",
+          "name": "jp",
+          "currency": "USD",
+          "status": "retained",
+          "last_verified_at": "2025-01-01T00:00:00Z",
+          "offers": [
+            {
+              "label": "ChatGPT Pro 100",
+              "amounts": [
+                {
+                  "amount": "90",
+                  "display": "90",
+                  "cny": "630.00"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "tr",
+          "name": "tr",
+          "currency": "USD",
+          "status": "pending",
+          "last_verified_at": "2025-01-01T00:00:00Z",
+          "offers": [
+            {
+              "label": "ChatGPT Pro 100",
+              "amounts": [
+                {
+                  "amount": "110",
+                  "display": "110",
+                  "cny": "770.00"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "reliable_history": false,
+      "expected": [
+        {
+          "label": "ChatGPT Pro 5x",
+          "local": [
+            "100",
+            "90",
+            "110"
+          ],
+          "cny": [
+            "700.00",
+            "630.00",
+            "770.00"
+          ],
+          "ranks": [
+            2,
+            1,
+            3
+          ],
+          "minimum": "630.00",
+          "winners": [
+            "jp"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "missing_currency_rate_is_missing_never_zero",
+      "fx": {
+        "updated_at": "2026-10-01T00:00:00Z",
+        "fallback": false,
+        "rates": {
+          "USD": "1",
+          "CNY": "7"
+        }
+      },
+      "markets": [
+        {
+          "code": "us",
+          "name": "us",
+          "currency": "USD",
+          "status": "verified",
+          "last_verified_at": "2026-10-01T00:00:00Z",
+          "offers": [
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                {
+                  "amount": "19.99",
+                  "display": "19.99",
+                  "cny": "139.93"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "de",
+          "name": "de",
+          "currency": "EUR",
+          "status": "verified",
+          "last_verified_at": "2026-10-01T00:00:00Z",
+          "offers": [
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                {
+                  "amount": "1",
+                  "display": "1",
+                  "cny": null
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "reliable_history": false,
+      "expected": [
+        {
+          "label": "ChatGPT Plus",
+          "local": [
+            "19.99",
+            "1"
+          ],
+          "cny": [
+            "139.93",
+            null
+          ],
+          "ranks": [
+            1,
+            null
+          ],
+          "minimum": "139.93",
+          "winners": [
+            "us"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "absent_fx_has_no_minimum_or_rank",
+      "fx": null,
+      "markets": [
+        {
+          "code": "us",
+          "name": "us",
+          "currency": "USD",
+          "status": "verified",
+          "last_verified_at": "2026-10-01T00:00:00Z",
+          "offers": [
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                {
+                  "amount": "19.99",
+                  "display": "19.99",
+                  "cny": null
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "reliable_history": false,
+      "expected": [
+        {
+          "label": "ChatGPT Plus",
+          "local": [
+            "19.99"
+          ],
+          "cny": [
+            null
+          ],
+          "ranks": [
+            null
+          ],
+          "minimum": null,
+          "winners": []
+        }
+      ]
+    },
+    {
+      "name": "future_fx_temporarily_hides_comparison",
+      "fx": {
+        "updated_at": "2026-10-01T00:05:01Z",
+        "fallback": false,
+        "rates": {
+          "USD": "1",
+          "CNY": "7",
+          "JPY": "140",
+          "TRY": "28",
+          "EUR": "2"
+        }
+      },
+      "markets": [
+        {
+          "code": "us",
+          "name": "us",
+          "currency": "USD",
+          "status": "verified",
+          "last_verified_at": "2026-10-01T00:00:00Z",
+          "offers": [
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                {
+                  "amount": "19.99",
+                  "display": "19.99",
+                  "cny": "139.93"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "reliable_history": false,
+      "expected": [
+        {
+          "label": "ChatGPT Plus",
+          "local": [
+            "19.99"
+          ],
+          "cny": [
+            null
+          ],
+          "ranks": [
+            null
+          ],
+          "minimum": null,
+          "winners": []
+        }
+      ]
+    },
+    {
+      "name": "future_market_cannot_win",
+      "fx": {
+        "updated_at": "2026-10-01T00:00:00Z",
+        "fallback": false,
+        "rates": {
+          "USD": "1",
+          "CNY": "7",
+          "JPY": "140",
+          "TRY": "28",
+          "EUR": "2"
+        }
+      },
+      "markets": [
+        {
+          "code": "us",
+          "name": "us",
+          "currency": "USD",
+          "status": "verified",
+          "last_verified_at": "2026-10-01T00:05:01Z",
+          "offers": [
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                {
+                  "amount": "1",
+                  "display": "1",
+                  "cny": "7.00"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "jp",
+          "name": "jp",
+          "currency": "USD",
+          "status": "verified",
+          "last_verified_at": "2026-10-01T00:00:00Z",
+          "offers": [
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                {
+                  "amount": "2",
+                  "display": "2",
+                  "cny": "14.00"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "reliable_history": false,
+      "expected": [
+        {
+          "label": "ChatGPT Plus",
+          "local": [
+            "1",
+            "2"
+          ],
+          "cny": [
+            null,
+            "14.00"
+          ],
+          "ranks": [
+            null,
+            1
+          ],
+          "minimum": "14.00",
+          "winners": [
+            "jp"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "published_half_up_cents_remain_exact",
+      "fx": {
+        "updated_at": "2026-10-01T00:00:00Z",
+        "fallback": false,
+        "rates": {
+          "USD": "1",
+          "CNY": "7",
+          "JPY": "140",
+          "TRY": "28",
+          "EUR": "2"
+        }
+      },
+      "markets": [
+        {
+          "code": "us",
+          "name": "us",
+          "currency": "USD",
+          "status": "verified",
+          "last_verified_at": "2026-10-01T00:00:00Z",
+          "offers": [
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                {
+                  "amount": "1.005",
+                  "display": "1.005",
+                  "cny": "7.04"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "jp",
+          "name": "jp",
+          "currency": "USD",
+          "status": "verified",
+          "last_verified_at": "2026-10-01T00:00:00Z",
+          "offers": [
+            {
+              "label": "ChatGPT Plus",
+              "amounts": [
+                {
+                  "amount": "1.006",
+                  "display": "1.006",
+                  "cny": "7.04"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "reliable_history": true,
+      "expected": [
+        {
+          "label": "ChatGPT Plus",
+          "local": [
+            "1.005",
+            "1.006"
+          ],
+          "cny": [
+            "7.04",
+            "7.04"
+          ],
+          "ranks": [
+            1,
+            1
+          ],
+          "minimum": "7.04",
+          "winners": [
+            "jp",
+            "us"
+          ]
+        }
+      ]
+    }
+  ]
+}

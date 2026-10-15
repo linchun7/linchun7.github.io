@@ -102,6 +102,16 @@ const elements = {
 const numberFormatter = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 });
 const moneyFormatter = new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const percentFormatter = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 });
+const dateFormatter = new Intl.DateTimeFormat('zh-CN', {
+  year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'UTC'
+});
+const beijingDateTimeFormatter = new Intl.DateTimeFormat('zh-CN', {
+  year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit',
+  minute: '2-digit', hour12: false, timeZone: 'Asia/Shanghai'
+});
+const beijingDateFormatter = new Intl.DateTimeFormat('en', {
+  year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Shanghai'
+});
 const collator = new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base' });
 let analyticsScheduled = false;
 let staticSnapshotDomDowngraded = false;
@@ -279,12 +289,7 @@ async function readBoundedJsonResponse(response, fileName) {
 
 function formatDate(value) {
   if (!value) return '--';
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    timeZone: 'UTC'
-  })
+  return dateFormatter
     .format(new Date(`${value.slice(0, 10)}T00:00:00Z`));
 }
 
@@ -292,27 +297,14 @@ function formatBeijingDateTime(value) {
   if (!value) return '--';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '--';
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone: 'Asia/Shanghai'
-  }).format(date);
+  return beijingDateTimeFormatter.format(date);
 }
 
 function formatBeijingDate(value) {
   if (!value) return '--';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '--';
-  const parts = new Intl.DateTimeFormat('en', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    timeZone: 'Asia/Shanghai'
-  }).formatToParts(date);
+  const parts = beijingDateFormatter.formatToParts(date);
   const part = (type) => parts.find((entry) => entry.type === type)?.value;
   return `${part('year')}-${part('month')}-${part('day')}`;
 }
@@ -325,12 +317,7 @@ function formatPublishedDate(value) {
     ? new Date(`${dateOnly[1]} ${dateOnly[2]}, ${dateOnly[3]} 00:00:00 UTC`)
     : new Date(text);
   if (Number.isNaN(date.getTime())) return text;
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    timeZone: 'UTC'
-  }).format(date);
+  return dateFormatter.format(date);
 }
 
 async function fetchJson(fileName, { forceRefresh = false } = {}) {
