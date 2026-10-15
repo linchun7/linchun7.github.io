@@ -640,6 +640,11 @@ test('accepts pin-only YAML list shorthand without allowing step-structure chang
     validWorkflowChange().patch.replace('+        uses:', '+      - uses:'),
     short.patch + '\n+      - run: echo injected',
     short.patch.replace('+      - uses:', '+      - run:'),
+    short.patch.replace('+      - uses:', '+    - uses:'),
+    short.patch.replace('+      - uses:', '+      -  uses:'),
+    short.patch.replace('+      - uses:', '+      - uses:  '),
+    short.patch.replace('+      - uses: actions/checkout@' + NEW_ACTION_SHA + ' #', '+      - uses: actions/checkout@' + NEW_ACTION_SHA + '  #'),
+    short.patch.replace('# v6.1.0', '#  v6.1.0'),
   ]) {
     assert.throws(() => validateChangedFiles([{ ...short, patch: changed, changes: changed.includes('echo injected') ? 3 : 2 }]));
   }
