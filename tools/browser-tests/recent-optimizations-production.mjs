@@ -39,8 +39,13 @@ export function pageContract(html, url) {
     const loaders = scripts.filter(match => loaderPattern.test(match[1]));
     assert.ok(loaders.length <= 1, 'duplicated observed Cloudflare loader');
     const nonce = loaders.length ? loaderPattern.exec(loaders[0][1])[1] : null;
+    // Browser-only Cloudflare Web Analytics node was captured verbatim in run
+    // 38679541328. Match the complete tag, including URL, SRI, beacon attributes
+    // and empty body; never ignore an arbitrary cross-origin script.
+    const beacons = scripts.filter(match => hash(match[0]) === 'e10b4c517370bb73f72eeb202c228dd3ec8bc9f86306d832a6485e48b2f24d71');
+    assert.ok(beacons.length <= 1, 'duplicated evidenced Cloudflare analytics node');
     if (loaders.length) assert.equal(loaders[0][2], '', 'Cloudflare loader must not contain inline code');
-    const appScripts = scripts.filter(match => match !== loaders[0]).map(match => {
+    const appScripts = scripts.filter(match => match !== loaders[0] && match !== beacons[0]).map(match => {
         if (!nonce) return match[0];
         const marker = ' type="' + nonce + '-text/javascript"';
         if (!match[1].includes(marker)) return match[0];
@@ -62,7 +67,7 @@ export function assertResource(bytes, resource) {
 }
 export function isAnalyticsUrl(value) {
     const hostname = new URL(value).hostname;
-    return ['googletagmanager.com', 'google-analytics.com'].some(domain =>
+    return ['googletagmanager.com', 'google-analytics.com', 'static.cloudflareinsights.com'].some(domain =>
         hostname === domain || hostname.endsWith('.' + domain));
 }
 export function assertRequestsComplete(records, required, verified) {
@@ -80,7 +85,11 @@ export function assertScheduleParity(actual, expected) {
         assert.ok(Number.isFinite(value) && Number.isFinite(reference), label + ' must be finite');
         const difference = Math.abs(value - reference);
         maximumRateDifference = Math.max(maximumRateDifference, difference);
-        assert.ok(difference <= 64 * Number.EPSILON * Math.max(1, Math.abs(value), Math.abs(reference)), label + ' exceeds the observed cross-engine Math.pow precision boundary');
+        // annualizeMonthlyIRR is (Math.pow(1 + monthlyRate, 12) - 1) * 100.
+        // Bound engine ulps at the pre-subtraction scale, including that factor
+        // of 100; scaling by the small final APR alone understates cancellation.
+        const tolerance = 64 * Number.EPSILON * Math.max(100, Math.abs(value), Math.abs(reference));
+        assert.ok(difference <= tolerance, label + ' exceeds the cross-engine annualization precision boundary: ' + JSON.stringify({ value, reference, difference, tolerance }));
         assert.equal(value.toFixed(2), reference.toFixed(2), label + ' must retain the exact displayed percentage');
     };
     rate(actual.apr, expected.apr, 'full APR');
@@ -397,7 +406,7 @@ export async function main() {
             const page = await context.newPage();
             try {
                 const url = ORIGIN + '/tools/translation_benchmark/' + language + '.html';
-                await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+                await page.goto(url, { waitUntil: 'load', timeout: 30000 });
                 assert.equal(page.url(), url);
                 async function corpus() {
                     assert.deepEqual(await page.locator('.sample-text').allTextContents(), CORPUS[language].flatMap(([, samples]) => samples));
@@ -405,14 +414,15 @@ export async function main() {
                     assert.equal(await page.locator('.sample-item').count(), 48);
                     assert.equal(await page.locator('html').getAttribute('lang'), language);
                     assert.equal(await page.locator('.test-nav a[aria-current="page"]').getAttribute('href'), language + '.html');
+                    await page.locator('.sample-text').first().waitFor({ state: 'visible' });
                     assert.equal(await page.locator('.sample-text').first().isVisible(), true);
                 }
                 await corpus();
-                await page.reload({ waitUntil: 'domcontentloaded' }); await corpus();
+                await page.reload({ waitUntil: 'load' }); await corpus();
                 const next = languages[(languages.indexOf(language) + 1) % languages.length];
                 await page.locator('.test-nav a[href="' + next + '.html"]').click();
                 await page.waitForURL('**/' + next + '.html');
-                await page.goBack({ waitUntil: 'domcontentloaded' }); await corpus();
+                await page.goBack({ waitUntil: 'load' }); await corpus();
                 checks += 1;
                 console.log(JSON.stringify({ suite: 'production-translation', browser: browserName, language, javaScriptEnabled, status: 'passed' }));
             } finally {

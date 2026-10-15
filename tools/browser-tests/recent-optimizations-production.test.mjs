@@ -27,7 +27,7 @@ test('resource verification rejects even one changed byte', () => {
 });
 
 test('analytics isolation matches exact Google domains and their real www hosts', () => {
-    for (const host of ['googletagmanager.com', 'www.googletagmanager.com', 'google-analytics.com', 'www.google-analytics.com']) {
+    for (const host of ['googletagmanager.com', 'www.googletagmanager.com', 'google-analytics.com', 'www.google-analytics.com', 'static.cloudflareinsights.com']) {
         assert.equal(isAnalyticsUrl('https://' + host + '/gtag/js?id=fixture'), true);
     }
     for (const host of ['www.linchun.com.cn', 'notgoogletagmanager.com', 'googletagmanager.com.example.org']) {
@@ -71,4 +71,13 @@ test('cross-engine APR ulps never permit a monetary or displayed-percentage chan
     assert.throws(() => assertScheduleParity(money, expected), /monetary/);
     const badRate = structuredClone(actual); badRate.apr += 0.001;
     assert.throws(() => assertScheduleParity(badRate, expected), /precision boundary/);
+});
+
+test('only the exact evidenced Cloudflare analytics tag is outside the application contract', () => {
+    const beacon = "<script type=\"module\" src=\"https://static.cloudflareinsights.com/beacon.min.js/v4bc70e2c01a94c73b74392e4234840661791215815920\" integrity=\"sha512-L0ha0OXavK/8okipN9F8BtP84dg9DUhPERbBXzwI6dgTA55d2+yweo3pn5CSFYs45/r8md2+xvUPtTdvTNRfjA==\" data-cf-beacon='{\"version\":\"2024.11.0\",\"token\":\"a57726bb7d694048b17e1f50ea2e7346\",\"r\":1,\"spa\":2}' crossorigin=\"anonymous\"></script>";
+    assert.deepEqual(pageContract(html.replace('</body>', beacon + '</body>'), url), pageContract(html, url));
+    for (const changed of [beacon.replace('sha512-L0ha', 'sha512-X0ha'), beacon.replace('crossorigin="anonymous"', 'crossorigin="use-credentials"'), beacon.replace('static.cloudflareinsights.com', 'unexpected.example')]) {
+        assert.notDeepEqual(pageContract(html.replace('</body>', changed + '</body>'), url), pageContract(html, url));
+    }
+    assert.throws(() => pageContract(html.replace('</body>', beacon + beacon + '</body>'), url), /duplicated evidenced/);
 });
