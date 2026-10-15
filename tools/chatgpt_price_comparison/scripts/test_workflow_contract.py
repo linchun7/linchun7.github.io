@@ -172,6 +172,7 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn('scripts/validation-scope.mjs', validate)
         live = validate[validate.index("\n  live-source:"):]
         self.assertIn('needs: validation-scope', live)
+        self.assertIn("if: ${{ !cancelled() && github.event_name == 'pull_request'", live)
         self.assertIn("needs.validation-scope.outputs.dependency_only != 'true'", live)
         before_live = validate[:validate.index("\n  live-source:")]
         self.assertEqual(before_live.count('dependency_only'), 2)

@@ -231,7 +231,7 @@ jobs:
   live-source:
     name: Verify live App Store sources without publishing
     needs: validation-scope
-    if: github.event_name == 'pull_request' && needs.validation-scope.outputs.dependency_only != 'true'
+    if: ${{ !cancelled() && github.event_name == 'pull_request' && needs.validation-scope.outputs.dependency_only != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
