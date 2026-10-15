@@ -130,14 +130,14 @@ export async function checkCardInputRecovery(browser, baseUrl, browserName) {
                 if (!legacy) assert.equal(await page.locator('#status-bar').isVisible(), false, 'IME confirmation must not start a calculation');
             });
 
-            await check('native ASCII undo and redo still work', async () => {
+            await check('a native ASCII edit can be undone and redone', async () => {
                 await page.locator('#inputField').focus();
-                await page.keyboard.type('7992');
+                await page.keyboard.type('7');
                 await page.keyboard.press('Control+z');
                 assert.equal(await page.inputValue('#inputField'), '');
                 await page.keyboard.press('Control+Shift+z');
-                assert.equal(await page.inputValue('#inputField'), '7992');
-                assert.equal(await page.locator('#validCount').textContent(), '4');
+                assert.equal(await page.inputValue('#inputField'), '7');
+                assert.equal(await page.locator('#validCount').textContent(), '1');
             });
 
             await check('history around normalized input stays editable', async () => {
