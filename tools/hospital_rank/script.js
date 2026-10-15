@@ -20,6 +20,7 @@ let hospitalSearchMap = new Map();
 let gradeOrder = new Map();
 let currentPage = 1;
 let hospitalRenderPending = false;
+let historyBackdropPress = null;
 
 const sortConfig = {
     column: null,
@@ -473,6 +474,7 @@ function openHistoryDialog(hospitalId, trigger) {
     });
     body.appendChild(list);
 
+    historyBackdropPress = null;
     if (typeof dialog.showModal === 'function') dialog.showModal();
     else dialog.setAttribute('open', '');
     body.scrollTop = 0;
@@ -718,13 +720,38 @@ function bindEvents() {
 
     const dialog = document.getElementById('historyDialog');
     document.getElementById('historyDialogClose').addEventListener('click', () => dialog.close());
+    const isBackdrop = event => {
+        const rect = dialog.getBoundingClientRect();
+        return event.target === dialog && (event.clientX < rect.left || event.clientX > rect.right
+            || event.clientY < rect.top || event.clientY > rect.bottom);
+    };
+    dialog.addEventListener('pointerdown', event => {
+        historyBackdropPress = event.isPrimary && event.button === 0 && isBackdrop(event)
+            ? { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false, released: false }
+            : null;
+    });
+    for (const type of ['pointermove', 'pointerup']) {
+        dialog.addEventListener(type, event => {
+            if (!historyBackdropPress || event.pointerId !== historyBackdropPress.id) return;
+            if (Math.hypot(event.clientX - historyBackdropPress.x, event.clientY - historyBackdropPress.y) > 8) {
+                historyBackdropPress.moved = true;
+            }
+            if (type === 'pointerup') historyBackdropPress.released = event.button === 0 && isBackdrop(event);
+        });
+    }
+    dialog.addEventListener('pointercancel', () => { historyBackdropPress = null; });
+    dialog.addEventListener('cancel', () => { historyBackdropPress = null; });
     dialog.addEventListener('click', event => {
-        if (event.target === dialog) dialog.close();
+        const press = historyBackdropPress;
+        historyBackdropPress = null;
+        // Dialog whitespace and cross-boundary drags also retarget clicks to the dialog.
+        if (press?.released && !press.moved && event.detail > 0 && isBackdrop(event)) dialog.close();
     });
     dialog.addEventListener('close', () => {
         // A queued close from an older session must not touch a reopened dialog.
-        if (dialog.open || !hospitalRenderPending) return;
-        displayHospitals();
+        if (dialog.open) return;
+        historyBackdropPress = null;
+        if (hospitalRenderPending) displayHospitals();
     });
 }
 

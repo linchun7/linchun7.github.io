@@ -137,6 +137,100 @@ try {
             await context.close();
         }
     }
+    // Deliberately synthetic lifecycle boundaries, separate from the trusted input cases above.
+    for (const scenario of ['valid-backdrop-control', 'pointercancel', 'keyboard-detail-zero', 'down-escape-reopen', 'released-close-reopen']) {
+        const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+        try {
+            await context.route('**/googletagmanager.com/**', route => route.abort());
+            await context.route('**/google-analytics.com/**', route => route.abort());
+            const page = await context.newPage();
+            const errors = [];
+            page.on('pageerror', error => errors.push(error.message));
+            await page.goto(`${base}/tools/hospital_rank/`);
+            await page.waitForFunction(() => !document.getElementById('yearSelect').disabled);
+            await page.locator('#yearSelect').selectOption(year);
+            await page.locator('#hospitalSearch').fill(hospital.name);
+            await page.waitForFunction(id => {
+                const buttons = [...document.querySelectorAll('.hospital-history-button')];
+                return buttons.length === 1 && buttons[0].dataset.hospitalId === id;
+            }, hospital.id);
+            const trigger = page.locator('.hospital-history-button');
+            await trigger.focus();
+            await page.keyboard.press('Enter');
+            await page.locator('#historyDialog').waitFor({ state: 'visible' });
+            await page.evaluate(() => {
+                const dialog = document.getElementById('historyDialog');
+                const rect = dialog.getBoundingClientRect();
+                if (rect.top <= 8) throw new Error('synthetic fixture must expose a real backdrop');
+                const point = { clientX: rect.left + rect.width / 2, clientY: rect.top / 2 };
+                window.__hospitalSyntheticEvents = [];
+                window.__hospitalBoundaryEvent = (type, detail) => {
+                    const init = {
+                        ...point, bubbles: true, cancelable: true, composed: true,
+                        pointerId: 73, pointerType: 'mouse', isPrimary: true,
+                        button: type === 'pointercancel' ? -1 : 0,
+                        buttons: type === 'pointerdown' ? 1 : 0,
+                        detail: type === 'click' ? detail : 0
+                    };
+                    const event = type === 'click' ? new MouseEvent(type, init) : new PointerEvent(type, init);
+                    dialog.dispatchEvent(event);
+                    window.__hospitalSyntheticEvents.push({
+                        type, trusted: event.isTrusted, detail: event.detail, open: dialog.open
+                    });
+                };
+            });
+            const fire = (type, detail = 1) => page.evaluate(({ type, detail }) =>
+                window.__hospitalBoundaryEvent(type, detail), { type, detail });
+            await fire('pointerdown');
+            if (scenario === 'pointercancel') await fire('pointercancel');
+            if (scenario === 'down-escape-reopen') {
+                await page.keyboard.press('Escape');
+                await page.locator('#historyDialog').waitFor({ state: 'hidden' });
+                assert.equal(await trigger.evaluate(node => document.activeElement === node), true,
+                    'Escape during a press must retain native trigger focus');
+                await page.keyboard.press('Enter');
+                await page.locator('#historyDialog').waitFor({ state: 'visible' });
+            }
+            await fire('pointerup');
+            if (scenario === 'released-close-reopen') {
+                await page.evaluate(() => {
+                    document.getElementById('historyDialog').close();
+                    const trigger = document.querySelector('.hospital-history-button');
+                    trigger.focus();
+                    trigger.click();
+                });
+                await page.locator('#historyDialog').waitFor({ state: 'visible' });
+            }
+            await fire('click', scenario === 'keyboard-detail-zero' ? 0 : 1);
+            if (scenario === 'keyboard-detail-zero') {
+                // A keyboard-like click must consume any older candidate as well.
+                await fire('click', 1);
+            }
+            const evidence = await page.evaluate(async () => {
+                await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                return { open: document.getElementById('historyDialog').open, events: window.__hospitalSyntheticEvents };
+            });
+            console.log(JSON.stringify({ label: 'hospital-dialog-synthetic-boundary', browser: name, scenario,
+                eventSource: 'synthetic-boundary', evidence }));
+            assert.ok(evidence.events.length >= 3 && evidence.events.every(event => !event.trusted),
+                'lifecycle boundary evidence must be explicitly synthetic');
+            assert.equal(evidence.open, scenario !== 'valid-backdrop-control',
+                'only a complete current-session primary backdrop click may dismiss history');
+            if (evidence.open) {
+                await page.keyboard.press('Escape');
+                await page.locator('#historyDialog').waitFor({ state: 'hidden' });
+            }
+            assert.equal(await trigger.evaluate(node => document.activeElement === node), true);
+            assert.deepEqual(errors, []);
+            console.log(JSON.stringify({ label: 'hospital-dialog-synthetic-boundary', browser: name, scenario, status: 'passed' }));
+        } catch (error) {
+            failures.push({ view: 'synthetic-boundary', scenario, message: error.message });
+            console.error(JSON.stringify({ label: 'hospital-dialog-synthetic-boundary', browser: name, scenario,
+                status: 'failed', message: error.message }));
+        } finally {
+            await context.close();
+        }
+    }
     assert.deepEqual(failures, [], 'hospital dialog pointer regressions');
 } finally {
     await browser.close();
