@@ -61,12 +61,11 @@ test('verifies npm tarballs against the strongest supported dist.integrity diges
     assert.throws(() => assertDistIntegrity(bytes, 'md5-deadbeef', 'fixture'), /unsupported npm dist\.integrity token/);
 });
 
-test('adapts both Pangu 9 spacingText and Pangu 10 spaceText without executing the candidate in Node', () => {
-    const prepared = preparePanguCode('/* upstream browser bundle */', '10.0.0');
-    assert.match(prepared, /linchun-vendor: pangu@10\.0\.0/);
-    assert.match(prepared, /typeof pangu\.spaceText === 'function'/);
-    assert.match(prepared, /pangu\.spaceText : pangu\.spacingText/);
-    assert.match(prepared, /pangu\.spacing = spacingText\.bind\(pangu\)/);
+test('keeps Pangu upstream bytes intact with only a version provenance header', () => {
+    const upstream = '/* upstream browser bundle */\nglobalThis.pangu = { spaceText() {} };';
+    const prepared = preparePanguCode(upstream, '10.4.1');
+    assert.equal(prepared, `/*! linchun-vendor: pangu@10.4.1 */\n${upstream}\n`);
+    assert.doesNotMatch(prepared, /pangu\.spacing\s*=|spacingText/);
 });
 
 test('never uses node:vm to execute registry-delivered browser bundles', async () => {

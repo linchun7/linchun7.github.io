@@ -4,12 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="format-detection" content="telephone=no">
-    <meta name="description" content="中英文加空格工具：为中文与英文、数字等内容之间自动补充合适空格，并保留原有段落和换行。">
+    <meta name="description" content="中英文加空格工具：使用 Pangu.js 调整普通文本的中英文间距与标点，保留原文供对照。">
     <title>中英文加空格工具</title>
     <link rel="shortcut icon" href="/images/favicon.ico">
     <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
     <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
-    <script data-cfasync="false" src="spacing.js?v=20261013-url-parentheses"></script>
     <style>
         :root {
             color-scheme: light;
@@ -58,9 +57,11 @@
         .secondary-button { border: 1px solid var(--line); color: var(--ink); background: var(--surface); }
         .secondary-button:hover { border-color: #bdcad5; background: var(--surface-soft); }
         .primary-button:active, .secondary-button:active { transform: translateY(1px); }
-        textarea { width: 100%; min-height: 360px; margin-top: 10px; padding: 12px; resize: vertical; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: #fff; font-size: 15px; line-height: 1.7; }
+        textarea { width: 100%; min-height: 220px; margin-top: 10px; padding: 12px; resize: vertical; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: #fff; font-size: 15px; line-height: 1.7; }
         textarea:hover { border-color: #bdcad5; }
         textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(17, 104, 212, .10); outline: none; }
+        .text-label { display: block; margin-top: 12px; font-weight: 700; }
+        textarea[readonly] { background: var(--surface-soft); }
         .input-meta { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; color: var(--muted); font-size: 12px; }
         .status-text { min-width: 48px; color: var(--green); font-weight: 700; text-align: right; }
         .calculator-note { margin: 12px 4px 0; color: var(--muted); font-size: 12px; text-align: center; }
@@ -77,7 +78,7 @@
             .section-heading h1 { font-size: 16px; }
             .button-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
             .primary-button, .secondary-button { min-height: 42px; padding: 0 8px; }
-            textarea { min-height: 320px; margin-top: 12px; font-size: 16px; }
+            textarea { min-height: 200px; margin-top: 12px; font-size: 16px; }
         }
         @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; } }
     </style>
@@ -95,7 +96,7 @@
                 </span>
                 <span class="brand-copy">
                     <strong>中英文加空格工具</strong>
-                    <p>自动补齐中文与英文、数字之间的排版空格</p>
+                    <p>使用 Pangu.js 进行普通文本排版</p>
                 </span>
             </a>
         </div>
@@ -106,24 +107,26 @@
             <div class="section-heading">
                 <div>
                     <h1 id="tool-title">文本处理</h1>
-                    <p>保留原有字符、空格与换行，只补充需要的中英文间距。</p>
+                    <p>使用 Pangu.js 调整间距与标点；原文保留，结果可单独复制。</p>
                 </div>
                 <div class="button-row">
-                    <button class="primary-button" type="button" id="addBtn">加空格</button>
-                    <button class="secondary-button" type="button" id="copyBtn">复制</button>
+                    <button class="primary-button" type="button" id="addBtn">排版</button>
+                    <button class="secondary-button" type="button" id="copyBtn">复制结果</button>
                     <button class="secondary-button" type="button" id="clearBtn">清空</button>
                 </div>
             </div>
 
-            <label for="info" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">待处理文本</label>
-            <textarea id="info" placeholder="粘贴或输入需要处理的文本" spellcheck="false" autofocus></textarea>
+            <label for="info" class="text-label">原文</label>
+            <textarea id="info" placeholder="粘贴或输入普通文本（单次最多 20 万字符）" spellcheck="false" autofocus></textarea>
             <div class="input-meta">
                 <span id="countText">已输入字符：0</span>
                 <span id="alertText" class="status-text" role="status" aria-live="polite"></span>
             </div>
+            <label for="result" class="text-label">排版结果</label>
+            <textarea id="result" placeholder="排版结果将显示在这里" readonly spellcheck="false"></textarea>
         </section>
 
-        <p class="calculator-note">仅补齐相邻汉字与英文字母、数字或英文括号间的空格；不会上传或保存输入内容。</p>
+        <p class="calculator-note">适用于普通文本，可能调整标点与空格。Markdown、代码和结构化文本请保留原文自行核对。复杂 URL 可用 &lt;https://...&gt; 包裹。处理超过 4 秒会停止，可分段重试；输入仅在本机处理，不会上传或保存。</p>
     </main>
 
     <footer class="page-footer">
@@ -137,7 +140,12 @@
             const textarea = document.getElementById('info');
             const countText = document.getElementById('countText');
             const alertText = document.getElementById('alertText');
+            const result = document.getElementById('result');
+            const addButton = document.getElementById('addBtn');
             let statusTimer;
+            let deadlineTimer;
+            let worker;
+            let revision = 0;
 
             function updateCount() {
                 countText.textContent = `已输入字符：${Array.from(textarea.value).length}`;
@@ -146,7 +154,16 @@
             function setStatus(message) {
                 alertText.textContent = message;
                 window.clearTimeout(statusTimer);
-                statusTimer = window.setTimeout(() => { alertText.textContent = ''; }, 2200);
+                statusTimer = window.setTimeout(() => { alertText.textContent = ''; }, 8000);
+            }
+
+            function stopProcessing() {
+                revision += 1;
+                window.clearTimeout(deadlineTimer);
+                worker?.terminate();
+                worker = undefined;
+                addButton.textContent = '排版';
+                addButton.removeAttribute('aria-busy');
             }
 
             async function copyText(text) {
@@ -175,44 +192,83 @@
                 }
             }
 
-            document.getElementById('addBtn').addEventListener('click', () => {
+            addButton.addEventListener('click', () => {
+                if (worker) {
+                    stopProcessing();
+                    setStatus('已取消，原文保留');
+                    return;
+                }
                 if (!textarea.value) {
                     setStatus('无内容');
                     textarea.focus();
                     return;
                 }
-                if (typeof window.spaceTextPreservingContent !== 'function') {
-                    setStatus('排版组件加载失败');
-                    textarea.focus();
+                if (textarea.value.length > 200000) {
+                    setStatus('单次最多处理 20 万字符，请分段处理');
                     return;
                 }
-                textarea.value = window.spaceTextPreservingContent(textarea.value);
-                updateCount();
-                setStatus('已处理');
-                textarea.focus();
+                result.value = '';
+                const id = ++revision;
+                try {
+                    worker = new Worker('worker.js?v=20261015-pangu');
+                    addButton.textContent = '取消处理';
+                    addButton.setAttribute('aria-busy', 'true');
+                    setStatus('处理中');
+                    deadlineTimer = window.setTimeout(() => {
+                        if (id !== revision) return;
+                        stopProcessing();
+                        setStatus('处理超时，原文保留，请分段重试');
+                    }, 4000);
+                    worker.onmessage = ({ data }) => {
+                        if (id !== revision || data?.id !== id) return;
+                        stopProcessing();
+                        if (typeof data.result === 'string') {
+                            result.value = data.result;
+                            setStatus('已处理');
+                        } else setStatus(data.error || '排版失败，原文保留');
+                    };
+                    worker.onerror = (event) => {
+                        event.preventDefault();
+                        if (id !== revision) return;
+                        stopProcessing();
+                        setStatus('排版组件加载失败，原文保留');
+                    };
+                    worker.postMessage({ id, text: textarea.value });
+                } catch {
+                    stopProcessing();
+                    setStatus('排版组件加载失败，原文保留');
+                }
             });
 
             document.getElementById('copyBtn').addEventListener('click', async () => {
-                if (!textarea.value.trim()) {
-                    setStatus('无内容');
+                if (!result.value.trim()) {
+                    setStatus('无结果');
                     return;
                 }
+                const id = revision;
                 try {
-                    await copyText(textarea.value);
-                    setStatus('已复制');
-                } catch (error) {
-                    setStatus('复制失败');
+                    await copyText(result.value);
+                    if (id === revision) setStatus('已复制');
+                } catch {
+                    if (id === revision) setStatus('复制失败');
                 }
             });
 
             document.getElementById('clearBtn').addEventListener('click', () => {
+                stopProcessing();
                 textarea.value = '';
+                result.value = '';
                 updateCount();
                 setStatus('已清空');
                 textarea.focus();
             });
 
-            textarea.addEventListener('input', updateCount);
+            textarea.addEventListener('input', () => {
+                stopProcessing();
+                result.value = '';
+                updateCount();
+                alertText.textContent = '';
+            });
             updateCount();
         })();
     </script>

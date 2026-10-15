@@ -45,7 +45,7 @@ const vendors = [
 ];
 
 export function preparePanguCode(code, version) {
-    return `/*! linchun-vendor: pangu@${version} */\n${code}\n;(() => {\n    const pangu = globalThis.pangu;\n    if (pangu && typeof pangu.spacing !== 'function') {\n        const spacingText = typeof pangu.spaceText === 'function' ? pangu.spaceText : pangu.spacingText;\n        if (typeof spacingText === 'function') {\n            pangu.spacing = spacingText.bind(pangu);\n        }\n    }\n})();\n`;
+    return `/*! linchun-vendor: pangu@${version} */\n${code}\n`;
 }
 
 function parseVersionFromPatterns(patterns, code) {

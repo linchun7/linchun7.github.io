@@ -118,7 +118,7 @@ jobs:
           STATIC_VENDOR=pangu node tools/browser-tests/static-vendor-smoke.mjs
           node tools/browser-tests/input-boundaries-smoke.mjs
           node tools/browser-tests/financial-seeded-properties-review.mjs
-          node tools/browser-tests/space-targeted-mutation.mjs
+          node --test tools/browser-tests/space-upstream-contract.test.mjs
           node --test tools/browser-tests/script-startup-contract-test.mjs
           python3 tools/hospital_rank/scripts/validate_data.py
           node tools/browser-tests/hospital-rank-smoke.mjs
