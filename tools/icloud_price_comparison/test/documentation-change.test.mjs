@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFile } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { evaluateDocumentationChange, main, parseRawChanges } from '../scripts/validate-documentation-change.mjs';
 import { validateChangedFiles, verifyActionReferences } from '../scripts/auto-merge-official-actions.mjs';
@@ -16,7 +18,7 @@ const README = 'tools/icloud_price_comparison/README.md';
 const OPERATIONS = 'tools/icloud_price_comparison/OPERATIONS.md';
 const bot = () => ({ login: 'dependabot[bot]', id: 49699333, type: 'Bot' });
 const workflow = (sha = OLD, version = 'v6.0.0') => [
-  'permissions:', '  contents: read', 'jobs:', '  check:', '    steps:',
+  'name: Pin fixture', 'on: push', 'permissions:', '  contents: read', 'jobs:', '  check:', '    runs-on: ubuntu-latest', '    steps:',
   '      - name: Checkout', '        uses: actions/checkout@' + sha + ' # ' + version,
   '        with:', '          persist-credentials: false', '',
 ].join('\n');
@@ -257,8 +259,8 @@ test('replays all seven actual PR #195 pin-only patches, including real list sho
   assert.equal(result.exempt, true);
 });
 
-test('Actions verifies the actual historical Git merge bytes and both live official release tags read-only', {
-  skip: process.env.GITHUB_ACTIONS !== 'true', timeout: 120_000,
+test('opt-in research verifies actual historical Git merge bytes and both live official release tags read-only', {
+  skip: process.env.VERIFY_HISTORICAL_ACTION_TAGS !== 'true', timeout: 120_000,
 }, async () => {
   const historical = await readHistoricalFixture();
   const runGit = promisify(execFile);
@@ -275,4 +277,53 @@ test('Actions verifies the actual historical Git merge bytes and both live offic
   }, () => {});
   assert.equal(result.exempt, true, result.reason);
   assert.deepEqual(result.missingDocs, []);
+});
+
+test('default regression validates complete merge-tree bytes in an isolated local Git fixture without network', { timeout: 30_000 }, async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'icloud-documentation-git-'));
+  const execute = promisify(execFile);
+  const git = async (...args) => (await execute('git', args, { cwd: directory, encoding: 'utf8', timeout: 10_000 })).stdout;
+  try {
+    await git('init', '--initial-branch=main');
+    await git('config', 'user.name', 'Documentation gate test');
+    await git('config', 'user.email', 'documentation-gate@example.invalid');
+    await git('config', 'commit.gpgsign', 'false');
+    const filenames = [WORKFLOW, '.github/workflows/validate-chatgpt-prices.yml'];
+    const writeWorkflows = async (sha, version) => {
+      for (const [index, filename] of filenames.entries()) {
+        const destination = join(directory, filename);
+        await mkdir(dirname(destination), { recursive: true });
+        await writeFile(destination, index === 0 ? workflow(sha, version) : workflow(sha, version).replace('      - name: Checkout\n        uses:', '      - uses:'), 'utf8');
+      }
+    };
+    await writeWorkflows(OLD, 'v6.0.0');
+    await git('add', '.');
+    await git('commit', '-qm', 'base fixture');
+    const base = (await git('rev-parse', 'HEAD')).trim();
+    await git('checkout', '-b', 'pin-update');
+    await writeWorkflows(NEW, 'v6.1.0');
+    await git('add', '.');
+    await git('commit', '-qm', 'pin-only fixture');
+    const head = (await git('rev-parse', 'HEAD')).trim();
+    await git('checkout', 'main');
+    await git('merge', '--no-ff', '--no-edit', 'pin-update');
+    const merge = (await git('rev-parse', 'HEAD')).trim();
+    const input = fixture();
+    input.event.pull_request.base.sha = base;
+    input.event.pull_request.head.sha = head;
+    const requests = [];
+    const result = await main({
+      BASE_SHA: base, HEAD_SHA: head, GITHUB_SHA: merge,
+      GITHUB_REPOSITORY: input.repository, GITHUB_EVENT_NAME: 'pull_request', GITHUB_EVENT_PATH: 'local-fixture',
+    }, async (command, args, options) => {
+      requests.push(args);
+      if (args[0] === 'ls-remote') return releaseGit()(command, args, options);
+      return execute(command, args, { ...options, cwd: directory });
+    }, async () => JSON.stringify(input.event), () => {});
+    assert.equal(result.exempt, true, result.reason);
+    assert.equal(requests.filter(([command]) => command === 'ls-remote').length, 2, 'only the injected fixed official-tag responses are used; no remote is configured or contacted');
+    assert.ok(requests.some((args) => args[0] === 'diff' && args.at(-1) === merge));
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
