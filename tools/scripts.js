@@ -3,7 +3,20 @@ const ul = document.getElementById("toolList");
 const searchInput = document.getElementById("searchInput");
 const noResults = document.getElementById("noResults");
 const MAX_SEARCH_LENGTH = 160;
-const normalizeQuery = value => String(value).slice(0, MAX_SEARCH_LENGTH * 2).normalize('NFKC').slice(0, MAX_SEARCH_LENGTH).trim();
+// Preserve the UTF-16 budgets without cutting a valid surrogate pair.
+function unicodeSafePrefix(value, maxLength) {
+    let end = Math.min(value.length, maxLength);
+    if (end > 0 && end < value.length) {
+        const previous = value.charCodeAt(end - 1);
+        const next = value.charCodeAt(end);
+        if (previous >= 0xD800 && previous <= 0xDBFF && next >= 0xDC00 && next <= 0xDFFF) end -= 1;
+    }
+    return value.slice(0, end);
+}
+const normalizeQuery = value => {
+    const prefix = unicodeSafePrefix(String(value), MAX_SEARCH_LENGTH * 2);
+    return unicodeSafePrefix(prefix.normalize('NFKC'), MAX_SEARCH_LENGTH).trim();
+};
 
 // 优化相似度算法
 function similarity(s1, s2) {
