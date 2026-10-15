@@ -50,6 +50,9 @@ test('retained derived prices are reused verbatim, without recasting old publica
 test('scientific decimal operands and large final values do not round intermediates', () => {
   const vectors = [
     { price: 1e7, rate: 1e9, cny: 7.5, expected: 0.08 },
+    // Operand-level scientific boundaries, not claims about live provider FX.
+    { price: 0.99, rate: 1e21, cny: 7.5e21, expected: 7.43 },
+    { price: Number.MIN_VALUE, rate: Number.MIN_VALUE, cny: 7.425, expected: 7.43 },
     { price: 0.01, rate: 1e-7, cny: 7.5, expected: 750000 },
     { price: 0.01, rate: 3, cny: 7, expected: 0.02 },
     { price: 1.13, rate: 1, cny: 1.5, expected: 1.7 },
