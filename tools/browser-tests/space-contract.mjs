@@ -92,7 +92,7 @@ export async function testSpaceContract(browser, baseUrl) {
         // A real previously pathological 180k input must have a bounded terminal
         // state while the main UI remains responsive. Completion OR timeout is
         // acceptable here: no claim is made that fenced code is supported.
-        const hostile = '```js\n'.repeat(30000);
+        const hostile = '```js\n'.repeat(30000) + '中文ABC';
         await setInput(hostile);
         const started = Date.now();
         await page.click('#addBtn');
@@ -113,6 +113,9 @@ export async function testSpaceContract(browser, baseUrl) {
         assert.match(await page.locator('#alertText').textContent(), /最多处理 20 万/);
         assert.equal(await page.inputValue('#result'), '');
         assert.ok(bundleRequests.length >= cases.length, 'each real worker must request the staged bundle');
+        await page.setViewportSize({ width: 390, height: 844 });
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, 'narrow screen must not overflow');
+        assert.ok((await page.locator('#copyBtn').boundingBox()).width > 40);
         assert.deepEqual(errors, [], 'page errors');
         console.log(JSON.stringify({ suite: 'space-real-ui-upgrade-contract', cases: cases.length, bundleRequests: bundleRequests.length, status: 'passed' }));
     } finally {
