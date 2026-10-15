@@ -116,100 +116,136 @@ const engines = [
   { id: 'content-preserving', path: 'tools/space/spacing.js', functionName: 'spaceTextPreservingContent' },
   { id: 'pangu-10.4.1', path: 'tools/space/dist/browser/pangu.min.js', functionName: 'pangu' }
 ];
-let browser;
+// Run conventional inputs before stress, and restart a dedicated browser server
+// after a blocked renderer. No timeout is converted into a matching output.
+fixtures.sort((a, b) => Number(a.group === 'bounded-stress') - Number(b.group === 'bounded-stress'));
 const totals = [];
 let invalid = false;
+let server;
+let browser;
+let page;
+let errors;
 const watchdog = setTimeout(() => {
   console.error('SPACE_ENGINE_DIAGNOSTIC ' + JSON.stringify({ status: 'invalid', reason: '180s global deadline' }));
   process.exit(2);
 }, 180000);
+async function stopEngine(force = false) {
+  const active = server;
+  server = undefined;
+  page = undefined;
+  browser = undefined;
+  if (active) await deadline(() => force ? active.kill() : active.close(), 'browser server cleanup', 10000);
+}
+async function startEngine(engine) {
+  server = await deadline(() => browserType.launchServer({ headless: true }), 'browser server launch', 30000);
+  browser = await deadline(() => browserType.connect(server.wsEndpoint()), 'browser connect');
+  const context = await deadline(() => browser.newContext(), 'context');
+  page = await deadline(() => context.newPage(), 'page');
+  errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await deadline(() => page.addScriptTag({ path: engine.path }), engine.id + ' load');
+  if (engine.id === 'pangu-10.4.1') {
+    assert.equal(await page.evaluate(() => window.pangu?.version), '10.4.1', 'comparison version must be pinned');
+  }
+}
+async function evaluate(engine, input, label) {
+  return deadline(() => page.evaluate(({ engine, input }) => {
+    if (engine === 'pangu-10.4.1') return window.pangu.spacing(input);
+    return window.spaceTextPreservingContent(input);
+  }, { engine: engine.id, input }), label);
+}
 try {
-  browser = await deadline(() => browserType.launch({ headless: true }), 'browser launch', 30000);
   for (const engine of engines) {
-    const context = await deadline(() => browser.newContext(), 'context');
-    const errors = [];
+    const source = await readFile(engine.path, 'utf8');
     const rows = [];
     try {
-      const page = await deadline(() => context.newPage(), 'page');
-      page.on('pageerror', error => errors.push(error.message));
-      const source = await readFile(engine.path, 'utf8');
-      await deadline(() => page.addScriptTag({ path: engine.path }), engine.id + ' load');
-      if (engine.id === 'pangu-10.4.1') {
-        assert.equal(await page.evaluate(() => window.pangu?.version), '10.4.1', 'comparison version must be pinned');
-      }
       for (const fixture of fixtures) {
-        const actual = await deadline(() => page.evaluate(({ engine, input }) => {
-          if (engine === 'pangu-10.4.1') return window.pangu.spacing(input);
-          return window.spaceTextPreservingContent(input);
-        }, { engine: engine.id, input: fixture.input }), engine.id + '/' + fixture.id);
-        assert.equal(typeof actual, 'string', 'engine must return string');
-        const repeated = await deadline(() => page.evaluate(({ engine, input }) => {
-          if (engine === 'pangu-10.4.1') return window.pangu.spacing(input);
-          return window.spaceTextPreservingContent(input);
-        }, { engine: engine.id, input: actual }), engine.id + '/' + fixture.id + '/repeat');
-        const row = {
+        if (!page) await startEngine(engine);
+        const base = {
           browser: browserName, engine: engine.id, fixture: fixture.id, group: fixture.group,
-          matchesCurrentContract: actual === fixture.currentExpected,
-          matchesOptionalTypography: fixture.typographyExpected === undefined ? null : actual === fixture.typographyExpected,
-          insertionOnly: insertionOnly(fixture.input, actual),
-          idempotent: repeated === actual,
           input: describe(fixture.input), currentContractExpected: describe(fixture.currentExpected),
-          optionalTypographyExpected: fixture.typographyExpected === undefined ? null : describe(fixture.typographyExpected),
-          actual: describe(actual),
-          firstDifference: firstDifference(fixture.currentExpected, actual)
+          optionalTypographyExpected: fixture.typographyExpected === undefined ? null : describe(fixture.typographyExpected)
         };
-        rows.push(row);
-        console.log('SPACE_ENGINE_DIAGNOSTIC ' + JSON.stringify(row));
+        let phase = 'initial-output';
+        try {
+          const previousErrorCount = errors.length;
+          const actual = await evaluate(engine, fixture.input, engine.id + '/' + fixture.id);
+          assert.equal(typeof actual, 'string', 'engine must return string');
+          phase = 'idempotence';
+          const repeated = await evaluate(engine, actual, engine.id + '/' + fixture.id + '/repeat');
+          assert.equal(errors.length, previousErrorCount, 'unexpected browser error invalidates fixture');
+          const row = {
+            ...base, status: 'output', matchesCurrentContract: actual === fixture.currentExpected,
+            matchesOptionalTypography: fixture.typographyExpected === undefined ? null : actual === fixture.typographyExpected,
+            insertionOnly: insertionOnly(fixture.input, actual), idempotent: repeated === actual,
+            actual: describe(actual), firstDifference: firstDifference(fixture.currentExpected, actual)
+          };
+          rows.push(row);
+          console.log('SPACE_ENGINE_DIAGNOSTIC ' + JSON.stringify(row));
+        } catch (error) {
+          invalid = true;
+          const row = { ...base, status: error.message.endsWith(' timeout') ? 'timeout' : 'invalid', phase, reason: error.message };
+          rows.push(row);
+          console.error('SPACE_ENGINE_DIAGNOSTIC ' + JSON.stringify(row));
+          // BrowserServer.kill terminates the blocked browser process independently
+          // of page evaluation; later fixtures get a fresh isolated browser.
+          await stopEngine(true);
+        }
       }
-      assert.deepEqual(errors, [], 'unexpected browser errors invalidate comparison');
-      const total = {
-        browser: browserName, engine: engine.id, sourceSha256: sha256(source), cases: rows.length,
-        currentContractMatches: rows.filter(row => row.matchesCurrentContract).length,
-        currentContractDifferences: rows.filter(row => !row.matchesCurrentContract).map(row => row.fixture),
-        optionalTypographyCases: rows.filter(row => row.matchesOptionalTypography !== null).length,
-        optionalTypographyMatches: rows.filter(row => row.matchesOptionalTypography === true).length,
-        optionalTypographyDifferences: rows.filter(row => row.matchesOptionalTypography === false).map(row => row.fixture),
-        notInsertionOnly: rows.filter(row => !row.insertionOnly).map(row => row.fixture),
-        notIdempotent: rows.filter(row => !row.idempotent).map(row => row.fixture),
-        groups: Object.fromEntries([...new Set(fixtures.map(row => row.group))].map(group => {
-          const selected = rows.filter(row => row.group === group);
-          return [group, { cases: selected.length, currentContractMatches: selected.filter(row => row.matchesCurrentContract).length }];
-        }))
-      };
-      assert.equal(total.cases, fixtures.length);
-      totals.push(total);
-      console.log('SPACE_ENGINE_SUMMARY ' + JSON.stringify(total));
     } finally {
-      await deadline(() => context.close(), 'context cleanup');
+      await stopEngine();
     }
+    const outputs = rows.filter(row => row.status === 'output');
+    const total = {
+      browser: browserName, engine: engine.id, sourceSha256: sha256(source),
+      attemptedCases: rows.length, availableOutputs: outputs.length,
+      timeouts: rows.filter(row => row.status === 'timeout').map(row => ({ fixture: row.fixture, phase: row.phase })),
+      invalidFixtures: rows.filter(row => row.status === 'invalid').map(row => ({ fixture: row.fixture, reason: row.reason })),
+      currentContractMatches: outputs.filter(row => row.matchesCurrentContract).length,
+      currentContractDifferences: outputs.filter(row => !row.matchesCurrentContract).map(row => row.fixture),
+      optionalTypographyCases: outputs.filter(row => row.matchesOptionalTypography !== null).length,
+      optionalTypographyMatches: outputs.filter(row => row.matchesOptionalTypography === true).length,
+      optionalTypographyDifferences: outputs.filter(row => row.matchesOptionalTypography === false).map(row => row.fixture),
+      notInsertionOnly: outputs.filter(row => !row.insertionOnly).map(row => row.fixture),
+      notIdempotent: outputs.filter(row => !row.idempotent).map(row => row.fixture),
+      groups: Object.fromEntries([...new Set(fixtures.map(row => row.group))].map(group => {
+        const selected = outputs.filter(row => row.group === group);
+        return [group, { availableOutputs: selected.length, currentContractMatches: selected.filter(row => row.matchesCurrentContract).length }];
+      }))
+    };
+    assert.equal(total.attemptedCases, fixtures.length, 'every fixture must be attempted');
+    totals.push(total);
+    console.log('SPACE_ENGINE_SUMMARY ' + JSON.stringify(total));
   }
-  assert.equal(totals.length, engines.length, 'both engines must complete');
+  assert.equal(totals.length, engines.length, 'both engines must be attempted');
   console.log('SPACE_ENGINE_COMPARISON_COMPLETED ' + JSON.stringify({
-    browser: browserName, casesPerEngine: fixtures.length, status: 'diagnostic-completed',
-    meaning: 'Harness completed; current-contract and optional-typography matches are independent observations, not a quality ranking.'
+    browser: browserName, casesPerEngine: fixtures.length, status: invalid ? 'completed-with-invalid-or-timeout-fixtures' : 'diagnostic-completed',
+    meaning: 'Target-profile matches are independent observations, not a quality ranking. Timeout/invalid fixtures have no matching output and are reported separately.'
   }));
   if (process.env.GITHUB_STEP_SUMMARY) {
     const lines = ['\n## Space engine diagnostic (' + browserName + ')',
       'Diagnostic completion is not quality acceptance. Both unchanged engines receive identical inputs and separately labelled target profiles.',
       'Current insertion-only behavior is not presumed to be the user\'s immutable preference; intentional Pangu normalization is not automatically a bug.',
-      'Bounded stress cases are regressions, not a comparative speed benchmark.', ''];
+      'Bounded stress cases are regressions, not a comparative speed benchmark. Timeout/invalid fixtures are excluded from output-match denominators and invalidate full acceptance.', ''];
     for (const total of totals) {
-      lines.push('- ' + total.engine + ': current-contract matches ' + total.currentContractMatches + '/' + total.cases +
+      lines.push('- ' + total.engine + ': attempted ' + total.attemptedCases + '; available outputs ' + total.availableOutputs +
+        '; current-contract matches ' + total.currentContractMatches + '/' + total.availableOutputs +
         '; optional-typography matches ' + total.optionalTypographyMatches + '/' + total.optionalTypographyCases +
-        '; insertion-only violations ' + total.notInsertionOnly.length +
-        '; idempotence violations ' + total.notIdempotent.length + '.');
+        '; insertion-only violations ' + total.notInsertionOnly.length + '; idempotence violations ' + total.notIdempotent.length + '.');
       lines.push('  Current-contract differences: ' + (total.currentContractDifferences.join(', ') || 'none'));
       lines.push('  Optional-typography differences: ' + (total.optionalTypographyDifferences.join(', ') || 'none'));
+      lines.push('  Timeout/invalid fixtures: ' + JSON.stringify([...total.timeouts, ...total.invalidFixtures]));
     }
     await appendFile(process.env.GITHUB_STEP_SUMMARY, lines.join('\n') + '\n');
   }
+  if (invalid) process.exitCode = 2;
 } catch (error) {
   invalid = true;
   console.error('SPACE_ENGINE_DIAGNOSTIC ' + JSON.stringify({ browser: browserName, status: 'invalid', reason: error.message }));
   process.exitCode = 2;
 } finally {
-  try { if (browser) await deadline(() => browser.close(), 'browser cleanup'); }
+  try { await stopEngine(true); }
   catch (error) { invalid = true; console.error('SPACE_ENGINE_DIAGNOSTIC cleanup invalid: ' + error.message); process.exitCode = 2; }
   clearTimeout(watchdog);
-  if (invalid) console.error('Comparison incomplete or infrastructure-invalid; do not treat partial counts as final.');
+  if (invalid) console.error('Timeout or infrastructure-invalid observations remain; do not describe this evaluation as all passed.');
 }
