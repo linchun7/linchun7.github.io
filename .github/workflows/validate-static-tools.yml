@@ -107,6 +107,7 @@ jobs:
           server_pid=$!
           trap 'kill "$server_pid" 2>/dev/null || true' EXIT
           sleep 1
+          STATIC_VENDOR=pangu node tools/browser-tests/static-vendor-smoke.mjs
           node tools/browser-tests/static-tools-smoke.mjs
           node tools/browser-tests/navigation-smoke.mjs
           node tools/browser-tests/card-number-core-test.mjs
@@ -115,10 +116,9 @@ jobs:
           node tools/browser-tests/pinyin-smoke.mjs
           node tools/browser-tests/utility-tools-smoke.mjs
           node tools/browser-tests/renovation-rounding-regression.mjs
-          STATIC_VENDOR=pangu node tools/browser-tests/static-vendor-smoke.mjs
           node tools/browser-tests/input-boundaries-smoke.mjs
           node tools/browser-tests/financial-seeded-properties-review.mjs
-          node tools/browser-tests/space-targeted-mutation.mjs
+          node --test tools/browser-tests/space-upstream-contract.test.mjs
           node --test tools/browser-tests/script-startup-contract-test.mjs
           python3 tools/hospital_rank/scripts/validate_data.py
           node tools/browser-tests/hospital-rank-smoke.mjs

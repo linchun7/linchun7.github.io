@@ -376,30 +376,27 @@ try {
             window.fetch = async () => ({ ok: true, json: () => { window.__bodyReads++; return new Promise(() => {}); } });
         }, withoutAbortController));
     }
-    await check('spacing fails closed when the content-preserving helper is unavailable', 'space', async page => {
+    await check('spacing clipboard denial falls back without losing source or focus', 'space', async page => {
         await page.fill('#info', '中文ABC');
         await page.click('#addBtn');
-        assert.equal(await page.inputValue('#info'), '中文ABC');
-        assert.match(await page.locator('#alertText').textContent(), /组件加载失败/);
-    }, page => page.route('**/tools/space/spacing.js*', route => route.abort()));
-    await check('spacing clipboard denial falls back without losing input or focus', 'space', async page => {
-        await page.fill('#info', '中文 ABC');
+        await page.waitForFunction(() => document.getElementById('alertText').textContent === '已处理');
         await page.evaluate(() => {
             Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new Error('denied'); } } });
-            document.execCommand = () => { window.__copied = document.querySelector('textarea[readonly]').value; return true; };
+            document.execCommand = () => { window.__copied = document.querySelector('textarea[readonly]:not(#result)').value; return true; };
             const button = document.getElementById('copyBtn');
             button.focus();
             button.click();
         });
         await page.waitForFunction(() => document.getElementById('alertText').textContent === '已复制');
         assert.equal(await page.evaluate(() => window.__copied), '中文 ABC');
-        assert.equal(await page.locator('textarea').count(), 1);
+        assert.equal(await page.locator('textarea').count(), 2);
         assert.equal(await page.evaluate(() => document.activeElement.id), 'copyBtn');
         await page.evaluate(() => { document.execCommand = () => { throw new Error('unavailable'); }; });
         await page.click('#copyBtn');
         await page.waitForFunction(() => document.getElementById('alertText').textContent === '复制失败');
-        assert.equal(await page.locator('textarea').count(), 1);
-        assert.equal(await page.inputValue('#info'), '中文 ABC');
+        assert.equal(await page.locator('textarea').count(), 2);
+        assert.equal(await page.inputValue('#info'), '中文ABC');
+        assert.equal(await page.inputValue('#result'), '中文 ABC');
     });
     const addresses = [
         ['0:0:0:0:0:0:0:1', null],

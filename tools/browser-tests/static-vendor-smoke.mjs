@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { chromium, firefox, webkit } from 'playwright';
+import { testSpaceContract, testSpaceFailures } from './space-contract.mjs';
 
 const browserName = process.env.PLAYWRIGHT_BROWSER || 'chromium';
 const vendor = process.env.STATIC_VENDOR;
@@ -33,19 +34,8 @@ async function testNzh() {
 }
 
 async function testPangu() {
-    const { context, page, pageErrors } = await createPage();
-    await page.goto(`${baseUrl}/tools/space/`, { waitUntil: 'domcontentloaded' });
-    // The space UI now uses its insertion-only helper. Exercise Pangu directly so
-    // this candidate-vendor check still loads and validates the actual vendor bundle.
-    assert.equal(await page.locator('script[src="dist/browser/pangu.min.js"]').count(), 0);
-    await page.addScriptTag({ url: `${baseUrl}/tools/space/dist/browser/pangu.min.js` });
-    assert.equal(await page.evaluate(() => typeof window.pangu?.spacing), 'function');
-    assert.equal(
-        await page.evaluate(() => window.pangu.spacing('中文ABC\n第二行123')),
-        '中文 ABC\n第二行 123'
-    );
-    assert.equal(pageErrors.length, 0, `space tool page errors: ${pageErrors.map(String).join('; ')}`);
-    await context.close();
+    await testSpaceContract(browser, baseUrl);
+    await testSpaceFailures(browser, baseUrl);
 }
 
 try {
