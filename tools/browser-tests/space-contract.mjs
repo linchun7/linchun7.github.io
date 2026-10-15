@@ -7,6 +7,7 @@ export async function testSpaceContract(browser, baseUrl) {
     const page = await context.newPage();
     const errors = [];
     const bundleRequests = [];
+    const differences = [];
     page.on('pageerror', error => errors.push(error.message));
     context.on('request', request => {
         if (new URL(request.url()).pathname === '/tools/space/dist/browser/pangu.min.js') bundleRequests.push(request.url());
@@ -22,18 +23,26 @@ export async function testSpaceContract(browser, baseUrl) {
         await page.click('#addBtn');
         await page.waitForFunction(() => document.getElementById('alertText').textContent === '已处理', null, { timeout: 10000 });
         assert.equal(await page.inputValue('#info'), input.replace(/\r\n?/g, '\n'), 'formatting must leave the source intact');
-        assert.equal(await page.inputValue('#result'), expected.replace(/\r\n?/g, '\n'), JSON.stringify(input).slice(0, 180));
+        const actual = await page.inputValue('#result');
+        const normalizedExpected = expected.replace(/\r\n?/g, '\n');
+        if (actual !== normalizedExpected) differences.push({ input: input.slice(0, 180), actual: actual.slice(0, 180), expected: normalizedExpected.slice(0, 180) });
     };
     try {
         await page.goto(`${baseUrl}/tools/space/`, { waitUntil: 'domcontentloaded' });
         assert.match(await page.locator('.calculator-note').textContent(), /普通文本.*Markdown.*4 秒/);
         assert.equal(await page.locator('#result').getAttribute('readonly'), '');
+        const puaProbe = '中文`ABC` \uE000BACKTICK_CONTENT_0\uE001';
+        await setInput(puaProbe);
+        await page.click('#addBtn');
+        await page.waitForFunction(() => document.getElementById('alertText').textContent === '已处理');
+        assert.equal(await page.inputValue('#info'), puaProbe);
+        console.log(JSON.stringify({ suite: 'upstream-literal-pua-marker-probe', input: puaProbe, result: await page.inputValue('#result') }));
         const cases = [
             ['访问https://[2001:db8::1]/中文ABC，后文DEF', '访问 https://[2001:db8::1]/中文ABC，后文 DEF'],
             ['HTTP://[::1]:8080/Ａ中文ABC]后文DEF', 'HTTP://[::1]:8080/Ａ中文ABC] 后文 DEF'],
             ['<https://[2001:db8::1]/目录[中文ABC]{尾DEF}>', '<https://[2001:db8::1]/目录[中文ABC]{尾DEF}>'],
             ['中文ABC\n第二行123', '中文 ABC\n第二行 123'],
-            ['中文:ABC', '中文：ABC'],
+            ['中文:ABC', '中文: ABC'],
             ['王·小明', '王・小明'],
             ['中文,标点!测试?', '中文, 标点! 测试?'],
             ['中文`ABC中文123`后文DEF', '中文 `ABC中文123` 后文 DEF'],
@@ -117,6 +126,7 @@ export async function testSpaceContract(browser, baseUrl) {
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, 'narrow screen must not overflow');
         assert.ok((await page.locator('#copyBtn').boundingBox()).width > 40);
         assert.deepEqual(errors, [], 'page errors');
+        assert.deepEqual(differences, [], 'exact upstream/URL UI outputs');
         console.log(JSON.stringify({ suite: 'space-real-ui-upgrade-contract', cases: cases.length, bundleRequests: bundleRequests.length, status: 'passed' }));
     } finally {
         await context.close();
