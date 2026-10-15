@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { access, readFile, readdir } from 'node:fs/promises';
 import test from 'node:test';
 import { CORPUS } from '../scripts/corpus.mjs';
 import { BEGIN, END, LANGUAGES, escapeHtml, renderCorpus, renderPage, renderPages, validateCorpus } from '../scripts/render-pages.mjs';
@@ -66,4 +66,15 @@ test('generator rejects malformed, missing, duplicate or reversed regions and la
   assert.throws(() => renderPage(shell.replace(BEGIN + END, END + BEGIN), 'en'), /out of order/);
   assert.throws(() => renderPage(shell, 'ja'), /language mismatch/);
   assert.throws(() => renderPage(shell + '<script src="script.js"></script>', 'en'), /runtime JavaScript/);
+});
+
+test('obsolete runtime payload is removed and no benchmark HTML still references it', async () => {
+  const root = new URL('../', import.meta.url);
+  await assert.rejects(access(new URL('script.js', root)), { code: 'ENOENT' });
+  const pages = (await readdir(root)).filter(path => path.endsWith('.html'));
+  assert.equal(pages.length, 7);
+  for (const path of pages) {
+    const html = await readFile(new URL(path, root), 'utf8');
+    assert.doesNotMatch(html, /<script\b/i, path + ': no runtime renderer or six-language payload');
+  }
 });

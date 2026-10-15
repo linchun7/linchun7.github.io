@@ -29,7 +29,12 @@ async function assertCorpus(page, language) {
     return heading?.tagName === 'H2' && section.contains(heading);
   }));
   assert.equal(headings, true, 'semantic category labels resolve');
-  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, 'no horizontal overflow');
+  const layout = await page.evaluate(() => ({
+    width: window.innerWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+    overflowing: [...document.querySelectorAll('body *')].filter(element => element.getBoundingClientRect().right > window.innerWidth + 1).map(element => element.tagName + '.' + element.className).slice(0, 8)
+  }));
+  assert.ok(layout.scrollWidth <= layout.width, 'no horizontal overflow: ' + JSON.stringify(layout));
 }
 
 try {
