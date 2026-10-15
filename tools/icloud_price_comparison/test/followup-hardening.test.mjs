@@ -415,7 +415,7 @@ test('history loading validates each response once and retries only cross-file m
     assert.deepEqual(caches, scenario.caches);
     assert.equal(structureChecks, scenario.caches.length);
     assert.equal(relationshipChecks, scenario.checks);
-    assert.equal(pricePasses, scenario.checks, 'validated prices get only the latest-value relationship pass');
+    assert.equal(pricePasses, scenario.accepted ? 1 : 0, 'publication mismatches reject before the country pass; validated prices are never revalidated');
     if (scenario.accepted) {
       assert.equal(historyPasses, scenario.caches.length, 'each history event list is structurally traversed once');
       assert.equal(result, state.history);
