@@ -135,7 +135,7 @@ export async function testSpaceContract(browser, baseUrl) {
         await page.click('#clearBtn');
         assert.equal(await page.inputValue('#info'), '');
         assert.equal(await page.inputValue('#result'), '');
-        assert.equal(await page.locator('#countText').textContent(), '已输入字符：0');
+        assert.equal(await page.locator('#countText').textContent(), '已输入长度：0 / 200000');
         await page.click('#addBtn');
         assert.equal(await page.locator('#alertText').textContent(), '无内容');
 
@@ -158,17 +158,29 @@ export async function testSpaceContract(browser, baseUrl) {
         await page.click('#clearBtn');
         await process('恢复ABC', '恢复 ABC');
 
+        const emojiAtLimit = '😀'.repeat(100000);
+        await process(emojiAtLimit, emojiAtLimit);
+        assert.equal(await page.locator('#countText').textContent(), '已输入长度：200000 / 200000');
+        const emojiOverLimit = '😀'.repeat(100001);
+        await setInput(emojiOverLimit);
+        await page.click('#addBtn');
+        assert.match(await page.locator('#alertText').textContent(), /输入长度超过 200000/);
+        assert.equal(await page.locator('#countText').textContent(), '已输入长度：200002 / 200000');
+        assert.equal(await page.inputValue('#info'), emojiOverLimit, 'over-limit emoji input is never truncated');
+        assert.equal(await page.inputValue('#result'), '');
+
         await setInput('x'.repeat(200001));
         await page.click('#addBtn');
-        assert.match(await page.locator('#alertText').textContent(), /最多处理 20 万/);
+        assert.match(await page.locator('#alertText').textContent(), /输入长度超过 200000/);
         assert.equal(await page.inputValue('#result'), '');
+        assert.equal((await page.inputValue('#info')).length, 200001, 'over-limit input is never truncated');
         assert.ok(bundleRequests.length >= cases.length, 'each real worker must request the staged bundle');
         await page.setViewportSize({ width: 390, height: 844 });
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, 'narrow screen must not overflow');
         assert.ok((await page.locator('#copyBtn').boundingBox()).width > 40);
         assert.deepEqual(errors, [], 'page errors');
         assert.deepEqual(differences, [], 'exact upstream/URL UI outputs');
-        console.log(JSON.stringify({ suite: 'space-real-ui-upgrade-contract', cases: cases.length, bundleRequests: bundleRequests.length, status: 'passed' }));
+        console.log(JSON.stringify({ suite: 'space-real-ui-upgrade-contract', cases: caseIndex, bundleRequests: bundleRequests.length, status: 'passed' }));
     } finally {
         await context.close();
     }

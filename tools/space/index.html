@@ -117,16 +117,16 @@
             </div>
 
             <label for="info" class="text-label">原文</label>
-            <textarea id="info" placeholder="粘贴或输入普通文本（单次最多 20 万字符）" spellcheck="false" autofocus></textarea>
+            <textarea id="info" placeholder="粘贴或输入普通文本（长度上限 200000，部分表情计 2）" spellcheck="false" autofocus></textarea>
             <div class="input-meta">
-                <span id="countText">已输入字符：0</span>
+                <span id="countText">已输入长度：0 / 200000</span>
                 <span id="alertText" class="status-text" role="status" aria-live="polite"></span>
             </div>
             <label for="result" class="text-label">排版结果</label>
             <textarea id="result" placeholder="排版结果将显示在这里" readonly spellcheck="false"></textarea>
         </section>
 
-        <p class="calculator-note">适用于普通文本，可能调整标点与空格。Markdown、代码和结构化文本请保留原文自行核对。复杂 URL 可用 &lt;https://...&gt; 包裹。处理超过 4 秒会停止，可分段重试；输入仅在本机处理，不会上传或保存。</p>
+        <p class="calculator-note">适用于普通文本，可能调整标点与空格。Markdown、代码和结构化文本请保留原文自行核对。复杂 URL 可用 &lt;https://...&gt; 包裹。长度按 UTF-16 计数，部分表情计 2。处理超过 4 秒会停止，可分段重试；输入仅在本机处理，不会上传或保存。</p>
     </main>
 
     <footer class="page-footer">
@@ -148,7 +148,7 @@
             let revision = 0;
 
             function updateCount() {
-                countText.textContent = `已输入字符：${Array.from(textarea.value).length}`;
+                countText.textContent = `已输入长度：${textarea.value.length} / 200000`;
             }
 
             function setStatus(message) {
@@ -204,7 +204,7 @@
                     return;
                 }
                 if (textarea.value.length > 200000) {
-                    setStatus('单次最多处理 20 万字符，请分段处理');
+                    setStatus('输入长度超过 200000（UTF-16），请分段处理');
                     return;
                 }
                 result.value = '';
