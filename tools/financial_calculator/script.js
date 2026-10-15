@@ -119,12 +119,12 @@
     function calculateInterest() {
         const principal = readPositiveNumber('principal2', '本金');
         const days = readPositiveInteger('days2', '天数');
-        const annualRate = readFiniteNumber('annualRate2', '单利年化收益率');
+        const annualRate = readFiniteNumber('annualRate2', '年利率（单利）');
         const annualDays = readAnnualDays('rateType2');
 
         const rate = annualRate / 100;
         if (annualRate !== 0 && Math.abs(rate) < MIN_NORMAL_NUMBER) {
-            throw new Error('该单利年化收益率低于可计算精度，请调整参数');
+            throw new Error('该年利率低于可计算精度，请调整参数');
         }
         const earnings = principal * rate * (days / annualDays);
         if (!Number.isFinite(earnings)) throw new Error('计算结果异常，请检查输入');
@@ -153,7 +153,7 @@
             : Math.expm1(logGrowth * (annualDays / days)) * 100;
 
         if (!Number.isFinite(annualizedReturn)) throw new Error('计算结果异常，请检查输入');
-        return `净值年化收益率（CAGR）：${formatPercent(annualizedReturn)}（持有 ${days} 天）`;
+        return `净值年化收益率：${formatPercent(annualizedReturn)}（持有 ${days} 天）`;
     }
 
     const frequencyConfig = {
@@ -175,10 +175,10 @@
 
         const rate = periodicPercent / 100;
         if (!Number.isFinite(rate) || rate <= -1) {
-            throw new Error('该名义年利率在当前复利方式下会使单期本金小于等于 0，请调整参数');
+            throw new Error('该年利率在当前复利方式下会使单期本金小于等于 0，请调整参数');
         }
         if (annualRatePercent !== 0 && Math.abs(rate) < MIN_NORMAL_NUMBER) {
-            throw new Error('该名义年利率在当前复利方式下低于可计算精度，请调整参数');
+            throw new Error('该年利率在当前复利方式下低于可计算精度，请调整参数');
         }
         return rate;
     }
@@ -220,7 +220,7 @@
         if (periods > MAX_DETAIL_PERIODS) {
             const note = document.createElement('p');
             note.className = 'detail-limit-note';
-            note.textContent = `存期共 ${periods} 期，为避免浏览器卡顿，仅显示汇总结果；明细最多展示 ${MAX_DETAIL_PERIODS} 期。`;
+            note.textContent = `存期共 ${periods} 期，超过 ${MAX_DETAIL_PERIODS} 期，仅显示汇总结果，不展开明细。`;
             container.appendChild(note);
             return;
         }
@@ -259,7 +259,7 @@
     function calculateCompound() {
         const principal = readPositiveNumber('principal3', '本金');
         const periods = readPositiveInteger('depositPeriod', '存期');
-        const annualRate = readFiniteNumber('annualRate3', '名义年利率');
+        const annualRate = readFiniteNumber('annualRate3', '年利率');
         const frequency = $('compoundingFrequency').value;
         const config = frequencyConfig[frequency];
         if (!config) throw new Error('复利方式无效');

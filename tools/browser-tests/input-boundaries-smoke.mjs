@@ -204,7 +204,7 @@ try {
             assert.equal(await page.locator('#result4').evaluate(el => el.classList.contains('result-error')), false);
             assert.equal(await page.locator('#result4').textContent(), `本息总计：${future} 元；利息总计：${interest} 元`);
             assert.equal(await page.locator('#result4-table tbody tr').count(), 0);
-            assert.match(await page.locator('#result4-table').textContent(), /明细最多展示 2000 期/);
+            assert.match(await page.locator('#result4-table').textContent(), /超过 2000 期，仅显示汇总结果，不展开明细/);
         }
     });
     await check('financial simple interest rejects scaled subnormal rates and recovers at zero', 'financial_calculator', async page => {

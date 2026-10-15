@@ -4,14 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="format-detection" content="telephone=no">
-    <meta name="description" content="金融计算器：计算单利年化收益率、利息收益、净值年化收益率（CAGR）和复利收益。">
+    <meta name="description" content="金融计算器：计算年化收益、利息、净值年化和复利收益。">
     <link rel="stylesheet" href="../css/bootstrap.min.css">
-    <link rel="stylesheet" href="styles.css?v=20261015-2">
+    <link rel="stylesheet" href="styles.css?v=20261015-3">
     <link rel="shortcut icon" href="/images/favicon.ico">
     <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
     <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
-    <script data-cfasync="false" src="script.js?v=20261015-2" defer></script>
-    <title>金融计算器 - 单利年化、利息收益、净值 CAGR、复利收益</title>
+    <script data-cfasync="false" src="script.js?v=20261015-3" defer></script>
+    <title>金融计算器 - 年化、利息、净值与复利</title>
 
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-K2S9L4CHNP"></script>
     <script>
@@ -35,7 +35,7 @@
                 </span>
                 <span class="brand-copy">
                     <strong>金融计算器</strong>
-                    <p>年化收益、利息、净值与复利，一页完成常用计算</p>
+                    <p>年化、利息、复利，一页算清</p>
                 </span>
             </a>
         </div>
@@ -46,15 +46,15 @@
             <div class="section-heading">
                 <div>
                     <h1 id="calculator-title">选择计算方式</h1>
-                    <p>360 / 365 天口径可按产品规则选择；单利、CAGR 与复利口径均在对应功能中明确标注。</p>
+                    <p>选择计算方式，填写数据即可。</p>
                 </div>
             </div>
 
             <div class="nav nav-tabs calculator-tabs" id="myTabs" role="tablist" aria-label="金融计算类型">
-                <button class="nav-link active" id="tab1" type="button" data-target="content1" role="tab" aria-controls="content1" aria-selected="true">单利年化</button>
-                <button class="nav-link" id="tab2" type="button" data-target="content2" role="tab" aria-controls="content2" aria-selected="false" tabindex="-1">利息收益</button>
-                <button class="nav-link" id="tab3" type="button" data-target="content3" role="tab" aria-controls="content3" aria-selected="false" tabindex="-1">净值年化</button>
-                <button class="nav-link" id="tab4" type="button" data-target="content4" role="tab" aria-controls="content4" aria-selected="false" tabindex="-1">复利收益</button>
+                <button class="nav-link active" id="tab1" type="button" data-target="content1" role="tab" aria-controls="content1" aria-selected="true">收益算年化</button>
+                <button class="nav-link" id="tab2" type="button" data-target="content2" role="tab" aria-controls="content2" aria-selected="false" tabindex="-1">计算利息</button>
+                <button class="nav-link" id="tab3" type="button" data-target="content3" role="tab" aria-controls="content3" aria-selected="false" tabindex="-1">净值算年化</button>
+                <button class="nav-link" id="tab4" type="button" data-target="content4" role="tab" aria-controls="content4" aria-selected="false" tabindex="-1">计算复利</button>
             </div>
 
             <div class="tab-content" id="contents">
@@ -103,7 +103,7 @@
                         <span class="col-auto unit">天</span>
                     </div>
                     <div class="mb-3 row align-items-center">
-                        <label for="annualRate2" class="form-label col-auto mb-0">单利年化收益率：</label>
+                        <label for="annualRate2" class="form-label col-auto mb-0">年利率（单利）：</label>
                         <div class="col"><input type="number" class="form-control" id="annualRate2" step="0.01" inputmode="decimal"></div>
                         <span class="col-auto unit">%</span>
                     </div>
@@ -157,7 +157,7 @@
                     </div>
                     <div class="button-row">
                         <button id="empty3" type="button" class="secondary-button">清空</button>
-                        <button id="calculate3" type="button" class="primary-button">计算 CAGR</button>
+                        <button id="calculate3" type="button" class="primary-button">计算</button>
                     </div>
                     <div class="result-info" id="result3" role="status" aria-live="polite"></div>
                 </section>
@@ -188,7 +188,7 @@
                         <span class="col-auto unit" id="frequency">年</span>
                     </div>
                     <div class="mb-3 row align-items-center">
-                        <label for="annualRate3" class="form-label col-auto mb-0">名义年利率（APR）：</label>
+                        <label for="annualRate3" class="form-label col-auto mb-0">年利率：</label>
                         <div class="col"><input type="number" class="form-control" id="annualRate3" step="0.01" inputmode="decimal"></div>
                         <span class="col-auto unit">%</span>
                     </div>
@@ -212,7 +212,7 @@
             </div>
         </section>
 
-        <p class="calculator-note">单利年化/利息工具按线性单利口径；净值年化使用 CAGR；复利收益输入为名义年利率（APR）。360 / 365 天只参与按周、按日复利的单期利率折算。</p>
+        <p class="calculator-note">前两项不计复利，净值年化按复利折算。年化天数按产品规则选。复利页将年利率分到每期，360 / 365 天仅影响周、日复利。</p>
     </main>
 
     <footer class="page-footer">

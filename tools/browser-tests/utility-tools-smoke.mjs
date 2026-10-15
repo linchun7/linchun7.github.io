@@ -189,10 +189,10 @@ async function testFinancialCalculatorAlgorithms() {
     await page.fill('#endNetValue', '1.1');
     await page.selectOption('#rateType3', '365');
     await page.click('#calculate3');
-    assert.match(await page.locator('#result3').textContent(), /CAGR.*21\.32%/);
+    assert.match(await page.locator('#result3').textContent(), /净值年化收益率：21\.32%/);
 
     await page.click('#tab4');
-    assert.match(await page.locator('label[for="annualRate3"]').textContent(), /名义年利率（APR）/);
+    assert.match(await page.locator('label[for="annualRate3"]').textContent(), /^年利率：$/);
     assert.match(await page.locator('label[for="rateType4"]').textContent(), /周\/日年计息天数/);
 
     await page.fill('#principal3', '10000');
@@ -217,6 +217,63 @@ async function testFinancialCalculatorAlgorithms() {
     await page.click('#calculate4');
     const daily365 = await page.locator('#result4').textContent();
     assert.notEqual(daily360, daily365, '360/365 selection should affect daily APR compounding');
+
+    // The brand keeps its link feedback and keyboard outline without underlining both lines.
+    await page.setViewportSize({ width: 1024, height: 800 });
+    await page.goto(`${baseUrl}/tools/financial_calculator/`, { waitUntil: 'domcontentloaded' });
+    await page.keyboard.press('Tab');
+    assert.equal(await page.locator('.skip-link').evaluate(node => node === document.activeElement), true);
+    await page.keyboard.press('Tab');
+    const brand = page.locator('.app-brand');
+    assert.equal(await brand.evaluate(node => node === document.activeElement), true);
+    assert.equal(await brand.getAttribute('href'), './');
+    assert.deepEqual(await brand.evaluate(node => {
+        const style = getComputedStyle(node);
+        return [node.matches(':focus-visible'), style.outlineStyle, style.outlineWidth];
+    }), [true, 'solid', '2px']);
+    const normalColor = await brand.evaluate(node => getComputedStyle(node).color);
+    await brand.hover();
+    assert.deepEqual(await brand.evaluate(node => [node, ...node.querySelectorAll('.brand-copy, strong, p')]
+        .map(item => getComputedStyle(item).textDecorationLine)), ['none', 'none', 'none', 'none']);
+    assert.notEqual(await brand.evaluate(node => getComputedStyle(node).color), normalColor);
+    const footerLink = page.locator('.page-footer a');
+    await footerLink.hover();
+    assert.equal(await footerLink.evaluate(node => getComputedStyle(node).textDecorationLine), 'underline');
+
+    await page.setViewportSize({ width: 320, height: 800 });
+    for (let tab = 1; tab <= 4; tab += 1) {
+        await page.click('#tab' + tab);
+        assert.equal(await page.locator('#content' + tab).isVisible(), true);
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true,
+            'financial calculator must fit a 320px screen');
+    }
+
+    const clearCases = [
+        { tab: 1, fields: { principal1: '1000', days1: '360', interest1: '50' },
+            selects: { rateType1: '360' }, expected: /5\.00%/ },
+        { tab: 2, fields: { principal2: '1000', days2: '360', annualRate2: '5' },
+            selects: { rateType2: '360' }, expected: /50\.00 元/ },
+        { tab: 3, fields: { startDate: '2026-01-01', startNetValue: '1', endDate: '2027-01-01', endNetValue: '1.1' },
+            selects: { rateType3: '365' }, expected: /10\.00%（持有 365 天）/ },
+        { tab: 4, fields: { principal3: '1000', depositPeriod: '2', annualRate3: '5' },
+            selects: { compoundingFrequency: 'annually', rateType4: '360' }, expected: /1,102\.50 元；利息总计：102\.50 元/ }
+    ];
+    for (const item of clearCases) {
+        await page.click('#tab' + item.tab);
+        for (const [id, value] of Object.entries(item.fields)) await page.fill('#' + id, value);
+        for (const [id, value] of Object.entries(item.selects)) await page.selectOption('#' + id, value);
+        await page.click('#calculate' + item.tab);
+        assert.match(await page.locator('#result' + item.tab).textContent(), item.expected);
+        await page.click('#empty' + item.tab);
+        for (const id of Object.keys(item.fields)) assert.equal(await page.inputValue('#' + id), '');
+        for (const [id, value] of Object.entries(item.selects)) assert.equal(await page.inputValue('#' + id), value);
+        assert.equal(await page.locator('#result' + item.tab).textContent(), '');
+        assert.equal(await page.evaluate(() => document.activeElement?.id), Object.keys(item.fields)[0]);
+        if (item.tab === 4) assert.equal(await page.locator('#result4-table').textContent(), '');
+        await page.click('#calculate' + item.tab);
+        assert.match(await page.locator('#result' + item.tab).textContent(),
+            item.tab === 3 ? /请选择起始日期/ : /请输入本金/);
+    }
 
     assert.equal(pageErrors.length, 0, `financial calculator page errors: ${pageErrors.map(String).join('; ')}`);
     await context.close();
