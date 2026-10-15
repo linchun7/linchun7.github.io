@@ -1,0 +1,42 @@
+name: Verify recent tools on production
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/recent-tools-production-acceptance.yml'
+      - 'tools/browser-tests/recent-optimizations-production.mjs'
+      - 'tools/browser-tests/recent-optimizations-production.test.mjs'
+permissions:
+  contents: read
+jobs:
+  production:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    name: Ordinary production URL acceptance (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Install existing exact browser-test dependency
+        working-directory: tools/browser-tests
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Validate acceptance contract
+        run: |
+          node --check tools/browser-tests/recent-optimizations-production.mjs
+          node --test tools/browser-tests/recent-optimizations-production.test.mjs
+      - name: Install browser
+        working-directory: tools/browser-tests
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+      - name: Verify actual production resources and repeated legacy interactions
+        env:
+          PLAYWRIGHT_BROWSER: ${{ matrix.browser }}
+          BASE_URL: https://www.linchun.com.cn
+        run: node tools/browser-tests/recent-optimizations-production.mjs
