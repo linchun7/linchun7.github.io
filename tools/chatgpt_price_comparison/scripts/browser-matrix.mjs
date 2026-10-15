@@ -247,6 +247,7 @@ async function assertMinimumHistoryReuse(browser, priceData) {
   const committedHistory = JSON.parse(await readFile(resolve(projectDir, 'data/minimum-history.json'), 'utf8'));
   const generatedAt = Date.parse(priceData.generated_at);
   assert.ok(committedHistory.checkpoint, 'reuse regression needs an accepted minimum-history checkpoint');
+  let startupProjection;
   for (const mode of ['unchecked', 'older', 'same', 'newer', 'same-offset']) {
     const isolated = await browser.newContext();
     const page = await isolated.newPage();
@@ -264,8 +265,10 @@ async function assertMinimumHistoryReuse(browser, priceData) {
       history.checked_at = stamp;
       history.checkpoint.at = stamp;
     }
+    const initialDeviceNow = generatedAt + (mode === 'newer' ? -1 : 1) * 3650 * 86400000;
     await page.addInitScript(now => {
       Date.now = () => now;
+      globalThis.__initialDeviceNow = Date.now();
       const originalFetch = globalThis.fetch;
       globalThis.__minimumHistoryFetches = 0;
       globalThis.fetch = (input, init) => {
@@ -274,12 +277,24 @@ async function assertMinimumHistoryReuse(browser, priceData) {
         }
         return originalFetch(input, init);
       };
-    }, generatedAt + 3600000);
+    }, initialDeviceNow);
     await page.route('**/data/minimum-history.json*', route => route.fulfill({ json: history }));
     const calls = () => page.evaluate(() => globalThis.__minimumHistoryFetches);
     try {
       await page.goto(url, { waitUntil: 'domcontentloaded' });
       await page.waitForFunction(() => !document.querySelector('#minimumHistoryButton').disabled);
+      assert.deepEqual(await page.evaluate(() => ({ initial: globalThis.__initialDeviceNow, current: Date.now() })),
+        { initial: initialDeviceNow, current: initialDeviceNow }, mode + ': init script installs the wrong device clock before app startup');
+      assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), priceData.markets.length,
+        mode + ': initial wrong clock retains all published markets');
+      const projection = await page.evaluate(() => ({
+        rows: document.querySelector('#priceRows').textContent,
+        minimum: document.querySelector('#minimumSummary').textContent,
+        dates: document.querySelector('#updatedAt').textContent
+      }));
+      if (startupProjection) assert.deepEqual(projection, startupProjection,
+        mode + ': initial fast and slow clocks preserve prices, ranks, minima and real dates');
+      else startupProjection = projection;
       assert.equal(await calls(), 0, mode + ': startup leaves history on demand');
       await page.locator('#minimumHistoryButton').click();
       await page.waitForFunction(() => !document.querySelector('#minimumHistoryRetry').disabled
