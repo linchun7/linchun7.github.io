@@ -43,13 +43,19 @@ test('daily token and pinned browser behavior remain documented accurately', asy
   assert.match(workflow, /Chromium \+ Firefox \+ WebKit/);
 });
 
-test('critical-change gate requires only the two maintained guides', async () => {
+test('critical-change gate requires the maintained guides with only a verified pin-only exception', async () => {
   const workflow = await repo('.github/workflows/validate-icloud-price-comparison.yml');
-  assert.match(workflow, /market-registry\.mjs/);
-  assert.match(workflow, /data-model\.js/);
-  assert.match(workflow, /for doc in tools\/icloud_price_comparison\/README\.md tools\/icloud_price_comparison\/OPERATIONS\.md; do/);
-  assert.doesNotMatch(workflow, /ARCHITECTURE\.md|TROUBLESHOOTING\.md|reserved-market-registry\.mjs/);
+  const gate = await project('scripts/validate-documentation-change.mjs');
+  const core = JSON.parse(await project('package.json')).scripts['test:core'];
+  assert.match(workflow, /run: node tools\/icloud_price_comparison\/scripts\/validate-documentation-change\.mjs/);
+  assert.match(workflow, /HEAD_SHA: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
+  for (const path of ['market-registry.mjs', 'data-model.js', 'README.md', 'OPERATIONS.md']) assert.ok(gate.includes(path));
+  assert.doesNotMatch(gate, /ARCHITECTURE\.md|TROUBLESHOOTING\.md|reserved-market-registry\.mjs/);
+  assert.match(gate, /validateChangedFiles, verifyActionReferences/);
+  assert.ok(core.split(/\s+/).includes('test/documentation-change.test.mjs'));
   assert.match(workflow, /github\.event_name == 'pull_request' \|\| github\.event_name == 'push'/);
+  const guides = await documents();
+  for (const requirement of [/Dependabot/, /pin-only/, /同 major/, /SHA/, /两份指南/]) assert.match(guides, requirement);
 });
 
 test('concise guides retain data recovery and symptom troubleshooting', async () => {
