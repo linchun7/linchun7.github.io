@@ -34,12 +34,12 @@ GITHUB_TOKEN 发布数据提交不会再触发普通 push 验证，updater 必�
 - 网络/来源失败：保留旧数据，查来源状态，短暂故障交后续正常更新
 - `STALE_WORKFLOW_DEFINITION`：从最新 main 新建运行
 - parser disagreement/独立确认不一致：查官方页或挑战页，用 fixture 修解析，不关闭交叉核验
-- Published Date 倒退/未来：查官方日期及系统时钟，不改成今天
+- Published Date 倒退/未来：查官方日期及采集/发布机器时钟，不改成今天
 - FX stale/缺币种：查真实源日期和兼容条件，不伪造汇率
 - artifact/snapshot/static mismatch：定位跨文件根因，不要逐个手拼 JSON、改 active hash 或单换 prices.json
 - main advanced：相关变更须重新生成，不覆盖新 main
 - 内嵌数据读取失败：静态价格可读，查 HTML、console、CSP 和生成区域；启动不读 prices.json，清 localStorage 无助于修复
-- 时钟纠正后仍离线：可见/恢复及交互只本地复核，有效快照应恢复价格、日期、最低价及交互，不请求主价格；已打开最低价历史独立复核其检查时间
+- 访问者设备时间：不参与已发布价格、排名或历史的可用性判断；前端只保留格式、包内时间关系及版本完整性检查，展示真实核验及汇率日期。设备时间变化、可见/恢复及交互不请求主价格。采集及发布侧保留服务器时间、来源、运行日志与工件校验。
 - Actions 成功但页面旧：核对最终 Pages SHA、canonical 验证及资源哈希
 - lock/journal 残留：确认无活跃更新，让正常入口恢复，不手删新鲜事务文件
 - `bad tree object`：从权威远端恢复精确 Git 对象，不 prune、删分支或改数据掩盖缺失

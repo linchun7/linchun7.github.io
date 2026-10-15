@@ -247,6 +247,7 @@ async function assertMinimumHistoryReuse(browser, priceData) {
   const committedHistory = JSON.parse(await readFile(resolve(projectDir, 'data/minimum-history.json'), 'utf8'));
   const generatedAt = Date.parse(priceData.generated_at);
   assert.ok(committedHistory.checkpoint, 'reuse regression needs an accepted minimum-history checkpoint');
+  let startupProjection;
   for (const mode of ['unchecked', 'older', 'same', 'newer', 'same-offset']) {
     const isolated = await browser.newContext();
     const page = await isolated.newPage();
@@ -264,8 +265,10 @@ async function assertMinimumHistoryReuse(browser, priceData) {
       history.checked_at = stamp;
       history.checkpoint.at = stamp;
     }
+    const initialDeviceNow = generatedAt + (mode === 'newer' ? -1 : 1) * 3650 * 86400000;
     await page.addInitScript(now => {
       Date.now = () => now;
+      globalThis.__initialDeviceNow = Date.now();
       const originalFetch = globalThis.fetch;
       globalThis.__minimumHistoryFetches = 0;
       globalThis.fetch = (input, init) => {
@@ -274,18 +277,31 @@ async function assertMinimumHistoryReuse(browser, priceData) {
         }
         return originalFetch(input, init);
       };
-    }, generatedAt + 3600000);
+    }, initialDeviceNow);
     await page.route('**/data/minimum-history.json*', route => route.fulfill({ json: history }));
     const calls = () => page.evaluate(() => globalThis.__minimumHistoryFetches);
     try {
       await page.goto(url, { waitUntil: 'domcontentloaded' });
       await page.waitForFunction(() => !document.querySelector('#minimumHistoryButton').disabled);
+      assert.deepEqual(await page.evaluate(() => ({ initial: globalThis.__initialDeviceNow, current: Date.now() })),
+        { initial: initialDeviceNow, current: initialDeviceNow }, mode + ': init script installs the wrong device clock before app startup');
+      assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), priceData.markets.length,
+        mode + ': initial wrong clock retains all published markets');
+      const projection = await page.evaluate(() => ({
+        rows: document.querySelector('#priceRows').textContent,
+        minimum: document.querySelector('#minimumSummary').textContent,
+        dates: document.querySelector('#updatedAt').textContent
+      }));
+      if (startupProjection) assert.deepEqual(projection, startupProjection,
+        mode + ': initial fast and slow clocks preserve prices, ranks, minima and real dates');
+      else startupProjection = projection;
       assert.equal(await calls(), 0, mode + ': startup leaves history on demand');
       await page.locator('#minimumHistoryButton').click();
       await page.waitForFunction(() => !document.querySelector('#minimumHistoryRetry').disabled
         && !document.querySelector('#minimumHistoryNote').hidden);
       const records = await page.locator('#minimumHistoryEvents').textContent();
       const cutoff = await page.locator('#minimumHistoryStatus').textContent();
+      const historyVisibility = await page.evaluate(() => Object.fromEntries(['minimumHistoryToolbar', 'minimumHistoryMore', 'minimumHistoryNote'].map(id => [id, document.getElementById(id).hidden])));
       assert.equal(await calls(), 1);
       await page.locator('#closeMinimumHistory').click();
       await page.locator('#minimumHistoryButton').click();
@@ -305,10 +321,10 @@ async function assertMinimumHistoryReuse(browser, priceData) {
         await page.locator('#closeMinimumHistory').click();
         await page.evaluate(now => { Date.now = () => now; }, generatedAt + 60000);
         await page.locator('#minimumHistoryButton').click();
-        assert.equal(await page.locator('#minimumHistoryEvents').textContent(), '');
-        assert.equal(await page.locator('#minimumHistoryStatus').textContent(), '记录时间异常');
+        assert.equal(await page.locator('#minimumHistoryEvents').textContent(), records);
+        assert.equal(await page.locator('#minimumHistoryStatus').textContent(), cutoff);
         for (const id of ['minimumHistoryToolbar', 'minimumHistoryMore', 'minimumHistoryNote']) {
-          assert.equal(await page.locator('#' + id).isHidden(), true, id + ': future evidence is hidden');
+          assert.equal(await page.locator('#' + id).isHidden(), historyVisibility[id], id + ': accepted history remains available');
         }
         assert.equal(await calls(), 1, 'clock rollback is local and does not download history');
         await page.locator('#closeMinimumHistory').click();
@@ -332,10 +348,10 @@ async function assertMinimumHistoryReuse(browser, priceData) {
             else document.dispatchEvent(new Event(type));
           }, { now: generatedAt + 60000, type: trigger });
           assert.equal(await page.locator('#minimumHistoryDialog').evaluate(dialog => dialog.open), true);
-          assert.equal(await page.locator('#minimumHistoryEvents').textContent(), '');
-          assert.equal(await page.locator('#minimumHistoryStatus').textContent(), '记录时间异常');
+          assert.equal(await page.locator('#minimumHistoryEvents').textContent(), records);
+          assert.equal(await page.locator('#minimumHistoryStatus').textContent(), cutoff);
           for (const id of ['minimumHistoryToolbar', 'minimumHistoryMore', 'minimumHistoryNote']) {
-            assert.equal(await page.locator('#' + id).isHidden(), true, trigger + ': future history projection is hidden');
+            assert.equal(await page.locator('#' + id).isHidden(), historyVisibility[id], trigger + ': device clock preserves accepted history');
           }
           assert.equal(await page.locator('#searchInput').isEnabled(), true, 'the older page snapshot remains time-valid');
           assert.equal(await page.locator('#updatedAt').textContent(), priceDate);
@@ -649,13 +665,12 @@ try {
 
 
 
-  // A self-consistent future cutoff must not poison rollback protection.
+  // Package-internal future events must still fail without using the visitor clock.
   const acceptedText = await page.locator('#minimumHistoryEvents').textContent();
   const acceptedCutoff = await page.locator('#minimumHistoryStatus').textContent();
   const futureHistory = JSON.parse(await readFile(resolve(projectDir, 'data/minimum-history.json'), 'utf8'));
   assert.ok(futureHistory.checkpoint, 'future-cutoff regression needs an accepted checkpoint');
-  futureHistory.checked_at = new Date(Date.now() + 86400000).toISOString();
-  futureHistory.checkpoint.at = futureHistory.checked_at;
+  futureHistory.checkpoint.at = new Date(Date.parse(futureHistory.checked_at) + 1).toISOString();
   await page.route('**/data/minimum-history.json*', route => route.fulfill({
     contentType: 'application/json', body: JSON.stringify(futureHistory)
   }));

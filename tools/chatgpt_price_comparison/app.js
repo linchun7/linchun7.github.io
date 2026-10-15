@@ -45,7 +45,9 @@
       : JSON.stringify(value);
   const usable = (value) => {
     const timestamp = Date.parse(value);
-    return Number.isFinite(timestamp) && timestamp <= Date.now() + 300_000;
+    // This is a package-internal relationship, never a visitor-clock check.
+    const generatedAt = Date.parse(state.data?.generated_at);
+    return Number.isFinite(timestamp) && Number.isFinite(generatedAt) && timestamp <= generatedAt + 300_000;
   };
   const comparable = (market) => market.offers.length > 0 && usable(market.last_verified_at);
   const shortPlan = (label) => label.replace(/^ChatGPT\s+/, '');
@@ -156,7 +158,6 @@
       || !Array.isArray(value.markets) || !value.markets.length || value.markets.length > 250) throw Error('数据格式不匹配');
 
     const generatedAt = Date.parse(value.generated_at);
-    if (generatedAt > Date.now() + 300_000) throw Error('价格数据时间异常');
     const codes = new Set();
     for (const market of value.markets) {
       const checkedAt = Date.parse(market.last_checked_at);
@@ -577,7 +578,7 @@
   }
 
   function renderTable({ updateHeaders = true } = {}) {
-    // Interactions can follow a local clock correction without a visibility event.
+    // Reconcile validated snapshot relationships before rendering interactions.
     const nextSignature = timeDependentSignature();
     if (nextSignature !== freshnessSignature) {
       freshnessSignature = nextSignature;
@@ -862,7 +863,6 @@
       return Date.parse(value);
     };
     const checked = value.checked_at === null ? null : timestamp(value.checked_at);
-    if (checked !== null && checked > Date.now() + 300000) throw Error('最低价历史时间晚于当前时间');
     const first = value.first_observed_at === null ? null : timestamp(value.first_observed_at);
     const checkpoint = value.checkpoint === null ? null : timestamp(value.checkpoint.at);
     if (first !== null && (checked === null || first > checked)) throw Error('历史起点晚于检查时间');
@@ -1064,10 +1064,10 @@
     return (from || '暂无') + ' → ' + minimumWinnerSummary(event.comparison?.to || event.to);
   }
 
-  function minimumHistoryTimeUsable(history, nowMs = Date.now()) {
-    // Accepted structure already bounds every event/checkpoint by checked_at.
+  function minimumHistoryTimeUsable(history) {
+    // Publication verifies wall time; the frontend retains format/chronology checks only.
     return !history || history.checked_at === null
-      || Date.parse(history.checked_at) <= nowMs + 300_000;
+      || Number.isFinite(Date.parse(history.checked_at));
   }
 
   function renderMinimumHistoryStatus() {
@@ -1225,7 +1225,7 @@
     dialog.showModal();
     renderMinimumHistory();
     // A later accepted history is already sufficient for this page snapshot.
-    // Keep the existing retry for an unobserved/older history, never for clock rollback.
+    // Only unobserved/older history needs a refresh; visitor time is not evidence.
     if (!minimumHistoryUi.data || (minimumHistoryTimeUsable(minimumHistoryUi.data) && state.data
       && (minimumHistoryUi.data.checked_at === null
         || Date.parse(minimumHistoryUi.data.checked_at) < Date.parse(state.data.generated_at)))) void loadMinimumHistory();
@@ -1299,10 +1299,10 @@
     el.priceWorkspace.classList.add('price-ui-ready');
     updateTableScrollMode();
     void loadIcons();
-    // No background polling: interactions and tab return recheck clock validity.
+    // No background polling: tab return reuses the accepted snapshot and history.
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) return;
-      // History can cross the clock boundary independently of the page snapshot.
+      // Optional history retains its own validated chronology and accepted records.
       if (minimumHistoryUi.dialog?.open && minimumHistoryUi.data
         && minimumHistoryTimeUsable(minimumHistoryUi.data) !== minimumHistoryUi.renderedTimeUsable) renderMinimumHistory();
       refreshTimeDependentUi();

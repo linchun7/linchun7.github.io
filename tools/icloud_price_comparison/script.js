@@ -16,7 +16,6 @@ const REQUEST_TIMEOUT_MS = 8_000;
 const ANALYTICS_ID = 'G-K2S9L4CHNP';
 const DEFAULT_SORT_TIER = '200GB';
 const FIXED_PRICE_TABLE_COLUMN_COUNT = 2;
-const MAX_PRICE_FUTURE_SKEW_MS = 5 * 60 * 1_000;
 const MAX_RESPONSE_BYTES = Object.freeze({
   'history.json': 8 * 1024 * 1024,
   'minimum-history.json': 8 * 1024 * 1024
@@ -359,18 +358,15 @@ function readEmbeddedSnapshot() {
   return { data, publishedDate: snapshot.publishedDate };
 }
 
-export function classifyPriceFreshness(data, nowMs = Date.now()) {
-  const ageMs = nowMs - Date.parse(data?.generatedAt);
-  // Age is not a validity limit: a validated observation remains displayable indefinitely.
-  if (!Number.isFinite(ageMs)) return { status: 'unusable', reason: 'invalid-time', ageMs };
-  if (ageMs < -MAX_PRICE_FUTURE_SKEW_MS) return { status: 'unusable', reason: 'future-data', ageMs };
-  return { status: 'fresh', reason: null, ageMs };
+export function classifyPriceFreshness(data) {
+  // Wall time is checked at publication, never against the visitor's device clock.
+  if (!Number.isFinite(Date.parse(data?.generatedAt))) return { status: 'unusable', reason: 'invalid-time' };
+  return { status: 'fresh', reason: null };
 }
 
 function validatePriceFreshness(data) {
   const freshness = classifyPriceFreshness(data);
-  if (!Number.isFinite(freshness.ageMs)) throw new Error('价格数据生成时间无效');
-  if (freshness.reason === 'future-data') throw new Error('价格数据生成时间超过允许的未来偏差');
+  if (freshness.status === 'unusable') throw new Error('价格数据生成时间无效');
   return freshness;
 }
 
@@ -1378,7 +1374,7 @@ function scheduleBackToTableUpdate() {
 }
 
 // The static table remains readable if its interactive payload is damaged.
-// Only invalid/future timestamps remove current-price cues; age is never a limit.
+// Only invalid timestamp formats remove current-price cues; device time and age are never limits.
 function protectStaticSnapshotTime() {
   const freshness = classifyPriceFreshness({ generatedAt: staticSnapshotGeneratedAt });
   state.dataFreshness = freshness;
@@ -1632,9 +1628,8 @@ function bindEvents() {
     if (event.ctrlKey || event.metaKey || event.altKey) return;
     delete document.documentElement.dataset.countryHistoryPointer;
   }, { capture: true });
-  // A device-clock change need not produce a lifecycle event. Guard current
-  // price interactions before their handlers, without checking inside render
-  // functions (which the time-safety transition itself calls).
+  // Recheck snapshot format before interactions without reading the visitor clock.
+  // Do not check inside render functions, which integrity recovery itself calls.
   const currentPriceControls = [
     '#searchInput', '#regionSelect', 'button[data-sort]', 'button[data-sort-tier]',
     '#mobileTierControl button', '.minimum-card', '#priceRows tr[data-market-id]',
@@ -1746,10 +1741,10 @@ function initialize() {
 elements.retryButton?.addEventListener('click', () => location.reload());
 if (elements.retryButton) elements.retryButton.textContent = '刷新页面';
 
-// A corrected device clock can restore the same page snapshot. These events
-// never fetch prices, discover a new version, or impose an expiry deadline.
+// Lifecycle events reuse the same validated snapshot. They never use device
+// wall time, fetch prices, discover a new version, or impose an expiry deadline.
 function recheckSnapshotClock() {
-  // An open, later history can cross the clock boundary while this snapshot remains valid.
+  // Optional history retains its separately validated chronology.
   if (minimumHistoryUi.dialog?.open && minimumHistoryUi.data
     && minimumHistoryTimeUsable(minimumHistoryUi.data) !== minimumHistoryUi.renderedTimeUsable) renderMinimumHistory();
   const freshness = classifyPriceFreshness({ generatedAt: staticSnapshotGeneratedAt });
@@ -1867,10 +1862,10 @@ function minimumHistoryTierIds(history) {
   ));
 }
 
-function minimumHistoryTimeUsable(history, nowMs = Date.now()) {
-  // Accepted structure already bounds every event/checkpoint by checkedAt.
+function minimumHistoryTimeUsable(history) {
+  // Publication verifies wall time; accepted chronology is independent of device time.
   return !history || history.checkedAt === null
-    || Date.parse(history.checkedAt) <= nowMs + MAX_PRICE_FUTURE_SKEW_MS;
+    || Number.isFinite(Date.parse(history.checkedAt));
 }
 
 function renderMinimumHistoryStatus() {
@@ -1979,7 +1974,6 @@ async function loadMinimumHistory() {
       });
       if (!response.ok || !/application\/json/i.test(response.headers.get('content-type') ?? '')) throw new Error('History unavailable');
       const value = validateMinimumHistoryPayload(await readBoundedJsonResponse(response, 'minimum-history.json'));
-      if (Date.parse(value.checkedAt) > Date.now() + MAX_PRICE_FUTURE_SKEW_MS) throw new Error('Future history');
       const previous = minimumHistoryUi.data?.checkedAt;
       if (previous && (!value.checkedAt || Date.parse(value.checkedAt) < Date.parse(previous))) {
         throw new Error('History response would roll back accepted records');
@@ -2015,7 +2009,7 @@ function openMinimumHistory() {
   dialog.showModal();
   renderMinimumHistory();
   // A later accepted history is already sufficient for this page snapshot.
-  // Keep the existing retry for an unobserved/older history, never for clock rollback.
+  // Only unobserved/older history needs a refresh; visitor time is not evidence.
   if (!minimumHistoryUi.data || (minimumHistoryTimeUsable(minimumHistoryUi.data) && state.data
     && (minimumHistoryUi.data.checkedAt === null
       || Date.parse(minimumHistoryUi.data.checkedAt) < Date.parse(state.data.generatedAt)))) void loadMinimumHistory();
