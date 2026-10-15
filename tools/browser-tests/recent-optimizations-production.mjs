@@ -273,7 +273,11 @@ export async function main() {
                         const options = { ...(method === 'goto' ? args[1] : args[0]), waitUntil: 'load' };
                         const response = method === 'goto' ? await navigate(args[0], options) : await navigate(options);
                         await drain();
-                        await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+                        if (options.javaScriptEnabled !== false) {
+                            await withDeadline(page.evaluate(() => new Promise(resolve =>
+                                requestAnimationFrame(() => requestAnimationFrame(resolve)))), 5000,
+                                'native autofocus settle ' + page.url());
+                        }
                         return response;
                     };
                 }
