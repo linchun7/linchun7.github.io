@@ -39,6 +39,10 @@
 
 运行环境 Python 3.10+、Node 22、pnpm 10.14.0，浏览器依赖以 package/lockfile 为准；基础开发与离线测试无需额外 API Key。测试在 [GitHub Actions](../../.github/workflows/validate-chatgpt-prices.yml) 执行，保留 Python 离线回归、候选校验、深度 fixture 和锁定 Playwright 的 Chromium/Firefox/WebKit 完整矩阵，main 另验实际部署。
 
+独立的 Playwright package/lock 已纳入 Dependabot 每周升级；共享 tools/browser-tests 的版本不覆盖本项目。单依赖、稳定向前、同 major 的更新在离线回归、依赖审计及 Chromium/Firefox/WebKit 全通过后，才可由默认分支的可信校验器合并精确测试提交。major、锁文件单改、新依赖及任何脚本/配置/工作流混改均须人工复核。
+
+仅真实 Dependabot、同仓且 Git base/head 与合并检出一致的纯 package+lock 更新可省略 PR 的 Apple 实时来源步骤。固定完整性 pnpm 在无凭据的隔离临时 HOME/config/store 中，从明确的 npm 官方 registry 重新解析候选 pin，完整比对锁文件，拒绝额外依赖、registry/integrity 及其他锁语义改写。使用 pnpm 自身生成标准锁，不手写 YAML 解析器；正常锁格式在 Actions 做真实 roundtrip。未来 pnpm 格式或依赖图的变化若无法重现则保守保留实时来源并交由复核。网络、Git 或解析失败保留原实时校验，也不能使自动合并放行。离线 fixtures、三浏览器和 audit 始终执行；源码/采集/解析改动仍验全部实时市场，main 线上验收及生产采集发布门禁不变。
+
 从仓库根目录运行：
 
 ```sh

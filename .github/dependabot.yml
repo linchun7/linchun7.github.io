@@ -22,6 +22,19 @@ updates:
     # installs that version's browsers, and runs the full three-browser suite.
     open-pull-requests-limit: 5
 
+  - package-ecosystem: npm
+    directory: /tools/chatgpt_price_comparison
+    schedule:
+      interval: weekly
+      day: monday
+      time: "11:40"
+      timezone: Asia/Shanghai
+    # Independent Playwright package/lock; same-major updates require its own
+    # offline fixtures, audit and full three-browser validation.
+    open-pull-requests-limit: 5
+    allow:
+      - dependency-name: playwright
+
   - package-ecosystem: github-actions
     directory: /
     schedule:

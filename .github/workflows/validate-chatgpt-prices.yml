@@ -11,6 +11,25 @@ concurrency:
   group: validate-chatgpt-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  validation-scope:
+    name: Classify exact dependency-only PR
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      dependency_only: ${{ steps.scope.outputs.dependency_only }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Verify manifest and official-registry lock without credentials
+        id: scope
+        run: node tools/chatgpt_price_comparison/scripts/validation-scope.mjs
+
   tests:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -26,6 +45,7 @@ jobs:
           python3 -m unittest discover -s tools/chatgpt_price_comparison/scripts -p 'test_*.py' -v
           node --check tools/chatgpt_price_comparison/app.js
           node tools/chatgpt_price_comparison/scripts/test-verify-production.mjs
+          node --test tools/chatgpt_price_comparison/scripts/test-dependency-policy.mjs tools/chatgpt_price_comparison/scripts/test-validation-scope.mjs
           python3 - <<'PY'
           import copy, json, sys
           sys.path.insert(0, 'tools/chatgpt_price_comparison/scripts')
@@ -111,6 +131,11 @@ jobs:
       - name: Audit browser-test dependency
         if: matrix.browser == 'chromium'
         run: pnpm audit --audit-level low
+      - name: Verify real pinned-pnpm lock roundtrip
+        if: matrix.browser == 'chromium'
+        env:
+          VERIFY_PNPM_ROUNDTRIP: '1'
+        run: node --test scripts/test-dependency-policy.mjs
       - name: Install ${{ matrix.browser }}
         run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
       - name: Run ${{ matrix.browser }} smoke
@@ -205,7 +230,8 @@ jobs:
 
   live-source:
     name: Verify live App Store sources without publishing
-    if: github.event_name == 'pull_request'
+    needs: validation-scope
+    if: github.event_name == 'pull_request' && needs.validation-scope.outputs.dependency_only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
