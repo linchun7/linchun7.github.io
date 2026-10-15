@@ -6,11 +6,11 @@
     <meta name="format-detection" content="telephone=no">
     <meta name="description" content="金融计算器：计算单利年化收益率、利息收益、净值年化收益率（CAGR）和复利收益。">
     <link rel="stylesheet" href="../css/bootstrap.min.css">
-    <link rel="stylesheet" href="styles.css?v=20260819-1">
+    <link rel="stylesheet" href="styles.css?v=20261015-1">
     <link rel="shortcut icon" href="/images/favicon.ico">
     <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
     <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
-    <script data-cfasync="false" src="script.js?v=20261012-4" defer></script>
+    <script data-cfasync="false" src="script.js?v=20261015-1" defer></script>
     <title>金融计算器 - 单利年化、利息收益、净值 CAGR、复利收益</title>
 
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-K2S9L4CHNP"></script>
@@ -89,6 +89,10 @@
                         <button id="calculate1" type="button" class="primary-button">计算</button>
                     </div>
                     <div class="result-info" id="result1" role="status" aria-live="polite"></div>
+                    <div class="summary-actions">
+                        <button id="copySummary1" type="button" class="secondary-button" aria-describedby="copyStatus1" disabled>复制计算摘要</button>
+                        <span id="copyStatus1" class="copy-status" role="status" aria-live="polite"></span>
+                    </div>
                 </section>
 
                 <section id="content2" class="function-content tab-pane" role="tabpanel" aria-labelledby="tab2" hidden>
@@ -122,6 +126,10 @@
                         <button id="calculate2" type="button" class="primary-button">计算</button>
                     </div>
                     <div class="result-info" id="result2" role="status" aria-live="polite"></div>
+                    <div class="summary-actions">
+                        <button id="copySummary2" type="button" class="secondary-button" aria-describedby="copyStatus2" disabled>复制计算摘要</button>
+                        <span id="copyStatus2" class="copy-status" role="status" aria-live="polite"></span>
+                    </div>
                 </section>
 
                 <section id="content3" class="function-content tab-pane" role="tabpanel" aria-labelledby="tab3" hidden>
@@ -160,6 +168,10 @@
                         <button id="calculate3" type="button" class="primary-button">计算 CAGR</button>
                     </div>
                     <div class="result-info" id="result3" role="status" aria-live="polite"></div>
+                    <div class="summary-actions">
+                        <button id="copySummary3" type="button" class="secondary-button" aria-describedby="copyStatus3" disabled>复制计算摘要</button>
+                        <span id="copyStatus3" class="copy-status" role="status" aria-live="polite"></span>
+                    </div>
                 </section>
 
                 <section id="content4" class="function-content tab-pane" role="tabpanel" aria-labelledby="tab4" hidden>
@@ -207,6 +219,10 @@
                         <button id="calculate4" type="button" class="primary-button">计算</button>
                     </div>
                     <div class="result-info" id="result4" role="status" aria-live="polite"></div>
+                    <div class="summary-actions">
+                        <button id="copySummary4" type="button" class="secondary-button" aria-describedby="copyStatus4" disabled>复制计算摘要</button>
+                        <span id="copyStatus4" class="copy-status" role="status" aria-live="polite"></span>
+                    </div>
                     <div id="result4-table"></div>
                 </section>
             </div>
