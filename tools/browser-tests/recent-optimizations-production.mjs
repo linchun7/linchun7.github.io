@@ -156,7 +156,8 @@ function validateMime(mime, resource) {
 function scriptInventory(html) {
     return [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)].map(match => ({
         attributes: match[1], src: /\bsrc="([^"]+)"/.exec(match[1])?.[1] || null,
-        bodyBytes: Buffer.byteLength(match[2]), bodyHash: hash(match[2])
+        bodyBytes: Buffer.byteLength(match[2]), bodyHash: hash(match[2]),
+        bodyPreview: match[2].length <= 2500 ? match[2] : undefined
     }));
 }
 async function preflight(manifest) {
@@ -203,6 +204,7 @@ export async function main() {
     const networkFailures = [];
     const pageErrors = [];
     const observed = new Set();
+    const diagnosed = new Set();
     let checks = 0;
     const verifiedBrowser = {
         async newContext(options = {}) {
@@ -221,7 +223,7 @@ export async function main() {
                     }
                     await Promise.all(ownNetworkTasks);
                     try { assertRequestsComplete([...requests.values()], required, verified); }
-                    catch (error) { networkFailures.push(error.message); }
+                    catch (error) { networkFailures.push(error.message.split('\n')[0]); }
                     closeChecksDone = true;
                 }
                 await close();
@@ -259,8 +261,19 @@ export async function main() {
                     assert.equal(response.request().redirectedFrom(), null, 'application redirect is not accepted');
                     validateMime(response.headers()['content-type'], resource);
                     const bytes = await withDeadline(response.body(), 15000, 'browser response body ' + resource.path);
-                    if (resource.kind === 'html') assert.deepEqual(pageContract(bytes.toString('utf8'), response.url()), resource.contract, 'browser page differs: ' + resource.path);
-                    else assertResource(bytes, resource);
+                    if (resource.kind === 'html') {
+                        try { assert.deepEqual(pageContract(bytes.toString('utf8'), response.url()), resource.contract, 'browser page differs: ' + resource.path); }
+                        catch (error) {
+                            if (!diagnosed.has(response.url())) {
+                                diagnosed.add(response.url());
+                                console.log(JSON.stringify({ suite: 'production-browser-page-diagnostic',
+                                    browser: browserName, url: response.url(),
+                                    expectedScripts: scriptInventory(expectedBytes(resource.path).toString('utf8')),
+                                    actualScripts: scriptInventory(bytes.toString('utf8')), status: 'mismatch' }));
+                            }
+                            throw error;
+                        }
+                    } else assertResource(bytes, resource);
                     observed.add(response.url());
                     verified.add(response.url());
                     const record = requests.get(response.request());
@@ -269,8 +282,8 @@ export async function main() {
                     record.status = 'verified';
                 })().catch(error => {
                     const record = requests.get(response.request());
-                    if (record) { record.status = 'failed'; record.reason = error.message; }
-                    networkFailures.push(error.message);
+                    if (record) { record.status = 'failed'; record.reason = error.message.split('\n')[0]; }
+                    networkFailures.push(error.message.split('\n')[0]);
                 });
                 networkTasks.push(task);
                 ownNetworkTasks.push(task);
