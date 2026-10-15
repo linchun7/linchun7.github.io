@@ -48,13 +48,16 @@ try {
         await page.keyboard.press('Backspace');
         assert.equal(await page.inputValue('#inputField'), '7992 398 713');
     });
-    await check('full-width paste and repeated spaces keep normalization', async page => {
+    await check('raw full-width input and repeated spaces use the normalized calculation', async page => {
         await page.fill('#inputField', '７９９２　　７３９８　７１３');
-        assert.equal(await page.inputValue('#inputField'), '7992 7398 713');
+        assert.equal(await page.inputValue('#inputField'), '７９９２　　７３９８　７１３');
         assert.equal(await page.locator('#validCount').textContent(), '11');
+        await page.click('#calcBtn');
+        await done(page);
+        assert.equal(await page.locator('.result-row').getAttribute('data-clipboard'), '79927398713');
         await page.click('#clearBtn');
         await page.locator('#inputField').pressSequentially('7992   7398  713');
-        assert.equal(await page.inputValue('#inputField'), '7992 7398 713');
+        assert.equal(await page.inputValue('#inputField'), '7992   7398  713');
         await page.click('#calcBtn');
         await done(page);
         assert.equal(await page.locator('.result-row').getAttribute('data-clipboard'), '79927398713');

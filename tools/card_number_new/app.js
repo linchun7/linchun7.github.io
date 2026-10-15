@@ -69,27 +69,29 @@ function summarizeRemovedChars(chars) {
     return chars.length > 6 ? `${shown} 等` : shown;
 }
 
-function sanitizeCurrentInput(announce = true) {
+function readCurrentRule(announce = true) {
     const normalized = normalizeRuleInput(ui.input.value, MAX_PATTERN_LENGTH);
-    if (normalized.value !== ui.input.value) ui.input.value = normalized.value;
 
     if (announce) {
         const notices = [];
         if (normalized.removedChars.length > 0) {
-            notices.push(`已删除不支持字符：${summarizeRemovedChars(normalized.removedChars)}`);
+            notices.push(`计算时忽略不支持字符：${summarizeRemovedChars(normalized.removedChars)}`);
         }
-        if (normalized.truncated) notices.push(`最多支持 ${MAX_PATTERN_LENGTH} 位，超出部分已忽略`);
+        if (normalized.truncated) notices.push(`最多使用前 ${MAX_PATTERN_LENGTH} 个有效位计算，原输入保留`);
         if (notices.length > 0) showToast(notices.join('；'));
     }
 
     return normalized;
 }
 
-function updateLengthWarning() {
-    const length = (ui.input.value.match(/[a-zA-Z0-9*]/g) || []).length;
+function updateLengthWarning(normalized = readCurrentRule(false)) {
+    const length = normalized.symbolCount;
     ui.validCount.textContent = length;
 
-    if (length > 0 && length < 12) {
+    if (normalized.truncated) {
+        ui.lenWarning.textContent = `仅按前 ${MAX_PATTERN_LENGTH} 个有效位计算，原输入已保留`;
+        ui.lenWarning.hidden = false;
+    } else if (length > 0 && length < 12) {
         ui.lenWarning.textContent = '少于常见的 12–19 位';
         ui.lenWarning.hidden = false;
     } else if (length > 19) {
@@ -288,8 +290,8 @@ function startCalculation() {
     if (isRunning || composing) return;
     ui.input.classList.remove('input-error');
     ui.input.setAttribute('aria-invalid', 'false');
-    const normalized = sanitizeCurrentInput(true);
-    updateLengthWarning();
+    const normalized = readCurrentRule(true);
+    updateLengthWarning(normalized);
     currentPattern = normalized.value.replace(/\s/g, '');
     resetCalculationOutput();
 
@@ -452,8 +454,8 @@ let composing = false;
 function handleRuleInput() {
     ui.input.classList.remove('input-error');
     ui.input.setAttribute('aria-invalid', 'false');
-    sanitizeCurrentInput(true);
-    updateLengthWarning();
+    const normalized = readCurrentRule(true);
+    updateLengthWarning(normalized);
 }
 ui.input.addEventListener('compositionstart', () => { composing = true; });
 ui.input.addEventListener('compositionend', () => {
