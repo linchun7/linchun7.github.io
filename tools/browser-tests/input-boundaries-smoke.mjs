@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { checkRmbInputLifecycle } from './rmb-input-lifecycle.mjs';
 import { chromium, firefox, webkit } from 'playwright';
 
 const browserName = process.env.PLAYWRIGHT_BROWSER || 'chromium';
@@ -32,6 +33,7 @@ async function check(name, tool, run, prepare = async () => {}) {
 }
 
 try {
+    await checkRmbInputLifecycle(check, browserName);
     await check('legacy rejects empty and non-digit Luhn inputs', 'card_number', async page => {
         assert.equal(await page.evaluate(() => luhnCheck('')), false);
         assert.equal(await page.evaluate(() => luhnCheck('12x')), false);
@@ -99,7 +101,7 @@ try {
         assert.equal((await page.locator('#result1').textContent()).trim(), '人民币零元整');
 
         await page.fill('#inputmoney', '１２３．４５');
-        assert.equal(await page.inputValue('#inputmoney'), '123.45');
+        assert.equal(await page.inputValue('#inputmoney'), '１２３．４５');
         assert.equal((await page.locator('#result1').textContent()).trim(), '人民币壹佰贰拾叁元肆角伍分');
     });
     await check('RMB clipboard rejection falls back and removes its temporary textarea', 'rmb_converter', async page => {
