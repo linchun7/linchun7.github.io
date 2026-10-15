@@ -225,18 +225,26 @@ function clearInput() {
 /**
  * 处理用户输入，过滤非法字符并更新统计信息
  */
+function normalizeCardRule(value) {
+  return value.normalize('NFKC').replace(/[^a-zA-Z0-9*\s]/g, '').replace(/\s+/g, ' ');
+}
+
 function handleInput() {
-  let inputField = document.getElementById('inputField');
-  let inputStr = inputField.value;
+  const inputField = document.getElementById('inputField');
+  const raw = inputField.value;
+  const inputStr = normalizeCardRule(raw);
 
-  // 过滤非字母、数字、星号的字符，并将多个空格替换为一个空格
-  inputStr = inputStr.normalize('NFKC').replace(/[^a-zA-Z0-9*\s]/g, '').replace(/\s+/g, ' ');
-
-  // 更新输入框内容
-  inputField.value = inputStr;
+  if (inputStr !== raw) {
+    // 分别归一化选区前缀，让全角转换、非法字符删除和空格合并后仍可原位编辑。
+    const start = normalizeCardRule(raw.slice(0, inputField.selectionStart)).length;
+    const end = normalizeCardRule(raw.slice(0, inputField.selectionEnd)).length;
+    const direction = inputField.selectionDirection;
+    inputField.value = inputStr;
+    inputField.setSelectionRange(start, end, direction);
+  }
 
   // 统计有效位数（不包括空格）
-  let validCount = inputStr.replace(/[^a-zA-Z0-9*]/g, '').length;
+  const validCount = inputStr.replace(/[^a-zA-Z0-9*]/g, '').length;
   document.getElementById('validCount').textContent = `${validCount}`;
 }
 

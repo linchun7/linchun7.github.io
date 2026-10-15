@@ -70,8 +70,16 @@ function summarizeRemovedChars(chars) {
 }
 
 function sanitizeCurrentInput(announce = true) {
-    const normalized = normalizeRuleInput(ui.input.value, MAX_PATTERN_LENGTH);
-    if (normalized.value !== ui.input.value) ui.input.value = normalized.value;
+    const raw = ui.input.value;
+    const normalized = normalizeRuleInput(raw, MAX_PATTERN_LENGTH);
+    if (normalized.value !== raw) {
+        // 选区位置也使用相同的归一化及长度上限，不能直接沿用原字符串的偏移。
+        const start = normalizeRuleInput(raw.slice(0, ui.input.selectionStart), MAX_PATTERN_LENGTH).value.length;
+        const end = normalizeRuleInput(raw.slice(0, ui.input.selectionEnd), MAX_PATTERN_LENGTH).value.length;
+        const direction = ui.input.selectionDirection;
+        ui.input.value = normalized.value;
+        ui.input.setSelectionRange(start, end, direction);
+    }
 
     if (announce) {
         const notices = [];
