@@ -38,3 +38,20 @@ test('artifact roundtrip becomes required only for upload/download Action diffs'
   assert.deepEqual(requiredActionValidationWorkflows([actionChange('upload-artifact')]), [ICLOUD_WORKFLOW, ARTIFACT_WORKFLOW]);
   assert.deepEqual(requiredActionValidationWorkflows([actionChange('download-artifact')]), [ICLOUD_WORKFLOW, ARTIFACT_WORKFLOW]);
 });
+
+test('list-shorthand upload/download updates still require artifact roundtrip and route the merge trigger', async () => {
+  for (const action of ['checkout', 'upload-artifact', 'download-artifact']) {
+    const changed = actionChange(action);
+    changed.patch = changed.patch.replaceAll('        uses:', '      - uses:');
+    assert.deepEqual(requiredActionValidationWorkflows([changed]), action === 'checkout' ? [ICLOUD_WORKFLOW] : [ICLOUD_WORKFLOW, ARTIFACT_WORKFLOW]);
+  }
+  const workflow = await readFile(autoMergeWorkflowUrl, 'utf8');
+  const expression = workflow.match(/const content = (line\.replace\([^;\n]+\));/)[1];
+  const normalize = new Function('line', 'return ' + expression);
+  for (const prefix of ['-        uses:', '+        uses:', '-      - uses:', '+      - uses:']) {
+    for (const action of ['upload-artifact', 'download-artifact']) {
+      assert.equal(normalize(prefix + ' actions/' + action + '@' + 'a'.repeat(40)).startsWith('uses: actions/' + action + '@'), true);
+    }
+  }
+  assert.equal(normalize('+      - run: curl example.invalid').startsWith('uses: actions/'), false);
+});

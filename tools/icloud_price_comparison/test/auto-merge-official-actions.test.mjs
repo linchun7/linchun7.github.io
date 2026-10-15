@@ -630,3 +630,22 @@ test('full artifact merge gate blocks tied failures and inconsistent attempts, t
   }
   assert.deepEqual(actual, expected);
 });
+
+test('accepts pin-only YAML list shorthand without allowing step-structure changes or commands', () => {
+  const short = validWorkflowChange();
+  short.patch = short.patch.replaceAll('        uses:', '      - uses:');
+  assert.equal(validateChangedFiles([short]), 1);
+  for (const changed of [
+    short.patch.replace('+      - uses:', '+        uses:'),
+    validWorkflowChange().patch.replace('+        uses:', '+      - uses:'),
+    short.patch + '\n+      - run: echo injected',
+    short.patch.replace('+      - uses:', '+      - run:'),
+    short.patch.replace('+      - uses:', '+    - uses:'),
+    short.patch.replace('+      - uses:', '+      -  uses:'),
+    short.patch.replace('+      - uses:', '+      - uses:  '),
+    short.patch.replace('+      - uses: actions/checkout@' + NEW_ACTION_SHA + ' #', '+      - uses: actions/checkout@' + NEW_ACTION_SHA + '  #'),
+    short.patch.replace('# v6.1.0', '#  v6.1.0'),
+  ]) {
+    assert.throws(() => validateChangedFiles([{ ...short, patch: changed, changes: changed.includes('echo injected') ? 3 : 2 }]));
+  }
+});

@@ -27,7 +27,7 @@
 
 日期展示的四个 helper 复用三种固定 Intl.DateTimeFormat（UTC 日期、北京时间、北京日期分量），不改变时区或日期解析。回归测试同时锁住国家历史兼容检查与最低价历史可接受更晚、拒绝回退的不同策略。
 
-`index.html` 为生成产物。`seoProjection()` 维护 `ICLOUD_STATIC_*` markers 外的 SEO Projection，不直接改生成结果；JS/CSS 变化用内容哈希更新资源版本。关键契约、生成器或发布规则变化需同步本说明及 OPERATIONS。
+`index.html` 为生成产物。`seoProjection()` 维护 `ICLOUD_STATIC_*` markers 外的 SEO Projection，不直接改生成结果；JS/CSS 变化用内容哈希更新资源版本。关键契约、生成器或发布规则变化需同步本说明及 OPERATIONS 两份指南。唯一文档豁免是可信 Dependabot 的官方 Action pin-only 升级：完整 SHA 与旧新稳定 release 匹配，同 major 向前，且其余工作流字节不变；身份、标签或网络校验失败仍要求文档。完整测试与自动合并条件不变。
 
 
 下载工件使用固定 SHA 的 actions/download-artifact v8.0.2，改善限流重试；下载后仍须通过工件完整性与发布校验。

@@ -1,0 +1,101 @@
+{
+  "provenance": {
+    "pullRequest": "https://github.com/linchun7/linchun7.github.io/pull/195",
+    "originalPinOnlyCommit": "https://github.com/linchun7/linchun7.github.io/commit/dc46bf6df46d3ba77f3377e014df675e5ced3f60",
+    "originalValidationJob": "https://github.com/linchun7/linchun7.github.io/actions/runs/38258288525/job/114841944334",
+    "note": "File patches and Git refs are copied from the original pin-only commit and its tested merge. Event fields below are a minimized reconstructed test fixture, not a captured original webhook payload. Sender is reconstructed from the original workflow-run actor. No GitHub event is submitted and no auto-merge entry point is executed."
+  },
+  "baseSha": "38f4307e8490d8f8387a6560608f6f9dcab1e320",
+  "headSha": "dc46bf6df46d3ba77f3377e014df675e5ced3f60",
+  "checkoutSha": "e1c0dcfd2073022b15737f130050a22f905101bc",
+  "reconstructedEvent": {
+    "sender": {
+      "login": "dependabot[bot]",
+      "id": 49699333,
+      "type": "Bot"
+    },
+    "repository": {
+      "full_name": "linchun7/linchun7.github.io",
+      "default_branch": "main"
+    },
+    "pull_request": {
+      "state": "open",
+      "draft": false,
+      "user": {
+        "login": "dependabot[bot]",
+        "id": 49699333,
+        "type": "Bot"
+      },
+      "base": {
+        "ref": "main",
+        "sha": "38f4307e8490d8f8387a6560608f6f9dcab1e320",
+        "repo": {
+          "full_name": "linchun7/linchun7.github.io"
+        }
+      },
+      "head": {
+        "ref": "dependabot/github_actions/actions/setup-node-7.1.0",
+        "sha": "dc46bf6df46d3ba77f3377e014df675e5ced3f60",
+        "repo": {
+          "full_name": "linchun7/linchun7.github.io"
+        }
+      }
+    }
+  },
+  "references": [
+    {
+      "action": "actions/setup-node",
+      "sha": "820762786026740c76f36085b0efc47a31fe5020",
+      "version": "v7.0.0"
+    },
+    {
+      "action": "actions/setup-node",
+      "sha": "949feb2413d6458794dcd2491c4babbbce0c15c1",
+      "version": "v7.1.0"
+    }
+  ],
+  "files": [
+    {
+      "filename": ".github/workflows/auto-merge-official-actions.yml",
+      "status": "modified",
+      "changes": 2,
+      "patch": "@@ -112,7 +112,7 @@ jobs:\n \n       - name: 配置 Node.js\n         if: steps.route.outputs.should_run == 'true'\n-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0\n+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0\n         with:\n           node-version: 22\n "
+    },
+    {
+      "filename": ".github/workflows/monitor-icloud-zh-markets.yml",
+      "status": "modified",
+      "changes": 2,
+      "patch": "@@ -51,7 +51,7 @@ jobs:\n           printf '监测代码与历史已复核名称 revision：`%s`\\n\\n' \"$(git rev-parse HEAD)\" >> \"$GITHUB_STEP_SUMMARY\"\n \n       - name: 配置 Node.js\n-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0\n+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0\n         with:\n           node-version: 22\n "
+    },
+    {
+      "filename": ".github/workflows/update-chatgpt-prices.yml",
+      "status": "modified",
+      "changes": 6,
+      "patch": "@@ -126,7 +126,7 @@ jobs:\n             echo \"::warning title=MINIMUM_HISTORY_RECOVERY::Minimum history needs Git-backed recovery; fetching full first-parent evidence.\"\n             git fetch --unshallow origin main\n           fi\n-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0\n+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0\n         with:\n           node-version: 22\n       - id: base\n@@ -256,7 +256,7 @@ jobs:\n         with:\n           ref: ${{ needs.generate.outputs.base }}\n           persist-credentials: false\n-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0\n+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0\n         with:\n           node-version: 22\n       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1\n@@ -317,7 +317,7 @@ jobs:\n         with:\n           ref: ${{ needs.prepare.outputs.validated_main_sha }}\n           persist-credentials: false\n-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0\n+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0\n         with:\n           node-version: 22\n       - name: Detect a newer ChatGPT deployment before verifying pinned bytes"
+    },
+    {
+      "filename": ".github/workflows/update-icloud-prices.yml",
+      "status": "modified",
+      "changes": 10,
+      "patch": "@@ -42,7 +42,7 @@ jobs:\n           persist-credentials: false\n \n       - name: 配置 Node.js\n-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0\n+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0\n         with:\n           node-version: 22\n \n@@ -171,7 +171,7 @@ jobs:\n           echo \"sha=$VALIDATED_MAIN_SHA\" >> \"$GITHUB_OUTPUT\"\n \n       - name: 配置 Node.js\n-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0\n+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0\n         with:\n           node-version: 22\n \n@@ -344,7 +344,7 @@ jobs:\n           persist-credentials: false\n \n       - name: 配置 Node.js\n-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0\n+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0\n         with:\n           node-version: 22\n \n@@ -589,7 +589,7 @@ jobs:\n           persist-credentials: false\n \n       - name: 配置 Node.js\n-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0\n+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0\n         with:\n           node-version: 22\n \n@@ -676,7 +676,7 @@ jobs:\n           persist-credentials: false\n \n       - name: 配置 Node.js\n-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0\n+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0\n         with:\n           node-version: 22\n "
+    },
+    {
+      "filename": ".github/workflows/validate-chatgpt-prices.yml",
+      "status": "modified",
+      "changes": 6,
+      "patch": "@@ -18,7 +18,7 @@ jobs:\n       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n         with:\n           persist-credentials: false\n-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0\n+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0\n         with:\n           node-version: 22\n       - name: Unit tests and deterministic browser fixture\n@@ -99,7 +99,7 @@ jobs:\n       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n         with:\n           persist-credentials: false\n-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0\n+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0\n         with:\n           node-version: 22\n       - name: Enable pinned pnpm\n@@ -132,7 +132,7 @@ jobs:\n       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n         with:\n           persist-credentials: false\n-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0\n+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0\n         with:\n           node-version: 22\n       - name: Wait for Pages build of this commit or verified successor"
+    },
+    {
+      "filename": ".github/workflows/validate-icloud-price-comparison.yml",
+      "status": "modified",
+      "changes": 6,
+      "patch": "@@ -107,7 +107,7 @@ jobs:\n           }\n           NODE\n       - name: 配置 Node.js\n-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0\n+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0\n         with:\n           node-version: 22\n       - name: 启用并校验 pnpm\n@@ -152,7 +152,7 @@ jobs:\n         with:\n           persist-credentials: false\n       - name: 配置 Node.js\n-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0\n+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0\n         with:\n           node-version: 22\n       - name: 启用并校验 pnpm\n@@ -182,7 +182,7 @@ jobs:\n         with:\n           persist-credentials: false\n       - name: 配置 Node.js\n-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0\n+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0\n         with:\n           node-version: 22\n       - name: 校验实际页面、数据和静态资源"
+    },
+    {
+      "filename": ".github/workflows/validate-static-tools.yml",
+      "status": "modified",
+      "changes": 6,
+      "patch": "@@ -78,7 +78,7 @@ jobs:\n           fetch-depth: 0\n \n       - name: 配置 Node.js\n-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0\n+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0\n         with:\n           node-version: 22\n \n@@ -147,7 +147,7 @@ jobs:\n         run: echo \"sha=$(git rev-parse HEAD)\" >> \"$GITHUB_OUTPUT\"\n \n       - name: 配置 Node.js\n-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0\n+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0\n         with:\n           node-version: 22\n \n@@ -306,7 +306,7 @@ jobs:\n         run: echo \"sha=$(git rev-parse HEAD)\" >> \"$GITHUB_OUTPUT\"\n \n       - name: 配置 Node.js\n-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0\n+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0\n         with:\n           node-version: 22\n           registry-url: https://registry.npmjs.org"
+    }
+  ]
+}
