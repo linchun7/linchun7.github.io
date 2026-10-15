@@ -1,3 +1,4 @@
+import '../renovation_calculator/test/core-regression.mjs';
 import assert from 'node:assert/strict';
 import { chromium, firefox, webkit } from 'playwright';
 
