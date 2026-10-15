@@ -119,6 +119,10 @@ jobs:
           node tools/browser-tests/input-boundaries-smoke.mjs
           node tools/browser-tests/financial-seeded-properties-review.mjs
           node --test tools/browser-tests/space-upstream-contract.test.mjs
+          node --test tools/browser-tests/space-production.test.mjs
+          if [[ "$PLAYWRIGHT_BROWSER" == chromium ]]; then
+            node tools/browser-tests/space-production.mjs --fixture
+          fi
           node --test tools/browser-tests/script-startup-contract-test.mjs
           python3 tools/hospital_rank/scripts/validate_data.py
           node tools/browser-tests/hospital-rank-smoke.mjs
@@ -396,25 +400,47 @@ jobs:
           git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth_header" push origin HEAD:main
 
   production-contract:
-    if: ${{ always() && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.run_updates)) }}
+    if: ${{ always() && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.run_updates) || (github.event_name == 'push' && needs.browser.result == 'success')) }}
     needs:
+      - browser
       - update-pinyin-pro
       - update-static-vendor
     name: 验证静态依赖生产契约
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 20
     permissions:
       contents: read
 
     steps:
-      - name: 检出最新 main
+      - name: 固定本次生产验收提交
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
-          fetch-depth: 1
+          ref: ${{ github.event_name == 'push' && github.sha || 'main' }}
+          fetch-depth: 0
           persist-credentials: false
 
-      - name: 等待并验证生产资源
+      - name: 配置 Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - name: 判断本次 space 运行链验收范围
+        id: space_scope
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          EXPECTED_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == push ]]; then
+            node tools/browser-tests/space-production.mjs --scope "$BEFORE_SHA" "$EXPECTED_SHA"
+          else
+            # Scheduled bot pushes need their owning update run to verify them.
+            echo 'run_space=true' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 等待并验证原有定时依赖资源
+        if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.run_updates)
         shell: bash
         run: |
           set -euo pipefail
@@ -489,3 +515,17 @@ jobs:
 
           echo "::error title=生产契约验证失败::GitHub Pages 静态资源或 pinyin-pro CDN 与当前 main 的 SRI/版本不一致。"
           exit 1
+
+      - name: 安装 space 生产验收依赖
+        if: steps.space_scope.outputs.run_space == 'true'
+        working-directory: tools/browser-tests
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: 安装 Chromium
+        if: steps.space_scope.outputs.run_space == 'true'
+        working-directory: tools/browser-tests
+        run: npx playwright install --with-deps chromium
+
+      - name: 验证普通生产 URL 的真实 space 运行链
+        if: steps.space_scope.outputs.run_space == 'true'
+        run: node tools/browser-tests/space-production.mjs --expected-sha "$(git rev-parse HEAD)"

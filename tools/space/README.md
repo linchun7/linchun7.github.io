@@ -46,3 +46,14 @@ Pangu 候选实际写入同一个发布路径后，Chromium、Firefox、WebKit �
 旧 insertion-only 扫描器、只针对其私有语义的 mutation 测试和未使用的 4.0.7 bundle 已删除。仍保留有价值的 URL/输入/大输入测试，转入当前实际处理契约。
 
 历史研究证据保留在 [PR #203](https://github.com/linchun7/linchun7.github.io/pull/203) 及其 Actions 运行中；该研究表明官方 URL 和大输入行为需要真实应用保护，不能仅凭库成熟就免检。
+
+
+## 生产部署验收
+
+沿用同一个静态工具 workflow 的 production-contract。普通 main push 必须先通过本轮三浏览器测试，且只有本页四个运行文件、专项验收脚本/测试、浏览器依赖配置或 workflow 变化才执行 space 生产检查；README 与其它工具变更不触发。定时依赖更新仍由其原运行负责提交后的验收。
+
+验收固定一个精确 Git 提交及 index.html、worker.js、format.js、Pangu bundle。生产页面的 main、style、唯一 data-cfasync=false 应用脚本按原字节核对，不归一空白或任意剥离脚本；CDN 在这些应用区域之外追加的统计脚本不参与契约。挑战页、缺失或重复的应用区域均不能通过。
+
+最终接受的是用户实际访问的普通页面 URL 和它声明的 Worker/依赖 URL，包括原本的版本查询参数。三项 JS 均核对 SHA-256；Chromium 再打开同一个普通页面，观察真实 page → worker → Pangu/format 响应字节，用少量非敏感合成文本验证上游标点、URL 保留、原文/结果分离、重复操作及清空。不会注入替代格式化器，也不会提交真实用户输入。缓存绕过 URL 仅在失败后用于诊断，其成功不能替代普通 URL 验收。
+
+网络与缓存传播在有界时间内重试；每次请求和浏览器检查都有时限。若 main 仅在其它文件前进，继续验证原快照；若经过提交祖先关系验证后发现本页四文件运行链已改变，结果明确为 superseded，由后继运行承担验收，不声称旧提交已上线。通过后仍复核 main，避免把已过期快照的缓存命中当作新版本通过。没有增加凭据权限、定时器或通知服务；不会绕过 Cloudflare 挑战或修改其安全设置。
