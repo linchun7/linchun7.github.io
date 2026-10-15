@@ -31,6 +31,7 @@ export async function testSpaceContract(browser, baseUrl) {
             if (status.startsWith('处理超时')) {
                 assert.equal(await page.inputValue('#result'), '', 'timeout must not publish a partial result');
                 assert.equal(await page.locator('#addBtn').getAttribute('aria-busy'), null, 'timeout must release the worker');
+                assert.equal(await page.locator('#addBtn').textContent(), '排版', 'timeout must restore the action button');
                 return;
             }
         }
