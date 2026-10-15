@@ -205,6 +205,10 @@ export async function main() {
     assert.ok(type, 'explicit supported browser is required');
     assert.equal(process.env.BASE_URL, ORIGIN, 'only the ordinary production origin is allowed');
     const { manifest, filePaths } = makeManifest();
+    const captureUrls = browserName === 'chromium' && process.env.CAPTURE_REAL_WORKER_HTTP === '1'
+        ? new Set([...manifest].filter(([, resource]) =>
+            ['tools/card_number_new/worker.js', 'tools/card_number_new/core.js'].includes(resource.path)).map(([url]) => url))
+        : new Set();
     const startMain = proveSnapshot(filePaths);
     const preflightFailures = await preflight(manifest);
     const browser = await type.launch({ headless: true });
@@ -222,6 +226,7 @@ export async function main() {
             const requests = new Map();
             const required = new Set();
             const verified = new Set();
+            const captured = new Map();
             let closeChecksDone = false;
             const close = context.close.bind(context);
             const drain = async () => {
@@ -261,6 +266,34 @@ export async function main() {
                     record.reason = request.failure()?.errorText || 'request failed';
                 }
             });
+            // Chromium can lose the dedicated-worker protocol target before
+            // response.body() returns. Only these two evidenced URLs use an
+            // unmodified real HTTP pass-through, never a fixture or replacement
+            // implementation. This mode does not prove a native cache path.
+            if (captureUrls.size) await context.route(url => captureUrls.has(url.href), async route => {
+                const request = route.request();
+                const resource = manifest.get(request.url());
+                try {
+                    const response = await route.fetch({ timeout: 20000, maxRedirects: 0 });
+                    assert.equal(response.url(), request.url(), 'worker capture must use the identical ordinary URL');
+                    assert.ok(response.ok(), 'real worker HTTP capture failed: ' + response.status());
+                    validateMime(response.headers()['content-type'], resource);
+                    const bytes = await response.body();
+                    assertResource(bytes, resource);
+                    captured.set(request, { status: response.status(), headers: response.headers(), hash: hash(bytes) });
+                    // Passing the original APIResponse preserves its status,
+                    // headers and body; no locally generated response is used.
+                    await route.fulfill({ response });
+                    console.log(JSON.stringify({ suite: 'production-worker-real-http-capture',
+                        browser: browserName, url: request.url(), status: response.status(),
+                        sha256: hash(bytes), bytes: bytes.length, cachePathProven: false }));
+                } catch (error) {
+                    const record = requests.get(request);
+                    if (record) { record.status = 'failed'; record.reason = error.message.split('\n')[0]; }
+                    networkFailures.push(resource.path + ': real HTTP capture: ' + error.message.split('\n')[0]);
+                    await route.abort('failed').catch(() => {});
+                }
+            });
             context.on('page', page => {
                 page.setDefaultTimeout(20000);
                 // The reused localhost suites navigate repeatedly in one page.
@@ -290,8 +323,14 @@ export async function main() {
                     assert.ok(response.ok(), 'browser HTTP failure: ' + resource.path);
                     assert.equal(response.request().redirectedFrom(), null, 'application redirect is not accepted');
                     validateMime(response.headers()['content-type'], resource);
-                    const bytes = await withDeadline(response.body(), 15000, 'browser response body ' + resource.path);
-                    if (resource.kind === 'html') {
+                    const proof = captured.get(response.request());
+                    if (proof) {
+                        assert.equal(response.status(), proof.status, 'pass-through HTTP status changed');
+                        assert.deepEqual(response.headers(), proof.headers, 'pass-through HTTP headers changed');
+                        assert.equal(proof.hash, resource.hash, 'pass-through body was not bound to fixed main');
+                    } else {
+                      const bytes = await withDeadline(response.body(), 15000, 'browser response body ' + resource.path);
+                      if (resource.kind === 'html') {
                         try { assert.deepEqual(pageContract(bytes.toString('utf8'), response.url()), resource.contract, 'browser page differs: ' + resource.path); }
                         catch (error) {
                             if (!diagnosed.has(response.url())) {
@@ -303,7 +342,8 @@ export async function main() {
                             }
                             throw error;
                         }
-                    } else assertResource(bytes, resource);
+                      } else assertResource(bytes, resource);
+                    }
                     observed.add(response.url());
                     verified.add(response.url());
                     const record = requests.get(response.request());
@@ -462,7 +502,8 @@ export async function main() {
             startMain, endMain, browser: browserName, fixtureOnly: false,
             resources: manifest.size, observedResources: observed.size, additionalChecks: checks,
             reusedCardInputChecks: 33, status: 'passed',
-            limits: 'Synthetic text only. Clipboard writes and composition events in reused cases are modeled. Native editing/undo, production app responses and CSV downloads are real. This does not prove OS IME, OS clipboard, all hardware or arbitrary inputs.'
+            workerByteCapture: captureUrls.size ? 'real same-URL HTTP pass-through for two card worker/core URLs; native cache path not proven' : 'native browser response observation',
+            limits: 'Synthetic text only. Clipboard writes and composition events in reused cases are modeled. Native editing/undo, production app responses and CSV downloads are real. This does not prove OS IME, OS clipboard, all hardware or arbitrary inputs. Chromium worker/core byte capture uses unmodified real HTTP pass-through; native no-pass-through functional evidence is retained in run 38680605827.'
         };
         console.log(JSON.stringify(report));
         if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, 'Recent optimization production acceptance\n\n' + JSON.stringify(report, null, 2) + '\n');

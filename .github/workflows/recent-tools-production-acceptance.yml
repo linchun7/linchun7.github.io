@@ -39,4 +39,5 @@ jobs:
         env:
           PLAYWRIGHT_BROWSER: ${{ matrix.browser }}
           BASE_URL: https://www.linchun.com.cn
+          CAPTURE_REAL_WORKER_HTTP: ${{ matrix.browser == 'chromium' && '1' || '0' }}
         run: node tools/browser-tests/recent-optimizations-production.mjs
