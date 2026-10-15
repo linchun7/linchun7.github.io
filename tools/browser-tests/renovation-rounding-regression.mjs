@@ -1,4 +1,5 @@
 import '../renovation_calculator/test/core-regression.mjs';
+import { runRenderRegression } from '../renovation_calculator/test/render-regression.mjs';
 import assert from 'node:assert/strict';
 import { chromium, firefox, webkit } from 'playwright';
 
@@ -162,6 +163,7 @@ try {
     }
 
     assert.deepEqual(pageErrors, [], 'no unhandled renovation calculator errors');
+    await runRenderRegression({ browser, browserName, baseUrl });
     console.log('renovation rounding regression passed (' + browserName + ')');
 } finally {
     await context.close();
