@@ -20,6 +20,118 @@
         return Number.isFinite(value) ? `${value.toFixed(2)}%` : '—';
     }
 
+
+    // Store a bounded, plain-text snapshot only after a successful calculation.
+    // Clipboard access happens exclusively in the user's copy-button handler.
+    const summaries = new Map();
+    let clipboardPending = false;
+    const summaryConfig = {
+        result1: {
+            title: '单利年化',
+            fields: [['principal1', '本金', ' 元'], ['days1', '持有天数', ' 天'], ['interest1', '收益', ' 元']],
+            basis: 'rateType1',
+            method: '单利：收益 ÷ 本金 ÷ 持有天数 × 年化天数'
+        },
+        result2: {
+            title: '利息收益',
+            fields: [['principal2', '本金', ' 元'], ['days2', '持有天数', ' 天'], ['annualRate2', '单利年化收益率', '%']],
+            basis: 'rateType2',
+            method: '单利：本金 × 年化收益率 × 持有天数 ÷ 年化天数'
+        },
+        result3: {
+            title: '净值年化（CAGR）',
+            fields: [['startDate', '起始日期', ''], ['startNetValue', '起始净值', ''], ['endDate', '终止日期', ''], ['endNetValue', '终止净值', '']],
+            basis: 'rateType3',
+            method: 'CAGR：(终止净值 ÷ 起始净值)^(年化天数 ÷ 持有天数) − 1；持有天数按 UTC 日期差计算'
+        },
+        result4: {
+            title: '复利收益',
+            fields: [['principal3', '本金', ' 元'], ['annualRate3', '名义年利率（APR）', '%']],
+            method: '复利：本金 × (1 + 单期利率)^期数；结果保留页面显示精度'
+        }
+    };
+
+    function inputFingerprint(resultId) {
+        const panel = $(resultId).closest('.function-content');
+        return JSON.stringify([...panel.querySelectorAll('input, select')].map((input) => [input.id, input.value]));
+    }
+
+    function updateCopyButtons() {
+        for (const resultId of Object.keys(summaryConfig)) {
+            $(`copySummary${resultId.slice(-1)}`).disabled = clipboardPending || !summaries.has(resultId);
+        }
+    }
+
+    function invalidateSummary(resultId) {
+        summaries.delete(resultId);
+        const status = $(`copyStatus${resultId.slice(-1)}`);
+        if (status) status.textContent = '';
+        updateCopyButtons();
+    }
+
+    function captureSummary(resultId, message) {
+        const config = summaryConfig[resultId];
+        const lines = [`金融计算摘要｜${config.title}`];
+        for (const [id, label, unit] of config.fields) {
+            const input = $(id);
+            const value = input.type === 'date' ? input.value : String(Number(input.value));
+            lines.push(`${label}：${value}${unit}`);
+        }
+        if (config.basis) lines.push(`年化天数：${$(config.basis).value} 天`);
+        if (resultId === 'result4') {
+            const frequency = $('compoundingFrequency');
+            const config = frequencyConfig[frequency.value];
+            lines.push(`复利方式：${frequency.selectedOptions[0].textContent}`);
+            lines.push(`存期：${Number($('depositPeriod').value)} ${config.label}（共 ${Number($('depositPeriod').value)} 期）`);
+            lines.push(config.dayBased
+                ? `年计息天数：${$('rateType4').value} 天；单期利率 = APR × ${config.dayBased} ÷ 年计息天数`
+                : `单期利率 = APR ÷ ${config.divisor}；360 / 365 天不参与本复利方式`);
+            lines.push('复制范围：仅汇总，不含逐期明细');
+        }
+        lines.push(`计算口径：${config.method}`, `计算结果：${message}`);
+        summaries.set(resultId, { text: lines.join('\n'), fingerprint: inputFingerprint(resultId) });
+        updateCopyButtons();
+    }
+
+    async function copySummary(resultId) {
+        if (clipboardPending) return;
+        const snapshot = summaries.get(resultId);
+        if (!snapshot) return;
+        const status = $(`copyStatus${resultId.slice(-1)}`);
+        if (snapshot.fingerprint !== inputFingerprint(resultId)) {
+            clearResult(resultId);
+            if (resultId === 'result4') clearElement($('result4-table'));
+            status.textContent = '输入已更改，请重新计算后复制';
+            return;
+        }
+
+        clipboardPending = true;
+        updateCopyButtons();
+        status.textContent = '正在复制…';
+        try {
+            if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
+                throw new Error('Clipboard unavailable');
+            }
+            await navigator.clipboard.writeText(snapshot.text);
+            if (summaries.get(resultId) === snapshot && snapshot.fingerprint === inputFingerprint(resultId)) {
+                status.textContent = '已复制计算摘要';
+            }
+        } catch {
+            if (summaries.get(resultId) === snapshot && snapshot.fingerprint === inputFingerprint(resultId)) {
+                status.textContent = '复制失败，请检查剪贴板权限后重试，或手动复制页面结果';
+            }
+        } finally {
+            // Input edits or a newer calculation may have replaced this snapshot.
+            // Never publish an old completion over the newer panel state.
+            if (summaries.get(resultId) === snapshot && snapshot.fingerprint !== inputFingerprint(resultId)) {
+                clearResult(resultId);
+                if (resultId === 'result4') clearElement($('result4-table'));
+            }
+            clipboardPending = false;
+            updateCopyButtons();
+        }
+    }
+
     function setResult(id, text, type = 'success') {
         const element = $(id);
         if (!element) return;
@@ -29,6 +141,7 @@
     }
 
     function clearResult(id) {
+        invalidateSummary(id);
         const element = $(id);
         if (!element) return;
         element.textContent = '';
@@ -96,9 +209,11 @@
     }
 
     function runCalculation(resultId, calculator) {
+        invalidateSummary(resultId);
         try {
             const message = calculator();
             setResult(resultId, message, 'success');
+            captureSummary(resultId, message);
         } catch (error) {
             setResult(resultId, error instanceof Error ? error.message : '计算失败，请检查输入', 'error');
         }
@@ -310,6 +425,11 @@
     }
 
     function init() {
+        for (const resultId of Object.keys(summaryConfig)) {
+            $(`copySummary${resultId.slice(-1)}`).addEventListener('click', () => copySummary(resultId));
+        }
+        updateCopyButtons();
+
         const tabs = [...document.querySelectorAll('#myTabs .nav-link')];
         tabs.forEach((tab, index) => {
             tab.addEventListener('click', () => activateTab(tab));

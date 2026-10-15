@@ -5,6 +5,8 @@ on:
       - '.github/workflows/recent-tools-production-acceptance.yml'
       - 'tools/browser-tests/recent-optimizations-production.mjs'
       - 'tools/browser-tests/recent-optimizations-production.test.mjs'
+      - 'tools/browser-tests/financial-summary-production.mjs'
+      - 'tools/browser-tests/financial-summary-production.test.mjs'
 permissions:
   contents: read
 jobs:
@@ -31,7 +33,8 @@ jobs:
       - name: Validate acceptance contract
         run: |
           node --check tools/browser-tests/recent-optimizations-production.mjs
-          node --test tools/browser-tests/recent-optimizations-production.test.mjs
+          node --check tools/browser-tests/financial-summary-production.mjs
+          node --test tools/browser-tests/recent-optimizations-production.test.mjs tools/browser-tests/financial-summary-production.test.mjs
       - name: Install browser
         working-directory: tools/browser-tests
         run: npx playwright install --with-deps ${{ matrix.browser }}
@@ -41,3 +44,8 @@ jobs:
           BASE_URL: https://www.linchun.com.cn
           CAPTURE_REAL_WORKER_HTTP: ${{ matrix.browser == 'chromium' && '1' || '0' }}
         run: node tools/browser-tests/recent-optimizations-production.mjs
+      - name: Verify merged financial summary on ordinary production URL with the unchanged author suite
+        env:
+          PLAYWRIGHT_BROWSER: ${{ matrix.browser }}
+          BASE_URL: https://www.linchun.com.cn
+        run: node tools/browser-tests/financial-summary-production.mjs

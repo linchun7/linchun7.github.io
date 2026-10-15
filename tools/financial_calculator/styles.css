@@ -156,6 +156,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .result-success { color: var(--green); background: var(--green-soft); }
 .result-error { color: var(--danger); background: var(--danger-soft); }
 
+.summary-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 10px; }
+.summary-actions button { min-height: 42px; }
+.summary-actions button:disabled { cursor: default; opacity: .55; transform: none; }
+.copy-status { min-width: 0; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+
 .compound-table-wrap { max-height: 460px; margin-top: 10px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
 .compound-table { min-width: 620px; margin-bottom: 0; }
 .compound-table thead th { position: sticky; top: 0; z-index: 1; background: #f3f6f8; }
