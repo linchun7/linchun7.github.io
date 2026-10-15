@@ -23,7 +23,7 @@
 ## 输入与 URL 范围
 
 - 面向普通文本。单次最多接受 200,000 个 UTF-16 代码单元；页面计数、提示和 Worker 校验统一使用这个长度口径。大多数汉字/英文字母计 1，部分表情如 😀 计 2；10 万个 😀 恰好达到上限。超出只拒绝处理并提示，不截断原文。
-- 单次任务超过 4 秒就终止 Worker，保留原文并提示分段重试。可以手动取消；新输入和清空会终止旧任务并忽略迟到结果。这是明确的运行边界，不承诺任意长度或任意输入都能处理完。
+- 单次任务超过 4 秒就终止 Worker，保留原文并提示分段重试。可以手动取消；新输入和清空会终止旧任务并忽略迟到结果。这是明确的运行边界，不承诺任意长度或任意输入都能处理完。长度上限也不是完成保证：WebKit 的 60k 普通文本压力样例已出现 4 秒超时，产品按设计停止并提示分段重试。
 - 当前上游会误替换六组完整编号的字面保留标记：BACKTICK_CONTENT、HTML_TAG_PLACEHOLDER、HTML_TAG_MENTION、SINGLE_QUOTE_CJK_PLACEHOLDER、COMPOUND_WORD_PLACEHOLDER、HTTP_URL_PLACEHOLDER，各自带匹配的 U+E000…U+E00B 成对分隔符。三浏览器已逐族复现（[GitHub Actions run 38668999124](https://github.com/linchun7/linchun7.github.io/actions/runs/38668999124)）；例如 compound marker 会变为 foo-bar，HTML marker 会变为标签。应用只拒绝这些确切的完整编号形态并保留原文，普通 PUA 私用字符及非完整编号形态仍可处理。
 - Pangu 能处理简单单反引号内容，但不是完整 Markdown 解析器。不保证多反引号、围栏、HTML、代码或结构化文本不变，请自行核对。
 - URL 薄层保护大小写混合的 HTTP(S)、Unicode 路径/查询和 IPv6 方括号主机。尖括号形式 `<https://...>` 内的 URL 整体保留，包含裸方括号、花括号和句读。
