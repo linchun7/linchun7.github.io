@@ -248,6 +248,33 @@ async function testFinancialCalculatorAlgorithms() {
             'financial calculator must fit a 320px screen');
     }
 
+    const clearCases = [
+        { tab: 1, fields: { principal1: '1000', days1: '360', interest1: '50' },
+            selects: { rateType1: '360' }, expected: /5\.00%/ },
+        { tab: 2, fields: { principal2: '1000', days2: '360', annualRate2: '5' },
+            selects: { rateType2: '360' }, expected: /50\.00 元/ },
+        { tab: 3, fields: { startDate: '2026-01-01', startNetValue: '1', endDate: '2027-01-01', endNetValue: '1.1' },
+            selects: { rateType3: '365' }, expected: /10\.00%（持有 365 天）/ },
+        { tab: 4, fields: { principal3: '1000', depositPeriod: '2', annualRate3: '5' },
+            selects: { compoundingFrequency: 'annually', rateType4: '360' }, expected: /1,102\.50 元；利息总计：102\.50 元/ }
+    ];
+    for (const item of clearCases) {
+        await page.click('#tab' + item.tab);
+        for (const [id, value] of Object.entries(item.fields)) await page.fill('#' + id, value);
+        for (const [id, value] of Object.entries(item.selects)) await page.selectOption('#' + id, value);
+        await page.click('#calculate' + item.tab);
+        assert.match(await page.locator('#result' + item.tab).textContent(), item.expected);
+        await page.click('#empty' + item.tab);
+        for (const id of Object.keys(item.fields)) assert.equal(await page.inputValue('#' + id), '');
+        for (const [id, value] of Object.entries(item.selects)) assert.equal(await page.inputValue('#' + id), value);
+        assert.equal(await page.locator('#result' + item.tab).textContent(), '');
+        assert.equal(await page.evaluate(() => document.activeElement?.id), Object.keys(item.fields)[0]);
+        if (item.tab === 4) assert.equal(await page.locator('#result4-table').textContent(), '');
+        await page.click('#calculate' + item.tab);
+        assert.match(await page.locator('#result' + item.tab).textContent(),
+            item.tab === 3 ? /请选择起始日期/ : /请输入本金/);
+    }
+
     assert.equal(pageErrors.length, 0, `financial calculator page errors: ${pageErrors.map(String).join('; ')}`);
     await context.close();
 }
