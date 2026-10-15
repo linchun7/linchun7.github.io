@@ -165,7 +165,6 @@ try {
             const text = fit(corpus.text, size.length);
             for (let sample = 1; sample <= repetitions; sample++) {
                 const observed = await boundedEvaluate(page, async text => {
-                    const expected = window.__pinyinExpected(text);
                     const input = document.getElementById('inputInfo');
                     input.value = text;
                     // Allow oracle work and the preceding sample to leave the task.
@@ -178,7 +177,10 @@ try {
                         const finish = () => {
                             if (nextTaskMs === undefined || nextFrameMs === undefined) return;
                             try {
-                                window.__pinyinAssertOutputs(expected);
+                                // Oracle work starts only after every latency marker,
+                                // avoiding input-specific oracle cache warming or GC
+                                // immediately before the production input handler.
+                                window.__pinyinAssertOutputs(window.__pinyinExpected(text));
                                 resolve({ outputDomMs, nextTaskMs, nextFrameMs, oracleEquivalent: true });
                             } catch (error) {
                                 reject(error);
