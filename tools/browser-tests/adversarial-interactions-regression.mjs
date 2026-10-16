@@ -9,6 +9,7 @@ const probes = [
     "card-number-worker-failure-regression.mjs",
     "card-number-pagination-regression.mjs",
     "calculator-state-regression.mjs",
+    "startup-replay-regression.mjs",
     "navigation-breakpoint-regression.mjs",
     "myip-empty-location-regression.mjs",
     "pinyin-copy-focus-regression.mjs",
