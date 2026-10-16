@@ -108,8 +108,16 @@
       "sha256": "ea845346be1beaa82aeb414f11a2e93af478e5175beae79871f5beea2923f935"
     },
     {
+      "path": "js/main.c0746aa7ef36.js",
+      "sha256": "c0746aa7ef36061742ae66853201a00d8ec9786ce976750eb94e3a2d3c3482ee"
+    },
+    {
       "path": "js/main.ecccbd5bfc3b.js",
       "sha256": "ecccbd5bfc3b2d18a9ff57b72aae38694b53f51b290bdfe16eef32855359db73"
+    },
+    {
+      "path": "js/search.0663bba906a8.js",
+      "sha256": "0663bba906a8da3783d8fd065b1d706a8fa6edfad4d6e9ae117bbd2a322d8e16"
     },
     {
       "path": "js/search.3335e4149024.js",

@@ -3,6 +3,7 @@
 
   const i18n = window.CACTUS_I18N || {};
   const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
+  let copyRevision = 0;
 
   function setExpanded(control, target, expanded) {
     if (!control || !target) return;
@@ -21,24 +22,38 @@
   }
 
   function copyFallback(text) {
+    const previousFocus = document.activeElement;
+    const selection = previousFocus && typeof previousFocus.selectionStart === 'number'
+      ? [previousFocus.selectionStart, previousFocus.selectionEnd, previousFocus.selectionDirection]
+      : null;
     const textarea = document.createElement('textarea');
     textarea.value = text;
     textarea.setAttribute('readonly', '');
     textarea.style.position = 'fixed';
     textarea.style.opacity = '0';
-    document.body.append(textarea);
-    textarea.select();
-    const success = document.execCommand('copy');
-    textarea.remove();
-    if (!success) throw new Error('Copy command failed');
+    try {
+      document.body.append(textarea);
+      textarea.select();
+      if (!document.execCommand('copy')) throw new Error('Copy command failed');
+    } finally {
+      textarea.remove();
+      if (previousFocus?.isConnected) {
+        previousFocus.focus({ preventScroll: true });
+        if (selection) previousFocus.setSelectionRange(...selection);
+      }
+    }
   }
 
-  async function copyText(text) {
+  async function copyText(text, isCurrent = () => true) {
     if (navigator.clipboard?.writeText && window.isSecureContext) {
-      await navigator.clipboard.writeText(text);
-      return;
+      try {
+        await navigator.clipboard.writeText(text);
+        return;
+      } catch {
+        // A denied native request may fall back, but not after a newer copy.
+      }
     }
-    copyFallback(text);
+    if (isCurrent()) copyFallback(text);
   }
 
   function setupCodeCopy() {
@@ -49,18 +64,24 @@
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'btn-copy tooltipped tooltipped-sw';
-      button.setAttribute('aria-label', i18n.copy || 'Copy code');
+      const original = i18n.copy || 'Copy code';
+      let resetTimer = null;
+      button.setAttribute('aria-label', original);
       button.innerHTML = '<svg class="icon-svg" aria-hidden="true" focusable="false"><use href="/vendor/fontawesome/icons.0f8d2dd5bd48.svg#fa-regular-clone"></use></svg>';
 
       button.addEventListener('click', async () => {
+        const revision = ++copyRevision;
+        const isCurrent = () => revision === copyRevision && button.isConnected;
+        window.clearTimeout(resetTimer);
+        button.setAttribute('aria-label', original);
         const text = [...codeCells].map((cell) => cell.innerText).join('\n').replace(/\n+$/, '');
         try {
-          await copyText(text);
-          const original = i18n.copy || 'Copy code';
+          await copyText(text, isCurrent);
+          if (!isCurrent()) return;
           button.setAttribute('aria-label', i18n.copied || 'Copied');
-          window.setTimeout(() => button.setAttribute('aria-label', original), 1600);
+          resetTimer = window.setTimeout(() => button.setAttribute('aria-label', original), 1600);
         } catch (error) {
-          console.warn('Copy failed:', error);
+          if (isCurrent()) console.warn('Copy failed:', error);
         }
       });
 
@@ -160,9 +181,15 @@
     }, { passive: true });
   }
 
-  document.addEventListener('DOMContentLoaded', () => {
+  function initialize() {
     setupHeaderNavigation();
     setupPostActions();
     setupCodeCopy();
-  });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initialize, { once: true });
+  } else {
+    initialize();
+  }
 })();

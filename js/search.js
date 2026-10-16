@@ -11,6 +11,18 @@
     return (documentFragment.body.textContent || '').replace(/\s+/g, ' ').trim();
   }
 
+  function validateResultUrl(link) {
+    const url = new URL(link, window.location.href);
+    // Hexo emits canonical absolute URLs, including in local build previews.
+    const canonicalPreview = ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname)
+      && url.origin === 'https://www.linchun.com.cn';
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password
+        || (url.origin !== window.location.origin && !canonicalPreview)) {
+      throw new Error('Search index destination is not a trusted site URL');
+    }
+    return link;
+  }
+
   function combinations(words) {
     const result = [];
     for (let start = 0; start < words.length; start += 1) {
@@ -72,7 +84,7 @@
         return {
           title,
           content: stripHtml(contentNode.textContent || ''),
-          url: link
+          url: validateResultUrl(link)
         };
       });
     } finally {
