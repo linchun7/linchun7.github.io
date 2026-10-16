@@ -10,6 +10,9 @@ const baselineSource = execFileSync('git', [
 ], { encoding: 'utf8' });
 // Test the actual shipped UI, never a synthesized or test-only fast path.
 const candidateSource = readFileSync(new URL('../script.js', import.meta.url), 'utf8');
+// Compare UI implementations under the same committed HTML, not edge-injected
+// lifecycle replay. The independent startup regression checks the live deployment.
+const pageSource = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 
 function summary(values) {
     const sorted = [...values].sort((a, b) => a - b);
@@ -30,6 +33,9 @@ export async function runRenderRegression({ browser, browserName, baseUrl }) {
         const page = await context.newPage();
         page.on('pageerror', error => errors.push(label + ': ' + error.message));
         await page.route('**/googletagmanager.com/**', route => route.abort());
+        await page.route('**/tools/renovation_calculator/', route => route.fulfill({
+            status: 200, contentType: 'text/html; charset=utf-8', body: pageSource
+        }));
         await page.route('**/tools/renovation_calculator/script.js?*', route => route.fulfill({
             status: 200, contentType: 'application/javascript; charset=utf-8', body: source
         }));

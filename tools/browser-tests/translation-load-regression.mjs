@@ -29,7 +29,9 @@ async function assertCorpus(page, language) {
   assert.deepEqual(await page.locator('.sample-list').evaluateAll(lists => lists.map(list => list.start)), Array.from({ length: 16 }, (_, index) => index * 3 + 1));
   assert.equal(await page.locator('.test-nav a[aria-current="page"]').getAttribute('href'), language + '.html');
   assert.equal(await page.locator('.test-nav a').count(), 6);
-  assert.equal(await page.locator('.sample-text').first().isVisible(), true);
+  // WebKit may not have laid out static text yet at DOMContentLoaded.
+  await page.waitForLoadState('load');
+  await page.locator('.sample-text').first().waitFor({ state: 'visible', timeout: 10000 });
   const headings = await page.locator('.category-section').evaluateAll(sections => sections.every(section => {
     const heading = document.getElementById(section.getAttribute('aria-labelledby'));
     return heading?.tagName === 'H2' && section.contains(heading);

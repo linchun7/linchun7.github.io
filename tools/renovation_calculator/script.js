@@ -277,4 +277,4 @@ document.addEventListener('DOMContentLoaded', () => {
             resultElement.classList.add('show');
         }
     });
-});
+}, { once: true });
