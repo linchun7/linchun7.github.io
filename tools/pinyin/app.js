@@ -10,6 +10,14 @@
 
     let composing = false;
     let toastTimer = null;
+    let copyRevision = 0;
+
+    function invalidatePendingCopy() {
+        copyRevision += 1;
+        clearTimeout(toastTimer);
+        toast.classList.remove('show');
+        toast.textContent = '';
+    }
 
     function showToast(message) {
         clearTimeout(toastTimer);
@@ -97,7 +105,7 @@
         return copied;
     }
 
-    async function copyText(text) {
+    async function copyText(text, isCurrent) {
         if (window.isSecureContext && navigator.clipboard?.writeText) {
             try {
                 await navigator.clipboard.writeText(text);
@@ -106,23 +114,28 @@
                 // Fall back for browsers or permission states where Clipboard API is unavailable.
             }
         }
-        return fallbackCopy(text);
+        // A rejected native request must not revive an obsolete copy.
+        return isCurrent() ? fallbackCopy(text) : false;
     }
 
     input.addEventListener('compositionstart', () => {
         composing = true;
+        invalidatePendingCopy();
     });
 
     input.addEventListener('compositionend', () => {
         composing = false;
+        invalidatePendingCopy();
         render();
     });
 
     input.addEventListener('input', () => {
+        invalidatePendingCopy();
         if (!composing) render();
     });
 
     clearButton.addEventListener('click', () => {
+        invalidatePendingCopy();
         input.value = '';
         render();
         input.focus();
@@ -130,6 +143,9 @@
 
     copyButtons.forEach((button) => {
         button.addEventListener('click', async () => {
+            invalidatePendingCopy();
+            const id = copyRevision;
+            const isCurrent = () => id === copyRevision;
             const result = outputs[button.dataset.result];
             if (!result || button.disabled) {
                 showToast('无内容');
@@ -137,8 +153,8 @@
             }
 
             const value = result.textContent.trim();
-            const copied = await copyText(value);
-            showToast(copied ? '已复制' : '复制失败，请手动复制');
+            const copied = await copyText(value, isCurrent);
+            if (isCurrent()) showToast(copied ? '已复制' : '复制失败，请手动复制');
         });
     });
 

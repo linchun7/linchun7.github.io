@@ -168,6 +168,13 @@
             const MAX_EXPANDED_DIGITS = 1000;
             let composing = false;
             let statusTimer;
+            let copyRevision = 0;
+
+            function invalidatePendingCopy() {
+                copyRevision += 1;
+                window.clearTimeout(statusTimer);
+                alertText.textContent = '';
+            }
 
             function amountFitsLimit(value) {
                 if (value.length > MAX_INPUT_LENGTH) return false;
@@ -224,6 +231,7 @@
             }
 
             function render() {
+                invalidatePendingCopy();
                 if (composing) return;
                 // Normalize only the calculation snapshot to preserve native caret and undo history.
                 const normalizedInput = input.value.normalize('NFKC');
@@ -266,7 +274,7 @@
                 }
             }
 
-            async function copyText(text) {
+            async function copyText(text, isCurrent) {
                 if (navigator.clipboard?.writeText && window.isSecureContext) {
                     try {
                         await navigator.clipboard.writeText(text);
@@ -275,6 +283,8 @@
                         // Permission denial must still allow the legacy copy path.
                     }
                 }
+                // Native writes already dispatched cannot be cancelled; only current requests may fall back.
+                if (!isCurrent()) return;
                 const previousFocus = document.activeElement;
                 const textArea = document.createElement('textarea');
                 textArea.value = text;
@@ -299,19 +309,22 @@
             });
 
             document.getElementById('copyBtn').addEventListener('click', async () => {
+                invalidatePendingCopy();
+                const id = copyRevision;
+                const isCurrent = () => id === copyRevision;
                 if (result.classList.contains('empty') || result.classList.contains('error')) {
                     setStatus('无金额');
                     return;
                 }
                 try {
-                    await copyText(result.textContent.trim());
-                    setStatus('已复制');
+                    await copyText(result.textContent.trim(), isCurrent);
+                    if (isCurrent()) setStatus('已复制');
                 } catch (error) {
-                    setStatus('复制失败');
+                    if (isCurrent()) setStatus('复制失败');
                 }
             });
 
-            input.addEventListener('compositionstart', () => { composing = true; });
+            input.addEventListener('compositionstart', () => { composing = true; invalidatePendingCopy(); });
             input.addEventListener('compositionend', () => { composing = false; render(); });
             input.addEventListener('input', event => { if (!event.isComposing) render(); });
             input.addEventListener('focus', syncVisualViewportTop);

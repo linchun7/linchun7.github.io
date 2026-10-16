@@ -8,6 +8,14 @@ let toastTimeout = null;
 let isRunning = false;
 let expectedCount = null;
 let downloadMode = 'complete';
+let copyRevision = 0;
+
+function invalidatePendingCopy() {
+    copyRevision += 1;
+    clearTimeout(toastTimeout);
+    ui.toast.classList.remove('show');
+    ui.toast.textContent = '';
+}
 
 const pageSize = 200;
 const MAX_PATTERN_LENGTH = 100;
@@ -288,6 +296,7 @@ function resetCalculationOutput() {
 
 function startCalculation() {
     if (isRunning || composing) return;
+    invalidatePendingCopy();
     ui.input.classList.remove('input-error');
     ui.input.setAttribute('aria-invalid', 'false');
     const normalized = readCurrentRule(true);
@@ -358,6 +367,7 @@ ui.stopBtn.addEventListener('click', () => {
 });
 
 ui.clearBtn.addEventListener('click', () => {
+    invalidatePendingCopy();
     if (worker) {
         worker.terminate();
         worker = null;
@@ -406,22 +416,25 @@ function fallbackCopy(text) {
     }
 }
 
-async function copyText(text) {
+async function copyText(text, isCurrent) {
     if (navigator.clipboard && window.isSecureContext) {
         try {
             await navigator.clipboard.writeText(text);
             return true;
         } catch (error) {
-            return fallbackCopy(text);
+            // Fall through only while this user request is still current.
         }
     }
-    return fallbackCopy(text);
+    return isCurrent() ? fallbackCopy(text) : false;
 }
 
 async function copyResultRow(row) {
+    invalidatePendingCopy();
+    const id = copyRevision;
+    const isCurrent = () => id === copyRevision;
     const text = row.getAttribute('data-clipboard');
-    const copied = await copyText(text);
-    showToast(copied ? `复制成功：${text}` : '复制失败，请手动选择号码');
+    const copied = await copyText(text, isCurrent);
+    if (isCurrent()) showToast(copied ? `复制成功：${text}` : '复制失败，请手动选择号码');
 }
 
 ui.resultContent.addEventListener('click', (event) => {
@@ -438,6 +451,9 @@ ui.resultContent.addEventListener('keydown', (event) => {
 });
 
 ui.copyPageBtn.addEventListener('click', async () => {
+    invalidatePendingCopy();
+    const id = copyRevision;
+    const isCurrent = () => id === copyRevision;
     if (results.length === 0) return;
     const start = (currentPage - 1) * pageSize;
     const currentData = results.slice(start, start + pageSize);
@@ -446,8 +462,8 @@ ui.copyPageBtn.addEventListener('click', async () => {
         const tags = getFeatureLabels(analyzeCardFeatures(result));
         return tags.length > 0 ? `${formatted}  [${tags.join(', ')}]` : formatted;
     }).join('\n');
-    const copied = await copyText(content);
-    showToast(copied ? `成功复制本页 ${currentData.length} 条数据` : '复制失败，请重试');
+    const copied = await copyText(content, isCurrent);
+    if (isCurrent()) showToast(copied ? `成功复制本页 ${currentData.length} 条数据` : '复制失败，请重试');
 });
 
 let composing = false;
@@ -486,7 +502,9 @@ function updatePaginationUI() {
 
 function goToPage(page) {
     const total = Math.max(1, Math.ceil(results.length / pageSize));
-    currentPage = Math.min(Math.max(1, page), total);
+    const nextPage = Math.min(Math.max(1, page), total);
+    if (nextPage !== currentPage) invalidatePendingCopy();
+    currentPage = nextPage;
     renderPage();
     updatePaginationUI();
     window.scrollTo({ top: 0, behavior: 'smooth' });
