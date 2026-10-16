@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { chromium, firefox, webkit } from 'playwright';
+import { isDeploymentTelemetryRequest, isDeploymentTelemetryScript } from './translation-deployment-telemetry.mjs';
 import { CORPUS } from '../translation_benchmark/scripts/corpus.mjs';
 import { LANGUAGES, escapeHtml, renderCorpus } from '../translation_benchmark/scripts/render-pages.mjs';
 
@@ -15,7 +16,12 @@ async function assertCorpus(page, language) {
   assert.equal(await page.locator('#categoryList').getAttribute('lang'), language);
   assert.equal(await page.locator('.category-section').count(), 16);
   assert.equal(await page.locator('.sample-item').count(), 48);
-  assert.equal(await page.locator('.corpus-load-status, script').count(), 0);
+  assert.equal(await page.locator('.corpus-load-status').count(), 0);
+  const scripts = await page.locator('script').evaluateAll(nodes => nodes.map(node => ({
+    src: node.getAttribute('src') || '', text: node.textContent || '',
+    beacon: node.hasAttribute('data-cf-beacon')
+  })));
+  assert.deepEqual(scripts.filter(script => !isDeploymentTelemetryScript(script, baseUrl)), [], 'no application or unknown scripts');
   assert.deepEqual(await page.locator('.category-header h2').allTextContents(), CORPUS[language].map(([title]) => title));
   assert.deepEqual(await page.locator('.sample-text').allTextContents(), CORPUS[language].flatMap(([, samples]) => samples));
   assert.deepEqual(await page.locator('.sample-index').allTextContents(), Array.from({ length: 48 }, (_, index) => String(index + 1).padStart(2, '0')));
@@ -50,11 +56,19 @@ try {
         const payloadRequests = [];
         page.on('pageerror', error => errors.push(error.message));
         page.on('request', request => {
-          if (['script', 'xhr', 'fetch'].includes(request.resourceType())) payloadRequests.push(request.url());
+          const type = request.resourceType();
+          if (['script', 'xhr', 'fetch'].includes(type) && !isDeploymentTelemetryRequest(request.url(), baseUrl, type)) {
+            payloadRequests.push(request.url());
+          }
         });
-        if (mode === 'scripts-blocked') {
-          await page.route('**/*', route => route.request().resourceType() === 'script' ? route.abort() : route.continue());
-        }
+        // Deployment analytics must neither become a corpus dependency nor make
+        // these content checks depend on a third-party beacon being reachable.
+        await page.route('**/*', route => {
+          const request = route.request();
+          const blocked = isDeploymentTelemetryRequest(request.url(), baseUrl, request.resourceType()) ||
+            (mode === 'scripts-blocked' && request.resourceType() === 'script');
+          return blocked ? route.abort() : route.continue();
+        });
         const url = baseUrl + '/tools/translation_benchmark/' + language + '.html';
         const response = await page.goto(url, { waitUntil: 'domcontentloaded' });
         assert.equal(response.status(), 200);
@@ -81,7 +95,7 @@ try {
         await page.goForward({ waitUntil: 'domcontentloaded' });
         await assertCorpus(page, next);
         assert.deepEqual(errors, [], language + ': ' + mode);
-        assert.deepEqual(payloadRequests, [], 'no runtime script, corpus or translation API requests');
+        assert.deepEqual(payloadRequests, [], 'no application script, corpus or translation API requests');
         console.log(JSON.stringify({ label: 'translation-prerender', browser: browserName, language, mode, samples: 48, status: 'passed' }));
       } finally {
         await context.close();
