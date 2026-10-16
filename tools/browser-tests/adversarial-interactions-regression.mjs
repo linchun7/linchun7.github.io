@@ -13,6 +13,9 @@ const probes = [
     "navigation-breakpoint-regression.mjs",
     "myip-empty-location-regression.mjs",
     "pinyin-copy-focus-regression.mjs",
+    "pinyin-late-load-copy-regression.mjs",
+    "clipboard-race-regression.mjs",
+    "card-clipboard-race-regression.mjs",
     "translation-load-regression.mjs"
 ];
 const failures = [];

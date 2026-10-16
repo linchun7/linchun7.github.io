@@ -146,6 +146,13 @@
             let deadlineTimer;
             let worker;
             let revision = 0;
+            let copyRevision = 0;
+
+            function invalidatePendingCopy() {
+                copyRevision += 1;
+                window.clearTimeout(statusTimer);
+                alertText.textContent = '';
+            }
 
             function updateCount() {
                 countText.textContent = `已输入长度：${textarea.value.length} / 200000`;
@@ -158,6 +165,7 @@
             }
 
             function stopProcessing() {
+                invalidatePendingCopy();
                 revision += 1;
                 window.clearTimeout(deadlineTimer);
                 worker?.terminate();
@@ -166,7 +174,7 @@
                 addButton.removeAttribute('aria-busy');
             }
 
-            async function copyText(text) {
+            async function copyText(text, isCurrent) {
                 if (navigator.clipboard?.writeText && window.isSecureContext) {
                     try {
                         await navigator.clipboard.writeText(text);
@@ -175,6 +183,7 @@
                         // Permission denial must still allow the legacy copy path.
                     }
                 }
+                if (!isCurrent()) return;
                 const previousFocus = document.activeElement;
                 const helper = document.createElement('textarea');
                 helper.value = text;
@@ -193,6 +202,7 @@
             }
 
             addButton.addEventListener('click', () => {
+                invalidatePendingCopy();
                 if (worker) {
                     stopProcessing();
                     setStatus('已取消，原文保留');
@@ -241,16 +251,18 @@
             });
 
             document.getElementById('copyBtn').addEventListener('click', async () => {
+                invalidatePendingCopy();
                 if (!result.value.trim()) {
                     setStatus('无结果');
                     return;
                 }
-                const id = revision;
+                const id = copyRevision;
+                const isCurrent = () => id === copyRevision;
                 try {
-                    await copyText(result.value);
-                    if (id === revision) setStatus('已复制');
+                    await copyText(result.value, isCurrent);
+                    if (isCurrent()) setStatus('已复制');
                 } catch {
-                    if (id === revision) setStatus('复制失败');
+                    if (isCurrent()) setStatus('复制失败');
                 }
             });
 
@@ -263,12 +275,14 @@
                 textarea.focus();
             });
 
-            textarea.addEventListener('input', () => {
+            function invalidateResult() {
                 stopProcessing();
                 result.value = '';
                 updateCount();
                 alertText.textContent = '';
-            });
+            }
+            textarea.addEventListener('compositionstart', invalidateResult);
+            textarea.addEventListener('input', invalidateResult);
             updateCount();
         })();
     </script>
