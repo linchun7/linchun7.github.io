@@ -2,8 +2,8 @@
   "schema": 1,
   "project_since": "2026-09-24",
   "first_observed_at": "2026-09-24T02:13:15Z",
-  "checked_at": "2026-10-15T01:06:24Z",
-  "observations": 31,
+  "checked_at": "2026-10-16T01:06:21Z",
+  "observations": 32,
   "excluded_versions": 3,
   "pending_gap": false,
   "gaps": [
@@ -586,54 +586,198 @@
         ],
         "missing": []
       }
+    },
+    {
+      "plan": "ChatGPT Go",
+      "at": "2026-10-16T01:06:21Z",
+      "previous_at": "2026-10-15T01:06:24Z",
+      "kind": "change",
+      "cause": "fx",
+      "from": [
+        {
+          "code": "id",
+          "name": "印度尼西亚",
+          "currency": "IDR",
+          "local": "75000",
+          "cny": "28.09"
+        },
+        {
+          "code": "in",
+          "name": "印度",
+          "currency": "INR",
+          "local": "399",
+          "cny": "28.09"
+        }
+      ],
+      "to": [
+        {
+          "code": "id",
+          "name": "印度尼西亚",
+          "currency": "IDR",
+          "local": "75000",
+          "cny": "28.01"
+        }
+      ],
+      "evidence": {
+        "prices_changed": false,
+        "scope_changed": false,
+        "fx_changed": true,
+        "gap": false
+      },
+      "source_revision": "5a733f1bd6493a13d66d670f99ebfc01543f23877c0a2c4d2c87ef7e84c79a83",
+      "comparison": {
+        "at": "2026-10-16T01:06:21Z",
+        "source_revision": "5a733f1bd6493a13d66d670f99ebfc01543f23877c0a2c4d2c87ef7e84c79a83",
+        "source_commit": null,
+        "fx": {
+          "updated_at": "2026-10-16T00:02:31Z",
+          "rates": {
+            "CNY": "6.702985",
+            "IDR": "17949.090321",
+            "INR": "95.10014",
+            "USD": "1"
+          }
+        },
+        "from": [
+          {
+            "code": "id",
+            "name": "印度尼西亚",
+            "currency": "IDR",
+            "local": "75000",
+            "cny": "28.01"
+          },
+          {
+            "code": "in",
+            "name": "印度",
+            "currency": "INR",
+            "local": "399",
+            "cny": "28.12"
+          }
+        ],
+        "to": [
+          {
+            "code": "id",
+            "name": "印度尼西亚",
+            "currency": "IDR",
+            "local": "75000",
+            "cny": "28.01"
+          }
+        ],
+        "missing": []
+      }
+    },
+    {
+      "plan": "ChatGPT Pro 5x",
+      "at": "2026-10-16T01:06:21Z",
+      "previous_at": "2026-10-15T01:06:24Z",
+      "kind": "change",
+      "cause": "fx",
+      "from": [
+        {
+          "code": "ch",
+          "name": "瑞士",
+          "currency": "CHF",
+          "local": "83",
+          "cny": "667.73"
+        }
+      ],
+      "to": [
+        {
+          "code": "th",
+          "name": "泰国",
+          "currency": "THB",
+          "local": "3350",
+          "cny": "669.78"
+        }
+      ],
+      "evidence": {
+        "prices_changed": false,
+        "scope_changed": false,
+        "fx_changed": true,
+        "gap": false
+      },
+      "source_revision": "5a733f1bd6493a13d66d670f99ebfc01543f23877c0a2c4d2c87ef7e84c79a83",
+      "comparison": {
+        "at": "2026-10-16T01:06:21Z",
+        "source_revision": "5a733f1bd6493a13d66d670f99ebfc01543f23877c0a2c4d2c87ef7e84c79a83",
+        "source_commit": null,
+        "fx": {
+          "updated_at": "2026-10-16T00:02:31Z",
+          "rates": {
+            "CHF": "0.828286",
+            "CNY": "6.702985",
+            "THB": "33.52609",
+            "USD": "1"
+          }
+        },
+        "from": [
+          {
+            "code": "ch",
+            "name": "瑞士",
+            "currency": "CHF",
+            "local": "83",
+            "cny": "671.69"
+          }
+        ],
+        "to": [
+          {
+            "code": "th",
+            "name": "泰国",
+            "currency": "THB",
+            "local": "3350",
+            "cny": "669.78"
+          }
+        ],
+        "missing": []
+      }
     }
   ],
   "checkpoint": {
-    "at": "2026-10-15T01:06:24Z",
-    "revision": "e7a6e7b186276a202b787b88e6421104fe55ba66c8db5b6dbde396c8d7d51d0a",
+    "at": "2026-10-16T01:06:21Z",
+    "revision": "5a733f1bd6493a13d66d670f99ebfc01543f23877c0a2c4d2c87ef7e84c79a83",
     "fx": {
-      "updated_at": "2026-10-15T00:02:31Z",
+      "updated_at": "2026-10-16T00:02:31Z",
       "rates": {
         "AED": "3.6725",
-        "AUD": "1.433021",
-        "BRL": "5.035924",
-        "CAD": "1.422795",
-        "CHF": "0.833623",
-        "CLP": "981.815969",
-        "CNY": "6.706494",
-        "COP": "3182.996886",
-        "CZK": "21.778949",
-        "DKK": "6.677204",
-        "EGP": "53.095404",
-        "EUR": "0.894425",
-        "GBP": "0.756165",
-        "HUF": "325.413407",
-        "IDR": "17907.815096",
-        "ILS": "3.095708",
-        "INR": "95.252751",
-        "JPY": "158.305497",
-        "KRW": "1339.811585",
-        "KZT": "450.515428",
-        "MXN": "18.464303",
-        "MYR": "4.082359",
-        "NGN": "1331.826337",
-        "NOK": "9.501535",
-        "NZD": "1.784407",
-        "PEN": "3.440036",
-        "PHP": "62.922028",
-        "PKR": "276.883421",
-        "PLN": "3.91007",
+        "AUD": "1.44602",
+        "BRL": "5.054452",
+        "CAD": "1.419149",
+        "CHF": "0.828286",
+        "CLP": "985.501337",
+        "CNY": "6.702985",
+        "COP": "3184.574607",
+        "CZK": "21.715093",
+        "DKK": "6.668969",
+        "EGP": "53.464508",
+        "EUR": "0.89165",
+        "GBP": "0.754053",
+        "HUF": "324.418167",
+        "IDR": "17949.090321",
+        "ILS": "3.100396",
+        "INR": "95.10014",
+        "JPY": "158.086954",
+        "KRW": "1342.741111",
+        "KZT": "452.968824",
+        "MXN": "18.457205",
+        "MYR": "4.08249",
+        "NGN": "1331.189609",
+        "NOK": "9.482814",
+        "NZD": "1.780763",
+        "PEN": "3.435254",
+        "PHP": "63.084291",
+        "PKR": "276.982736",
+        "PLN": "3.896818",
         "QAR": "3.64",
-        "RON": "4.768215",
+        "RON": "4.759492",
         "SAR": "3.75",
-        "SEK": "9.994434",
-        "SGD": "1.283055",
-        "THB": "33.627869",
-        "TRY": "49.45021",
-        "TWD": "32.207621",
+        "SEK": "9.959903",
+        "SGD": "1.282338",
+        "THB": "33.52609",
+        "TRY": "49.480304",
+        "TWD": "32.360287",
         "USD": "1",
-        "VND": "25890.201508",
-        "ZAR": "16.579734"
+        "VND": "25856.487917",
+        "ZAR": "16.523523"
       }
     },
     "plans": [
@@ -1180,14 +1324,7 @@
             "name": "印度尼西亚",
             "currency": "IDR",
             "local": "75000",
-            "cny": "28.09"
-          },
-          {
-            "code": "in",
-            "name": "印度",
-            "currency": "INR",
-            "local": "399",
-            "cny": "28.09"
+            "cny": "28.01"
           }
         ]
       },
@@ -1734,7 +1871,7 @@
             "name": "菲律宾",
             "currency": "PHP",
             "local": "999",
-            "cny": "106.48"
+            "cny": "106.15"
           }
         ]
       },
@@ -2277,11 +2414,11 @@
         ],
         "winners": [
           {
-            "code": "ch",
-            "name": "瑞士",
-            "currency": "CHF",
-            "local": "83",
-            "cny": "667.73"
+            "code": "th",
+            "name": "泰国",
+            "currency": "THB",
+            "local": "3350",
+            "cny": "669.78"
           }
         ]
       },
@@ -2828,7 +2965,7 @@
             "name": "菲律宾",
             "currency": "PHP",
             "local": "9990",
-            "cny": "1064.78"
+            "cny": "1061.48"
           }
         ]
       },
@@ -3375,7 +3512,7 @@
             "name": "泰国",
             "currency": "THB",
             "local": "16490",
-            "cny": "3288.64"
+            "cny": "3296.90"
           }
         ]
       }
