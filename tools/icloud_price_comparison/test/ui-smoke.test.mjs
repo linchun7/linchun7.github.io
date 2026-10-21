@@ -3251,7 +3251,7 @@ test('minimum history defaults to one dense timeline, filters optionally, and st
         allChanges.map((event)=>event.tier),
         'all-capacity timeline must be globally chronological'
       );
-      assert.match(await page.locator('#minimumHistoryNote').textContent(),/此前并列最低的地区，更新后的金额可能已不同/);
+      assert.match(await page.locator('#minimumHistoryNote').textContent(),/此前并列最低的地区，更新后的金额可能已不同。缺失价格会注明。金额保留两位小数，显示相同不代表实际价格相同。/);
       const priceTransitions = await page.locator('.minimum-history-change').allTextContents();
       assert.ok(priceTransitions.includes('巴基斯坦（¥4.86） → 俄罗斯（¥4.86）'));
       assert.ok(priceTransitions.includes('台湾（¥189.96） → 墨西哥（¥189.67）'));
@@ -3397,7 +3397,7 @@ test('minimum history keeps all-capacity pagination, cause labels and optional f
     await page.waitForFunction(()=>document.querySelectorAll('.minimum-history-event').length===20);
     assert.equal(await page.locator('#minimumHistoryTierFilter').inputValue(),'all');
     assert.match(await page.locator('#minimumHistoryStatus').textContent(),/记录截至/);
-    assert.match(await page.locator('#minimumHistoryNote').textContent(),/此前并列最低的地区，更新后的金额可能已不同/);
+    assert.match(await page.locator('#minimumHistoryNote').textContent(),/此前并列最低的地区，更新后的金额可能已不同。缺失价格会注明。金额保留两位小数，显示相同不代表实际价格相同。/);
     assert.equal(await page.locator('.minimum-history-event[data-cause="mixed"]').count()>0,true);
     assert.match(await page.locator('.minimum-history-event[data-cause="mixed"]').first().innerText(),/汇率 \+ Apple 调价/);
     assert.match(await page.locator('.minimum-history-event').first().innerText(),/¥\d/);
