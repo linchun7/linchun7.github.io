@@ -225,6 +225,7 @@ test('same-observation comparison preserves old facts while repricing the former
   assert.deepEqual(enrichMinimumEvent(original,b), event);
   assert.deepEqual(original.from.map(r=>r.cny), [20,20]);
   assert.throws(()=>minimumEventComparison(original,a), /event price snapshot/);
+  assert.throws(()=>minimumEventComparison(original,b,{sourceCommit:'a'.repeat(40)}), /source commit/);
   const wrongWinner = structuredClone(original); wrongWinner.to[0].cny += 1;
   assert.throws(()=>minimumEventComparison(wrongWinner,b), /winners do not match/);
 });
@@ -288,6 +289,9 @@ test('history display uses only same-observation evidence and lists every tied m
   assert.equal(context.minimumEventSummary({from:many,to:many,comparison:{from:many,to:many}}),
     '甲（¥1.00）、乙（¥1.00）、丙（¥1.00）、丁（¥1.00）、戊（¥1.00）此前并列最低 → 甲（¥1.00）、乙（¥1.00）、丙（¥1.00）、丁（¥1.00）、戊（¥1.00）并列最低');
   assert.equal(context.minimumEventSummary({from:[],to:[]}), '暂无 → 暂无');
+  assert.equal(context.minimumEventSummary({from:[],to:[many[0]]}), '暂无 → 甲（¥1.00）');
+  assert.equal(context.minimumEventSummary({from:[many[0]],to:[],comparison:{from:[many[0]],to:[]}}), '甲（¥1.00） → 暂无');
+  assert.equal(context.minimumEventSummary({from:[many[0]],to:many.slice(0,2),comparison:{from:[many[0]],to:many.slice(0,2)}}), '甲（¥1.00） → 甲（¥1.00）、乙（¥1.00）并列最低');
 });
 
 test('published changes retain original facts and carry source-bound same-observation amounts', () => {
