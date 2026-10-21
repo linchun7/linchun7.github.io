@@ -1809,7 +1809,7 @@ function ensureMinimumHistoryDialog() {
   more.type = 'button'; more.id = 'minimumHistoryMore'; more.hidden = true;
   more.addEventListener('click', () => { minimumHistoryUi.limit += 20; renderMinimumHistory(); });
 
-  const note = minimumHistoryNode('p', '箭头表示最低价地区的变化。此前并列最低的地区，更新后的金额可能已不同。缺失价格会注明。', 'minimum-history-note');
+  const note = minimumHistoryNode('p', '箭头表示最低价地区的变化。此前并列最低的地区，更新后的金额可能已不同。缺失价格会注明。金额保留两位小数，显示相同不代表实际价格相同。', 'minimum-history-note');
   note.id = 'minimumHistoryNote'; note.hidden = true;
 
   const retry = minimumHistoryNode('button', '重新读取历史', 'minimum-history-button');
