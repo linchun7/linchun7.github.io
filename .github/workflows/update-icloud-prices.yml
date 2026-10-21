@@ -329,7 +329,7 @@ jobs:
       contents: write
       pages: write
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 25
     outputs:
       severe_failure: ${{ steps.classify_publish.outputs.severe_failure }}
       publish_outcome: ${{ steps.classify_publish.outputs.publish_outcome }}
@@ -470,6 +470,7 @@ jobs:
 
       - name: 等待 Pages 构建完成
         id: wait_pages_build
+        timeout-minutes: 20
         if: steps.push_data.outputs.pushed == 'true' && steps.request_pages_build.outcome == 'success'
         continue-on-error: true
         env:
@@ -479,7 +480,9 @@ jobs:
         run: |
           set -euo pipefail
           echo "pages_built=false" >> "$GITHUB_OUTPUT"
-          for attempt in $(seq 1 60); do
+          # Allow queueing plus build/deploy time; 5 minutes can expire just before a healthy build finishes.
+          # The step and job deadlines additionally bound slow API requests.
+          for attempt in $(seq 1 180); do
             read -r built_sha build_status build_error < <(
               gh api \
                 -H 'Accept: application/vnd.github+json' \
@@ -512,9 +515,12 @@ jobs:
                 exit 1
               fi
             fi
-            sleep 5
+            if (( attempt == 1 || attempt % 12 == 0 )); then
+              echo "Pages wait $attempt/180: target=$TARGET_SHA observed=$built_sha status=$build_status relation=$relation"
+            fi
+            if (( attempt < 180 )); then sleep 5; fi
           done
-          echo "::error title=PAGES_BUILD_TIMEOUT::Pages did not build $TARGET_SHA or a verified successor within the bounded wait."
+          echo "::error title=PAGES_BUILD_TIMEOUT::Pages did not build $TARGET_SHA or a verified successor after 180 polls (15-minute polling budget). Last observed: $built_sha status=$build_status relation=$relation."
           exit 1
 
       - name: 分类发布故障
