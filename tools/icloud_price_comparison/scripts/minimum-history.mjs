@@ -70,6 +70,40 @@ export function buildMinimumSnapshot(data, { sourceCommit = null, resolve = reso
   };
 }
 
+
+// Add same-observation display evidence without changing the historical winner chain.
+export function minimumEventComparison(event, data, options = {}) {
+  const snapshot = buildMinimumSnapshot(data, options);
+  if (!snapshot || snapshot.at !== event.at) throw new Error('Comparison requires the event price snapshot');
+  const tier = snapshot.tiers.find((item) => item.id === event.tier);
+  const to = tier?.winners ?? [];
+  const identity = (rows) => rows.map(({ name, ...row }) => row);
+  if (JSON.stringify(identity(to)) !== JSON.stringify(identity(event.to))) {
+    throw new Error('Comparison winners do not match the historical event');
+  }
+  const resolve = options.resolve ?? resolveMarket;
+  const countries = new Map(data.countries.map((country) => [
+    country.marketId ?? resolve(country.country).id, country
+  ]));
+  const from = [], missing = [];
+  for (const previous of event.from) {
+    const country = countries.get(previous.id);
+    const plan = country?.plans[event.tier];
+    if (!plan) { missing.push({ id: previous.id, name: previous.name }); continue; }
+    const cny = data.schemaVersion < 3
+      ? Math.round(plan.price * data.fx.rates.CNY / data.fx.rates[country.currency] * 100) / 100
+      : plan.cnyPrice;
+    from.push({ id: previous.id, name: country.nameZh || country.country,
+      currency: country.currency, local: plan.price, cny });
+  }
+  return { at: event.at, fingerprint: snapshot.fingerprint, sourceCommit: event.sourceCommit,
+    basis: snapshot.basis, fxFetchedAt: data.fx.fetchedAt, from, to: structuredClone(event.to), missing };
+}
+
+export function enrichMinimumEvent(event, data, options = {}) {
+  return { ...structuredClone(event), comparison: minimumEventComparison(event, data, options) };
+}
+
 export function emptyMinimumHistory(projectSince = '2024-12-08') {
   return {
     schemaVersion: 1, projectSince, firstObservedAt: null, checkedAt: null,
@@ -113,11 +147,12 @@ export function advanceMinimumHistory(previous, data, options = {}) {
       gap: result.pendingGap,
       basisChanged: Boolean(last && last.basis !== current.basis)
     };
-    result.events.push({
+    const event = {
       tier, at: current.at, previousAt: initial ? null : last.at,
       kind: initial ? 'initial' : 'change', cause: initial ? 'initial' : minimumChangeCause(evidence),
       from: structuredClone(from), to: structuredClone(to), evidence, sourceCommit: current.sourceCommit, basis: current.basis
-    });
+    };
+    result.events.push(enrichMinimumEvent(event, data, options));
   }
   result.firstObservedAt ??= current.at;
   result.checkedAt = current.at;
