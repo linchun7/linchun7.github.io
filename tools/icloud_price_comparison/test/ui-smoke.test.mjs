@@ -3251,7 +3251,12 @@ test('minimum history defaults to one dense timeline, filters optionally, and st
         allChanges.map((event)=>event.tier),
         'all-capacity timeline must be globally chronological'
       );
-      assert.match(await page.locator('#minimumHistoryNote').textContent(),/人民币价格按当时汇率折算/);
+      assert.match(await page.locator('#minimumHistoryNote').textContent(),/此前并列最低的地区，更新后的金额可能已不同/);
+      const priceTransitions = await page.locator('.minimum-history-change').allTextContents();
+      assert.ok(priceTransitions.includes('巴基斯坦（¥4.86） → 俄罗斯（¥4.86）'));
+      assert.ok(priceTransitions.includes('台湾（¥189.96） → 墨西哥（¥189.67）'));
+      assert.ok(priceTransitions.every(text=>!text.includes('¥190.36')&&!text.includes('¥4.87')),
+        'prior-observation amounts must never appear as same-observation prices');
       const separatorLayout = await page.locator('#minimumHistoryDialog').evaluate((dialog) => {
         const list = dialog.querySelector('#minimumHistoryEvents');
         const events = [...dialog.querySelectorAll('.minimum-history-event')];
@@ -3392,7 +3397,7 @@ test('minimum history keeps all-capacity pagination, cause labels and optional f
     await page.waitForFunction(()=>document.querySelectorAll('.minimum-history-event').length===20);
     assert.equal(await page.locator('#minimumHistoryTierFilter').inputValue(),'all');
     assert.match(await page.locator('#minimumHistoryStatus').textContent(),/记录截至/);
-    assert.match(await page.locator('#minimumHistoryNote').textContent(),/人民币价格按当时汇率折算/);
+    assert.match(await page.locator('#minimumHistoryNote').textContent(),/此前并列最低的地区，更新后的金额可能已不同/);
     assert.equal(await page.locator('.minimum-history-event[data-cause="mixed"]').count()>0,true);
     assert.match(await page.locator('.minimum-history-event[data-cause="mixed"]').first().innerText(),/汇率 \+ Apple 调价/);
     assert.match(await page.locator('.minimum-history-event').first().innerText(),/¥\d/);

@@ -8,7 +8,7 @@ import test from 'node:test';
 import { minimumChangeCause, validateMinimumHistoryPayload, validatePricePayload } from '../data-contract.js';
 import { attachDerivedCnyPrices, publicExchangeRateMetadata } from '../scripts/update-prices.mjs';
 import { advanceMinimumHistory, assertMinimumHistoryMatches, buildMinimumSnapshot, comparisonFxFingerprint,
-  emptyMinimumHistory, updateMinimumHistory, writeMinimumHistory, backfillMinimumHistory } from '../scripts/minimum-history.mjs';
+  emptyMinimumHistory, updateMinimumHistory, writeMinimumHistory, backfillMinimumHistory, minimumEventComparison, enrichMinimumEvent } from '../scripts/minimum-history.mjs';
 const production = JSON.parse(await readFile(new URL('../data/prices.json', import.meta.url), 'utf8'));
 const existing = JSON.parse(await readFile(new URL('../data/minimum-history.json', import.meta.url), 'utf8'));
 const T = Date.parse(production.generatedAt);
@@ -211,4 +211,103 @@ test('backfill is reproducible in a self-contained Git fixture and rejects shall
         error.message.includes('Backfill cannot read price evidence at ' + brokenSha));
     }
   } finally {await rm(tmp,{recursive:true,force:true});}
+});
+
+test('same-observation comparison preserves old facts while repricing the former winners', () => {
+  const a = fixture({ rates: [5,5,2.5] }), b = fixture({ day:1, rates:[2,5,2.5] });
+  const event = changed(a,b);
+  assert.deepEqual(event.from.map(r=>r.cny), [20,20]);
+  assert.deepEqual(event.comparison.from.map(r=>r.cny), [20,50]);
+  assert.deepEqual(event.comparison.to, event.to);
+  assert.equal(event.comparison.at, b.generatedAt);
+  assert.equal(event.comparison.from.find(r=>r.id==='ca').cny, event.to[0].cny);
+  const original = structuredClone(event); delete original.comparison;
+  assert.deepEqual(enrichMinimumEvent(original,b), event);
+  assert.deepEqual(original.from.map(r=>r.cny), [20,20]);
+  assert.throws(()=>minimumEventComparison(original,a), /event price snapshot/);
+  assert.throws(()=>minimumEventComparison(original,b,{sourceCommit:'a'.repeat(40)}), /source commit/);
+  const wrongWinner = structuredClone(original); wrongWinner.to[0].cny += 1;
+  assert.throws(()=>minimumEventComparison(wrongWinner,b), /winners do not match/);
+});
+
+test('same-observation comparison marks removed markets and capacities instead of old-price fallback', () => {
+  const a=fixture(), b=fixture({day:1});
+  b.countries=b.countries.filter(c=>c.marketId!=='mx');
+  b.countries[0].plans['6TB'].cnyRank=1; b.countries[1].plans['6TB'].cnyRank=2;
+  b.run.countries=2;b.run.pricePoints=2;
+  const event=changed(a,b);
+  assert.deepEqual(event.comparison.from, []);
+  assert.deepEqual(event.comparison.missing, [{id:'mx',name:event.from[0].name}]);
+  const c=fixture({day:2});
+  c.tiers=[{id:'12TB',label:'12 TB',capacityGb:12288}];
+  c.countries.forEach(c=>{c.plans['12TB']=c.plans['6TB'];delete c.plans['6TB'];});
+  const removed=advanceMinimumHistory(first(a),c).events.find(e=>e.kind==='change');
+  assert.deepEqual(removed.comparison.from, []);
+  assert.deepEqual(removed.comparison.to, []);
+  assert.equal(removed.comparison.missing.length,removed.from.length);
+});
+
+test('comparison contract rejects inconsistent evidence and accepts legacy events without it', () => {
+  const good=advanceMinimumHistory(first(fixture({rates:[5,5,2.5]})),fixture({day:1,rates:[2,5,2.5]}));
+  const legacy=structuredClone(good); legacy.events.forEach(e=>delete e.comparison);
+  validateMinimumHistoryPayload(legacy);
+  const mutations=[
+    e=>e.comparison=null, e=>e.comparison.at=e.previousAt,
+    e=>e.comparison.extra=true, e=>e.comparison.fingerprint='bad',
+    e=>e.comparison.sourceCommit='a'.repeat(40),
+    e=>e.comparison.basis='saved-fx',
+    e=>e.comparison.fxFetchedAt='2099-01-01T00:00:00Z',
+    e=>e.comparison.from.push(e.comparison.from[0]),
+    e=>e.comparison.from[0].id='aa',
+    e=>e.comparison.from[0].cny+=1,
+    e=>e.comparison.to[0].cny+=1,
+    e=>e.comparison.from.pop(),
+    e=>e.comparison.missing.push({id:'ca',name:e.from[0].name})
+  ];
+  mutations.forEach((mutate,i)=>{
+    const h=structuredClone(good);mutate(h.events.at(-1));
+    assert.throws(()=>validateMinimumHistoryPayload(h),undefined,'comparison mutation '+i);
+  });
+});
+
+test('history display uses only same-observation evidence and lists every tied market', async () => {
+  const { runInNewContext } = await import('node:vm');
+  const source = await readFile(new URL('../script.js',import.meta.url),'utf8');
+  const context={moneyFormatter:new Intl.NumberFormat('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2})};
+  for(const name of ['minimumWinnerSummary','minimumEventSummary']){
+    const match=source.match(new RegExp('function '+name+'\\([^]*?\\n\\}'));
+    assert.ok(match,name);
+    context[name]=runInNewContext('('+match[0]+')',context);
+  }
+  const event=changed(fixture({rates:[5,5,2.5]}),fixture({day:1,rates:[2,5,2.5]}));
+  assert.equal(context.minimumEventSummary(event),'加拿大（¥20.00）、墨西哥（¥50.00）此前并列最低 → 加拿大（¥20.00）');
+  const legacy=structuredClone(event);delete legacy.comparison;
+  assert.equal(context.minimumEventSummary(legacy),'加拿大（同期价未记录）、墨西哥（同期价未记录）此前并列最低 → 加拿大（¥20.00）');
+  const missing=structuredClone(event);missing.comparison.from.pop();
+  assert.equal(context.minimumEventSummary(missing),'加拿大（¥20.00）、墨西哥（同期价缺失）此前并列最低 → 加拿大（¥20.00）');
+  const many=['甲','乙','丙','丁','戊'].map((name,i)=>({id:String(i),name,cny:1}));
+  assert.equal(context.minimumEventSummary({from:many,to:many,comparison:{from:many,to:many}}),
+    '甲（¥1.00）、乙（¥1.00）、丙（¥1.00）、丁（¥1.00）、戊（¥1.00）此前并列最低 → 甲（¥1.00）、乙（¥1.00）、丙（¥1.00）、丁（¥1.00）、戊（¥1.00）并列最低');
+  assert.equal(context.minimumEventSummary({from:[],to:[]}), '暂无 → 暂无');
+  assert.equal(context.minimumEventSummary({from:[],to:[many[0]]}), '暂无 → 甲（¥1.00）');
+  assert.equal(context.minimumEventSummary({from:[many[0]],to:[],comparison:{from:[many[0]],to:[]}}), '甲（¥1.00） → 暂无');
+  assert.equal(context.minimumEventSummary({from:[many[0]],to:many.slice(0,2),comparison:{from:[many[0]],to:many.slice(0,2)}}), '甲（¥1.00） → 甲（¥1.00）、乙（¥1.00）并列最低');
+});
+
+test('published changes retain original facts and carry source-bound same-observation amounts', () => {
+  const august=existing.events.find(e=>e.at==='2026-08-10T00:05:56.887Z' && e.tier==='50GB');
+  const september=existing.events.find(e=>e.at==='2026-09-25T04:51:35.064Z' && e.tier==='6TB');
+  assert.equal(august.from[0].cny,4.87);
+  assert.equal(august.comparison.from[0].cny,4.86);
+  assert.equal(august.comparison.to[0].cny,4.86);
+  assert.notEqual(august.from[0].id,august.to[0].id,'rounded display equality must not rewrite the exact ranking');
+  assert.equal(september.from[0].cny,190.36);
+  assert.equal(september.comparison.from[0].cny,189.96);
+  assert.equal(september.comparison.to[0].cny,189.67);
+  for(const event of [august,september]){
+    assert.equal(event.comparison.at,event.at);
+    assert.equal(event.comparison.sourceCommit,event.sourceCommit);
+    assert.deepEqual(event.comparison.to,event.to);
+    assert.match(event.comparison.fingerprint,/^[a-f0-9]{64}$/);
+  }
 });

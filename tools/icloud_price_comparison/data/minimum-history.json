@@ -175,7 +175,33 @@
         "basisChanged": false
       },
       "sourceCommit": "01b4fb9728819ed368b605481c0906b517f109fe",
-      "basis": "saved-fx"
+      "basis": "saved-fx",
+      "comparison": {
+        "at": "2026-08-10T00:05:56.887Z",
+        "fingerprint": "8ece3684eca43e613945c483b12cf3c5cf090bcd42f87c656e6971747efa75c9",
+        "sourceCommit": "01b4fb9728819ed368b605481c0906b517f109fe",
+        "basis": "saved-fx",
+        "fxFetchedAt": "2026-08-10T00:00:01.000Z",
+        "from": [
+          {
+            "id": "pk",
+            "name": "巴基斯坦",
+            "currency": "PKR",
+            "local": 200,
+            "cny": 4.86
+          }
+        ],
+        "to": [
+          {
+            "id": "ru",
+            "name": "俄罗斯",
+            "currency": "RUB",
+            "local": 59,
+            "cny": 4.86
+          }
+        ],
+        "missing": []
+      }
     },
     {
       "tier": "6TB",
@@ -209,7 +235,33 @@
         "basisChanged": false
       },
       "sourceCommit": "d799cd09ad57040b99ad5ebf872eaeb46445abaf",
-      "basis": "stored-ranks"
+      "basis": "stored-ranks",
+      "comparison": {
+        "at": "2026-09-25T04:51:35.064Z",
+        "fingerprint": "bb93cd0d613df42fb88b9ee7069b00cf52dcb1aaac3cdaad2d35d80c2711472e",
+        "sourceCommit": "d799cd09ad57040b99ad5ebf872eaeb46445abaf",
+        "basis": "stored-ranks",
+        "fxFetchedAt": "2026-09-25T00:00:01.000Z",
+        "from": [
+          {
+            "id": "tw",
+            "name": "台湾",
+            "currency": "TWD",
+            "local": 900,
+            "cny": 189.96
+          }
+        ],
+        "to": [
+          {
+            "id": "mx",
+            "name": "墨西哥",
+            "currency": "MXN",
+            "local": 499,
+            "cny": 189.67
+          }
+        ],
+        "missing": []
+      }
     }
   ],
   "checkpoint": {

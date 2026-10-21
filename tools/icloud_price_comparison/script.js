@@ -8,7 +8,7 @@ import {
   validatePayload,
   assertValidatedPriceHistoryConsistency,
   visiblePublicationEntries
-} from './data-contract.js?v=464d21cf';
+} from './data-contract.js?v=81b0d024';
 let createIcons = null;
 import { foldPublicationCountryRenames, marketSearchPriority, matchesMarketSearch, normalizeMarketSearchText, REGION_LABELS, VALID_REGIONS } from './data-model.js?v=27f94e24';
 
@@ -1809,7 +1809,7 @@ function ensureMinimumHistoryDialog() {
   more.type = 'button'; more.id = 'minimumHistoryMore'; more.hidden = true;
   more.addEventListener('click', () => { minimumHistoryUi.limit += 20; renderMinimumHistory(); });
 
-  const note = minimumHistoryNode('p', '人民币价格按当时汇率折算，仅展示网站可核验到的最低价变更。', 'minimum-history-note');
+  const note = minimumHistoryNode('p', '箭头表示最低价地区的变化。此前并列最低的地区，更新后的金额可能已不同。缺失价格会注明。', 'minimum-history-note');
   note.id = 'minimumHistoryNote'; note.hidden = true;
 
   const retry = minimumHistoryNode('button', '重新读取历史', 'minimum-history-button');
@@ -1836,10 +1836,17 @@ function ensureMinimumHistoryDialog() {
 
 function minimumWinnerSummary(rows) {
   if (!rows.length) return '暂无';
-  const summaries = rows.map((row) => `${row.name} ¥${moneyFormatter.format(row.cny)}`);
-  return summaries.length > 3
-    ? `${summaries.slice(0, 3).join('、')}等 ${summaries.length} 个地区并列`
-    : summaries.join('、');
+  return rows.map((row) => `${row.name}（¥${moneyFormatter.format(row.cny)}）`).join('、');
+}
+
+function minimumEventSummary(event) {
+  const current = new Map((event.comparison?.from ?? []).map((row) => [row.id, row]));
+  const previous = event.from.map((row) => current.has(row.id)
+    ? minimumWinnerSummary([current.get(row.id)])
+    : row.name + '（同期价' + (event.comparison ? '缺失' : '未记录') + '）');
+  const winners = event.comparison?.to ?? event.to;
+  return (previous.join('、') || '暂无') + (previous.length > 1 ? '此前并列最低' : '')
+    + ' → ' + minimumWinnerSummary(winners) + (winners.length > 1 ? '并列最低' : '');
 }
 
 function minimumHistoryCauseLabel(event) {
@@ -1944,7 +1951,7 @@ function renderMinimumHistory() {
     );
     const change = minimumHistoryNode(
       'strong',
-      `${minimumWinnerSummary(event.from)} → ${minimumWinnerSummary(event.to)}`,
+      minimumEventSummary(event),
       'minimum-history-change'
     );
     const cause = minimumHistoryNode('span', minimumHistoryCauseLabel(event), 'minimum-history-cause');
