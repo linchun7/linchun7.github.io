@@ -243,7 +243,7 @@ const oldTies = [{...id,cny:'28.09'},{...india,cny:'28.09'}];
 const summary = (from,to,current=from) => context.minimumEventSummary({from,to,comparison:{from:current,to}});
 assert.equal(summary(oldTies,[id],[id,india]),'印度尼西亚（¥28.01）、印度（¥28.12）此前并列最低 → 印度尼西亚（¥28.01）单独最低');
 assert.equal(summary([id],[id,tiedIndia]),'印度尼西亚（¥28.01）此前最低 → 印度尼西亚（¥28.01）、印度（¥28.01）并列最低');
-assert.equal(summary(oldTies,[id,tiedIndia],[id,india]),'印度尼西亚（¥28.01）、印度（¥28.12）此前并列最低 → 印度尼西亚（¥28.01）、印度（¥28.01）并列最低');
+assert.equal(summary(oldTies,[id,{code:'th',name:'泰国',cny:'28.01'}],[id,india]),'印度尼西亚（¥28.01）、印度（¥28.12）此前并列最低 → 印度尼西亚（¥28.01）、泰国（¥28.01）并列最低');
 assert.equal(summary([], [id]),'暂无 → 印度尼西亚（¥28.01）单独最低');
 assert.equal(summary([id], []),'印度尼西亚（¥28.01）此前最低 → 暂无');
 assert.equal(summary([], []),'暂无 → 暂无');
