@@ -511,3 +511,88 @@ test('main code pushes verify the deployed iCloud artifact and assets after all 
   assert.match(job, /--current-main-data-dir/);
   assert.match(job, /--max-wait-ms 600000/);
 });
+
+
+test('Pages polling tolerates queued builds beyond five minutes without weakening commit or failure guards', async t => {
+  const { mkdtemp, writeFile, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const workflow = await readFile(workflowUrl, 'utf8');
+  const publish = workflow.slice(workflow.indexOf('\n  publish:'), workflow.indexOf('\n  verify-production:'));
+  assert.match(publish, /timeout-minutes: 25/);
+  const step = workflow.slice(workflow.indexOf('      - name: 等待 Pages 构建完成'), workflow.indexOf('      - name: 分类发布故障'));
+  assert.match(step, /timeout-minutes: 20/);
+  assert.match(step, /seq 1 180/);
+  assert.match(step, /sleep 5/);
+  const script = step.slice(step.indexOf('        run: |\n') + '        run: |\n'.length)
+    .split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n');
+  const target = 'a'.repeat(40);
+  const other = 'b'.repeat(40);
+  const mock = [
+    'gh() {',
+    '  case "$*" in',
+    '    *"/compare/"*) printf "%s\\n" "$MOCK_RELATION"; return 0 ;;',
+    '  esac',
+    '  local count; count=$(cat "$MOCK_COUNTER"); count=$((count + 1)); printf "%s\\n" "$count" > "$MOCK_COUNTER"',
+    '  local sha="$TARGET_SHA" status=building error=""',
+    '  case "$MOCK_SCENARIO" in',
+    '    delayed) if (( count >= 65 )); then status=built; fi ;;',
+    '    successor|unrelated) sha="$MOCK_OTHER"; status=built ;;',
+    '    errored) status=errored; error="synthetic build failure" ;;',
+    '    pending) status=building ;;',
+    '  esac',
+    '  printf "%s\\t%s\\t%s\\n" "$sha" "$status" "$error"',
+    '}',
+    'sleep() { :; }'
+  ].join('\n');
+  for (const [scenario, success, relation] of [
+    ['delayed', true, 'identical'],
+    ['successor', true, 'ahead'],
+    ['unrelated', false, 'behind'],
+    ['errored', false, 'identical'],
+    ['pending', false, 'identical']
+  ]) {
+    await t.test(scenario, async () => {
+      const root = await mkdtemp(path.join(tmpdir(), 'icloud-pages-wait-'));
+      try {
+        const output = path.join(root, 'output');
+        const counter = path.join(root, 'counter');
+        await writeFile(output, '');
+        await writeFile(counter, '0\n');
+        let stdout = '', failed = false;
+        try {
+          stdout = execFileSync('bash', ['--noprofile', '--norc', '-c', mock + '\n' + script], {
+            encoding: 'utf8', timeout: 15000, stdio: ['ignore', 'pipe', 'pipe'],
+            env: { ...process.env, TARGET_SHA: target, GITHUB_REPOSITORY: 'fixture/example',
+              GITHUB_OUTPUT: output, MOCK_COUNTER: counter, MOCK_OTHER: other,
+              MOCK_SCENARIO: scenario, MOCK_RELATION: relation }
+          });
+        } catch (error) {
+          assert.equal(error.status, 1, 'must fail closed, not crash or time out the harness');
+          stdout = String(error.stdout);
+          failed = true;
+        }
+        const result = await readFile(output, 'utf8');
+        const count = Number(await readFile(counter, 'utf8'));
+        assert.equal(failed, !success);
+        assert.equal(result.includes('pages_built=true'), success);
+        if (scenario === 'delayed') {
+          assert.equal(count, 65, 'a healthy build after the old 60 polls must be accepted');
+          assert.ok(result.includes('built_sha=' + target));
+          assert.ok(result.includes('build_relation=identical'));
+        } else if (scenario === 'successor') {
+          assert.ok(result.includes('built_sha=' + other));
+          assert.ok(result.includes('build_relation=successor'));
+        } else if (scenario === 'errored') {
+          assert.equal(count, 1, 'a matching failed build must fail immediately');
+          assert.match(stdout, /PAGES_BUILD_FAILED/);
+        } else {
+          assert.equal(count, 180, 'pending/unrelated builds must retain a finite deadline');
+          assert.match(stdout, /PAGES_BUILD_TIMEOUT/);
+          assert.match(stdout, /Last observed:/);
+        }
+      } finally {
+        await rm(root, { recursive: true, force: true });
+      }
+    });
+  }
+});
