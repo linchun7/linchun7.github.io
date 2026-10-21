@@ -1032,7 +1032,7 @@
     const more = minimumHistoryNode('button', '显示更多', 'minimum-history-button');
     more.type = 'button'; more.id = 'minimumHistoryMore'; more.hidden = true;
     more.addEventListener('click', () => { minimumHistoryUi.limit += 20; renderMinimumHistory(); });
-    const note = minimumHistoryNode('p', '箭头两端按换榜时同一快照、同一汇率比较；缺少同期证据会明确标注。仅记录最低价地区变化。', 'minimum-history-note');
+    const note = minimumHistoryNode('p', '箭头表示最低价地区的变化。此前并列最低的地区，更新后的金额可能已不同。缺失价格会注明。', 'minimum-history-note');
     note.id = 'minimumHistoryNote'; note.hidden = true;
     const retry = minimumHistoryNode('button', '重新读取历史', 'minimum-history-button');
     retry.type = 'button'; retry.id = 'minimumHistoryRetry'; retry.hidden = true;
