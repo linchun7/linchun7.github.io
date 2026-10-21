@@ -405,6 +405,9 @@ const snapshotTag = '<script type="application/json" id="price-data">' + JSON.st
 const workspace = expectedHtml.match(/<section id="priceWorkspace">[\s\S]*?<\/section>/)[0];
 for (const phase of ['diagnostic', 'canonical']) {
   for (const [name, html] of [
+    ['extra html root', expectedHtml + '<html hidden></html>'],
+    ['extra head', expectedHtml.replace('</head>', '</head><head></head>')],
+    ['changed base URL', expectedHtml.replace('</head>', '<base href="https://example.invalid/"></head>')],
     ['head only', expectedHtml.replace(/<body>[\s\S]*<\/body>/, '')],
     ['missing snapshot', expectedHtml.replace(snapshotTag, '')],
     ['duplicate snapshot', expectedHtml.replace(snapshotTag, snapshotTag + snapshotTag)],
