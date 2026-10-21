@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { execFile } from 'node:child_process';
 
 export const PRICES_URL = 'https://www.linchun.com.cn/tools/chatgpt_price_comparison/data/prices.json';
 export const MINIMUM_HISTORY_URL = 'https://www.linchun.com.cn/tools/chatgpt_price_comparison/data/minimum-history.json';
@@ -120,6 +121,10 @@ async function getText(fetchImpl, base, maxBytes, signal, attempt, diagnostic) {
       && !/application\/json/i.test(response.headers.get('content-type') || '')) {
     throw new Error('production minimum history content type is not application/json');
   }
+  if (base === INDEX_URL
+      && !/^text\/html(?:\s*;|\s*$)/i.test(response.headers.get('content-type') || '')) {
+    throw new Error('production HTML content type is not text/html');
+  }
   if (response.url) {
     const actual = new URL(response.url);
     if (actual.origin !== requestUrl.origin || actual.pathname !== requestUrl.pathname) {
@@ -129,8 +134,28 @@ async function getText(fetchImpl, base, maxBytes, signal, attempt, diagnostic) {
   return limitedText(response, maxBytes);
 }
 
+function validateProductionHtml(actualHtml, expectedHtml, expectedData, signal) {
+  return new Promise((resolve, reject) => {
+    const child = execFile(
+      process.platform === 'win32' ? 'python' : 'python3',
+      [fileURLToPath(new URL('./production_html.py', import.meta.url))],
+      { encoding: 'utf8', timeout: 10_000, maxBuffer: 64 * 1024, signal, windowsHide: true },
+      (error, stdout, stderr) => {
+        if (error) {
+          if (error.name === 'AbortError') reject(error);
+          else reject(new Error('production HTML contract failed: ' + String(stderr || error.message).trim().slice(0, 300)));
+        } else resolve();
+      }
+    );
+    child.stdin.on('error', reject);
+    child.stdin.end(JSON.stringify({
+      actual_html: actualHtml, expected_html: expectedHtml, expected_data: expectedData
+    }));
+  });
+}
+
 async function verifyResponse(expected, {
-  expectedMinimumHistory, expectedPageRevision, expectedAssets, fetchImpl, signal, attempt, diagnostic
+  expectedMinimumHistory, expectedPageRevision, expectedAssets, expectedHtml, fetchImpl, signal, attempt, diagnostic
 }) {
   const [jsonText, minimumText, html] = await Promise.all([
     getText(fetchImpl, PRICES_URL, MAX_JSON, signal, attempt, diagnostic),
@@ -152,6 +177,7 @@ async function verifyResponse(expected, {
   if (canonical(liveAssets) !== canonical(expectedAssets)) {
     throw new Error('production HTML asset versions do not match expected build');
   }
+  await validateProductionHtml(html, expectedHtml, expected, signal);
   const assetEntries = Object.entries(expectedAssets);
   const assetTexts = await Promise.all(assetEntries.map(([name, version]) =>
     getText(fetchImpl, assetUrl(name, version), MAX_ASSET, signal, attempt, diagnostic)
@@ -170,6 +196,7 @@ export async function verifyOnce(expected, {
   expectedMinimumHistory,
   expectedPageRevision,
   expectedAssets,
+  expectedHtml,
   fetchImpl = globalThis.fetch,
   requestTimeoutMs = 12_000,
   attempt = 1
@@ -178,12 +205,15 @@ export async function verifyOnce(expected, {
     throw new Error('expected page revision is invalid');
   }
   validateAssetVersions(expectedAssets);
+  if (typeof expectedHtml !== 'string' || !expectedHtml || Buffer.byteLength(expectedHtml, 'utf8') > MAX_HTML) {
+    throw new Error('expected HTML is missing or exceeds size limit');
+  }
   validateMinimumHistory(expectedMinimumHistory, expected);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), requestTimeoutMs);
   try {
     const options = {
-      expectedMinimumHistory, expectedPageRevision, expectedAssets, fetchImpl,
+      expectedMinimumHistory, expectedPageRevision, expectedAssets, expectedHtml, fetchImpl,
       signal: controller.signal, attempt
     };
     // Cache-bypassing probes diagnose deployment lag; only ordinary URLs can prove acceptance.
@@ -199,6 +229,7 @@ export async function verifyWithRetry(expected, {
   expectedMinimumHistory,
   expectedPageRevision,
   expectedAssets,
+  expectedHtml,
   maxWaitMs = 5 * 60_000,
   intervalMs = 10_000,
   requestTimeoutMs = 12_000,
@@ -214,7 +245,7 @@ export async function verifyWithRetry(expected, {
   while (now() - start <= maxWaitMs) {
     attempt += 1;
     try {
-      const revision = await verifyOnce(expected, { expectedMinimumHistory, expectedPageRevision, expectedAssets, fetchImpl, requestTimeoutMs, attempt });
+      const revision = await verifyOnce(expected, { expectedMinimumHistory, expectedPageRevision, expectedAssets, expectedHtml, fetchImpl, requestTimeoutMs, attempt });
       console.log('Verified canonical JSON, history, HTML and versioned assets revision:', revision, 'attempt:', attempt);
       return { revision, attempt };
     } catch (error) {
@@ -241,7 +272,8 @@ async function main() {
   await verifyWithRetry(expected, {
     expectedMinimumHistory,
     expectedPageRevision: pageRevisionOf(expectedHtml),
-    expectedAssets: assetVersionsOf(expectedHtml)
+    expectedAssets: assetVersionsOf(expectedHtml),
+    expectedHtml
   });
 }
 
