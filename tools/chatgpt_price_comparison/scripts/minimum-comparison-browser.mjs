@@ -11,14 +11,16 @@ export async function assertMinimumComparison(page, projectDir) {
   assert.equal(target.comparison.to[0].cny, '668.11');
   await page.setViewportSize({width:320,height:568});
   await page.locator('#minimumHistoryButton').click();
-  const row = page.locator('.minimum-history-event').filter({hasText:'瑞士（¥669.57）此前最低 → 泰国（¥668.11）单独最低'});
+  const row = page.locator('.minimum-history-event').filter({hasText:'瑞士（¥669.57） → 泰国（¥668.11）'});
   assert.equal(await row.count(), 1, 'one single-line comparison for the actual event');
   assert.equal(await row.locator('.minimum-history-cause').textContent(), '汇率等因素');
   assert.equal(await row.locator('.minimum-history-cause').isVisible(), true, 'gap is visible without hovering');
-  const go = page.locator('.minimum-history-event').filter({hasText:'印度尼西亚（¥28.01）、印度（¥28.12）此前并列最低 → 印度尼西亚（¥28.01）单独最低'});
+  const go = page.locator('.minimum-history-event').filter({hasText:'印度尼西亚（¥28.01）、印度（¥28.12）此前并列最低 → 印度尼西亚（¥28.01）'});
   assert.equal(await go.count(), 1, 'tie removal retains same-snapshot amounts, not the old tied prices');
   assert.equal(await page.locator('#minimumHistoryNote').textContent(), '箭头表示最低价地区的变化。此前并列最低的地区，更新后的金额可能已不同。缺失价格会注明。');
-  for (const candidate of [row, go]) {
+  const five = page.locator('.minimum-history-event').filter({hasText:'阿根廷（¥672.16）、科威特（¥672.16）、斯里兰卡（¥672.16）、摩洛哥（¥672.16）、美国（¥672.16）此前并列最低 → 泰国（¥670.34）'});
+  assert.equal(await five.count(), 1, 'all five historical winners and their same-snapshot amounts remain visible');
+  for (const candidate of [row, go, five]) {
   const geometry = await candidate.evaluate(item => {
     const dialog = document.querySelector('#minimumHistoryDialog').getBoundingClientRect();
     return [...item.querySelectorAll('.minimum-history-change,.minimum-history-cause')].map(node => {
@@ -39,25 +41,25 @@ export async function assertMinimumComparison(page, projectDir) {
     await page.evaluate(() => document.querySelector('#minimumHistoryRetry').click());
     await page.waitForFunction(text => [...document.querySelectorAll('.minimum-history-change')].some(node => node.textContent === text), expected);
     assert.equal(await page.locator('#minimumHistoryRetry').isHidden(), true);
-    assert.equal(await page.locator('.minimum-history-change').filter({hasText:'瑞士（¥667.56）此前最低 → 泰国'}).count(), 0,
+    assert.equal(await page.locator('.minimum-history-change').filter({hasText:'瑞士（¥667.56） → 泰国'}).count(), 0,
       'cross-period price must never masquerade as the event comparison');
     await page.locator('#closeMinimumHistory').click();
     await page.unroute('**/data/minimum-history.json*');
   }
   const legacy = structuredClone(source);
   for (const event of legacy.events) delete event.comparison;
-  await replaceHistory(legacy, '瑞士（同期价未记录）此前最低 → 泰国（¥668.11）单独最低');
+  await replaceHistory(legacy, '瑞士（同期价未记录） → 泰国（¥668.11）');
   const missing = structuredClone(source);
   const event = missing.events.find(item => item.plan === target.plan && item.at === target.at);
   event.comparison.from = [];
   event.comparison.missing = [{code:'ch',name:'瑞士'}];
   delete event.comparison.fx.rates.CHF;
-  await replaceHistory(missing, '瑞士（同期价缺失）此前最低 → 泰国（¥668.11）单独最低');
+  await replaceHistory(missing, '瑞士（同期价缺失） → 泰国（¥668.11）');
 
   await page.locator('#minimumHistoryButton').click();
   await page.evaluate(() => document.querySelector('#minimumHistoryRetry').click());
   await page.waitForFunction(() => [...document.querySelectorAll('.minimum-history-change')]
-    .some(node => node.textContent === '瑞士（¥669.57）此前最低 → 泰国（¥668.11）单独最低'));
+    .some(node => node.textContent === '瑞士（¥669.57） → 泰国（¥668.11）'));
   await page.locator('#closeMinimumHistory').click();
   await page.setViewportSize({width:1280,height:900});
 }
