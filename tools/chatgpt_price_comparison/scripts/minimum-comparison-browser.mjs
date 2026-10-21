@@ -18,14 +18,16 @@ export async function assertMinimumComparison(page, projectDir) {
   const go = page.locator('.minimum-history-event').filter({hasText:'印度尼西亚（¥28.01）、印度（¥28.12）此前并列最低 → 印度尼西亚（¥28.01）单独最低'});
   assert.equal(await go.count(), 1, 'tie removal retains same-snapshot amounts, not the old tied prices');
   assert.equal(await page.locator('#minimumHistoryNote').textContent(), '箭头表示最低价地区的变化。此前并列最低的地区，更新后的金额可能已不同。缺失价格会注明。');
-  const geometry = await row.evaluate(item => {
+  for (const candidate of [row, go]) {
+  const geometry = await candidate.evaluate(item => {
     const dialog = document.querySelector('#minimumHistoryDialog').getBoundingClientRect();
     return [...item.querySelectorAll('.minimum-history-change,.minimum-history-cause')].map(node => {
       const rect = node.getBoundingClientRect();
       return rect.left >= dialog.left && rect.right <= dialog.right && rect.width > 0;
     });
   });
-  assert.ok(geometry.every(Boolean), 'comparison and gap fit a 320px dialog');
+  assert.ok(geometry.every(Boolean), 'single and tied comparisons fit a 320px dialog');
+  }
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
   await page.locator('#closeMinimumHistory').click();
 
