@@ -25,11 +25,18 @@ class Document(HTMLParser):
         self.stack = [self.root]
         self.ids = {}
         self.bodies = []
+        self.htmls = []
+        self.heads = []
         self.feed(source)
         self.close()
         if len(self.stack) != 1:
             raise ValueError('unclosed HTML element: ' + self.stack[-1].tag)
-        if len(self.bodies) != 1 or self.bodies[0].parent.tag != 'html':
+        roots = [node for node in self.root.children if isinstance(node, Element)]
+        if len(roots) != 1 or roots[0].tag != 'html' or len(self.htmls) != 1:
+            raise ValueError('expected one top-level HTML document')
+        if len(self.heads) != 1 or self.heads[0].parent is not roots[0]:
+            raise ValueError('expected one direct HTML head')
+        if len(self.bodies) != 1 or self.bodies[0].parent is not roots[0]:
             raise ValueError('expected one real HTML body')
 
     def handle_starttag(self, tag, attrs):
@@ -41,6 +48,10 @@ class Document(HTMLParser):
         identifier = node.attrs.get('id')
         if identifier:
             self.ids.setdefault(identifier, []).append(node)
+        if tag == 'html':
+            self.htmls.append(node)
+        if tag == 'head':
+            self.heads.append(node)
         if tag == 'body':
             self.bodies.append(node)
         if tag not in VOID:
@@ -156,6 +167,10 @@ def elements(node):
             yield from elements(child)
 
 def validate_assets(expected, actual):
+    def base_contract(document):
+        return [(ancestors(node), projection(node)) for node in elements(document.root) if node.tag == 'base']
+    if base_contract(actual) != base_contract(expected):
+        raise ValueError('HTML base URL differs from expected')
     definitions = (
         ('script', 'src', 'app.js?v=', ('src', 'type', 'defer', 'async', 'nomodule', 'integrity', 'crossorigin')),
         ('link', 'href', 'style.css?v=', ('href', 'rel', 'media', 'disabled', 'type', 'integrity', 'crossorigin')),
