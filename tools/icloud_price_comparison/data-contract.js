@@ -637,7 +637,7 @@ export function validateMinimumHistoryPayload(value) {
   let previousAt = -Infinity;
   const latest = new Map(), eventKeys = new Set();
   for (const event of value.events) {
-    if (!keys(event, 'tier at previousAt kind cause from to evidence sourceCommit basis')
+    if (!hasAllowedKeys(event, new Set('tier at previousAt kind cause from to evidence sourceCommit basis comparison'.split(' ')), 'tier at previousAt kind cause from to evidence sourceCommit basis'.split(' '))
       || !canonicalTierDefinition(event.tier) || !isValidIsoTimestamp(event.at)
       || !(event.previousAt === null || isValidIsoTimestamp(event.previousAt))
       || Date.parse(event.at) < previousAt || Date.parse(event.at) > limit
@@ -648,6 +648,36 @@ export function validateMinimumHistoryPayload(value) {
       || !keys(event.evidence, 'pricesChanged scopeChanged fxChanged gap basisChanged')
       || ['pricesChanged','scopeChanged','gap','basisChanged'].some((key) => typeof event.evidence[key] !== 'boolean')
       || ![true, false, null].includes(event.evidence.fxChanged)) fail();
+
+    if (Object.hasOwn(event, 'comparison')) {
+      const comparison = event.comparison;
+      if (!keys(comparison, 'at fingerprint sourceCommit basis fxFetchedAt from to missing')
+        || comparison.at !== event.at || !sha(comparison.fingerprint)
+        || comparison.sourceCommit !== event.sourceCommit || !commit(comparison.sourceCommit)
+        || comparison.basis !== event.basis || !isValidIsoTimestamp(comparison.fxFetchedAt)
+        || Date.parse(comparison.fxFetchedAt) > Date.parse(event.at) + 300000
+        || Date.parse(event.at) - Date.parse(comparison.fxFetchedAt) > 36 * 3600000 + 300000
+        || !winners(comparison.from) || !winners(comparison.to)
+        || JSON.stringify(comparison.to) !== JSON.stringify(event.to)
+        || !Array.isArray(comparison.missing) || comparison.missing.length > MAX_PUBLIC_COUNTRIES) fail();
+      const old = new Map(event.from.map((row) => [row.id, row]));
+      const found = new Map(comparison.from.map((row) => [row.id, row]));
+      const absent = new Set();
+      let previousMissing = '';
+      for (const row of comparison.missing) {
+        if (!keys(row, 'id name') || !old.has(row.id) || row.id <= previousMissing
+          || row.name !== old.get(row.id).name || found.has(row.id)) fail();
+        absent.add(row.id); previousMissing = row.id;
+      }
+      if (comparison.from.some((row) => !old.has(row.id))
+        || event.from.some((row) => !found.has(row.id) && !absent.has(row.id))) fail();
+      for (const row of comparison.to) {
+        const same = found.get(row.id);
+        if (old.has(row.id) && !same) fail();
+        if (same && (same.currency !== row.currency || same.local !== row.local || same.cny !== row.cny)) fail();
+      }
+    }
+
     const eventKey = `${event.at}|${event.tier}`;
     if (eventKeys.has(eventKey)) fail();
     eventKeys.add(eventKey);
