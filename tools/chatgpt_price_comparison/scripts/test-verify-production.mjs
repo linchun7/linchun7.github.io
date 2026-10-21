@@ -43,7 +43,18 @@ const expectedHtml =
   + '<link rel="modulepreload" href="vendor/lucide-subset.js?v=' + expectedAssets.lucide + '">'
   + '<link rel="stylesheet" href="style.css?v=' + expectedAssets.style + '">'
   + '<script src="app.js?v=' + expectedAssets.app + '"></script>'
-  + '</head></html>';
+  + '</head><body>'
+  + '<span id="updatedAt">2026-09-24</span><span id="freshnessWarning" hidden></span>'
+  + '<button id="minimumHistoryButton" disabled>历史</button>'
+  + '<div id="minimumSummary"><p>暂无价格</p></div>'
+  + '<span id="marketCount">0</span><span id="currencyCount">0</span><span id="planCount">0</span>'
+  + '<section id="priceWorkspace"><input id="searchInput" disabled>'
+  + '<table><thead><tr><th>价格</th></tr></thead><tbody id="priceRows"><tr><td>暂无数据</td></tr></tbody></table>'
+  + '<span id="fxStatus">无汇率</span></section>'
+  + '<dialog id="historyDialog"><button id="closeHistory">关闭</button></dialog>'
+  + '<button id="backToTableButton">返回</button>'
+  + '<script type="application/json" id="price-data">' + JSON.stringify(data) + '</script>'
+  + '</body></html>';
 
 assert.match(data.revision, /^[a-f0-9]{64}$/);
 assert.equal(validateSnapshot(data), data.revision);
@@ -80,6 +91,7 @@ assert.equal(
     expectedMinimumHistory: minimumHistory,
     expectedPageRevision: pageRevision,
     expectedAssets,
+    expectedHtml,
     fetchImpl: goodFetch,
     requestTimeoutMs: 1000
   }),
@@ -115,6 +127,7 @@ await assert.rejects(
     expectedMinimumHistory: minimumHistory,
     expectedPageRevision: pageRevision,
     expectedAssets,
+    expectedHtml,
     fetchImpl: async url => responseFor(url, {
       html: '<html><head><meta name="chatgpt-data-revision" content="' + data.revision + '"></head></html>'
     }),
@@ -128,6 +141,7 @@ await assert.rejects(
     expectedMinimumHistory: minimumHistory,
     expectedPageRevision: pageRevision,
     expectedAssets,
+    expectedHtml,
     fetchImpl: async url => responseFor(url, { html: expectedHtml.replace(pageRevision, 'c'.repeat(64)) }),
     requestTimeoutMs: 1000
   }),
@@ -139,6 +153,7 @@ await assert.rejects(
     expectedMinimumHistory: minimumHistory,
     expectedPageRevision: pageRevision,
     expectedAssets,
+    expectedHtml,
     fetchImpl: async url => responseFor(url, {
       html: expectedHtml.replace(expectedAssets.app, 'd'.repeat(12))
     }),
@@ -152,6 +167,7 @@ await assert.rejects(
     expectedMinimumHistory: minimumHistory,
     expectedPageRevision: pageRevision,
     expectedAssets,
+    expectedHtml,
     fetchImpl: async url => responseFor(url, { app: 'console.log("different");\n' }),
     requestTimeoutMs: 1000
   }),
@@ -167,6 +183,7 @@ for (const phase of ['diagnostic', 'canonical']) {
         expectedMinimumHistory: minimumHistory,
         expectedPageRevision: pageRevision,
         expectedAssets,
+    expectedHtml,
         fetchImpl: async url => {
           const request = new URL(String(url));
           const response = responseFor(url);
@@ -192,6 +209,7 @@ assert.equal(
     expectedMinimumHistory: minimumHistory,
     expectedPageRevision: pageRevision,
     expectedAssets,
+    expectedHtml,
     fetchImpl: async url => responseFor(url),
     requestTimeoutMs: 1000
   }),
@@ -210,6 +228,7 @@ await assert.rejects(
     expectedMinimumHistory: wrongHistory,
     expectedPageRevision: pageRevision,
     expectedAssets,
+    expectedHtml,
     fetchImpl: goodFetch,
     requestTimeoutMs: 1000
   }),
@@ -221,6 +240,7 @@ await assert.rejects(
     expectedMinimumHistory: minimumHistory,
     expectedPageRevision: pageRevision,
     expectedAssets,
+    expectedHtml,
     fetchImpl: async () => new Response('blocked', { status: 403 }),
     requestTimeoutMs: 1000
   }),
@@ -237,6 +257,7 @@ await assert.rejects(
     expectedMinimumHistory: minimumHistory,
     expectedPageRevision: pageRevision,
     expectedAssets,
+    expectedHtml,
     fetchImpl: async url => {
       const pathname = new URL(String(url)).pathname;
       if (pathname.endsWith('/data/prices.json') || pathname.endsWith('/data/minimum-history.json')) {
@@ -252,7 +273,7 @@ await assert.rejects(
 
 const verificationOptions = {
   expectedMinimumHistory: minimumHistory, expectedPageRevision: pageRevision,
-  expectedAssets, requestTimeoutMs: 1000
+  expectedAssets, expectedHtml, requestTimeoutMs: 1000
 };
 // A fresh cache-bypassing response must not hide stale ordinary URLs.
 for (const { name, overrides, reason } of [
@@ -346,6 +367,7 @@ for (const failureMode of ['diagnostic', 'canonical']) {
         expectedMinimumHistory: minimumHistory,
         expectedPageRevision: pageRevision,
         expectedAssets,
+    expectedHtml,
         fetchImpl: hangingFetch,
         requestTimeoutMs: 1000
       }),
@@ -360,7 +382,7 @@ for (const failureMode of ['diagnostic', 'canonical']) {
 let timedOutRequests = 0;
 let cancelledRequests = 0;
 await assert.rejects(verifyOnce(data, {
-  ...verificationOptions, requestTimeoutMs: 100,
+  ...verificationOptions, requestTimeoutMs: 1000,
   fetchImpl: async (url, { signal }) => {
     if (new URL(String(url)).searchParams.has('verify')) return responseFor(url);
     timedOutRequests += 1;
@@ -376,5 +398,68 @@ await assert.rejects(verifyOnce(data, {
 }), { name: 'AbortError' });
 assert.equal(timedOutRequests, 3, 'canonical documents were checked after diagnostic success');
 assert.equal(cancelledRequests, 3, 'canonical timeout aborts every in-flight request');
+
+
+// Valid version markers must not bless missing, inert or mismatched app content.
+const snapshotTag = '<script type="application/json" id="price-data">' + JSON.stringify(data) + '</script>';
+const workspace = expectedHtml.match(/<section id="priceWorkspace">[\s\S]*?<\/section>/)[0];
+for (const phase of ['diagnostic', 'canonical']) {
+  for (const [name, html] of [
+    ['extra html root', expectedHtml + '<html hidden></html>'],
+    ['extra head', expectedHtml.replace('</head>', '</head><head></head>')],
+    ['changed base URL', expectedHtml.replace('</head>', '<base href="https://example.invalid/"></head>')],
+    ['head only', expectedHtml.replace(/<body>[\s\S]*<\/body>/, '')],
+    ['missing snapshot', expectedHtml.replace(snapshotTag, '')],
+    ['duplicate snapshot', expectedHtml.replace(snapshotTag, snapshotTag + snapshotTag)],
+    ['wrong snapshot', expectedHtml.replace(snapshotTag, snapshotTag.replace('"markets":[]', '"markets":[{}]'))],
+    ['comment snapshot', expectedHtml.replace(snapshotTag, '<!--' + snapshotTag + '-->')],
+    ['inert snapshot', expectedHtml.replace(snapshotTag, '<template>' + snapshotTag + '</template>')],
+    ['wrong snapshot type', expectedHtml.replace('type="application/json" id="price-data"', 'type="text/plain" id="price-data"')],
+    ['inert app script', expectedHtml.replace('<script src="app.js?', '<script type="application/json" src="app.js?')],
+    ['comment app script', expectedHtml.replace(/<script src="app.js[^>]*><\/script>/, match => '<!--' + match + '-->')],
+    ['disabled stylesheet', expectedHtml.replace('rel="stylesheet"', 'rel="alternate stylesheet"')],
+    ['duplicate JSON key', expectedHtml.replace(snapshotTag, snapshotTag.replace('"schema":1,', '"schema":1,"schema":1,'))],
+    ['boolean schema', expectedHtml.replace(snapshotTag, snapshotTag.replace('"schema":1,', '"schema":true,'))],
+    ['duplicate required ID', expectedHtml.replace('</body>', '<div id="priceRows"></div></body>')],
+    ['noscript workspace', expectedHtml.replace(workspace, '<noscript>' + workspace + '</noscript>')],
+    ['script text workspace', expectedHtml.replace(workspace, '<script type="application/json">' + workspace + '</script>')],
+    ['textarea workspace', expectedHtml.replace(workspace, '<textarea>' + workspace + '</textarea>')],
+    ['select workspace', expectedHtml.replace(workspace, '<select>' + workspace + '</select>')],
+    ['unbalanced table', expectedHtml.replace('</tbody>', '')],
+    ['missing table', expectedHtml.replace(/<table>[\s\S]*?<\/table>/, '')],
+    ['changed static row', expectedHtml.replace('<td>暂无数据</td>', '<td>错误价格</td>')],
+    ['inert workspace', expectedHtml.replace(workspace, '<template>' + workspace + '</template>')],
+    ['comment workspace', expectedHtml.replace(workspace, '<!--' + workspace + '-->')],
+    ['hidden wrapper', expectedHtml.replace(workspace, '<div hidden>' + workspace + '</div>')]
+  ]) {
+    await assert.rejects(verifyOnce(data, {
+      ...verificationOptions,
+      fetchImpl: async url => {
+        const diagnostic = new URL(String(url)).searchParams.has('verify');
+        return responseFor(url, diagnostic === (phase === 'diagnostic') ? { html } : {});
+      }
+    }), /production HTML contract failed/, phase + ': ' + name);
+  }
+  for (const contentType of ['text/plain', 'application/json', null]) {
+    await assert.rejects(verifyOnce(data, {
+      ...verificationOptions,
+      fetchImpl: async url => {
+        const request = new URL(String(url));
+        const response = responseFor(url);
+        if (request.pathname.endsWith('/') && request.searchParams.has('verify') === (phase === 'diagnostic')) {
+          if (contentType === null) response.headers.delete('content-type');
+          else response.headers.set('content-type', contentType);
+        }
+        return response;
+      }
+    }), /HTML content type/, phase + ': rejects non-HTML document MIME');
+  }
+}
+assert.equal(await verifyOnce(data, {
+  ...verificationOptions,
+  fetchImpl: async url => responseFor(url, {
+    html: expectedHtml.replaceAll('><', '> \n <').replace('<body>', '<body><!-- harmless CDN comment -->')
+  })
+}), data.revision, 'formatting/comments do not require byte-identical HTML');
 
 console.log('verify-production tests passed');
