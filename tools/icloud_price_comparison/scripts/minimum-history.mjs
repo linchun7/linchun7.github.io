@@ -73,6 +73,9 @@ export function buildMinimumSnapshot(data, { sourceCommit = null, resolve = reso
 
 // Add same-observation display evidence without changing the historical winner chain.
 export function minimumEventComparison(event, data, options = {}) {
+  if (Object.hasOwn(options, 'sourceCommit') && options.sourceCommit !== event.sourceCommit) {
+    throw new Error('Comparison source commit does not match the historical event');
+  }
   const snapshot = buildMinimumSnapshot(data, options);
   if (!snapshot || snapshot.at !== event.at) throw new Error('Comparison requires the event price snapshot');
   const tier = snapshot.tiers.find((item) => item.id === event.tier);
