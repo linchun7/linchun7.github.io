@@ -1050,10 +1050,9 @@
 
   function minimumWinnerSummary(rows) {
     if (!rows.length) return '暂无';
-    const values = rows.map((row) => `${row.name} ¥${Number(row.cny).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
-    return values.length > 3 ? `${values.slice(0, 3).join('、')}等 ${values.length} 个地区并列` : values.join('、');
+    const values = rows.map((row) => `${row.name}（¥${Number(row.cny).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}）`);
+    return values.length > 3 ? `${values.slice(0, 3).join('、')}等 ${values.length} 个地区` : values.join('、');
   }
-
 
   function minimumEventSummary(event) {
     const current = new Map((event.comparison?.from || []).map(row => [row.code, row]));
@@ -1061,7 +1060,10 @@
       ? minimumWinnerSummary([current.get(row.code)])
       : row.name + '（同期价' + (event.comparison ? '缺失' : '未记录') + '）');
     const from = previous.length > 3 ? previous.slice(0, 3).join('、') + '等 ' + previous.length + ' 个地区' : previous.join('、');
-    return (from || '暂无') + ' → ' + minimumWinnerSummary(event.comparison?.to || event.to);
+    const beforeStatus = previous.length > 1 ? '此前并列最低' : previous.length ? '此前最低' : '';
+    const winners = event.comparison?.to || event.to;
+    const afterStatus = winners.length > 1 ? '并列最低' : winners.length ? '单独最低' : '';
+    return (from || '暂无') + beforeStatus + ' → ' + minimumWinnerSummary(winners) + afterStatus;
   }
 
   function minimumHistoryTimeUsable(history) {
