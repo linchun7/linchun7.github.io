@@ -64,3 +64,7 @@ pnpm audit --audit-level low
 汇率来自 ExchangeRate-API，认证源不可用时尝试[开放源](https://open.er-api.com/v6/latest/USD)。页面加载 GA4 和 Cloudflare Web Analytics；加载前清理搜索词及非法 URL 参数，GA4 可能写统计 Cookie。
 
 本工具与 Apple Inc. 无关联。自有代码见 [LICENSE](LICENSE)，第三方归属见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+### Pages 排队与发布等待
+
+每日更新的 Pages 等待保留精确提交或已验证后继提交检查，最多轮询 180 次、间隔 5 秒，约 15 分钟；等待步骤上限 20 分钟、发布 job 上限 25 分钟，为排队、API 请求及收尾留出余量。匹配构建失败仍立即失败，超时记录最后观察的提交、状态及关系，不把数据推送成功当作生产验证成功。
