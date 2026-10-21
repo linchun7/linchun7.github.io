@@ -29,6 +29,9 @@ class ProductionHtmlTests(unittest.TestCase):
         snapshot = re.search(r'<script type="application/json" id="price-data">.*?</script>', self.html, re.S).group()
         workspace = re.search(r'<section id="priceWorkspace"[\s\S]*?</section>', self.html).group()
         variants = {
+            'extra-html': self.html + '<html hidden></html>',
+            'extra-head': self.html.replace('</head>', '</head><head></head>'),
+            'base-url': self.html.replace('</head>', '<base href="https://example.invalid/"></head>'),
             'head-only': self.html[:self.html.index('<body>')] + '</html>',
             'missing-snapshot': self.html.replace(snapshot, ''),
             'duplicated-snapshot': self.html.replace(snapshot, snapshot + snapshot),
