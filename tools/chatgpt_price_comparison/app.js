@@ -1032,7 +1032,7 @@
     const more = minimumHistoryNode('button', '显示更多', 'minimum-history-button');
     more.type = 'button'; more.id = 'minimumHistoryMore'; more.hidden = true;
     more.addEventListener('click', () => { minimumHistoryUi.limit += 20; renderMinimumHistory(); });
-    const note = minimumHistoryNode('p', '箭头两端按换榜时同一快照、同一汇率比较；缺少同期证据会明确标注。仅记录最低价地区变化。', 'minimum-history-note');
+    const note = minimumHistoryNode('p', '箭头表示最低价地区的变化。此前并列最低的地区，更新后的金额可能已不同。缺失价格会注明。', 'minimum-history-note');
     note.id = 'minimumHistoryNote'; note.hidden = true;
     const retry = minimumHistoryNode('button', '重新读取历史', 'minimum-history-button');
     retry.type = 'button'; retry.id = 'minimumHistoryRetry'; retry.hidden = true;
@@ -1050,10 +1050,9 @@
 
   function minimumWinnerSummary(rows) {
     if (!rows.length) return '暂无';
-    const values = rows.map((row) => `${row.name} ¥${Number(row.cny).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
-    return values.length > 3 ? `${values.slice(0, 3).join('、')}等 ${values.length} 个地区并列` : values.join('、');
+    const values = rows.map((row) => `${row.name}（¥${Number(row.cny).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}）`);
+    return values.length > 3 ? `${values.slice(0, 3).join('、')}等 ${values.length} 个地区` : values.join('、');
   }
-
 
   function minimumEventSummary(event) {
     const current = new Map((event.comparison?.from || []).map(row => [row.code, row]));
@@ -1061,7 +1060,10 @@
       ? minimumWinnerSummary([current.get(row.code)])
       : row.name + '（同期价' + (event.comparison ? '缺失' : '未记录') + '）');
     const from = previous.length > 3 ? previous.slice(0, 3).join('、') + '等 ' + previous.length + ' 个地区' : previous.join('、');
-    return (from || '暂无') + ' → ' + minimumWinnerSummary(event.comparison?.to || event.to);
+    const beforeStatus = previous.length > 1 ? '此前并列最低' : previous.length ? '此前最低' : '';
+    const winners = event.comparison?.to || event.to;
+    const afterStatus = winners.length > 1 ? '并列最低' : winners.length ? '单独最低' : '';
+    return (from || '暂无') + beforeStatus + ' → ' + minimumWinnerSummary(winners) + afterStatus;
   }
 
   function minimumHistoryTimeUsable(history) {

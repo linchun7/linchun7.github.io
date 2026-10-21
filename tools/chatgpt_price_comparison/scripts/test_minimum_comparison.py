@@ -233,9 +233,24 @@ for (const name of ['minimumWinnerSummary','minimumEventSummary']) {
   assert.ok(match, name);
   context[name] = runInNewContext('('+match[0].trim()+')',context);
 }
-assert.equal(context.minimumEventSummary(cases[0]),'瑞士 ¥669.57 → 泰国 ¥668.11');
-assert.equal(context.minimumEventSummary(cases[1]),'瑞士（同期价缺失） → 泰国 ¥668.11');
-assert.equal(context.minimumEventSummary(cases[2]),'瑞士（同期价未记录） → 泰国 ¥668.11');
+assert.equal(context.minimumEventSummary(cases[0]),'瑞士（¥669.57）此前最低 → 泰国（¥668.11）单独最低');
+assert.equal(context.minimumEventSummary(cases[1]),'瑞士（同期价缺失）此前最低 → 泰国（¥668.11）单独最低');
+assert.equal(context.minimumEventSummary(cases[2]),'瑞士（同期价未记录）此前最低 → 泰国（¥668.11）单独最低');
+const id = {code:'id',name:'印度尼西亚',cny:'28.01'};
+const india = {code:'in',name:'印度',cny:'28.12'};
+const tiedIndia = {...india,cny:'28.01'};
+const oldTies = [{...id,cny:'28.09'},{...india,cny:'28.09'}];
+const summary = (from,to,current=from) => context.minimumEventSummary({from,to,comparison:{from:current,to}});
+assert.equal(summary(oldTies,[id],[id,india]),'印度尼西亚（¥28.01）、印度（¥28.12）此前并列最低 → 印度尼西亚（¥28.01）单独最低');
+assert.equal(summary([id],[id,tiedIndia]),'印度尼西亚（¥28.01）此前最低 → 印度尼西亚（¥28.01）、印度（¥28.01）并列最低');
+assert.equal(summary(oldTies,[id,{code:'th',name:'泰国',cny:'28.01'}],[id,india]),'印度尼西亚（¥28.01）、印度（¥28.12）此前并列最低 → 印度尼西亚（¥28.01）、泰国（¥28.01）并列最低');
+assert.equal(summary([], [id]),'暂无 → 印度尼西亚（¥28.01）单独最低');
+assert.equal(summary([id], []),'印度尼西亚（¥28.01）此前最低 → 暂无');
+assert.equal(summary([], []),'暂无 → 暂无');
+assert.equal(summary(oldTies,[id],[id]),'印度尼西亚（¥28.01）、印度（同期价缺失）此前并列最低 → 印度尼西亚（¥28.01）单独最低');
+const many = ['甲','乙','丙','丁'].map((name,i)=>({code:String(i),name,cny:'1.00'}));
+assert.equal(summary(many,many),'甲（¥1.00）、乙（¥1.00）、丙（¥1.00）等 4 个地区此前并列最低 → 甲（¥1.00）、乙（¥1.00）、丙（¥1.00）等 4 个地区并列最低');
+
 """
         subprocess.run(['node','--input-type=module','-e',script,str(p.ROOT/'app.js'),
                         json.dumps([event,missing,old_event],ensure_ascii=False)],
