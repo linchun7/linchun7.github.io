@@ -59,3 +59,7 @@ node tools/chatgpt_price_comparison/scripts/browser-test.mjs
 同期证据回填：从项目目录运行 `python3 scripts/enrich_minimum_comparisons.py --write`，只从完整 Git 第一父链精确匹配事件时间及 source_revision 的可靠 prices.json 回填；保留事件、归因、缺口和检查点，重复运行不改已有证据。`--report <path>` 导出来源及无法回填原因。命令只生成历史及对应 HTML，不抓 Apple、不改市场价格、不运行测试。
 
 页面与 OpenAI、Apple 无关联。[第三方资源许可](THIRD_PARTY_NOTICES.md) · [汇率服务条款](https://www.exchangerate-api.com/docs/free) · [OpenAI 网页多币种说明](https://help.openai.com/en/articles/10421635-multicurrency-billing)
+
+### 线上 HTML 内容验收
+
+生产校验除版本标记及资源哈希外，同时要求 HTML MIME、唯一且位于有效 body 中的内嵌价格快照，以及与已验证生成页一致的应用主体、静态价格表、历史弹窗和资源标签语义。`scripts/production_html.py` 使用现有 Python 标准库解析显式闭合的生成标记，忽略注释、属性顺序和无关排版空白，不要求 CDN 返回逐字节一致的 HTML；它是本项目生成页的验收契约，不是通用 HTML5 解析器或安全清洗器。主体缺失、隐藏/惰性容器中的伪主体、价格快照错配和失效资源标签都不能只靠正确 head 标记过关。缓存诊断和 canonical 两个阶段都执行此检查，共享原请求预算；既有提交归属、真实线上资源及失败后复核门禁不变。
