@@ -382,7 +382,7 @@ for (const failureMode of ['diagnostic', 'canonical']) {
 let timedOutRequests = 0;
 let cancelledRequests = 0;
 await assert.rejects(verifyOnce(data, {
-  ...verificationOptions, requestTimeoutMs: 100,
+  ...verificationOptions, requestTimeoutMs: 1000,
   fetchImpl: async (url, { signal }) => {
     if (new URL(String(url)).searchParams.has('verify')) return responseFor(url);
     timedOutRequests += 1;
@@ -415,6 +415,14 @@ for (const phase of ['diagnostic', 'canonical']) {
     ['inert app script', expectedHtml.replace('<script src="app.js?', '<script type="application/json" src="app.js?')],
     ['comment app script', expectedHtml.replace(/<script src="app.js[^>]*><\/script>/, match => '<!--' + match + '-->')],
     ['disabled stylesheet', expectedHtml.replace('rel="stylesheet"', 'rel="alternate stylesheet"')],
+    ['duplicate JSON key', expectedHtml.replace(snapshotTag, snapshotTag.replace('"schema":1,', '"schema":1,"schema":1,'))],
+    ['boolean schema', expectedHtml.replace(snapshotTag, snapshotTag.replace('"schema":1,', '"schema":true,'))],
+    ['duplicate required ID', expectedHtml.replace('</body>', '<div id="priceRows"></div></body>')],
+    ['noscript workspace', expectedHtml.replace(workspace, '<noscript>' + workspace + '</noscript>')],
+    ['script text workspace', expectedHtml.replace(workspace, '<script type="application/json">' + workspace + '</script>')],
+    ['textarea workspace', expectedHtml.replace(workspace, '<textarea>' + workspace + '</textarea>')],
+    ['select workspace', expectedHtml.replace(workspace, '<select>' + workspace + '</select>')],
+    ['unbalanced table', expectedHtml.replace('</tbody>', '')],
     ['missing table', expectedHtml.replace(/<table>[\s\S]*?<\/table>/, '')],
     ['changed static row', expectedHtml.replace('<td>暂无数据</td>', '<td>错误价格</td>')],
     ['inert workspace', expectedHtml.replace(workspace, '<template>' + workspace + '</template>')],
