@@ -3,7 +3,7 @@
   "channel": "ios-app-store",
   "billing_period": "not_disclosed",
   "purchase_eligibility": "not_verified",
-  "generated_at": "2026-10-26T01:05:40Z",
+  "generated_at": "2026-10-27T01:05:42Z",
   "markets": [
     {
       "code": "us",
@@ -16,7 +16,7 @@
             {
               "amount": "8",
               "display": "$8.00",
-              "cny": "53.42"
+              "cny": "53.47"
             }
           ]
         },
@@ -26,12 +26,12 @@
             {
               "amount": "19.99",
               "display": "$19.99",
-              "cny": "133.48"
+              "cny": "133.61"
             },
             {
               "amount": "200",
               "display": "$200.00",
-              "cny": "1335.49"
+              "cny": "1336.75"
             }
           ]
         },
@@ -41,7 +41,7 @@
             {
               "amount": "100",
               "display": "$100.00",
-              "cny": "667.74"
+              "cny": "668.38"
             }
           ]
         },
@@ -51,7 +51,7 @@
             {
               "amount": "200",
               "display": "$200.00",
-              "cny": "1335.49"
+              "cny": "1336.75"
             }
           ]
         },
@@ -61,22 +61,22 @@
             {
               "amount": "500",
               "display": "$500.00",
-              "cny": "3338.72"
+              "cny": "3341.88"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "USD",
       "unclassified_labels": [
         "100 Credits",
         "1000 Credits",
         "500 Credits"
       ],
-      "source_sha256": "e971f6b37269e53932320cef4ff96691b9dbb50fbb6b917a2f17fdc0e6a6f987",
+      "source_sha256": "bbd5fc6f72bedc39847affbdcba4b9c7736b9c9c9f1215bb03d53092567e2292",
       "fingerprint": "e23b43a341fcd1de008d8e849f917a50debc3a1d3cfd4973f6e7b26988cc109f",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -122,7 +122,7 @@
             {
               "amount": "6.99",
               "display": "£6.99",
-              "cny": "62.42"
+              "cny": "62.36"
             }
           ]
         },
@@ -132,12 +132,12 @@
             {
               "amount": "19.99",
               "display": "£19.99",
-              "cny": "178.50"
+              "cny": "178.33"
             },
             {
               "amount": "200",
               "display": "£200.00",
-              "cny": "1785.93"
+              "cny": "1784.17"
             }
           ]
         },
@@ -147,7 +147,7 @@
             {
               "amount": "88.9",
               "display": "£88.90",
-              "cny": "793.85"
+              "cny": "793.06"
             }
           ]
         },
@@ -157,7 +157,7 @@
             {
               "amount": "200",
               "display": "£200.00",
-              "cny": "1785.93"
+              "cny": "1784.17"
             }
           ]
         },
@@ -167,18 +167,18 @@
             {
               "amount": "444.99",
               "display": "£444.99",
-              "cny": "3973.61"
+              "cny": "3969.69"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "GBP",
       "unclassified_labels": [],
-      "source_sha256": "7a7cc391bbedbaf8d4fa63f07e3e24278e5a0d4325f613a4af61b15ea406b3c4",
+      "source_sha256": "b33e4c541725d0b02b949d3a59af0ec12a67e40c29c5cf5ad8f37192930b2c25",
       "fingerprint": "5e006f799506322c8a283d60971ebeeec0592487bab7c2110394ef7494ea540e",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -224,7 +224,7 @@
             {
               "amount": "12.99",
               "display": "$12.99",
-              "cny": "61.90"
+              "cny": "61.95"
             }
           ]
         },
@@ -234,12 +234,12 @@
             {
               "amount": "24.99",
               "display": "$24.99",
-              "cny": "119.08"
+              "cny": "119.17"
             },
             {
               "amount": "249",
               "display": "$249.00",
-              "cny": "1186.52"
+              "cny": "1187.40"
             }
           ]
         },
@@ -249,7 +249,7 @@
             {
               "amount": "152.99",
               "display": "$152.99",
-              "cny": "729.02"
+              "cny": "729.56"
             }
           ]
         },
@@ -259,7 +259,7 @@
             {
               "amount": "249",
               "display": "$249.00",
-              "cny": "1186.52"
+              "cny": "1187.40"
             }
           ]
         },
@@ -269,18 +269,18 @@
             {
               "amount": "759.99",
               "display": "$759.99",
-              "cny": "3621.46"
+              "cny": "3624.16"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "CAD",
       "unclassified_labels": [],
-      "source_sha256": "495728a1e0a736177fb28595c4a22e0945caa1411e7b333eeab8a1c572f1c8aa",
+      "source_sha256": "b6633b3b72fae1dcb3d89cf2fc65b5386d8dab4e81f97e0e8d088f2088adfc9f",
       "fingerprint": "b9ad4f0bae30e2584d380984716fe9208289d3e8397798e110768581e5867f5b",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -326,7 +326,7 @@
             {
               "amount": "13",
               "display": "$13.00",
-              "cny": "61.01"
+              "cny": "60.99"
             }
           ]
         },
@@ -336,12 +336,12 @@
             {
               "amount": "29.99",
               "display": "$29.99",
-              "cny": "140.74"
+              "cny": "140.71"
             },
             {
               "amount": "300",
               "display": "$300.00",
-              "cny": "1407.86"
+              "cny": "1407.53"
             }
           ]
         },
@@ -351,7 +351,7 @@
             {
               "amount": "154.99",
               "display": "$154.99",
-              "cny": "727.35"
+              "cny": "727.18"
             }
           ]
         },
@@ -361,7 +361,7 @@
             {
               "amount": "300",
               "display": "$300.00",
-              "cny": "1407.86"
+              "cny": "1407.53"
             }
           ]
         },
@@ -371,18 +371,18 @@
             {
               "amount": "769.99",
               "display": "$769.99",
-              "cny": "3613.46"
+              "cny": "3612.61"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "AUD",
       "unclassified_labels": [],
-      "source_sha256": "14e32155dab8ea24fb2c91cc0f20f8662f96bd3f4921fc145306e97457d41234",
+      "source_sha256": "c4f7b8edfe7082e4ce0284bbb92e30f2d13c17e9c0d3067fab885e7e30a05cd2",
       "fingerprint": "2fd9616bbdcfb03d4bf4ea294c02fe2aff90483fbda55a7674231f007bdf85c1",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -428,7 +428,7 @@
             {
               "amount": "13.99",
               "display": "$13.99",
-              "cny": "53.23"
+              "cny": "53.17"
             }
           ]
         },
@@ -438,12 +438,12 @@
             {
               "amount": "39.99",
               "display": "$39.99",
-              "cny": "152.16"
+              "cny": "151.98"
             },
             {
               "amount": "400",
               "display": "$400.00",
-              "cny": "1521.97"
+              "cny": "1520.18"
             }
           ]
         },
@@ -453,7 +453,7 @@
             {
               "amount": "190",
               "display": "$190.00",
-              "cny": "722.94"
+              "cny": "722.08"
             }
           ]
         },
@@ -463,7 +463,7 @@
             {
               "amount": "400",
               "display": "$400.00",
-              "cny": "1521.97"
+              "cny": "1520.18"
             }
           ]
         },
@@ -473,18 +473,18 @@
             {
               "amount": "949.99",
               "display": "$949.99",
-              "cny": "3614.65"
+              "cny": "3610.38"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "NZD",
       "unclassified_labels": [],
-      "source_sha256": "0dd5f77ecd08931af603ae5982d9ef8f5a09d19be0247b778c2f7f9cf31bac24",
+      "source_sha256": "4502b9ff9f312ee904e8b0c64cefab5d9d8ba63f9cf18b0541ad8006ec9cc530",
       "fingerprint": "56029c95a94f68ad259b327ebe0d92750b3d5abc90b6ba8381663745aa235e5d",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -530,7 +530,7 @@
             {
               "amount": "1400",
               "display": "¥1,400",
-              "cny": "59.59"
+              "cny": "59.43"
             }
           ]
         },
@@ -540,12 +540,12 @@
             {
               "amount": "3000",
               "display": "¥3,000",
-              "cny": "127.70"
+              "cny": "127.36"
             },
             {
               "amount": "30000",
               "display": "¥30,000",
-              "cny": "1276.99"
+              "cny": "1273.60"
             }
           ]
         },
@@ -555,7 +555,7 @@
             {
               "amount": "16800",
               "display": "¥16,800",
-              "cny": "715.11"
+              "cny": "713.22"
             }
           ]
         },
@@ -565,7 +565,7 @@
             {
               "amount": "30000",
               "display": "¥30,000",
-              "cny": "1276.99"
+              "cny": "1273.60"
             }
           ]
         },
@@ -575,18 +575,18 @@
             {
               "amount": "84000",
               "display": "¥84,000",
-              "cny": "3575.56"
+              "cny": "3566.08"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "JPY",
       "unclassified_labels": [],
-      "source_sha256": "8c428b5e8ccc4d98f44f75018c5cd6cf51a7f6efa756aa78bdbcfd3fb8064d8b",
+      "source_sha256": "e8c9bad5040f47db1456ad17f5bff2ad469b732ad1d7450eeb5c554f5e250d5e",
       "fingerprint": "5c6f7179031cad0a2c03216bfa6840ca4298c4d855be4862d2640cf5681d9403",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -647,7 +647,7 @@
             {
               "amount": "299000",
               "display": "₩299,000",
-              "cny": "1508.08"
+              "cny": "1508.05"
             }
           ]
         },
@@ -657,7 +657,7 @@
             {
               "amount": "159000",
               "display": "₩159,000",
-              "cny": "801.96"
+              "cny": "801.94"
             }
           ]
         },
@@ -667,7 +667,7 @@
             {
               "amount": "299000",
               "display": "₩299,000",
-              "cny": "1508.08"
+              "cny": "1508.05"
             }
           ]
         },
@@ -677,18 +677,18 @@
             {
               "amount": "790000",
               "display": "₩790,000",
-              "cny": "3984.57"
+              "cny": "3984.47"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "KRW",
       "unclassified_labels": [],
-      "source_sha256": "98cc02d58b80b169ae26ba458b66cf703e89e14d2e445457ad767aa99743e66f",
+      "source_sha256": "c5e82d5ca7bbc923be9ee80368063a43e58f2d264695f9ea0a6e69a724656509",
       "fingerprint": "75d836479cf98578e088580a66714a01f38341951af3fdd2d8dd6f683a0de36c",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -734,7 +734,7 @@
             {
               "amount": "270",
               "display": "NT$270.00",
-              "cny": "55.31"
+              "cny": "55.37"
             }
           ]
         },
@@ -744,12 +744,12 @@
             {
               "amount": "690",
               "display": "NT$690.00",
-              "cny": "141.35"
+              "cny": "141.50"
             },
             {
               "amount": "6990",
               "display": "NT$6,990.00",
-              "cny": "1431.93"
+              "cny": "1433.44"
             }
           ]
         },
@@ -759,7 +759,7 @@
             {
               "amount": "3300",
               "display": "NT$3,300.00",
-              "cny": "676.02"
+              "cny": "676.73"
             }
           ]
         },
@@ -769,7 +769,7 @@
             {
               "amount": "6990",
               "display": "NT$6,990.00",
-              "cny": "1431.93"
+              "cny": "1433.44"
             }
           ]
         },
@@ -779,18 +779,18 @@
             {
               "amount": "16500",
               "display": "NT$16,500.00",
-              "cny": "3380.09"
+              "cny": "3383.67"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "TWD",
       "unclassified_labels": [],
-      "source_sha256": "9d9c52dfa76f92a84b816a9bba3f64226eae68664ee38cc3c4f1f6435fc879f7",
+      "source_sha256": "811d01037934b632420bdfead2a6d8bff3fcf439d31b9294d502d91466ee154a",
       "fingerprint": "b015f4c5afec3477a3c721fdc0c56130b7cdf23ac98d3ad16281a7aa5e9f8cc4",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -836,7 +836,7 @@
             {
               "amount": "10.98",
               "display": "S$ 10.98",
-              "cny": "57.34"
+              "cny": "57.30"
             }
           ]
         },
@@ -846,12 +846,12 @@
             {
               "amount": "29.98",
               "display": "S$ 29.98",
-              "cny": "156.57"
+              "cny": "156.46"
             },
             {
               "amount": "299.98",
               "display": "S$ 299.98",
-              "cny": "1566.67"
+              "cny": "1565.51"
             }
           ]
         },
@@ -861,7 +861,7 @@
             {
               "amount": "137.98",
               "display": "S$ 137.98",
-              "cny": "720.61"
+              "cny": "720.08"
             }
           ]
         },
@@ -871,7 +871,7 @@
             {
               "amount": "299.98",
               "display": "S$ 299.98",
-              "cny": "1566.67"
+              "cny": "1565.51"
             }
           ]
         },
@@ -881,18 +881,18 @@
             {
               "amount": "689.98",
               "display": "S$ 689.98",
-              "cny": "3603.48"
+              "cny": "3600.81"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "SGD",
       "unclassified_labels": [],
-      "source_sha256": "93502096481937927d7bf4f00a365452e8d7209585f2eaf96456b91074afbc45",
+      "source_sha256": "d6dece17dd4b4eef1090e2d3176b853b520443e462cf8eccc6b910fef7433b99",
       "fingerprint": "ce184c3ee89b8834bfeb9b4fc860098dbdc1edb9195daf1c2dc64aec7e62a332",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -938,7 +938,7 @@
             {
               "amount": "23.99",
               "display": "RM23.99",
-              "cny": "39.21"
+              "cny": "39.23"
             }
           ]
         },
@@ -948,12 +948,12 @@
             {
               "amount": "99.9",
               "display": "RM99.90",
-              "cny": "163.29"
+              "cny": "163.36"
             },
             {
               "amount": "999.9",
               "display": "RM999.90",
-              "cny": "1634.35"
+              "cny": "1635.08"
             }
           ]
         },
@@ -963,7 +963,7 @@
             {
               "amount": "419.9",
               "display": "RM419.90",
-              "cny": "686.33"
+              "cny": "686.64"
             }
           ]
         },
@@ -973,7 +973,7 @@
             {
               "amount": "999.9",
               "display": "RM999.90",
-              "cny": "1634.35"
+              "cny": "1635.08"
             }
           ]
         },
@@ -983,18 +983,18 @@
             {
               "amount": "2099.9",
               "display": "RM2,099.90",
-              "cny": "3432.32"
+              "cny": "3433.84"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "MYR",
       "unclassified_labels": [],
-      "source_sha256": "1b3d6241a8f184cccc23565a1434287a9110df41ba5a7f04cd3d0ab6811a6bfc",
+      "source_sha256": "cc965852c030a1d3439fe0f87fb65291bdde741788ad8a7aa068c81f6c93b932",
       "fingerprint": "b65f1a297ce4f053abb17026ab62b3deb06037d57051dd28b50df74d12585fad",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -1040,7 +1040,7 @@
             {
               "amount": "259",
               "display": "฿259.00",
-              "cny": "51.22"
+              "cny": "51.24"
             }
           ]
         },
@@ -1050,12 +1050,12 @@
             {
               "amount": "699",
               "display": "฿699.00",
-              "cny": "138.25"
+              "cny": "138.28"
             },
             {
               "amount": "6990",
               "display": "฿6,990.00",
-              "cny": "1382.47"
+              "cny": "1382.76"
             }
           ]
         },
@@ -1065,7 +1065,7 @@
             {
               "amount": "3350",
               "display": "฿3,350.00",
-              "cny": "662.56"
+              "cny": "662.70"
             }
           ]
         },
@@ -1075,7 +1075,7 @@
             {
               "amount": "6990",
               "display": "฿6,990.00",
-              "cny": "1382.47"
+              "cny": "1382.76"
             }
           ]
         },
@@ -1085,18 +1085,18 @@
             {
               "amount": "16490",
               "display": "฿16,490.00",
-              "cny": "3261.37"
+              "cny": "3262.05"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "THB",
       "unclassified_labels": [],
-      "source_sha256": "124a5d6ed625b2b944faa1ba7f1d3afa46e0b8a33401d2f6294d53a63075358f",
+      "source_sha256": "9721053df0301a10f220597c3d3a7391cf87cc5a1321338dda3ec6a998361e17",
       "fingerprint": "03653cd69827bc35f6b23b0ecee458353c2011f630c13b1401a886c63f8b0a48",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -1142,7 +1142,7 @@
             {
               "amount": "132000",
               "display": "132.000đ",
-              "cny": "34.12"
+              "cny": "34.15"
             }
           ]
         },
@@ -1152,12 +1152,12 @@
             {
               "amount": "499000",
               "display": "499.000đ",
-              "cny": "129.00"
+              "cny": "129.11"
             },
             {
               "amount": "4999000",
               "display": "4.999.000đ",
-              "cny": "1292.33"
+              "cny": "1293.46"
             }
           ]
         },
@@ -1167,7 +1167,7 @@
             {
               "amount": "2849000",
               "display": "2.849.000đ",
-              "cny": "736.52"
+              "cny": "737.16"
             }
           ]
         },
@@ -1177,7 +1177,7 @@
             {
               "amount": "4999000",
               "display": "4.999.000đ",
-              "cny": "1292.33"
+              "cny": "1293.46"
             }
           ]
         },
@@ -1187,18 +1187,18 @@
             {
               "amount": "14199000",
               "display": "14.199.000đ",
-              "cny": "3670.71"
+              "cny": "3673.90"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "VND",
       "unclassified_labels": [],
-      "source_sha256": "0d89ab0d09efbe83fbc008d302030da4774fc3b42ce493645913f046e2c03d0d",
+      "source_sha256": "abf3b6bb8541f2e74a2eeb136098c199bd8ddce1387a412d725015525108cfe2",
       "fingerprint": "7fc1029876e80ed72f481ce5db73c8fb608adefa1b4c42bc95d58a172095777f",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -1244,7 +1244,7 @@
             {
               "amount": "75000",
               "display": "Rp 75ribu",
-              "cny": "27.68"
+              "cny": "27.62"
             }
           ]
         },
@@ -1254,12 +1254,12 @@
             {
               "amount": "349000",
               "display": "Rp 349ribu",
-              "cny": "128.82"
+              "cny": "128.53"
             },
             {
               "amount": "3499000",
               "display": "Rp 3,499juta",
-              "cny": "1291.54"
+              "cny": "1288.59"
             }
           ]
         },
@@ -1269,7 +1269,7 @@
             {
               "amount": "1889000",
               "display": "Rp 1,889juta",
-              "cny": "697.26"
+              "cny": "695.67"
             }
           ]
         },
@@ -1279,7 +1279,7 @@
             {
               "amount": "3499000",
               "display": "Rp 3,499juta",
-              "cny": "1291.54"
+              "cny": "1288.59"
             }
           ]
         },
@@ -1289,18 +1289,18 @@
             {
               "amount": "9399000",
               "display": "Rp 9,399juta",
-              "cny": "3469.34"
+              "cny": "3461.42"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "IDR",
       "unclassified_labels": [],
-      "source_sha256": "11730fa0c1b3aa916a06af851a14baaf82d7c43b33f0ab7844eb7aa8ee25a760",
+      "source_sha256": "b1b3f96686137f2bb8144f4682baf3f40525c10708bac0e442bf077f53c2b4a8",
       "fingerprint": "7707ad58e86fb751ea899b6e2b09749db1dee2764a08e82ee8d5480893e202b8",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -1346,7 +1346,7 @@
             {
               "amount": "300",
               "display": "₱ 300.00",
-              "cny": "31.46"
+              "cny": "31.35"
             }
           ]
         },
@@ -1356,12 +1356,12 @@
             {
               "amount": "999",
               "display": "₱ 999.00",
-              "cny": "104.75"
+              "cny": "104.39"
             },
             {
               "amount": "9990",
               "display": "₱ 9,990.00",
-              "cny": "1047.53"
+              "cny": "1043.94"
             }
           ]
         },
@@ -1371,7 +1371,7 @@
             {
               "amount": "6490",
               "display": "₱ 6,490.00",
-              "cny": "680.53"
+              "cny": "678.20"
             }
           ]
         },
@@ -1381,7 +1381,7 @@
             {
               "amount": "9990",
               "display": "₱ 9,990.00",
-              "cny": "1047.53"
+              "cny": "1043.94"
             }
           ]
         },
@@ -1391,18 +1391,18 @@
             {
               "amount": "32490",
               "display": "₱ 32,490.00",
-              "cny": "3406.84"
+              "cny": "3395.16"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "PHP",
       "unclassified_labels": [],
-      "source_sha256": "785f740887ca3a29167ac9105b5908b8906dc8fb7493b9876745b61657f9311a",
+      "source_sha256": "1fdbd1dbbfc873be1049c53f5d41ae361b5b5f78bd4a3a587f75420efe91aa43",
       "fingerprint": "f1d8bea17d20c637303d6bdb1b94f55a4bf530488c4ccbd6a2934a4ce6064519",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -1448,7 +1448,7 @@
             {
               "amount": "399",
               "display": "₹ 399",
-              "cny": "28.00"
+              "cny": "27.99"
             }
           ]
         },
@@ -1458,12 +1458,12 @@
             {
               "amount": "1999",
               "display": "₹ 1,999",
-              "cny": "140.27"
+              "cny": "140.24"
             },
             {
               "amount": "19900",
               "display": "₹ 19,900",
-              "cny": "1396.39"
+              "cny": "1396.12"
             }
           ]
         },
@@ -1473,7 +1473,7 @@
             {
               "amount": "10699",
               "display": "₹ 10,699",
-              "cny": "750.75"
+              "cny": "750.61"
             }
           ]
         },
@@ -1483,7 +1483,7 @@
             {
               "amount": "19900",
               "display": "₹ 19,900",
-              "cny": "1396.39"
+              "cny": "1396.12"
             }
           ]
         },
@@ -1493,18 +1493,18 @@
             {
               "amount": "52900",
               "display": "₹ 52,900",
-              "cny": "3712.00"
+              "cny": "3711.28"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "INR",
       "unclassified_labels": [],
-      "source_sha256": "1e245e648fee2500198ed0f62365cdf7214d23c06fba417229e7070934472ab6",
+      "source_sha256": "8c1ed96a19ac8b3047b0130d7f76108cb5a6f6eec92b17aed432c51a23569b3a",
       "fingerprint": "cf1fe72d03fab0a9b659200aff22ce4fb59bc2c79aa531855eac1a4d221d6301",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -1550,7 +1550,7 @@
             {
               "amount": "1400",
               "display": "Rs 1,400.00",
-              "cny": "33.76"
+              "cny": "33.80"
             }
           ]
         },
@@ -1560,12 +1560,12 @@
             {
               "amount": "4900",
               "display": "Rs 4,900.00",
-              "cny": "118.15"
+              "cny": "118.31"
             },
             {
               "amount": "49900",
               "display": "Rs 49,900.00",
-              "cny": "1203.16"
+              "cny": "1204.85"
             }
           ]
         },
@@ -1575,7 +1575,7 @@
             {
               "amount": "27999",
               "display": "Rs 27,999.00",
-              "cny": "675.10"
+              "cny": "676.04"
             }
           ]
         },
@@ -1585,7 +1585,7 @@
             {
               "amount": "49900",
               "display": "Rs 49,900.00",
-              "cny": "1203.16"
+              "cny": "1204.85"
             }
           ]
         },
@@ -1595,18 +1595,18 @@
             {
               "amount": "139999",
               "display": "Rs 139,999.00",
-              "cny": "3375.59"
+              "cny": "3380.31"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "PKR",
       "unclassified_labels": [],
-      "source_sha256": "ba813c746b07b9f4b9ad58708b2dd44ddc09048ea215a95410b7473472a48acb",
+      "source_sha256": "040aa15e386852f011ddaac6a093e3a7f8779e6e0549ee30151e1fdc221086cc",
       "fingerprint": "9535c7d69d8d55be17e1729cea21887a14580d3dfe7df6da4f5a5692b7e5a30e",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -1652,7 +1652,7 @@
             {
               "amount": "5",
               "display": "USD 5.00",
-              "cny": "33.39"
+              "cny": "33.42"
             }
           ]
         },
@@ -1662,12 +1662,12 @@
             {
               "amount": "19.99",
               "display": "USD 19.99",
-              "cny": "133.48"
+              "cny": "133.61"
             },
             {
               "amount": "200",
               "display": "USD 200.00",
-              "cny": "1335.49"
+              "cny": "1336.75"
             }
           ]
         },
@@ -1677,7 +1677,7 @@
             {
               "amount": "100",
               "display": "USD 100.00",
-              "cny": "667.74"
+              "cny": "668.38"
             }
           ]
         },
@@ -1687,7 +1687,7 @@
             {
               "amount": "200",
               "display": "USD 200.00",
-              "cny": "1335.49"
+              "cny": "1336.75"
             }
           ]
         },
@@ -1697,18 +1697,18 @@
             {
               "amount": "500",
               "display": "USD 500.00",
-              "cny": "3338.72"
+              "cny": "3341.88"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "USD",
       "unclassified_labels": [],
-      "source_sha256": "61eebb892d8a4e6db1561ac08ce55f04cd5d5c7291705f6d815f8632d56daa02",
+      "source_sha256": "1c2a5ac4610f622d7f60321e43d4cb0dc84b238a6558b094b3dd7cad6c1265ba",
       "fingerprint": "37659de9e050d98d5052700f992d4f2a0f152bb1df283bf617a494ec7e788c2d",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -1754,7 +1754,7 @@
             {
               "amount": "5.69",
               "display": "USD 5.69",
-              "cny": "37.99"
+              "cny": "38.03"
             }
           ]
         },
@@ -1764,12 +1764,12 @@
             {
               "amount": "19.99",
               "display": "USD 19.99",
-              "cny": "133.48"
+              "cny": "133.61"
             },
             {
               "amount": "250",
               "display": "USD 250.00",
-              "cny": "1669.36"
+              "cny": "1670.94"
             }
           ]
         },
@@ -1779,7 +1779,7 @@
             {
               "amount": "112.99",
               "display": "USD 112.99",
-              "cny": "754.48"
+              "cny": "755.20"
             }
           ]
         },
@@ -1789,7 +1789,7 @@
             {
               "amount": "250",
               "display": "USD 250.00",
-              "cny": "1669.36"
+              "cny": "1670.94"
             }
           ]
         },
@@ -1799,18 +1799,18 @@
             {
               "amount": "559.99",
               "display": "USD 559.99",
-              "cny": "3739.30"
+              "cny": "3742.83"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "USD",
       "unclassified_labels": [],
-      "source_sha256": "5b43ef96294f315418e5397b6e8ab15bda26785eb79b246b1d91cada05c953ce",
+      "source_sha256": "e42ad1f4af2671be309c89b22792a2088388b0a0d104b12b48d76d45b3656bc8",
       "fingerprint": "15ba98d6b689ee09975c3e5f8ea0daeb95f4cd0d0297d5e226379704e5a6158e",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -1856,7 +1856,7 @@
             {
               "amount": "249.99",
               "display": "₺249,99",
-              "cny": "33.53"
+              "cny": "33.56"
             }
           ]
         },
@@ -1866,12 +1866,12 @@
             {
               "amount": "999.99",
               "display": "₺999,99",
-              "cny": "134.11"
+              "cny": "134.24"
             },
             {
               "amount": "9999.99",
               "display": "₺9.999,99",
-              "cny": "1341.15"
+              "cny": "1342.39"
             }
           ]
         },
@@ -1881,7 +1881,7 @@
             {
               "amount": "5299.99",
               "display": "₺5.299,99",
-              "cny": "710.81"
+              "cny": "711.47"
             }
           ]
         },
@@ -1891,7 +1891,7 @@
             {
               "amount": "9999.99",
               "display": "₺9.999,99",
-              "cny": "1341.15"
+              "cny": "1342.39"
             }
           ]
         },
@@ -1901,18 +1901,18 @@
             {
               "amount": "26499",
               "display": "₺26.499,00",
-              "cny": "3553.91"
+              "cny": "3557.21"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "TRY",
       "unclassified_labels": [],
-      "source_sha256": "6738d855e7b127302f63d967998d9f549dfd64ad0148602da40076d198908fe6",
+      "source_sha256": "1c2d86971172db2e6950af637d34b3b665fdc9da529bb9d21c512c28e80420e5",
       "fingerprint": "2638e3d43c57eabdfc9ef93a99c509ce00eb9ef435ffadd47c6a7c589a237f5b",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -1958,7 +1958,7 @@
             {
               "amount": "39.9",
               "display": "R$ 39,90",
-              "cny": "53.34"
+              "cny": "49.10"
             }
           ]
         },
@@ -1968,12 +1968,12 @@
             {
               "amount": "99.9",
               "display": "R$ 99,90",
-              "cny": "133.55"
+              "cny": "122.92"
             },
             {
               "amount": "999.9",
               "display": "R$ 999,90",
-              "cny": "1336.68"
+              "cny": "1230.35"
             }
           ]
         },
@@ -1983,7 +1983,7 @@
             {
               "amount": "524.9",
               "display": "R$ 524,90",
-              "cny": "701.69"
+              "cny": "645.87"
             }
           ]
         },
@@ -1993,7 +1993,7 @@
             {
               "amount": "999.9",
               "display": "R$ 999,90",
-              "cny": "1336.68"
+              "cny": "1230.35"
             }
           ]
         },
@@ -2003,18 +2003,18 @@
             {
               "amount": "2599.9",
               "display": "R$ 2.599,90",
-              "cny": "3475.58"
+              "cny": "3199.10"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "BRL",
       "unclassified_labels": [],
-      "source_sha256": "8c87b2e1ef59d325584ba2bac24c0cfe29bfafb90a8615b50254423e843f6e79",
+      "source_sha256": "5a08521fb74fedfd5179ba3cb8c936ee3e3f7883479533c445efafd33637e431",
       "fingerprint": "8fb8679167d0d4c2f9d4567891745dfd2e556e793cecf727998013289cefe31d",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -2060,7 +2060,7 @@
             {
               "amount": "129",
               "display": "$129.00",
-              "cny": "46.01"
+              "cny": "46.38"
             }
           ]
         },
@@ -2070,12 +2070,12 @@
             {
               "amount": "399",
               "display": "$399.00",
-              "cny": "142.30"
+              "cny": "143.44"
             },
             {
               "amount": "3999",
               "display": "$3,999.00",
-              "cny": "1426.21"
+              "cny": "1437.68"
             }
           ]
         },
@@ -2085,7 +2085,7 @@
             {
               "amount": "1989",
               "display": "$1,989.00",
-              "cny": "709.36"
+              "cny": "715.07"
             }
           ]
         },
@@ -2095,7 +2095,7 @@
             {
               "amount": "3999",
               "display": "$3,999.00",
-              "cny": "1426.21"
+              "cny": "1437.68"
             }
           ]
         },
@@ -2105,18 +2105,18 @@
             {
               "amount": "9899",
               "display": "$9,899.00",
-              "cny": "3530.40"
+              "cny": "3558.79"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "MXN",
       "unclassified_labels": [],
-      "source_sha256": "1a56b5073a5631453c047d85eae6b9692283ba8ba00a6f931204a4cce147d225",
+      "source_sha256": "bc109b2ef61a7930b0cc33fdf298e68e8c57d63e26d8665492987e0b871526f7",
       "fingerprint": "e31344d3154fa582bbd31426bdc92ff4a03107d37d50eb60fa4fa8930a28f0a6",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -2162,7 +2162,7 @@
             {
               "amount": "5.99",
               "display": "USD 5.99",
-              "cny": "40.00"
+              "cny": "40.04"
             }
           ]
         },
@@ -2172,12 +2172,12 @@
             {
               "amount": "19.99",
               "display": "USD 19.99",
-              "cny": "133.48"
+              "cny": "133.61"
             },
             {
               "amount": "200",
               "display": "USD 200.00",
-              "cny": "1335.49"
+              "cny": "1336.75"
             }
           ]
         },
@@ -2187,7 +2187,7 @@
             {
               "amount": "100",
               "display": "USD 100.00",
-              "cny": "667.74"
+              "cny": "668.38"
             }
           ]
         },
@@ -2197,7 +2197,7 @@
             {
               "amount": "200",
               "display": "USD 200.00",
-              "cny": "1335.49"
+              "cny": "1336.75"
             }
           ]
         },
@@ -2207,18 +2207,18 @@
             {
               "amount": "500",
               "display": "USD 500.00",
-              "cny": "3338.72"
+              "cny": "3341.88"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "USD",
       "unclassified_labels": [],
-      "source_sha256": "78dd2a8845cefdabe5429b6e2610ab9c2ab9dc077d0fa674d1e839a5811ca92b",
+      "source_sha256": "35a2f176a40f6dae4db0ecca363e463f0710364ff2967e22c5c8844456181745",
       "fingerprint": "23af09300c1e5718fcfab3cab7dae274bf44fe3425fbfa4e4412954f6ccf6c04",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -2264,7 +2264,7 @@
             {
               "amount": "7990",
               "display": "$7.990",
-              "cny": "53.92"
+              "cny": "53.63"
             }
           ]
         },
@@ -2274,12 +2274,12 @@
             {
               "amount": "19990",
               "display": "$19.990",
-              "cny": "134.90"
+              "cny": "134.17"
             },
             {
               "amount": "229990",
               "display": "$229.990",
-              "cny": "1552.00"
+              "cny": "1543.60"
             }
           ]
         },
@@ -2289,7 +2289,7 @@
             {
               "amount": "102990",
               "display": "$102.990",
-              "cny": "694.99"
+              "cny": "691.23"
             }
           ]
         },
@@ -2299,7 +2299,7 @@
             {
               "amount": "199990",
               "display": "$199.990",
-              "cny": "1349.56"
+              "cny": "1342.26"
             }
           ]
         },
@@ -2309,18 +2309,18 @@
             {
               "amount": "509990",
               "display": "$509.990",
-              "cny": "3441.48"
+              "cny": "3422.86"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "CLP",
       "unclassified_labels": [],
-      "source_sha256": "f0827a8a4759b662c71b7bef6ddb5baf50624c878e00b59728efafadb1b10bd5",
+      "source_sha256": "fa8797a8c2373ef63c8a809751061e1e861f5a5dce0f1bc044a8c1a51467f1e8",
       "fingerprint": "48f2ba35c6ad42058563b97b87a302a5bc0820284c8f33e43d939be84a3d86cb",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -2366,7 +2366,7 @@
             {
               "amount": "24900",
               "display": "$ 24.900,00",
-              "cny": "52.44"
+              "cny": "52.75"
             }
           ]
         },
@@ -2376,12 +2376,12 @@
             {
               "amount": "99900",
               "display": "$ 99.900,00",
-              "cny": "210.40"
+              "cny": "211.62"
             },
             {
               "amount": "999900",
               "display": "$ 999.900,00",
-              "cny": "2105.92"
+              "cny": "2118.12"
             }
           ]
         },
@@ -2391,7 +2391,7 @@
             {
               "amount": "364900",
               "display": "$ 364.900,00",
-              "cny": "768.53"
+              "cny": "772.98"
             }
           ]
         },
@@ -2401,7 +2401,7 @@
             {
               "amount": "999900",
               "display": "$ 999.900,00",
-              "cny": "2105.92"
+              "cny": "2118.12"
             }
           ]
         },
@@ -2411,18 +2411,18 @@
             {
               "amount": "1819900",
               "display": "$ 1.819.900,00",
-              "cny": "3832.94"
+              "cny": "3855.14"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "COP",
       "unclassified_labels": [],
-      "source_sha256": "472cb55a30cb3d0ecf25a23037de8c06c4f5c52291007aee88bcf2aaec0a9e59",
+      "source_sha256": "b5f4da43dfee09ebb4e2fda0928dbaa8f8bbdea5f82262bba735a26d0176e9aa",
       "fingerprint": "7763a68e559239ef561a7b2238796936ecd3835ef96a1ee8abe9f2f90eb68681",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -2468,7 +2468,7 @@
             {
               "amount": "19.9",
               "display": "S/ 19.90",
-              "cny": "38.61"
+              "cny": "38.67"
             }
           ]
         },
@@ -2478,12 +2478,12 @@
             {
               "amount": "79.9",
               "display": "S/ 79.90",
-              "cny": "155.02"
+              "cny": "155.24"
             },
             {
               "amount": "899.9",
               "display": "S/ 899.90",
-              "cny": "1745.99"
+              "cny": "1748.49"
             }
           ]
         },
@@ -2493,7 +2493,7 @@
             {
               "amount": "394.9",
               "display": "S/ 394.90",
-              "cny": "766.19"
+              "cny": "767.28"
             }
           ]
         },
@@ -2503,7 +2503,7 @@
             {
               "amount": "799.9",
               "display": "S/ 799.90",
-              "cny": "1551.97"
+              "cny": "1554.19"
             }
           ]
         },
@@ -2513,18 +2513,18 @@
             {
               "amount": "1969.9",
               "display": "S/ 1,969.90",
-              "cny": "3822.00"
+              "cny": "3827.48"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "PEN",
       "unclassified_labels": [],
-      "source_sha256": "f7fe2bf576b4f286e2e557135f7c3a6d408cce9399ca2941726ada1c7f60309c",
+      "source_sha256": "742c1d7aee52bbbea277f09cbe5c89cf144e10a0a685c35f2f3a47c321fabfec",
       "fingerprint": "8ceaa1ef3cb6c5b97a8818824c5992f1fea979bba63833da9a0bdbbca12dc6a0",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -2570,7 +2570,7 @@
             {
               "amount": "8.99",
               "display": "USD 8.99",
-              "cny": "60.03"
+              "cny": "60.09"
             }
           ]
         },
@@ -2580,12 +2580,12 @@
             {
               "amount": "19.99",
               "display": "USD 19.99",
-              "cny": "133.48"
+              "cny": "133.61"
             },
             {
               "amount": "200",
               "display": "USD 200.00",
-              "cny": "1335.49"
+              "cny": "1336.75"
             }
           ]
         },
@@ -2595,7 +2595,7 @@
             {
               "amount": "121.99",
               "display": "USD 121.99",
-              "cny": "814.58"
+              "cny": "815.35"
             }
           ]
         },
@@ -2605,7 +2605,7 @@
             {
               "amount": "200",
               "display": "USD 200.00",
-              "cny": "1335.49"
+              "cny": "1336.75"
             }
           ]
         },
@@ -2615,18 +2615,18 @@
             {
               "amount": "609.99",
               "display": "USD 609.99",
-              "cny": "4073.18"
+              "cny": "4077.02"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "USD",
       "unclassified_labels": [],
-      "source_sha256": "1982e8e2c68cfd46da961af7c7769ee97cb964d6f8a8e31ed1baeafd2a9d3716",
+      "source_sha256": "ee02a3a33b2ee3f353d9dae64c39b1ef3da884a056b1c8ab27f8cdc310c805a1",
       "fingerprint": "7c91f5d2692377d79af46a225c22243b3b39f086b58254629cead83c7a4eae51",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -2672,7 +2672,7 @@
             {
               "amount": "149.99",
               "display": "R149.99",
-              "cny": "60.34"
+              "cny": "60.26"
             }
           ]
         },
@@ -2682,12 +2682,12 @@
             {
               "amount": "399.99",
               "display": "R399.99",
-              "cny": "160.91"
+              "cny": "160.71"
             },
             {
               "amount": "3999.99",
               "display": "R3,999.99",
-              "cny": "1609.14"
+              "cny": "1607.10"
             }
           ]
         },
@@ -2697,7 +2697,7 @@
             {
               "amount": "1839",
               "display": "R1,839.00",
-              "cny": "739.80"
+              "cny": "738.87"
             }
           ]
         },
@@ -2707,7 +2707,7 @@
             {
               "amount": "3999.99",
               "display": "R3,999.99",
-              "cny": "1609.14"
+              "cny": "1607.10"
             }
           ]
         },
@@ -2717,18 +2717,18 @@
             {
               "amount": "9199",
               "display": "R9,199.00",
-              "cny": "3700.62"
+              "cny": "3695.94"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "ZAR",
       "unclassified_labels": [],
-      "source_sha256": "d8914f3480af82d9c8722b874eab02af80bbe2760144879da988e41951b9e868",
+      "source_sha256": "da4f904b709ab2822366a9306a6aa8eae26a99bf408db58a57cb9f60f1da08ba",
       "fingerprint": "c64845b2685938b99b6ac0965b9200d19340de54a729364ff2db867c1b838743",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -2774,7 +2774,7 @@
             {
               "amount": "249.99",
               "display": "EGP 249.99",
-              "cny": "29.98"
+              "cny": "29.69"
             }
           ]
         },
@@ -2784,12 +2784,12 @@
             {
               "amount": "999.99",
               "display": "EGP 999.99",
-              "cny": "119.93"
+              "cny": "118.78"
             },
             {
               "amount": "9999.99",
               "display": "EGP 9,999.99",
-              "cny": "1199.32"
+              "cny": "1187.80"
             }
           ]
         },
@@ -2799,7 +2799,7 @@
             {
               "amount": "5399.99",
               "display": "EGP 5,399.99",
-              "cny": "647.63"
+              "cny": "641.41"
             }
           ]
         },
@@ -2809,7 +2809,7 @@
             {
               "amount": "9999.99",
               "display": "EGP 9,999.99",
-              "cny": "1199.32"
+              "cny": "1187.80"
             }
           ]
         },
@@ -2819,18 +2819,18 @@
             {
               "amount": "26999.99",
               "display": "EGP 26,999.99",
-              "cny": "3238.18"
+              "cny": "3207.07"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "EGP",
       "unclassified_labels": [],
-      "source_sha256": "5839b1695edf631900ddb220af5c37e9e3596c6d5e61ae9be1743867ebbb9660",
+      "source_sha256": "19a6b2a3f5b45a4ae70a3f9bc511dd780f548a5b7683e1e3d79d26198236545b",
       "fingerprint": "cb65ffa70ac93eb4b52a95adf0b6fb54c46cbdbd99c1e2ff45d8f036c8647ade",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -2876,7 +2876,7 @@
             {
               "amount": "35",
               "display": "SAR 35.00",
-              "cny": "62.32"
+              "cny": "62.38"
             }
           ]
         },
@@ -2886,12 +2886,12 @@
             {
               "amount": "89.99",
               "display": "SAR 89.99",
-              "cny": "160.24"
+              "cny": "160.39"
             },
             {
               "amount": "899.99",
               "display": "SAR 899.99",
-              "cny": "1602.57"
+              "cny": "1604.08"
             }
           ]
         },
@@ -2901,7 +2901,7 @@
             {
               "amount": "429.99",
               "display": "SAR 429.99",
-              "cny": "765.66"
+              "cny": "766.39"
             }
           ]
         },
@@ -2911,7 +2911,7 @@
             {
               "amount": "899.99",
               "display": "SAR 899.99",
-              "cny": "1602.57"
+              "cny": "1604.08"
             }
           ]
         },
@@ -2921,18 +2921,18 @@
             {
               "amount": "2149.99",
               "display": "SAR 2,149.99",
-              "cny": "3828.38"
+              "cny": "3832.00"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "SAR",
       "unclassified_labels": [],
-      "source_sha256": "19f08bcc536fc3eff1b6fd478f828dcd2127f01a13dfc02490dfaccaee37c8e8",
+      "source_sha256": "bf4c651d6f97dada8a4de07bba8446d58881565f404f901f62316a300eb34a31",
       "fingerprint": "88d73d64d2c288d52d81cfd6f13247d60ef004d429c335eae0b7bb45a003e4f2",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -2978,7 +2978,7 @@
             {
               "amount": "29.99",
               "display": "AED 29.99",
-              "cny": "54.53"
+              "cny": "54.58"
             }
           ]
         },
@@ -2988,12 +2988,12 @@
             {
               "amount": "79.99",
               "display": "AED 79.99",
-              "cny": "145.44"
+              "cny": "145.58"
             },
             {
               "amount": "799.99",
               "display": "AED 799.99",
-              "cny": "1454.57"
+              "cny": "1455.94"
             }
           ]
         },
@@ -3003,7 +3003,7 @@
             {
               "amount": "384.99",
               "display": "AED 384.99",
-              "cny": "700.00"
+              "cny": "700.66"
             }
           ]
         },
@@ -3013,7 +3013,7 @@
             {
               "amount": "799.99",
               "display": "AED 799.99",
-              "cny": "1454.57"
+              "cny": "1455.94"
             }
           ]
         },
@@ -3023,18 +3023,18 @@
             {
               "amount": "1919.99",
               "display": "AED 1,919.99",
-              "cny": "3490.98"
+              "cny": "3494.28"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "AED",
       "unclassified_labels": [],
-      "source_sha256": "1376b5ee6ad6c5714149c701503212cd32ba96f3fc0100be9004f34a51ef72ba",
+      "source_sha256": "46d9e0127bf934c90be6f63676053a6fd2e3b98c6997ac9a67db4f8dcbbb8051",
       "fingerprint": "d7c0422085b8323cf96094a421dad4d056aef7bc51f8f4dd47012f7ed1fefdcc",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -3080,7 +3080,7 @@
             {
               "amount": "25",
               "display": "₪25.00",
-              "cny": "53.60"
+              "cny": "54.26"
             }
           ]
         },
@@ -3090,12 +3090,12 @@
             {
               "amount": "69.9",
               "display": "₪69.90",
-              "cny": "149.86"
+              "cny": "151.72"
             },
             {
               "amount": "699.9",
               "display": "₪699.90",
-              "cny": "1500.53"
+              "cny": "1519.16"
             }
           ]
         },
@@ -3105,7 +3105,7 @@
             {
               "amount": "309.9",
               "display": "₪309.90",
-              "cny": "664.40"
+              "cny": "672.65"
             }
           ]
         },
@@ -3115,7 +3115,7 @@
             {
               "amount": "699.9",
               "display": "₪699.90",
-              "cny": "1500.53"
+              "cny": "1519.16"
             }
           ]
         },
@@ -3125,18 +3125,18 @@
             {
               "amount": "1549.9",
               "display": "₪1,549.90",
-              "cny": "3322.87"
+              "cny": "3364.11"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "ILS",
       "unclassified_labels": [],
-      "source_sha256": "4b58246099bee2098229c008e5d5835383280374ecd6638932b996ccc7132131",
+      "source_sha256": "3a2e44e269beeebfe8615fea0b95db9b8e301b0dc0b900f0e66ca097cbaada4e",
       "fingerprint": "ebf69c564d9d5767415ed0635bae2fec63ee5147c12cedc4caf664fbe6fc66e0",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -3182,7 +3182,7 @@
             {
               "amount": "29.99",
               "display": "QAR 29.99",
-              "cny": "55.02"
+              "cny": "55.07"
             }
           ]
         },
@@ -3192,12 +3192,12 @@
             {
               "amount": "69.99",
               "display": "QAR 69.99",
-              "cny": "128.39"
+              "cny": "128.52"
             },
             {
               "amount": "699.99",
               "display": "QAR 699.99",
-              "cny": "1284.11"
+              "cny": "1285.32"
             }
           ]
         },
@@ -3207,7 +3207,7 @@
             {
               "amount": "364.99",
               "display": "QAR 364.99",
-              "cny": "669.56"
+              "cny": "670.19"
             }
           ]
         },
@@ -3217,7 +3217,7 @@
             {
               "amount": "699.99",
               "display": "QAR 699.99",
-              "cny": "1284.11"
+              "cny": "1285.32"
             }
           ]
         },
@@ -3227,18 +3227,18 @@
             {
               "amount": "1819.99",
               "display": "QAR 1,819.99",
-              "cny": "3338.70"
+              "cny": "3341.86"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "QAR",
       "unclassified_labels": [],
-      "source_sha256": "64f8f8e190b266988d2f60226e81e59e10a200b921709fdf1b853c01576e3226",
+      "source_sha256": "991f720521a8380394df51aca2254fa415d09c142f365c7abd304ea9327eaaea",
       "fingerprint": "976e57e73bfb744cd2e6ed42cf09c29620521f9720775d652377724cb11693e2",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -3284,7 +3284,7 @@
             {
               "amount": "7.99",
               "display": "$7.99",
-              "cny": "53.35"
+              "cny": "53.40"
             }
           ]
         },
@@ -3294,12 +3294,12 @@
             {
               "amount": "19.99",
               "display": "$19.99",
-              "cny": "133.48"
+              "cny": "133.61"
             },
             {
               "amount": "200",
               "display": "$200.00",
-              "cny": "1335.49"
+              "cny": "1336.75"
             }
           ]
         },
@@ -3309,7 +3309,7 @@
             {
               "amount": "100",
               "display": "$100.00",
-              "cny": "667.74"
+              "cny": "668.38"
             }
           ]
         },
@@ -3319,7 +3319,7 @@
             {
               "amount": "200",
               "display": "$200.00",
-              "cny": "1335.49"
+              "cny": "1336.75"
             }
           ]
         },
@@ -3329,18 +3329,18 @@
             {
               "amount": "500",
               "display": "$500.00",
-              "cny": "3338.72"
+              "cny": "3341.88"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "USD",
       "unclassified_labels": [],
-      "source_sha256": "ef08acd55bedb0773833c450b354037539c2c8476cad645c5e7409fce9208538",
+      "source_sha256": "f7952aa7a79f6f4810446f552c5d26b130d4674c9bddd7fdf60553e4a671faf4",
       "fingerprint": "ed63a35b37558c3e540c3f0d43630013cb0232367e8d8de5ac3fb041997e45e1",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -3386,7 +3386,7 @@
             {
               "amount": "7.99",
               "display": "$7.99",
-              "cny": "53.35"
+              "cny": "53.40"
             }
           ]
         },
@@ -3396,12 +3396,12 @@
             {
               "amount": "19.99",
               "display": "$19.99",
-              "cny": "133.48"
+              "cny": "133.61"
             },
             {
               "amount": "200",
               "display": "$200.00",
-              "cny": "1335.49"
+              "cny": "1336.75"
             }
           ]
         },
@@ -3411,7 +3411,7 @@
             {
               "amount": "109",
               "display": "$109.00",
-              "cny": "727.84"
+              "cny": "728.53"
             }
           ]
         },
@@ -3421,7 +3421,7 @@
             {
               "amount": "200",
               "display": "$200.00",
-              "cny": "1335.49"
+              "cny": "1336.75"
             }
           ]
         },
@@ -3431,18 +3431,18 @@
             {
               "amount": "549.99",
               "display": "$549.99",
-              "cny": "3672.53"
+              "cny": "3676.00"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "USD",
       "unclassified_labels": [],
-      "source_sha256": "0e46dba8aa2e1bbf01fc0fab667edf8043d8c2b2e2558b46432b35209b74c0d2",
+      "source_sha256": "61206f253cb12c1035e2823894406e40fffb89bb0f4d2d34d85d3519fe524aec",
       "fingerprint": "4e43be5f7e909482a30873be9b67c24e9df1225e4e067de78b56f1731fcc49aa",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -3488,7 +3488,7 @@
             {
               "amount": "7.99",
               "display": "$7.99",
-              "cny": "53.35"
+              "cny": "53.40"
             }
           ]
         },
@@ -3498,12 +3498,12 @@
             {
               "amount": "19.99",
               "display": "$19.99",
-              "cny": "133.48"
+              "cny": "133.61"
             },
             {
               "amount": "200",
               "display": "$200.00",
-              "cny": "1335.49"
+              "cny": "1336.75"
             }
           ]
         },
@@ -3513,7 +3513,7 @@
             {
               "amount": "104.99",
               "display": "$104.99",
-              "cny": "701.07"
+              "cny": "701.73"
             }
           ]
         },
@@ -3523,7 +3523,7 @@
             {
               "amount": "200",
               "display": "$200.00",
-              "cny": "1335.49"
+              "cny": "1336.75"
             }
           ]
         },
@@ -3533,18 +3533,18 @@
             {
               "amount": "519.99",
               "display": "$519.99",
-              "cny": "3472.21"
+              "cny": "3475.48"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "USD",
       "unclassified_labels": [],
-      "source_sha256": "fd611198dec1bffbc5d3d82a9e40b5c475afd853614db4ebae91f9de15507e59",
+      "source_sha256": "05893bb1f8f78b09790134fe0f666c15e79757bcad348ace6514b24e102e2cbf",
       "fingerprint": "a7d774fda7b03898867bc4dddeec8ec2ac6ab17df654277e0e3cf75cd576c22f",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -3590,7 +3590,7 @@
             {
               "amount": "7.99",
               "display": "7,99 €",
-              "cny": "59.80"
+              "cny": "59.74"
             }
           ]
         },
@@ -3600,12 +3600,12 @@
             {
               "amount": "22.99",
               "display": "22,99 €",
-              "cny": "172.08"
+              "cny": "171.89"
             },
             {
               "amount": "229",
               "display": "229,00 €",
-              "cny": "1714.03"
+              "cny": "1712.18"
             }
           ]
         },
@@ -3615,7 +3615,7 @@
             {
               "amount": "102.99",
               "display": "102,99 €",
-              "cny": "770.86"
+              "cny": "770.03"
             }
           ]
         },
@@ -3625,7 +3625,7 @@
             {
               "amount": "229",
               "display": "229,00 €",
-              "cny": "1714.03"
+              "cny": "1712.18"
             }
           ]
         },
@@ -3635,18 +3635,18 @@
             {
               "amount": "509.99",
               "display": "509,99 €",
-              "cny": "3817.19"
+              "cny": "3813.08"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "EUR",
       "unclassified_labels": [],
-      "source_sha256": "a739dd0259c3f328b038fcfbb0cc459fea100e7294df39f5caa6eca1c2b1d5c1",
+      "source_sha256": "3fe2c936bbc133d98289adf0ca3dbb363c7646cc2ad088ac6035d2a8816e3958",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -3692,7 +3692,7 @@
             {
               "amount": "7.99",
               "display": "7,99 €",
-              "cny": "59.80"
+              "cny": "59.74"
             }
           ]
         },
@@ -3702,12 +3702,12 @@
             {
               "amount": "22.99",
               "display": "22,99 €",
-              "cny": "172.08"
+              "cny": "171.89"
             },
             {
               "amount": "229",
               "display": "229,00 €",
-              "cny": "1714.03"
+              "cny": "1712.18"
             }
           ]
         },
@@ -3717,7 +3717,7 @@
             {
               "amount": "102.99",
               "display": "102,99 €",
-              "cny": "770.86"
+              "cny": "770.03"
             }
           ]
         },
@@ -3727,7 +3727,7 @@
             {
               "amount": "229",
               "display": "229,00 €",
-              "cny": "1714.03"
+              "cny": "1712.18"
             }
           ]
         },
@@ -3737,18 +3737,18 @@
             {
               "amount": "509.99",
               "display": "509,99 €",
-              "cny": "3817.19"
+              "cny": "3813.08"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "EUR",
       "unclassified_labels": [],
-      "source_sha256": "c6db3d6c344d69257224a3c2a048fd72bb17a04467926fd8ec9f1283586a3cad",
+      "source_sha256": "3423f3c9a34fdbd8756e5a8e6cf0eef35329a30565c6baae1221f8aae00d0a2f",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -3794,7 +3794,7 @@
             {
               "amount": "7.99",
               "display": "7,99 €",
-              "cny": "59.80"
+              "cny": "59.74"
             }
           ]
         },
@@ -3804,12 +3804,12 @@
             {
               "amount": "22.99",
               "display": "22,99 €",
-              "cny": "172.08"
+              "cny": "171.89"
             },
             {
               "amount": "229",
               "display": "229,00 €",
-              "cny": "1714.03"
+              "cny": "1712.18"
             }
           ]
         },
@@ -3819,7 +3819,7 @@
             {
               "amount": "102.99",
               "display": "102,99 €",
-              "cny": "770.86"
+              "cny": "770.03"
             }
           ]
         },
@@ -3829,7 +3829,7 @@
             {
               "amount": "229",
               "display": "229,00 €",
-              "cny": "1714.03"
+              "cny": "1712.18"
             }
           ]
         },
@@ -3839,18 +3839,18 @@
             {
               "amount": "509.99",
               "display": "509,99 €",
-              "cny": "3817.19"
+              "cny": "3813.08"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "EUR",
       "unclassified_labels": [],
-      "source_sha256": "4b484a5245cb3efba6a5078d684bf95b0eff9cc683dbc44b5ee9537f818a9c49",
+      "source_sha256": "ecd605219b1414d3931f405b95a7f306fc5ed4747f2a0fc28dff901717d71164",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -3896,7 +3896,7 @@
             {
               "amount": "7.99",
               "display": "7,99 €",
-              "cny": "59.80"
+              "cny": "59.74"
             }
           ]
         },
@@ -3906,12 +3906,12 @@
             {
               "amount": "22.99",
               "display": "22,99 €",
-              "cny": "172.08"
+              "cny": "171.89"
             },
             {
               "amount": "229",
               "display": "229,00 €",
-              "cny": "1714.03"
+              "cny": "1712.18"
             }
           ]
         },
@@ -3921,7 +3921,7 @@
             {
               "amount": "102.99",
               "display": "102,99 €",
-              "cny": "770.86"
+              "cny": "770.03"
             }
           ]
         },
@@ -3931,7 +3931,7 @@
             {
               "amount": "229",
               "display": "229,00 €",
-              "cny": "1714.03"
+              "cny": "1712.18"
             }
           ]
         },
@@ -3941,20 +3941,20 @@
             {
               "amount": "509.99",
               "display": "509,99 €",
-              "cny": "3817.19"
+              "cny": "3813.08"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "EUR",
       "unclassified_labels": [
         "100 Credits"
       ],
-      "source_sha256": "294ef65af76f14ace01ca53f7fa56018b41242883aacea452c7a0e94bfa553c9",
+      "source_sha256": "de96016254dbf5b508d8817be671b6410d73a3cd35b2f8f6903a138b13299b3f",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -4000,7 +4000,7 @@
             {
               "amount": "7.99",
               "display": "7,99 €",
-              "cny": "59.80"
+              "cny": "59.74"
             }
           ]
         },
@@ -4010,12 +4010,12 @@
             {
               "amount": "22.99",
               "display": "22,99 €",
-              "cny": "172.08"
+              "cny": "171.89"
             },
             {
               "amount": "229",
               "display": "229,00 €",
-              "cny": "1714.03"
+              "cny": "1712.18"
             }
           ]
         },
@@ -4025,7 +4025,7 @@
             {
               "amount": "102.99",
               "display": "102,99 €",
-              "cny": "770.86"
+              "cny": "770.03"
             }
           ]
         },
@@ -4035,7 +4035,7 @@
             {
               "amount": "229",
               "display": "229,00 €",
-              "cny": "1714.03"
+              "cny": "1712.18"
             }
           ]
         },
@@ -4045,20 +4045,20 @@
             {
               "amount": "509.99",
               "display": "509,99 €",
-              "cny": "3817.19"
+              "cny": "3813.08"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "EUR",
       "unclassified_labels": [
         "100 Credits"
       ],
-      "source_sha256": "c2dcbe31e4902dc562771872c796cf889d07d3ba40d21dcce1e0062f1c0bdafc",
+      "source_sha256": "5e927f594eef4882b4741c5af0fcabd2a2260c07e1420842ccb303490d7b43c6",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -4104,7 +4104,7 @@
             {
               "amount": "7.99",
               "display": "€ 7,99",
-              "cny": "59.80"
+              "cny": "59.74"
             }
           ]
         },
@@ -4114,12 +4114,12 @@
             {
               "amount": "22.99",
               "display": "€ 22,99",
-              "cny": "172.08"
+              "cny": "171.89"
             },
             {
               "amount": "229",
               "display": "€ 229,00",
-              "cny": "1714.03"
+              "cny": "1712.18"
             }
           ]
         },
@@ -4129,7 +4129,7 @@
             {
               "amount": "102.99",
               "display": "€ 102,99",
-              "cny": "770.86"
+              "cny": "770.03"
             }
           ]
         },
@@ -4139,7 +4139,7 @@
             {
               "amount": "229",
               "display": "€ 229,00",
-              "cny": "1714.03"
+              "cny": "1712.18"
             }
           ]
         },
@@ -4149,18 +4149,18 @@
             {
               "amount": "509.99",
               "display": "€ 509,99",
-              "cny": "3817.19"
+              "cny": "3813.08"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "EUR",
       "unclassified_labels": [],
-      "source_sha256": "30112b2f8402d4cc2304298375c3f0a07917fed5dedd4908a8962d665996d432",
+      "source_sha256": "34c6779e5b6edb8f5dfa0987396da9b0ce7a9381f8ae4faf01033c6aa522a5f9",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -4206,7 +4206,7 @@
             {
               "amount": "7.99",
               "display": "7,99 €",
-              "cny": "59.80"
+              "cny": "59.74"
             }
           ]
         },
@@ -4216,12 +4216,12 @@
             {
               "amount": "22.99",
               "display": "22,99 €",
-              "cny": "172.08"
+              "cny": "171.89"
             },
             {
               "amount": "229",
               "display": "229,00 €",
-              "cny": "1714.03"
+              "cny": "1712.18"
             }
           ]
         },
@@ -4231,7 +4231,7 @@
             {
               "amount": "102.99",
               "display": "102,99 €",
-              "cny": "770.86"
+              "cny": "770.03"
             }
           ]
         },
@@ -4241,7 +4241,7 @@
             {
               "amount": "229",
               "display": "229,00 €",
-              "cny": "1714.03"
+              "cny": "1712.18"
             }
           ]
         },
@@ -4251,18 +4251,18 @@
             {
               "amount": "509.99",
               "display": "509,99 €",
-              "cny": "3817.19"
+              "cny": "3813.08"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "EUR",
       "unclassified_labels": [],
-      "source_sha256": "1ec46de929f2d6073ee60144031baf6280c01e0a534c29be41f839c598094736",
+      "source_sha256": "c6c8d219cf1711b7239e76c1124d432589896a99f74673cf316808a1a8f4bf49",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -4308,7 +4308,7 @@
             {
               "amount": "7.99",
               "display": "7,99 €",
-              "cny": "59.80"
+              "cny": "59.74"
             }
           ]
         },
@@ -4318,12 +4318,12 @@
             {
               "amount": "22.99",
               "display": "22,99 €",
-              "cny": "172.08"
+              "cny": "171.89"
             },
             {
               "amount": "229",
               "display": "229,00 €",
-              "cny": "1714.03"
+              "cny": "1712.18"
             }
           ]
         },
@@ -4333,7 +4333,7 @@
             {
               "amount": "102.99",
               "display": "102,99 €",
-              "cny": "770.86"
+              "cny": "770.03"
             }
           ]
         },
@@ -4343,7 +4343,7 @@
             {
               "amount": "229",
               "display": "229,00 €",
-              "cny": "1714.03"
+              "cny": "1712.18"
             }
           ]
         },
@@ -4353,18 +4353,18 @@
             {
               "amount": "509.99",
               "display": "509,99 €",
-              "cny": "3817.19"
+              "cny": "3813.08"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "EUR",
       "unclassified_labels": [],
-      "source_sha256": "fd7d8d1cee6b4ca230ff098c2c611e311882b169c5ef2f10927187d9da789d27",
+      "source_sha256": "cdf0feef46867ae24e26c014d7d4b8bf3d529fd9a99337baead5129c3ca665c6",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -4410,7 +4410,7 @@
             {
               "amount": "7.99",
               "display": "€7.99",
-              "cny": "59.80"
+              "cny": "59.74"
             }
           ]
         },
@@ -4420,12 +4420,12 @@
             {
               "amount": "22.99",
               "display": "€22.99",
-              "cny": "172.08"
+              "cny": "171.89"
             },
             {
               "amount": "229",
               "display": "€229.00",
-              "cny": "1714.03"
+              "cny": "1712.18"
             }
           ]
         },
@@ -4435,7 +4435,7 @@
             {
               "amount": "102.99",
               "display": "€102.99",
-              "cny": "770.86"
+              "cny": "770.03"
             }
           ]
         },
@@ -4445,7 +4445,7 @@
             {
               "amount": "229",
               "display": "€229.00",
-              "cny": "1714.03"
+              "cny": "1712.18"
             }
           ]
         },
@@ -4455,18 +4455,18 @@
             {
               "amount": "509.99",
               "display": "€509.99",
-              "cny": "3817.19"
+              "cny": "3813.08"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "EUR",
       "unclassified_labels": [],
-      "source_sha256": "bb0e3c5239ad083243a53c4061ea8184f5d0fdbdb44a45f3ec322ca66a6c273a",
+      "source_sha256": "5a5d9747287b3cef0009bcefe3bb082f29b41e378317f9fee8eca26c7a83ae67",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -4512,7 +4512,7 @@
             {
               "amount": "7.99",
               "display": "7,99 €",
-              "cny": "59.80"
+              "cny": "59.74"
             }
           ]
         },
@@ -4522,12 +4522,12 @@
             {
               "amount": "22.99",
               "display": "22,99 €",
-              "cny": "172.08"
+              "cny": "171.89"
             },
             {
               "amount": "229",
               "display": "229,00 €",
-              "cny": "1714.03"
+              "cny": "1712.18"
             }
           ]
         },
@@ -4537,7 +4537,7 @@
             {
               "amount": "102.99",
               "display": "102,99 €",
-              "cny": "770.86"
+              "cny": "770.03"
             }
           ]
         },
@@ -4547,7 +4547,7 @@
             {
               "amount": "229",
               "display": "229,00 €",
-              "cny": "1714.03"
+              "cny": "1712.18"
             }
           ]
         },
@@ -4557,18 +4557,18 @@
             {
               "amount": "509.99",
               "display": "509,99 €",
-              "cny": "3817.19"
+              "cny": "3813.08"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "EUR",
       "unclassified_labels": [],
-      "source_sha256": "ea02f5e086c0ab9585e46902e482181a222addfcb187d9a0ef887e20280fb56c",
+      "source_sha256": "9c702eda5f4ef0022b27b18e631338e4369e384b5ae6003957c943c608071a87",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -4614,7 +4614,7 @@
             {
               "amount": "7.99",
               "display": "7,99 €",
-              "cny": "59.80"
+              "cny": "59.74"
             }
           ]
         },
@@ -4624,12 +4624,12 @@
             {
               "amount": "22.99",
               "display": "22,99 €",
-              "cny": "172.08"
+              "cny": "171.89"
             },
             {
               "amount": "229",
               "display": "229,00 €",
-              "cny": "1714.03"
+              "cny": "1712.18"
             }
           ]
         },
@@ -4639,7 +4639,7 @@
             {
               "amount": "102.99",
               "display": "102,99 €",
-              "cny": "770.86"
+              "cny": "770.03"
             }
           ]
         },
@@ -4649,7 +4649,7 @@
             {
               "amount": "229",
               "display": "229,00 €",
-              "cny": "1714.03"
+              "cny": "1712.18"
             }
           ]
         },
@@ -4659,18 +4659,18 @@
             {
               "amount": "509.99",
               "display": "509,99 €",
-              "cny": "3817.19"
+              "cny": "3813.08"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "EUR",
       "unclassified_labels": [],
-      "source_sha256": "cca1f0bd3764e90ff545e34a4b9a128902b057a3c73483938831ec4e788e18e3",
+      "source_sha256": "91d7b7093b62cfdc9e76c54e8090ef94e81d76a5bff8642aedc66f0d68501d72",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -4716,7 +4716,7 @@
             {
               "amount": "200",
               "display": "200,00 Kč",
-              "cny": "61.53"
+              "cny": "61.37"
             }
           ]
         },
@@ -4726,12 +4726,12 @@
             {
               "amount": "499",
               "display": "499,00 Kč",
-              "cny": "153.51"
+              "cny": "153.13"
             },
             {
               "amount": "4990",
               "display": "4 990,00 Kč",
-              "cny": "1535.10"
+              "cny": "1531.27"
             }
           ]
         },
@@ -4741,7 +4741,7 @@
             {
               "amount": "2490",
               "display": "2 490,00 Kč",
-              "cny": "766.01"
+              "cny": "764.10"
             }
           ]
         },
@@ -4751,7 +4751,7 @@
             {
               "amount": "4990",
               "display": "4 990,00 Kč",
-              "cny": "1535.10"
+              "cny": "1531.27"
             }
           ]
         },
@@ -4761,18 +4761,18 @@
             {
               "amount": "12390",
               "display": "12 390,00 Kč",
-              "cny": "3811.60"
+              "cny": "3802.10"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "CZK",
       "unclassified_labels": [],
-      "source_sha256": "7e3ca06f836503bf48788e6847ee7c4746d9950e3332445654fb44b5de28a175",
+      "source_sha256": "f8d6ff4c7927c69b4c5f9ff926950b14997f0e6b34a6af1f7743f385943b13f7",
       "fingerprint": "15abe03a1e91df654c6660559c8e1407aa0f2f20fe3a64caaa781382d1a80263",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -4818,7 +4818,7 @@
             {
               "amount": "34.99",
               "display": "34,99 zł",
-              "cny": "59.51"
+              "cny": "59.39"
             }
           ]
         },
@@ -4828,12 +4828,12 @@
             {
               "amount": "99.99",
               "display": "99,99 zł",
-              "cny": "170.05"
+              "cny": "169.71"
             },
             {
               "amount": "999.99",
               "display": "999,99 zł",
-              "cny": "1700.66"
+              "cny": "1697.24"
             }
           ]
         },
@@ -4843,7 +4843,7 @@
             {
               "amount": "439",
               "display": "439,00 zł",
-              "cny": "746.60"
+              "cny": "745.09"
             }
           ]
         },
@@ -4853,7 +4853,7 @@
             {
               "amount": "999.99",
               "display": "999,99 zł",
-              "cny": "1700.66"
+              "cny": "1697.24"
             }
           ]
         },
@@ -4863,18 +4863,18 @@
             {
               "amount": "2199",
               "display": "2 199,00 zł",
-              "cny": "3739.78"
+              "cny": "3732.26"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "PLN",
       "unclassified_labels": [],
-      "source_sha256": "3428a823ca4554ad2f1efde70df49c14746cf007a372bc271cc4ba8e45fc540f",
+      "source_sha256": "f4adb1d2e6fdb1882bfc4c121cbb4b1ea0a5ee3a8ea7ba696a3ab53676f6067a",
       "fingerprint": "dbef0519a62a075b104f2493820d0a802e5d9911b627f7a9061d1c2c91581dba",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -4920,7 +4920,7 @@
             {
               "amount": "29.99",
               "display": "29,99 lei",
-              "cny": "41.91"
+              "cny": "41.95"
             }
           ]
         },
@@ -4930,12 +4930,12 @@
             {
               "amount": "99.99",
               "display": "99,99 lei",
-              "cny": "139.73"
+              "cny": "139.87"
             },
             {
               "amount": "999.99",
               "display": "999,99 lei",
-              "cny": "1397.40"
+              "cny": "1398.80"
             }
           ]
         },
@@ -4945,7 +4945,7 @@
             {
               "amount": "519.99",
               "display": "519,99 lei",
-              "cny": "726.64"
+              "cny": "727.37"
             }
           ]
         },
@@ -4955,7 +4955,7 @@
             {
               "amount": "999.99",
               "display": "999,99 lei",
-              "cny": "1397.40"
+              "cny": "1398.80"
             }
           ]
         },
@@ -4965,18 +4965,18 @@
             {
               "amount": "2599.99",
               "display": "2 599,99 lei",
-              "cny": "3633.26"
+              "cny": "3636.91"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "RON",
       "unclassified_labels": [],
-      "source_sha256": "420161eadaab9f24a8560929888603d9f07d0f69f919991fe9269dbfd33c42dd",
+      "source_sha256": "7f132b27e28362062f0838292ff812163043e8197f34486d4c284164f7213e92",
       "fingerprint": "981ca6274eb15df3a78665fda9ee5d2293435a06daa5d77ceacb3675bbadb60f",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -5022,7 +5022,7 @@
             {
               "amount": "2990",
               "display": "HUF2,990.00",
-              "cny": "61.06"
+              "cny": "60.85"
             }
           ]
         },
@@ -5032,12 +5032,12 @@
             {
               "amount": "8990",
               "display": "HUF8,990.00",
-              "cny": "183.58"
+              "cny": "182.95"
             },
             {
               "amount": "89990",
               "display": "HUF89,990.00",
-              "cny": "1837.68"
+              "cny": "1831.37"
             }
           ]
         },
@@ -5047,7 +5047,7 @@
             {
               "amount": "40490",
               "display": "HUF40,490.00",
-              "cny": "826.84"
+              "cny": "824.00"
             }
           ]
         },
@@ -5057,7 +5057,7 @@
             {
               "amount": "89990",
               "display": "HUF89,990.00",
-              "cny": "1837.68"
+              "cny": "1831.37"
             }
           ]
         },
@@ -5067,18 +5067,18 @@
             {
               "amount": "199990",
               "display": "HUF199,990.00",
-              "cny": "4083.98"
+              "cny": "4069.95"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "HUF",
       "unclassified_labels": [],
-      "source_sha256": "e48228d6ea57c94374023a2fd7855a889d34d1d2f1d54c4613b09ff82015c8e5",
+      "source_sha256": "7f06a4e82dc033a6680ead41816431b955127119303961c78a3ebb379f9bb013",
       "fingerprint": "48819bf4878f0d60ec375915f60b84b60c22a19659c72ed912d37c454da95575",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -5124,7 +5124,7 @@
             {
               "amount": "85",
               "display": "85,00 kr",
-              "cny": "57.15"
+              "cny": "57.08"
             }
           ]
         },
@@ -5134,12 +5134,12 @@
             {
               "amount": "249",
               "display": "249,00 kr",
-              "cny": "167.42"
+              "cny": "167.21"
             },
             {
               "amount": "2495",
               "display": "2 495,00 kr",
-              "cny": "1677.58"
+              "cny": "1675.50"
             }
           ]
         },
@@ -5149,7 +5149,7 @@
             {
               "amount": "1120",
               "display": "1 120,00 kr",
-              "cny": "753.06"
+              "cny": "752.13"
             }
           ]
         },
@@ -5159,7 +5159,7 @@
             {
               "amount": "2495",
               "display": "2 495,00 kr",
-              "cny": "1677.58"
+              "cny": "1675.50"
             }
           ]
         },
@@ -5169,18 +5169,18 @@
             {
               "amount": "5599",
               "display": "5 599,00 kr",
-              "cny": "3764.64"
+              "cny": "3759.97"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "SEK",
       "unclassified_labels": [],
-      "source_sha256": "51f4cb6d91a45723c3ffa90c8b2c029758bbabc0176ba6b6d2b70ac082de8c5c",
+      "source_sha256": "fd7c344845dc2745fbbbb25da4a9d90eb9acbff2d7eec54c2444d9a4d1735e84",
       "fingerprint": "d9c89fa61cf30ac72c6e0e33ebcb2888057c7e23589bdf6b0ffbf4dc99d6f146",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -5226,7 +5226,7 @@
             {
               "amount": "99",
               "display": "99,00 kr",
-              "cny": "70.92"
+              "cny": "70.97"
             }
           ]
         },
@@ -5236,12 +5236,12 @@
             {
               "amount": "249",
               "display": "249,00 kr",
-              "cny": "178.38"
+              "cny": "178.51"
             },
             {
               "amount": "2490",
               "display": "2.490,00 kr",
-              "cny": "1783.81"
+              "cny": "1785.11"
             }
           ]
         },
@@ -5251,7 +5251,7 @@
             {
               "amount": "1190",
               "display": "1.190,00 kr",
-              "cny": "852.51"
+              "cny": "853.12"
             }
           ]
         },
@@ -5261,7 +5261,7 @@
             {
               "amount": "2490",
               "display": "2.490,00 kr",
-              "cny": "1783.81"
+              "cny": "1785.11"
             }
           ]
         },
@@ -5271,18 +5271,18 @@
             {
               "amount": "5899",
               "display": "5.899,00 kr",
-              "cny": "4225.99"
+              "cny": "4229.05"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "NOK",
       "unclassified_labels": [],
-      "source_sha256": "b23f9a5cbdf61715e64472e7fdc433bc17bd15224cada6099a2878b400ef0fda",
+      "source_sha256": "8462664033a41e935f747aaa4a5160fb35dad8adba7dafc28fc0a7968d770645",
       "fingerprint": "9aa797486a42904774ebfa052ab22ee81ae0fcc11e676fdff43db708727cf29a",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -5328,7 +5328,7 @@
             {
               "amount": "64",
               "display": "64,00 kr",
-              "cny": "64.01"
+              "cny": "64.03"
             }
           ]
         },
@@ -5338,12 +5338,12 @@
             {
               "amount": "179",
               "display": "179,00 kr",
-              "cny": "179.02"
+              "cny": "179.08"
             },
             {
               "amount": "1799",
               "display": "1.799,00 kr",
-              "cny": "1799.16"
+              "cny": "1799.85"
             }
           ]
         },
@@ -5353,7 +5353,7 @@
             {
               "amount": "789",
               "display": "789,00 kr",
-              "cny": "789.07"
+              "cny": "789.37"
             }
           ]
         },
@@ -5363,7 +5363,7 @@
             {
               "amount": "1799",
               "display": "1.799,00 kr",
-              "cny": "1799.16"
+              "cny": "1799.85"
             }
           ]
         },
@@ -5373,18 +5373,18 @@
             {
               "amount": "3899",
               "display": "3.899,00 kr",
-              "cny": "3899.35"
+              "cny": "3900.83"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "DKK",
       "unclassified_labels": [],
-      "source_sha256": "df1be023fe075c0e8f449ef5199876bac5693b3e3fdf242ce2b7f1d50430cac8",
+      "source_sha256": "9d5d7cf162bb57f0404a608b45f3e7048ada3b3cfecc56ff1f347938414b92f1",
       "fingerprint": "a85dacb68f294c8007495c977e00b09b5f40b1573921f691834eac491ce83211",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -5430,7 +5430,7 @@
             {
               "amount": "7",
               "display": "CHF 7.00",
-              "cny": "56.69"
+              "cny": "56.57"
             }
           ]
         },
@@ -5440,12 +5440,12 @@
             {
               "amount": "20",
               "display": "CHF 20.00",
-              "cny": "161.96"
+              "cny": "161.63"
             },
             {
               "amount": "200",
               "display": "CHF 200.00",
-              "cny": "1619.60"
+              "cny": "1616.25"
             }
           ]
         },
@@ -5455,7 +5455,7 @@
             {
               "amount": "83",
               "display": "CHF 83.00",
-              "cny": "672.14"
+              "cny": "670.75"
             }
           ]
         },
@@ -5465,7 +5465,7 @@
             {
               "amount": "200",
               "display": "CHF 200.00",
-              "cny": "1619.60"
+              "cny": "1616.25"
             }
           ]
         },
@@ -5475,18 +5475,18 @@
             {
               "amount": "415",
               "display": "CHF 415.00",
-              "cny": "3360.68"
+              "cny": "3353.73"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "CHF",
       "unclassified_labels": [],
-      "source_sha256": "d4f5f9b93d307d77663f4b04e2d0bc95355a2f0d0f4c34e6c32c9948baf2c74b",
+      "source_sha256": "73b5882f472ac4e9b5bd3438c326233648407015079e2e5ef75d67a3382cdd82",
       "fingerprint": "8afcef3a7b8272618fa05d3ca93221984ad2c11af9e42883b041cf17d050b201",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -5532,7 +5532,7 @@
             {
               "amount": "6.99",
               "display": "6,99 USD",
-              "cny": "46.68"
+              "cny": "46.72"
             }
           ]
         },
@@ -5542,12 +5542,12 @@
             {
               "amount": "22.99",
               "display": "22,99 USD",
-              "cny": "153.51"
+              "cny": "153.66"
             },
             {
               "amount": "250",
               "display": "250,00 USD",
-              "cny": "1669.36"
+              "cny": "1670.94"
             }
           ]
         },
@@ -5557,7 +5557,7 @@
             {
               "amount": "119",
               "display": "119,00 USD",
-              "cny": "794.62"
+              "cny": "795.37"
             }
           ]
         },
@@ -5567,7 +5567,7 @@
             {
               "amount": "250",
               "display": "250,00 USD",
-              "cny": "1669.36"
+              "cny": "1670.94"
             }
           ]
         },
@@ -5577,18 +5577,18 @@
             {
               "amount": "599",
               "display": "599,00 USD",
-              "cny": "3999.79"
+              "cny": "4003.57"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "USD",
       "unclassified_labels": [],
-      "source_sha256": "c9ee6f117fac970367f4dcf80881cb38ed93f40fb29d32e35a3680f7ab46c93b",
+      "source_sha256": "92e988f3ffaf6e951bac3a621836dabd47c1d7f69fa56dffdcd01e03eb976003",
       "fingerprint": "042a794d4a4736eea87f67e3956175bea799cacd9b4b403160e57c1a98d4fb85",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -5634,7 +5634,7 @@
             {
               "amount": "3390",
               "display": "3,390.00₸",
-              "cny": "50.01"
+              "cny": "50.21"
             }
           ]
         },
@@ -5644,12 +5644,12 @@
             {
               "amount": "9990",
               "display": "9,990.00₸",
-              "cny": "147.38"
+              "cny": "147.95"
             },
             {
               "amount": "99990",
               "display": "99,990.00₸",
-              "cny": "1475.14"
+              "cny": "1480.85"
             }
           ]
         },
@@ -5659,7 +5659,7 @@
             {
               "amount": "54990",
               "display": "54,990.00₸",
-              "cny": "811.26"
+              "cny": "814.40"
             }
           ]
         },
@@ -5669,7 +5669,7 @@
             {
               "amount": "99990",
               "display": "99,990.00₸",
-              "cny": "1475.14"
+              "cny": "1480.85"
             }
           ]
         },
@@ -5679,18 +5679,18 @@
             {
               "amount": "274990",
               "display": "274,990.00₸",
-              "cny": "4056.90"
+              "cny": "4072.59"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "KZT",
       "unclassified_labels": [],
-      "source_sha256": "f4897a01f5dc07628d4068b89a0e9499c44f63fa40f8b064fc06845e2b3cb058",
+      "source_sha256": "4b2374d6ce8f2b8f163f078cfafdf1deb1cfddd203008ecdc5d93fde068e428f",
       "fingerprint": "825f9a6be43a75a8fa48d2434d9972190bcdfd34c4f535d45e3d63f13e52a197",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -5736,7 +5736,7 @@
             {
               "amount": "6900",
               "display": "₦ 6,900.00",
-              "cny": "34.53"
+              "cny": "33.91"
             }
           ]
         },
@@ -5746,12 +5746,12 @@
             {
               "amount": "31500",
               "display": "₦ 31,500.00",
-              "cny": "157.64"
+              "cny": "154.82"
             },
             {
               "amount": "299900",
               "display": "₦ 299,900.00",
-              "cny": "1500.84"
+              "cny": "1473.96"
             }
           ]
         },
@@ -5761,7 +5761,7 @@
             {
               "amount": "144900",
               "display": "₦ 144,900.00",
-              "cny": "725.15"
+              "cny": "712.16"
             }
           ]
         },
@@ -5771,7 +5771,7 @@
             {
               "amount": "299900",
               "display": "₦ 299,900.00",
-              "cny": "1500.84"
+              "cny": "1473.96"
             }
           ]
         },
@@ -5781,18 +5781,18 @@
             {
               "amount": "699900",
               "display": "₦ 699,900.00",
-              "cny": "3502.62"
+              "cny": "3439.90"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "NGN",
       "unclassified_labels": [],
-      "source_sha256": "19dddfd049bf6c53b2032aa01b778c331fe1e34b0655b9e37d371f9d55b3ccd9",
+      "source_sha256": "c3280f837d24667aabd594b480ce539427cdbdfc9d02165a17e60a6da76c15f8",
       "fingerprint": "264ffa5f433899266cbd5f47282a9abd1777b135ec426004ab6e87f5aa2f23c3",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -5838,7 +5838,7 @@
             {
               "amount": "5.99",
               "display": "USD 5.99",
-              "cny": "40.00"
+              "cny": "40.04"
             }
           ]
         },
@@ -5848,12 +5848,12 @@
             {
               "amount": "22.99",
               "display": "USD 22.99",
-              "cny": "153.51"
+              "cny": "153.66"
             },
             {
               "amount": "250",
               "display": "USD 250.00",
-              "cny": "1669.36"
+              "cny": "1670.94"
             }
           ]
         },
@@ -5863,7 +5863,7 @@
             {
               "amount": "115.99",
               "display": "USD 115.99",
-              "cny": "774.52"
+              "cny": "775.25"
             }
           ]
         },
@@ -5873,7 +5873,7 @@
             {
               "amount": "250",
               "display": "USD 250.00",
-              "cny": "1669.36"
+              "cny": "1670.94"
             }
           ]
         },
@@ -5883,18 +5883,18 @@
             {
               "amount": "579.99",
               "display": "USD 579.99",
-              "cny": "3872.85"
+              "cny": "3876.51"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "USD",
       "unclassified_labels": [],
-      "source_sha256": "97d7e6b11b9bc62a3a1dc41c7945b4bdf5bb3d83778a7f483c19c4404d49d3bb",
+      "source_sha256": "5acc82e88f622a65d3eaa8885334ec56c865d7bc440a74098afa22e3cdaee462",
       "fingerprint": "46ebf53dd348d38221028d4b4adffc802dbf9576a5f7e4211f1d152b32fa5c45",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -5940,7 +5940,7 @@
             {
               "amount": "5.99",
               "display": "$5.99",
-              "cny": "40.00"
+              "cny": "40.04"
             }
           ]
         },
@@ -5950,12 +5950,12 @@
             {
               "amount": "19.99",
               "display": "$19.99",
-              "cny": "133.48"
+              "cny": "133.61"
             },
             {
               "amount": "200",
               "display": "$200.00",
-              "cny": "1335.49"
+              "cny": "1336.75"
             }
           ]
         },
@@ -5965,7 +5965,7 @@
             {
               "amount": "100",
               "display": "$100.00",
-              "cny": "667.74"
+              "cny": "668.38"
             }
           ]
         },
@@ -5975,7 +5975,7 @@
             {
               "amount": "200",
               "display": "$200.00",
-              "cny": "1335.49"
+              "cny": "1336.75"
             }
           ]
         },
@@ -5985,18 +5985,18 @@
             {
               "amount": "500",
               "display": "$500.00",
-              "cny": "3338.72"
+              "cny": "3341.88"
             }
           ]
         }
       ],
-      "last_checked_at": "2026-10-26T01:05:40Z",
+      "last_checked_at": "2026-10-27T01:05:42Z",
       "currency": "USD",
       "unclassified_labels": [],
-      "source_sha256": "33e9071ad2bf7ea575e7aed728641b9831d47e23898d3396861140d985ba2f72",
+      "source_sha256": "5ad6a21b4e437de169d1743012a0483246d3abb823d8b5141661b7b45ab928ac",
       "fingerprint": "23af09300c1e5718fcfab3cab7dae274bf44fe3425fbfa4e4412954f6ccf6c04",
       "status": "verified",
-      "last_verified_at": "2026-10-26T01:05:40Z",
+      "last_verified_at": "2026-10-27T01:05:42Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -6034,48 +6034,48 @@
   ],
   "fx": {
     "source_url": "https://open.er-api.com/v6/latest/USD",
-    "updated_at": "2026-10-26T00:02:31Z",
+    "updated_at": "2026-10-27T00:02:31Z",
     "rates": {
       "AED": "3.6725",
-      "AUD": "1.422894",
-      "BRL": "4.995042",
-      "CAD": "1.401312",
-      "CHF": "0.824578",
-      "CLP": "989.525786",
-      "CNY": "6.677446",
-      "COP": "3170.487231",
-      "CZK": "21.705722",
-      "DKK": "6.67684",
-      "EGP": "55.676694",
-      "EUR": "0.89213",
-      "GBP": "0.747783",
-      "HUF": "326.990712",
-      "IDR": "18090.294944",
-      "ILS": "3.114592",
-      "INR": "95.160836",
-      "JPY": "156.872016",
-      "KRW": "1323.904108",
-      "KZT": "452.619718",
-      "MXN": "18.723111",
-      "MYR": "4.085277",
-      "NGN": "1334.299722",
-      "NOK": "9.320945",
-      "NZD": "1.754943",
-      "PEN": "3.441627",
-      "PHP": "63.680824",
-      "PKR": "276.940193",
-      "PLN": "3.926353",
+      "AUD": "1.42457",
+      "BRL": "5.431867",
+      "CAD": "1.401591",
+      "CHF": "0.827067",
+      "CLP": "995.84839",
+      "CNY": "6.683751",
+      "COP": "3155.202026",
+      "CZK": "21.780517",
+      "DKK": "6.680612",
+      "EGP": "56.269832",
+      "EUR": "0.893935",
+      "GBP": "0.749228",
+      "HUF": "328.427501",
+      "IDR": "18148.805129",
+      "ILS": "3.079309",
+      "INR": "95.269051",
+      "JPY": "157.437384",
+      "KRW": "1325.18618",
+      "KZT": "451.3014",
+      "MXN": "18.591266",
+      "MYR": "4.087317",
+      "NGN": "1359.911907",
+      "NOK": "9.322995",
+      "NZD": "1.758677",
+      "PEN": "3.439943",
+      "PHP": "63.960174",
+      "PKR": "276.81401",
+      "PLN": "3.937979",
       "QAR": "3.64",
-      "RON": "4.778435",
+      "RON": "4.778142",
       "SAR": "3.75",
-      "SEK": "9.93111",
-      "SGD": "1.278569",
-      "THB": "33.762188",
-      "TRY": "49.789069",
-      "TWD": "32.596145",
+      "SEK": "9.95282",
+      "SGD": "1.280726",
+      "THB": "33.78705",
+      "TRY": "49.789815",
+      "TWD": "32.592411",
       "USD": "1",
-      "VND": "25829.651426",
-      "ZAR": "16.598788"
+      "VND": "25831.545742",
+      "ZAR": "16.635521"
     },
     "fallback": false
   },
@@ -10211,5 +10211,5 @@
       }
     }
   ],
-  "revision": "9c22e9bbc24af13851dde0ff57a98137d93cbc98d6c8fcbd62adbec76921560a"
+  "revision": "1c1c861b7bd2290b5951c9849dd0964872f20932a356b91f0b0c0f4faaa39f27"
 }
