@@ -234,8 +234,8 @@ test('bot-created issue on a later page is reused rather than duplicated', async
     if (url.endsWith('/commits/master')) {
       return response({ sha: nextSha, commit: { committer: { date } } });
     }
-    if (url.includes('page=1')) return response(prior);
-    if (url.includes('page=2')) return response([managedIssue()]);
+    if (/[?&]page=1(?:&|$)/.test(url)) return response(prior);
+    if (/[?&]page=2(?:&|$)/.test(url)) return response([managedIssue()]);
     throw new Error('Unexpected test URL: ' + url);
   };
   const result = await runMonitor({
