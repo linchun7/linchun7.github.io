@@ -6,6 +6,8 @@ import {
   UPSTREAM_REPOSITORY,
   ISSUE_TITLE,
   ISSUE_MARKER,
+  USER_NOTES_MARKER,
+  preserveUserNotes,
   extractTrackedSha,
   isManagedIssue,
   renderIssueBody,
@@ -206,6 +208,7 @@ test('a changed SHA updates the existing issue despite annotations', async () =>
   assert.equal(writes(mock).length, 1);
   assert.equal(writes(mock)[0].method, 'PATCH');
   assert.equal(extractTrackedSha(writes(mock)[0].payload.body), newerSha);
+  assert.ok(writes(mock)[0].payload.body.includes('Existing note (prefer Issue comments for persistent notes).'));
 });
 
 test('unexpected managed-issue state fails closed without issue mutations', async () => {
@@ -248,4 +251,24 @@ test('bot-created issue on a later page is reused rather than duplicated', async
   assert.equal(result.issue, 42);
   assert.equal(calls.length, 3);
   assert.equal(calls.filter(x => x.method !== 'GET').length, 0);
+});
+
+
+test('human notes appended after the dedicated marker persist when a closed issue reopens', async () => {
+  const oldIssue = managedIssue({ state: 'closed' });
+  oldIssue.body += '\nThis follow-up is not an authorization to upgrade.\n';
+  const mock = mockGithub({ sha: newerSha, issues: [oldIssue] });
+  const result = await runMonitor(options(mock));
+  assert.equal(result.updatedIssue, oldIssue.number);
+  const patch = writes(mock)[0].payload;
+  assert.equal(patch.state, 'open');
+  assert.ok(patch.body.includes(USER_NOTES_MARKER));
+  assert.ok(patch.body.includes('This follow-up is not an authorization to upgrade.'));
+  assert.equal(extractTrackedSha(patch.body), newerSha);
+});
+
+test('legacy issue without notes marker never absorbs arbitrary untrusted text as notes', () => {
+  assert.equal(preserveUserNotes('Historical issue body without a marked notes section.'), '');
+  assert.equal(preserveUserNotes(null), '');
+  assert.equal(preserveUserNotes(USER_NOTES_MARKER + '\nUser text'), '\nUser text');
 });
