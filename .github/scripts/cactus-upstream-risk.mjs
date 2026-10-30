@@ -114,7 +114,7 @@ async function fetchPublicJson(url, fetcher, token) {
 }
 
 export async function inspectPublicUpstream({
-  baselineSha = INITIAL_REVIEW_CHECKPOINT,
+  baselineSha = process.env.CACTUS_REVIEWED_BASELINE || INITIAL_REVIEW_CHECKPOINT,
   fetcher = globalThis.fetch,
   token = process.env.GITHUB_TOKEN,
   log = console.log,
