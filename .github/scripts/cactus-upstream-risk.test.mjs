@@ -200,3 +200,18 @@ test('an API failure cannot be reported as a safe comparison', async () => {
     /HTTP 403/
   );
 });
+
+
+test('a verified private baseline may advance without retaining obsolete public checkpoint', async () => {
+  const calls = [];
+  const fetcher = async url => {
+    calls.push(url);
+    return response({ sha: HEAD });
+  };
+  const result = await inspectPublicUpstream({
+    baselineSha: HEAD, fetcher, summaryFile: null, log: () => {}
+  });
+  assert.equal(result.status, 'up-to-date');
+  assert.equal(result.baselineSha, HEAD);
+  assert.deepEqual(calls, [upstreamApi + '/commits/master']);
+});
