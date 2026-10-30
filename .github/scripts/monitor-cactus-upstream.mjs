@@ -7,6 +7,7 @@ export const UPSTREAM_REPOSITORY = 'probberechts/hexo-theme-cactus';
 export const INITIAL_REVIEW_CHECKPOINT = '7a6074d830ac5d524582f142ac524c041077aad7';
 export const ISSUE_TITLE = 'Cactus upstream update available';
 export const ISSUE_MARKER = '<!-- cactus-upstream-public-monitor:v1 -->';
+export const USER_NOTES_MARKER = '<!-- cactus-upstream-user-notes:v1 -->';
 
 const shaPattern = /^[0-9a-f]{40}$/i;
 const apiRoot = 'https://api.github.com/repos/';
@@ -47,8 +48,17 @@ export function renderIssueBody(remoteSha, commitDate = 'unknown') {
       '/compare/' + INITIAL_REVIEW_CHECKPOINT + '...' + remoteSha,
     '',
     'This workflow uses public upstream data only. It does not access any private repository.',
-    'Changes to the customized theme are not merged or deployed automatically.'
+    'Changes to the customized theme are not merged or deployed automatically.',
+    '',
+    'Optional review notes placed below this line are retained when upstream changes:',
+    USER_NOTES_MARKER
   ].join('\n');
+}
+
+export function preserveUserNotes(previousBody) {
+  if (typeof previousBody !== 'string') return '';
+  const position = previousBody.indexOf(USER_NOTES_MARKER);
+  return position < 0 ? '' : previousBody.slice(position + USER_NOTES_MARKER.length);
 }
 
 export function extractTrackedSha(body) {
@@ -73,7 +83,7 @@ async function findManagedIssue(token, fetcher) {
   // GitHub sorts issues by creation date descending by default.
   for (let page = 1; page <= 20; page += 1) {
     const issues = await githubJson(
-      issueRoot + '?state=all&sort=created&direction=desc&per_page=100&page=' + page,
+      issueRoot + '?state=all&creator=github-actions%5Bbot%5D&sort=created&direction=desc&per_page=100&page=' + page,
       { token, fetcher }
     );
     if (!Array.isArray(issues)) throw new Error('GitHub did not return an issues array.');
@@ -143,6 +153,14 @@ export async function runMonitor({
     return result;
   }
 
+  // Preserve owner annotations to the issue body while upstream HEAD is unchanged.
+  // The monitor only rewrites the managed issue when a genuinely new SHA appears.
+  if (existing.state !== 'open' && existing.state !== 'closed') {
+    throw new Error('Unexpected state for managed Cactus issue.');
+  }
+  if (!Number.isSafeInteger(existing.number) || existing.number < 1) {
+    throw new Error('Managed Cactus issue has no valid issue number.');
+  }
   const lastAlertSha = extractTrackedSha(existing.body);
   if (existing.state === 'closed' && lastAlertSha === remoteSha) {
     const result = { status: 'already-acknowledged', remoteSha, issue: existing.number };
@@ -150,15 +168,16 @@ export async function runMonitor({
     return result;
   }
 
-  if (existing.state === 'open' && existing.body === body) {
+  if (existing.state === 'open' && lastAlertSha === remoteSha) {
     const result = { status: 'unchanged', remoteSha, issue: existing.number };
     log(JSON.stringify(result));
     return result;
   }
 
+  const refreshedBody = body + preserveUserNotes(existing.body);
   const payload = existing.state === 'closed'
-    ? { state: 'open', body }
-    : { body };
+    ? { state: 'open', body: refreshedBody }
+    : { body: refreshedBody };
   await githubJson(issueRoot + '/' + existing.number, {
     token, fetcher, method: 'PATCH', payload
   });
