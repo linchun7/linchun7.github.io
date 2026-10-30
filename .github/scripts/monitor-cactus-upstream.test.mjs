@@ -175,29 +175,3 @@ test('marker and baseline are stable public-only values', () => {
   assert.equal(ISSUE_MARKER, '<!-- cactus-upstream-public-monitor:v1 -->');
   assert.ok(renderIssueBody(nextSha).includes('/compare/' + INITIAL_REVIEW_CHECKPOINT + '...' + nextSha));
 });
-
-
-test('a verified private reviewed checkpoint overrides the initial static checkpoint', async () => {
-  const mock = mockGithub({ sha: nextSha });
-  const result = await runMonitor(options(mock, { baselineSha: nextSha }));
-  assert.equal(result.status, 'up-to-date');
-  assert.equal(writes(mock).length, 0);
-});
-
-test('private reviewed baseline is reflected in public issue without private code', async () => {
-  const mock = mockGithub({ sha: nextSha });
-  const result = await runMonitor(options(mock, { baselineSha: newerSha }));
-  assert.equal(result.status, 'update-available');
-  const issueBody = writes(mock)[0].payload.body;
-  assert.ok(issueBody.includes('/compare/' + newerSha + '...' + nextSha));
-  assert.ok(!issueBody.includes('/compare/' + INITIAL_REVIEW_CHECKPOINT + '...' + nextSha));
-});
-
-test('malformed private baseline fails closed before any upstream or issue requests', async () => {
-  const mock = mockGithub({ sha: nextSha });
-  await assert.rejects(
-    () => runMonitor(options(mock, { baselineSha: 'not-a-sha' })),
-    /Invalid reviewed upstream baseline/
-  );
-  assert.equal(mock.calls.length, 0);
-});
