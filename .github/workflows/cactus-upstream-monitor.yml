@@ -1,0 +1,78 @@
+name: Monitor Cactus upstream (public)
+
+on:
+  schedule:
+    # Monday 06:17 China time, Sunday 22:17 UTC. Avoid the top-of-hour surge.
+    - cron: '17 22 * * 0'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/cactus-upstream-monitor.yml'
+      - '.github/scripts/monitor-cactus-upstream.mjs'
+      - '.github/scripts/monitor-cactus-upstream.test.mjs'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/cactus-upstream-monitor.yml'
+      - '.github/scripts/monitor-cactus-upstream.mjs'
+      - '.github/scripts/monitor-cactus-upstream.test.mjs'
+
+# The test job has read-only permissions. Only a trusted default-branch
+# schedule/manual/push run gets narrowly-scoped public-repo Issues write access.
+permissions:
+  contents: read
+
+concurrency:
+  group: public-cactus-upstream-monitor
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Public monitor regression and upstream read-only check
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout monitor
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Check JavaScript syntax
+        run: |
+          node --check .github/scripts/monitor-cactus-upstream.mjs
+          node --check .github/scripts/monitor-cactus-upstream.test.mjs
+      - name: Verify monitoring, idempotency, permissions, and no private access
+        run: node --test .github/scripts/monitor-cactus-upstream.test.mjs
+      - name: Check real public upstream without writing issues
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node .github/scripts/monitor-cactus-upstream.mjs --dry-run
+
+  monitor:
+    name: Automatically manage the public Cactus update issue
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout trusted default branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: main
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Compare upstream and automatically maintain issue
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node .github/scripts/monitor-cactus-upstream.mjs
