@@ -73,7 +73,7 @@ async function findManagedIssue(token, fetcher) {
   // GitHub sorts issues by creation date descending by default.
   for (let page = 1; page <= 20; page += 1) {
     const issues = await githubJson(
-      issueRoot + '?state=all&sort=created&direction=desc&per_page=100&page=' + page,
+      issueRoot + '?state=all&creator=github-actions%5Bbot%5D&sort=created&direction=desc&per_page=100&page=' + page,
       { token, fetcher }
     );
     if (!Array.isArray(issues)) throw new Error('GitHub did not return an issues array.');
@@ -143,6 +143,14 @@ export async function runMonitor({
     return result;
   }
 
+  // Preserve owner annotations to the issue body while upstream HEAD is unchanged.
+  // The monitor only rewrites the managed issue when a genuinely new SHA appears.
+  if (existing.state !== 'open' && existing.state !== 'closed') {
+    throw new Error('Unexpected state for managed Cactus issue.');
+  }
+  if (!Number.isSafeInteger(existing.number) || existing.number < 1) {
+    throw new Error('Managed Cactus issue has no valid issue number.');
+  }
   const lastAlertSha = extractTrackedSha(existing.body);
   if (existing.state === 'closed' && lastAlertSha === remoteSha) {
     const result = { status: 'already-acknowledged', remoteSha, issue: existing.number };
@@ -150,7 +158,7 @@ export async function runMonitor({
     return result;
   }
 
-  if (existing.state === 'open' && existing.body === body) {
+  if (existing.state === 'open' && lastAlertSha === remoteSha) {
     const result = { status: 'unchanged', remoteSha, issue: existing.number };
     log(JSON.stringify(result));
     return result;
