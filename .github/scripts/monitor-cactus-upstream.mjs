@@ -33,18 +33,18 @@ async function githubJson(url, { token, fetcher, method = 'GET', payload } = {})
   return body;
 }
 
-export function renderIssueBody(remoteSha, commitDate = 'unknown') {
-  if (!shaPattern.test(remoteSha)) throw new Error('Invalid upstream commit SHA.');
+export function renderIssueBody(remoteSha, commitDate = 'unknown', baselineSha = INITIAL_REVIEW_CHECKPOINT) {
+  if (!shaPattern.test(remoteSha) || !shaPattern.test(baselineSha)) throw new Error('Invalid upstream or baseline commit SHA.');
   return [
     ISSUE_MARKER,
     'Automatically maintained by a scheduled GitHub Actions workflow in this public repository.',
     '',
     '- Public upstream: https://github.com/' + UPSTREAM_REPOSITORY,
-    '- Initial reviewed upstream checkpoint: ' + INITIAL_REVIEW_CHECKPOINT,
+    '- Current reviewed upstream checkpoint: ' + baselineSha,
     '- Current upstream HEAD: ' + remoteSha,
     '- Latest upstream commit date (UTC): ' + commitDate,
     '- Compare upstream commits: https://github.com/' + UPSTREAM_REPOSITORY +
-      '/compare/' + INITIAL_REVIEW_CHECKPOINT + '...' + remoteSha,
+      '/compare/' + baselineSha + '...' + remoteSha,
     '',
     'This workflow uses public upstream data only. It does not access any private repository.',
     'Changes to the customized theme are not merged or deployed automatically.'
@@ -88,6 +88,7 @@ async function findManagedIssue(token, fetcher) {
 export async function runMonitor({
   token = process.env.GITHUB_TOKEN,
   repository = process.env.GITHUB_REPOSITORY,
+  baselineSha = process.env.CACTUS_REVIEWED_BASELINE || INITIAL_REVIEW_CHECKPOINT,
   dryRun = false,
   fetcher = globalThis.fetch,
   log = console.log
@@ -99,6 +100,7 @@ export async function runMonitor({
     throw new Error('Missing GITHUB_TOKEN for public repository issue management.');
   }
   if (typeof fetcher !== 'function') throw new Error('No fetch implementation available.');
+  if (!shaPattern.test(baselineSha)) throw new Error('Invalid reviewed upstream baseline SHA.');
 
   const upstream = await githubJson(
     apiRoot + UPSTREAM_REPOSITORY + '/commits/master',
@@ -107,7 +109,7 @@ export async function runMonitor({
   const remoteSha = String(upstream?.sha || '').toLowerCase();
   if (!shaPattern.test(remoteSha)) throw new Error('Invalid upstream response SHA.');
   const date = String(upstream?.commit?.committer?.date || 'unknown');
-  const current = remoteSha === INITIAL_REVIEW_CHECKPOINT;
+  const current = remoteSha === baselineSha.toLowerCase();
 
   if (dryRun) {
     const result = { status: current ? 'up-to-date' : 'update-available', remoteSha, dryRun: true };
@@ -132,7 +134,7 @@ export async function runMonitor({
     return result;
   }
 
-  const body = renderIssueBody(remoteSha, date);
+  const body = renderIssueBody(remoteSha, date, baselineSha.toLowerCase());
   if (!existing) {
     const created = await githubJson(issueRoot, {
       token, fetcher, method: 'POST', payload: { title: ISSUE_TITLE, body }
