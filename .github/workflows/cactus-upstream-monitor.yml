@@ -10,20 +10,12 @@ on:
       - '.github/workflows/cactus-upstream-monitor.yml'
       - '.github/scripts/monitor-cactus-upstream.mjs'
       - '.github/scripts/monitor-cactus-upstream.test.mjs'
-      - '.github/scripts/cactus-upstream-risk.mjs'
-      - '.github/scripts/cactus-upstream-risk.test.mjs'
-      - '.github/scripts/cactus-private-baseline.mjs'
-      - '.github/scripts/cactus-private-baseline.test.mjs'
   push:
     branches: [main]
     paths:
       - '.github/workflows/cactus-upstream-monitor.yml'
       - '.github/scripts/monitor-cactus-upstream.mjs'
       - '.github/scripts/monitor-cactus-upstream.test.mjs'
-      - '.github/scripts/cactus-upstream-risk.mjs'
-      - '.github/scripts/cactus-upstream-risk.test.mjs'
-      - '.github/scripts/cactus-private-baseline.mjs'
-      - '.github/scripts/cactus-private-baseline.test.mjs'
 
 # The test job has read-only permissions. Only a trusted default-branch
 # schedule/manual/push run gets narrowly-scoped public-repo Issues write access.
@@ -54,62 +46,17 @@ jobs:
         run: |
           node --check .github/scripts/monitor-cactus-upstream.mjs
           node --check .github/scripts/monitor-cactus-upstream.test.mjs
-          node --check .github/scripts/cactus-upstream-risk.mjs
-          node --check .github/scripts/cactus-upstream-risk.test.mjs
-          node --check .github/scripts/cactus-private-baseline.mjs
-          node --check .github/scripts/cactus-private-baseline.test.mjs
       - name: Verify monitoring, idempotency, permissions, and no private access
-        run: node --test .github/scripts/monitor-cactus-upstream.test.mjs .github/scripts/cactus-upstream-risk.test.mjs .github/scripts/cactus-private-baseline.test.mjs
+        run: node --test .github/scripts/monitor-cactus-upstream.test.mjs
       - name: Check real public upstream without writing issues
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node .github/scripts/monitor-cactus-upstream.mjs --dry-run
 
-
-  private_baseline:
-    name: Optional read-only private reviewed baseline
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.CACTUS_PRIVATE_BASELINE_SYNC == 'enabled'
-    needs: validate
-    runs-on: ubuntu-latest
-    timeout-minutes: 8
-    permissions:
-      contents: read
-    outputs:
-      reviewed_sha: ${{ steps.read-baseline.outputs.reviewed_sha }}
-    steps:
-      - name: Checkout trusted public baseline reader
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          ref: main
-      - name: Set up Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 22
-      - name: Obtain one-repository read-only GitHub App token
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        id: app-token
-        with:
-          client-id: ${{ vars.CACTUS_READ_APP_CLIENT_ID }}
-          private-key: ${{ secrets.CACTUS_READ_APP_PRIVATE_KEY }}
-          owner: linchun7
-          repositories: linchun.github.io
-          permission-contents: read
-      - name: Extract only the public upstream SHA from private theme metadata
-        id: read-baseline
-        env:
-          CACTUS_PRIVATE_READ_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: node .github/scripts/cactus-private-baseline.mjs
-
   monitor:
     name: Automatically manage the public Cactus update issue
-    if: >-
-      always() &&
-      github.event_name != 'pull_request' &&
-      github.ref == 'refs/heads/main' &&
-      needs.validate.result == 'success' &&
-      (needs.private_baseline.result == 'success' || needs.private_baseline.result == 'skipped')
-    needs: [validate, private_baseline]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 8
     permissions:
@@ -128,34 +75,4 @@ jobs:
       - name: Compare upstream and automatically maintain issue
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          CACTUS_REVIEWED_BASELINE: ${{ needs.private_baseline.outputs.reviewed_sha }}
         run: node .github/scripts/monitor-cactus-upstream.mjs
-
-  triage:
-    name: Classify public upstream changes (read-only)
-    if: >-
-      always() &&
-      github.event_name != 'pull_request' &&
-      github.ref == 'refs/heads/main' &&
-      needs.validate.result == 'success' &&
-      (needs.private_baseline.result == 'success' || needs.private_baseline.result == 'skipped')
-    needs: [validate, private_baseline]
-    runs-on: ubuntu-latest
-    timeout-minutes: 8
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout trusted upstream analyzer
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          ref: main
-      - name: Set up Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 22
-      - name: Assess public upstream changes without private access or merge permission
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          CACTUS_REVIEWED_BASELINE: ${{ needs.private_baseline.outputs.reviewed_sha }}
-        run: node .github/scripts/cactus-upstream-risk.mjs
