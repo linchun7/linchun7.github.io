@@ -13,8 +13,8 @@ importers:
         version: 1.2.0
     devDependencies:
       lucide:
-        specifier: 1.64.0
-        version: 1.64.0
+        specifier: 1.69.0
+        version: 1.69.0
       playwright:
         specifier: 1.65.0
         version: 1.65.0
@@ -73,8 +73,8 @@ packages:
     resolution: {integrity: sha512-4fCk79wshMdzMp2rH06qWrJE4iolqLhCUH+OiuIgU++RB0+94NlDL81atO7GX55uUKueo0txHNtvEyI6D7WdMw==}
     engines: {node: '>=0.10.0'}
 
-  lucide@1.64.0:
-    resolution: {integrity: sha512-2k481p+2dnI88E5chX8D1niwJzar/0EMFZwS93E/umHVxl+Po5uoDIGuo64Ij3a35YaD1J6EsWulDzKaod5wOw==}
+  lucide@1.69.0:
+    resolution: {integrity: sha512-0i7rhzoeiE7rAB6w0Jb/2Gb2qlC6xezen4wStLEY8thp+nhGef1iM7Ulh0YfGkPjp02gY/D88UWYDg3uMsat4A==}
 
   nth-check@2.1.1:
     resolution: {integrity: sha512-lqjrjmaOoAnWfMmBPL+XNnynZh2+swxiX3WUE0s4yEHI6m+AwrK2UZOimIRl3X/4QctVqS8AiZjFqyOGrMXb/w==}
@@ -191,7 +191,7 @@ snapshots:
     dependencies:
       safer-buffer: 2.1.2
 
-  lucide@1.64.0: {}
+  lucide@1.69.0: {}
 
   nth-check@2.1.1:
     dependencies:
