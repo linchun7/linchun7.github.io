@@ -63,3 +63,5 @@ node tools/chatgpt_price_comparison/scripts/browser-test.mjs
 ### 线上 HTML 内容验收
 
 生产校验除版本标记及资源哈希外，同时要求 HTML MIME、唯一且位于有效 body 中的内嵌价格快照，以及与已验证生成页一致的应用主体、静态价格表、历史弹窗和资源标签语义。`scripts/production_html.py` 使用现有 Python 标准库解析显式闭合的生成标记，忽略注释、属性顺序和无关排版空白，不要求 CDN 返回逐字节一致的 HTML；它是本项目生成页的验收契约，不是通用 HTML5 解析器或安全清洗器。主体缺失、隐藏/惰性容器中的伪主体、价格快照错配和失效资源标签都不能只靠正确 head 标记过关。缓存诊断和 canonical 两个阶段都执行此检查，共享原请求预算；既有提交归属、真实线上资源及失败后复核门禁不变。
+
+生产验收还要求 JavaScript/ES module 与 CSS 的响应 MIME 可被浏览器使用，诊断 URL 与普通 URL 均检查；不能仅靠正确资源哈希放行。CDP 浏览器验收累计所有 `Runtime.exceptionThrown`，跨刷新保留并在成功结束前失败关闭，不再只输出日志。

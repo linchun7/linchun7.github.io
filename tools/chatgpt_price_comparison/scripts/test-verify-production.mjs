@@ -217,6 +217,39 @@ assert.equal(
   'JSON MIME with a charset parameter is accepted'
 );
 
+// Correct bytes with a browser-blocked asset MIME must not be accepted.
+for (const phase of ['diagnostic', 'canonical']) {
+  for (const suffix of ['/app.js', '/style.css', '/vendor/lucide-subset.js']) {
+    for (const contentType of ['text/plain', 'application/octet-stream', 'text/html', null]) {
+      await assert.rejects(verifyOnce(data, {
+        expectedMinimumHistory: minimumHistory, expectedPageRevision: pageRevision,
+        expectedAssets, expectedHtml, requestTimeoutMs: 1000,
+        fetchImpl: async url => {
+          const request = new URL(String(url)), response = responseFor(url);
+          if (request.pathname.endsWith(suffix)
+              && request.searchParams.has('verify') === (phase === 'diagnostic')) {
+            if (contentType === null) response.headers.delete('content-type');
+            else response.headers.set('content-type', contentType);
+          }
+          return response;
+        }
+      }), /asset content type is unusable/, phase + ' ' + suffix + ' ' + contentType);
+    }
+  }
+}
+for (const javascriptType of ['text/javascript; charset=utf-8', 'application/javascript', 'Application/EcmaScript; charset=utf-8']) {
+  assert.equal(await verifyOnce(data, {
+    expectedMinimumHistory: minimumHistory, expectedPageRevision: pageRevision,
+    expectedAssets, expectedHtml, requestTimeoutMs: 1000,
+    fetchImpl: async url => {
+      const response = responseFor(url), pathname = new URL(String(url)).pathname;
+      if (pathname.endsWith('.js')) response.headers.set('content-type', javascriptType);
+      if (pathname.endsWith('.css')) response.headers.set('content-type', 'Text/CSS; charset=utf-8');
+      return response;
+    }
+  }), data.revision, 'accepts browser-supported asset MIME with case and parameters');
+}
+
 const bad = structuredClone(data);
 bad.generated_at = '2026-09-24T00:00:01Z';
 assert.throws(() => validateSnapshot(bad), /revision/);

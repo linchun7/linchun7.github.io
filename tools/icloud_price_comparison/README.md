@@ -72,4 +72,8 @@ pnpm audit --audit-level low
 
 Pages 等待现读取最近 100 条构建记录，不仅依赖可能回退的 `builds/latest` 指针；按 API 的最新优先顺序寻找精确提交或经 ancestry 验证的后继。最新相关构建若仍排队或失败，不接受更旧的成功记录；读取/关系查询错误立即失败。仍保留 180 次轮询和真实生产数据/资源验证，不重试提交、不放宽验收。回归覆盖旧指针遮挡、较新失败/排队遮挡旧成功、空结果及 API 故障。
 
+### 生产验收的实时 main 证明与流式限长
+
+生产长轮询遇到更新版本时，每次重新 fetch main，固定精确 SHA 后读取同一提交的四份数据及全部静态资源，并核验该提交是当前验收 checkout 的后继；canonical 验收完成后再确认 main 未前进，否则重试。兼容的 `--current-main-data-dir` 参数仅开启此实时证明，启动时导出的冻结目录不再作为当前 main 的依据。JSON、HTML、JS/CSS 响应按流累计字节，缺失或虚假的 Content-Length 也不能突破上限；越限、HTTP/MIME 拒绝和中止均清理流并释放 reader，不先完整缓冲后检查。
+
 发布基线比较先完整捕获并检查 `git diff --name-only` 的退出状态，再分类路径；任何比较失败（包括无输出或部分输出的 exit 128）以 `PUBLISH_BASE_COMPARISON_FAILED` 停止，不 checkout 最新 main、不覆盖候选文件、不暂存或提交。仅比较成功且全部改动无关时才沿用已测候选，敏感改动继续拒绝；同一 main 或成功的空 diff 保留既有正常路径。
