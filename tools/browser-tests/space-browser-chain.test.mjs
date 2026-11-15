@@ -52,14 +52,21 @@ async function fixture(fault, check) {
 }
 
 test('real Worker chain: exact-byte and native-network positive controls', { timeout: 60000 }, async () => {
-    await fixture(null, baseUrl => verifyUi(manifest, { baseUrl }));
+    await fixture(null, baseUrl => verifyUi(manifest, { baseUrl, timeoutMs: 6000 }));
 });
 
 for (const resource of manifest.resources) {
     for (const mode of ['mime', 'hash', 'http', 'interrupt', 'delay']) {
         test('real Worker chain rejects ' + mode + ' for ' + resource.path, { timeout: 20000 }, async () => {
             await fixture({ path: resource.path, mode }, async baseUrl => {
-                await assert.rejects(verifyUi(manifest, { baseUrl, timeoutMs: 6000 }));
+                const reason = {
+                    mime: /text.*javascript|application.*javascript|content-type|input did not match/i,
+                    hash: /browser loaded unexpected bytes/,
+                    http: /browser dependency HTTP failure/,
+                    interrupt: /socket|closed|reset|aborted|network|fetch|body|premature/i,
+                    delay: /timeout|closed|deadline/i
+                }[mode];
+                await assert.rejects(verifyUi(manifest, { baseUrl, timeoutMs: 6000 }), reason);
             });
         });
     }
