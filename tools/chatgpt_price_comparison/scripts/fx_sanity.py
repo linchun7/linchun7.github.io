@@ -28,25 +28,22 @@ def confirmation_currencies(now, updated, rates, old, parse_time):
     """Compare actual CNY projections, not independent USD legs."""
     active = set(rates) - {'CNY'}
     if not old:
-        return active
+        return set()  # No reliable numeric anchor: retain existing bootstrap validation.
     baseline_at = parse_time(old['updated_at'])
     if updated < baseline_at:
         raise ValueError('FX source timestamp regressed')
     elapsed = now - baseline_at
     if elapsed < -300:
         raise ValueError('future FX baseline')
-    if elapsed > MAX_BASELINE_AGE:
-        return active
     # A recent accepted baseline is an anomaly detector, not an absolute cap:
     # large legitimate moves can still pass independent confirmation.
-    days = Decimal(str(max(1, elapsed / 86400)))
+    days = Decimal(str(min(MAX_BASELINE_AGE / 86400, max(1, elapsed / 86400))))
     limit = DAILY_RATIO ** days
     previous = old.get('rates', {})
     suspicious = set()
     for code in active:
         if code not in previous or 'CNY' not in previous:
-            suspicious.add(code)
-            continue
+            continue  # A newly covered currency has no trustworthy prior comparison.
         before = number(previous['CNY']) / number(previous[code])
         after = number(rates['CNY']) / number(rates[code])
         if ratio(before, after) > limit:
