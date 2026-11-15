@@ -30,7 +30,7 @@ export async function githubJson(url, { token, fetchImpl = fetch, sleep = pause,
         (retry != null || response.headers.get('x-ratelimit-remaining') === '0');
       transient = rateLimited || [429, 500, 502, 503, 504].includes(response.status);
       if (!response.ok && !transient) {
-        await response.body?.cancel();
+        await response.body?.cancel().catch(() => {});
         throw new Error('PAGES_API_HTTP_' + response.status);
       }
       if (response.ok) {
@@ -44,7 +44,7 @@ export async function githubJson(url, { token, fetchImpl = fetch, sleep = pause,
           if (!transient) throw error;
         }
       }
-      await response.body?.cancel();
+      await response.body?.cancel().catch(() => {});
     }
     if (!transient || attempt === maxAttempts) throw new Error('PAGES_API_RETRIES_EXHAUSTED');
     const delay = Math.max(1000 * 2 ** (attempt - 1), retryAfter || 0);
