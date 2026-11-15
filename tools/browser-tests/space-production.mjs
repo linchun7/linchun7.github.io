@@ -145,16 +145,18 @@ export async function forwardVerifiedResponse(route, resource, timeoutMs) {
     await route.fulfill({ response, body });
 }
 
-export async function verifyUi(manifest, { baseUrl = PRODUCTION_URL, timeoutMs = 25000 } = {}) {
+async function verifyUiSession(manifest, { baseUrl = PRODUCTION_URL, timeoutMs = 25000, captureDependencies = true } = {}) {
     const { chromium } = await import('playwright');
+    const sessionStarted = Date.now();
     const browser = await chromium.launch({ headless: true, timeout: Math.min(timeoutMs, 10000) });
-    const deadline = setTimeout(() => { void browser.close().catch(() => {}); }, timeoutMs);
+    const deadline = setTimeout(() => { void browser.close().catch(() => {}); }, Math.max(1, timeoutMs - (Date.now() - sessionStarted)));
     const context = await browser.newContext();
     const page = await context.newPage();
     page.setDefaultTimeout(Math.min(timeoutMs, 7000));
     const errors = [];
     const observed = new Map();
     const responses = [];
+    const dependencyErrors = [];
     const expected = new Map(manifest.resources.map(resource => {
         const url = new URL(resource.url);
         return [new URL(url.pathname + url.search, new URL(baseUrl).origin).href, resource];
@@ -163,7 +165,7 @@ export async function verifyUi(manifest, { baseUrl = PRODUCTION_URL, timeoutMs =
     // Response bodies afterwards races Chromium target disposal (Playwright 1.65).
     // Capture and validate the exact upstream response before forwarding it,
     // rather than changing application code or accepting a separate byte probe.
-    await context.route(url => expected.has(url.href), async route => {
+    if (captureDependencies) await context.route(url => expected.has(url.href), async route => {
         const resource = expected.get(route.request().url());
         const verification = (async () => {
             await forwardVerifiedResponse(route, resource, timeoutMs);
@@ -171,7 +173,7 @@ export async function verifyUi(manifest, { baseUrl = PRODUCTION_URL, timeoutMs =
         })();
         responses.push(verification);
         try { await verification; }
-        catch { await route.abort().catch(() => {}); }
+        catch (error) { dependencyErrors.push(error); await route.abort().catch(() => {}); }
     });
     page.on('pageerror', error => errors.push(error.message));
     await context.route('**/googletagmanager.com/**', route => route.abort());
@@ -198,11 +200,26 @@ export async function verifyUi(manifest, { baseUrl = PRODUCTION_URL, timeoutMs =
         assert.equal(await page.inputValue('#info'), '');
         assert.equal(await page.inputValue('#result'), '');
         await Promise.all(responses);
-        for (const url of expected.keys()) assert.ok(observed.get(url), 'real browser did not load dependency: ' + url);
+        if (captureDependencies) for (const url of expected.keys()) assert.ok(observed.get(url), 'real browser did not load dependency: ' + url);
         assert.deepEqual(errors, [], 'production page errors');
+    } catch (error) {
+        // Preserve the actual dependency validation failure instead of hiding it
+        // behind the UI timeout caused by correctly aborting that resource.
+        throw dependencyErrors[0] || error;
     } finally {
         clearTimeout(deadline);
         await browser.close();
+    }
+}
+
+// A second fresh context exercises the browser's native dependency network path.
+// It does not replace the exact-byte pass; both passes are mandatory.
+export async function verifyUi(manifest, options = {}) {
+    const expires = Date.now() + (options.timeoutMs ?? 25000);
+    for (const captureDependencies of [true, false]) {
+        const remaining = expires - Date.now();
+        assert.ok(remaining > 0, 'shared UI verification deadline exceeded');
+        await verifyUiSession(manifest, { ...options, timeoutMs: remaining, captureDependencies });
     }
 }
 

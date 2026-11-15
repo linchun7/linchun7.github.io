@@ -3010,7 +3010,8 @@ test('falls back from an FX candidate that fails sanity to a sane open candidate
   const previous = JSON.parse(await readFile(pricesUrl, 'utf8'));
   const saneRates = compatibleExchangeRates(previous);
   const anomalousRates = { ...saneRates, JPY: saneRates.JPY / 2 };
-  const now = new Date();
+  // Keep this a one-hour FX jump regardless of the checkout's age.
+  const now = new Date(Date.parse(previous.fx.fetchedAt) + 60 * 60 * 1_000);
   const timestamp = Math.floor(now.getTime() / 1_000);
   const originalFetch = globalThis.fetch;
   let authenticatedRequests = 0;
