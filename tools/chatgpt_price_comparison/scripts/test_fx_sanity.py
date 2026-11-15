@@ -65,24 +65,24 @@ class FxSanityTests(unittest.TestCase):
         old = self.baseline()
         for age in [1, 8, 90]:
             prior = dict(old, updated_at=p.stamp(NOW-age*86400), fallback=True)
-            blocked, _ = self.collect(150, old=prior, secondary=URLError('offline'))
+            blocked, _ = self.collect(1000, old=prior, secondary=URLError('offline'))
             self.assertTrue(blocked['fallback'])
             self.assertEqual(blocked['updated_at'], prior['updated_at'])
-            recovered, _ = self.collect(150, old=blocked, secondary=150)
+            recovered, _ = self.collect(1000, old=blocked, secondary=1000)
             self.assertFalse(recovered['fallback'])
             self.assertEqual(recovered['updated_at'], p.stamp(NOW))
 
-    def test_missing_baseline_new_currency_and_old_baseline_require_confirmation(self):
-        for old in [None, self.baseline(8*86400),
+    def test_bootstrap_new_currency_and_normal_long_gap_do_not_depend_on_secondary(self):
+        for old in [None, self.baseline(90*86400),
                     dict(self.baseline(), rates={'USD': '1', 'CNY': '7'})]:
-            result, calls = self.collect(old=old)
+            result, calls = self.collect(old=old, secondary=URLError('offline'))
             self.assertFalse(result['fallback'])
-            self.assertIn(gate.CONFIRM_URL, calls)
-            result, _ = self.collect(old=old, secondary=URLError('offline'))
-            if old is None:
-                self.assertIsNone(result)
-            else:
-                self.assertTrue(result['fallback'])
+            self.assertEqual(calls, [p.FX_URL])
+
+    def test_long_gap_does_not_allow_decimal_shift_just_because_baseline_is_old(self):
+        result, calls = self.collect(0.9426, old=self.baseline(90*86400))
+        self.assertTrue(result['fallback'])
+        self.assertIn(gate.CONFIRM_URL, calls)
 
     def test_stale_future_missing_duplicate_wrong_base_and_bad_numeric_confirmation_rejected(self):
         mutations = [
