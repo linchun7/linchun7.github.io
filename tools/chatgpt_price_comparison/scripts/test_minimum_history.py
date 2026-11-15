@@ -475,6 +475,82 @@ class MinimumHistoryTests(unittest.TestCase):
 
 
 class CauseLabelPresentationTests(unittest.TestCase):
+
+    def test_frontend_history_chain_matches_generator(self):
+        # Exercise actual app.js validation with the committed real ledger.
+        baseline = json.loads((p.ROOT / 'data/minimum-history.json').read_text(encoding='utf-8'))
+        cases = [('current ledger', baseline, True)]
+        def add(name, mutate, valid=False):
+            value = copy.deepcopy(baseline)
+            mutate(value)
+            cases.append((name, value, valid))
+        # Locate a middle transition rather than depending on a particular index/date.
+        middle = next(i for i, event in enumerate(baseline['events'])
+                      if event['kind'] == 'change'
+                      and any(later['plan'] == event['plan'] for later in baseline['events'][i + 1:]))
+        add('missing middle transition', lambda v: v['events'].pop(middle))
+        add('initial mislabeled as change', lambda v: v['events'][0].update(kind='change', cause='unknown'))
+        add('repeated initial', lambda v: v['events'][middle].update(kind='initial', cause='initial', previous_at=None))
+        add('initial has prior winners', lambda v: v['events'][0].update(
+            **{'from': copy.deepcopy(v['events'][0]['to'])}))
+        add('initial missing winners', lambda v: v['events'][0].update(to=[]))
+        add('change lacks previous time', lambda v: v['events'][middle].update(previous_at=None))
+        def no_change(v):
+            event = v['events'][middle]
+            event.pop('comparison', None)
+            event['to'] = copy.deepcopy(event['from'])
+        add('change does not change winner identity', no_change)
+        def wrong_checkpoint(v):
+            v['checkpoint']['plans'][0]['winners'][0]['code'] = 'zz'
+        add('checkpoint winner mismatch', wrong_checkpoint)
+        add('duplicate checkpoint plan', lambda v: v['checkpoint']['plans'].append(copy.deepcopy(v['checkpoint']['plans'][0])))
+        add('empty checkpoint winners', lambda v: v['checkpoint']['plans'][0].update(winners=[]))
+        def duplicate_winner(v):
+            event = v['events'][0]
+            event.pop('comparison', None)
+            event['to'].append(copy.deepcopy(event['to'][0]))
+        add('duplicate winner identity', duplicate_winner)
+        def legacy(v):
+            for event in v['events']:
+                event.pop('comparison', None)
+        add('legacy ledger without comparisons', legacy, True)
+        # A checkpoint is the latest observation, not necessarily the last event.
+        def checkpoint_price_change(v):
+            v['checkpoint']['plans'][0]['winners'][0]['local'] = '123.45'
+            v['checkpoint']['plans'][0]['winners'][0]['cny'] = '678.90'
+        add('checkpoint prices may move without winner change', checkpoint_price_change, True)
+        # A plan may disappear from the current snapshot; keep its historical events.
+        add('removed plan remains in history', lambda v: v['checkpoint']['plans'].pop(), True)
+        for name, value, expected in cases:
+            with self.subTest(name=name):
+                if expected:
+                    h.validate_history(value)
+                else:
+                    with self.assertRaises(ValueError):
+                        h.validate_history(value)
+        script = r"""
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
+const source = readFileSync(process.argv[1], 'utf8');
+const start = source.indexOf('  function minimumHistoryCause(');
+const end = source.indexOf('  function ensureMinimumHistoryDialog(');
+assert.ok(start >= 0 && end > start);
+const canonical = value => {
+  if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';
+  if (value && typeof value === 'object') return '{' + Object.keys(value).sort().map(key => JSON.stringify(key) + ':' + canonical(value[key])).join(',') + '}';
+  return JSON.stringify(value);
+};
+const validate = runInNewContext(source.slice(start, end) + ';validateMinimumHistory;', { canonical });
+for (const [name, value, expected] of JSON.parse(readFileSync(0, 'utf8'))) {
+  if (expected) assert.doesNotThrow(() => validate(value), name);
+  else assert.throws(() => validate(value), undefined, name);
+}
+
+"""
+        subprocess.run(['node', '--input-type=module', '-e', script, str(p.ROOT / 'app.js')],
+                       input=json.dumps(cases), check=True, capture_output=True, text=True, timeout=10)
+
     def test_frontend_cause_classification_matches_backend(self):
         import itertools
         cases = []
