@@ -128,6 +128,20 @@ class FxSanityTests(unittest.TestCase):
             NOW, NOW, {'USD': '1', 'CNY': '14', 'INR': '188.52'}, self.baseline(), p.epoch)
         self.assertEqual(needed, {'USD'})
 
+    def test_tolerance_tracks_source_dates_not_retry_clock_and_is_capped(self):
+        old = self.baseline(3*86400)
+        rates = {'USD': '1', 'CNY': '7', 'INR': str(94.26*1.4)}
+        # An actual three-day source interval permits 1.4x; this is tolerance
+        # growth, not evidence from repeated failed requests.
+        self.assertEqual(gate.confirmation_currencies(NOW, NOW, rates, old, p.epoch), set())
+        # A fresh-enough but earlier payload gets only its true two-day interval,
+        # not extra allowance merely because it was fetched a day later.
+        self.assertEqual(gate.confirmation_currencies(
+            NOW, NOW-86400, rates, old, p.epoch), {'INR'})
+        extreme = dict(rates, INR='.9426')
+        self.assertEqual(gate.confirmation_currencies(
+            NOW, NOW, extreme, self.baseline(90*86400), p.epoch), {'INR'})
+
     def test_secondary_requests_use_existing_url_allowlist_and_budget(self):
         with patch.object(p.urllib.request, 'build_opener') as opener:
             opener.return_value.open.side_effect = URLError('test')
