@@ -5,7 +5,7 @@ import os
 import tempfile
 from pathlib import Path
 import minimum_history
-from test_retained_fx import RetainedFxTests
+import test_retained_fx
 from urllib.error import URLError
 from unittest.mock import patch
 
@@ -141,7 +141,7 @@ class FxSanityTests(unittest.TestCase):
     def test_pipeline_marks_anomaly_degraded_preserves_history_and_recovers(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            old, config, _ = RetainedFxTests().baseline(root)
+            old, config, _ = test_retained_fx.RetainedFxTests().baseline(root)
             old['fx']['rates']['INR'] = '94.26'
             india = next(m for m in old['markets'] if m['code'] == 'in')
             india['currency'] = 'INR'
