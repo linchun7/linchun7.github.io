@@ -147,14 +147,16 @@ export async function forwardVerifiedResponse(route, resource, timeoutMs) {
 
 async function verifyUiSession(manifest, { baseUrl = PRODUCTION_URL, timeoutMs = 25000, captureDependencies = true } = {}) {
     const { chromium } = await import('playwright');
+    const sessionStarted = Date.now();
     const browser = await chromium.launch({ headless: true, timeout: Math.min(timeoutMs, 10000) });
-    const deadline = setTimeout(() => { void browser.close().catch(() => {}); }, timeoutMs);
+    const deadline = setTimeout(() => { void browser.close().catch(() => {}); }, Math.max(1, timeoutMs - (Date.now() - sessionStarted)));
     const context = await browser.newContext();
     const page = await context.newPage();
     page.setDefaultTimeout(Math.min(timeoutMs, 7000));
     const errors = [];
     const observed = new Map();
     const responses = [];
+    const dependencyErrors = [];
     const expected = new Map(manifest.resources.map(resource => {
         const url = new URL(resource.url);
         return [new URL(url.pathname + url.search, new URL(baseUrl).origin).href, resource];
@@ -171,7 +173,7 @@ async function verifyUiSession(manifest, { baseUrl = PRODUCTION_URL, timeoutMs =
         })();
         responses.push(verification);
         try { await verification; }
-        catch { await route.abort().catch(() => {}); }
+        catch (error) { dependencyErrors.push(error); await route.abort().catch(() => {}); }
     });
     page.on('pageerror', error => errors.push(error.message));
     await context.route('**/googletagmanager.com/**', route => route.abort());
@@ -200,6 +202,10 @@ async function verifyUiSession(manifest, { baseUrl = PRODUCTION_URL, timeoutMs =
         await Promise.all(responses);
         if (captureDependencies) for (const url of expected.keys()) assert.ok(observed.get(url), 'real browser did not load dependency: ' + url);
         assert.deepEqual(errors, [], 'production page errors');
+    } catch (error) {
+        // Preserve the actual dependency validation failure instead of hiding it
+        // behind the UI timeout caused by correctly aborting that resource.
+        throw dependencyErrors[0] || error;
     } finally {
         clearTimeout(deadline);
         await browser.close();
@@ -209,8 +215,12 @@ async function verifyUiSession(manifest, { baseUrl = PRODUCTION_URL, timeoutMs =
 // A second fresh context exercises the browser's native dependency network path.
 // It does not replace the exact-byte pass; both passes are mandatory.
 export async function verifyUi(manifest, options = {}) {
-    await verifyUiSession(manifest, { ...options, captureDependencies: true });
-    await verifyUiSession(manifest, { ...options, captureDependencies: false });
+    const expires = Date.now() + (options.timeoutMs ?? 25000);
+    for (const captureDependencies of [true, false]) {
+        const remaining = expires - Date.now();
+        assert.ok(remaining > 0, 'shared UI verification deadline exceeded');
+        await verifyUiSession(manifest, { ...options, timeoutMs: remaining, captureDependencies });
+    }
 }
 
 export async function verifyWithRetry(manifest, {
