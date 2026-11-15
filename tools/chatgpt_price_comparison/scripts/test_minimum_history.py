@@ -551,6 +551,26 @@ for (const [name, value, expected] of JSON.parse(readFileSync(0, 'utf8'))) {
         subprocess.run(['node', '--input-type=module', '-e', script, str(p.ROOT / 'app.js')],
                        input=json.dumps(cases), check=True, capture_output=True, text=True, timeout=10)
 
+    def test_long_browser_history_fixture_has_valid_producer_semantics(self):
+        script = r"""
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+const projectDir = process.argv[1];
+const source = await readFile(resolve(projectDir, 'scripts/browser-matrix.mjs'), 'utf8');
+const start = source.indexOf('  // Synthetic but semantically valid ledger:');
+const end = source.indexOf('  const diagnostics = [], failures = [];', start);
+assert.ok(start >= 0 && end > start);
+const make = new Function('readFile', 'resolve', 'projectDir', 'assert',
+  'return (async () => {' + source.slice(start, end) + ';return history;})();');
+const history = await make(readFile, resolve, projectDir, assert);
+assert.equal(history.events.filter(event => event.kind === 'change').length, 30);
+console.log(JSON.stringify(history));
+"""
+        result = subprocess.run(['node', '--input-type=module', '-e', script, str(p.ROOT)],
+                                check=True, capture_output=True, text=True, timeout=10)
+        h.validate_history(json.loads(result.stdout))
+
     def test_frontend_cause_classification_matches_backend(self):
         import itertools
         cases = []

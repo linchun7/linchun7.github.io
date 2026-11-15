@@ -499,22 +499,33 @@ async function assertDailyTableGeometry(browser) {
 }
 
 async function assertHistoryHeaderReachability(browser) {
-  // UI consumer fixture only: repeat an existing change record to stress bounded list
-  // reachability, filtering and pagination. This is not a natural/canonical ledger,
-  // must not be persisted, and does not assert canonical producer acceptance.
+  // Synthetic but semantically valid ledger: one initial event followed by
+  // 30 alternating winner changes. Keep the real consumer gate enabled.
   const history = JSON.parse(await readFile(resolve(projectDir, 'data/minimum-history.json'), 'utf8'));
-  const seed = history.events.find(event => event.kind === 'change');
-  assert.ok(seed, 'header-reachability consumer fixture needs an existing change template');
+  const seed = history.events.find(event => event.kind === 'change' && event.from.length && event.to.length);
+  assert.ok(seed, 'header-reachability fixture needs two nonempty winner sets');
   const firstAt = Date.parse(history.first_observed_at), lastAt = Date.parse(history.checkpoint.at);
-  assert.ok(lastAt > firstAt + 30000);
-  history.events = Array.from({ length: 30 }, (_, index) => {
+  assert.ok(lastAt > firstAt + 31000);
+  history.events = Array.from({ length: 31 }, (_, index) => {
     const event = structuredClone(seed);
     delete event.comparison;
-    event.at = new Date(firstAt + Math.floor(index * (lastAt - firstAt) / 31)).toISOString();
-    event.previous_at = index === 0 ? null : new Date(firstAt + Math.floor((index - 1) * (lastAt - firstAt) / 31)).toISOString();
+    event.at = new Date(firstAt + Math.floor(index * (lastAt - firstAt) / 32)).toISOString();
+    event.previous_at = index === 0 ? null : new Date(firstAt + Math.floor((index - 1) * (lastAt - firstAt) / 32)).toISOString();
+    event.kind = index === 0 ? 'initial' : 'change';
+    event.evidence = { prices_changed: false, scope_changed: false, fx_changed: true, gap: false };
+    event.cause = index === 0 ? 'initial' : 'fx';
+    event.from = index === 0 ? [] : structuredClone(index % 2 ? seed.from : seed.to);
+    event.to = structuredClone(index % 2 ? seed.to : seed.from);
     return event;
   });
   history.first_observed_at = history.events[0].at;
+  history.gaps = [];
+  history.pending_gap = false;
+  history.checked_at = history.checkpoint.at;
+  history.observations = history.events.length;
+  history.checkpoint.plans = [{
+    id: seed.plan, scope: [], prices: [], winners: structuredClone(history.events.at(-1).to),
+  }];
   const diagnostics = [], failures = [];
   for (const [width, height] of [[320, 568], [667, 375], [1280, 900]]) {
     const touch = width < 1101, label = width + 'x' + height;
