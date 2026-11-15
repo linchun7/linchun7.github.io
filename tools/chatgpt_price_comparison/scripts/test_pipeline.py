@@ -433,7 +433,10 @@ class ContractTests(unittest.TestCase):
             for second in 'ABC':
                 rates[f'X{first}{second}'] = 2
         payload = {'result':'success','base_code':'USD','time_last_update_unix':NOW,'rates':rates}
-        result = p.collect_fx(NOW, None, lambda *a, **kw: json.dumps(payload), {'JPY'})
+        confirmation = [{'base': 'USD', 'quote': code, 'rate': rates[code], 'date': p.stamp(NOW)[:10]}
+                        for code in ['USD', 'CNY', 'JPY']]
+        result = p.collect_fx(NOW, None, lambda url, **kw: json.dumps(
+            payload if url == p.FX_URL else confirmation), {'JPY'})
         self.assertEqual(set(result['rates']), {'USD', 'CNY', 'JPY'})
 
     def test_staggered_known_aliases_collapse_to_one_logical_plan(self):
