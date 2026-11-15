@@ -66,6 +66,10 @@ node tools/chatgpt_price_comparison/scripts/browser-test.mjs
 
 生产验收还要求 JavaScript/ES module 与 CSS 的响应 MIME 可被浏览器使用，诊断 URL 与普通 URL 均检查；不能仅靠正确资源哈希放行。CDP 浏览器验收累计所有 `Runtime.exceptionThrown`，跨刷新保留并在成功结束前失败关闭，不再只输出日志。
 
+### 统一 Pages 等待器与有限重试
+
+iCloud 更新、ChatGPT 更新及 ChatGPT push 验证统一使用 `.github/scripts/wait-pages-build.mjs`，扫描最近 100 条构建；精确 SHA 或已验证后继才可通过，最新相关排队/失败不能借旧成功过关。只对 GET 网络/超时、429、明确限流的 403、500/502/503/504 有限重试（每请求最多 3 次，1/2 秒退避并尊重 Retry-After，上限 60 秒）；认证/权限、格式、提交关系错误立即失败。总期限 15 分钟、最多 180 轮，单请求 15 秒包含响应体；失败不能伪装成功。ChatGPT 保留后继项目 supersession 与 canonical 验证，所有项目仍验真实数据、HTML 和资源。共享脚本修改会触发两套 CI 与负面回归。此门禁不请求新构建、不重写生产数据，不以普通 Pages 绿灯代替每日更新端到端验证。
+
 
 ### 汇率异常与独立确认
 
