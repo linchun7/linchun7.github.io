@@ -22,6 +22,7 @@ import unicodedata
 import minimum_history
 import plan_identity as plan_ids
 import change_policy
+import fx_sanity
 import reviewed_confirmation
 import urllib.error
 import urllib.parse
@@ -435,7 +436,7 @@ def _read_response_body(response, deadline: float) -> bytes:
 
 
 def fetch(url: str, *, confirm=False, deadline=float('inf')) -> str:
-    if not (url == FX_URL or re.fullmatch(r'https://apps\.apple\.com/[a-z]{2}/app/chatgpt/id6448311069\?l=en-US', url)):
+    if not (url in (FX_URL, fx_sanity.CONFIRM_URL) or re.fullmatch(r'https://apps\.apple\.com/[a-z]{2}/app/chatgpt/id6448311069\?l=en-US', url)):
         raise ValueError('source URL is not allowlisted')
     request = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (compatible; PublicPriceObserver/1.0)',
         'Accept-Language': 'en-US,en;q=0.9', 'Accept-Encoding': 'identity',
@@ -558,8 +559,13 @@ def collect_fx(now: float, old: dict | None, getter=fetch, required_currencies=(
         if any(code not in rates for code in required):
             raise ValueError('required FX rate missing')
         selected = {code: str(rates[code]) for code in required}
+        suspicious = fx_sanity.confirmation_currencies(now, updated, selected, old, epoch)
+        if suspicious:
+            fx_sanity.confirm(now, selected, suspicious, getter)
+            print('FX_SANITY independently confirmed:', ','.join(sorted(suspicious)), flush=True)
         return {'source_url': FX_URL, 'updated_at': stamp(updated), 'rates': selected, 'fallback': False}
-    except (ValueError, KeyError, TypeError, urllib.error.URLError, TimeoutError, OSError):
+    except (ValueError, KeyError, TypeError, InvalidOperation, urllib.error.URLError, TimeoutError, OSError) as exc:
+        print('FX_RETAINED', clean(str(exc))[:180], flush=True)
         if old and -300 <= now - epoch(old['updated_at']):
             old_rates = old.get('rates', {})
             selected = {code: str(old_rates[code]) for code in required if code in old_rates}
