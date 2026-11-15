@@ -9,6 +9,9 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import { plansFor, offerFor, comparisonFor } from './browser-oracle.mjs';
 
+import { createRuntimeExceptionGuard } from './runtime-exception-guard.mjs';
+const runtimeExceptions = createRuntimeExceptionGuard();
+
 const scope = process.env.BROWSER_TEST_SCOPE || 'full';
 assert.ok(['full', 'state'].includes(scope), 'Unknown BROWSER_TEST_SCOPE');
 const fullUi = scope === 'full';
@@ -77,7 +80,7 @@ try {
   const tab=await (await fetch(origin+'/json/new?about:blank',{method:'PUT'})).json();
   socket=new WebSocket(tab.webSocketDebuggerUrl);
   await new Promise((resolve,reject)=>{socket.addEventListener('open',resolve,{once:true});socket.addEventListener('error',reject,{once:true});});
-  socket.addEventListener('message', ({data}) => {const m=JSON.parse(data), p=pending.get(m.id);if(m.method === 'Runtime.exceptionThrown') console.error('PAGE ERROR',JSON.stringify(m.params));if(p){clearTimeout(p.timer);pending.delete(m.id);m.error?p.reject(Error(JSON.stringify(m.error))):p.resolve(m.result);}});
+  socket.addEventListener('message', ({data}) => {const m=JSON.parse(data), p=pending.get(m.id);runtimeExceptions.record(m);if(m.method === 'Runtime.exceptionThrown') console.error('PAGE ERROR',JSON.stringify(m.params));if(p){clearTimeout(p.timer);pending.delete(m.id);m.error?p.reject(Error(JSON.stringify(m.error))):p.resolve(m.result);}});
   await command('Page.enable'); await command('Runtime.enable'); await command('Network.enable');
   await command('Emulation.setTimezoneOverride', {timezoneId: 'Asia/Tokyo'});
   const url='http://127.0.0.1:4177/tools/chatgpt_price_comparison/';
@@ -568,6 +571,7 @@ try {
     assert.equal(await evaluate(`document.querySelector('i[data-lucide="search"]')!==null`),true,'no-JS keeps Lucide placeholder in static HTML');
     assert.equal(await evaluate(`document.querySelector('#refresh')===null`),true,'no-JS has no reload button');
   }
+  runtimeExceptions.assertClean();
   console.log(`Browser tests passed (scope=${scope}): prices, ranks, minima, history, dates, mobile data and static fallback${fullUi ? '; complete keyboard, XSS and responsive checks' : ''}.`);
 } catch(error) {
   if (socket?.readyState === 1) console.error('PAGE STATE',await evaluate('({url:location.href,rows:document.querySelectorAll("#priceRows tr").length,dialog:document.querySelector("#historyDialog")?.open,body:document.body?.textContent.slice(0,1200)})'));
