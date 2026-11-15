@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import {
-    makeManifest, pageContract, scopeChanged, mainState, verifyBytes, verifyWithRetry,
+    forwardVerifiedResponse, makeManifest, pageContract, scopeChanged, mainState, verifyBytes, verifyWithRetry,
     SPACE_FILES, PRODUCTION_SCOPE, PRODUCTION_URL
 } from './space-production.mjs';
 
@@ -213,4 +213,40 @@ test('workflow keeps push behind all browser success and preserves scheduled upd
     assert.match(job, /contents: read/);
     assert.doesNotMatch(job, /pages:|contents: write|secrets\./);
     assert.match(workflow, /space-production\.mjs --fixture/);
+});
+
+test('browser response is verified before forwarding; no separate fetch can rescue invalid bytes', async () => {
+    const resource = manifest().resources[0];
+    const body = files[resource.path];
+    for (const failure of [null, 'http', 'mime', 'hash', 'closed']) {
+        const calls = [];
+        const response = {
+            ok: () => failure !== 'http',
+            headers: () => ({ 'content-type': failure === 'mime' ? 'text/html' : 'text/javascript' }),
+            body: async () => {
+                calls.push('body');
+                if (failure === 'closed') throw Error('target closed');
+                return failure === 'hash' ? Buffer.from('stale') : body;
+            }
+        };
+        const route = {
+            fetch: async options => {
+                assert.deepEqual(options, { maxRedirects: 0, timeout: 7000 });
+                calls.push('fetch');
+                return response;
+            },
+            fulfill: async options => {
+                calls.push('fulfill');
+                assert.equal(options.response, response);
+                assert.equal(options.body, body);
+            }
+        };
+        if (failure) {
+            await assert.rejects(forwardVerifiedResponse(route, resource, 25000));
+            assert.ok(!calls.includes('fulfill'));
+        } else {
+            await forwardVerifiedResponse(route, resource, 25000);
+            assert.deepEqual(calls, ['fetch', 'body', 'fulfill']);
+        }
+    }
 });

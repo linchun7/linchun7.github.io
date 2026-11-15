@@ -118,7 +118,24 @@ try {
   assert.equal(await page.locator('#bankTable [data-sort="rank"] .lucide-arrow-up').count(), 1, 'default rank sort should show the iCloud-style arrow-up icon');
   assert.equal(await page.locator('#bankTable [data-sort="name"] .lucide-arrow-up-down').count(), 1, 'inactive headers should show the iCloud-style arrow-up-down icon');
   assert.equal(await page.locator('#bankTable th').nth(0).locator('button').evaluate(element => getComputedStyle(element).justifyContent), 'center', 'rank header should align with centered rank cells');
-  assert.equal(await page.locator('#bankTable th').nth(2).locator('button').evaluate(element => getComputedStyle(element).justifyContent), 'flex-start', 'bank-type header should align with left-aligned type cells');
+  const typeHeaderAlignment = await page.locator('#bankTable th').nth(2).locator('button').evaluate(element => {
+    const style = getComputedStyle(element);
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    const button = element.getBoundingClientRect();
+    const content = range.getBoundingClientRect();
+    return {
+      keyword: style.justifyContent,
+      direction: style.direction,
+      leftGap: content.left - button.left,
+      rightGap: button.right - content.right
+    };
+  });
+  // Chromium can serialize this logical start alignment as flow-start.
+  // Check real geometry too, so accepting the alias cannot hide centered/end alignment.
+  assert.ok(['flex-start', 'flow-start', 'start'].includes(typeHeaderAlignment.keyword), 'type header must use start alignment');
+  assert.equal(typeHeaderAlignment.direction, 'ltr');
+  assert.ok(typeHeaderAlignment.leftGap < typeHeaderAlignment.rightGap, 'bank-type header content must sit at the left edge, not center/end');
 
   if (oldestYear !== latestYear) {
     await page.locator('#yearSelect').selectOption(String(oldestYear));
