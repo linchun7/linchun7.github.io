@@ -131,6 +131,23 @@ async function getText(fetchImpl, base, maxBytes, signal, attempt, diagnostic) {
       throw new Error('unexpected production redirect');
     }
   }
+  // CSS and ESM are MIME-gated by browsers; correct bytes alone are not enough.
+  // Apply this in both diagnostic and canonical probes, including nosniff hosts.
+  const assetName = Object.keys(ASSET_PATHS).find(name =>
+    new URL(base).pathname === new URL(ASSET_PATHS[name], INDEX_URL).pathname);
+  if (assetName) {
+    const mime = (response.headers.get('content-type') || '').split(';', 1)[0].trim().toLowerCase();
+    const javascriptMimes = new Set([
+      'application/ecmascript', 'application/javascript', 'application/x-ecmascript',
+      'application/x-javascript', 'text/ecmascript', 'text/javascript',
+      'text/javascript1.0', 'text/javascript1.1', 'text/javascript1.2',
+      'text/javascript1.3', 'text/javascript1.4', 'text/javascript1.5',
+      'text/jscript', 'text/livescript', 'text/x-ecmascript', 'text/x-javascript'
+    ]);
+    if (!(assetName === 'style' ? mime === 'text/css' : javascriptMimes.has(mime))) {
+      throw new Error('production asset content type is unusable: ' + assetName);
+    }
+  }
   return limitedText(response, maxBytes);
 }
 
