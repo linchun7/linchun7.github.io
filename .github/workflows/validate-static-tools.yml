@@ -140,6 +140,11 @@ jobs:
           if [[ "$PLAYWRIGHT_BROWSER" == chromium ]]; then
             node tools/browser-tests/math-card-audit-verification.mjs
             node tools/browser-tests/space-production.mjs --fixture
+            node --test --test-concurrency=1 tools/browser-tests/space-browser-chain.test.mjs
+            # Read-only candidate verification against current public production.
+            # No credentials, publishing, or update workflow is invoked.
+            git fetch origin main
+            node tools/browser-tests/space-production.mjs --expected-sha "$(git rev-parse origin/main)"
           fi
           node --test tools/browser-tests/script-startup-contract-test.mjs
           python3 tools/hospital_rank/scripts/validate_data.py

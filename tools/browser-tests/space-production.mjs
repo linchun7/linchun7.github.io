@@ -136,31 +136,44 @@ export async function verifyBytes(manifest, {
     }));
 }
 
-export async function verifyUi(manifest, { baseUrl = PRODUCTION_URL, timeoutMs = 25000 } = {}) {
+export async function forwardVerifiedResponse(route, resource, timeoutMs) {
+    const response = await route.fetch({ maxRedirects: 0, timeout: Math.min(timeoutMs, 7000) });
+    assert.ok(response.ok(), 'browser dependency HTTP failure: ' + resource.path);
+    assert.match(response.headers()['content-type'] || '', /^(?:text|application)\/(?:javascript|x-javascript|ecmascript)\b/i);
+    const body = await response.body();
+    assert.equal(sha256(body), resource.hash, 'browser loaded unexpected bytes: ' + resource.path);
+    await route.fulfill({ response, body });
+}
+
+async function verifyUiSession(manifest, { baseUrl = PRODUCTION_URL, timeoutMs = 25000, captureDependencies = true } = {}) {
     const { chromium } = await import('playwright');
+    const sessionStarted = Date.now();
     const browser = await chromium.launch({ headless: true, timeout: Math.min(timeoutMs, 10000) });
-    const deadline = setTimeout(() => { void browser.close().catch(() => {}); }, timeoutMs);
+    const deadline = setTimeout(() => { void browser.close().catch(() => {}); }, Math.max(1, timeoutMs - (Date.now() - sessionStarted)));
     const context = await browser.newContext();
     const page = await context.newPage();
     page.setDefaultTimeout(Math.min(timeoutMs, 7000));
     const errors = [];
     const observed = new Map();
     const responses = [];
+    const dependencyErrors = [];
     const expected = new Map(manifest.resources.map(resource => {
         const url = new URL(resource.url);
         return [new URL(url.pathname + url.search, new URL(baseUrl).origin).href, resource];
     }));
-    context.on('response', response => {
-        const resource = expected.get(response.url());
-        if (!resource) return;
-        responses.push((async () => {
-            assert.ok(response.ok(), 'browser dependency HTTP failure: ' + resource.path);
-            assert.match(response.headers()['content-type'] || '', /^(?:text|application)\/(?:javascript|x-javascript|ecmascript)\b/i);
-            assert.equal(sha256(await response.body()), resource.hash, 'browser loaded unexpected bytes: ' + resource.path);
-            observed.set(response.url(), true);
-        })());
-        // The assertion is awaited below; prevent an early unhandled rejection.
-        responses.at(-1).catch(() => {});
+    // Workers are terminated as soon as formatting completes. Reading their
+    // Response bodies afterwards races Chromium target disposal (Playwright 1.65).
+    // Capture and validate the exact upstream response before forwarding it,
+    // rather than changing application code or accepting a separate byte probe.
+    if (captureDependencies) await context.route(url => expected.has(url.href), async route => {
+        const resource = expected.get(route.request().url());
+        const verification = (async () => {
+            await forwardVerifiedResponse(route, resource, timeoutMs);
+            observed.set(route.request().url(), true);
+        })();
+        responses.push(verification);
+        try { await verification; }
+        catch (error) { dependencyErrors.push(error); await route.abort().catch(() => {}); }
     });
     page.on('pageerror', error => errors.push(error.message));
     await context.route('**/googletagmanager.com/**', route => route.abort());
@@ -187,11 +200,26 @@ export async function verifyUi(manifest, { baseUrl = PRODUCTION_URL, timeoutMs =
         assert.equal(await page.inputValue('#info'), '');
         assert.equal(await page.inputValue('#result'), '');
         await Promise.all(responses);
-        for (const url of expected.keys()) assert.ok(observed.get(url), 'real browser did not load dependency: ' + url);
+        if (captureDependencies) for (const url of expected.keys()) assert.ok(observed.get(url), 'real browser did not load dependency: ' + url);
         assert.deepEqual(errors, [], 'production page errors');
+    } catch (error) {
+        // Preserve the actual dependency validation failure instead of hiding it
+        // behind the UI timeout caused by correctly aborting that resource.
+        throw dependencyErrors[0] || error;
     } finally {
         clearTimeout(deadline);
         await browser.close();
+    }
+}
+
+// A second fresh context exercises the browser's native dependency network path.
+// It does not replace the exact-byte pass; both passes are mandatory.
+export async function verifyUi(manifest, options = {}) {
+    const expires = Date.now() + (options.timeoutMs ?? 25000);
+    for (const captureDependencies of [true, false]) {
+        const remaining = expires - Date.now();
+        assert.ok(remaining > 0, 'shared UI verification deadline exceeded');
+        await verifyUiSession(manifest, { ...options, timeoutMs: remaining, captureDependencies });
     }
 }
 
