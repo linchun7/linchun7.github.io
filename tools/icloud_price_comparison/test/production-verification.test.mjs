@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import test, { mock } from 'node:test';
 import {
-  readBoundedResponse, runCli,
+  readBoundedResponse, runCli, createCurrentMainReader,
   MAX_HISTORY_RESPONSE_BYTES,
   MAX_RUN_LOG_RESPONSE_BYTES,
   PRODUCTION_HISTORY_URL,
@@ -653,4 +653,22 @@ test('supersession retries if final main proof advances and never silently accep
   assert.equal(result.status, 'superseded');
   assert.equal(result.attempts, 2);
   assert.equal(proofs, 2);
+});
+
+test('live main proof fails closed on fetch errors, malformed SHA or non-descendant main', async () => {
+  for (const failure of ['fetch', 'rev-parse', 'merge-base']) {
+    const calls = [];
+    const reader = createCurrentMainReader({ runGit: async (_command, args) => {
+      calls.push(args);
+      if (args[0] === failure) {
+        if (failure === 'rev-parse') return { stdout: 'not-a-commit' };
+        throw Error(failure + ' unavailable');
+      }
+      if (args[0] === 'rev-parse') return { stdout: 'b'.repeat(40) };
+      return { stdout: '' };
+    } });
+    await assert.rejects(reader.getCurrentMainArtifact(), /unavailable|Invalid refreshed/);
+    await assert.rejects(reader.getCurrentMainStaticAssets(), /must be read first/);
+    assert.equal(calls.some(args => args[0] === 'show'), false, 'no frozen artifact fallback');
+  }
 });
