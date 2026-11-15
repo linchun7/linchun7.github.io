@@ -121,3 +121,79 @@ test('all three callers use shared waiter and both CI path filters test shared c
     assert.match(text, /node --test \.github\/scripts\/wait-pages-build\.test\.mjs/);
   }
 });
+
+
+test('default wait budget accepts a healthy build on poll 65 after five minutes', async () => {
+  let polls = 0, elapsed = 0;
+  const result = await waitForPages({
+    repository: 'fixture/repo', targetSha: target,
+    now: () => elapsed,
+    sleep: async ms => { assert.equal(ms, 5000); elapsed += ms; },
+    log: () => {},
+    request: async url => {
+      assert.match(url, /\/pages\/builds\?per_page=100$/);
+      return [build(++polls === 65 ? 'built' : 'building')];
+    }
+  });
+  assert.equal(result.built_sha, target);
+  assert.equal(polls, 65);
+  assert.equal(elapsed, 320000);
+});
+
+test('real CLI reads environment and writes exact success or failure outputs', async () => {
+  const { mkdtemp, writeFile, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { fileURLToPath, pathToFileURL } = await import('node:url');
+  const { spawnSync } = await import('node:child_process');
+  const root = await mkdtemp(join(tmpdir(), 'pages-wait-cli-'));
+  try {
+    const preload = join(root, 'fetch-fixture.mjs');
+    await writeFile(preload, [
+      "import assert from 'node:assert/strict';",
+      "globalThis.fetch = async (url, options) => {",
+      "  assert.equal(options.method, 'GET');",
+      "  assert.equal(options.headers.Authorization, 'Bearer fixture-token');",
+      "  if (url.includes('/compare/')) {",
+      "    assert.equal(process.env.FIXTURE_SCENARIO, 'successor');",
+      "    return new Response(JSON.stringify({status:'ahead'}), {status:200});",
+      "  }",
+      "  assert.equal(url, 'https://api.github.com/repos/fixture/repo/pages/builds?per_page=100');",
+      "  const scenario = process.env.FIXTURE_SCENARIO;",
+      "  if (scenario === 'permanent') return new Response('{}', {status:403});",
+      "  const commit = scenario === 'successor' ? 'b'.repeat(40) : process.env.TARGET_SHA;",
+      "  const status = scenario === 'failed' ? 'errored' : 'built';",
+      "  return new Response(JSON.stringify([{commit,status,error:null}]), {status:200});",
+      "};"
+    ].join('\n'));
+    for (const scenario of ['exact', 'successor', 'failed', 'permanent', 'missing-env']) {
+      const output = join(root, scenario + '.txt');
+      await writeFile(output, 'existing=preserved\n');
+      const result = spawnSync(process.execPath, [
+        '--import', pathToFileURL(preload).href,
+        fileURLToPath(new URL('./wait-pages-build.mjs', import.meta.url))
+      ], { encoding:'utf8', timeout:10000, env: {
+        ...process.env, GITHUB_REPOSITORY:'fixture/repo', TARGET_SHA:target,
+        GITHUB_OUTPUT:output, GH_TOKEN:scenario === 'missing-env' ? '' : 'fixture-token',
+        FIXTURE_SCENARIO:scenario
+      } });
+      assert.ifError(result.error);
+      const actual = await readFile(output, 'utf8');
+      const success = ['exact', 'successor'].includes(scenario);
+      assert.equal(result.status, success ? 0 : 1, result.stderr);
+      if (success) {
+        assert.equal(actual, 'existing=preserved\npages_built=false\npages_built=true\nbuilt_sha=' +
+          (scenario === 'successor' ? other : target) + '\nbuild_relation=' +
+          (scenario === 'successor' ? 'successor' : 'identical') + '\n');
+        assert.match(result.stdout, /Pages built/);
+      } else {
+        assert.equal(actual, 'existing=preserved\n' + (scenario === 'missing-env' ? '' : 'pages_built=false\n'));
+        assert.match(result.stderr, scenario === 'failed' ? /PAGES_BUILD_FAILED/ :
+          scenario === 'permanent' ? /PAGES_API_HTTP_403/ : /PAGES_MISSING_ENV/);
+        assert.doesNotMatch(actual, /pages_built=true|built_sha=|build_relation=/);
+      }
+    }
+  } finally {
+    await rm(root, {recursive:true, force:true});
+  }
+});
