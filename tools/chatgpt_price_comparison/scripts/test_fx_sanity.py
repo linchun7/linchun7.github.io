@@ -1,6 +1,11 @@
 import copy
 import json
 import unittest
+import os
+import tempfile
+from pathlib import Path
+import minimum_history
+from test_retained_fx import RetainedFxTests
 from urllib.error import URLError
 from unittest.mock import patch
 
@@ -132,6 +137,55 @@ class FxSanityTests(unittest.TestCase):
             self.assertEqual(opener.return_value.open.call_args.args[0].full_url, gate.CONFIRM_URL)
         with self.assertRaisesRegex(ValueError, 'not allowlisted'):
             p.fetch(gate.CONFIRM_URL + '&evil=1')
+
+    def test_pipeline_marks_anomaly_degraded_preserves_history_and_recovers(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            old, config, _ = RetainedFxTests().baseline(root)
+            old['fx']['rates']['INR'] = '94.26'
+            india = next(m for m in old['markets'] if m['code'] == 'in')
+            india['currency'] = 'INR'
+            for offer in india['offers']:
+                for price in offer['amounts']:
+                    price['display'] = '₹' + price['amount']
+                    price['cny'] = p.converted(india, price['amount'], old['fx'], NOW)
+            india['fingerprint'] = p.digest(p.semantic(india))
+            revise(old)
+            history = minimum_history.advance_history(minimum_history.empty_history(), old)
+            (root/'data/prices.json').write_text(json.dumps(old))
+            (root/'data/minimum-history.json').write_text(json.dumps(history))
+            p.validate(old, NOW)
+            def observed(item, previous, now, getter, **kwargs):
+                market = copy.deepcopy(previous)
+                market.update(status='verified', last_checked_at=p.stamp(now), last_verified_at=p.stamp(now))
+                return market
+            for offset, rate, degraded in [(3600, .9426, True), (7200, 94.26, False)]:
+                output = root/('status-' + str(offset))
+                rates = {'USD': 1, 'CNY': 7, 'INR': rate}
+                rates.update({'X'+a+b: 2 for a in 'ABCDEFGHIJ' for b in 'ABC'})
+                def fetched(url, **kwargs):
+                    if url == p.FX_URL:
+                        return json.dumps({'result': 'success', 'base_code': 'USD',
+                                           'time_last_update_unix': NOW+offset, 'rates': rates})
+                    return json.dumps([{'base': 'USD', 'quote': code, 'rate': value,
+                                        'date': p.stamp(NOW+offset)[:10]}
+                                       for code, value in [('USD', 1), ('CNY', 7), ('INR', 94.26)]])
+                candidate = root/('candidate-' + str(offset))
+                with patch.object(p, 'ROOT', root), patch.object(p, 'observe', side_effect=observed),                         patch.object(p, 'fetch', side_effect=fetched),                         patch.dict(os.environ, {'GITHUB_OUTPUT': str(output)}):
+                    result = p.run(candidate, NOW+offset)
+                self.assertEqual(result['fx']['fallback'], degraded)
+                self.assertIn('degraded=' + str(degraded).lower(), output.read_text())
+                self.assertEqual(result['changes'], old['changes'])
+                projected = next(m for m in result['markets'] if m['code'] == 'in')
+                self.assertEqual(projected['offers'], india['offers'])
+                ledger = json.loads((candidate/'minimum-history.json').read_text())
+                self.assertEqual(ledger['events'], history['events'])
+                if degraded:
+                    self.assertEqual(result['fx']['updated_at'], old['fx']['updated_at'])
+                else:
+                    self.assertEqual(result['fx']['updated_at'], p.stamp(NOW+offset))
+                for name in ['prices.json', 'minimum-history.json']:
+                    (root/'data'/name).write_bytes((candidate/name).read_bytes())
 
 
 if __name__ == '__main__':
