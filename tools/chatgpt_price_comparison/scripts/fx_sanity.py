@@ -32,8 +32,8 @@ def confirmation_currencies(now, updated, rates, old, parse_time):
     baseline_at = parse_time(old['updated_at'])
     if updated < baseline_at:
         raise ValueError('FX source timestamp regressed')
-    elapsed = now - baseline_at
-    if elapsed < -300:
+    elapsed = updated - baseline_at
+    if now - baseline_at < -300:
         raise ValueError('future FX baseline')
     # A recent accepted baseline is an anomaly detector, not an absolute cap:
     # large legitimate moves can still pass independent confirmation.
