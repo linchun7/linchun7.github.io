@@ -934,6 +934,48 @@
     }
   }
 
+  // Winner identity follows minimum_history.py: sorted storefront codes, not prices.
+  // Prices/FX may change between winner-change events and the latest checkpoint.
+  function minimumWinnerIds(rows) {
+    if (!Array.isArray(rows) || rows.length > 250
+      || !rows.every((row, index) => validMinimumWinner(row)
+        && (index === 0 || rows[index - 1].code < row.code))) throw Error('最低价历史赢家列表错误');
+    return rows.map(row => row.code).join(',');
+  }
+
+  function validateMinimumHistoryChain(value) {
+    const latest = new Map();
+    for (const event of value.events) {
+      const from = minimumWinnerIds(event.from), to = minimumWinnerIds(event.to);
+      const previous = latest.get(event.plan);
+      if (event.kind === 'initial') {
+        if (previous || from || !to || event.previous_at !== null || event.cause !== 'initial') {
+          throw Error('最低价历史初始事件错误');
+        }
+      } else if (!previous || event.previous_at === null
+        || minimumWinnerIds(previous.to) !== from || from === to) {
+        throw Error('最低价历史事件链断裂');
+      }
+      latest.set(event.plan, event);
+    }
+    if (value.checkpoint !== null) {
+      const ids = new Set();
+      for (const plan of value.checkpoint.plans) {
+        if (!plan || typeof plan !== 'object' || Array.isArray(plan)
+          || Object.keys(plan).sort().join(',') !== 'id,prices,scope,winners'
+          || typeof plan.id !== 'string' || !/^ChatGPT [^\x00-\x1f\x7f<>]{1,70}$/.test(plan.id)
+          || ids.has(plan.id) || !Array.isArray(plan.scope) || !Array.isArray(plan.prices)) {
+          throw Error('最低价历史检查点套餐错误');
+        }
+        ids.add(plan.id);
+        const winners = minimumWinnerIds(plan.winners);
+        if (!winners || winners !== minimumWinnerIds(latest.get(plan.id)?.to || [])) {
+          throw Error('最低价历史检查点与事件链不一致');
+        }
+      }
+    }
+  }
+
   function validateMinimumHistory(value) {
     const keys = 'checked_at,checkpoint,events,excluded_versions,first_observed_at,gaps,observations,pending_gap,project_since,schema';
     if (!value || typeof value !== 'object' || Array.isArray(value)
@@ -983,6 +1025,7 @@
       }
     }
     validateMinimumHistoryTimes(value);
+    validateMinimumHistoryChain(value);
     return value;
   }
 
