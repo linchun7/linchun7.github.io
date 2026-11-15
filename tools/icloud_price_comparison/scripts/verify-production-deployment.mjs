@@ -164,7 +164,11 @@ export function createCurrentMainReader({ runGit = execFileAsync } = {}) {
     timeout: 15000, windowsHide: true
   })).stdout.trim();
   const refresh = async () => {
-    await git(['fetch', '--no-tags', 'origin', 'main']);
+    // The workflow's depth-1 fetch can leave the newer main commit as a
+    // shallow boundary. Complete ancestry before proving HEAD is an ancestor.
+    const shallow = await git(['rev-parse', '--is-shallow-repository']);
+    if (!['true', 'false'].includes(shallow)) throw new Error('Invalid repository shallow state');
+    await git(['fetch', '--no-tags', ...(shallow === 'true' ? ['--unshallow'] : []), 'origin', 'main']);
     const sha = await git(['rev-parse', 'FETCH_HEAD']);
     if (!/^[a-f0-9]{40}$/.test(sha)) throw new Error('Invalid refreshed main SHA');
     await git(['merge-base', '--is-ancestor', 'HEAD', sha]);
