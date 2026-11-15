@@ -150,17 +150,24 @@ export async function verifyUi(manifest, { baseUrl = PRODUCTION_URL, timeoutMs =
         const url = new URL(resource.url);
         return [new URL(url.pathname + url.search, new URL(baseUrl).origin).href, resource];
     }));
-    context.on('response', response => {
-        const resource = expected.get(response.url());
-        if (!resource) return;
-        responses.push((async () => {
+    // Workers are terminated as soon as formatting completes. Reading their
+    // Response bodies afterwards races Chromium target disposal (Playwright 1.65).
+    // Capture and validate the exact upstream response before forwarding it,
+    // rather than changing application code or accepting a separate byte probe.
+    await context.route(url => expected.has(url.href), async route => {
+        const resource = expected.get(route.request().url());
+        const verification = (async () => {
+            const response = await route.fetch({ maxRedirects: 0, timeout: Math.min(timeoutMs, 7000) });
             assert.ok(response.ok(), 'browser dependency HTTP failure: ' + resource.path);
             assert.match(response.headers()['content-type'] || '', /^(?:text|application)\/(?:javascript|x-javascript|ecmascript)\b/i);
-            assert.equal(sha256(await response.body()), resource.hash, 'browser loaded unexpected bytes: ' + resource.path);
-            observed.set(response.url(), true);
-        })());
-        // The assertion is awaited below; prevent an early unhandled rejection.
-        responses.at(-1).catch(() => {});
+            const body = await response.body();
+            assert.equal(sha256(body), resource.hash, 'browser loaded unexpected bytes: ' + resource.path);
+            await route.fulfill({ response, body });
+            observed.set(route.request().url(), true);
+        })();
+        responses.push(verification);
+        try { await verification; }
+        catch { await route.abort().catch(() => {}); }
     });
     page.on('pageerror', error => errors.push(error.message));
     await context.route('**/googletagmanager.com/**', route => route.abort());
