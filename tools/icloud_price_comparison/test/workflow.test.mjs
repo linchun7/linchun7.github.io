@@ -162,7 +162,7 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /steps\.prepare_publish\.outputs\.should_push == 'true'/, 'unresolved advancement and no-data paths must skip the push');
   assert.match(workflow, /publish:[\s\S]*?permissions:[\s\S]*?contents: write[\s\S]*?pages: write/);
   assert.match(workflow, /steps\.push_data\.outputs\.pushed == 'true'[\s\S]*?gh api --method POST[\s\S]*?repos\/\$GITHUB_REPOSITORY\/pages\/builds/);
-  assert.match(workflow, /wait_pages_build[\s\S]*?pages\/builds\/latest[\s\S]*?compare\/\$TARGET_SHA\.\.\.\$built_sha[\s\S]*?pages_built=true/);
+  assert.match(workflow, /wait_pages_build[\s\S]*?pages\/builds\?per_page=100[\s\S]*?compare\/\$TARGET_SHA\.\.\.\$built_sha[\s\S]*?pages_built=true/);
   assert.match(workflow, /steps\.request_pages_build\.outcome[^]*?failure[^]*?pages_request_failed/);
   assert.match(workflow, /steps\.wait_pages_build\.outcome[^]*?failure[^]*?pages_build_failed/);
   assert.match(workflow, /verify-production:[\s\S]*?needs:[\s\S]*?- publish[\s\S]*?publish_outcome == 'pages_built'[\s\S]*?publish_outcome == 'no_data_changes'/);
@@ -539,6 +539,11 @@ test('Pages polling tolerates queued builds beyond five minutes without weakenin
     '    successor|unrelated) sha="$MOCK_OTHER"; status=built ;;',
     '    errored) status=errored; error="synthetic build failure" ;;',
     '    pending) status=building ;;',
+    '    hidden-target) printf "%s\\tbuilt\\t\\n" "$MOCK_OTHER"; status=built ;;',
+    '    pending-before-success) printf "%s\\tbuilding\\t\\n" "$TARGET_SHA"; status=built ;;',
+    '    failed-before-success) printf "%s\\terrored\\tsynthetic failure\\n" "$TARGET_SHA"; status=built ;;',
+    '    api-failure) return 1 ;;',
+    '    empty) return 0 ;;',
     '  esac',
     '  printf "%s\\t%s\\t%s\\n" "$sha" "$status" "$error"',
     '}',
@@ -549,7 +554,12 @@ test('Pages polling tolerates queued builds beyond five minutes without weakenin
     ['successor', true, 'ahead'],
     ['unrelated', false, 'behind'],
     ['errored', false, 'identical'],
-    ['pending', false, 'identical']
+    ['pending', false, 'identical'],
+    ['hidden-target', true, 'behind'],
+    ['pending-before-success', false, 'identical'],
+    ['failed-before-success', false, 'identical'],
+    ['api-failure', false, 'identical'],
+    ['empty', false, 'identical']
   ]) {
     await t.test(scenario, async () => {
       const root = await mkdtemp(path.join(tmpdir(), 'icloud-pages-wait-'));
@@ -582,7 +592,12 @@ test('Pages polling tolerates queued builds beyond five minutes without weakenin
         } else if (scenario === 'successor') {
           assert.ok(result.includes('built_sha=' + other));
           assert.ok(result.includes('build_relation=successor'));
-        } else if (scenario === 'errored') {
+        } else if (scenario === 'hidden-target') {
+          assert.equal(count, 1);
+          assert.ok(result.includes('built_sha=' + target));
+        } else if (scenario === 'api-failure') {
+          assert.equal(count, 1, 'API failure must not be swallowed by a process substitution');
+        } else if (scenario === 'errored' || scenario === 'failed-before-success') {
           assert.equal(count, 1, 'a matching failed build must fail immediately');
           assert.match(stdout, /PAGES_BUILD_FAILED/);
         } else {
