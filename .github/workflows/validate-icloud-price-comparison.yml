@@ -3,6 +3,7 @@ name: Validate iCloud price comparison
 on:
   pull_request:
     paths:
+      - '.github/scripts/wait-pages-build*'
       - '.github/dependabot.yml'
       - '.github/workflows/auto-merge-official-actions.yml'
       - '.github/workflows/icloud-repository-maintenance.yml'
@@ -15,6 +16,7 @@ on:
   push:
     branches: [main]
     paths:
+      - '.github/scripts/wait-pages-build*'
       - '.github/dependabot.yml'
       - '.github/workflows/auto-merge-official-actions.yml'
       - '.github/workflows/icloud-repository-maintenance.yml'
@@ -54,6 +56,9 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
+      - name: Shared Pages waiter regression
+        working-directory: .
+        run: node --test .github/scripts/wait-pages-build.test.mjs
       - name: 强制关键架构更新同步文档
         if: github.event_name == 'pull_request'
         working-directory: .

@@ -41,7 +41,8 @@ class ProductionRecheckTests(unittest.TestCase):
         self.assertIn("if: ${{ !cancelled() && steps.verification.outcome == 'failure' }}", self.validation)
         self.assertIn('BASE_SHA: ${{ github.sha }}', self.validation)
         production = self.validation.split('  production-smoke:', 1)[1]
-        self.assertIn('timeout-minutes: 15', production)
+        self.assertIn('timeout-minutes: 25', production)
+        self.assertIn('timeout-minutes: 20', production)
 
     def test_only_real_project_successor_can_supersede_failure(self):
         for scenario in ('unchanged', 'unrelated', 'project-change', 'missing-base', 'comparison-error', 'malformed-base', 'empty-base', 'fetch-error'):

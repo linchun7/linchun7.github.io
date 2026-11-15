@@ -161,7 +161,7 @@ jobs:
     needs: [prepare, generate]
     if: needs.prepare.outputs.should_run == 'true' && needs.generate.result == 'success' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     outputs:
       published_sha: ${{ steps.push_data.outputs.pushed_sha }}
       failure_stage: ${{ steps.artifact_check.outcome == 'failure' && '发布工件复验' || steps.push_data.outcome == 'failure' && '原子发布或并发保护' || steps.pages.outcome == 'failure' && 'Pages 部署' || '环境准备' }}
@@ -173,6 +173,9 @@ jobs:
         with:
           ref: ${{ needs.generate.outputs.base }}
           persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: chatgpt-candidate-${{ github.run_id }}
@@ -209,38 +212,13 @@ jobs:
           echo "pushed_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Wait for Pages build of published commit or successor
         id: pages
+        timeout-minutes: 20
         if: steps.push_data.outputs.pushed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TARGET_SHA: ${{ steps.push_data.outputs.pushed_sha }}
         shell: bash
-        run: |
-          set -euo pipefail
-          for attempt in $(seq 1 90); do
-            read -r built_sha build_status build_error < <(
-              gh api -H 'Accept: application/vnd.github+json'                 "repos/$GITHUB_REPOSITORY/pages/builds/latest"                 --jq '[.commit, .status, (.error.message // "")] | @tsv'
-            )
-            relation=unrelated
-            if [[ "$built_sha" == "$TARGET_SHA" ]]; then
-              relation=identical
-            elif [[ "$built_sha" =~ ^[0-9a-f]{40}$ ]]; then
-              compare_status=$(gh api                 "repos/$GITHUB_REPOSITORY/compare/$TARGET_SHA...$built_sha"                 --jq '.status' 2>/dev/null || true)
-              [[ "$compare_status" == "ahead" ]] && relation=successor
-            fi
-            if [[ "$relation" == identical || "$relation" == successor ]]; then
-              if [[ "$build_status" == built ]]; then
-                echo "Pages built $built_sha ($relation)."
-                exit 0
-              fi
-              if [[ "$build_status" == errored || -n "$build_error" ]]; then
-                echo "::error::Pages build failed: ${build_error:-$build_status}"
-                exit 1
-              fi
-            fi
-            sleep 5
-          done
-          echo "::error::Pages did not build the published commit or a verified successor within 7.5 minutes."
-          exit 1
+        run: node .github/scripts/wait-pages-build.mjs
 
   verify-production:
     needs: [prepare, generate, publish]

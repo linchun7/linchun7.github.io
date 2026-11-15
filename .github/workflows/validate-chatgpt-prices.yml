@@ -1,10 +1,10 @@
 name: Validate ChatGPT price comparison
 on:
   pull_request:
-    paths: ['tools/chatgpt_price_comparison/**', '.github/workflows/*chatgpt*.yml']
+    paths: ['tools/chatgpt_price_comparison/**', '.github/workflows/*chatgpt*.yml', '.github/scripts/wait-pages-build*']
   push:
     branches: [main]
-    paths: ['tools/chatgpt_price_comparison/**', '.github/workflows/*chatgpt*.yml']
+    paths: ['tools/chatgpt_price_comparison/**', '.github/workflows/*chatgpt*.yml', '.github/scripts/wait-pages-build*']
 permissions:
   contents: read
 concurrency:
@@ -40,6 +40,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
+      - name: Shared Pages waiter regression
+        run: node --test .github/scripts/wait-pages-build.test.mjs
       - name: Unit tests and deterministic browser fixture
         run: |
           python3 -m unittest discover -s tools/chatgpt_price_comparison/scripts -p 'test_*.py' -v
@@ -149,7 +151,7 @@ jobs:
     if: github.event_name == 'push'
     needs: [tests, browser-matrix]
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     permissions:
       contents: read
       pages: read
@@ -162,54 +164,32 @@ jobs:
           node-version: 22
       - name: Wait for Pages build of this commit or verified successor
         id: pages
+        timeout-minutes: 20
         env:
           GH_TOKEN: ${{ github.token }}
           TARGET_SHA: ${{ github.sha }}
         shell: bash
         run: |
           set -euo pipefail
-          for attempt in $(seq 1 90); do
-            read -r built_sha build_status build_error < <(
-              gh api -H 'Accept: application/vnd.github+json' \
-                "repos/$GITHUB_REPOSITORY/pages/builds/latest" \
-                --jq '[.commit, .status, (.error.message // "")] | @tsv'
-            )
-            relation=unrelated
-            if [[ "$built_sha" == "$TARGET_SHA" ]]; then
-              relation=identical
-            elif [[ "$built_sha" =~ ^[0-9a-f]{40}$ ]]; then
-              compare_status=$(gh api "repos/$GITHUB_REPOSITORY/compare/$TARGET_SHA...$built_sha" --jq '.status' 2>/dev/null || true)
-              [[ "$compare_status" == ahead ]] && relation=successor
-            fi
-            if [[ "$relation" == identical || "$relation" == successor ]]; then
-              if [[ "$build_status" == built ]]; then
-                if [[ "$relation" == successor ]]; then
-                  git fetch origin "$built_sha" --depth=1
-                  diff_status=0
-                  python3 tools/chatgpt_price_comparison/scripts/deployment_scope.py --base "$TARGET_SHA" --head "$built_sha" || diff_status=$?
-                  case "$diff_status" in
-                    0) ;;
-                    1)
-                      echo "::notice title=SUPERSEDED_CHATGPT_BUILD::A later ChatGPT project commit is already deployed; this older validation run is superseded."
-                      echo "should_verify=false" >> "$GITHUB_OUTPUT"
-                      exit 0
-                      ;;
-                    *) echo "::error::Cannot establish ChatGPT deployment supersession."; exit "$diff_status" ;;
-                  esac
-                fi
-                echo "Pages built $built_sha ($relation)."
-                echo "should_verify=true" >> "$GITHUB_OUTPUT"
+          node .github/scripts/wait-pages-build.mjs
+          # The waiter writes only validated SHA/relation values to this step's output.
+          built_sha=$(sed -n 's/^built_sha=//p' "$GITHUB_OUTPUT" | tail -n 1)
+          relation=$(sed -n 's/^build_relation=//p' "$GITHUB_OUTPUT" | tail -n 1)
+          if [[ "$relation" == successor ]]; then
+            git fetch origin "$built_sha" --depth=1
+            diff_status=0
+            python3 tools/chatgpt_price_comparison/scripts/deployment_scope.py --base "$TARGET_SHA" --head "$built_sha" || diff_status=$?
+            case "$diff_status" in
+              0) ;;
+              1)
+                echo "::notice title=SUPERSEDED_CHATGPT_BUILD::A later ChatGPT project commit is already deployed; this older validation run is superseded."
+                echo "should_verify=false" >> "$GITHUB_OUTPUT"
                 exit 0
-              fi
-              if [[ "$build_status" == errored || -n "$build_error" ]]; then
-                echo "::error::Pages build failed: ${build_error:-$build_status}"
-                exit 1
-              fi
-            fi
-            sleep 5
-          done
-          echo "::error::Pages did not build this commit or a verified successor within 7.5 minutes."
-          exit 1
+                ;;
+              *) echo "::error::Cannot establish ChatGPT deployment supersession."; exit "$diff_status" ;;
+            esac
+          fi
+          echo "should_verify=true" >> "$GITHUB_OUTPUT"
       - name: Verify canonical JSON, minimum history, HTML and versioned assets
         id: verification
         continue-on-error: true
