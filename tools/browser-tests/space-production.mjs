@@ -136,6 +136,15 @@ export async function verifyBytes(manifest, {
     }));
 }
 
+export async function forwardVerifiedResponse(route, resource, timeoutMs) {
+    const response = await route.fetch({ maxRedirects: 0, timeout: Math.min(timeoutMs, 7000) });
+    assert.ok(response.ok(), 'browser dependency HTTP failure: ' + resource.path);
+    assert.match(response.headers()['content-type'] || '', /^(?:text|application)\/(?:javascript|x-javascript|ecmascript)\b/i);
+    const body = await response.body();
+    assert.equal(sha256(body), resource.hash, 'browser loaded unexpected bytes: ' + resource.path);
+    await route.fulfill({ response, body });
+}
+
 export async function verifyUi(manifest, { baseUrl = PRODUCTION_URL, timeoutMs = 25000 } = {}) {
     const { chromium } = await import('playwright');
     const browser = await chromium.launch({ headless: true, timeout: Math.min(timeoutMs, 10000) });
@@ -157,12 +166,7 @@ export async function verifyUi(manifest, { baseUrl = PRODUCTION_URL, timeoutMs =
     await context.route(url => expected.has(url.href), async route => {
         const resource = expected.get(route.request().url());
         const verification = (async () => {
-            const response = await route.fetch({ maxRedirects: 0, timeout: Math.min(timeoutMs, 7000) });
-            assert.ok(response.ok(), 'browser dependency HTTP failure: ' + resource.path);
-            assert.match(response.headers()['content-type'] || '', /^(?:text|application)\/(?:javascript|x-javascript|ecmascript)\b/i);
-            const body = await response.body();
-            assert.equal(sha256(body), resource.hash, 'browser loaded unexpected bytes: ' + resource.path);
-            await route.fulfill({ response, body });
+            await forwardVerifiedResponse(route, resource, timeoutMs);
             observed.set(route.request().url(), true);
         })();
         responses.push(verification);
