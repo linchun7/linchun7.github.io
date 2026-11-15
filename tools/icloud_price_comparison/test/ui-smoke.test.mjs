@@ -4246,52 +4246,52 @@ for (const corruption of ['duplicate market row', 'swapped market rows', 'duplic
 
 for (const corruption of ['amount', 'navigation target']) {
   for (const [fixtureAmount, expectedText] of [[null, null], [4.8, '¥4.80'], [4, '¥4.00'], [4.83, '¥4.83']]) {
-  test('minimum cards recover a corrupted static ' + corruption + ' from embedded rank-one prices (' + (fixtureAmount ?? 'current data') + ')', { timeout: 30000 }, async context => {
-    const session = await snapshotSession(context, 'minimum card projection', { width: 1024 });
-    if (!session) return;
-    const { page, browser, data, url, mainRequests, errors } = session;
-    const tier = data.tiers[0];
-    const winners = data.countries.filter(country => country.plans[tier.id].cnyRank === 1).sort((a, b) => a.marketId.localeCompare(b.marketId, 'en'));
-    assert.ok(winners.length > 0);
-    const expected = winners[0];
-    if (fixtureAmount !== null) {
-      // Synthetic display boundary: keep original local prices/history intact.
-      // Fixed whole/tenth/cent values catch the regression regardless of daily FX.
-      for (const country of data.countries) {
-        country.plans[tier.id].cnyPrice = country === expected ? fixtureAmount : fixtureAmount + 10;
+    test('minimum cards recover a corrupted static ' + corruption + ' from embedded rank-one prices (' + (fixtureAmount ?? 'current data') + ')', { timeout: 30000 }, async context => {
+      const session = await snapshotSession(context, 'minimum card projection', { width: 1024 });
+      if (!session) return;
+      const { page, browser, data, url, mainRequests, errors } = session;
+      const tier = data.tiers[0];
+      const winners = data.countries.filter(country => country.plans[tier.id].cnyRank === 1).sort((a, b) => a.marketId.localeCompare(b.marketId, 'en'));
+      assert.ok(winners.length > 0);
+      const expected = winners[0];
+      if (fixtureAmount !== null) {
+        // Synthetic display boundary: keep original local prices/history intact.
+        // Fixed whole/tenth/cent values catch the regression regardless of daily FX.
+        for (const country of data.countries) {
+          country.plans[tier.id].cnyPrice = country === expected ? fixtureAmount : fixtureAmount + 10;
+        }
+        rerankPriceFixture(data);
+        await page.route(candidate => candidate.pathname === '/', async route => {
+          await route.fulfill({ contentType: 'text/html', body: await snapshotHtml(data) });
+        });
       }
-      rerankPriceFixture(data);
-      await page.route(candidate => candidate.pathname === '/', async route => {
-        await route.fulfill({ contentType: 'text/html', body: await snapshotHtml(data) });
-      });
-    }
-    const wrongTarget = data.countries.find(country => country.plans[tier.id].cnyRank !== 1);
-    assert.ok(wrongTarget, 'the fixture needs a nonminimum navigation target');
-    let release;
-    const pendingModule = new Promise(resolve => { release = resolve; });
-    await page.route('**/script.js?v=*', async route => { await pendingModule; await route.continue(); });
-    try {
-      await page.goto(url, { waitUntil: 'commit' });
-      await page.waitForSelector('.minimum-card');
-      const untouched = await page.evaluate(({ mode, tierId, wrongId }) => {
-        const card = document.querySelector('.minimum-card[data-tier="' + tierId + '"]');
-        const original = { envelope: document.querySelector('#icloud-price-data').textContent, rows: document.querySelector('#priceRows').innerHTML };
-        if (mode === 'amount') card.querySelector('.minimum-price').textContent = '¥0.01';
-        else card.dataset.marketId = wrongId;
-        return original;
-      }, { mode: corruption, tierId: tier.id, wrongId: wrongTarget.marketId });
-      release();
-      await waitForSnapshot(page);
-      assert.equal(await page.locator('#icloud-price-data').textContent(), untouched.envelope);
-      const card = page.locator('.minimum-card[data-tier="' + tier.id + '"]');
-      assert.equal(await card.locator('.minimum-price').textContent(), expectedText ?? '¥' + uiMoneyFormatter.format(expected.plans[tier.id].cnyPrice));
-      assert.equal(await card.getAttribute('data-market-id'), expected.marketId);
-      await card.click();
-      await assertMinimumNavigation(page, expected.marketId, tier.id);
-      assert.deepEqual(mainRequests, []);
-      assert.deepEqual(errors, []);
-    } finally { release(); await browser.close(); }
-  });
+      const wrongTarget = data.countries.find(country => country.plans[tier.id].cnyRank !== 1);
+      assert.ok(wrongTarget, 'the fixture needs a nonminimum navigation target');
+      let release;
+      const pendingModule = new Promise(resolve => { release = resolve; });
+      await page.route('**/script.js?v=*', async route => { await pendingModule; await route.continue(); });
+      try {
+        await page.goto(url, { waitUntil: 'commit' });
+        await page.waitForSelector('.minimum-card');
+        const untouched = await page.evaluate(({ mode, tierId, wrongId }) => {
+          const card = document.querySelector('.minimum-card[data-tier="' + tierId + '"]');
+          const original = { envelope: document.querySelector('#icloud-price-data').textContent, rows: document.querySelector('#priceRows').innerHTML };
+          if (mode === 'amount') card.querySelector('.minimum-price').textContent = '¥0.01';
+          else card.dataset.marketId = wrongId;
+          return original;
+        }, { mode: corruption, tierId: tier.id, wrongId: wrongTarget.marketId });
+        release();
+        await waitForSnapshot(page);
+        assert.equal(await page.locator('#icloud-price-data').textContent(), untouched.envelope);
+        const card = page.locator('.minimum-card[data-tier="' + tier.id + '"]');
+        assert.equal(await card.locator('.minimum-price').textContent(), expectedText ?? '¥' + uiMoneyFormatter.format(expected.plans[tier.id].cnyPrice));
+        assert.equal(await card.getAttribute('data-market-id'), expected.marketId);
+        await card.click();
+        await assertMinimumNavigation(page, expected.marketId, tier.id);
+        assert.deepEqual(mainRequests, []);
+        assert.deepEqual(errors, []);
+      } finally { release(); await browser.close(); }
+    });
   }
 }
 
