@@ -131,28 +131,71 @@ export async function loadStaticAssetManifest(projectDirectory = PROJECT_DIRECTO
   return createStaticAssetManifest(indexHtml, assetContents, label);
 }
 
-async function readTextFromGitRef(ref, relativePath) {
+async function readTextFromGitRef(ref, relativePath, runGit = execFileAsync) {
   const object = `${ref}:${PROJECT_REPOSITORY_PATH}/${relativePath}`;
-  const { stdout } = await execFileAsync('git', ['show', object], {
+  const { stdout } = await runGit('git', ['show', object], {
     cwd: REPOSITORY_ROOT,
     encoding: 'utf8',
-    maxBuffer: 2 * 1024 * 1024,
+    maxBuffer: 8 * 1024 * 1024,
     timeout: 15_000,
     windowsHide: true
   });
   return stdout;
 }
 
-export async function loadStaticAssetManifestFromGitRef(ref = 'origin/main', label = 'git static asset manifest') {
+export async function loadStaticAssetManifestFromGitRef(ref = 'origin/main', label = 'git static asset manifest', runGit = execFileAsync) {
   const [indexHtml, ...assetTexts] = await Promise.all([
-    readTextFromGitRef(ref, 'index.html'),
-    ...CORE_STATIC_ASSETS.map(({ path: assetPath }) => readTextFromGitRef(ref, assetPath))
+    readTextFromGitRef(ref, 'index.html', runGit),
+    ...CORE_STATIC_ASSETS.map(({ path: assetPath }) => readTextFromGitRef(ref, assetPath, runGit))
   ]);
   return createStaticAssetManifest(
     indexHtml,
     Object.fromEntries(CORE_STATIC_ASSETS.map(({ path: assetPath }, index) => [assetPath, assetTexts[index]])),
     label
   );
+}
+
+// Refresh remote main for each supersession attempt, then read every data and
+// asset blob from one immutable SHA, never a frozen directory or moving ref.
+export function createCurrentMainReader({ runGit = execFileAsync } = {}) {
+  let snapshotSha = null;
+  const git = async args => (await runGit('git', args, {
+    cwd: REPOSITORY_ROOT, encoding: 'utf8', maxBuffer: 1024 * 1024,
+    timeout: 15000, windowsHide: true
+  })).stdout.trim();
+  const refresh = async () => {
+    await git(['fetch', '--no-tags', 'origin', 'main']);
+    const sha = await git(['rev-parse', 'FETCH_HEAD']);
+    if (!/^[a-f0-9]{40}$/.test(sha)) throw new Error('Invalid refreshed main SHA');
+    await git(['merge-base', '--is-ancestor', 'HEAD', sha]);
+    return sha;
+  };
+  return {
+    async getCurrentMainArtifact() {
+      snapshotSha = null;
+      const sha = await refresh();
+      const raw = Object.fromEntries(await Promise.all(JSON_FILES.map(async ([key, name]) => [
+        key, Buffer.from(await readTextFromGitRef(sha, 'data/' + name, runGit))
+      ])));
+      const values = Object.fromEntries(JSON_FILES.map(([key, name]) => [
+        key, parseJsonStrictBytes(raw[key], 'current main ' + name)
+      ]));
+      const artifact = buildArtifact(values, raw, 'current main artifact');
+      snapshotSha = sha;
+      return artifact;
+    },
+    async getCurrentMainStaticAssets() {
+      if (!snapshotSha) throw new Error('Current main artifact must be read first');
+      return loadStaticAssetManifestFromGitRef(snapshotSha, 'current main static assets', runGit);
+    },
+    async confirmCurrentMain() {
+      if (!snapshotSha || await refresh() !== snapshotSha) {
+        const error = new Error('Main advanced during supersession verification');
+        error.reason = 'current-main-advanced';
+        throw error;
+      }
+    }
+  };
 }
 
 function requestOptions(signal, { cacheBypass = true } = {}) {
@@ -183,26 +226,51 @@ function canonicalAssetUrl(baseUrl, assetPath, version) {
   return url;
 }
 
-async function readBoundedResponse(response, { label, maxBytes, contentTypePattern }) {
-  if (!response.ok) {
-    const error = new Error(`${label} HTTP_${response.status}`);
-    error.reason = `HTTP_${response.status}`;
-    throw error;
+export async function readBoundedResponse(response, { label, maxBytes, contentTypePattern, signal }) {
+  let reader;
+  const abort = () => { void reader?.cancel().catch(() => {}); };
+  try {
+    if (!response.ok) {
+      const error = new Error(`${label} HTTP_${response.status}`);
+      error.reason = `HTTP_${response.status}`;
+      throw error;
+    }
+    const contentType = response.headers.get('content-type') ?? '';
+    if (!contentTypePattern.test(contentType)) throw new Error(`${label} unexpected content type: ${contentType || 'missing'}`);
+    const declaredLength = response.headers.get('content-length');
+    if (/^\d+$/.test(declaredLength ?? '') && Number(declaredLength) > maxBytes) throw new Error(`${label} response exceeds the size limit`);
+    if (!response.body?.getReader) throw new Error(`${label} missing response body`);
+    reader = response.body.getReader();
+    signal?.addEventListener('abort', abort, { once: true });
+    const chunks = [];
+    let size = 0;
+    while (true) {
+      signal?.throwIfAborted();
+      const { value, done } = await reader.read();
+      signal?.throwIfAborted();
+      if (done) break;
+      size += value.byteLength;
+      if (size > maxBytes) throw new Error(`${label} response exceeds the size limit`);
+      chunks.push(Buffer.from(value));
+    }
+    return Buffer.concat(chunks, size);
+  } finally {
+    signal?.removeEventListener('abort', abort);
+    // Cancel on HTTP/MIME/header rejection too; never retain unread bodies.
+    if (reader) {
+      try { await reader.cancel(); } catch {}
+      reader.releaseLock();
+    } else {
+      try { await response.body?.cancel(); } catch {}
+    }
   }
-  const contentType = response.headers.get('content-type') ?? '';
-  if (!contentTypePattern.test(contentType)) throw new Error(`${label} unexpected content type: ${contentType || 'missing'}`);
-  const declaredLength = response.headers.get('content-length');
-  if (/^\d+$/.test(declaredLength ?? '') && Number(declaredLength) > maxBytes) throw new Error(`${label} response exceeds the size limit`);
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  if (bytes.byteLength > maxBytes) throw new Error(`${label} response exceeds the size limit`);
-  return bytes;
 }
 
 async function fetchJsonResource(fetchImpl, url, signal, resource, maxBytes, { cacheBypass = true } = {}) {
   try {
     const response = await fetchImpl(url, requestOptions(signal, { cacheBypass }));
     const bytes = await readBoundedResponse(response, {
-      label: resource, maxBytes,
+      label: resource, maxBytes, signal,
       contentTypePattern: /(?:application|text)\/(?:[a-z0-9.+-]*\+)?json\b/i
     });
     return { bytes, value: parseJsonStrictBytes(bytes, resource) };
@@ -219,7 +287,7 @@ async function fetchHtmlResource(fetchImpl, url, signal, { cacheBypass = true } 
   try {
     const response = await fetchImpl(url, requestOptions(signal, { cacheBypass }));
     const bytes = await readBoundedResponse(response, {
-      label: 'index.html', maxBytes: MAX_HTML_RESPONSE_BYTES, contentTypePattern: /text\/html\b/i
+      label: 'index.html', signal, maxBytes: MAX_HTML_RESPONSE_BYTES, contentTypePattern: /text\/html\b/i
     });
     return decodeUtf8(bytes, 'index.html');
   } catch (error) {
@@ -241,7 +309,7 @@ async function fetchStaticAsset(fetchImpl, baseUrl, definition, expected, signal
       requestOptions(signal, { cacheBypass: diagnostic })
     );
     return await readBoundedResponse(response, {
-      label: definition.path,
+      label: definition.path, signal,
       maxBytes: MAX_STATIC_ASSET_RESPONSE_BYTES,
       contentTypePattern: definition.contentTypePattern
     });
@@ -427,6 +495,7 @@ export async function verifyProductionDeployment(expectedArtifact, {
   sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)), now = () => Date.now(),
   getCurrentMainArtifact = async () => null,
   getCurrentMainStaticAssets = async () => null,
+  confirmCurrentMain = async () => {},
   log = console.log
 } = {}) {
   const expected = normalizeArtifact(expectedArtifact, 'expected artifact');
@@ -533,6 +602,7 @@ export async function verifyProductionDeployment(expectedArtifact, {
               runId,
               attempt: attempts
             });
+            await confirmCurrentMain();
             const sameTarget = artifactExactlyMatches(currentMain, expected) && expectedStaticAssets
               && CORE_STATIC_ASSETS.every(({ path: assetPath }) => (
                 currentMainStaticAssets.assets[assetPath].hash === expectedStaticAssets.assets[assetPath].hash
@@ -626,24 +696,21 @@ function summaryLines(result) {
   ];
 }
 
-async function runCli() {
-  const options = parseCliArguments(process.argv.slice(2));
+export async function runCli(argv = process.argv.slice(2), { runGit = execFileAsync, verify = verifyProductionDeployment } = {}) {
+  const options = parseCliArguments(argv);
   const expected = await loadVerificationArtifact(options.expectedDataDir, 'expected artifact');
   const expectedStaticAssets = await loadStaticAssetManifest(PROJECT_DIRECTORY, 'expected static assets');
-  const getCurrentMainArtifact = options.currentMainDataDir
-    ? async () => loadVerificationArtifact(options.currentMainDataDir, 'current main artifact')
-    : async () => null;
-  const getCurrentMainStaticAssets = options.currentMainDataDir
-    ? async () => loadStaticAssetManifestFromGitRef('origin/main', 'current main static assets')
-    : async () => null;
+  // Legacy --current-main-data-dir remains the opt-in flag; its startup
+  // archive is not authoritative once main advances during polling.
+  const currentMain = options.currentMainDataDir ? createCurrentMainReader({ runGit }) : {};
   try {
-    const result = await verifyProductionDeployment(expected, {
+    const result = await verify(expected, {
       ...options,
       expectedStaticAssets,
-      getCurrentMainArtifact,
-      getCurrentMainStaticAssets
+      ...currentMain
     });
     if (options.summaryFile) await appendFile(options.summaryFile, summaryLines(result).join('\n'), 'utf8');
+    return result;
   } catch (error) {
     if (options.summaryFile) {
       const details = error.details ?? {};
