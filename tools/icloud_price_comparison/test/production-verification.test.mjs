@@ -1,8 +1,14 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile, mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import test, { mock } from 'node:test';
 import {
+  readBoundedResponse, runCli, createCurrentMainReader,
   MAX_HISTORY_RESPONSE_BYTES,
   MAX_RUN_LOG_RESPONSE_BYTES,
   PRODUCTION_HISTORY_URL,
@@ -546,4 +552,174 @@ test('newer production cannot be proven with different minimum-history bytes', (
   return rejectsWithReason(previous, [{ artifact: expected }], 'minimum-history-not-deployed', {
     getCurrentMainArtifact: async () => current
   });
+});
+
+test('bounded production reader stops unknown-length or dishonest streams at the first excess chunk', async () => {
+  for (const declared of [null, '1']) {
+    let pulls = 0, cancelled = 0;
+    const stream = new ReadableStream({
+      pull(controller) { pulls++; controller.enqueue(new Uint8Array(4)); },
+      cancel() { cancelled++; }
+    }, { highWaterMark: 0 });
+    const headers = new Headers({ 'content-type': 'application/json' });
+    if (declared) headers.set('content-length', declared);
+    await assert.rejects(readBoundedResponse({ ok: true, headers, body: stream }, {
+      label: 'fixture', maxBytes: 8, contentTypePattern: /json/
+    }), /size limit/);
+    assert.equal(pulls, 3);
+    assert.equal(cancelled, 1);
+    assert.equal(stream.locked, false);
+  }
+});
+
+test('bounded production reader cancels rejected headers without reading and preserves stream errors', async () => {
+  for (const [status, mime, length, reason] of [[503, 'application/json', '1', /HTTP_503/],
+    [200, 'text/html', '1', /content type/], [200, 'application/json', '9', /size limit/]]) {
+    let pulls = 0, cancelled = 0;
+    const body = new ReadableStream({ pull() { pulls++; }, cancel() { cancelled++; throw Error('cancel error'); } }, { highWaterMark: 0 });
+    await assert.rejects(readBoundedResponse({ ok: status === 200, status,
+      headers: new Headers({ 'content-type': mime, 'content-length': length }), body },
+      { label: 'fixture', maxBytes: 8, contentTypePattern: /json/ }), reason);
+    assert.equal(pulls, 0);
+    assert.equal(cancelled, 1);
+    assert.equal(body.locked, false);
+  }
+  const body = new ReadableStream({ pull(controller) { controller.error(Error('broken stream')); } }, { highWaterMark: 0 });
+  await assert.rejects(readBoundedResponse(new Response(body, { headers: { 'content-type': 'application/json' } }),
+    { label: 'fixture', maxBytes: 8, contentTypePattern: /json/ }), /broken stream/);
+  assert.equal(body.locked, false);
+});
+
+test('bounded production reader preserves split UTF-8 and aborts a stalled body', async () => {
+  const bytes = new TextEncoder().encode('中文');
+  const parts = [bytes.slice(0, 1), bytes.slice(1)];
+  const body = new ReadableStream({ pull(controller) { if (parts.length) controller.enqueue(parts.shift()); else controller.close(); } });
+  assert.deepEqual(await readBoundedResponse(new Response(body, { headers: { 'content-type': 'text/html' } }),
+    { label: 'fixture', maxBytes: bytes.length, contentTypePattern: /html/ }), Buffer.from(bytes));
+  assert.equal(body.locked, false);
+  const controller = new AbortController();
+  let cancelled = 0;
+  const stalled = new ReadableStream({ pull() {}, cancel() { cancelled++; } }, { highWaterMark: 0 });
+  const pending = readBoundedResponse(new Response(stalled, { headers: { 'content-type': 'text/html' } }),
+    { label: 'fixture', maxBytes: 8, contentTypePattern: /html/, signal: controller.signal });
+  controller.abort();
+  await assert.rejects(pending, { name: 'AbortError' });
+  assert.equal(cancelled, 1);
+  assert.equal(stalled.locked, false);
+});
+
+test('CLI refreshes main A to B and pins data/assets to the same exact revision', async () => {
+  const a = 'a'.repeat(40), b = 'b'.repeat(40);
+  let remote = a, fetched = null, fetches = 0;
+  const shown = [];
+  const runGit = async (_command, args) => {
+    if (args[1] === '--is-shallow-repository') return { stdout: 'false' };
+    if (args[0] === 'fetch') { fetched = remote; fetches++; return { stdout: '' }; }
+    if (args[0] === 'rev-parse') return { stdout: fetched + '\n' };
+    if (args[0] === 'merge-base') return { stdout: '' };
+    assert.equal(args[0], 'show');
+    const [sha, file] = args[1].split(':');
+    shown.push({ sha, file });
+    const relative = file.replace('tools/icloud_price_comparison/', '');
+    let content = await readFile(new URL('../' + relative, import.meta.url), 'utf8');
+    if (sha === b && relative === 'data/history.json') content += '\n';
+    return { stdout: content };
+  };
+  await runCli(['--expected-data-dir', dataDirectory.pathname,
+    '--current-main-data-dir', '/not-used-frozen-startup-directory'], {
+    runGit,
+    verify: async (_expected, options) => {
+      const first = await options.getCurrentMainArtifact();
+      remote = b;
+      const count = shown.length;
+      await options.getCurrentMainStaticAssets();
+      assert.ok(shown.slice(count).every(row => row.sha === a), 'assets remain bound to data A even if remote changes');
+      await assert.rejects(options.confirmCurrentMain(), /Main advanced/);
+      const second = await options.getCurrentMainArtifact();
+      assert.notEqual(first.hashes.history, second.hashes.history);
+      const nextCount = shown.length;
+      await options.getCurrentMainStaticAssets();
+      assert.ok(shown.slice(nextCount).every(row => row.sha === b));
+      await options.confirmCurrentMain();
+      return { status: 'superseded' };
+    }
+  });
+  assert.equal(fetches, 4);
+});
+
+test('supersession retries if final main proof advances and never silently accepts a stale proof', async t => {
+  const { previous, current } = supersessionFixtures();
+  const server = await startSequenceServer([{ artifact: current }]);
+  t.after(() => server.close());
+  let proofs = 0;
+  const result = await verifyProductionDeployment(previous, fastOptions(server, {
+    getCurrentMainArtifact: async () => current,
+    confirmCurrentMain: async () => { if (++proofs === 1) { const error = Error('main advanced'); error.reason = 'current-main-advanced'; throw error; } }
+  }));
+  assert.equal(result.status, 'superseded');
+  assert.equal(result.attempts, 2);
+  assert.equal(proofs, 2);
+});
+
+test('live main proof fails closed on fetch errors, malformed SHA or non-descendant main', async () => {
+  for (const failure of ['fetch', 'rev-parse', 'merge-base']) {
+    const calls = [];
+    const reader = createCurrentMainReader({ runGit: async (_command, args) => {
+      calls.push(args);
+      if (args[1] === '--is-shallow-repository') return { stdout: 'false' };
+      if (args[0] === failure) {
+        if (failure === 'rev-parse') return { stdout: 'not-a-commit' };
+        throw Error(failure + ' unavailable');
+      }
+      if (args[0] === 'rev-parse') return { stdout: 'b'.repeat(40) };
+      return { stdout: '' };
+    } });
+    await assert.rejects(reader.getCurrentMainArtifact(), /unavailable|Invalid refreshed/);
+    await assert.rejects(reader.getCurrentMainStaticAssets(), /must be read first/);
+    assert.equal(calls.some(args => args[0] === 'show'), false, 'no frozen artifact fallback');
+  }
+});
+
+test('live main reader repairs real depth-one fetch boundaries before proving A to B ancestry', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'icloud-main-shallow-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const source = join(root, 'source'), checkout = join(root, 'checkout');
+  const exec = promisify(execFile);
+  const git = (cwd, args) => exec('git', args, { cwd, encoding: 'utf8', timeout: 15000 });
+  await mkdir(source);
+  await git(source, ['init', '--initial-branch=main']);
+  await git(source, ['config', 'user.name', 'Verifier Test']);
+  await git(source, ['config', 'user.email', 'verifier@example.invalid']);
+  const fixtureData = join(source, 'tools/icloud_price_comparison/data');
+  await mkdir(fixtureData, { recursive: true });
+  for (const name of ['prices.json', 'history.json', 'run-log.json', 'minimum-history.json']) {
+    await writeFile(join(fixtureData, name), await readFile(new URL(name, dataDirectory)));
+  }
+  await writeFile(join(source, 'revision'), 'A');
+  await git(source, ['add', '.']);
+  await git(source, ['commit', '-m', 'A']);
+  const a = (await git(source, ['rev-parse', 'HEAD'])).stdout.trim();
+  await git(root, ['clone', '--depth=1', pathToFileURL(source).href, checkout]);
+  await writeFile(join(source, 'revision'), 'B');
+  await git(source, ['add', '.']);
+  await git(source, ['commit', '-m', 'B']);
+  const b = (await git(source, ['rev-parse', 'HEAD'])).stdout.trim();
+  // Reproduce both workflow operations: depth-one checkout of A, then
+  // depth-one fetch of B without changing HEAD.
+  await git(checkout, ['fetch', 'origin', 'main', '--depth=1']);
+  assert.equal((await git(checkout, ['rev-parse', 'HEAD'])).stdout.trim(), a);
+  await assert.rejects(git(checkout, ['merge-base', '--is-ancestor', 'HEAD', b]),
+    error => error.code === 1);
+  const calls = [];
+  const reader = createCurrentMainReader({ runGit: async (command, args, options) => {
+    calls.push(args);
+    return exec(command, args, { ...options, cwd: checkout });
+  } });
+  const artifact = await reader.getCurrentMainArtifact();
+  assert.equal(artifact.hashes.prices, (await loadVerificationArtifact(dataDirectory)).hashes.prices);
+  assert.ok(calls.some(args => args[0] === 'fetch' && args.includes('--unshallow')));
+  assert.ok(calls.filter(args => args[0] === 'show').every(args => args[1].startsWith(b + ':')));
+  assert.equal((await git(checkout, ['rev-parse', '--is-shallow-repository'])).stdout.trim(), 'false');
+  await git(checkout, ['merge-base', '--is-ancestor', 'HEAD', b]);
+  await reader.confirmCurrentMain();
 });

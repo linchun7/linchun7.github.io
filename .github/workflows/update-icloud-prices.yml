@@ -385,6 +385,12 @@ jobs:
           current_main_sha=$(git rev-parse origin/main)
           publish_base_sha="$GENERATION_BASE_SHA"
           if [[ "$current_main_sha" != "$GENERATION_BASE_SHA" ]]; then
+            # A process substitution hides git diff failure from set -e.
+            # Establish the complete comparison before classifying or adopting main.
+            if ! changed_paths=$(git diff --name-only "$GENERATION_BASE_SHA" "$current_main_sha" --); then
+              echo "::error title=PUBLISH_BASE_COMPARISON_FAILED::Cannot compare generation base with current main; refusing checkout, staging and publication."
+              exit 1
+            fi
             sensitive_change=false
             sensitive_paths=()
             while IFS= read -r changed_path; do
@@ -394,7 +400,7 @@ jobs:
                   sensitive_paths+=("$changed_path")
                   ;;
               esac
-            done < <(git diff --name-only "$GENERATION_BASE_SHA" "$current_main_sha" --)
+            done <<< "$changed_paths"
             if [[ "$sensitive_change" == "true" ]]; then
               printf -v joined_paths '%s, ' "${sensitive_paths[@]}"
               joined_paths="${joined_paths%, }"
@@ -477,51 +483,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TARGET_SHA: ${{ steps.push_data.outputs.pushed_sha }}
         shell: bash
-        run: |
-          set -euo pipefail
-          echo "pages_built=false" >> "$GITHUB_OUTPUT"
-          # Allow queueing plus build/deploy time; 5 minutes can expire just before a healthy build finishes.
-          # The step and job deadlines additionally bound slow API requests.
-          for attempt in $(seq 1 180); do
-            read -r built_sha build_status build_error < <(
-              gh api \
-                -H 'Accept: application/vnd.github+json' \
-                -H 'X-GitHub-Api-Version: 2026-03-10' \
-                "repos/$GITHUB_REPOSITORY/pages/builds/latest" \
-                --jq '[.commit, .status, (.error.message // "")] | @tsv'
-            )
-            relation=unrelated
-            if [[ "$built_sha" == "$TARGET_SHA" ]]; then
-              relation=identical
-            elif [[ "$built_sha" =~ ^[0-9a-f]{40}$ ]]; then
-              compare_status=$(gh api \
-                -H 'Accept: application/vnd.github+json' \
-                -H 'X-GitHub-Api-Version: 2026-03-10' \
-                "repos/$GITHUB_REPOSITORY/compare/$TARGET_SHA...$built_sha" \
-                --jq '.status' 2>/dev/null || true)
-              if [[ "$compare_status" == "ahead" ]]; then
-                relation=successor
-              fi
-            fi
-            if [[ "$relation" == "identical" || "$relation" == "successor" ]]; then
-              if [[ "$build_status" == "built" ]]; then
-                echo "pages_built=true" >> "$GITHUB_OUTPUT"
-                echo "built_sha=$built_sha" >> "$GITHUB_OUTPUT"
-                echo "build_relation=$relation" >> "$GITHUB_OUTPUT"
-                exit 0
-              fi
-              if [[ "$build_status" == "errored" || -n "$build_error" ]]; then
-                echo "::error title=PAGES_BUILD_FAILED::Pages build for $built_sha failed: ${build_error:-$build_status}"
-                exit 1
-              fi
-            fi
-            if (( attempt == 1 || attempt % 12 == 0 )); then
-              echo "Pages wait $attempt/180: target=$TARGET_SHA observed=$built_sha status=$build_status relation=$relation"
-            fi
-            if (( attempt < 180 )); then sleep 5; fi
-          done
-          echo "::error title=PAGES_BUILD_TIMEOUT::Pages did not build $TARGET_SHA or a verified successor after 180 polls (15-minute polling budget). Last observed: $built_sha status=$build_status relation=$relation."
-          exit 1
+        run: node .github/scripts/wait-pages-build.mjs
 
       - name: 分类发布故障
         id: classify_publish

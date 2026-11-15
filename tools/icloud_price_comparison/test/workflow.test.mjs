@@ -131,7 +131,7 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /GENERATION_BASE_SHA/);
   assert.match(
     workflow,
-    /current_main_sha=\$\(git rev-parse origin\/main\)[\s\S]*?tools\/icloud_price_comparison\/\*[\s\S]*?\.github\/workflows\/\*icloud\*[\s\S]*?git diff --name-only "\$GENERATION_BASE_SHA" "\$current_main_sha" --[\s\S]*?git checkout --detach "\$current_main_sha"[\s\S]*?publish_base_sha="\$current_main_sha"/,
+    /current_main_sha=\$\(git rev-parse origin\/main\)[\s\S]*?if ! changed_paths=\$\(git diff --name-only "\$GENERATION_BASE_SHA" "\$current_main_sha" --\)[\s\S]*?PUBLISH_BASE_COMPARISON_FAILED[\s\S]*?exit 1[\s\S]*?tools\/icloud_price_comparison\/\*[\s\S]*?\.github\/workflows\/\*icloud\*[\s\S]*?git checkout --detach "\$current_main_sha"[\s\S]*?publish_base_sha="\$current_main_sha"/,
     'publisher must adopt unrelated main advances but reject iCloud-sensitive advances',
   );
   assert.match(
@@ -162,7 +162,7 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /steps\.prepare_publish\.outputs\.should_push == 'true'/, 'unresolved advancement and no-data paths must skip the push');
   assert.match(workflow, /publish:[\s\S]*?permissions:[\s\S]*?contents: write[\s\S]*?pages: write/);
   assert.match(workflow, /steps\.push_data\.outputs\.pushed == 'true'[\s\S]*?gh api --method POST[\s\S]*?repos\/\$GITHUB_REPOSITORY\/pages\/builds/);
-  assert.match(workflow, /wait_pages_build[\s\S]*?pages\/builds\/latest[\s\S]*?compare\/\$TARGET_SHA\.\.\.\$built_sha[\s\S]*?pages_built=true/);
+  assert.match(workflow, /wait_pages_build[\s\S]*?node \.github\/scripts\/wait-pages-build\.mjs/);
   assert.match(workflow, /steps\.request_pages_build\.outcome[^]*?failure[^]*?pages_request_failed/);
   assert.match(workflow, /steps\.wait_pages_build\.outcome[^]*?failure[^]*?pages_build_failed/);
   assert.match(workflow, /verify-production:[\s\S]*?needs:[\s\S]*?- publish[\s\S]*?publish_outcome == 'pages_built'[\s\S]*?publish_outcome == 'no_data_changes'/);
@@ -513,86 +513,88 @@ test('main code pushes verify the deployed iCloud artifact and assets after all 
 });
 
 
-test('Pages polling tolerates queued builds beyond five minutes without weakening commit or failure guards', async t => {
-  const { mkdtemp, writeFile, rm } = await import('node:fs/promises');
-  const { tmpdir } = await import('node:os');
+test('Pages polling uses the shared tested bounded waiter', async () => {
   const workflow = await readFile(workflowUrl, 'utf8');
   const publish = workflow.slice(workflow.indexOf('\n  publish:'), workflow.indexOf('\n  verify-production:'));
   assert.match(publish, /timeout-minutes: 25/);
   const step = workflow.slice(workflow.indexOf('      - name: 等待 Pages 构建完成'), workflow.indexOf('      - name: 分类发布故障'));
   assert.match(step, /timeout-minutes: 20/);
-  assert.match(step, /seq 1 180/);
-  assert.match(step, /sleep 5/);
+  assert.match(step, /node \.github\/scripts\/wait-pages-build\.mjs/);
+  assert.doesNotMatch(step, /pages\/builds\/latest/);
+});
+
+
+test('publication main comparison fails closed before checkout/staging when git diff fails', async t => {
+  const { mkdtemp, writeFile, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const workflow = await readFile(workflowUrl, 'utf8');
+  const step = workflow.slice(workflow.indexOf('      - name: 确认发布基线并准备提交'),
+    workflow.indexOf('      - name: 仅在最终步骤推送'));
   const script = step.slice(step.indexOf('        run: |\n') + '        run: |\n'.length)
     .split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n');
-  const target = 'a'.repeat(40);
-  const other = 'b'.repeat(40);
+  const base = 'a'.repeat(40), latest = 'b'.repeat(40);
   const mock = [
-    'gh() {',
-    '  case "$*" in',
-    '    *"/compare/"*) printf "%s\\n" "$MOCK_RELATION"; return 0 ;;',
+    'git() {',
+    '  printf "git %s\\n" "$*" >> "$TRACE"',
+    '  case "$1 $2" in',
+    '    "fetch origin") return 0 ;;',
+    '    "rev-parse origin/main") printf "%s\\n" "$CURRENT_SHA"; return 0 ;;',
+    '    "diff --name-only")',
+    '      case "$SCENARIO" in',
+    '        diff-failure) return 128 ;;',
+    '        partial-failure) printf "css/style.css\\n"; return 128 ;;',
+    '        related) printf "tools/icloud_price_comparison/data/prices.json\\n"; return 0 ;;',
+    '        workflow-related) printf ".github/workflows/update-icloud-prices.yml\\n"; return 0 ;;',
+    '        unrelated) printf "css/style.css\\n"; return 0 ;;',
+    '        empty) return 0 ;;',
+    '        *) return 99 ;;',
+    '      esac ;;',
+    '    "checkout --detach") return 0 ;;',
+    '    "show "*) printf "<html>fixture</html>\\n"; return 0 ;;',
+    '    "diff --cached") return 0 ;;',
+    '    *) return 99 ;;',
     '  esac',
-    '  local count; count=$(cat "$MOCK_COUNTER"); count=$((count + 1)); printf "%s\\n" "$count" > "$MOCK_COUNTER"',
-    '  local sha="$TARGET_SHA" status=building error=""',
-    '  case "$MOCK_SCENARIO" in',
-    '    delayed) if (( count >= 65 )); then status=built; fi ;;',
-    '    successor|unrelated) sha="$MOCK_OTHER"; status=built ;;',
-    '    errored) status=errored; error="synthetic build failure" ;;',
-    '    pending) status=building ;;',
-    '  esac',
-    '  printf "%s\\t%s\\t%s\\n" "$sha" "$status" "$error"',
     '}',
-    'sleep() { :; }'
+    'rm() { printf "rm %s\\n" "$*" >> "$TRACE"; }',
+    'cp() { printf "cp %s\\n" "$*" >> "$TRACE"; }',
+    'node() { printf "node %s\\n" "$*" >> "$TRACE"; }'
   ].join('\n');
-  for (const [scenario, success, relation] of [
-    ['delayed', true, 'identical'],
-    ['successor', true, 'ahead'],
-    ['unrelated', false, 'behind'],
-    ['errored', false, 'identical'],
-    ['pending', false, 'identical']
-  ]) {
+  for (const scenario of ['diff-failure', 'partial-failure', 'related', 'workflow-related', 'unrelated', 'empty', 'unchanged']) {
     await t.test(scenario, async () => {
-      const root = await mkdtemp(path.join(tmpdir(), 'icloud-pages-wait-'));
+      const root = await mkdtemp(path.join(tmpdir(), 'icloud-base-guard-'));
       try {
-        const output = path.join(root, 'output');
-        const counter = path.join(root, 'counter');
-        await writeFile(output, '');
-        await writeFile(counter, '0\n');
-        let stdout = '', failed = false;
+        const output = path.join(root, 'output'), trace = path.join(root, 'trace');
+        await writeFile(output, ''); await writeFile(trace, '');
+        let failed = false, stdout = '';
         try {
           stdout = execFileSync('bash', ['--noprofile', '--norc', '-c', mock + '\n' + script], {
-            encoding: 'utf8', timeout: 15000, stdio: ['ignore', 'pipe', 'pipe'],
-            env: { ...process.env, TARGET_SHA: target, GITHUB_REPOSITORY: 'fixture/example',
-              GITHUB_OUTPUT: output, MOCK_COUNTER: counter, MOCK_OTHER: other,
-              MOCK_SCENARIO: scenario, MOCK_RELATION: relation }
+            encoding: 'utf8', timeout: 10000, stdio: ['ignore', 'pipe', 'pipe'],
+            env: { ...process.env, GENERATION_BASE_SHA:base, CURRENT_SHA:scenario === 'unchanged' ? base : latest,
+              GITHUB_OUTPUT:output, RUNNER_TEMP:root, TRACE:trace, SCENARIO:scenario }
           });
         } catch (error) {
-          assert.equal(error.status, 1, 'must fail closed, not crash or time out the harness');
-          stdout = String(error.stdout);
-          failed = true;
+          assert.equal(error.status, 1, error.stderr);
+          failed = true; stdout = String(error.stdout);
         }
-        const result = await readFile(output, 'utf8');
-        const count = Number(await readFile(counter, 'utf8'));
-        assert.equal(failed, !success);
-        assert.equal(result.includes('pages_built=true'), success);
-        if (scenario === 'delayed') {
-          assert.equal(count, 65, 'a healthy build after the old 60 polls must be accepted');
-          assert.ok(result.includes('built_sha=' + target));
-          assert.ok(result.includes('build_relation=identical'));
-        } else if (scenario === 'successor') {
-          assert.ok(result.includes('built_sha=' + other));
-          assert.ok(result.includes('build_relation=successor'));
-        } else if (scenario === 'errored') {
-          assert.equal(count, 1, 'a matching failed build must fail immediately');
-          assert.match(stdout, /PAGES_BUILD_FAILED/);
+        const actual = await readFile(output, 'utf8'), calls = await readFile(trace, 'utf8');
+        const error = scenario.endsWith('failure');
+        const sensitive = ['related', 'workflow-related'].includes(scenario);
+        assert.equal(failed, error);
+        assert.match(actual, /should_push=false/);
+        assert.doesNotMatch(actual, /should_push=true/);
+        if (error || sensitive) {
+          assert.doesNotMatch(calls, /git checkout|git show|node |cp |rm /);
+          assert.doesNotMatch(actual, /publish_base_sha=|publish_candidate=/);
+          if (error) assert.match(stdout, /PUBLISH_BASE_COMPARISON_FAILED/);
+          else assert.match(actual, /main_advanced=true/);
         } else {
-          assert.equal(count, 180, 'pending/unrelated builds must retain a finite deadline');
-          assert.match(stdout, /PAGES_BUILD_TIMEOUT/);
-          assert.match(stdout, /Last observed:/);
+          assert.match(calls, /node .*stage-price-publication\.mjs/);
+          assert.match(actual, /publish_candidate=no_data_changes/);
+          assert.ok(actual.includes('publish_base_sha=' + (scenario === 'unchanged' ? base : latest)));
+          if (scenario === 'unchanged') assert.doesNotMatch(calls, /diff --name-only|checkout --detach/);
+          else assert.match(calls, /git checkout --detach/);
         }
-      } finally {
-        await rm(root, { recursive: true, force: true });
-      }
+      } finally { await rm(root, {recursive:true, force:true}); }
     });
   }
 });
