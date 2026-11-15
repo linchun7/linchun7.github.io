@@ -76,4 +76,8 @@ Pages 等待现读取最近 100 条构建记录，不仅依赖可能回退的 `b
 
 生产长轮询遇到更新版本时，每次重新 fetch main，固定精确 SHA 后读取同一提交的四份数据及全部静态资源，并核验该提交是当前验收 checkout 的后继；canonical 验收完成后再确认 main 未前进，否则重试。兼容的 `--current-main-data-dir` 参数仅开启此实时证明，启动时导出的冻结目录不再作为当前 main 的依据。JSON、HTML、JS/CSS 响应按流累计字节，缺失或虚假的 Content-Length 也不能突破上限；越限、HTTP/MIME 拒绝和中止均清理流并释放 reader，不先完整缓冲后检查。
 
+### 统一 Pages 等待器与有限重试
+
+iCloud 更新、ChatGPT 更新及 ChatGPT push 验证统一使用 `.github/scripts/wait-pages-build.mjs`，扫描最近 100 条构建；精确 SHA 或已验证后继才可通过，最新相关排队/失败不能借旧成功过关。只对 GET 网络/超时、429、明确限流的 403、500/502/503/504 有限重试（每请求最多 3 次，1/2 秒退避并尊重 Retry-After，上限 60 秒）；认证/权限、格式、提交关系错误立即失败。总期限 15 分钟、最多 180 轮，单请求 15 秒包含响应体；失败不能伪装成功。ChatGPT 保留后继项目 supersession 与 canonical 验证，所有项目仍验真实数据、HTML 和资源。共享脚本修改会触发两套 CI 与负面回归。此门禁不请求新构建、不重写生产数据，不以普通 Pages 绿灯代替每日更新端到端验证。
+
 发布基线比较先完整捕获并检查 `git diff --name-only` 的退出状态，再分类路径；任何比较失败（包括无输出或部分输出的 exit 128）以 `PUBLISH_BASE_COMPARISON_FAILED` 停止，不 checkout 最新 main、不覆盖候选文件、不暂存或提交。仅比较成功且全部改动无关时才沿用已测候选，敏感改动继续拒绝；同一 main 或成功的空 diff 保留既有正常路径。
