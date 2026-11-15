@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile, mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import test, { mock } from 'node:test';
 import {
   readBoundedResponse, runCli, createCurrentMainReader,
@@ -608,6 +613,7 @@ test('CLI refreshes main A to B and pins data/assets to the same exact revision'
   let remote = a, fetched = null, fetches = 0;
   const shown = [];
   const runGit = async (_command, args) => {
+    if (args[1] === '--is-shallow-repository') return { stdout: 'false' };
     if (args[0] === 'fetch') { fetched = remote; fetches++; return { stdout: '' }; }
     if (args[0] === 'rev-parse') return { stdout: fetched + '\n' };
     if (args[0] === 'merge-base') return { stdout: '' };
@@ -660,6 +666,7 @@ test('live main proof fails closed on fetch errors, malformed SHA or non-descend
     const calls = [];
     const reader = createCurrentMainReader({ runGit: async (_command, args) => {
       calls.push(args);
+      if (args[1] === '--is-shallow-repository') return { stdout: 'false' };
       if (args[0] === failure) {
         if (failure === 'rev-parse') return { stdout: 'not-a-commit' };
         throw Error(failure + ' unavailable');
@@ -671,4 +678,48 @@ test('live main proof fails closed on fetch errors, malformed SHA or non-descend
     await assert.rejects(reader.getCurrentMainStaticAssets(), /must be read first/);
     assert.equal(calls.some(args => args[0] === 'show'), false, 'no frozen artifact fallback');
   }
+});
+
+test('live main reader repairs real depth-one fetch boundaries before proving A to B ancestry', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'icloud-main-shallow-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const source = join(root, 'source'), checkout = join(root, 'checkout');
+  const exec = promisify(execFile);
+  const git = (cwd, args) => exec('git', args, { cwd, encoding: 'utf8', timeout: 15000 });
+  await mkdir(source);
+  await git(source, ['init', '--initial-branch=main']);
+  await git(source, ['config', 'user.name', 'Verifier Test']);
+  await git(source, ['config', 'user.email', 'verifier@example.invalid']);
+  const fixtureData = join(source, 'tools/icloud_price_comparison/data');
+  await mkdir(fixtureData, { recursive: true });
+  for (const name of ['prices.json', 'history.json', 'run-log.json', 'minimum-history.json']) {
+    await writeFile(join(fixtureData, name), await readFile(new URL(name, dataDirectory)));
+  }
+  await writeFile(join(source, 'revision'), 'A');
+  await git(source, ['add', '.']);
+  await git(source, ['commit', '-m', 'A']);
+  const a = (await git(source, ['rev-parse', 'HEAD'])).stdout.trim();
+  await git(root, ['clone', '--depth=1', pathToFileURL(source).href, checkout]);
+  await writeFile(join(source, 'revision'), 'B');
+  await git(source, ['add', '.']);
+  await git(source, ['commit', '-m', 'B']);
+  const b = (await git(source, ['rev-parse', 'HEAD'])).stdout.trim();
+  // Reproduce both workflow operations: depth-one checkout of A, then
+  // depth-one fetch of B without changing HEAD.
+  await git(checkout, ['fetch', 'origin', 'main', '--depth=1']);
+  assert.equal((await git(checkout, ['rev-parse', 'HEAD'])).stdout.trim(), a);
+  await assert.rejects(git(checkout, ['merge-base', '--is-ancestor', 'HEAD', b]),
+    error => error.code === 1);
+  const calls = [];
+  const reader = createCurrentMainReader({ runGit: async (command, args, options) => {
+    calls.push(args);
+    return exec(command, args, { ...options, cwd: checkout });
+  } });
+  const artifact = await reader.getCurrentMainArtifact();
+  assert.equal(artifact.hashes.prices, (await loadVerificationArtifact(dataDirectory)).hashes.prices);
+  assert.ok(calls.some(args => args[0] === 'fetch' && args.includes('--unshallow')));
+  assert.ok(calls.filter(args => args[0] === 'show').every(args => args[1].startsWith(b + ':')));
+  assert.equal((await git(checkout, ['rev-parse', '--is-shallow-repository'])).stdout.trim(), 'false');
+  await git(checkout, ['merge-base', '--is-ancestor', 'HEAD', b]);
+  await reader.confirmCurrentMain();
 });
