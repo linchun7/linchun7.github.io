@@ -385,6 +385,12 @@ jobs:
           current_main_sha=$(git rev-parse origin/main)
           publish_base_sha="$GENERATION_BASE_SHA"
           if [[ "$current_main_sha" != "$GENERATION_BASE_SHA" ]]; then
+            # A process substitution hides git diff failure from set -e.
+            # Establish the complete comparison before classifying or adopting main.
+            if ! changed_paths=$(git diff --name-only "$GENERATION_BASE_SHA" "$current_main_sha" --); then
+              echo "::error title=PUBLISH_BASE_COMPARISON_FAILED::Cannot compare generation base with current main; refusing checkout, staging and publication."
+              exit 1
+            fi
             sensitive_change=false
             sensitive_paths=()
             while IFS= read -r changed_path; do
@@ -394,7 +400,7 @@ jobs:
                   sensitive_paths+=("$changed_path")
                   ;;
               esac
-            done < <(git diff --name-only "$GENERATION_BASE_SHA" "$current_main_sha" --)
+            done <<< "$changed_paths"
             if [[ "$sensitive_change" == "true" ]]; then
               printf -v joined_paths '%s, ' "${sensitive_paths[@]}"
               joined_paths="${joined_paths%, }"
