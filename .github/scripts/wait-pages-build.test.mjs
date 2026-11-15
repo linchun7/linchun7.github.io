@@ -74,7 +74,7 @@ test('network, timeout, 429 and transient 5xx recover with bounded backoff', asy
   }
 });
 test('body transport timeout retries; malformed JSON does not', async () => {
-  const broken = response(200); broken.json = async () => {throw new TypeError('terminated');};
+  const broken = response(200); broken.body.cancel = async () => {throw new TypeError('errored stream');}; broken.json = async () => {throw new TypeError('terminated');};
   const h = api([broken, response(200, [])]); assert.deepEqual(await h.run(), []);
   const invalid = response(200); invalid.json = async () => {throw new SyntaxError('bad json');};
   const bad = api([invalid]); await assert.rejects(bad.run(), SyntaxError); assert.equal(bad.counts().calls, 1);
