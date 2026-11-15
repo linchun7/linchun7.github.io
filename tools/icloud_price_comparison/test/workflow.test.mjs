@@ -131,7 +131,7 @@ test('keeps the scheduled update workflow guarded and ordered', async () => {
   assert.match(workflow, /GENERATION_BASE_SHA/);
   assert.match(
     workflow,
-    /current_main_sha=\$\(git rev-parse origin\/main\)[\s\S]*?tools\/icloud_price_comparison\/\*[\s\S]*?\.github\/workflows\/\*icloud\*[\s\S]*?git diff --name-only "\$GENERATION_BASE_SHA" "\$current_main_sha" --[\s\S]*?git checkout --detach "\$current_main_sha"[\s\S]*?publish_base_sha="\$current_main_sha"/,
+    /current_main_sha=\$\(git rev-parse origin\/main\)[\s\S]*?if ! changed_paths=\$\(git diff --name-only "\$GENERATION_BASE_SHA" "\$current_main_sha" --\)[\s\S]*?PUBLISH_BASE_COMPARISON_FAILED[\s\S]*?exit 1[\s\S]*?tools\/icloud_price_comparison\/\*[\s\S]*?\.github\/workflows\/\*icloud\*[\s\S]*?git checkout --detach "\$current_main_sha"[\s\S]*?publish_base_sha="\$current_main_sha"/,
     'publisher must adopt unrelated main advances but reject iCloud-sensitive advances',
   );
   assert.match(
@@ -521,4 +521,80 @@ test('Pages polling uses the shared tested bounded waiter', async () => {
   assert.match(step, /timeout-minutes: 20/);
   assert.match(step, /node \.github\/scripts\/wait-pages-build\.mjs/);
   assert.doesNotMatch(step, /pages\/builds\/latest/);
+});
+
+
+test('publication main comparison fails closed before checkout/staging when git diff fails', async t => {
+  const { mkdtemp, writeFile, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const workflow = await readFile(workflowUrl, 'utf8');
+  const step = workflow.slice(workflow.indexOf('      - name: 确认发布基线并准备提交'),
+    workflow.indexOf('      - name: 仅在最终步骤推送'));
+  const script = step.slice(step.indexOf('        run: |\n') + '        run: |\n'.length)
+    .split('\n').map(line => line.startsWith('          ') ? line.slice(10) : line).join('\n');
+  const base = 'a'.repeat(40), latest = 'b'.repeat(40);
+  const mock = [
+    'git() {',
+    '  printf "git %s\\n" "$*" >> "$TRACE"',
+    '  case "$1 $2" in',
+    '    "fetch origin") return 0 ;;',
+    '    "rev-parse origin/main") printf "%s\\n" "$CURRENT_SHA"; return 0 ;;',
+    '    "diff --name-only")',
+    '      case "$SCENARIO" in',
+    '        diff-failure) return 128 ;;',
+    '        partial-failure) printf "css/style.css\\n"; return 128 ;;',
+    '        related) printf "tools/icloud_price_comparison/data/prices.json\\n"; return 0 ;;',
+    '        workflow-related) printf ".github/workflows/update-icloud-prices.yml\\n"; return 0 ;;',
+    '        unrelated) printf "css/style.css\\n"; return 0 ;;',
+    '        empty) return 0 ;;',
+    '        *) return 99 ;;',
+    '      esac ;;',
+    '    "checkout --detach") return 0 ;;',
+    '    "show "*) printf "<html>fixture</html>\\n"; return 0 ;;',
+    '    "diff --cached") return 0 ;;',
+    '    *) return 99 ;;',
+    '  esac',
+    '}',
+    'rm() { printf "rm %s\\n" "$*" >> "$TRACE"; }',
+    'cp() { printf "cp %s\\n" "$*" >> "$TRACE"; }',
+    'node() { printf "node %s\\n" "$*" >> "$TRACE"; }'
+  ].join('\n');
+  for (const scenario of ['diff-failure', 'partial-failure', 'related', 'workflow-related', 'unrelated', 'empty', 'unchanged']) {
+    await t.test(scenario, async () => {
+      const root = await mkdtemp(path.join(tmpdir(), 'icloud-base-guard-'));
+      try {
+        const output = path.join(root, 'output'), trace = path.join(root, 'trace');
+        await writeFile(output, ''); await writeFile(trace, '');
+        let failed = false, stdout = '';
+        try {
+          stdout = execFileSync('bash', ['--noprofile', '--norc', '-c', mock + '\n' + script], {
+            encoding: 'utf8', timeout: 10000, stdio: ['ignore', 'pipe', 'pipe'],
+            env: { ...process.env, GENERATION_BASE_SHA:base, CURRENT_SHA:scenario === 'unchanged' ? base : latest,
+              GITHUB_OUTPUT:output, RUNNER_TEMP:root, TRACE:trace, SCENARIO:scenario }
+          });
+        } catch (error) {
+          assert.equal(error.status, 1, error.stderr);
+          failed = true; stdout = String(error.stdout);
+        }
+        const actual = await readFile(output, 'utf8'), calls = await readFile(trace, 'utf8');
+        const error = scenario.endsWith('failure');
+        const sensitive = ['related', 'workflow-related'].includes(scenario);
+        assert.equal(failed, error);
+        assert.match(actual, /should_push=false/);
+        assert.doesNotMatch(actual, /should_push=true/);
+        if (error || sensitive) {
+          assert.doesNotMatch(calls, /git checkout|git show|node |cp |rm /);
+          assert.doesNotMatch(actual, /publish_base_sha=|publish_candidate=/);
+          if (error) assert.match(stdout, /PUBLISH_BASE_COMPARISON_FAILED/);
+          else assert.match(actual, /main_advanced=true/);
+        } else {
+          assert.match(calls, /node .*stage-price-publication\.mjs/);
+          assert.match(actual, /publish_candidate=no_data_changes/);
+          assert.ok(actual.includes('publish_base_sha=' + (scenario === 'unchanged' ? base : latest)));
+          if (scenario === 'unchanged') assert.doesNotMatch(calls, /diff --name-only|checkout --detach/);
+          else assert.match(calls, /git checkout --detach/);
+        }
+      } finally { await rm(root, {recursive:true, force:true}); }
+    });
+  }
 });
