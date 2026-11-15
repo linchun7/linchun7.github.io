@@ -1,0 +1,19 @@
+name: Temporary FX confirmation probe
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/probe-chatgpt-fx.yml'
+      - 'tools/chatgpt_price_comparison/scripts/probe_fx_confirmation.py'
+permissions:
+  contents: read
+jobs:
+  read-only-probe:
+    if: github.head_ref == 'fix/chatgpt-fx-anomaly-confirmation-20261115'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Probe current currencies without writing publication data
+        run: python3 tools/chatgpt_price_comparison/scripts/probe_fx_confirmation.py
