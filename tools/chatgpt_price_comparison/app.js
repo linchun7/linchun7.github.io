@@ -35,7 +35,7 @@
     data: null, plans: [], query: '', sortKey: 'plan', sortPlan: null,
     sortDirection: 'asc', activePlan: null, minimums: new Map(),
     ranks: new Map(), activeMarket: null, historyPlan: null,
-    historyReturnFocus: null, highlightTimer: null, scrollFrame: null,
+    historyReturnFocus: null, highlightTimer: null, scrollFrame: null, searchFrame: null, composing: false,
   };
 
   const canonical = (value) => Array.isArray(value)
@@ -615,6 +615,16 @@
     el.resultSummary.textContent = `${state.query ? markets.length + ' / ' + state.data.markets.length : markets.length} 个地区 · ${suffix}`;
   }
 
+  function revealSelectedPlan(container) {
+    if (!container || container.clientWidth === 0) return;
+    const selected = container.querySelector('[aria-pressed="true"]');
+    if (!selected) return;
+    const box = container.getBoundingClientRect(), item = selected.getBoundingClientRect();
+    // Scroll only this segmented control, never the page or an enclosing dialog.
+    if (item.left < box.left + 4) container.scrollLeft += item.left - box.left - 4;
+    else if (item.right > box.right - 4) container.scrollLeft += item.right - box.right + 4;
+  }
+
   function planButtons(container, selected, handler, plans = state.plans) {
     const focusedPlan = container.contains(document.activeElement) ? document.activeElement?.dataset.plan : null;
     let focusTarget = null;
@@ -630,18 +640,58 @@
       container.append(button);
     }
     focusTarget?.focus({ preventScroll: true });
+    revealSelectedPlan(container);
   }
+
+  // Only comparison controls are shared. Search text stays in this page.
+  function readComparisonUrl() {
+    const params = new URL(location.href).searchParams;
+    const requested = params.get('plan');
+    const defaultPlan = state.plans.includes('ChatGPT Plus') ? 'ChatGPT Plus' : state.plans[0];
+    const plan = state.plans.find(p => p === requested)
+      || state.plans.find(p => requested && planIdentity(p) === planIdentity(requested)) || defaultPlan;
+    state.activePlan = plan;
+    state.sortPlan = plan;
+    state.sortKey = params.get('sort') === 'country' ? 'country' : 'plan';
+    state.sortDirection = params.get('direction') === 'desc' ? 'desc' : 'asc';
+  }
+  function writeComparisonUrl() {
+    try {
+      const url = new URL(location.href);
+      url.searchParams.set('plan', state.activePlan);
+      url.searchParams.set('sort', state.sortKey);
+      url.searchParams.set('direction', state.sortDirection);
+      if (url.href !== location.href) history.pushState(null, '', url);
+    } catch {
+      // History may be unavailable in embedded/sandboxed pages; comparison works.
+    }
+  }
+  function cancelSearchRender() {
+    if (state.searchFrame !== null) cancelAnimationFrame(state.searchFrame);
+    state.searchFrame = null;
+  }
+  function scheduleSearchRender() {
+    cancelSearchRender();
+    state.searchFrame = requestAnimationFrame(() => {
+      state.searchFrame = null;
+      if (state.composing) return;
+      state.query = el.searchInput.value.normalize('NFKC').slice(0, 80);
+      renderTable({ updateHeaders: false });
+    });
+  }
+
   function renderMobilePlans() {
-    planButtons(el.mobilePlanControl, state.activePlan, (plan) => { state.activePlan = plan; state.sortKey = 'plan'; state.sortPlan = plan; state.sortDirection = 'asc'; renderMobilePlans(); renderTable(); });
+    planButtons(el.mobilePlanControl, state.activePlan, (plan) => { state.activePlan = plan; state.sortKey = 'plan'; state.sortPlan = plan; state.sortDirection = 'asc'; renderMobilePlans(); renderTable(); writeComparisonUrl(); });
   }
-  function setCountrySort() { if (state.sortKey === 'country') state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc'; else { state.sortKey = 'country'; state.sortDirection = 'asc'; } renderTable(); }
+  function setCountrySort() { if (state.sortKey === 'country') state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc'; else { state.sortKey = 'country'; state.sortDirection = 'asc'; } renderTable(); writeComparisonUrl(); }
   function setPlanSort(plan, force = false) {
     state.activePlan = plan;
     if (!force && state.sortKey === 'plan' && state.sortPlan === plan) state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
     else { state.sortKey = 'plan'; state.sortPlan = plan; state.sortDirection = 'asc'; }
-    renderMobilePlans(); renderTable();
+    renderMobilePlans(); renderTable(); writeComparisonUrl();
   }
   function focusMinimum(plan, marketId) {
+    cancelSearchRender(); state.composing = false;
     state.query = ''; el.searchInput.value = ''; setPlanSort(plan, true);
     const currentMinimum = state.minimums.get(plan);
     if (!currentMinimum?.markets.length) return;
@@ -706,6 +756,8 @@
     const offer = offerFor(market, state.historyPlan);
     el.historyLocalPrice.textContent = offer ? offer.amounts.map((a) => a.display).join(' / ') : '—';
     el.historyCnyPrice.textContent = offer ? offer.amounts.map((a) => cnyText(market, a)).join(' / ') : '—';
+    const variantNote = document.querySelector('#historyVariantNote');
+    variantNote.hidden = !offer || offer.amounts.length < 2;
     el.historyPlanHeader.textContent = shortPlan(state.historyPlan);
     const events = compactHistory(historyEvents(market), state.historyPlan); el.historyEventCount.textContent = `${Math.max(events.length - 1, 0)} 次`;
     el.historyRows.replaceChildren();
@@ -1288,7 +1340,8 @@
   }
 
   function backButton() {
-    const rect = el.priceWorkspace.getBoundingClientRect(), visible = rect.top < -120 && rect.bottom > 120;
+    const rect = el.priceWorkspace.getBoundingClientRect();
+    const visible = (rect.top < -120 && rect.bottom > 120) || document.activeElement === el.backToTableButton;
     el.backToTableButton.classList.toggle('is-visible', visible); el.backToTableButton.setAttribute('aria-hidden', String(!visible)); el.backToTableButton.tabIndex = visible ? 0 : -1;
   }
   function bind() {
@@ -1307,7 +1360,14 @@
       if (event.ctrlKey || event.metaKey || event.altKey) return;
       delete document.documentElement.dataset.countryHistoryPointer;
     }, { capture: true });
-    el.searchInput.addEventListener('input', () => { state.query = el.searchInput.value.normalize('NFKC').slice(0, 80); renderTable({ updateHeaders: false }); });
+    el.searchInput.addEventListener('compositionstart', () => { state.composing = true; cancelSearchRender(); });
+    el.searchInput.addEventListener('compositionend', () => { state.composing = false; scheduleSearchRender(); });
+    el.searchInput.addEventListener('input', event => {
+      if (!state.composing && !event.isComposing) scheduleSearchRender();
+    });
+    addEventListener('popstate', () => {
+      readComparisonUrl(); renderMobilePlans(); renderTable();
+    });
     el.minimumHistoryButton?.addEventListener('click', openMinimumHistory);
     el.closeHistory.addEventListener('click', closeHistory);
     el.historyDialog.addEventListener('close', () => {
@@ -1317,7 +1377,8 @@
     el.resetHistoryBackdrop = bindDialogBackdropDismiss(el.historyDialog, closeHistory);
     el.backToTableButton.addEventListener('click', () => { el.priceWorkspace.scrollIntoView({ behavior: 'smooth', block: 'start' }); el.priceWorkspace.focus({ preventScroll: true }); });
     addEventListener('scroll', () => { if (!state.scrollFrame) state.scrollFrame = requestAnimationFrame(() => { state.scrollFrame = null; backButton(); }); }, { passive: true });
-    addEventListener('resize', () => { updateTableScrollMode(); backButton(); }, { passive: true });
+    el.backToTableButton.addEventListener('blur', backButton);
+    addEventListener('resize', () => { updateTableScrollMode(); backButton(); revealSelectedPlan(el.mobilePlanControl); revealSelectedPlan(el.historyPlanControl); }, { passive: true });
   }
 
   async function start() {
@@ -1329,7 +1390,9 @@
     const defaultPlan = state.plans.includes('ChatGPT Plus') ? 'ChatGPT Plus' : state.plans[0];
     state.activePlan = defaultPlan;
     state.sortPlan = defaultPlan;
-    state.historyPlan = defaultPlan;
+    readComparisonUrl();
+    el.searchInput.value = '';
+    state.historyPlan = state.activePlan;
     freshnessSignature = timeDependentSignature();
     calculateMinimums();
     renderMinimums();

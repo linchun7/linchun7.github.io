@@ -547,3 +547,8 @@ th button svg { width: 15px; height: 15px; stroke-width: 2.25; }
 @media (forced-colors: active) {
   .minimum-history-button, .minimum-history-filter select, .minimum-history-plan { border-color: ButtonText; color: ButtonText; }
 }
+
+/* Keep the country dialog dismiss control accessible on short screens. */
+#historyDialog > .dialog-header { position: sticky; top: 0; z-index: 3; background: var(--surface); }
+.history-variant-note { margin: 0; padding: 10px 20px; color: var(--muted); font-size: 12px; background: var(--surface-soft); }
+.history-variant-note[hidden] { display: none; }
