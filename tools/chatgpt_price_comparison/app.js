@@ -478,6 +478,7 @@
     updateRankingPresentation();
     refreshIcons();
     focusTarget?.focus({ preventScroll: true });
+    revealSelectedPlan(container);
   }
 
   function isMinimum(plan, market, amount) {
@@ -615,6 +616,16 @@
     el.resultSummary.textContent = `${state.query ? markets.length + ' / ' + state.data.markets.length : markets.length} 个地区 · ${suffix}`;
   }
 
+  function revealSelectedPlan(container) {
+    if (!container || container.clientWidth === 0) return;
+    const selected = container.querySelector('[aria-pressed="true"]');
+    if (!selected) return;
+    const box = container.getBoundingClientRect(), item = selected.getBoundingClientRect();
+    // Scroll only this segmented control, never the page or an enclosing dialog.
+    if (item.left < box.left + 4) container.scrollLeft += item.left - box.left - 4;
+    else if (item.right > box.right - 4) container.scrollLeft += item.right - box.right + 4;
+  }
+
   function planButtons(container, selected, handler, plans = state.plans) {
     const focusedPlan = container.contains(document.activeElement) ? document.activeElement?.dataset.plan : null;
     let focusTarget = null;
@@ -745,6 +756,8 @@
     const offer = offerFor(market, state.historyPlan);
     el.historyLocalPrice.textContent = offer ? offer.amounts.map((a) => a.display).join(' / ') : '—';
     el.historyCnyPrice.textContent = offer ? offer.amounts.map((a) => cnyText(market, a)).join(' / ') : '—';
+    const variantNote = document.querySelector('#historyVariantNote');
+    variantNote.hidden = !offer || offer.amounts.length < 2;
     el.historyPlanHeader.textContent = shortPlan(state.historyPlan);
     const events = compactHistory(historyEvents(market), state.historyPlan); el.historyEventCount.textContent = `${Math.max(events.length - 1, 0)} 次`;
     el.historyRows.replaceChildren();
@@ -1327,7 +1340,8 @@
   }
 
   function backButton() {
-    const rect = el.priceWorkspace.getBoundingClientRect(), visible = rect.top < -120 && rect.bottom > 120;
+    const rect = el.priceWorkspace.getBoundingClientRect();
+    const visible = (rect.top < -120 && rect.bottom > 120) || document.activeElement === el.backToTableButton;
     el.backToTableButton.classList.toggle('is-visible', visible); el.backToTableButton.setAttribute('aria-hidden', String(!visible)); el.backToTableButton.tabIndex = visible ? 0 : -1;
   }
   function bind() {
@@ -1363,7 +1377,8 @@
     el.resetHistoryBackdrop = bindDialogBackdropDismiss(el.historyDialog, closeHistory);
     el.backToTableButton.addEventListener('click', () => { el.priceWorkspace.scrollIntoView({ behavior: 'smooth', block: 'start' }); el.priceWorkspace.focus({ preventScroll: true }); });
     addEventListener('scroll', () => { if (!state.scrollFrame) state.scrollFrame = requestAnimationFrame(() => { state.scrollFrame = null; backButton(); }); }, { passive: true });
-    addEventListener('resize', () => { updateTableScrollMode(); backButton(); }, { passive: true });
+    el.backToTableButton.addEventListener('blur', backButton);
+    addEventListener('resize', () => { updateTableScrollMode(); backButton(); revealSelectedPlan(el.mobilePlanControl); revealSelectedPlan(el.historyPlanControl); }, { passive: true });
   }
 
   async function start() {

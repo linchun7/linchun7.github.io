@@ -918,13 +918,13 @@ function renderLocalPriceWithTrend(plan, country, changedSeries) {
   elements.historyLocalPrice.append(trend);
 }
 
-function renderHistoryRows(record) {
+function renderHistoryRows(record, { currentSnapshot = false } = {}) {
   renderHistoryHeaders();
   elements.historyRows.replaceChildren();
   const changedSeries = compactHistorySeries(record.events, state.historyTier);
   [...changedSeries].reverse().forEach((event) => {
     const row = document.createElement('tr');
-    row.append(createCell(formatDate(event.observedAt)), createCell(event.currency, 'currency-code'));
+    row.append(createCell(`${formatDate(event.observedAt)}${currentSnapshot ? '（当前快照）' : ''}`), createCell(event.currency, 'currency-code'));
     row.append(createCell(Number.isFinite(event.plans[state.historyTier]) ? numberFormatter.format(event.plans[state.historyTier]) : '—'));
     elements.historyRows.append(row);
   });
@@ -1164,8 +1164,9 @@ function renderHistoryContent() {
 
   renderLocalPriceWithTrend(plan, country, state.historyCompatible ? changedSeries : []);
   elements.historyCnyPrice.textContent = formatConverted(cny, '¥');
-  elements.historyEventCount.textContent = `${Math.max(changedSeries.length - 1, 0)} 次`;
-  renderHistoryRows(record);
+  const hasAcceptedHistory = Boolean(state.history?.markets?.[country.marketId]?.events?.length);
+  elements.historyEventCount.textContent = hasAcceptedHistory ? `${Math.max(changedSeries.length - 1, 0)} 次` : '—';
+  renderHistoryRows(record, { currentSnapshot: !hasAcceptedHistory });
 }
 
 function openHistory(country, returnFocus = null) {

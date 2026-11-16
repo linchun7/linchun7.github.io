@@ -647,10 +647,68 @@ async function assertHistoryHeaderReachability(browser) {
   assert.deepEqual(failures, [], browserName + ': long-history reachability\n' + JSON.stringify(diagnostics, null, 2));
 }
 
+async function assertReviewUx(browser, enforce = false) {
+  const results = [];
+  const sourceData = JSON.parse(await readFile(resolve(projectDir, 'data/prices.json'), 'utf8'));
+  for (const [width, height] of [[320, 568], [667, 375], [1280, 900]]) {
+    const context = await browser.newContext({ viewport: { width, height } });
+    const page = await context.newPage();
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded' });
+      await page.waitForFunction(() => document.querySelector('#priceWorkspace').classList.contains('price-ui-ready'));
+      await page.evaluate(() => scrollTo(0, document.querySelector('#priceWorkspace').offsetTop + 500));
+      await page.waitForFunction(() => document.querySelector('#backToTableButton').tabIndex === 0);
+      await page.locator('#backToTableButton').focus();
+      await page.keyboard.press('Shift+Tab'); await page.keyboard.press('Tab');
+      await page.evaluate(() => scrollTo(0, 0));
+      await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+      const focus = await page.locator('#backToTableButton').evaluate(b => ({
+        focused: document.activeElement === b, visible: b.classList.contains('is-visible'),
+        hidden: b.getAttribute('aria-hidden'), tabIndex: b.tabIndex
+      }));
+      await page.locator('#searchInput').evaluate(b => b.focus({preventScroll: true}));
+      if (enforce) assert.equal(await page.locator('#backToTableButton').getAttribute('aria-hidden'), 'true', 'return button hides after focus leaves outside table');
+      await page.locator('.minimum-card:not(:disabled)').last().click();
+      const selected = await page.locator('#mobilePlanControl').evaluate(c => {
+        const b = c.querySelector('[aria-pressed="true"]'), r = b.getBoundingClientRect(), box = c.getBoundingClientRect();
+        return { label: b.textContent, scrollLeft: c.scrollLeft, left: r.left, right: r.right,
+          containerLeft: box.left, containerRight: box.right, visible: r.left >= box.left - 1 && r.right <= box.right + 1 };
+      });
+      await page.locator('.country-history-button:not(:disabled)').first().click();
+      await page.locator('#historyDialog').evaluate(d => { d.scrollTop = d.scrollHeight; });
+      const dialog = await page.locator('#historyDialog').evaluate(d => {
+        const b = d.querySelector('#closeHistory'), r = b.getBoundingClientRect(), box = d.getBoundingClientRect();
+        return { scrollTop:d.scrollTop, visible: r.top >= box.top && r.bottom <= box.bottom, top:r.top, dialogTop:box.top };
+      });
+      results.push({width,height,focus,selected,dialog});
+      console.log('REVIEW_UX_CASE ' + browserName + ' ' + JSON.stringify(results.at(-1)));
+      if (enforce) {
+        assert.ok(focus.focused && focus.visible && focus.hidden === 'false' && focus.tabIndex === 0, 'focused return button remains visible');
+        if (width <= 1100) assert.ok(selected.visible, 'programmatically selected last mobile plan is visible');
+        assert.ok(dialog.visible, 'country history close remains reachable after scrolling');
+        await page.keyboard.press('Escape');
+        const multi = sourceData.markets.find(m => m.offers.some(o => o.amounts.length > 1));
+        assert.ok(multi, 'price variants fixture exists');
+        await page.locator('tr[data-market-id="' + multi.code + '"] .country-history-button').click();
+        const plan = multi.offers.find(o => o.amounts.length > 1).label;
+        await page.locator('#historyPlanControl button').filter({ hasText: plan.replace(/^ChatGPT /, '') }).click();
+        assert.equal(await page.locator('#historyVariantNote').isVisible(), true, 'multiple amounts explained locally');
+        const single = multi.offers.find(o => o.amounts.length === 1);
+        if (single) {
+          await page.locator('#historyPlanControl button').filter({ hasText: single.label.replace(/^ChatGPT /, '') }).click();
+          assert.equal(await page.locator('#historyVariantNote').isVisible(), false, 'single amount does not get a misleading variants notice');
+        }
+      }
+    } finally { await context.close(); }
+  }
+  console.log('REVIEW_UX ' + browserName + ' ' + JSON.stringify(results));
+}
+
 let browser;
 try {
   await waitForServer();
   browser = await browserType.launch({ headless: true });
+  await assertReviewUx(browser, true);
   await assertHistoryHeaderReachability(browser);
   await assertDailyTableGeometry(browser);
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
@@ -1470,6 +1528,57 @@ async function assertNativeHistoryCloseLifecycle(page, { triggerSelector, dialog
       assert.ok(await statePage.locator('#priceRows tr[data-market-id]').count() > 1);
       assert.equal(statePage.url().includes('no-match-private'), false);
       await statePage.evaluate(() => window.__searchObserver.disconnect());
+
+      // A pending filter and a same-task sort/navigation must use the latest
+      // comparison state, rather than replay a captured stale sort.
+      await statePage.goto(url); await ready();
+      await statePage.evaluate(() => {
+        const input = document.querySelector('#searchInput');
+        input.value = '美国'; input.dispatchEvent(new Event('input', { bubbles: true }));
+        document.querySelector('button[data-sort="country"]').click();
+      });
+      await settle();
+      assert.match(await statePage.locator('#resultSummary').textContent(), /按名称排序/);
+      assert.equal(await statePage.locator('#priceRows tr[data-market-id]').count(), 1);
+      await statePage.evaluate(plan => {
+        const input = document.querySelector('#searchInput');
+        input.value = '加拿大'; input.dispatchEvent(new Event('input', { bubbles: true }));
+        const destination = new URL(location.href);
+        destination.searchParams.set('plan', plan);
+        destination.searchParams.set('sort', 'plan');
+        destination.searchParams.set('direction', 'desc');
+        history.replaceState(null, '', destination);
+        dispatchEvent(new PopStateEvent('popstate'));
+      }, chosen);
+      await settle();
+      assert.equal(await statePage.locator('#mobilePlanControl [aria-pressed="true"]').getAttribute('data-plan'), chosen);
+      assert.match(await statePage.locator('#resultSummary').textContent(), /从高到低/);
+      assert.equal(await statePage.locator('#priceRows tr[data-market-id]').count(), 1);
+      assert.equal(await statePage.locator('#priceRows tr').getAttribute('data-market-id'), 'ca');
+
+      const aliasTarget = plans.find(p => identity(p) === identity('ChatGPT Pro 5x'));
+      if (aliasTarget) {
+        await statePage.goto(url + '?plan=' + encodeURIComponent('ChatGPT Pro 5x') + '&direction=desc');
+        await ready();
+        assert.equal(await statePage.locator('#mobilePlanControl [aria-pressed="true"]').getAttribute('data-plan'), aliasTarget);
+        assert.match(await statePage.locator('#resultSummary').textContent(), /从高到低/);
+      }
+      // Sandboxed History API failure affects shareability, not comparison.
+      await statePage.goto(url); await ready();
+      await statePage.evaluate(() => {
+        window.__originalPushState = history.pushState;
+        history.pushState = () => { throw new DOMException('blocked for test', 'SecurityError'); };
+      });
+      const blockedUrl = statePage.url();
+      await statePage.locator('#mobilePlanControl button').last().click();
+      await statePage.locator('button[data-sort="country"]').click();
+      assert.equal(statePage.url(), blockedUrl);
+      assert.equal(await statePage.locator('#mobilePlanControl [aria-pressed="true"]').getAttribute('data-plan'), chosen);
+      assert.match(await statePage.locator('#resultSummary').textContent(), /按名称排序/);
+      await statePage.locator('#searchInput').fill('美国'); await settle();
+      assert.equal(await statePage.locator('#priceRows tr[data-market-id]').count(), 1);
+      await statePage.evaluate(() => { history.pushState = window.__originalPushState; delete window.__originalPushState; });
+
       await statePage.goto(url + '?plan=__unknown__&sort=__unknown__&direction=__unknown__');
       await ready();
       assert.match(await statePage.locator('#resultSummary').textContent(), /Plus 从低到高/);

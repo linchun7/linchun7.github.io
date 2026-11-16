@@ -8,15 +8,15 @@
   <meta name="theme-color" content="#eef2f6">
   <meta name="description" content="比较 ChatGPT 各套餐在不同地区 App Store 的公开标价、人民币参考价与价格历史。">
   <meta name="chatgpt-data-revision" content="c3aae97a17ae9ac84ec6e7829b9722fffbe65be0832f0fc6d8ae7a892eb36a1a">
-  <meta name="chatgpt-page-revision" content="8a9995042d003045f06ab06a496af0fe95025a0d4c4945c304f0a8fcdb44aeb0">
+  <meta name="chatgpt-page-revision" content="d7f0db38582d16ba525d0e37b00d32ead94e0805cb4e8111fb485a9dd563a4e6">
   <link rel="canonical" href="https://www.linchun.com.cn/tools/chatgpt_price_comparison/">
   <link rel="shortcut icon" href="/images/favicon.ico">
   <link rel="icon" type="image/png" href="/images/favicon-192x192.png" sizes="192x192">
   <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
   <link rel="modulepreload" href="vendor/lucide-subset.js?v=9a4c200cc927">
-  <link rel="stylesheet" href="style.css?v=48f50ec91d63">
+  <link rel="stylesheet" href="style.css?v=dd9f4f401b77">
   <title>ChatGPT 全球价格对比｜各地区 App Store 标价</title>
-  <script defer data-cfasync="false" src="app.js?v=fabdf7ededd0"></script>
+  <script defer data-cfasync="false" src="app.js?v=f25a56485b38"></script>
 </head>
 <body>
   <a class="skip-link" href="#priceWorkspace">跳到价格表</a>
@@ -177,7 +177,7 @@
         </div>
       </div>
       <div class="data-disclaimer">
-        <p>价格来自 OpenAI 官方 ChatGPT 的各地区 App Store 页面。人民币金额按参考汇率换算，仅用于比较；实际费用、税费、计费周期和可购买套餐以对应地区 App Store 与账户结算为准。</p>
+        <p>价格来自 OpenAI 官方 ChatGPT 的各地区 App Store 页面。主表展示同名套餐的最低公开标价，全部标价可在地区价格历史中查看。人民币金额按参考汇率换算，仅用于比较；实际费用、税费、计费周期和可购买套餐以对应地区 App Store 与账户结算为准。</p>
       </div>
     </section>
   </main>
@@ -197,6 +197,8 @@
       <div><span>人民币参考</span><strong id="historyCnyPrice">--</strong></div>
       <div><span>变更次数</span><strong id="historyEventCount">--</strong></div>
     </div>
+
+    <p id="historyVariantNote" class="history-variant-note" hidden>同名套餐有多个公开标价，主表取最低一项，此处保留全部。计费周期及购买资格以 App Store 结算页为准。</p>
 
     <div class="history-toolbar">
       <span class="control-label">套餐</span>
