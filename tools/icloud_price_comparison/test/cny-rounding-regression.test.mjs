@@ -96,7 +96,7 @@ test('corrected reference cents reach both readable HTML and embedded browser da
   assert.equal(validatePricePayload(payload), payload);
   const fragments = renderStaticFragments(payload);
   assert.equal(load(fragments.TABLE_BODY)('.price-amount').text(), '7.43');
-  const embedded = JSON.parse(load(fragments.META)('#icloud-price-data').text());
+  const embedded = JSON.parse(load(fragments.DATA)('#icloud-price-data').text());
   assert.equal(embedded.prices.countries[0].plans['50GB'].cnyPrice, 7.43);
   assert.equal(validatePricePayload(embedded.prices).countries[0].plans['50GB'].cnyRank, 1);
 });

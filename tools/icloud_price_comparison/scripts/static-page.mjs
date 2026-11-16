@@ -3,6 +3,7 @@ import { displayedPublishedDate, validatePricePayload } from '../data-contract.j
 
 export const STATIC_FRAGMENT_NAMES = Object.freeze([
   'META',
+  'DATA',
   'STATUS',
   'WORKSPACE_META',
   'OVERVIEW',
@@ -142,13 +143,11 @@ export function renderStaticFragments(payload, history = null) {
   const embeddedJson = serializeEmbeddedJson({ schemaVersion: 1, prices: payload, publishedDate: publicPublishedDate });
   if (Buffer.byteLength(embeddedJson, 'utf8') > 1024 * 1024) throw new Error('STATIC_EMBEDDED_SNAPSHOT_TOO_LARGE');
   return {
-    // Keep both projections in the existing generated region so the publication
-    // gate verifies prices.json, readable HTML and interactive data atomically.
+    // Metadata stays in head; the inert payload follows readable body content.
+    // Both regions remain exact validated projections in the publication gate.
     // Escaping '<' prevents JSON text from closing its inert script element.
-    META: [
-      `  <meta name="icloud-price-snapshot" content="${escapeHtml(payload.generatedAt)}" data-fingerprint="${fingerprint}" data-fx-stale="${fxStale}">`,
-      `  <script id="icloud-price-data" type="application/json">${embeddedJson}</script>`
-    ].join('\n'),
+    META: `  <meta name="icloud-price-snapshot" content="${escapeHtml(payload.generatedAt)}" data-fingerprint="${fingerprint}" data-fx-stale="${fxStale}">`,
+    DATA: `  <script id="icloud-price-data" type="application/json">${embeddedJson}</script>`,
     STATUS: `        <span id="updatedAt" title="北京时间">更新于 ${beijingDateTime(payload.generatedAt)}</span>`,
     WORKSPACE_META: [
       `          <p id="resultSummary" aria-live="polite">${payload.countries.length} 个地区 · ${escapeHtml(defaultTier.label)} 从低到高</p>`,

@@ -105,6 +105,11 @@ jobs:
           pnpm --version
       - name: 安装项目依赖
         run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: 重新生成静态页面及资源版本并确认已提交
+        run: |
+          pnpm render:static
+          pnpm assets:update
+          git diff --exit-code -- index.html script.js data-contract.js data-model.js
       - name: 运行核心与数据测试
         run: pnpm test:core
       - name: 深度验证当前完整数据工件

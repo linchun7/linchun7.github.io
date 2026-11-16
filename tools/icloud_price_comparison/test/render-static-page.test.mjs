@@ -44,6 +44,14 @@ test('committed raw HTML is the deterministic projection of validated prices', a
   assert.equal($('meta[name="icloud-price-snapshot"]').attr('data-fx-stale'), String(payload.fx.stale === true));
   assert.equal($('#icloud-price-data').length, 1);
   assert.equal($('#icloud-price-data').attr('type'), 'application/json');
+  assert.equal($('head #icloud-price-data').length, 0);
+  assert.equal($('body > #icloud-price-data').length, 1);
+  assert.ok(html.indexOf('id="icloud-price-data"') > html.indexOf('<footer'));
+  assert.equal(extractStaticFragments(html).META.includes('icloud-price-data'), false);
+  assert.ok(extractStaticFragments(html).DATA.includes('icloud-price-data'));
+  for (const marker of ['START', 'END']) {
+    assert.throws(() => extractStaticFragments(html.replace(`<!-- ICLOUD_STATIC_DATA:${marker} -->`, '')), /STATIC_RENDER_MARKER_INVALID:DATA/);
+  }
   assert.deepEqual(JSON.parse($('#icloud-price-data').text()), {
     schemaVersion: 1,
     prices: payload,
@@ -158,7 +166,7 @@ test('static renderer rejects missing, duplicate, and hand-edited generated regi
   assert.throws(() => extractStaticFragments(html.replace('<!-- ICLOUD_STATIC_STATUS:END -->', '')), /STATIC_RENDER_MARKER_INVALID:STATUS/);
   assert.throws(() => extractStaticFragments(html.replace('<!-- ICLOUD_STATIC_STATUS:START -->', '<!-- ICLOUD_STATIC_STATUS:START --><!-- ICLOUD_STATIC_STATUS:START -->')), /STATIC_RENDER_MARKER_INVALID:STATUS/);
   assert.throws(() => assertStaticPageMatches(html.replace('United States · USD', 'United States · EUR'), payload, history), /STATIC_RENDER_MISMATCH:TABLE_BODY/);
-  assert.throws(() => assertStaticPageMatches(html.replace('"schemaVersion":1,"prices":', '"schemaVersion":2,"prices":'), payload, history), /STATIC_RENDER_MISMATCH:META/);
+  assert.throws(() => assertStaticPageMatches(html.replace('"schemaVersion":1,"prices":', '"schemaVersion":2,"prices":'), payload, history), /STATIC_RENDER_MISMATCH:DATA/);
   assert.throws(() => assertSeoProjectionMatches(html.replace('<meta name="description"', '<meta name="description-copy"'), payload), /SEO_PROJECTION_TARGET_INVALID:description/);
 });
 
