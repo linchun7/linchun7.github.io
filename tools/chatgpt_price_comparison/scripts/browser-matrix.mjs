@@ -1395,6 +1395,88 @@ async function assertNativeHistoryCloseLifecycle(page, { triggerSelector, dialog
     await probe.close();
   }
 
+
+  {
+    const isolated = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const statePage = await isolated.newPage();
+    const errors = [];
+    statePage.on('pageerror', e => errors.push(e.message));
+    const ready = () => statePage.waitForFunction(() => !document.querySelector('#searchInput').disabled);
+    const settle = () => statePage.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    try {
+      await statePage.goto(url); await ready();
+      const plans = await statePage.locator('#mobilePlanControl button').evaluateAll(nodes => nodes.map(n => n.dataset.plan));
+      const chosen = plans.at(-1);
+      await statePage.locator('#mobilePlanControl button').last().click();
+      await statePage.locator('button[data-sort="country"]').click();
+      await statePage.locator('button[data-sort="country"]').click();
+      await statePage.locator('#searchInput').fill('美国'); await settle();
+      const shared = statePage.url();
+      assert.equal(new URL(shared).searchParams.get('plan'), chosen);
+      assert.equal(new URL(shared).searchParams.get('sort'), 'country');
+      assert.equal(new URL(shared).searchParams.get('direction'), 'desc');
+      assert.equal(decodeURIComponent(shared).includes('美国'), false, 'search stays private to page');
+      await statePage.reload(); await ready();
+      assert.equal(await statePage.locator('#searchInput').inputValue(), '');
+      assert.equal(await statePage.locator('#mobilePlanControl [aria-pressed="true"]').getAttribute('data-plan'), chosen);
+      assert.match(await statePage.locator('#resultSummary').textContent(), /按名称倒序/);
+      const fresh = await isolated.newPage();
+      await fresh.goto(shared); await fresh.waitForFunction(() => !document.querySelector('#searchInput').disabled);
+      assert.equal(await fresh.locator('#mobilePlanControl [aria-pressed="true"]').getAttribute('data-plan'), chosen);
+      assert.match(await fresh.locator('#resultSummary').textContent(), /按名称倒序/);
+      await fresh.close();
+      // Deliberate comparison changes create navigable state; search does not.
+      await statePage.locator('#mobilePlanControl button').first().click();
+      await statePage.goBack(); await settle();
+      assert.match(await statePage.locator('#resultSummary').textContent(), /按名称倒序/);
+      await statePage.goForward(); await settle();
+      assert.equal(await statePage.locator('#mobilePlanControl [aria-pressed="true"]').getAttribute('data-plan'), plans[0]);
+
+      await statePage.evaluate(() => {
+        const rows = document.querySelector('#priceRows');
+        window.__searchMutations = 0;
+        window.__searchObserver = new MutationObserver(records => { window.__searchMutations += records.filter(r => r.target === rows).length; });
+        window.__searchObserver.observe(rows, { childList: true });
+        const input = document.querySelector('#searchInput');
+        input.focus();
+        input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+        for (const value of ['z', 'zhong', '中']) {
+          input.value = value;
+          input.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true }));
+        }
+      });
+      await settle();
+      assert.equal(await statePage.evaluate(() => window.__searchMutations), 0, 'IME candidates do not rebuild table');
+      await statePage.evaluate(() => {
+        const input = document.querySelector('#searchInput');
+        input.value = '美国';
+        input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '美国' }));
+        input.dispatchEvent(new InputEvent('input', { bubbles: true }));
+      });
+      await settle();
+      assert.equal(await statePage.evaluate(() => window.__searchMutations), 1, 'compositionend plus trailing input coalesce');
+      assert.equal(await statePage.locator('#priceRows tr[data-market-id]').count(), 1);
+      assert.equal(await statePage.locator('#priceRows tr').getAttribute('data-market-id'), 'us');
+      assert.equal(await statePage.evaluate(() => document.activeElement.id), 'searchInput');
+      // Pending query cannot overwrite minimum-card reset.
+      await statePage.evaluate(() => {
+        const input = document.querySelector('#searchInput');
+        input.value = 'no-match-private';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        document.querySelector('.minimum-card:not(:disabled)').click();
+      });
+      await settle();
+      assert.equal(await statePage.locator('#searchInput').inputValue(), '');
+      assert.ok(await statePage.locator('#priceRows tr[data-market-id]').count() > 1);
+      assert.equal(statePage.url().includes('no-match-private'), false);
+      await statePage.evaluate(() => window.__searchObserver.disconnect());
+      await statePage.goto(url + '?plan=__unknown__&sort=__unknown__&direction=__unknown__');
+      await ready();
+      assert.match(await statePage.locator('#resultSummary').textContent(), /Plus 从低到高/);
+      assert.deepEqual(errors, []);
+    } finally { await isolated.close(); }
+  }
+
   console.log(`Cross-browser smoke passed: ${browserName}`);
 } finally {
   if (browser) await browser.close();

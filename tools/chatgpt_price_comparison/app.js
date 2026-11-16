@@ -35,7 +35,7 @@
     data: null, plans: [], query: '', sortKey: 'plan', sortPlan: null,
     sortDirection: 'asc', activePlan: null, minimums: new Map(),
     ranks: new Map(), activeMarket: null, historyPlan: null,
-    historyReturnFocus: null, highlightTimer: null, scrollFrame: null,
+    historyReturnFocus: null, highlightTimer: null, scrollFrame: null, searchFrame: null, composing: false,
   };
 
   const canonical = (value) => Array.isArray(value)
@@ -631,17 +631,56 @@
     }
     focusTarget?.focus({ preventScroll: true });
   }
-  function renderMobilePlans() {
-    planButtons(el.mobilePlanControl, state.activePlan, (plan) => { state.activePlan = plan; state.sortKey = 'plan'; state.sortPlan = plan; state.sortDirection = 'asc'; renderMobilePlans(); renderTable(); });
+
+  // Only comparison controls are shared. Search text stays in this page.
+  function readComparisonUrl() {
+    const params = new URL(location.href).searchParams;
+    const requested = params.get('plan');
+    const defaultPlan = state.plans.includes('ChatGPT Plus') ? 'ChatGPT Plus' : state.plans[0];
+    const plan = state.plans.find(p => p === requested)
+      || state.plans.find(p => requested && planIdentity(p) === planIdentity(requested)) || defaultPlan;
+    state.activePlan = plan;
+    state.sortPlan = plan;
+    state.sortKey = params.get('sort') === 'country' ? 'country' : 'plan';
+    state.sortDirection = params.get('direction') === 'desc' ? 'desc' : 'asc';
   }
-  function setCountrySort() { if (state.sortKey === 'country') state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc'; else { state.sortKey = 'country'; state.sortDirection = 'asc'; } renderTable(); }
+  function writeComparisonUrl() {
+    try {
+      const url = new URL(location.href);
+      url.searchParams.set('plan', state.activePlan);
+      url.searchParams.set('sort', state.sortKey);
+      url.searchParams.set('direction', state.sortDirection);
+      if (url.href !== location.href) history.pushState(null, '', url);
+    } catch {
+      // History may be unavailable in embedded/sandboxed pages; comparison works.
+    }
+  }
+  function cancelSearchRender() {
+    if (state.searchFrame !== null) cancelAnimationFrame(state.searchFrame);
+    state.searchFrame = null;
+  }
+  function scheduleSearchRender() {
+    cancelSearchRender();
+    state.searchFrame = requestAnimationFrame(() => {
+      state.searchFrame = null;
+      if (state.composing) return;
+      state.query = el.searchInput.value.normalize('NFKC').slice(0, 80);
+      renderTable({ updateHeaders: false });
+    });
+  }
+
+  function renderMobilePlans() {
+    planButtons(el.mobilePlanControl, state.activePlan, (plan) => { state.activePlan = plan; state.sortKey = 'plan'; state.sortPlan = plan; state.sortDirection = 'asc'; renderMobilePlans(); renderTable(); writeComparisonUrl(); });
+  }
+  function setCountrySort() { if (state.sortKey === 'country') state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc'; else { state.sortKey = 'country'; state.sortDirection = 'asc'; } renderTable(); writeComparisonUrl(); }
   function setPlanSort(plan, force = false) {
     state.activePlan = plan;
     if (!force && state.sortKey === 'plan' && state.sortPlan === plan) state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
     else { state.sortKey = 'plan'; state.sortPlan = plan; state.sortDirection = 'asc'; }
-    renderMobilePlans(); renderTable();
+    renderMobilePlans(); renderTable(); writeComparisonUrl();
   }
   function focusMinimum(plan, marketId) {
+    cancelSearchRender(); state.composing = false;
     state.query = ''; el.searchInput.value = ''; setPlanSort(plan, true);
     const currentMinimum = state.minimums.get(plan);
     if (!currentMinimum?.markets.length) return;
@@ -1307,7 +1346,14 @@
       if (event.ctrlKey || event.metaKey || event.altKey) return;
       delete document.documentElement.dataset.countryHistoryPointer;
     }, { capture: true });
-    el.searchInput.addEventListener('input', () => { state.query = el.searchInput.value.normalize('NFKC').slice(0, 80); renderTable({ updateHeaders: false }); });
+    el.searchInput.addEventListener('compositionstart', () => { state.composing = true; cancelSearchRender(); });
+    el.searchInput.addEventListener('compositionend', () => { state.composing = false; scheduleSearchRender(); });
+    el.searchInput.addEventListener('input', event => {
+      if (!state.composing && !event.isComposing) scheduleSearchRender();
+    });
+    addEventListener('popstate', () => {
+      readComparisonUrl(); renderMobilePlans(); renderTable();
+    });
     el.minimumHistoryButton?.addEventListener('click', openMinimumHistory);
     el.closeHistory.addEventListener('click', closeHistory);
     el.historyDialog.addEventListener('close', () => {
@@ -1329,7 +1375,9 @@
     const defaultPlan = state.plans.includes('ChatGPT Plus') ? 'ChatGPT Plus' : state.plans[0];
     state.activePlan = defaultPlan;
     state.sortPlan = defaultPlan;
-    state.historyPlan = defaultPlan;
+    readComparisonUrl();
+    el.searchInput.value = '';
+    state.historyPlan = state.activePlan;
     freshnessSignature = timeDependentSignature();
     calculateMinimums();
     renderMinimums();

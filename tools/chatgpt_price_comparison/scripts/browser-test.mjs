@@ -55,6 +55,9 @@ async function evaluate(expression) {
   if(result.exceptionDetails) throw Error(JSON.stringify(result.exceptionDetails));
   return result.result.value;
 }
+async function settleSearch() {
+  await evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
+}
 async function pressKey(key) {
   const code = key === ' ' ? 'Space' : key;
   const virtualKey = key === ' ' ? 32 : key === 'Tab' ? 9 : 13;
@@ -357,13 +360,16 @@ try {
     document.querySelector('#searchInput').value=${JSON.stringify(sampleMarket.name)};
     document.querySelector('#searchInput').dispatchEvent(new Event('input'));
   `);
+  await settleSearch();
   assert.equal(await evaluate(`globalThis.__countrySearchHeaders.every((node, index) => node === document.querySelectorAll('.price-table thead th, .price-table thead button')[index])`), true, 'country-mode search retains headers and buttons');
   assert.equal(await evaluate(`document.querySelector('#rankHeaderLabel > [aria-hidden="true"]').textContent`), '序号', 'country-mode search preserves sequence header');
   assert.equal(await evaluate('document.activeElement.id'), 'searchInput', 'country-mode search preserves focus');
   await evaluate(`delete globalThis.__countrySearchHeaders; document.querySelector('#searchInput').value='';document.querySelector('#searchInput').dispatchEvent(new Event('input'));`);
+  await settleSearch();
   await clickPlan(defaultPlan);
   await evaluate(`globalThis.__chatgptHeaderNodes = [...document.querySelectorAll('.price-table thead th')]; document.querySelector('#searchInput').focus();`);
   await evaluate(`document.querySelector('#searchInput').value=${JSON.stringify(sampleMarket.name)};document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);
+  await settleSearch();
   await until(()=>evaluate('document.querySelectorAll("#priceRows tr[data-market-id]").length===1'),'sample market filter');
   assert.equal(await evaluate(`globalThis.__chatgptHeaderNodes.every((node, index) => node === document.querySelectorAll('.price-table thead th')[index])`), true, 'search retains existing table headers');
   assert.equal(await evaluate('document.activeElement.id'), 'searchInput', 'search retains input focus');
@@ -435,6 +441,7 @@ try {
   }
 
   await evaluate(`document.querySelector('#searchInput').value='';document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);
+  await settleSearch();
   assert.equal(await evaluate('globalThis.__chatgptTestIntervals.length'), 0, 'static snapshot registers no periodic refresh');
   assert.equal(await evaluate('globalThis.__chatgptVisibilityListeners'), 1, 'tab return retains clock-validity recovery without polling');
   const observationTimes = [Date.parse(expected.generated_at), Date.parse(expected.fx?.updated_at || ''), ...expected.markets.filter(market => market.offers.length).map(market => Date.parse(market.last_verified_at))].filter(Number.isFinite);
@@ -463,6 +470,7 @@ try {
   // Visitor wall-clock changes must not change accepted comparison evidence.
   for (const clock of [Math.min(...observationTimes) - 600_000, latestObservation + 3650 * 86400e3]) {
     await evaluate(`{ Date.now = () => ${clock}; document.querySelector('#searchInput').dispatchEvent(new Event('input')); document.dispatchEvent(new Event('visibilitychange')); }`);
+  await settleSearch();
     await assertRanks(defaultPlan); await assertMinimums();
     assert.equal(await evaluate(`document.querySelector('#freshnessWarning').hidden`), true, 'device clock cannot create an availability warning');
     assert.equal(await evaluate(`JSON.stringify({
@@ -476,20 +484,24 @@ try {
 
   if (fullUi) {
   await evaluate(`document.querySelector('#searchInput').value='<img src=x onerror=alert(1)>';document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);
+  await settleSearch();
   assert.equal(await evaluate(`document.querySelector('#emptyState').hidden`),false,'empty search state');
   assert.equal(await evaluate(`document.querySelectorAll('#priceRows img').length`),0,'search never becomes HTML');
   await evaluate(`document.querySelector('#searchInput').value='';document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);
+  await settleSearch();
   }
 
   const missingFxMarket=expected.markets.find(m=>m.name==='缺汇率测试');
   if(missingFxMarket){
     await evaluate(`document.querySelector('#searchInput').value='缺汇率测试';document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);
+  await settleSearch();
     await until(()=>evaluate('document.querySelectorAll("#priceRows tr[data-market-id]").length===1'),'missing FX filter');
     const missingRow=await evaluate(`document.querySelector('#priceRows tr[data-market-id="de"]').textContent`);
     assert.ok(missingRow.includes('—'),'missing FX renders an unavailable CNY marker');
     assert.equal(missingRow.includes('¥0.00'),false,'missing FX never becomes zero');
     assert.equal(await evaluate(`document.querySelector('#priceRows tr[data-market-id="de"] td:first-child').textContent`),'—','missing FX has no price rank');
     await evaluate(`document.querySelector('#searchInput').value='';document.querySelector('#searchInput').dispatchEvent(new Event('input'))`);
+  await settleSearch();
   }
 
   for (const plan of plans) { await clickPlan(plan); await assertRanks(plan); }
