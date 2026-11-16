@@ -1358,6 +1358,43 @@ async function assertNativeHistoryCloseLifecycle(page, { triggerSelector, dialog
     } finally { await isolated.close(); }
   }
 
+
+  // Lab diagnostic only: synchronous handlers and batched DOM replacements,
+  // not field INP or network/LCP. Run unchanged before and after optimization.
+  {
+    const probe = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await probe.goto(url);
+    await probe.waitForFunction(() => !document.querySelector('#searchInput').disabled);
+    const measurements = await probe.evaluate(async () => {
+      const input = document.querySelector('#searchInput');
+      const rows = document.querySelector('#priceRows');
+      let replacements = 0;
+      const observer = new MutationObserver(records => { replacements += records.filter(r => r.target === rows).length; });
+      observer.observe(rows, { childList: true });
+      const samples = [];
+      for (let trial = 0; trial < 22; trial++) {
+        await new Promise(resolve => requestAnimationFrame(resolve));
+        replacements = 0;
+        const started = performance.now();
+        for (const value of ['u', 'us', '', 'c', 'ca', '']) {
+          input.value = value;
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        const handlerMs = performance.now() - started;
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        if (trial >= 2) samples.push({ handlerMs, replacements });
+      }
+      observer.disconnect();
+      const times = samples.map(s => s.handlerMs).sort((a,b) => a-b);
+      return { markets: rows.children.length, trials: samples.length,
+        medianHandlerMs: times[Math.floor(times.length / 2)],
+        p95HandlerMs: times[Math.ceil(times.length * .95) - 1],
+        replacementsPerBurst: samples.map(s => s.replacements) };
+    });
+    console.log('SEARCH_LAB_BASELINE', browserName, JSON.stringify(measurements));
+    await probe.close();
+  }
+
   console.log(`Cross-browser smoke passed: ${browserName}`);
 } finally {
   if (browser) await browser.close();
