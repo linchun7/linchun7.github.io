@@ -647,10 +647,52 @@ async function assertHistoryHeaderReachability(browser) {
   assert.deepEqual(failures, [], browserName + ': long-history reachability\n' + JSON.stringify(diagnostics, null, 2));
 }
 
+async function assertReviewUx(browser, enforce = false) {
+  const results = [];
+  for (const [width, height] of [[320, 568], [667, 375], [1280, 900]]) {
+    const context = await browser.newContext({ viewport: { width, height } });
+    const page = await context.newPage();
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded' });
+      await page.waitForFunction(() => document.querySelector('#priceWorkspace').classList.contains('price-ui-ready'));
+      await page.evaluate(() => scrollTo(0, document.querySelector('#priceWorkspace').offsetTop + 500));
+      await page.waitForFunction(() => document.querySelector('#backToTableButton').tabIndex === 0);
+      await page.locator('#backToTableButton').focus();
+      await page.keyboard.press('Shift+Tab'); await page.keyboard.press('Tab');
+      await page.evaluate(() => scrollTo(0, 0));
+      await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+      const focus = await page.locator('#backToTableButton').evaluate(b => ({
+        focused: document.activeElement === b, visible: b.classList.contains('is-visible'),
+        hidden: b.getAttribute('aria-hidden'), tabIndex: b.tabIndex
+      }));
+      await page.locator('.minimum-card:not(:disabled)').last().click();
+      const selected = await page.locator('#mobilePlanControl').evaluate(c => {
+        const b = c.querySelector('[aria-pressed="true"]'), r = b.getBoundingClientRect(), box = c.getBoundingClientRect();
+        return { label: b.textContent, scrollLeft: c.scrollLeft, left: r.left, right: r.right,
+          containerLeft: box.left, containerRight: box.right, visible: r.left >= box.left - 1 && r.right <= box.right + 1 };
+      });
+      await page.locator('.country-history-button:not(:disabled)').first().click();
+      await page.locator('#historyDialog').evaluate(d => { d.scrollTop = d.scrollHeight; });
+      const dialog = await page.locator('#historyDialog').evaluate(d => {
+        const b = d.querySelector('#closeHistory'), r = b.getBoundingClientRect(), box = d.getBoundingClientRect();
+        return { scrollTop:d.scrollTop, visible: r.top >= box.top && r.bottom <= box.bottom, top:r.top, dialogTop:box.top };
+      });
+      results.push({width,height,focus,selected,dialog});
+      if (enforce) {
+        assert.ok(focus.focused && focus.visible && focus.hidden === 'false' && focus.tabIndex === 0, 'focused return button remains visible');
+        if (width <= 1100) assert.ok(selected.visible, 'programmatically selected last mobile plan is visible');
+        assert.ok(dialog.visible, 'country history close remains reachable after scrolling');
+      }
+    } finally { await context.close(); }
+  }
+  console.log('REVIEW_UX ' + browserName + ' ' + JSON.stringify(results));
+}
+
 let browser;
 try {
   await waitForServer();
   browser = await browserType.launch({ headless: true });
+  await assertReviewUx(browser);
   await assertHistoryHeaderReachability(browser);
   await assertDailyTableGeometry(browser);
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
