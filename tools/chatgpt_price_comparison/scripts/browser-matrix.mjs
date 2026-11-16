@@ -649,6 +649,7 @@ async function assertHistoryHeaderReachability(browser) {
 
 async function assertReviewUx(browser, enforce = false) {
   const results = [];
+  const sourceData = JSON.parse(await readFile(resolve(projectDir, 'data/prices.json'), 'utf8'));
   for (const [width, height] of [[320, 568], [667, 375], [1280, 900]]) {
     const context = await browser.newContext({ viewport: { width, height } });
     const page = await context.newPage();
@@ -665,6 +666,8 @@ async function assertReviewUx(browser, enforce = false) {
         focused: document.activeElement === b, visible: b.classList.contains('is-visible'),
         hidden: b.getAttribute('aria-hidden'), tabIndex: b.tabIndex
       }));
+      await page.locator('#searchInput').evaluate(b => b.focus({preventScroll: true}));
+      if (enforce) assert.equal(await page.locator('#backToTableButton').getAttribute('aria-hidden'), 'true', 'return button hides after focus leaves outside table');
       await page.locator('.minimum-card:not(:disabled)').last().click();
       const selected = await page.locator('#mobilePlanControl').evaluate(c => {
         const b = c.querySelector('[aria-pressed="true"]'), r = b.getBoundingClientRect(), box = c.getBoundingClientRect();
@@ -678,10 +681,23 @@ async function assertReviewUx(browser, enforce = false) {
         return { scrollTop:d.scrollTop, visible: r.top >= box.top && r.bottom <= box.bottom, top:r.top, dialogTop:box.top };
       });
       results.push({width,height,focus,selected,dialog});
+      console.log('REVIEW_UX_CASE ' + browserName + ' ' + JSON.stringify(results.at(-1)));
       if (enforce) {
         assert.ok(focus.focused && focus.visible && focus.hidden === 'false' && focus.tabIndex === 0, 'focused return button remains visible');
         if (width <= 1100) assert.ok(selected.visible, 'programmatically selected last mobile plan is visible');
         assert.ok(dialog.visible, 'country history close remains reachable after scrolling');
+        await page.keyboard.press('Escape');
+        const multi = sourceData.markets.find(m => m.offers.some(o => o.amounts.length > 1));
+        assert.ok(multi, 'price variants fixture exists');
+        await page.locator('tr[data-market-id="' + multi.code + '"] .country-history-button').click();
+        const plan = multi.offers.find(o => o.amounts.length > 1).label;
+        await page.locator('#historyPlanControl button').filter({ hasText: plan.replace(/^ChatGPT /, '') }).click();
+        assert.equal(await page.locator('#historyVariantNote').isVisible(), true, 'multiple amounts explained locally');
+        const single = multi.offers.find(o => o.amounts.length === 1);
+        if (single) {
+          await page.locator('#historyPlanControl button').filter({ hasText: single.label.replace(/^ChatGPT /, '') }).click();
+          assert.equal(await page.locator('#historyVariantNote').isVisible(), false, 'single amount does not get a misleading variants notice');
+        }
       }
     } finally { await context.close(); }
   }
@@ -692,7 +708,7 @@ let browser;
 try {
   await waitForServer();
   browser = await browserType.launch({ headless: true });
-  await assertReviewUx(browser);
+  await assertReviewUx(browser, true);
   await assertHistoryHeaderReachability(browser);
   await assertDailyTableGeometry(browser);
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
