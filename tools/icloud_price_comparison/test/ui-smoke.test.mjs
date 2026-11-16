@@ -5221,8 +5221,10 @@ test('measures gzip streaming head versus tail snapshot without changing product
   const matches = [...baseline.matchAll(/  <script id="icloud-price-data" type="application\/json">[\s\S]*?<\/script>\n/g)];
   assert.equal(matches.length, 1);
   const embedded = matches[0][0];
-  const tail = baseline.replace(embedded, '').replace('</body>', embedded + '</body>');
-  const variants = { head: baseline, tail };
+  const withoutEmbedded = baseline.replace(embedded, '');
+  const head = withoutEmbedded.replace('<!-- ICLOUD_STATIC_META:END -->', embedded + '<!-- ICLOUD_STATIC_META:END -->');
+  const tail = withoutEmbedded.replace('</body>', embedded + '</body>');
+  const variants = { head, tail };
   const payloads = Object.fromEntries(Object.entries(variants).map(([key, html]) => [key, gzipSync(html)]));
   const timers = new Set();
   const server = http.createServer(async (request, response) => {
