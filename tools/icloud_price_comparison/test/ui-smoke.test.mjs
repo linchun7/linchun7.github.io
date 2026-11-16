@@ -1406,6 +1406,62 @@ test('renders every rank-one market without inventing a single winner', { timeou
 
 // Malformed/missing embedded snapshots and whole-page recovery are covered below.
 
+test('unknown history is not zero changes and recovers to accepted records', { timeout: 45000 }, async (context) => {
+  const config = await resolveBrowser(context, 'the unknown-history recovery test');
+  if (!config) return;
+  const data = await readFixture('prices.json');
+  const history = await readFixture('history.json');
+  const country = data.countries.find((item) => compactExpectedSeries(historyRecords(history)[item.marketId].events, '200GB').length > 1);
+  assert.ok(country, 'fixture needs a market with a real price change');
+  const server = await startServer();
+  const browser = await config.browserType.launch(config.launchOptions);
+  try {
+    for (const width of [390, 1280]) {
+      const page = await browser.newPage({ viewport: { width, height: 844 } });
+      let releasePending;
+      let pendingSeen;
+      const seen = new Promise((resolve) => { pendingSeen = resolve; });
+      const gate = new Promise((resolve) => { releasePending = resolve; });
+      let recover = false;
+      await page.route('https://**/*', (route) => route.abort());
+      await page.route('**/data/history.json*', async (route) => {
+        if (recover) return route.fulfill({ json: history });
+        pendingSeen();
+        await gate;
+        return route.fulfill({ status: 503, contentType: 'application/json', body: '{}' });
+      });
+      try {
+        await page.goto(`http://127.0.0.1:${server.address().port}/`, { waitUntil: 'domcontentloaded' });
+        await waitForSnapshot(page);
+        const button = page.locator(`tr[data-market-id="${country.marketId}"] .country-history-button`);
+        await button.click();
+        await seen;
+        assert.equal(await page.locator('#historyEventCount').textContent(), '—');
+        assert.match(await page.locator('#historyRows').textContent(), /当前快照/);
+        releasePending();
+        await page.waitForFunction(() => document.querySelector('#historySubtitle').textContent.includes('历史暂无法读取'));
+        assert.equal(await page.locator('#historyEventCount').textContent(), '—');
+        assert.match(await page.locator('#historyRows').textContent(), /当前快照/);
+        assert.ok((await page.locator('#historyLocalPrice').textContent()).includes(country.plans['200GB'].formattedPrice));
+        await page.locator('#closeHistory').click();
+        recover = true;
+        await button.click();
+        await page.waitForFunction(() => document.querySelector('#historySubtitle').textContent.includes('记录自'));
+        const expectedCount = compactExpectedSeries(historyRecords(history)[country.marketId].events, '200GB').length - 1;
+        assert.equal(await page.locator('#historyEventCount').textContent(), `${expectedCount} 次`);
+        assert.doesNotMatch(await page.locator('#historyRows').textContent(), /当前快照/);
+        await page.locator('#closeHistory').click();
+      } finally {
+        releasePending();
+        await page.close();
+      }
+    }
+  } finally {
+    await browser.close();
+    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
 test('keeps current prices usable when optional history data is unavailable or malformed', { timeout: 30_000 }, async (context) => {
   const browserConfig = await resolveBrowser(context, 'the history fallback test');
   if (!browserConfig) return;
@@ -1471,6 +1527,8 @@ test('keeps current prices usable when optional history data is unavailable or m
         if (scenario.unavailable) {
           await page.locator('#priceRows tr[data-market-id]').first().click();
           await page.waitForFunction(() => document.querySelector('#historySubtitle')?.textContent.includes('历史暂无法读取'));
+          assert.equal(await page.locator('#historyEventCount').textContent(), '—', 'unavailable history must not claim zero changes');
+          assert.match(await page.locator('#historyRows').textContent(), /当前快照/, 'fallback prices must be explicitly identified as the current snapshot');
           await page.locator('#closeHistory').click();
           await page.locator('#publishedDateButton').click();
           await page.waitForFunction(() => document.querySelector('#publishedDateRows')?.textContent.includes('暂时无法读取发布日期记录'));
