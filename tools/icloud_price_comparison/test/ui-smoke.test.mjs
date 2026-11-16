@@ -5211,3 +5211,102 @@ test('opening either history dialog keeps converted icons without another icon s
     await browser.close();
   }
 });
+
+
+test('measures gzip streaming head versus tail snapshot without changing production HTML', { timeout: 60000 }, async context => {
+  const config = await resolveBrowser(context, 'embedded snapshot position experiment');
+  if (!config) return;
+  const { gzipSync } = await import('node:zlib');
+  const baseline = await readFile(path.join(PROJECT_DIR, 'index.html'), 'utf8');
+  const matches = [...baseline.matchAll(/  <script id="icloud-price-data" type="application\/json">[\s\S]*?<\/script>\n/g)];
+  assert.equal(matches.length, 1);
+  const embedded = matches[0][0];
+  const tail = baseline.replace(embedded, '').replace('</body>', embedded + '</body>');
+  const variants = { head: baseline, tail };
+  const payloads = Object.fromEntries(Object.entries(variants).map(([key, html]) => [key, gzipSync(html)]));
+  const timers = new Set();
+  const server = http.createServer(async (request, response) => {
+    try {
+      const url = new URL(request.url, 'http://127.0.0.1');
+      if (url.pathname === '/') {
+        const bytes = payloads[url.searchParams.get('variant') || 'head'];
+        response.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'content-encoding': 'gzip', 'cache-control': 'no-store' });
+        // Controlled compressed transfer: 150 ms initial latency, 50 KiB/s.
+        let offset = 0;
+        const send = () => {
+          if (response.destroyed) return;
+          response.write(bytes.subarray(offset, offset + 1024));
+          offset += 1024;
+          if (offset >= bytes.length) response.end();
+          else { const timer = setTimeout(() => { timers.delete(timer); send(); }, 20); timers.add(timer); }
+        };
+        const timer = setTimeout(() => { timers.delete(timer); send(); }, 150); timers.add(timer);
+        return;
+      }
+      const root = url.pathname.startsWith('/images/') ? REPOSITORY_DIR : PROJECT_DIR;
+      const filename = path.resolve(root, '.' + decodeURIComponent(url.pathname));
+      if (!filename.startsWith(root + path.sep)) { response.writeHead(403).end(); return; }
+      response.writeHead(200, { 'content-type': CONTENT_TYPES[path.extname(filename)] || 'application/octet-stream' });
+      response.end(await readFile(filename));
+    } catch { response.writeHead(404).end(); }
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const browser = await config.browserType.launch(config.launchOptions);
+  const results = { head: [], tail: [] };
+  const expected = await readFixture('prices.json');
+  const expectedEmbedded = /<script id="icloud-price-data" type="application\/json">([\s\S]*?)<\/script>/.exec(baseline)[1];
+  try {
+    // Alternate order to reduce warm-up/order bias; separate contexts disable cache sharing.
+    for (const variant of ['head', 'tail', 'tail', 'head', 'head', 'tail']) {
+      const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+      const errors = [];
+      const priceRequests = [];
+      page.on('pageerror', error => errors.push(error.message));
+      page.on('request', request => { if (new URL(request.url()).pathname.endsWith('/data/prices.json')) priceRequests.push(request.url()); });
+      await page.route('https://**/*', route => route.abort());
+      await page.addInitScript(() => {
+        globalThis.__paintExperiment = { firstHeader: null, interactive: null };
+        const observer = new MutationObserver(() => {
+          const sample = globalThis.__paintExperiment;
+          if (sample.firstHeader === null && document.querySelector('h1')) sample.firstHeader = performance.now();
+          if (sample.interactive === null && document.querySelector('.workspace.price-ui-ready')) sample.interactive = performance.now();
+        });
+        observer.observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+      });
+      try {
+        await page.goto('http://127.0.0.1:' + server.address().port + '/?variant=' + variant, { waitUntil: 'load' });
+        await waitForSnapshot(page);
+        assert.equal(await page.locator('#icloud-price-data').textContent(), expectedEmbedded);
+        assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), expected.countries.length);
+        await page.locator('#searchInput').fill(expected.countries[0].marketId);
+        await page.waitForFunction(id => document.querySelector('#priceRows tr[data-market-id]')?.dataset.marketId === id, expected.countries[0].marketId);
+        assert.deepEqual(errors, []);
+        assert.deepEqual(priceRequests, []);
+        results[variant].push(await page.evaluate(() => ({
+          ...globalThis.__paintExperiment,
+          fcp: performance.getEntriesByName('first-contentful-paint')[0]?.startTime ?? null,
+          domContentLoaded: performance.getEntriesByType('navigation')[0].domContentLoadedEventEnd
+        })));
+      } finally { await page.close(); }
+    }
+    for (const variant of ['head', 'tail']) {
+      const page = await browser.newPage({ javaScriptEnabled: false, viewport: { width: 390, height: 844 } });
+      try {
+        await page.goto('http://127.0.0.1:' + server.address().port + '/?variant=' + variant);
+        assert.equal(await page.locator('#priceRows tr[data-market-id]').count(), expected.countries.length);
+        assert.equal(await page.locator('#icloud-price-data').textContent(), expectedEmbedded);
+        assert.equal(await page.locator('#searchInput').isDisabled(), true);
+      } finally { await page.close(); }
+    }
+    console.log('SNAPSHOT_POSITION_BENCHMARK ' + JSON.stringify({
+      browser: BROWSER_UNDER_TEST, transfer: 'gzip; 150ms latency; 50KiB/s; HTML only',
+      bytes: Object.fromEntries(Object.entries(payloads).map(([key, bytes]) => [key, bytes.length])),
+      results,
+      caveat: 'Controlled origin experiment, not production CDN or LCP measurement; no performance pass threshold.'
+    }));
+  } finally {
+    for (const timer of timers) clearTimeout(timer);
+    await browser.close();
+    await new Promise(resolve => server.close(resolve));
+  }
+});
