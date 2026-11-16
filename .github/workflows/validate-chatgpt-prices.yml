@@ -42,20 +42,6 @@ jobs:
           node-version: 22
       - name: Shared Pages waiter regression
         run: node --test .github/scripts/wait-pages-build.test.mjs
-      - name: Report generated HTML delta (temporary review preparation)
-        run: |
-          python3 - <<'PY'
-          import difflib, json, sys
-          sys.path.insert(0, 'tools/chatgpt_price_comparison/scripts')
-          import pipeline
-          root = pipeline.ROOT
-          old = (root/'index.html').read_text().splitlines(keepends=True)
-          data = json.loads((root/'data/prices.json').read_text())
-          new = pipeline.render(data, (root/'index.template.html').read_text()).splitlines(keepends=True)
-          changes = [{'start': i1, 'end': i2, 'old': old[i1:i2], 'new': new[j1:j2]}
-              for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, old, new).get_opcodes() if tag != 'equal']
-          print('GENERATED_HTML_DELTA=' + json.dumps(changes, ensure_ascii=True))
-          PY
       - name: Unit tests and deterministic browser fixture
         run: |
           python3 -m unittest discover -s tools/chatgpt_price_comparison/scripts -p 'test_*.py' -v
