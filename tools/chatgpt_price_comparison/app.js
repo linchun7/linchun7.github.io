@@ -478,7 +478,6 @@
     updateRankingPresentation();
     refreshIcons();
     focusTarget?.focus({ preventScroll: true });
-    revealSelectedPlan(container);
   }
 
   function isMinimum(plan, market, amount) {
@@ -641,6 +640,7 @@
       container.append(button);
     }
     focusTarget?.focus({ preventScroll: true });
+    revealSelectedPlan(container);
   }
 
   // Only comparison controls are shared. Search text stays in this page.
