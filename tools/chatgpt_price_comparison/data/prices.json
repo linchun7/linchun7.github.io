@@ -3,7 +3,7 @@
   "channel": "ios-app-store",
   "billing_period": "not_disclosed",
   "purchase_eligibility": "not_verified",
-  "generated_at": "2026-11-20T01:05:55Z",
+  "generated_at": "2026-11-21T01:05:37Z",
   "markets": [
     {
       "code": "us",
@@ -66,17 +66,17 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "USD",
       "unclassified_labels": [
         "100 Credits",
         "1000 Credits",
         "500 Credits"
       ],
-      "source_sha256": "5cfddf6c9ddc80f4dd3ad2a944ed351b6c0800c0b8d66a91a29078b1021d15d7",
+      "source_sha256": "f1adb1eb4840938f0ca2055ab47f8e85c002902a4f624202864466379a8541a7",
       "fingerprint": "e23b43a341fcd1de008d8e849f917a50debc3a1d3cfd4973f6e7b26988cc109f",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -172,13 +172,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "GBP",
       "unclassified_labels": [],
-      "source_sha256": "8d8bfbf797861df062f6d3f55ff9bdbc40d21202247e168aeac45ca3aee62093",
+      "source_sha256": "3c3f0c3e5a442c3321cc466d062e7f5afcb4133cea82634c17c43aac577a4c27",
       "fingerprint": "5e006f799506322c8a283d60971ebeeec0592487bab7c2110394ef7494ea540e",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -274,13 +274,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "CAD",
       "unclassified_labels": [],
-      "source_sha256": "078be7be62b8de548eaacf38a92e0e9cde6d82e03fd7b058195fa7cdbadca665",
+      "source_sha256": "bfaaf8c7f9af26ea55a2af3e9c0870c4f5a8b7488129eb949fc38ca3a9c767b8",
       "fingerprint": "b9ad4f0bae30e2584d380984716fe9208289d3e8397798e110768581e5867f5b",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -376,13 +376,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "AUD",
       "unclassified_labels": [],
-      "source_sha256": "e2c73c66c2ae8d702cfedf67b7f998aacdd3f804f0b218e4472fff3ca2d14ac7",
+      "source_sha256": "83b11282332f795ddd5eaefe48b42af101c3dceab5fef280336c5b218da022ec",
       "fingerprint": "2fd9616bbdcfb03d4bf4ea294c02fe2aff90483fbda55a7674231f007bdf85c1",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -478,13 +478,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "NZD",
       "unclassified_labels": [],
-      "source_sha256": "7099e0aa3a2e680d29a793c6567b6b5b5e6c7cc6fa27a42afb490b8f8901f25d",
+      "source_sha256": "f176806f2d51da96f16355276abaf1a7265a05c08024533b5f927577873e7be9",
       "fingerprint": "56029c95a94f68ad259b327ebe0d92750b3d5abc90b6ba8381663745aa235e5d",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -580,13 +580,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "JPY",
       "unclassified_labels": [],
-      "source_sha256": "ed2ebedb03910f341157b0b7a6f49ea4e50a9188d681eb5cd1c6adf3efe75606",
+      "source_sha256": "1b8eaa5d8bd27434275d48e68cbc66fede18306bd7e93c5a2af52f299d43003a",
       "fingerprint": "5c6f7179031cad0a2c03216bfa6840ca4298c4d855be4862d2640cf5681d9403",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -682,13 +682,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "KRW",
       "unclassified_labels": [],
-      "source_sha256": "45ff0fc074f40fb45806b828946e0e1413542bad3500da039c1b778f42b6a97b",
+      "source_sha256": "623e63e318ea46479bc3426a9c78bc24ee42316607a7e14c5fbb3b6893c13b13",
       "fingerprint": "75d836479cf98578e088580a66714a01f38341951af3fdd2d8dd6f683a0de36c",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -784,13 +784,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "TWD",
       "unclassified_labels": [],
-      "source_sha256": "aeb248713591e9399636dbe18fb52272cdccd9f90c8a6c85f91a7b74d41d43b2",
+      "source_sha256": "2fd82a8761403fd3cc80672843fa724f2a2fd576d2da55b14bdb3ddc67dddffa",
       "fingerprint": "b015f4c5afec3477a3c721fdc0c56130b7cdf23ac98d3ad16281a7aa5e9f8cc4",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -886,13 +886,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "SGD",
       "unclassified_labels": [],
-      "source_sha256": "96bfbb4e4d7d085ff4e9d95b883c54deeafa6bdf0a364f319f3ba1d20cefc3a9",
+      "source_sha256": "3c428bbfeeb36e75168eacce2a95ae81c5ada98120dd25f05ee28ba568bb30a3",
       "fingerprint": "ce184c3ee89b8834bfeb9b4fc860098dbdc1edb9195daf1c2dc64aec7e62a332",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -988,13 +988,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "MYR",
       "unclassified_labels": [],
-      "source_sha256": "defd32991f8836a73b2cae3972a213aeddacec7be20a4d3a249c5488e45843ef",
+      "source_sha256": "bcb2fb124ee9ff18d32672d11d05ba8209752811a72949e46d0c1f78eefd6c69",
       "fingerprint": "b65f1a297ce4f053abb17026ab62b3deb06037d57051dd28b50df74d12585fad",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -1090,13 +1090,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "THB",
       "unclassified_labels": [],
-      "source_sha256": "cff2fab1880e834e55a4042fab21ab57aae92527190d2af2c5e41c0a55421e8d",
+      "source_sha256": "507a0573aed6e44c5710b20f4f82e999c4931f95e2ff69cc31f27ca5735c5352",
       "fingerprint": "03653cd69827bc35f6b23b0ecee458353c2011f630c13b1401a886c63f8b0a48",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -1192,13 +1192,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "VND",
       "unclassified_labels": [],
-      "source_sha256": "89c045e29bf08b2819e1b9e4f2b46307c3d2476824a7f336bbbd2b121f34610b",
+      "source_sha256": "7d4e72c43b85a46cafac174d692ad0f41c354faf5083dee3343e0ce08d1daed4",
       "fingerprint": "7fc1029876e80ed72f481ce5db73c8fb608adefa1b4c42bc95d58a172095777f",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -1294,13 +1294,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "IDR",
       "unclassified_labels": [],
-      "source_sha256": "ab3a0e37b75085e822145e524a7c47f4f04f0000ac99ca98c11214f512014c04",
+      "source_sha256": "9bfb2b59c94bdca9cb230a4416840592f186e0fe97015e47c42f04560158481b",
       "fingerprint": "7707ad58e86fb751ea899b6e2b09749db1dee2764a08e82ee8d5480893e202b8",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -1396,13 +1396,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "PHP",
       "unclassified_labels": [],
-      "source_sha256": "8f6a77740818acdee32758e3a135af9ba4c844d7f3da529414c859332230f1bd",
+      "source_sha256": "ab95d840c0a0bc0f81a5a16036b39178e1b28f7c8e1d021af04288b465eb51ab",
       "fingerprint": "f1d8bea17d20c637303d6bdb1b94f55a4bf530488c4ccbd6a2934a4ce6064519",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -1498,13 +1498,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "INR",
       "unclassified_labels": [],
-      "source_sha256": "8fb12e3f3fdb44554f213dade7c0f3fa4075074b1f5e20b4e349101af7e55dd8",
+      "source_sha256": "0e330b947b89f74957eeb71d244a9ad5ca8b7a46b71be61b2ac7acedc6c84268",
       "fingerprint": "cf1fe72d03fab0a9b659200aff22ce4fb59bc2c79aa531855eac1a4d221d6301",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -1600,13 +1600,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "PKR",
       "unclassified_labels": [],
-      "source_sha256": "2d14c091bc45ab2eac92ea3c3df4c062e135f661db01d85ebf9e767371a8676c",
+      "source_sha256": "aa2c03c4a624cabc177a3406670f4f2f5ab1451e197c49fce600d99cfb100e51",
       "fingerprint": "9535c7d69d8d55be17e1729cea21887a14580d3dfe7df6da4f5a5692b7e5a30e",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -1702,13 +1702,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "USD",
       "unclassified_labels": [],
-      "source_sha256": "7ec62f25fe4b43bdae43f968b53ff6d47c0c351bd222ad338616f5430d383ad1",
+      "source_sha256": "b572e9829d504a74a8068a8744141540e8ceb67d651ed7cbadba71c714c466d2",
       "fingerprint": "37659de9e050d98d5052700f992d4f2a0f152bb1df283bf617a494ec7e788c2d",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -1804,13 +1804,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "USD",
       "unclassified_labels": [],
-      "source_sha256": "406f0a3b3cc7b4d75f8bb98f516bc64a684bd465057097053763578883918ffc",
+      "source_sha256": "c84f0d1727ec4ed530208db7b94c7983c029dd10ef7cadcbbe6be54233624735",
       "fingerprint": "15ba98d6b689ee09975c3e5f8ea0daeb95f4cd0d0297d5e226379704e5a6158e",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -1906,13 +1906,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "TRY",
       "unclassified_labels": [],
-      "source_sha256": "e3be360d58f52ecbb9ece353d9e06b1896e486e8ce5c01315dc349b0d3db6733",
+      "source_sha256": "1e7ad49a284eaa676d9cd7f3cd3568b6399ccdbeb435800435002877f82a305f",
       "fingerprint": "2638e3d43c57eabdfc9ef93a99c509ce00eb9ef435ffadd47c6a7c589a237f5b",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -2008,13 +2008,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "BRL",
       "unclassified_labels": [],
-      "source_sha256": "26d11d74172a09086757b39a4e7dc0830b81391f5a3973777625817446d6b9f6",
+      "source_sha256": "d1d09cfabf60bb7c76b994fb86c16b4fe2d1d27df7c9fd549979f8cfd3233e1b",
       "fingerprint": "8fb8679167d0d4c2f9d4567891745dfd2e556e793cecf727998013289cefe31d",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -2110,13 +2110,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "MXN",
       "unclassified_labels": [],
-      "source_sha256": "e0fc00dd0e84c28f52b49a18e688a30857efe97cf2353c103c1e8c49e4e79215",
+      "source_sha256": "c8d3b080eb6de66e6280a63519775f5ef3ade2e2a7878e1976e52edc4ad55e14",
       "fingerprint": "e31344d3154fa582bbd31426bdc92ff4a03107d37d50eb60fa4fa8930a28f0a6",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -2212,13 +2212,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "USD",
       "unclassified_labels": [],
-      "source_sha256": "2b060bea1c7085b8e2acf0316ddab7ffb3990ca50dca7383dcc51346ecdad067",
+      "source_sha256": "b811aa9f08cec111a9a542cbd116c8a19a6c5a594450e14e0a3f5376cb2dc2d1",
       "fingerprint": "23af09300c1e5718fcfab3cab7dae274bf44fe3425fbfa4e4412954f6ccf6c04",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -2314,13 +2314,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "CLP",
       "unclassified_labels": [],
-      "source_sha256": "d9a1afe0a616da0d9f890e78a8037633b9a8b54e731eef87eaf05f3de0bbf565",
+      "source_sha256": "ee1eda4312f5e58049d26c6b2977570e37ca6756b6fa84e6dd2566b3a0d60d5c",
       "fingerprint": "48f2ba35c6ad42058563b97b87a302a5bc0820284c8f33e43d939be84a3d86cb",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -2416,13 +2416,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "COP",
       "unclassified_labels": [],
-      "source_sha256": "7170f4758bb7a9eb11e4c6aa57641f2a19239207060481d1290a0ce3b482fffa",
+      "source_sha256": "e69f60cca2c7eeebfb3a9e8ca397cc38da64d625e2744add7f375c0dcc582042",
       "fingerprint": "7763a68e559239ef561a7b2238796936ecd3835ef96a1ee8abe9f2f90eb68681",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -2518,13 +2518,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "PEN",
       "unclassified_labels": [],
-      "source_sha256": "efa5d65c38fcfdef046c87f3b542e56a58125fb9e2c055072674c24f71c9348f",
+      "source_sha256": "e2a1fce3124848d69bc3a6f2ef0edb33eba145fe79898b1cfede503b7b4df294",
       "fingerprint": "8ceaa1ef3cb6c5b97a8818824c5992f1fea979bba63833da9a0bdbbca12dc6a0",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -2620,13 +2620,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "USD",
       "unclassified_labels": [],
-      "source_sha256": "c44f6494ce709b41707f0f4e8b3451d3bd71262ea60236b872f815e6e0a5a5db",
+      "source_sha256": "61ac855d36e05d6ac6eeea954ea2f43712d36a00f06fc001c46518865f10e5cd",
       "fingerprint": "7c91f5d2692377d79af46a225c22243b3b39f086b58254629cead83c7a4eae51",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -2722,13 +2722,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "ZAR",
       "unclassified_labels": [],
-      "source_sha256": "2d95cf581c0bbc37da9b48e662335a9cf577b31d21a57be45058856994d0c9cf",
+      "source_sha256": "aa8a4d26151e4c9ff9f26945d03de36d77513470db3b570fb3ccc2d86d7272c8",
       "fingerprint": "c64845b2685938b99b6ac0965b9200d19340de54a729364ff2db867c1b838743",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -2824,13 +2824,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "EGP",
       "unclassified_labels": [],
-      "source_sha256": "9fc0da39ca6a31a5d97b8a31a5741f541046a48fab2aaf729fc3a497485d06e6",
+      "source_sha256": "d987d45c9422ad62969f67b19640d7aad764792d2963e06d78c9546c2c3ece8b",
       "fingerprint": "cb65ffa70ac93eb4b52a95adf0b6fb54c46cbdbd99c1e2ff45d8f036c8647ade",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -2926,13 +2926,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "SAR",
       "unclassified_labels": [],
-      "source_sha256": "44362abcd80d4d19d3f3c0989e717379bbd4fb759e4dc067f5b1e802eeabbf22",
+      "source_sha256": "ec7bb5e497f13e218b865c881985d8ed007b6cdcc7084ccc997f964b8a24e374",
       "fingerprint": "88d73d64d2c288d52d81cfd6f13247d60ef004d429c335eae0b7bb45a003e4f2",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -3028,13 +3028,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "AED",
       "unclassified_labels": [],
-      "source_sha256": "b55bca39e18bd52955c7aa129450daa54014a1e2d9a0b205dba0ebbdc00af2e5",
+      "source_sha256": "1c5c42a481687b594712d99d37ee7c36c9e0f989849793deecafa47b57618067",
       "fingerprint": "d7c0422085b8323cf96094a421dad4d056aef7bc51f8f4dd47012f7ed1fefdcc",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -3130,13 +3130,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "ILS",
       "unclassified_labels": [],
-      "source_sha256": "6426cd9dc4db814b0aa0c723ba040125ccc8baa6172613597d03554dec17318b",
+      "source_sha256": "1d11702c3abcdc1eca9965b2c957336feeae4758c1be235aac1dffb288e50b97",
       "fingerprint": "ebf69c564d9d5767415ed0635bae2fec63ee5147c12cedc4caf664fbe6fc66e0",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -3232,13 +3232,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "QAR",
       "unclassified_labels": [],
-      "source_sha256": "425f0e192f5afde39bdb0a1655ffaa621b153bf722d9dc0522c03761b9e27656",
+      "source_sha256": "b1a0333f0b0a454da167d6dd60cbdc12bcbc7724fb9c6e0afdd5128167648213",
       "fingerprint": "976e57e73bfb744cd2e6ed42cf09c29620521f9720775d652377724cb11693e2",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -3334,13 +3334,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "USD",
       "unclassified_labels": [],
-      "source_sha256": "d4a352db39cb10cd7acea063ae92af85b2e293b805922106c8de1496f5c81fd5",
+      "source_sha256": "ee8a83c2165216d40374135afd84f613d3b939ef4c65e12177f164c3269ac10e",
       "fingerprint": "ed63a35b37558c3e540c3f0d43630013cb0232367e8d8de5ac3fb041997e45e1",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -3436,13 +3436,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "USD",
       "unclassified_labels": [],
-      "source_sha256": "3f19cf469f2e48d7a7fb61cea4e872ccc6a840052f20c63bef898aa6c963eb12",
+      "source_sha256": "cbfb7df49b0aab925c13c7277d7f56e381a76be65cee5f3cf39db7d19984ec0e",
       "fingerprint": "4e43be5f7e909482a30873be9b67c24e9df1225e4e067de78b56f1731fcc49aa",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -3538,13 +3538,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "USD",
       "unclassified_labels": [],
-      "source_sha256": "a4e765e09ddad2a1a25694884361410580c612e9b7a026d8d43af5f76be6e926",
+      "source_sha256": "60182f82a9932e00aef8f1841edf4b6aca2279482ea5622f60b4dad1fb8259cf",
       "fingerprint": "a7d774fda7b03898867bc4dddeec8ec2ac6ab17df654277e0e3cf75cd576c22f",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -3640,13 +3640,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "EUR",
       "unclassified_labels": [],
-      "source_sha256": "b2634cb7035f759c0902c46de543d96b78f69b2c113c5e09ee1ef603c5179a16",
+      "source_sha256": "08a0731d9ab17b6f688b70b4de4f0d3c1879d82f1bbddd12b0db3c97f0c0c266",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -3742,13 +3742,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "EUR",
       "unclassified_labels": [],
-      "source_sha256": "08ebac94906f10217e9c302243a0aef55480408353517e1a5a49111fd7ba57eb",
+      "source_sha256": "339324bede92290e362d336ea256af9a6029c4d1d28b98507fa73dc50b5dbedc",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -3844,13 +3844,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "EUR",
       "unclassified_labels": [],
-      "source_sha256": "457a1dba9e5fe21d341d33198c735adc6294581ecea8911b26c8c949f8f99a93",
+      "source_sha256": "321a04a6f94377402e73b4e203ac226b0f44d5a16ea7ecb8ffa7a0392b87e8cc",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -3946,15 +3946,15 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "EUR",
       "unclassified_labels": [
         "100 Credits"
       ],
-      "source_sha256": "f53ec138d3e28b66ca244b9694deb510b0df5e6c1bcbedfca5a482e8d275ebb4",
+      "source_sha256": "52a4b9dde2a1d16bf7aad41aaf4cf0d14f8df967600eb0002179808f509d51d8",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -4050,15 +4050,15 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "EUR",
       "unclassified_labels": [
         "100 Credits"
       ],
-      "source_sha256": "d9a1eb6a702f91d51c04a1bae7b07a47d2fb1675174e2c1c26ca715449e7d02f",
+      "source_sha256": "549c643720b4589fcd7303c75869f4b1ea47bf5a6d7955d4d2bfa959970e3055",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -4154,13 +4154,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "EUR",
       "unclassified_labels": [],
-      "source_sha256": "97f84b38fa562b6bda2d78ad12ed00be009a42aba22163c5d96e9ecd6ea883a8",
+      "source_sha256": "e4b39b8487172abe153261f4e68c553f02dc160d437c5aec1a3ff7a2c641a447",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -4256,13 +4256,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "EUR",
       "unclassified_labels": [],
-      "source_sha256": "6c7d21257d39dac7a53874847722c73ce42869fab3773219c6f523717cbafc71",
+      "source_sha256": "a42b26177f5e20f2e6f808e311dd81bd5b589a4f64701232ad9510a2f63ca613",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -4358,13 +4358,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "EUR",
       "unclassified_labels": [],
-      "source_sha256": "636c99ac7ec096911be3af409ba7e01929c8c029e82c2391598eb6db9c95ddb1",
+      "source_sha256": "3f1ea893fada224f5a0c7edaf82a0677abc6901be4d9cf0181b60c2ae51a3b4a",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -4460,13 +4460,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "EUR",
       "unclassified_labels": [],
-      "source_sha256": "0b992ba7b86ff11020ae8c71ea5357aa5291404b7f9ac2e0d9c65d48cc45a232",
+      "source_sha256": "7a33fe69bd30ca402168b18c6cf906c77159b07d57a05ada32902d9093ab968c",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -4562,13 +4562,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "EUR",
       "unclassified_labels": [],
-      "source_sha256": "62c99434876a275e36ec173f52f8d1214fb033f70b8c12668744ab31546f8be9",
+      "source_sha256": "88050f05d15a220caaf1f05238530678a0c6fa1c26e9d61dccae963ddc9cd904",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -4664,13 +4664,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "EUR",
       "unclassified_labels": [],
-      "source_sha256": "13434c84a24cd5d853ed9270da9919082755fd40596a8b26e7c3640bbec99a08",
+      "source_sha256": "add894d9abadc37092f8433fcd1b3987c1e2be4383f88e02489e430221e30c90",
       "fingerprint": "df90f51a3715524ed96f5e3e7dab146a4a655de5ddc932d5b879818a4fa80c06",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -4766,13 +4766,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "CZK",
       "unclassified_labels": [],
-      "source_sha256": "3b1bd908ef3622c6c71c8b52c47aed642f713f15ec40a912bf5d9f68a6688fc3",
+      "source_sha256": "dc1832aa44bcc485ff14e630251a05a1d9c3b55f4134100a57c52a6f70939e8a",
       "fingerprint": "15abe03a1e91df654c6660559c8e1407aa0f2f20fe3a64caaa781382d1a80263",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -4868,13 +4868,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "PLN",
       "unclassified_labels": [],
-      "source_sha256": "c8923774da4422361eb1954eaacb54bd7be1a60de9975d853d3f898fa872acc5",
+      "source_sha256": "eee62279496e3eeab8608539d1cd671047248dfcbd099f4b282a850490366e48",
       "fingerprint": "dbef0519a62a075b104f2493820d0a802e5d9911b627f7a9061d1c2c91581dba",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -4970,13 +4970,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "RON",
       "unclassified_labels": [],
-      "source_sha256": "1468bbc30a70d92c8de570bfbfe38ec9a8de4b96fb5828f66399fd57cfec135f",
+      "source_sha256": "971dab17a7d87366d36c191ecb56ff094af118ed78dda188f5d416aa1c265424",
       "fingerprint": "981ca6274eb15df3a78665fda9ee5d2293435a06daa5d77ceacb3675bbadb60f",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -5072,13 +5072,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "HUF",
       "unclassified_labels": [],
-      "source_sha256": "705ea6e8f7a44550d81cba8882fd541a7fa4d511b66cb3de8c0ed5ab317f7cbb",
+      "source_sha256": "41b856850dfc1ef6b421c0c5df5fb259324b3c07842660a5b9408d1c07a33b43",
       "fingerprint": "48819bf4878f0d60ec375915f60b84b60c22a19659c72ed912d37c454da95575",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -5174,13 +5174,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "SEK",
       "unclassified_labels": [],
-      "source_sha256": "640aeae67cb8c21b932051e34b1b2e075066926e545e6d8296bbb3076694ae5b",
+      "source_sha256": "e47c7fb97ec49f656a173cbce26917e6b143642d67c228e3b5fbc4206c4f8b53",
       "fingerprint": "d9c89fa61cf30ac72c6e0e33ebcb2888057c7e23589bdf6b0ffbf4dc99d6f146",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -5276,13 +5276,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "NOK",
       "unclassified_labels": [],
-      "source_sha256": "0c703a96272c827bc1b34331f08c8d47e76d9fdbf65621ac64814e11e278a966",
+      "source_sha256": "7e4c434bcd9bdf99f3ad49bf3428dcbd59b18252bec972ac246f566c81646abf",
       "fingerprint": "9aa797486a42904774ebfa052ab22ee81ae0fcc11e676fdff43db708727cf29a",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -5378,13 +5378,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "DKK",
       "unclassified_labels": [],
-      "source_sha256": "7a0623b920b9cb463294a243d017610a2886a8306697fdf3b08299eaff8b3058",
+      "source_sha256": "3fd7b31bddad0d0f51dea393f3d8597b1a278cd8ded0922ad662b683893a7497",
       "fingerprint": "a85dacb68f294c8007495c977e00b09b5f40b1573921f691834eac491ce83211",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -5480,13 +5480,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "CHF",
       "unclassified_labels": [],
-      "source_sha256": "c7cc69c723672b5b8908ff972c597caab9ec1fb3a96473af730a82ad0b70519c",
+      "source_sha256": "a17e02f6a24c4e8d83e577a0cc83e0c9ccd57f02aa648e87bef79d90fb17535e",
       "fingerprint": "8afcef3a7b8272618fa05d3ca93221984ad2c11af9e42883b041cf17d050b201",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -5582,13 +5582,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "USD",
       "unclassified_labels": [],
-      "source_sha256": "968a9f83ccc51252943cc8f84322d40e093848e5c2f2be78ffe05735851645f2",
+      "source_sha256": "95eb97051d805a04c8b20bce0bb8c6fe616cfe7abc47d80b722351a4823d085f",
       "fingerprint": "042a794d4a4736eea87f67e3956175bea799cacd9b4b403160e57c1a98d4fb85",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -5684,13 +5684,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "KZT",
       "unclassified_labels": [],
-      "source_sha256": "79c848343633aa2a0ca750189f47bb766bc3ffd55c6cd9c36f58d7ac5d11b07b",
+      "source_sha256": "06ec87e6e090f656e447aeeb1a70f427056c1fe71579cc33b50675a371f10374",
       "fingerprint": "825f9a6be43a75a8fa48d2434d9972190bcdfd34c4f535d45e3d63f13e52a197",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -5786,13 +5786,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "NGN",
       "unclassified_labels": [],
-      "source_sha256": "81d4c5d17495e90f99cdacbb3858b8d0ebf76a8b6bbb8b8024544504228b805b",
+      "source_sha256": "38f97e8fd77ebb59acbd5edcc064ca1b9dde0b6e66236c643d47c5355bedd078",
       "fingerprint": "264ffa5f433899266cbd5f47282a9abd1777b135ec426004ab6e87f5aa2f23c3",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -5888,13 +5888,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "USD",
       "unclassified_labels": [],
-      "source_sha256": "b38acc216329efa7ae79eea166bf45654a079162a25d58a0e966e52d5f811eca",
+      "source_sha256": "c6a94d69b5c171cb27df04e15299a1756ed66e0eab663eb0323937453fedcdfc",
       "fingerprint": "46ebf53dd348d38221028d4b4adffc802dbf9576a5f7e4211f1d152b32fa5c45",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -5990,13 +5990,13 @@
           ]
         }
       ],
-      "last_checked_at": "2026-11-20T01:05:55Z",
+      "last_checked_at": "2026-11-21T01:05:37Z",
       "currency": "USD",
       "unclassified_labels": [],
-      "source_sha256": "64c56a0ae0a47d2921afa53dd5d548ea8f851c429c4e7fe728098152b4ab13ff",
+      "source_sha256": "d38ecd68298d2df14531bdd47b128e1ac60d8d4e2392917d13339dad29b4ff7a",
       "fingerprint": "23af09300c1e5718fcfab3cab7dae274bf44fe3425fbfa4e4412954f6ccf6c04",
       "status": "verified",
-      "last_verified_at": "2026-11-20T01:05:55Z",
+      "last_verified_at": "2026-11-21T01:05:37Z",
       "history_baseline": {
         "at": "2026-09-24T02:13:15Z",
         "snapshot": {
@@ -10211,5 +10211,5 @@
       }
     }
   ],
-  "revision": "88b876834ac3332ad382e96f2f9c2151389573860c3ab3a5a0a201b99a0fa008"
+  "revision": "a26be0bc48068af459e4ebe8397d8c5b9289701f41eecbd4e21677ae096aa70c"
 }

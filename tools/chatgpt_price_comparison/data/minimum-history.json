@@ -2,8 +2,8 @@
   "schema": 1,
   "project_since": "2026-09-24",
   "first_observed_at": "2026-09-24T02:13:15Z",
-  "checked_at": "2026-11-20T01:05:55Z",
-  "observations": 67,
+  "checked_at": "2026-11-21T01:05:37Z",
+  "observations": 68,
   "excluded_versions": 3,
   "pending_gap": false,
   "gaps": [
@@ -1253,8 +1253,8 @@
     }
   ],
   "checkpoint": {
-    "at": "2026-11-20T01:05:55Z",
-    "revision": "88b876834ac3332ad382e96f2f9c2151389573860c3ab3a5a0a201b99a0fa008",
+    "at": "2026-11-21T01:05:37Z",
+    "revision": "a26be0bc48068af459e4ebe8397d8c5b9289701f41eecbd4e21677ae096aa70c",
     "fx": {
       "updated_at": "2026-11-20T00:02:32Z",
       "rates": {
